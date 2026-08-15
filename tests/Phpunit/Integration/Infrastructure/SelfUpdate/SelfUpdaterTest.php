@@ -23,11 +23,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAsset;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefresherInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture\FakeReleaseClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture\RecordingPricingCatalogRefresher;
 
 final class SelfUpdaterTest extends TestCase
 {
@@ -63,6 +66,43 @@ final class SelfUpdaterTest extends TestCase
 
         self::assertSame(SelfUpdateStatus::Updated, $selfUpdateResult->status);
         self::assertStringEqualsFile($this->binaryPath, $payload);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_refreshes_the_pricing_catalog_after_a_successful_update(): void
+    {
+        $payload = 'NEW-BINARY';
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(1, $recordingPricingCatalogRefresher->refreshCount);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_does_not_refresh_the_pricing_catalog_on_a_check_only_run(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', true);
+
+        self::assertSame(0, $recordingPricingCatalogRefresher->refreshCount);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_does_not_refresh_the_pricing_catalog_when_already_up_to_date(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(0, $recordingPricingCatalogRefresher->refreshCount);
     }
 
     /**
@@ -248,11 +288,11 @@ final class SelfUpdaterTest extends TestCase
         return (new GitHubBinaryAssetResolver('Linux', 'x86_64'))->resolve($version);
     }
 
-    private function selfUpdater(ReleaseClientInterface $releaseClient, ?string $binaryPath = null, ?Filesystem $filesystem = null): SelfUpdater
+    private function selfUpdater(ReleaseClientInterface $releaseClient, ?string $binaryPath = null, ?Filesystem $filesystem = null, ?PricingCatalogRefresherInterface $pricingCatalogRefresher = null): SelfUpdater
     {
         $locator = self::createStub(RunningBinaryLocatorInterface::class);
         $locator->method('path')->willReturn($binaryPath ?? $this->binaryPath);
 
-        return new SelfUpdater($releaseClient, new GitHubBinaryAssetResolver('Linux', 'x86_64'), $locator, $filesystem ?? new Filesystem());
+        return new SelfUpdater($releaseClient, new GitHubBinaryAssetResolver('Linux', 'x86_64'), $locator, $filesystem ?? new Filesystem(), $pricingCatalogRefresher ?? new NullPricingCatalogRefresher());
     }
 }

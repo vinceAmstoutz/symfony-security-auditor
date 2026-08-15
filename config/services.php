@@ -233,7 +233,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(TokenUsageRecorder::class);
 
     $defaultsConfigurator->set(ModelsDevPricingProvider::class)
-        ->args([service('logger')]);
+        ->args([service('logger'), '%kernel.cache_dir%/models-dev.json']);
     $defaultsConfigurator->alias(PricingProviderInterface::class, ModelsDevPricingProvider::class);
 
     $defaultsConfigurator->set(CostCalculator::class)

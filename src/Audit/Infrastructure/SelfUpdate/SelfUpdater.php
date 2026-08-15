@@ -40,6 +40,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         private GitHubBinaryAssetResolver $gitHubBinaryAssetResolver,
         private RunningBinaryLocatorInterface $runningBinaryLocator,
         private Filesystem $filesystem = new Filesystem(),
+        private PricingCatalogRefresherInterface $pricingCatalogRefresher = new NullPricingCatalogRefresher(),
     ) {}
 
     /**
@@ -63,6 +64,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         }
 
         $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestTag));
+        $this->pricingCatalogRefresher->refresh();
 
         return new SelfUpdateResult(SelfUpdateStatus::Updated, $currentVersion, $latestVersion);
     }

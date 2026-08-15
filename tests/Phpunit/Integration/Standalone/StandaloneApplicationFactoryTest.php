@@ -20,7 +20,10 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ModelsDevCatalogRefresher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 final class StandaloneApplicationFactoryTest extends TestCase
@@ -140,6 +143,96 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'opt-out variable empty' => [['SSA_NO_UPDATE_CHECK' => ''], false];
         yield 'opt-out variable explicitly zero' => [['SSA_NO_UPDATE_CHECK' => '0'], false];
         yield 'opt-out variable set to an arbitrary value' => [['SSA_NO_UPDATE_CHECK' => 'true'], true];
+    }
+
+    public function test_offline_only_is_false_when_no_config_file_exists(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)), $this->cacheHome, null);
+
+        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+    }
+
+    public function test_offline_only_is_false_when_the_config_file_has_no_privacy_key(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+
+        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+    }
+
+    public function test_offline_only_is_false_when_the_privacy_key_has_no_offline_only_entry(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    secret_scrubbing:\n        enabled: true\n");
+
+        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+    }
+
+    public function test_offline_only_is_true_when_the_config_file_enables_it(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline_only: true\n");
+
+        self::assertTrue(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+    }
+
+    public function test_offline_only_is_false_when_the_config_file_explicitly_disables_it(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline_only: false\n");
+
+        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+    }
+
+    public function test_offline_only_fails_closed_when_the_config_file_is_malformed(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("platform: [a, b\n");
+
+        self::assertTrue(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+    }
+
+    public function test_offline_only_fails_closed_when_the_home_directory_is_unresolvable(): void
+    {
+        self::assertTrue(StandaloneApplicationFactory::offlineOnly(new XdgConfigPathResolver(null, null, null)));
+    }
+
+    public function test_pricing_catalog_refresher_is_null_when_offline_only_is_enabled(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline_only: true\n");
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_downloads_when_offline_only_is_disabled(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_is_null_when_the_cache_directory_is_unresolvable(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    private function resolverForConfig(string $yaml): XdgConfigPathResolver
+    {
+        $this->writeConfig($yaml);
+
+        return new XdgConfigPathResolver($this->configHome, $this->cacheHome, null);
+    }
+
+    private function writeConfig(string $yaml): void
+    {
+        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $yaml);
     }
 
     public function test_it_registers_the_audit_command_as_visible(): void

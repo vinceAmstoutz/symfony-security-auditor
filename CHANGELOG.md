@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **`self-update` now refreshes the bundled pricing catalog after replacing the
+  binary**, so a long-lived install picks up newly-added models and price
+  changes without waiting for the next binary release. `SelfUpdater::run()`
+  calls a new `PricingCatalogRefresherInterface` port after
+  `replaceBinary()` succeeds; `ModelsDevCatalogRefresher`
+  (`src/Audit/Infrastructure/SelfUpdate/`) downloads
+  `models-dev.json` into the XDG cache directory, and
+  `ModelsDevPricingProvider` now reads from that same cache location by
+  default (`config/services.php` wires `%kernel.cache_dir%/models-dev.json`)
+  instead of only the version bundled at build time. The refresh is a
+  best-effort background step: a failed download or an unwritable cache
+  directory is logged as a warning, never thrown, and it is skipped entirely
+  when `privacy.offline_only` is set or the XDG config path can't be
+  resolved (`StandaloneApplicationFactory::pricingCatalogRefresher()` /
+  `offlineOnly()`).
+
+### Fixed
+
+- **A configured override catalog path that didn't exist yet silently
+  disabled pricing** instead of falling back to the bundled catalog.
+  `ModelsDevPricingProvider::loadCatalog()` used
+  `$this->catalogPath ?? $this->defaultCatalogPath()`, so a non-null but
+  missing override path short-circuited past the default entirely. The new
+  `resolveCatalogPath()` only honors the override when the file actually
+  exists, which also makes the override a genuine writable target for the
+  self-update refresh above.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged
