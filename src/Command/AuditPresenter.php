@@ -19,6 +19,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -134,6 +135,10 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                     number_format($entry['input_tokens']),
                     number_format($entry['output_tokens']),
                 );
+
+                if (AgentRole::Reviewer->value === $role) {
+                    $lines[] = '           (assumes ~20% of attacker input — a flat, pre-run heuristic; actual cost scales with real findings)';
+                }
             }
 
             $symfonyStyle->listing($lines);

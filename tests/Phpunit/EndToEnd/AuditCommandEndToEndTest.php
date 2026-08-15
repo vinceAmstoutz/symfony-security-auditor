@@ -1082,6 +1082,22 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_dry_run_caveats_the_reviewer_estimate_as_a_flat_heuristic(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('~20% of attacker input', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_warns_when_configured_model_is_unsupported(): void
     {
         $this->createProjectDir();

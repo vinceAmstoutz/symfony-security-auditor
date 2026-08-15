@@ -378,6 +378,47 @@ final class AuditPresenterTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_caveats_the_reviewer_figure_as_a_flat_heuristic(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 200, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('~20% of attacker input', $display);
+        self::assertStringContainsString('actual cost scales with real findings', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_omits_the_reviewer_caveat_when_no_reviewer_entry_is_present(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0123],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringNotContainsString('~20% of attacker input', $bufferedOutput->fetch());
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_scanned_files_lists_each_file_grouped_by_type(): void
