@@ -32,9 +32,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
  * stage.completed advances it, and pipeline.completed finishes it. The audit
  * narrative is printed as lines above the bar: audit.started (attack-surface
  * overview), attacker.finding.recorded (each finding as it is flagged),
- * attacker.chunk.completed (each chunk with its elapsed time), and
- * review.completed (the reviewer tally). Unhandled events are ignored. The
- * non-decorated counterpart is PlainProgressReporter.
+ * attacker.chunk.completed (each chunk with its elapsed time), review.skipped
+ * (acknowledges a zero-finding pass so the reviewer step doesn't read as
+ * having silently disappeared), and review.completed (the reviewer tally).
+ * Unhandled events are ignored. The non-decorated counterpart is
+ * PlainProgressReporter.
  *
  * Mutable because ProgressBar is stateful (tracks current step, format, and
  * output position).
@@ -72,6 +74,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             ProgressEvent::AttackerChunkCompleted => $this->onAttackerChunkCompleted($context),
             ProgressEvent::AttackerFindingRecorded => $this->onAttackerFindingRecorded($context),
             ProgressEvent::ReviewStarted => $this->onReviewStarted($context),
+            ProgressEvent::ReviewSkipped => $this->onReviewSkipped(),
             ProgressEvent::ReviewFindingReviewed => $this->onReviewFindingReviewed($context),
             ProgressEvent::BaselineFindingSkipped => $this->onBaselineFindingSkipped($context),
             ProgressEvent::ReviewCompleted => $this->onReviewCompleted($context),
@@ -203,6 +206,11 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         $this->reviewTotal = $findings;
         $this->reviewedCount = 0;
         $this->updateMessage(\sprintf('reviewing %d finding(s)', $findings));
+    }
+
+    private function onReviewSkipped(): void
+    {
+        $this->writeAboveBar('<fg=gray>  ⚖ no findings to review</>');
     }
 
     /** @param array<string, mixed> $context */

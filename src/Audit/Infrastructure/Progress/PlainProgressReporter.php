@@ -46,6 +46,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             ProgressEvent::AttackerChunkCompleted => $this->writeln($this->chunkDoneLine($context)),
             ProgressEvent::AttackerFindingRecorded => $this->writeln($this->findingLine($context)),
             ProgressEvent::ReviewStarted => $this->writeln($this->reviewStartLine($context)),
+            ProgressEvent::ReviewSkipped => $this->writeln('No findings to review.'),
             ProgressEvent::ReviewFindingReviewed => $this->writeln($this->reviewedLine($context)),
             ProgressEvent::BaselineFindingSkipped => $this->writeln($this->baselineSkippedLine($context)),
             ProgressEvent::ReviewCompleted => $this->writeln($this->reviewSummaryLine($context)),

@@ -1284,7 +1284,11 @@ final class AuditOrchestratorTest extends TestCase
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, [
+            'logger' => $logger,
+            'recordingProgressReporter' => $recordingProgressReporter,
+        ]);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -1295,6 +1299,7 @@ final class AuditOrchestratorTest extends TestCase
         ));
 
         self::assertCount(1, $stoppedLogs);
+        self::assertContains(['review.skipped', []], $recordingProgressReporter->events);
     }
 
     /**

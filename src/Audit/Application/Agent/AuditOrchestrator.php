@@ -91,6 +91,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             if ([] === $filtered) {
                 $this->logger->info('Attacker found no new findings, stopping');
+                $this->progressReporter->report(ProgressEvent::ReviewSkipped->value);
                 break;
             }
 

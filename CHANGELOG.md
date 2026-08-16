@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **A clean run (zero findings) no longer leaves the reviewer step looking like
+  it silently disappeared.** `ConsoleProgressReporter::onReviewStarted()` (and
+  its `PlainProgressReporter` counterpart) only ever fired when the attacker
+  recorded at least one finding, so a run with nothing to report jumped straight
+  from the last chunk to the final report with no acknowledgment that reviewing
+  had nothing to do. `AuditOrchestrator::run()` now reports a new
+  `review.skipped` progress event (`src/Audit/Domain/Model/ProgressEvent.php`)
+  when the attacker pass yields zero findings overall, which both progress
+  reporters render as a lightweight "no findings to review" line.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged

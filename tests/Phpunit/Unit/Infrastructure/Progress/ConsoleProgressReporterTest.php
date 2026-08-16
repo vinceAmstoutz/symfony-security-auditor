@@ -340,6 +340,22 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertSame('', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_acknowledges_a_review_pass_skipped_for_zero_findings(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.skipped');
+
+        self::assertStringContainsString('no findings to review', $this->bufferedOutput->fetch());
+    }
+
+    public function test_review_skipped_before_pipeline_started_is_a_no_op(): void
+    {
+        $this->consoleProgressReporter->report('review.skipped');
+
+        self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
     public function test_it_colors_a_finding_by_its_severity_in_a_decorated_terminal(): void
     {
         $bufferedOutput = new BufferedOutput(decorated: true);
