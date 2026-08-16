@@ -138,16 +138,16 @@ final readonly class StandaloneApplicationFactory
         return \sprintf('%s/vendor/autoload.php', self::resolverFromEnvironment($environment)->dataDir());
     }
 
-    public function create(): Application
+    public function create(): StandaloneApplication
     {
-        $application = new StandaloneApplication(self::APPLICATION_NAME, (new ReportPackage())->version(), (new ReportPackage(self::MODELS_DEV_PACKAGE))->version());
-        $application->addCommand($this->initCommand());
-        $application->addCommand($this->selfUpdateCommand());
-        $application->addCommand($this->doctorCommand());
-        $application->addCommand($this->lazyAuditCommand());
-        $this->registerUpdateAvailabilityNotice($application);
+        $standaloneApplication = new StandaloneApplication(self::APPLICATION_NAME, (new ReportPackage())->version(), (new ReportPackage(self::MODELS_DEV_PACKAGE))->version());
+        $standaloneApplication->addCommand($this->initCommand());
+        $standaloneApplication->addCommand($this->selfUpdateCommand());
+        $standaloneApplication->addCommand($this->doctorCommand());
+        $standaloneApplication->addCommand($this->lazyAuditCommand());
+        $this->registerUpdateAvailabilityNotice($standaloneApplication);
 
-        return $application;
+        return $standaloneApplication;
     }
 
     private static function processWorkingDirectory(): ?string
