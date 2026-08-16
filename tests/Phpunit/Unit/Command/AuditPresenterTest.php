@@ -140,16 +140,16 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->header($symfonyStyle, '/path/to/project');
 
         $display = $bufferedOutput->fetch();
-        $formatter = $bufferedOutput->getFormatter();
-        self::assertStringContainsString($this->formatted($formatter, '<fg=#e71c55>◉</>'), $display);
-        self::assertStringContainsString($this->formatted($formatter, '<fg=#242d5c;options=bold>Symfony LLM Security Auditor</>'), $display);
-        self::assertStringContainsString($this->formatted($formatter, \sprintf('<fg=#e71c55>%s</>', str_repeat('─', 70))), $display);
+        $outputFormatter = $bufferedOutput->getFormatter();
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55>◉</>'), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#242d5c;options=bold>Symfony LLM Security Auditor</>'), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, \sprintf('<fg=#e71c55>%s</>', str_repeat('─', 70))), $display);
         self::assertSame(1, substr_count($display, 'Symfony LLM Security Auditor'), 'the plain title() fallback must not also run once the banner has printed');
     }
 
-    private function formatted(OutputFormatterInterface $outputFormatterInterface, string $tag): string
+    private function formatted(OutputFormatterInterface $outputFormatter, string $tag): string
     {
-        $formatted = $outputFormatterInterface->format($tag);
+        $formatted = $outputFormatter->format($tag);
         self::assertNotNull($formatted);
 
         return $formatted;
