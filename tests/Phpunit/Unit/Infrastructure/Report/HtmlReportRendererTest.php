@@ -138,6 +138,17 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_caveats_zero_cost_when_tokens_were_spent_but_the_model_has_no_published_pricing(): void
+    {
+        $output = $this->renderer->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2')));
+
+        self::assertStringContainsString('$0.0000 (no published pricing, or a self-hosted model)', $output);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

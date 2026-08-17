@@ -52,6 +52,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{tokens}}' => $this->escape(\sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens()))),
             '{{primaryModel}}' => $this->escape('' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel()),
             '{{cost}}' => $this->escape(number_format($cost->estimatedCostUsd(), 4, '.', '')),
+            '{{costRateLabel}}' => $this->escape($cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model'),
             '{{riskLevel}}' => $this->escape($riskLevel),
             '{{riskLevelClass}}' => $this->escape(strtolower($riskLevel)),
             '{{riskScore}}' => $auditReport->riskScore(),

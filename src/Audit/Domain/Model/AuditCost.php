@@ -96,6 +96,17 @@ final readonly class AuditCost
     }
 
     /**
+     * `false` when tokens were actually spent but the total still priced out
+     * to zero — the model has no published rate in the pricing catalog, or is
+     * a free local/self-hosted model. Zero tokens (nothing tracked yet) is
+     * not treated as a pricing gap.
+     */
+    public function hasPublishedPricing(): bool
+    {
+        return 0.0 !== $this->estimatedCostUsd || 0 === $this->totalTokens();
+    }
+
+    /**
      * @return array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>
      */
     public function byRole(): array

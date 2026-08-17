@@ -22,7 +22,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `--dry-run`. All three renderers now show a `Cost` line labeled "published
   rates" — the token counts are the provider's exact figures, but the USD
   conversion comes from `symfony/models-dev`'s published pricing snapshot, which
-  can drift from a negotiated rate or an unpriced model.
+  can drift from a negotiated rate or an unpriced model. When tokens were
+  actually spent but the model has no published rate (a self-hosted or unlisted
+  model), the new `AuditCost::hasPublishedPricing()` flips the label to "no
+  published pricing, or a self-hosted model" instead of showing `$0.0000` as if
+  it were a genuinely free run — the same caveat `--dry-run` already gives via
+  `AuditPresenter::unsupportedModelWarnings()`.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

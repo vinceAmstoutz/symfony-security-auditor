@@ -45,6 +45,33 @@ final class AuditCostTest extends TestCase
     /**
      * @throws InvalidAuditCostException
      */
+    public function test_has_published_pricing_is_true_when_cost_is_nonzero(): void
+    {
+        $auditCost = AuditCost::of(100, 50, 0.05, 'claude-opus-4-7');
+
+        self::assertTrue($auditCost->hasPublishedPricing());
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_is_false_when_tokens_were_spent_but_cost_is_zero(): void
+    {
+        $auditCost = AuditCost::of(100, 50, 0.0, 'ollama/llama3.2');
+
+        self::assertFalse($auditCost->hasPublishedPricing());
+    }
+
+    public function test_has_published_pricing_is_true_when_no_tokens_were_tracked_yet(): void
+    {
+        $auditCost = AuditCost::zero('');
+
+        self::assertTrue($auditCost->hasPublishedPricing());
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_cost_is_rounded_to_six_decimal_places(): void
     {
         $auditCost = AuditCost::of(0, 0, 0.0000005, 'm');

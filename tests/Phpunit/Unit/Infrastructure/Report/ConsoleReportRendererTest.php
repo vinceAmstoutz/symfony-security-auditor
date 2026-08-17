@@ -569,6 +569,18 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditCostException
      * @throws InvalidAuditContextException
      */
+    public function test_render_caveats_zero_cost_when_tokens_were_spent_but_the_model_has_no_published_pricing(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2'));
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString('$0.0000 (no published pricing, or a self-hosted model)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_substitutes_actual_model_name_when_primary_model_is_set(): void
     {
         $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.05, 'claude-opus-4-7'));
