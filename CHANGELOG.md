@@ -17,10 +17,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   its `PlainProgressReporter` counterpart) only ever fired when the attacker
   recorded at least one finding, so a run with nothing to report jumped straight
   from the last chunk to the final report with no acknowledgment that reviewing
-  had nothing to do. `AuditOrchestrator::run()` now reports a new
-  `review.skipped` progress event (`src/Audit/Domain/Model/ProgressEvent.php`)
-  when the attacker pass yields zero findings overall, which both progress
-  reporters render as a lightweight "no findings to review" line.
+  had nothing to do. `AuditOrchestrator` now reports a new `review.skipped`
+  progress event (`src/Audit/Domain/Model/ProgressEvent.php`) from all three
+  places it can skip the reviewer pass — the attacker finding nothing, every
+  remaining finding already being baseline-accepted, and the mid-run abort
+  recovery path finding nothing left to review — which both progress reporters
+  render as a lightweight "no new findings this pass" line. The earlier wording
+  ("no findings to review") read as though the whole audit came up empty even on
+  iteration 2+, after findings had already streamed past.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

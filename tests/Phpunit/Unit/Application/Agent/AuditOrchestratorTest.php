@@ -612,6 +612,32 @@ final class AuditOrchestratorTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
+    public function test_it_reports_review_skipped_when_every_finding_is_baseline_accepted(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload()]),
+        );
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, [
+            'recordingProgressReporter' => $recordingProgressReporter,
+        ]);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertContains(['review.skipped', []], $recordingProgressReporter->events);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_skips_a_baselined_finding_that_follows_a_non_baselined_one(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -2044,6 +2070,36 @@ final class AuditOrchestratorTest extends TestCase
                 static fn (array $event): bool => 'review.started' === $event[0],
             )),
         );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     */
+    public function test_it_reports_review_skipped_when_no_candidate_survives_an_attacker_abort(): void
+    {
+        $recordingAttackerAgent = new RecordingAttackerAgent([], BudgetExceededException::forTokens(500, 100), []);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), $recordingProgressReporter);
+        $auditContext = $this->makeContextWithMapping();
+
+        $budgetExceeded = false;
+        try {
+            $auditOrchestrator->orchestrate($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow the attacker BudgetExceededException.');
+        self::assertContains(['review.skipped', []], $recordingProgressReporter->events);
     }
 
     /**

@@ -210,7 +210,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
 
     private function onReviewSkipped(): void
     {
-        $this->writeAboveBar('<fg=gray>  ⚖ no findings to review</>');
+        $this->writeAboveBar('<fg=gray>  ⚖ no new findings this pass</>');
     }
 
     /** @param array<string, mixed> $context */

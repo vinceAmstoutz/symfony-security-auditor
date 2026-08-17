@@ -346,7 +346,7 @@ final class ConsoleProgressReporterTest extends TestCase
         $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
         $this->consoleProgressReporter->report('review.skipped');
 
-        self::assertStringContainsString('no findings to review', $this->bufferedOutput->fetch());
+        self::assertStringContainsString('no new findings this pass', $this->bufferedOutput->fetch());
     }
 
     public function test_review_skipped_before_pipeline_started_is_a_no_op(): void

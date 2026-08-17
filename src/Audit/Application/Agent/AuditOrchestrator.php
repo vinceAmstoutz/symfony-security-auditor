@@ -99,6 +99,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             if ([] === $reviewCandidates) {
                 $this->logger->info('Every remaining finding is baseline-accepted, stopping');
+                $this->progressReporter->report(ProgressEvent::ReviewSkipped->value);
                 break;
             }
 
@@ -225,6 +226,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $filtered = $this->withoutBaselineAccepted($this->filterByConfidence($rawFindings), $auditContext);
 
         if ([] === $filtered) {
+            $this->progressReporter->report(ProgressEvent::ReviewSkipped->value);
+
             return;
         }
 

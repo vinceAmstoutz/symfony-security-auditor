@@ -171,7 +171,7 @@ final class PlainProgressReporterTest extends TestCase
     {
         $this->plainProgressReporter->report('review.skipped');
 
-        self::assertSame("No findings to review.\n", $this->bufferedOutput->fetch());
+        self::assertSame("No new findings this pass.\n", $this->bufferedOutput->fetch());
     }
 
     public function test_it_ignores_pipeline_and_stage_events(): void
