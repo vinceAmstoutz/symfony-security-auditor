@@ -17,10 +17,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `AuditPresenter::dryRunResult()` (`src/Command/AuditPresenter.php`) used
   `SymfonyStyle::success()` for the files-in-scope count and the
   dry-run-complete message, so `--show-scanned --dry-run` printed two `[OK]`
-  boxes and a `[NOTE]` block within a few lines. Both now print a single light
-  `✅` line, matching the style the console report already uses for its own
-  success line — the boxed block is reserved for a command's true final
-  pass/fail outcome (`AuditPresenter::result()`).
+  boxes and a `[NOTE]` block within a few lines. Both now go through a shared
+  `lightConfirmation()` helper printing a single light line, matching the style
+  the console report already uses for its own success line — the boxed block is
+  reserved for a command's true final pass/fail outcome
+  (`AuditPresenter::result()`). The `✅` marker is gated on `isDecorated()`, so
+  a redirected or CI log gets the plain text without it, matching the pattern
+  the branded identity banner already uses; and the line keeps the trailing
+  blank line `success()` used to add, so it doesn't abut whatever prints next.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

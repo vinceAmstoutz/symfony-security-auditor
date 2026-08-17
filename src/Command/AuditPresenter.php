@@ -140,7 +140,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
-        $symfonyStyle->writeln('  ✅ Dry run complete.');
+        $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
     }
 
     #[Override]
@@ -159,7 +159,20 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $symfonyStyle->listing(array_map($this->sanitizePathForListing(...), $relativePaths));
         }
 
-        $symfonyStyle->writeln(\sprintf('  ✅ %d file(s) in scope.', \count($projectFiles)));
+        $this->lightConfirmation($symfonyStyle, \sprintf('%d file(s) in scope.', \count($projectFiles)));
+    }
+
+    /**
+     * A lighter-weight replacement for `SymfonyStyle::success()` on
+     * intermediate confirmations — no boxed `[OK]` block, just a short line —
+     * but keeping its leading marker (gated on `isDecorated()`, since a
+     * redirected/CI log has no use for an emoji) and its trailing blank line,
+     * so it doesn't abut whatever prints next.
+     */
+    private function lightConfirmation(SymfonyStyle $symfonyStyle, string $message): void
+    {
+        $symfonyStyle->writeln(\sprintf($symfonyStyle->isDecorated() ? '  ✅ %s' : '  %s', $message));
+        $symfonyStyle->newLine();
     }
 
     #[Override]
