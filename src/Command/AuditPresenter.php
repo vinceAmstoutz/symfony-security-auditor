@@ -201,12 +201,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     /**
-     * `ProjectFileType::PHP`/`::OTHER` are the fallback buckets a file lands
-     * in only when nothing more specific matched, so — unlike `controller`,
-     * `voter`, etc. — they read as "every PHP file" if they appear as just
-     * another sibling in scan order. Moving them after every specific
-     * archetype marks them as the leftovers they are.
-     *
      * @param array<string, list<string>> $byType
      *
      * @return array<string, list<string>>
@@ -226,7 +220,11 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
     private function bucketLabel(string $type): string
     {
-        return ProjectFileType::PHP->value === $type ? 'php · uncategorized' : $type;
+        return match ($type) {
+            ProjectFileType::PHP->value => 'php · uncategorized',
+            ProjectFileType::OTHER->value => 'other · uncategorized',
+            default => $type,
+        };
     }
 
     #[Override]

@@ -418,6 +418,22 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_scanned_files_labels_the_generic_other_bucket_as_uncategorized(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('README.md', '/p/README.md', '# readme'),
+        ]);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('other · uncategorized (1)', $flattened);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_scanned_files_renders_the_uncategorized_php_and_other_buckets_last(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -432,7 +448,7 @@ final class AuditPresenterTest extends TestCase
         $flattened = $bufferedOutput->fetch();
         $controllerPosition = mb_strpos($flattened, 'controller (1)');
         $phpPosition = mb_strpos($flattened, 'php · uncategorized (1)');
-        $otherPosition = mb_strpos($flattened, 'other (1)');
+        $otherPosition = mb_strpos($flattened, 'other · uncategorized (1)');
 
         self::assertIsInt($controllerPosition);
         self::assertIsInt($phpPosition);
