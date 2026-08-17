@@ -142,8 +142,8 @@ final class AuditPresenterTest extends TestCase
         $display = $bufferedOutput->fetch();
         $outputFormatter = $bufferedOutput->getFormatter();
         self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55>◉</>'), $display);
-        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#242d5c;options=bold>Symfony LLM Security Auditor</>'), $display);
-        self::assertStringContainsString($this->formatted($outputFormatter, \sprintf('<fg=#e71c55>%s</>', str_repeat('─', 70))), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>Symfony LLM Security Auditor</>'), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, \sprintf('<fg=#e71c55>%s</>', str_repeat('─', \strlen('Symfony LLM Security Auditor')))), $display);
         self::assertSame(1, substr_count($display, 'Symfony LLM Security Auditor'), 'the plain title() fallback must not also run once the banner has printed');
     }
 

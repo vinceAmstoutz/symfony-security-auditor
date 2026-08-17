@@ -17,9 +17,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   to print `$symfonyStyle->title('Symfony LLM Security Auditor')` — a plain line
   with no visual identity. On a decorated (color-capable) terminal it now prints
   a small banner combining a circular glyph with the wordmark, colored with the
-  pink/navy palette sampled from `assets/banner.webp` (`#e71c55`/`#242d5c`).
+  pink/navy palette sampled from `assets/banner.webp` (`#e71c55`/`#5b6fd6`) and
+  underlined to the wordmark's own width rather than a fixed column count.
   Non-decorated output (CI, redirected output, `NO_COLOR`) keeps the original
-  plain title line.
+  plain title line. The navy is brightened from the `#242d5c` sampled off the
+  banner image — that value sits on the image's light background, but as
+  terminal foreground text it degrades toward black on a 16-colour palette and
+  disappears on the dark background most terminals default to.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

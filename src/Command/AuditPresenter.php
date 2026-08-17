@@ -33,8 +33,13 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     /** Sampled from the circular bug glyph in `assets/banner.webp`. */
     private const string BANNER_PINK = '#e71c55';
 
-    /** Sampled from the wordmark in `assets/banner.webp`. */
-    private const string BANNER_NAVY = '#242d5c';
+    /**
+     * Brightened from the wordmark's `#242d5c` in `assets/banner.webp` — that
+     * navy sits on the banner image's light background, but as terminal
+     * foreground text it degrades toward black on a 16-colour palette and
+     * disappears on the dark background most terminals default to.
+     */
+    private const string BANNER_NAVY = '#5b6fd6';
 
     public function __construct(private PricingProviderInterface $pricingProvider) {}
 
@@ -65,7 +70,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         $symfonyStyle->writeln([
             \sprintf('<fg=%s>◉</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_NAVY, self::WORDMARK),
-            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', 70)),
+            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', \strlen(self::WORDMARK))),
             '',
         ]);
     }
