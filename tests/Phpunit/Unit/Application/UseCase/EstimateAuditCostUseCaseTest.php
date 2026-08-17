@@ -576,6 +576,46 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     }
 
     /**
+     * A real run renders a chunk's skill block from only that chunk's own
+     * file types (`AttackerPromptBuilder::skillsForFiles()`), not the whole
+     * project's type union. Two chunks with different types therefore get
+     * differently-sized skill text — a renderer stubbed to return the same
+     * text for every call would hide a regression that flattens this back
+     * into "render once, multiply by chunk count".
+     *
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_skill_prompt_overhead_reflects_each_chunks_own_file_types(): void
+    {
+        $attackerSkillPromptRenderer = self::createStub(AttackerSkillPromptRendererInterface::class);
+        $attackerSkillPromptRenderer->method('render')->willReturnCallback(
+            static fn (array $presentTypes): string => [ProjectFileType::CONTROLLER] === $presentTypes ? 'CONTROLLERSKILL' : 'E',
+        );
+
+        // File-content sum = 3 + 3 = 6. Chunking by type with a chunk size of 1 puts the
+        // controller and the entity in separate chunks: 15 ('CONTROLLERSKILL') + 1 ('E') = 16.
+        // Total = 6 + 16 = 22. Flattening this back to "render once from the whole project's
+        // types, times chunk count" would instead charge 1 ('E', since the combined type list
+        // no longer matches the controller-only branch) * 2 chunks = 2, for a total of 8.
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
+                $this->makeProjectFile('src/Controller/FooController.php', 'aaa'),
+                $this->makeProjectFile('src/Entity/Bar.php', 'bbb'),
+            ],
+            'tokenEstimator' => $this->lengthEchoingEstimator(),
+            'fileChunker' => new FileChunker(ChunkingStrategy::Type, chunkSize: 1),
+            'attackerSkillPromptRenderer' => $attackerSkillPromptRenderer,
+            'maxIterations' => 1,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(22, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+    }
+
+    /**
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException

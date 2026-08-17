@@ -102,8 +102,7 @@ final readonly class EstimateAuditCostUseCase
             $attackerPerRoundInput += $this->tokenEstimator->estimateTokens($file->content(), $this->primaryModel);
         }
 
-        $chunkCount = \count($this->fileChunker->chunk($files));
-        $attackerPerRoundInput += $this->skillPromptTokens($files) * $chunkCount;
+        $attackerPerRoundInput += $this->skillPromptTokensAcrossChunks($files);
 
         $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
         $attackerOutputTokens = (int) ceil($attackerInputTokens * $this->outputRatio);
@@ -145,6 +144,26 @@ final readonly class EstimateAuditCostUseCase
         ]);
 
         return AuditReport::fromContext($auditContext, $auditCost);
+    }
+
+    /**
+     * The real run renders the skill block per chunk, filtered to that
+     * chunk's own file types (`AttackerPromptBuilder::skillsForFiles()`).
+     * Summing a per-chunk render here, instead of rendering once from the
+     * whole project's type union and multiplying by the chunk count, keeps
+     * the estimate accurate when `stable_system_prompt` is `false` and each
+     * chunk pulls in a smaller skill subset than the project as a whole.
+     *
+     * @param list<ProjectFile> $files
+     */
+    private function skillPromptTokensAcrossChunks(array $files): int
+    {
+        $total = 0;
+        foreach ($this->fileChunker->chunk($files) as $chunkFiles) {
+            $total += $this->skillPromptTokens($chunkFiles);
+        }
+
+        return $total;
     }
 
     /**

@@ -428,6 +428,16 @@ in `config/services.yaml` to override the bundled behaviour (see
   to persist rejections somewhere other than the local filesystem — a shared
   cache reachable by every CI runner, for example — so the cross-run memory
   survives across ephemeral containers.
+- `AttackerSkillPromptRendererInterface` —
+  `render(array $presentTypes, bool $emitAll): string` builds the attacker's
+  skill-block text for a set of `ProjectFileType`s (default:
+  `AttackerSkillRegistry`, the same registry the real attack loop renders from).
+  `--dry-run`'s cost estimate calls it once per chunk to size the skill-prompt
+  overhead accurately, mirroring how `stable_system_prompt` changes what a real
+  run actually sends. `$emitAll` bypasses the `$presentTypes` filter and renders
+  every registered skill — the shape `stable_system_prompt: true` needs, since
+  it holds the system prompt fixed across chunks to keep provider prompt caching
+  effective.
 
 ## 5. Schema-Enforced Collection (`audit.structured_collection`)
 

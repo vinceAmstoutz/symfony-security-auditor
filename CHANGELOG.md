@@ -18,12 +18,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the attacker send every built-in skill block — currently 25 of them, ~66KB of
   prompt — on every chunk regardless of relevance, and none of that reached the
   estimate. `EstimateAuditCostUseCase::execute()` now chunks the scanned files
-  the same way a real run does (via `FileChunker`), renders the skill prompt for
-  the resolved `stable_system_prompt` setting through the new
-  `AttackerSkillPromptRendererInterface` port (implemented by
-  `AttackerSkillRegistry`), estimates its tokens once, and adds
-  `skillPromptTokens * chunkCount` to the attacker's per-round input before
-  scaling by `max_iterations`.
+  the same way a real run does (via `FileChunker`) and, for each chunk, renders
+  its own skill prompt through the new `AttackerSkillPromptRendererInterface`
+  port (implemented by `AttackerSkillRegistry`) and estimates its tokens, adding
+  the sum to the attacker's per-round input before scaling by `max_iterations`.
+  Rendering per chunk — rather than once from the whole project's file-type
+  union and multiplying by the chunk count — keeps the estimate accurate when
+  `stable_system_prompt` is `false`: each chunk then only pulls in the skills
+  matching its own files, the same filtering
+  `AttackerPromptBuilder::skillsForFiles()` applies on a real run.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
