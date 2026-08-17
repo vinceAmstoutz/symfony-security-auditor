@@ -1092,7 +1092,8 @@ final class AuditCommandEndToEndTest extends TestCase
             '--dry-run' => true,
         ]);
 
-        self::assertStringContainsString('~20% of attacker input', $commandTester->getDisplay());
+        self::assertStringContainsString('Reviewer input assumes ~', $commandTester->getDisplay());
+        self::assertStringContainsString('% of attacker input', $commandTester->getDisplay());
     }
 
     /**

@@ -14,13 +14,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 - **`--dry-run` now caveats the reviewer figure as a flat, pre-run heuristic.**
   `EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO` derives the reviewer
-  estimate as ~20% of attacker input alone — there are no findings yet for a dry
-  run to count, so it can't reflect a project's real vulnerability density or
-  the code context each finding pulls in. `AuditPresenter::dryRunResult()` now
-  prints a note under the reviewer line in the cost breakdown stating the
-  estimate assumes ~20% of attacker input and that actual cost scales with real
-  findings, so it reads as a rough floor rather than a peer to the attacker
-  figure.
+  estimate as a fixed fraction of attacker input alone — there are no findings
+  yet for a dry run to count, so it can't reflect a project's real vulnerability
+  density or the code context each finding pulls in.
+  `AuditPresenter::dryRunResult()` now prints a note stating the actual ratio
+  and that actual cost scales with real findings, so it reads as a rough floor
+  rather than a peer to the attacker figure. The percentage is derived from the
+  reviewer/attacker token counts in the cost breakdown itself
+  (`AuditPresenter::reviewerRatioPercent()`) rather than restated as a fixed
+  string, so it stays correct if the ratio the use case was constructed with
+  ever differs from the default. The note also moved out of the
+  `SymfonyStyle::listing()` block it previously shared with the cost breakdown —
+  every `listing()` element gets its own bullet and no word-wrap, so a caveat
+  that size picked up a stray leading bullet and wrapped ragged on narrower
+  terminals; it now prints as its own properly-wrapped line.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

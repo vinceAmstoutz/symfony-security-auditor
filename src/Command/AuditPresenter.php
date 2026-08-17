@@ -135,17 +135,43 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                     number_format($entry['input_tokens']),
                     number_format($entry['output_tokens']),
                 );
-
-                if (AgentRole::Reviewer->value === $role) {
-                    $lines[] = '           (assumes ~20% of attacker input — a flat, pre-run heuristic; actual cost scales with real findings)';
-                }
             }
 
             $symfonyStyle->listing($lines);
+
+            $reviewerRatioPercent = $this->reviewerRatioPercent($cost);
+            if (null !== $reviewerRatioPercent) {
+                $symfonyStyle->text(\sprintf(
+                    '<fg=gray>Reviewer input assumes ~%d%% of attacker input — a flat, pre-run heuristic; actual cost scales with real findings.</>',
+                    $reviewerRatioPercent,
+                ));
+            }
         }
 
         $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
         $symfonyStyle->success('Dry run complete.');
+    }
+
+    /**
+     * Derived from the cost breakdown itself rather than restating
+     * `EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO` as a fixed
+     * string — a caller constructing the use case with a different ratio, or
+     * a future change to the default, would otherwise silently drift from
+     * this caveat.
+     */
+    private function reviewerRatioPercent(AuditCost $auditCost): ?int
+    {
+        $byRole = $auditCost->byRole();
+        if (!\array_key_exists(AgentRole::Reviewer->value, $byRole)) {
+            return null;
+        }
+
+        $attackerInputTokens = $byRole[AgentRole::Attacker->value]['input_tokens'] ?? 0;
+        if (0 === $attackerInputTokens) {
+            return 0;
+        }
+
+        return (int) round($byRole[AgentRole::Reviewer->value]['input_tokens'] / $attackerInputTokens * 100);
     }
 
     #[Override]

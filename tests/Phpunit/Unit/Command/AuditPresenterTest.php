@@ -381,7 +381,7 @@ final class AuditPresenterTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
-    public function test_dry_run_result_caveats_the_reviewer_figure_as_a_flat_heuristic(): void
+    public function test_dry_run_result_caveats_the_reviewer_figure_with_the_ratio_derived_from_the_breakdown(): void
     {
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
@@ -395,8 +395,68 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
         $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('~20% of attacker input', $display);
+        self::assertStringContainsString('~25% of attacker input', $display, 'the ratio (200/800) must be derived from the breakdown, not the hardcoded 20% default');
         self::assertStringContainsString('actual cost scales with real findings', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_caveats_a_different_ratio_when_the_breakdown_differs(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 1000, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 100, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~10% of attacker input', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_rounds_the_reviewer_ratio_up_when_the_fraction_is_at_least_half(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 8, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 3, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~38% of attacker input', $bufferedOutput->fetch(), '3/8 = 37.5% rounds up to 38%, not down to 37%');
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_rounds_the_reviewer_ratio_down_when_the_fraction_is_below_half(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 11, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 3, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~27% of attacker input', $bufferedOutput->fetch(), '3/11 = 27.27% rounds down to 27%, not up to 28%');
     }
 
     /**
@@ -415,7 +475,46 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringNotContainsString('~20% of attacker input', $bufferedOutput->fetch());
+        self::assertStringNotContainsString('Reviewer input assumes', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_caveats_zero_percent_when_the_attacker_took_no_input_tokens(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(0, 0, 0.0, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 0, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 0, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~0% of attacker input', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_caveats_zero_percent_when_the_breakdown_has_no_attacker_entry(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 200, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~0% of attacker input', $bufferedOutput->fetch());
     }
 
     /**
