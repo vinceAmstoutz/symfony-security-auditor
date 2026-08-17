@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `audit.fix_synthesis.enabled`) whenever `--dry-run` runs with one on,
   mirroring the existing unpriced-model warning precedent. The `thorough`
   profile turns PoC synthesis on by default, making it the case most likely to
-  hit this gap.
+  hit this gap. When both stages are enabled together, a single warning names
+  both instead of printing two near-identical full-width blocks back to back.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

@@ -554,16 +554,19 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('PoC synthesis', $display);
     }
 
-    public function test_synthesis_cost_warning_names_both_stages_when_both_enabled(): void
+    public function test_synthesis_cost_warning_combines_both_stages_into_a_single_block_when_both_enabled(): void
     {
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: true, fixSynthesisEnabled: true);
 
-        $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('PoC synthesis', $display);
-        self::assertStringContainsString('Fix synthesis', $display);
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('PoC synthesis', $flattened);
+        self::assertStringContainsString('audit.poc_synthesis.enabled', $flattened);
+        self::assertStringContainsString('fix synthesis', $flattened);
+        self::assertStringContainsString('audit.fix_synthesis.enabled', $flattened);
+        self::assertSame(1, substr_count($flattened, '[WARNING]'), 'both stages must share a single warning block, not one apiece');
     }
 
     public function test_synthesis_cost_warning_is_silent_when_neither_stage_is_enabled(): void
