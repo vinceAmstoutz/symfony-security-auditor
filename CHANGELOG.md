@@ -20,10 +20,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   downloads `models-dev.json` into the XDG cache directory, and
   `ModelsDevPricingProvider` now reads from that same cache location by default
   (`config/services.php` wires `%kernel.cache_dir%/models-dev.json`) instead of
-  only the version bundled at build time. The refresh is a best-effort
-  background step: a failed download or an unwritable cache directory is logged
-  as a warning, never thrown, and it is skipped entirely when
-  `privacy.offline_only` is set or the XDG config path can't be resolved
+  only the version bundled at build time. The download lands in a temp file and
+  is only moved into place once it has been confirmed to decode as a JSON
+  object, so a truncated transfer or a dropped connection can never leave a
+  corrupt catalog behind — the previous good file (or the one frozen into the
+  binary) stays in place. The refresh is a best-effort background step: a failed
+  download or an unwritable cache directory is logged as a warning, never
+  thrown, and it is skipped entirely when `privacy.offline_only` is set or the
+  XDG config path can't be resolved
   (`StandaloneApplicationFactory::pricingCatalogRefresher()` / `offlineOnly()`).
 
 ### Fixed

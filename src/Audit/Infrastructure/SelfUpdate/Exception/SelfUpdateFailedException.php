@@ -53,4 +53,9 @@ final class SelfUpdateFailedException extends RuntimeException
     {
         return new self(\sprintf('Failed to replace the binary at "%s": %s', $binaryPath, $throwable->getMessage()), previous: $throwable);
     }
+
+    public static function forInvalidCatalogDownload(string $url): self
+    {
+        return new self(\sprintf('The catalog downloaded from "%s" is not valid JSON; the download was discarded.', $url));
+    }
 }

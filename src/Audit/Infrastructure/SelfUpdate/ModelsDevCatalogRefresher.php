@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 
+use JsonException;
 use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
@@ -25,6 +26,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * back to the catalog frozen into the binary at build time. The only route a
  * standalone install otherwise has to a fresher catalog is a whole new
  * tagged release.
+ *
+ * The download lands in a temp file first and is only moved into place once
+ * it has been confirmed to decode as JSON, so a truncated or corrupt
+ * transfer can never overwrite a working catalog.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -44,15 +49,46 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
     #[Override]
     public function refresh(): void
     {
-        $destination = \sprintf('%s/%s', $this->cacheDir, self::CATALOG_FILENAME);
-
         try {
             $this->filesystem->mkdir($this->cacheDir);
-            $this->releaseClient->download(self::CATALOG_URL, $destination);
+            $downloadPath = $this->filesystem->tempnam($this->cacheDir, \sprintf('.%s.', self::CATALOG_FILENAME), '.download');
+        } catch (IOExceptionInterface $ioException) {
+            $this->logger->warning('Could not refresh the bundled pricing catalog', [
+                'exception' => $ioException->getMessage(),
+            ]);
+
+            return;
+        }
+
+        try {
+            $this->releaseClient->download(self::CATALOG_URL, $downloadPath);
+            $this->assertValidCatalog($downloadPath);
+            $this->filesystem->rename($downloadPath, \sprintf('%s/%s', $this->cacheDir, self::CATALOG_FILENAME), true);
         } catch (SelfUpdateFailedException|IOExceptionInterface $exception) {
+            $this->filesystem->remove($downloadPath);
+
             $this->logger->warning('Could not refresh the bundled pricing catalog', [
                 'exception' => $exception->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    private function assertValidCatalog(string $downloadPath): void
+    {
+        $contents = file_get_contents($downloadPath);
+        \assert(false !== $contents);
+
+        try {
+            $decoded = json_decode($contents, true, flags: \JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw SelfUpdateFailedException::forInvalidCatalogDownload(self::CATALOG_URL);
+        }
+
+        if (!\is_array($decoded)) {
+            throw SelfUpdateFailedException::forInvalidCatalogDownload(self::CATALOG_URL);
         }
     }
 }

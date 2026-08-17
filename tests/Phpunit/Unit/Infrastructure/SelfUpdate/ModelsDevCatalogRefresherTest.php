@@ -52,12 +52,71 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         $releaseClient = self::createMock(ReleaseClientInterface::class);
         $releaseClient->expects(self::once())
             ->method('download')
-            ->with('https://raw.githubusercontent.com/symfony/models-dev/main/models-dev.json', $this->cacheDir.'/models-dev.json')
+            ->with(
+                'https://raw.githubusercontent.com/symfony/models-dev/main/models-dev.json',
+                self::callback(fn (string $destination): bool => str_starts_with($destination, $this->cacheDir.'/') && $destination !== $this->cacheDir.'/models-dev.json'),
+            )
             ->willReturnCallback(static function (string $url, string $destination): void {
                 (new Filesystem())->dumpFile($destination, '{}');
             });
 
         (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, self::createStub(LoggerInterface::class)))->refresh();
+
+        self::assertFileExists($this->cacheDir.'/models-dev.json');
+    }
+
+    public function test_it_never_overwrites_an_existing_catalog_with_an_invalid_download(): void
+    {
+        (new Filesystem())->dumpFile($this->cacheDir.'/models-dev.json', '{"anthropic":{}}');
+
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Could not refresh the bundled pricing catalog',
+            self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
+        );
+
+        (new ModelsDevCatalogRefresher($this->releaseClientWriting('this is not json'), $this->cacheDir, $logger))->refresh();
+
+        self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', '{"anthropic":{}}');
+        self::assertSame(['models-dev.json'], $this->filesInCacheDir());
+    }
+
+    public function test_it_never_installs_a_download_that_decodes_to_a_non_array_value(): void
+    {
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Could not refresh the bundled pricing catalog',
+            self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
+        );
+
+        (new ModelsDevCatalogRefresher($this->releaseClientWriting('"just a string"'), $this->cacheDir, $logger))->refresh();
+
+        self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
+    }
+
+    public function test_it_replaces_an_existing_catalog_with_a_valid_download(): void
+    {
+        (new Filesystem())->dumpFile($this->cacheDir.'/models-dev.json', '{"stale":{}}');
+
+        (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"fresh":{}}'), $this->cacheDir, self::createStub(LoggerInterface::class)))->refresh();
+
+        self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', '{"fresh":{}}');
+    }
+
+    public function test_it_logs_and_does_not_throw_when_installing_the_download_fails(): void
+    {
+        (new Filesystem())->mkdir($this->cacheDir.'/models-dev.json');
+
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Could not refresh the bundled pricing catalog',
+            self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
+        );
+
+        (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{}}'), $this->cacheDir, $logger))->refresh();
+
+        self::assertDirectoryExists($this->cacheDir.'/models-dev.json');
+        self::assertSame(['models-dev.json'], $this->filesInCacheDir());
     }
 
     public function test_it_creates_the_cache_directory_when_missing(): void
@@ -83,6 +142,7 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, $logger))->refresh();
 
         self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
+        self::assertSame([], $this->filesInCacheDir());
     }
 
     public function test_it_logs_and_does_not_throw_when_the_cache_directory_cannot_be_created(): void
@@ -108,5 +168,16 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         );
 
         return $releaseClient;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function filesInCacheDir(): array
+    {
+        $entries = scandir($this->cacheDir);
+        self::assertNotFalse($entries);
+
+        return array_values(array_diff($entries, ['.', '..']));
     }
 }

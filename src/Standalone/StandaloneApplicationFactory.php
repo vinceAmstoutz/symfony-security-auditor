@@ -199,9 +199,11 @@ final readonly class StandaloneApplicationFactory
     /**
      * `self-update` must keep working before "init" has ever run, so this
      * never routes through `StandaloneConfigLoader::load()` — it would throw
-     * `MissingPlatformException` on a fresh install. Any config problem (an
-     * unresolvable home directory, malformed YAML) fails closed to skipping
-     * the refresh, same as `privacy.offline_only` being enabled on purpose.
+     * `MissingPlatformException` on a fresh install. A config file that is
+     * present but broken (an unresolvable home directory, malformed YAML)
+     * fails closed to skipping the refresh, same as `privacy.offline_only`
+     * being enabled on purpose. A fresh install with no config file yet has
+     * nothing to fail closed on, so it defaults to online.
      */
     public static function pricingCatalogRefresher(XdgConfigPathResolver $xdgConfigPathResolver): PricingCatalogRefresherInterface
     {
