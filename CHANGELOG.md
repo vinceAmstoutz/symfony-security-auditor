@@ -23,7 +23,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `StandaloneApplication` (`src/Standalone/StandaloneApplication.php`)
   overriding `getLongVersion()` — the bare
   `Symfony\Component\Console\Application` used by `StandaloneApplicationFactory`
-  had no other extension point for this.
+  had no other extension point for this. The `'symfony/models-dev'` package name
+  now lives in one place, `ModelsDevPricingProvider::CATALOG_PACKAGE` (made
+  `public`); `EnvironmentDoctor` and `StandaloneApplicationFactory` reference it
+  instead of each restating their own copy of the string.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

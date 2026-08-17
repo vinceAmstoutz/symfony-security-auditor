@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\P
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 
 use function Symfony\Component\String\b;
@@ -42,14 +43,12 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
 {
     private const string BRIDGE_AUTOLOAD_RELATIVE_PATH = 'vendor/autoload.php';
 
-    private const string MODELS_DEV_PACKAGE = 'symfony/models-dev';
-
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private ComposerAvailabilityCheckerInterface $composerAvailabilityChecker,
         private AuditPreflightInterface $auditPreflight,
-        private string $pricingCatalogPackage = self::MODELS_DEV_PACKAGE,
+        private string $pricingCatalogPackage = ModelsDevPricingProvider::CATALOG_PACKAGE,
     ) {}
 
     /**

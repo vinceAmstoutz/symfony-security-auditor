@@ -29,7 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProv
  */
 final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterface
 {
-    private const string CATALOG_PACKAGE = 'symfony/models-dev';
+    public const string CATALOG_PACKAGE = 'symfony/models-dev';
 
     private const string CATALOG_FILENAME = 'models-dev.json';
 

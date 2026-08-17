@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\FilesystemUpdateCheckStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
@@ -60,8 +61,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditC
 final readonly class StandaloneApplicationFactory
 {
     private const string APPLICATION_NAME = 'symfony-security-auditor';
-
-    private const string MODELS_DEV_PACKAGE = 'symfony/models-dev';
 
     private const string PROJECT_CONFIG_FILENAME = '.symfony-security-auditor.yaml';
 
@@ -140,7 +139,7 @@ final readonly class StandaloneApplicationFactory
 
     public function create(): StandaloneApplication
     {
-        $standaloneApplication = new StandaloneApplication(self::APPLICATION_NAME, (new ReportPackage())->version(), (new ReportPackage(self::MODELS_DEV_PACKAGE))->version());
+        $standaloneApplication = new StandaloneApplication(self::APPLICATION_NAME, (new ReportPackage())->version(), (new ReportPackage(ModelsDevPricingProvider::CATALOG_PACKAGE))->version());
         $standaloneApplication->addCommand($this->initCommand());
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
