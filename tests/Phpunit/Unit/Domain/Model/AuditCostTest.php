@@ -72,6 +72,32 @@ final class AuditCostTest extends TestCase
     /**
      * @throws InvalidAuditCostException
      */
+    public function test_has_published_pricing_is_false_when_one_split_role_prices_at_zero(): void
+    {
+        $auditCost = AuditCost::of(150, 75, 0.05, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 100, 'output_tokens' => 50, 'estimated_cost_usd' => 0.05],
+            'reviewer' => ['model' => 'ollama/llama3.2', 'input_tokens' => 50, 'output_tokens' => 25, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        self::assertFalse($auditCost->hasPublishedPricing());
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_is_true_when_every_split_role_prices_above_zero(): void
+    {
+        $auditCost = AuditCost::of(150, 75, 0.05, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 100, 'output_tokens' => 50, 'estimated_cost_usd' => 0.04],
+            'reviewer' => ['model' => 'claude-haiku-4-5-20251001', 'input_tokens' => 50, 'output_tokens' => 25, 'estimated_cost_usd' => 0.01],
+        ]);
+
+        self::assertTrue($auditCost->hasPublishedPricing());
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_cost_is_rounded_to_six_decimal_places(): void
     {
         $auditCost = AuditCost::of(0, 0, 0.0000005, 'm');

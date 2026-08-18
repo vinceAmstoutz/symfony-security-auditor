@@ -100,10 +100,27 @@ final readonly class AuditCost
      * to zero — the model has no published rate in the pricing catalog, or is
      * a free local/self-hosted model. Zero tokens (nothing tracked yet) is
      * not treated as a pricing gap.
+     *
+     * With a split attacker/reviewer configuration, the aggregate total can
+     * price out nonzero even when one role's own model is unpriced — e.g. a
+     * priced cloud attacker paired with an unpriced local reviewer. `byRole()`
+     * carries each role's own tokens and cost, so each role is checked on its
+     * own terms instead of the misleading total.
      */
     public function hasPublishedPricing(): bool
     {
-        return 0.0 !== $this->estimatedCostUsd || 0 === $this->totalTokens();
+        if ([] === $this->byRole) {
+            return 0.0 !== $this->estimatedCostUsd || 0 === $this->totalTokens();
+        }
+
+        foreach ($this->byRole as $entry) {
+            $roleTokens = $entry['input_tokens'] + $entry['output_tokens'];
+            if (0.0 === $entry['estimated_cost_usd'] && 0 !== $roleTokens) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
