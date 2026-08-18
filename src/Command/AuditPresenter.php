@@ -30,6 +30,8 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 {
     private const string WORDMARK = 'Symfony LLM Security Auditor';
 
+    private const string BANNER_GLYPH = '◉';
+
     /** Sampled from the circular bug glyph in `assets/banner.webp`. */
     private const string BANNER_PINK = '#e71c55';
 
@@ -68,9 +70,11 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
     private function identityBanner(SymfonyStyle $symfonyStyle): void
     {
+        $ruleWidth = mb_strlen(self::BANNER_GLYPH) + 1 + mb_strlen(self::WORDMARK);
+
         $symfonyStyle->writeln([
-            \sprintf('<fg=%s>◉</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_NAVY, self::WORDMARK),
-            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', mb_strlen(\sprintf('◉ %s', self::WORDMARK)))),
+            \sprintf('<fg=%s>%s</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_GLYPH, self::BANNER_NAVY, self::WORDMARK),
+            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', $ruleWidth)),
             '',
         ]);
     }
