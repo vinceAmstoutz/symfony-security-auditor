@@ -70,7 +70,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         $symfonyStyle->writeln([
             \sprintf('<fg=%s>◉</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_NAVY, self::WORDMARK),
-            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', \strlen(self::WORDMARK))),
+            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', mb_strlen(\sprintf('◉ %s', self::WORDMARK)))),
             '',
         ]);
     }
