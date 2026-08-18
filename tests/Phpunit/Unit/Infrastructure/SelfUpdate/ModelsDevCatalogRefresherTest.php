@@ -94,6 +94,52 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
     }
 
+    public function test_it_logs_and_does_not_throw_when_the_downloaded_file_disappears_before_validation(): void
+    {
+        $releaseClient = self::createStub(ReleaseClientInterface::class);
+        $releaseClient->method('download')->willReturnCallback(
+            static function (string $url, string $destination): void {
+                (new Filesystem())->dumpFile($destination, '{}');
+                unlink($destination);
+            },
+        );
+
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Could not refresh the bundled pricing catalog',
+            self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
+        );
+
+        (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, $logger))->refresh();
+
+        self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
+    }
+
+    public function test_it_logs_and_does_not_throw_when_removing_an_invalid_download_fails(): void
+    {
+        (new Filesystem())->mkdir($this->cacheDir);
+
+        $releaseClient = self::createStub(ReleaseClientInterface::class);
+        $releaseClient->method('download')->willReturnCallback(
+            function (string $url, string $destination): void {
+                (new Filesystem())->dumpFile($destination, 'this is not json');
+                chmod($this->cacheDir, 0500);
+            },
+        );
+
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::exactly(2))->method('warning')->with(
+            self::logicalOr('Could not refresh the bundled pricing catalog', 'Could not remove the leftover pricing catalog download'),
+            self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
+        );
+
+        try {
+            (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, $logger))->refresh();
+        } finally {
+            chmod($this->cacheDir, 0700);
+        }
+    }
+
     public function test_it_replaces_an_existing_catalog_with_a_valid_download(): void
     {
         (new Filesystem())->dumpFile($this->cacheDir.'/models-dev.json', '{"stale":{}}');

@@ -58,4 +58,9 @@ final class SelfUpdateFailedException extends RuntimeException
     {
         return new self(\sprintf('The catalog downloaded from "%s" is not valid JSON; the download was discarded.', $url));
     }
+
+    public static function forUnreadableCatalogDownload(string $downloadPath, string $reason): self
+    {
+        return new self(\sprintf('Could not read the downloaded catalog at "%s": %s', $downloadPath, $reason));
+    }
 }

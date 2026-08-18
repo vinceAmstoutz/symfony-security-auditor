@@ -65,10 +65,21 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
             $this->assertValidCatalog($downloadPath);
             $this->filesystem->rename($downloadPath, \sprintf('%s/%s', $this->cacheDir, self::CATALOG_FILENAME), true);
         } catch (SelfUpdateFailedException|IOExceptionInterface $exception) {
-            $this->filesystem->remove($downloadPath);
+            $this->removeLeftoverDownload($downloadPath);
 
             $this->logger->warning('Could not refresh the bundled pricing catalog', [
                 'exception' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function removeLeftoverDownload(string $downloadPath): void
+    {
+        try {
+            $this->filesystem->remove($downloadPath);
+        } catch (IOExceptionInterface $ioException) {
+            $this->logger->warning('Could not remove the leftover pricing catalog download', [
+                'exception' => $ioException->getMessage(),
             ]);
         }
     }
@@ -78,8 +89,18 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
      */
     private function assertValidCatalog(string $downloadPath): void
     {
+        $readError = null;
+        set_error_handler(static function (int $severity, string $message) use (&$readError): bool {
+            $readError = $message;
+
+            return true;
+        });
         $contents = file_get_contents($downloadPath);
-        \assert(false !== $contents);
+        restore_error_handler();
+
+        if (false === $contents) {
+            throw SelfUpdateFailedException::forUnreadableCatalogDownload($downloadPath, $readError ?? 'unknown error');
+        }
 
         try {
             $decoded = json_decode($contents, true, flags: \JSON_THROW_ON_ERROR);
