@@ -32,9 +32,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   tool-call rounds per chunk, each resending the growing conversation plus the
   tool schemas — none of which the estimate previously modeled. A new
   `EstimateAuditCostUseCase::DEFAULT_TOOL_ROUND_TRIP_RATIO` (50%) inflates the
-  per-round attacker input by that ratio whenever `tools_enabled` is on,
-  before scaling by `max_iterations`, following the same calibrated-ratio
-  pattern as `DEFAULT_OUTPUT_RATIO`.
+  per-round attacker input by that ratio whenever `tools_enabled` is on, before
+  scaling by `max_iterations`, following the same calibrated-ratio pattern as
+  `DEFAULT_OUTPUT_RATIO`.
 
   The reviewer estimate deliberately stays out of this. `reviewerInputRatio` is
   applied to the file-content sum alone, not to the attacker total, because the
