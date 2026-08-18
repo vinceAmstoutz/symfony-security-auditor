@@ -20,6 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ModelsDevCatalogRefresher;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate\Fixture\RemovalFailingFilesystem;
 
 final class ModelsDevCatalogRefresherTest extends TestCase
 {
@@ -107,7 +108,7 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         $logger = self::createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('warning')->with(
             'Could not refresh the bundled pricing catalog',
-            self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
+            self::callback(static fn (array $context): bool => \is_string($context['exception'] ?? null) && str_contains($context['exception'], 'Failed to open stream')),
         );
 
         (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, $logger))->refresh();
@@ -117,15 +118,7 @@ final class ModelsDevCatalogRefresherTest extends TestCase
 
     public function test_it_logs_and_does_not_throw_when_removing_an_invalid_download_fails(): void
     {
-        (new Filesystem())->mkdir($this->cacheDir);
-
-        $releaseClient = self::createStub(ReleaseClientInterface::class);
-        $releaseClient->method('download')->willReturnCallback(
-            function (string $url, string $destination): void {
-                (new Filesystem())->dumpFile($destination, 'this is not json');
-                chmod($this->cacheDir, 0500);
-            },
-        );
+        $releaseClient = $this->releaseClientWriting('this is not json');
 
         $logger = self::createMock(LoggerInterface::class);
         $logger->expects(self::exactly(2))->method('warning')->with(
@@ -133,11 +126,7 @@ final class ModelsDevCatalogRefresherTest extends TestCase
             self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
         );
 
-        try {
-            (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, $logger))->refresh();
-        } finally {
-            chmod($this->cacheDir, 0700);
-        }
+        (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, $logger, new RemovalFailingFilesystem()))->refresh();
     }
 
     public function test_it_replaces_an_existing_catalog_with_a_valid_download(): void
