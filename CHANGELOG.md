@@ -21,14 +21,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ModelsDevPricingProvider` now reads from that same cache location by default
   (`config/services.php` wires `%kernel.cache_dir%/models-dev.json`) instead of
   only the version bundled at build time. The download lands in a temp file and
-  is only moved into place once it has been confirmed to decode as a JSON
-  object, so a truncated transfer or a dropped connection can never leave a
-  corrupt catalog behind — the previous good file (or the one frozen into the
-  binary) stays in place. The refresh is a best-effort background step: a failed
-  download or an unwritable cache directory is logged as a warning, never
-  thrown, and it is skipped entirely when `privacy.offline_only` is set or the
-  XDG config path can't be resolved
-  (`StandaloneApplicationFactory::pricingCatalogRefresher()` / `offlineOnly()`).
+  is only moved into place once it has been confirmed both to decode as a JSON
+  object and to carry at least one priced model, so neither a truncated transfer
+  nor an unrelated document served in its place can leave a corrupt catalog
+  behind — the previous good file (or the one frozen into the binary) stays put.
+  The catalog URL tracks upstream `main` deliberately: pinning it to a tag would
+  freeze the catalog at exactly the staleness a new binary release already
+  fixes, so the shape check above is what guards the install. The refresh never
+  throws — a failed download, an unwritable cache directory or an unrecognized
+  payload returns `PricingCatalogRefreshOutcome::Failed`, and `self-update` now
+  says so instead of failing silently, warning that cost figures keep using the
+  catalog frozen into the binary at build time and that re-running `self-update`
+  retries it. It is skipped entirely when
+  `privacy.offline_only` is set or the XDG config path can't be resolved
+  (`StandaloneApplicationFactory::pricingCatalogRefresher()`), and the
+  `privacy.offline_only` lookup now goes through
+  `StandaloneConfig::offlineOnlyIn()` so the key path lives in one place rather
+  than being re-read by hand.
 
 ### Fixed
 

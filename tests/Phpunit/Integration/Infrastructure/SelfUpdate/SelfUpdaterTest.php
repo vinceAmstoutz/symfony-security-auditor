@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubB
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefresherInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
@@ -76,9 +77,23 @@ final class SelfUpdaterTest extends TestCase
     {
         $payload = 'NEW-BINARY';
         $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
-        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
 
         self::assertSame(1, $recordingPricingCatalogRefresher->refreshCount);
+        self::assertSame(PricingCatalogRefreshOutcome::Refreshed, $selfUpdateResult->pricingCatalogRefresh);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_carries_a_failed_pricing_catalog_refresh_into_the_result(): void
+    {
+        $payload = 'NEW-BINARY';
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher(PricingCatalogRefreshOutcome::Failed);
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $selfUpdateResult->pricingCatalogRefresh);
     }
 
     /**

@@ -63,4 +63,9 @@ final class SelfUpdateFailedException extends RuntimeException
     {
         return new self(\sprintf('Could not read the downloaded catalog at "%s": %s', $downloadPath, $reason));
     }
+
+    public static function forUnrecognizedCatalogDownload(string $url): self
+    {
+        return new self(\sprintf('The catalog downloaded from "%s" carries no model pricing; the download was discarded.', $url));
+    }
 }

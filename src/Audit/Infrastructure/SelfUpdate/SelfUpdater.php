@@ -64,9 +64,13 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         }
 
         $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestTag));
-        $this->pricingCatalogRefresher->refresh();
 
-        return new SelfUpdateResult(SelfUpdateStatus::Updated, $currentVersion, $latestVersion);
+        return new SelfUpdateResult(
+            SelfUpdateStatus::Updated,
+            $currentVersion,
+            $latestVersion,
+            $this->pricingCatalogRefresher->refresh(),
+        );
     }
 
     /**

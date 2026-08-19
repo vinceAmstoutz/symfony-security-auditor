@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -224,7 +225,7 @@ final readonly class StandaloneApplicationFactory
         );
     }
 
-    public static function offlineOnly(XdgConfigPathResolver $xdgConfigPathResolver): bool
+    private static function offlineOnly(XdgConfigPathResolver $xdgConfigPathResolver): bool
     {
         try {
             $configFile = $xdgConfigPathResolver->configFile();
@@ -242,9 +243,7 @@ final readonly class StandaloneApplicationFactory
             return true;
         }
 
-        $privacy = \is_array($parsed) ? ($parsed['privacy'] ?? null) : null;
-
-        return \is_array($privacy) && true === ($privacy['offline_only'] ?? false);
+        return \is_array($parsed) && StandaloneConfig::offlineOnlyIn($parsed);
     }
 
     private static function updateAvailabilityConsoleListener(

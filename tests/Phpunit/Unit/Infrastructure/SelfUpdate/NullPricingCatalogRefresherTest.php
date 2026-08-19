@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpd
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 
 final class NullPricingCatalogRefresherTest extends TestCase
 {
@@ -23,5 +24,10 @@ final class NullPricingCatalogRefresherTest extends TestCase
         $this->expectOutputString('');
 
         (new NullPricingCatalogRefresher())->refresh();
+    }
+
+    public function test_it_reports_a_skipped_refresh_so_self_update_stays_quiet(): void
+    {
+        self::assertSame(PricingCatalogRefreshOutcome::Skipped, (new NullPricingCatalogRefresher())->refresh());
     }
 }

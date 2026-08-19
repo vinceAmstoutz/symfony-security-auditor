@@ -145,51 +145,62 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'opt-out variable set to an arbitrary value' => [['SSA_NO_UPDATE_CHECK' => 'true'], true];
     }
 
-    public function test_offline_only_is_false_when_no_config_file_exists(): void
+    public function test_pricing_catalog_refresher_downloads_when_no_config_file_exists_yet(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)), $this->cacheHome, null);
 
-        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
     }
 
-    public function test_offline_only_is_false_when_the_config_file_has_no_privacy_key(): void
+    public function test_pricing_catalog_refresher_downloads_when_the_config_file_holds_no_mapping(): void
     {
-        $xdgConfigPathResolver = $this->resolverForConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $xdgConfigPathResolver = $this->resolverForConfig('');
 
-        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
     }
 
-    public function test_offline_only_is_false_when_the_privacy_key_has_no_offline_only_entry(): void
+    public function test_pricing_catalog_refresher_downloads_when_the_privacy_key_has_no_offline_only_entry(): void
     {
         $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    secret_scrubbing:\n        enabled: true\n");
 
-        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
     }
 
-    public function test_offline_only_is_true_when_the_config_file_enables_it(): void
-    {
-        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline_only: true\n");
-
-        self::assertTrue(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
-    }
-
-    public function test_offline_only_is_false_when_the_config_file_explicitly_disables_it(): void
+    public function test_pricing_catalog_refresher_downloads_when_the_config_file_explicitly_disables_offline_only(): void
     {
         $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline_only: false\n");
 
-        self::assertFalse(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
     }
 
-    public function test_offline_only_fails_closed_when_the_config_file_is_malformed(): void
+    public function test_pricing_catalog_refresher_fails_closed_when_the_config_file_is_malformed(): void
     {
         $xdgConfigPathResolver = $this->resolverForConfig("platform: [a, b\n");
 
-        self::assertTrue(StandaloneApplicationFactory::offlineOnly($xdgConfigPathResolver));
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
     }
 
-    public function test_offline_only_fails_closed_when_the_home_directory_is_unresolvable(): void
+    public function test_pricing_catalog_refresher_fails_closed_when_the_home_directory_is_unresolvable(): void
     {
-        self::assertTrue(StandaloneApplicationFactory::offlineOnly(new XdgConfigPathResolver(null, null, null)));
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher(new XdgConfigPathResolver(null, null, null)),
+        );
     }
 
     public function test_pricing_catalog_refresher_is_null_when_offline_only_is_enabled(): void

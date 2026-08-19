@@ -15,14 +15,19 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefresherInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 
 final class RecordingPricingCatalogRefresher implements PricingCatalogRefresherInterface
 {
     public int $refreshCount = 0;
 
+    public function __construct(private readonly PricingCatalogRefreshOutcome $outcome = PricingCatalogRefreshOutcome::Refreshed) {}
+
     #[Override]
-    public function refresh(): void
+    public function refresh(): PricingCatalogRefreshOutcome
     {
         ++$this->refreshCount;
+
+        return $this->outcome;
     }
 }

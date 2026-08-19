@@ -26,8 +26,8 @@ use Override;
 final readonly class NullPricingCatalogRefresher implements PricingCatalogRefresherInterface
 {
     #[Override]
-    public function refresh(): void
+    public function refresh(): PricingCatalogRefreshOutcome
     {
-        // intentionally noop
+        return PricingCatalogRefreshOutcome::Skipped;
     }
 }
