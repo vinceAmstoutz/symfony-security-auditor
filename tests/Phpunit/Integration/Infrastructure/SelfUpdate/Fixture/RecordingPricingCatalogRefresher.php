@@ -21,13 +21,13 @@ final class RecordingPricingCatalogRefresher implements PricingCatalogRefresherI
 {
     public int $refreshCount = 0;
 
-    public function __construct(private readonly PricingCatalogRefreshOutcome $outcome = PricingCatalogRefreshOutcome::Refreshed) {}
+    public function __construct(private readonly PricingCatalogRefreshOutcome $pricingCatalogRefreshOutcome = PricingCatalogRefreshOutcome::Refreshed) {}
 
     #[Override]
     public function refresh(): PricingCatalogRefreshOutcome
     {
         ++$this->refreshCount;
 
-        return $this->outcome;
+        return $this->pricingCatalogRefreshOutcome;
     }
 }

@@ -45,9 +45,9 @@ final class ModelsDevCatalogRefresherTest extends TestCase
     {
         $releaseClient = $this->releaseClientWriting(self::VALID_CATALOG);
 
-        $outcome = (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, self::createStub(LoggerInterface::class)))->refresh();
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, self::createStub(LoggerInterface::class)))->refresh();
 
-        self::assertSame(PricingCatalogRefreshOutcome::Refreshed, $outcome);
+        self::assertSame(PricingCatalogRefreshOutcome::Refreshed, $pricingCatalogRefreshOutcome);
         self::assertFileExists($this->cacheDir.'/models-dev.json');
         self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', self::VALID_CATALOG);
     }
@@ -80,9 +80,9 @@ final class ModelsDevCatalogRefresherTest extends TestCase
             self::callback(static fn (array $context): bool => \array_key_exists('exception', $context)),
         );
 
-        $outcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('this is not json'), $this->cacheDir, $logger))->refresh();
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('this is not json'), $this->cacheDir, $logger))->refresh();
 
-        self::assertSame(PricingCatalogRefreshOutcome::Failed, $outcome);
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $pricingCatalogRefreshOutcome);
         self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', '{"anthropic":{}}');
         self::assertSame(['models-dev.json'], $this->filesInCacheDir());
     }
@@ -97,9 +97,9 @@ final class ModelsDevCatalogRefresherTest extends TestCase
             self::callback(static fn (array $context): bool => \is_string($context['exception'] ?? null) && str_contains($context['exception'], 'carries no model pricing')),
         );
 
-        $outcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"message":"Not Found"}'), $this->cacheDir, $logger))->refresh();
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"message":"Not Found"}'), $this->cacheDir, $logger))->refresh();
 
-        self::assertSame(PricingCatalogRefreshOutcome::Failed, $outcome);
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $pricingCatalogRefreshOutcome);
         self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', self::VALID_CATALOG);
     }
 
@@ -107,9 +107,9 @@ final class ModelsDevCatalogRefresherTest extends TestCase
     {
         $logger = self::createStub(LoggerInterface::class);
 
-        $outcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{"api":"https://api.anthropic.com"}}'), $this->cacheDir, $logger))->refresh();
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{"api":"https://api.anthropic.com"}}'), $this->cacheDir, $logger))->refresh();
 
-        self::assertSame(PricingCatalogRefreshOutcome::Failed, $outcome);
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $pricingCatalogRefreshOutcome);
         self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
     }
 
@@ -117,9 +117,9 @@ final class ModelsDevCatalogRefresherTest extends TestCase
     {
         $logger = self::createStub(LoggerInterface::class);
 
-        $outcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{"models":{"claude-opus-5":{}}}}'), $this->cacheDir, $logger))->refresh();
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{"models":{"claude-opus-5":{}}}}'), $this->cacheDir, $logger))->refresh();
 
-        self::assertSame(PricingCatalogRefreshOutcome::Failed, $outcome);
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $pricingCatalogRefreshOutcome);
         self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
     }
 
@@ -174,9 +174,9 @@ final class ModelsDevCatalogRefresherTest extends TestCase
     {
         (new Filesystem())->dumpFile($this->cacheDir.'/models-dev.json', '{"stale":{}}');
 
-        (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"fresh":{}}'), $this->cacheDir, self::createStub(LoggerInterface::class)))->refresh();
+        (new ModelsDevCatalogRefresher($this->releaseClientWriting(self::VALID_CATALOG), $this->cacheDir, self::createStub(LoggerInterface::class)))->refresh();
 
-        self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', '{"fresh":{}}');
+        self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', self::VALID_CATALOG);
     }
 
     public function test_it_logs_and_does_not_throw_when_installing_the_download_fails(): void
