@@ -149,7 +149,7 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         $logger = self::createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('warning')->with(
             'Could not refresh the bundled pricing catalog',
-            self::callback(static fn (array $context): bool => \is_string($context['exception'] ?? null) && str_contains($context['exception'], 'Failed to open stream')),
+            self::callback(static fn (array $context): bool => \is_string($context['exception'] ?? null) && str_contains($context['exception'], 'Could not read the downloaded catalog')),
         );
 
         (new ModelsDevCatalogRefresher($releaseClient, $this->cacheDir, $logger))->refresh();

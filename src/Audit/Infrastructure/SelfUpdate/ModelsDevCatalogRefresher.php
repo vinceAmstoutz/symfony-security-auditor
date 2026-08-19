@@ -98,17 +98,9 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
      */
     private function assertValidCatalog(string $downloadPath): void
     {
-        $readError = null;
-        set_error_handler(static function (int $severity, string $message) use (&$readError): bool {
-            $readError = $message;
-
-            return true;
-        });
-        $contents = file_get_contents($downloadPath);
-        restore_error_handler();
-
+        $contents = is_file($downloadPath) ? file_get_contents($downloadPath) : false;
         if (false === $contents) {
-            throw SelfUpdateFailedException::forUnreadableCatalogDownload($downloadPath, $readError ?? 'unknown error');
+            throw SelfUpdateFailedException::forUnreadableCatalogDownload($downloadPath);
         }
 
         try {

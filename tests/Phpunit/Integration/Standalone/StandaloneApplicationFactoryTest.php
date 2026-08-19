@@ -223,6 +223,17 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    public function test_pricing_catalog_refresher_fails_closed_when_only_the_config_path_is_unresolvable(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, $this->cacheHome, null);
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+            'an unreadable config path must fail closed on its own, not rely on the cache path also being unresolvable',
+        );
+    }
+
     public function test_pricing_catalog_refresher_is_null_when_the_cache_directory_is_unresolvable(): void
     {
         $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
