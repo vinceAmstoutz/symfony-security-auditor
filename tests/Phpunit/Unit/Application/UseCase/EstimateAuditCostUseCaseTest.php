@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
@@ -821,6 +822,86 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_tool_round_trip_overhead_shrinks_with_a_lowered_max_tool_iterations(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'toolsEnabled' => true,
+            'maxToolIterations' => AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS / 2,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(125, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'half the calibrated tool-round bound must charge half the calibrated 50% overhead, not the full 150');
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_tool_round_trip_overhead_grows_with_a_raised_max_tool_iterations(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'toolsEnabled' => true,
+            'maxToolIterations' => AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS * 2,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(200, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'twice the calibrated tool-round bound must charge twice the calibrated overhead');
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_tool_round_trip_overhead_at_the_minimum_bound_still_rounds_up(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'toolsEnabled' => true,
+            'maxToolIterations' => 1,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(107, $auditReport->cost()->byRole()['attacker']['input_tokens'], '100 * 1.0625 = 106.25 must ceil to 107, not round to 106');
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_max_tool_iterations_is_ignored_when_tools_are_disabled(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'toolsEnabled' => false,
+            'maxToolIterations' => AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS * 4,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(100, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'a run without tools takes no tool-call rounds, whatever the bound allows');
+    }
+
+    /**
      * @param array{
      *     files?: list<ProjectFile>,
      *     tokenEstimator?: TokenEstimatorInterface,
@@ -837,6 +918,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      *     emitAllSkills?: bool,
      *     toolsEnabled?: bool,
      *     toolRoundTripRatio?: float,
+     *     maxToolIterations?: int,
      * } $overrides
      */
     private function makeUseCase(array $overrides = []): EstimateAuditCostUseCase
@@ -856,6 +938,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         $emitAllSkills = $overrides['emitAllSkills'] ?? true;
         $toolsEnabled = $overrides['toolsEnabled'] ?? false;
         $toolRoundTripRatio = $overrides['toolRoundTripRatio'] ?? EstimateAuditCostUseCase::DEFAULT_TOOL_ROUND_TRIP_RATIO;
+        $maxToolIterations = $overrides['maxToolIterations'] ?? AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS;
 
         return new EstimateAuditCostUseCase(
             $this->fixedScanner($files),
@@ -873,6 +956,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             $emitAllSkills,
             $toolsEnabled,
             $toolRoundTripRatio,
+            $maxToolIterations,
         );
     }
 

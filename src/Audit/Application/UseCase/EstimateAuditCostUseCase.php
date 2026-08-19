@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
@@ -70,9 +71,18 @@ final readonly class EstimateAuditCostUseCase
      * Conservative estimate of the extra attacker input consumed by
      * tool-call round-trips (the re-sent conversation plus tool schemas on
      * every round) when `audit.tools_enabled` is on. Calibrated against
-     * reference audits at ~50% on top of the base per-round input.
+     * reference audits at ~50% on top of the base per-round input, with
+     * `audit.max_tool_iterations` left at {@see CALIBRATION_MAX_TOOL_ITERATIONS}.
      */
     public const float DEFAULT_TOOL_ROUND_TRIP_RATIO = 0.50;
+
+    /**
+     * The `audit.max_tool_iterations` bound the ratio above was measured
+     * against. It moves only when the calibration is redone, which is why it
+     * is not simply `AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS` — changing
+     * that default must change the estimate, not silently re-anchor it.
+     */
+    public const int CALIBRATION_MAX_TOOL_ITERATIONS = 8;
 
     public function __construct(
         private ProjectFileScannerInterface $projectFileScanner,
@@ -90,6 +100,7 @@ final readonly class EstimateAuditCostUseCase
         private bool $emitAllSkills = true,
         private bool $toolsEnabled = true,
         private float $toolRoundTripRatio = self::DEFAULT_TOOL_ROUND_TRIP_RATIO,
+        private int $maxToolIterations = AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS,
     ) {}
 
     /**
@@ -125,7 +136,7 @@ final readonly class EstimateAuditCostUseCase
         $attackerPerRoundInput = $fileContentPerRoundInput + $this->skillPromptTokensAcrossChunks($files);
 
         if ($this->toolsEnabled) {
-            $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * (1 + $this->toolRoundTripRatio));
+            $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * $this->toolRoundTripMultiplier());
         }
 
         $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
@@ -168,6 +179,18 @@ final readonly class EstimateAuditCostUseCase
         ]);
 
         return AuditReport::fromContext($auditContext, $auditCost);
+    }
+
+    /**
+     * `audit.max_tool_iterations` caps the tool-call rounds a chunk may take,
+     * so it caps the conversation those rounds re-send. Scaling the calibrated
+     * ratio by the configured bound keeps the estimate honest for a user who
+     * lowers it to cut cost, instead of charging every run the calibrated
+     * maximum.
+     */
+    private function toolRoundTripMultiplier(): float
+    {
+        return 1.0 + $this->toolRoundTripRatio * ($this->maxToolIterations / self::CALIBRATION_MAX_TOOL_ITERATIONS);
     }
 
     /**
