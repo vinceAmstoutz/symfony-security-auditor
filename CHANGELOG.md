@@ -20,6 +20,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `Run: export ANTHROPIC_API_KEY=, then "audit <path>".`, a line that can be
   pasted as-is.
 
+### Fixed
+
+- **`self-update` could corrupt the installed binary and leave no readable error
+  behind.** `SelfUpdater::assertChecksumMatches()`
+  (`src/Audit/Infrastructure/SelfUpdate/SelfUpdater.php`) guarded a failed
+  `hash_file()` call with `\assert(false !== $actual)` — a no-op in production,
+  since `zend.assertions` is off by default, so an unreadable download fell
+  through to `hash_equals()` with a `bool` instead of a `string`: an uncaught
+  `TypeError` instead of an actionable message. It now checks readability
+  explicitly and throws `SelfUpdateFailedException::forUnreadableDownload()`.
+  `SelfUpdater::replaceBinary()` also now cleans up the downloaded temp file on
+  any failure — previously only on `SelfUpdateFailedException` — via a `finally`
+  block instead of a narrow `catch`, so the original binary is left untouched
+  regardless of which step failed.
+- **`self-update` could report a stale "update available" notice for up to a day
+  after actually updating.** `ThrottledUpdateAvailabilityNotifier` caches the
+  latest-version check for 24h (`DEFAULT_THROTTLE_SECONDS`), but nothing cleared
+  that cache when `self-update` itself succeeded, so a cached "a newer version
+  is available" answer could outlive the update that installed it.
+  `UpdateCheckStoreInterface` gained a `clear()` method, and `SelfUpdateCommand`
+  now calls it after a successful (non-`--check`) update.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged
