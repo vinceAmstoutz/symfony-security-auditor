@@ -103,6 +103,16 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', self::VALID_CATALOG);
     }
 
+    public function test_it_never_installs_a_provider_entry_without_a_models_map(): void
+    {
+        $logger = self::createStub(LoggerInterface::class);
+
+        $outcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{"api":"https://api.anthropic.com"}}'), $this->cacheDir, $logger))->refresh();
+
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $outcome);
+        self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
+    }
+
     public function test_it_never_installs_a_provider_entry_whose_models_carry_no_cost(): void
     {
         $logger = self::createStub(LoggerInterface::class);

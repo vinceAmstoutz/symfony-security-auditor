@@ -117,7 +117,11 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
             throw SelfUpdateFailedException::forInvalidCatalogDownload(self::CATALOG_URL);
         }
 
-        if (!\is_array($decoded) || !$this->containsAnyModelPrice($decoded)) {
+        if (!\is_array($decoded)) {
+            throw SelfUpdateFailedException::forInvalidCatalogDownload(self::CATALOG_URL);
+        }
+
+        if (!$this->containsAnyModelPrice($decoded)) {
             throw SelfUpdateFailedException::forUnrecognizedCatalogDownload(self::CATALOG_URL);
         }
     }
