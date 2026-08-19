@@ -233,8 +233,23 @@ final readonly class StandaloneApplicationFactory
                     $this->standaloneContainerFactory,
                     $this->standaloneConsoleCommandFactory,
                 ),
+                new ModelsDevPricingProvider(new NullLogger(), self::refreshedCatalogPath($this->xdgConfigPathResolver)),
             ),
         );
+    }
+
+    /**
+     * Where a refreshed pricing catalog lands. `doctor` builds its provider
+     * with the same override the audit container passes, so the two never
+     * disagree about which catalog file the run prices from.
+     */
+    private static function refreshedCatalogPath(XdgConfigPathResolver $xdgConfigPathResolver): ?string
+    {
+        try {
+            return \sprintf('%s/%s', $xdgConfigPathResolver->cacheDir(), ModelsDevPricingProvider::CATALOG_FILENAME);
+        } catch (UnresolvableConfigPathException) {
+            return null;
+        }
     }
 
     private function lazyAuditCommand(): LazyCommand

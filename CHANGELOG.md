@@ -26,7 +26,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   had no other extension point for this. The `'symfony/models-dev'` package name
   now lives in one place, `ModelsDevPricingProvider::CATALOG_PACKAGE` (made
   `public`); `EnvironmentDoctor` and `StandaloneApplicationFactory` reference it
-  instead of each restating their own copy of the string.
+  instead of each restating their own copy of the string. The check names the
+  catalog **file** it resolved, not just the packaged version, so it can never
+  report a snapshot the run is not actually pricing from once `self-update`
+  starts writing a refreshed catalog into the XDG cache directory — a new
+  `ModelsDevPricingProvider::effectiveCatalogPath()` is the single resolution
+  point both `loadCatalog()` and the check go through. An override path that
+  does not exist yet falls through to the packaged catalog instead of shadowing
+  it, so pointing the check at the refresh location before anything writes
+  there is safe. When neither an override nor a packaged catalog is readable,
+  the check warns as before.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

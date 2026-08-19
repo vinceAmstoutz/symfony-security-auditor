@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -48,6 +49,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private ComposerAvailabilityCheckerInterface $composerAvailabilityChecker,
         private AuditPreflightInterface $auditPreflight,
+        private ModelsDevPricingProvider $modelsDevPricingProvider = new ModelsDevPricingProvider(new NullLogger()),
         private string $pricingCatalogPackage = ModelsDevPricingProvider::CATALOG_PACKAGE,
     ) {}
 
@@ -132,12 +134,20 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             : new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not found — needed only to run "init" or switch providers, not to audit.');
     }
 
+    /**
+     * Names the catalog file actually in use rather than only the packaged
+     * version: once `self-update` has refreshed the catalog, the run reads an
+     * override and reporting the package version alone would describe a file
+     * the audit is not pricing from.
+     */
     private function pricingCatalogCheck(): DoctorCheckResult
     {
-        $version = (new ReportPackage($this->pricingCatalogPackage))->version();
+        $catalogPath = $this->modelsDevPricingProvider->effectiveCatalogPath();
 
-        return ReportPackage::UNKNOWN_VERSION === $version
-            ? new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Warning, \sprintf('%s not found — cost figures will show $0.00.', $this->pricingCatalogPackage))
-            : new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Ok, \sprintf('%s %s.', $this->pricingCatalogPackage, $version));
+        if (null === $catalogPath || !is_file($catalogPath)) {
+            return new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Warning, \sprintf('%s not found — cost figures will show $0.00.', $this->pricingCatalogPackage));
+        }
+
+        return new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Ok, \sprintf('%s %s (%s).', $this->pricingCatalogPackage, (new ReportPackage($this->pricingCatalogPackage))->version(), $catalogPath));
     }
 }

@@ -15,12 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
@@ -73,7 +75,22 @@ final class EnvironmentDoctorTest extends TestCase
 
         self::assertSame('Pricing catalog', $results[3]->label);
         self::assertSame(DoctorCheckStatus::Ok, $results[3]->status);
-        self::assertMatchesRegularExpression('/^symfony\/models-dev v?[0-9]+(\.[0-9]+)*\.$/', $results[3]->detail);
+        self::assertMatchesRegularExpression('/^symfony\/models-dev v?[0-9]+(\.[0-9]+)* \(.+models-dev\.json\)\.$/', $results[3]->detail);
+    }
+
+    public function test_it_reports_a_refreshed_catalog_instead_of_the_bundled_one(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+        $refreshed = $this->cacheHome.'/symfony-security-auditor/models-dev.json';
+        (new Filesystem())->dumpFile($refreshed, '{"anthropic":{}}');
+
+        $environmentDoctor = $this->doctorWith($this->resolver(), [], true, pricingProvider: new ModelsDevPricingProvider(new NullLogger(), $refreshed));
+
+        $results = $environmentDoctor->diagnose();
+
+        self::assertSame(DoctorCheckStatus::Ok, $results[3]->status);
+        self::assertStringContainsString($refreshed, $results[3]->detail, 'doctor must name the refreshed catalog the run actually prices from, not the bundled one');
     }
 
     public function test_it_warns_when_the_pricing_catalog_package_is_not_installed(): void
@@ -91,6 +108,7 @@ final class EnvironmentDoctorTest extends TestCase
             $xdgConfigPathResolver,
             $composerAvailabilityChecker,
             $auditPreflight,
+            new ModelsDevPricingProvider(new NullLogger(), null, 'vinceamstoutz/definitely-not-installed'),
             'vinceamstoutz/definitely-not-installed',
         );
 
@@ -254,7 +272,7 @@ final class EnvironmentDoctorTest extends TestCase
     /**
      * @param array<string, string> $environment
      */
-    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null, ?string $projectConfigFile = null): EnvironmentDoctor
+    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null, ?string $projectConfigFile = null, ?ModelsDevPricingProvider $pricingProvider = null): EnvironmentDoctor
     {
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
         $composerAvailabilityChecker->method('isAvailable')->willReturn($composerAvailable);
@@ -267,6 +285,7 @@ final class EnvironmentDoctorTest extends TestCase
             $xdgConfigPathResolver,
             $composerAvailabilityChecker,
             $auditPreflight,
+            $pricingProvider ?? new ModelsDevPricingProvider(new NullLogger()),
         );
     }
 

@@ -31,7 +31,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
 {
     public const string CATALOG_PACKAGE = 'symfony/models-dev';
 
-    private const string CATALOG_FILENAME = 'models-dev.json';
+    public const string CATALOG_FILENAME = 'models-dev.json';
 
     /**
      * Official first-party provider keys, in resolution priority order. A bare
@@ -235,7 +235,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /** @return array<array-key, mixed> */
     private function loadCatalog(): array
     {
-        $path = $this->catalogPath ?? $this->defaultCatalogPath();
+        $path = $this->effectiveCatalogPath();
         $contents = null !== $path && is_file($path) ? file_get_contents($path) : false;
         if (false === $contents) {
             return $this->disablePricing('catalog file not found or unreadable', $path);
@@ -248,6 +248,22 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         }
 
         return \is_array($decoded) ? $decoded : $this->disablePricing('catalog root is not an object', $path);
+    }
+
+    /**
+     * The catalog file this provider actually reads, so `doctor` can name it
+     * instead of assuming the packaged one — a `self-update` refresh writes an
+     * override that takes precedence. An override that does not exist yet falls
+     * through to the packaged catalog rather than shadowing it, which is what
+     * makes the override location safe to point at before anything writes there.
+     */
+    public function effectiveCatalogPath(): ?string
+    {
+        if (null !== $this->catalogPath && is_file($this->catalogPath)) {
+            return $this->catalogPath;
+        }
+
+        return $this->defaultCatalogPath() ?? $this->catalogPath;
     }
 
     private function defaultCatalogPath(): ?string
