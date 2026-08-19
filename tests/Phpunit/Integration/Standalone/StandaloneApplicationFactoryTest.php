@@ -113,6 +113,13 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertTrue($standaloneApplication->has('self-update'));
     }
 
+    public function test_it_builds_the_application_when_no_cache_directory_can_be_resolved(): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([])->create();
+
+        self::assertTrue($standaloneApplication->has('doctor'), 'an environment with no HOME and no XDG variables leaves the refreshed-catalog location unresolvable, which must not stop the application from building');
+    }
+
     public function test_it_registers_the_doctor_command(): void
     {
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([

@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
-use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -49,7 +48,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private ComposerAvailabilityCheckerInterface $composerAvailabilityChecker,
         private AuditPreflightInterface $auditPreflight,
-        private ModelsDevPricingProvider $modelsDevPricingProvider = new ModelsDevPricingProvider(new NullLogger()),
+        private ModelsDevPricingProvider $modelsDevPricingProvider,
         private string $pricingCatalogPackage = ModelsDevPricingProvider::CATALOG_PACKAGE,
     ) {}
 
