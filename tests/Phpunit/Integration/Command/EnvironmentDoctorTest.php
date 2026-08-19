@@ -85,7 +85,17 @@ final class EnvironmentDoctorTest extends TestCase
         $refreshed = $this->cacheHome.'/symfony-security-auditor/models-dev.json';
         (new Filesystem())->dumpFile($refreshed, '{"anthropic":{}}');
 
-        $environmentDoctor = $this->doctorWith($this->resolver(), [], true, pricingProvider: new ModelsDevPricingProvider(new NullLogger(), $refreshed));
+        $xdgConfigPathResolver = $this->resolver();
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+
+        $environmentDoctor = new EnvironmentDoctor(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            $composerAvailabilityChecker,
+            self::createStub(AuditPreflightInterface::class),
+            new ModelsDevPricingProvider(new NullLogger(), $refreshed),
+        );
 
         $results = $environmentDoctor->diagnose();
 
@@ -272,7 +282,7 @@ final class EnvironmentDoctorTest extends TestCase
     /**
      * @param array<string, string> $environment
      */
-    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null, ?string $projectConfigFile = null, ?ModelsDevPricingProvider $pricingProvider = null): EnvironmentDoctor
+    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null, ?string $projectConfigFile = null): EnvironmentDoctor
     {
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
         $composerAvailabilityChecker->method('isAvailable')->willReturn($composerAvailable);
@@ -285,7 +295,7 @@ final class EnvironmentDoctorTest extends TestCase
             $xdgConfigPathResolver,
             $composerAvailabilityChecker,
             $auditPreflight,
-            $pricingProvider ?? new ModelsDevPricingProvider(new NullLogger()),
+            new ModelsDevPricingProvider(new NullLogger()),
         );
     }
 

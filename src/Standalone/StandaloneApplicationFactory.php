@@ -233,7 +233,7 @@ final readonly class StandaloneApplicationFactory
                     $this->standaloneContainerFactory,
                     $this->standaloneConsoleCommandFactory,
                 ),
-                new ModelsDevPricingProvider(new NullLogger(), self::refreshedCatalogPath($this->xdgConfigPathResolver)),
+                new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
             ),
         );
     }
@@ -243,10 +243,10 @@ final readonly class StandaloneApplicationFactory
      * with the same override the audit container passes, so the two never
      * disagree about which catalog file the run prices from.
      */
-    private static function refreshedCatalogPath(XdgConfigPathResolver $xdgConfigPathResolver): ?string
+    private function refreshedCatalogPath(): ?string
     {
         try {
-            return \sprintf('%s/%s', $xdgConfigPathResolver->cacheDir(), ModelsDevPricingProvider::CATALOG_FILENAME);
+            return \sprintf('%s/%s', $this->xdgConfigPathResolver->cacheDir(), ModelsDevPricingProvider::CATALOG_FILENAME);
         } catch (UnresolvableConfigPathException) {
             return null;
         }

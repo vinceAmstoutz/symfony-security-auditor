@@ -273,6 +273,14 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::fail('Expected a "catalog unavailable" warning but none was logged.');
     }
 
+    public function test_a_missing_override_catalog_path_falls_back_to_the_default_catalog(): void
+    {
+        $modelsDevPricingProvider = new ModelsDevPricingProvider($this->warningCapturingLogger(), '/does/not/exist/models-dev.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-opus-4-8'));
+        self::assertSame([], $this->loggedWarnings);
+    }
+
     public function test_a_missing_catalog_package_disables_pricing_without_throwing(): void
     {
         $modelsDevPricingProvider = new ModelsDevPricingProvider($this->warningCapturingLogger(), null, 'vinceamstoutz/not-a-real-package');
@@ -318,7 +326,7 @@ final class ModelsDevPricingProviderTest extends TestCase
 
     private function providerForCatalog(string $fixture): ModelsDevPricingProvider
     {
-        return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/'.$fixture);
+        return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/'.$fixture, 'vinceamstoutz/not-a-real-package');
     }
 
     private function warningCapturingLogger(): LoggerInterface
