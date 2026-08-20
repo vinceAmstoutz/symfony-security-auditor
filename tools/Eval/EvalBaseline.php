@@ -95,7 +95,7 @@ final readonly class EvalBaseline
                 continue;
             }
 
-            $drift = [...$drift, ...self::metricDrift($type, $recorded, $measured)];
+            $drift = [...$drift, ...$this->metricDrift($type, $recorded, $measured)];
         }
 
         foreach (array_keys($actual) as $type) {
@@ -113,7 +113,7 @@ final readonly class EvalBaseline
      *
      * @return list<string>
      */
-    private static function metricDrift(string $type, array $recorded, array $actual): array
+    private function metricDrift(string $type, array $recorded, array $actual): array
     {
         $drift = [];
         foreach (['precision', 'recall'] as $metric) {

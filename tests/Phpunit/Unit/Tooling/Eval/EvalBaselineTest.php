@@ -49,9 +49,9 @@ final class EvalBaselineTest extends TestCase
 
     public function test_a_recall_regression_is_reported(): void
     {
-        $baseline = EvalBaseline::fromReport($this->report(10, 0, 0));
+        $evalBaseline = EvalBaseline::fromReport($this->report(10, 0, 0));
 
-        $drift = $baseline->driftAgainst($this->report(5, 0, 5));
+        $drift = $evalBaseline->driftAgainst($this->report(5, 0, 5));
 
         self::assertCount(2, $drift);
         self::assertStringContainsString('overall recall: baseline 1.0000, this run 0.5000.', $drift[0]);
@@ -60,9 +60,9 @@ final class EvalBaselineTest extends TestCase
 
     public function test_an_improvement_is_reported_too_because_a_pure_move_should_change_nothing(): void
     {
-        $baseline = EvalBaseline::fromReport($this->report(5, 5, 0));
+        $evalBaseline = EvalBaseline::fromReport($this->report(5, 5, 0));
 
-        $drift = $baseline->driftAgainst($this->report(5, 0, 0));
+        $drift = $evalBaseline->driftAgainst($this->report(5, 0, 0));
 
         self::assertCount(2, $drift);
         self::assertStringContainsString('overall precision: baseline 0.5000, this run 1.0000.', $drift[0]);
@@ -70,18 +70,18 @@ final class EvalBaselineTest extends TestCase
 
     public function test_a_class_the_baseline_never_saw_is_reported(): void
     {
-        $baseline = new EvalReport(new ClassScore('overall', 1, 0, 0), []);
+        $evalReport = new EvalReport(new ClassScore('overall', 1, 0, 0), []);
 
-        $drift = EvalBaseline::fromReport($baseline)->driftAgainst($this->report(1, 0, 0));
+        $drift = EvalBaseline::fromReport($evalReport)->driftAgainst($this->report(1, 0, 0));
 
         self::assertSame(['sql_injection: found by this run but absent from the baseline.'], $drift);
     }
 
     public function test_a_class_that_vanished_from_the_run_is_reported(): void
     {
-        $baseline = EvalBaseline::fromReport($this->report(1, 0, 0));
+        $evalBaseline = EvalBaseline::fromReport($this->report(1, 0, 0));
 
-        $drift = $baseline->driftAgainst(new EvalReport(new ClassScore('overall', 1, 0, 0), []));
+        $drift = $evalBaseline->driftAgainst(new EvalReport(new ClassScore('overall', 1, 0, 0), []));
 
         self::assertSame(['sql_injection: recorded in the baseline but absent from this run.'], $drift);
     }

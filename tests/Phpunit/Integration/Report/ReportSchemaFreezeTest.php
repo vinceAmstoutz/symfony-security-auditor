@@ -54,9 +54,9 @@ final class ReportSchemaFreezeTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('renderers')]
-    public function test_the_rendered_document_keeps_its_frozen_shape(string $fixture, ReportRendererInterface $renderer): void
+    public function test_the_rendered_document_keeps_its_frozen_shape(string $fixture, ReportRendererInterface $reportRenderer): void
     {
-        $rendered = $renderer->render($this->frozenReport());
+        $rendered = $reportRenderer->render($this->frozenReport());
         $decoded = json_decode($rendered, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
 
