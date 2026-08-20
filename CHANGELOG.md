@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
+
 ### Added
 
 - **Two regression gates for a refactor that is supposed to change nothing.**

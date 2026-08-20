@@ -21,7 +21,9 @@ element keeps working until at least the next `MAJOR`.
 | `PATCH`      | Bug fixes and internal changes only — no public API additions or removals.               |
 
 Every `MAJOR` release ships a migration note in
-[`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt.
+[`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt, plus
+an `UPGRADE-<MAJOR>.0.md` at the repository root collecting every break in one
+place — see [`UPGRADE-2.0.md`](../UPGRADE-2.0.md).
 
 ## Public API — what is covered by the BC promise
 
