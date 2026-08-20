@@ -147,6 +147,21 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             return new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Warning, \sprintf('%s not found — cost figures will show $0.00.', $this->pricingCatalogPackage));
         }
 
-        return new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Ok, \sprintf('%s %s (%s).', $this->pricingCatalogPackage, (new ReportPackage($this->pricingCatalogPackage))->version(), $catalogPath));
+        return new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Ok, $this->pricingCatalogDetail($catalogPath));
+    }
+
+    /**
+     * The package version describes the packaged catalog and nothing else. A
+     * `self-update` refresh writes an override whose contents come from
+     * upstream `main` at refresh time, so stamping the bundled version onto it
+     * would assert a version that file does not have.
+     */
+    private function pricingCatalogDetail(string $catalogPath): string
+    {
+        if ($catalogPath !== $this->modelsDevPricingProvider->packagedCatalogPath()) {
+            return \sprintf('refreshed catalog (%s); bundled %s unused.', $catalogPath, $this->pricingCatalogPackage);
+        }
+
+        return \sprintf('%s %s (%s).', $this->pricingCatalogPackage, (new ReportPackage($this->pricingCatalogPackage))->version(), $catalogPath);
     }
 }

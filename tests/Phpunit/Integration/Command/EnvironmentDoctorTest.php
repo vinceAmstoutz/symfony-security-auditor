@@ -101,6 +101,11 @@ final class EnvironmentDoctorTest extends TestCase
 
         self::assertSame(DoctorCheckStatus::Ok, $results[3]->status);
         self::assertStringContainsString($refreshed, $results[3]->detail, 'doctor must name the refreshed catalog the run actually prices from, not the bundled one');
+        self::assertDoesNotMatchRegularExpression(
+            '/symfony\/models-dev v?[0-9]/',
+            $results[3]->detail,
+            'the bundled package version describes the packaged catalog only; stamping it onto a refreshed override asserts a version that file does not have',
+        );
     }
 
     public function test_it_warns_when_the_pricing_catalog_package_is_not_installed(): void

@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   is safe. When neither an override nor a packaged catalog is readable, the
   check warns as before.
 
+  The version and the path are reported together only when they describe the
+  same file. `InstalledVersions::getPrettyVersion()` describes the packaged
+  catalog and nothing else, so when the resolved path is a refreshed override —
+  whose contents came from upstream `main` at refresh time — the check names the
+  override and says the bundled package is unused, rather than stamping a
+  version onto a file that does not have it.
+  `ModelsDevPricingProvider::packagedCatalogPath()` (the former private
+  `defaultCatalogPath()`, now `public`) is what the check compares against.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged
