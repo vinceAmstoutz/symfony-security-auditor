@@ -628,7 +628,7 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditOrchestrator->orchestrate($auditContext);
 
-        self::assertContains(['review.skipped', []], $recordingProgressReporter->events);
+        self::assertContains(['review.skipped', ['reason' => 'all_baseline_accepted']], $recordingProgressReporter->events);
     }
 
     /**
@@ -1325,7 +1325,7 @@ final class AuditOrchestratorTest extends TestCase
         ));
 
         self::assertCount(1, $stoppedLogs);
-        self::assertContains(['review.skipped', []], $recordingProgressReporter->events);
+        self::assertContains(['review.skipped', ['reason' => 'no_new_findings']], $recordingProgressReporter->events);
     }
 
     /**
@@ -2099,7 +2099,7 @@ final class AuditOrchestratorTest extends TestCase
         }
 
         self::assertTrue($budgetExceeded, 'The orchestrator must rethrow the attacker BudgetExceededException.');
-        self::assertContains(['review.skipped', []], $recordingProgressReporter->events);
+        self::assertContains(['review.skipped', ['reason' => 'nothing_recovered']], $recordingProgressReporter->events);
     }
 
     /**

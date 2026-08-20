@@ -22,9 +22,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   places it can skip the reviewer pass — the attacker finding nothing, every
   remaining finding already being baseline-accepted, and the mid-run abort
   recovery path finding nothing left to review — which both progress reporters
-  render as a lightweight "no new findings this pass" line. The earlier wording
-  ("no findings to review") read as though the whole audit came up empty even on
+  render as a lightweight one-line acknowledgment. The earlier wording ("no
+  findings to review") read as though the whole audit came up empty even on
   iteration 2+, after findings had already streamed past.
+
+  Each site carries its own `reason` in the event context, because only the
+  first of the three is actually "no new findings": the second means every
+  finding _was_ found and then baseline-accepted, and the third fires as a run
+  is aborting, where a reassuring line would print immediately before the
+  failure. The reporters render "every finding was baseline-accepted — review
+  skipped" and "nothing left to review after the abort" respectively.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

@@ -174,6 +174,20 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("No new findings this pass.\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_it_names_baseline_acceptance_as_the_reason_a_review_pass_was_skipped(): void
+    {
+        $this->plainProgressReporter->report('review.skipped', ['reason' => 'all_baseline_accepted']);
+
+        self::assertSame("Every finding was baseline-accepted — review skipped.\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_names_an_abort_as_the_reason_a_review_pass_was_skipped(): void
+    {
+        $this->plainProgressReporter->report('review.skipped', ['reason' => 'nothing_recovered']);
+
+        self::assertSame("Nothing left to review after the abort.\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_ignores_pipeline_and_stage_events(): void
     {
         $this->plainProgressReporter->report('pipeline.started', ['stages' => ['ingestion']]);

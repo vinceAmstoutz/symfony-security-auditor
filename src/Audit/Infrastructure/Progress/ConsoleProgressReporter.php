@@ -74,7 +74,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             ProgressEvent::AttackerChunkCompleted => $this->onAttackerChunkCompleted($context),
             ProgressEvent::AttackerFindingRecorded => $this->onAttackerFindingRecorded($context),
             ProgressEvent::ReviewStarted => $this->onReviewStarted($context),
-            ProgressEvent::ReviewSkipped => $this->onReviewSkipped(),
+            ProgressEvent::ReviewSkipped => $this->onReviewSkipped($context),
             ProgressEvent::ReviewFindingReviewed => $this->onReviewFindingReviewed($context),
             ProgressEvent::BaselineFindingSkipped => $this->onBaselineFindingSkipped($context),
             ProgressEvent::ReviewCompleted => $this->onReviewCompleted($context),
@@ -208,9 +208,20 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         $this->updateMessage(\sprintf('reviewing %d finding(s)', $findings));
     }
 
-    private function onReviewSkipped(): void
+    /** @param array<string, mixed> $context */
+    private function onReviewSkipped(array $context): void
     {
-        $this->writeAboveBar('<fg=gray>  ⚖ no new findings this pass</>');
+        $this->writeAboveBar(\sprintf('<fg=gray>  ⚖ %s</>', $this->reviewSkippedReason($context)));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function reviewSkippedReason(array $context): string
+    {
+        return match (ProgressContext::string($context, 'reason')) {
+            'all_baseline_accepted' => 'every finding was baseline-accepted — review skipped',
+            'nothing_recovered' => 'nothing left to review after the abort',
+            default => 'no new findings this pass',
+        };
     }
 
     /** @param array<string, mixed> $context */
