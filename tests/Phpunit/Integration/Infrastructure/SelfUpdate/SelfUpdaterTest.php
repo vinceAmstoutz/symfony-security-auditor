@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAsset;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PendingBinarySwap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
@@ -37,6 +38,8 @@ final class SelfUpdaterTest extends TestCase
 
     private string $binaryPath;
 
+    private PendingBinarySwap $pendingBinarySwap;
+
     #[Override]
     protected function setUp(): void
     {
@@ -44,6 +47,7 @@ final class SelfUpdaterTest extends TestCase
         (new Filesystem())->mkdir($this->workingDirectory);
         $this->binaryPath = $this->workingDirectory.'/symfony-security-auditor';
         (new Filesystem())->dumpFile($this->binaryPath, 'OLD-BINARY');
+        $this->pendingBinarySwap = new PendingBinarySwap();
     }
 
     #[Override]
@@ -60,9 +64,34 @@ final class SelfUpdaterTest extends TestCase
     {
         $payload = 'NEW-BINARY';
         $selfUpdateResult = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+        $this->pendingBinarySwap->commit();
 
         self::assertSame(SelfUpdateStatus::Updated, $selfUpdateResult->status);
         self::assertStringEqualsFile($this->binaryPath, $payload);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_leaves_the_running_binary_in_place_until_the_process_ends(): void
+    {
+        $payload = 'NEW-BINARY';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+
+        self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_keeps_the_verified_download_until_the_swap_is_committed(): void
+    {
+        $payload = 'NEW-BINARY';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+
+        self::assertCount(1, (new Finder())->in($this->workingDirectory)->files()->name('/\.download$/')->ignoreDotFiles(false));
     }
 
     /**
@@ -73,6 +102,7 @@ final class SelfUpdaterTest extends TestCase
     {
         $payload = 'NEW-BINARY';
         $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+        $this->pendingBinarySwap->commit();
 
         self::assertSame(0o755, fileperms($this->binaryPath) & 0o777);
     }
@@ -86,6 +116,7 @@ final class SelfUpdaterTest extends TestCase
     {
         $payload = 'NEW-BINARY';
         $selfUpdateResult = $this->selfUpdater($this->clientFor($tagName, $payload, hash('sha256', $payload)))->run('1.0.0', false);
+        $this->pendingBinarySwap->commit();
 
         self::assertSame('9.9.9', $selfUpdateResult->latestVersion);
         self::assertStringEqualsFile($this->binaryPath, $payload);
@@ -189,11 +220,67 @@ final class SelfUpdaterTest extends TestCase
         };
         $payload = 'NEW';
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem);
+        $selfUpdater->run('1.0.0', false);
+
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessage('Failed to replace the binary');
+
+            $this->pendingBinarySwap->commit();
+        } finally {
+            self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_reports_a_failure_to_make_the_download_executable_before_scheduling_a_swap(): void
+    {
+        $filesystem = new class extends Filesystem {
+            /**
+             * @param string|iterable<mixed> $files
+             */
+            #[Override]
+            public function chmod(string|iterable $files, int $mode, int $umask = 0o000, bool $recursive = false): void
+            {
+                throw new IOException('chmod refused');
+            }
+        };
+        $payload = 'NEW';
+        $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem);
+
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessage('Failed to replace the binary');
+
+            $selfUpdater->run('1.0.0', false);
+        } finally {
+            self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_discards_the_download_when_the_deferred_swap_fails(): void
+    {
+        $filesystem = new class extends Filesystem {
+            #[Override]
+            public function rename(string $origin, string $target, bool $overwrite = false): void
+            {
+                throw new IOException('rename refused');
+            }
+        };
+        $payload = 'NEW';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem)->run('1.0.0', false);
 
         try {
             $this->expectException(SelfUpdateFailedException::class);
 
-            $selfUpdater->run('1.0.0', false);
+            $this->pendingBinarySwap->commit();
         } finally {
             self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('/\.download$/')->ignoreDotFiles(false));
         }
@@ -208,7 +295,7 @@ final class SelfUpdaterTest extends TestCase
         $fakeReleaseClient = new FakeReleaseClient([]);
         $locator = self::createStub(RunningBinaryLocatorInterface::class);
         $locator->method('path')->willReturn($this->binaryPath);
-        $selfUpdater = new SelfUpdater($fakeReleaseClient, new GitHubBinaryAssetResolver('Windows', 'x86_64'), $locator);
+        $selfUpdater = new SelfUpdater($fakeReleaseClient, new GitHubBinaryAssetResolver('Windows', 'x86_64'), $locator, $this->pendingBinarySwap);
 
         try {
             $this->expectException(UnsupportedSelfUpdatePlatformException::class);
@@ -271,6 +358,6 @@ final class SelfUpdaterTest extends TestCase
         $locator = self::createStub(RunningBinaryLocatorInterface::class);
         $locator->method('path')->willReturn($binaryPath ?? $this->binaryPath);
 
-        return new SelfUpdater($releaseClient, new GitHubBinaryAssetResolver('Linux', 'x86_64'), $locator, $filesystem ?? new Filesystem());
+        return new SelfUpdater($releaseClient, new GitHubBinaryAssetResolver('Linux', 'x86_64'), $locator, $this->pendingBinarySwap, $filesystem ?? new Filesystem());
     }
 }

@@ -17,6 +17,7 @@ use JsonException;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 
@@ -39,6 +40,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         private ReleaseClientInterface $releaseClient,
         private GitHubBinaryAssetResolver $gitHubBinaryAssetResolver,
         private RunningBinaryLocatorInterface $runningBinaryLocator,
+        private BinarySwapSchedulerInterface $binarySwapScheduler,
         private Filesystem $filesystem = new Filesystem(),
     ) {}
 
@@ -102,9 +104,11 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         try {
             $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath);
             $this->assertChecksumMatches($gitHubBinaryAsset, $downloadPath);
-            $this->install($downloadPath, $binaryPath);
-        } finally {
+            $this->scheduleInstall($downloadPath, $binaryPath);
+        } catch (Throwable $throwable) {
             $this->filesystem->remove($downloadPath);
+
+            throw $throwable;
         }
     }
 
@@ -134,12 +138,29 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     /**
      * @throws SelfUpdateFailedException
      */
-    private function install(string $downloadPath, string $binaryPath): void
+    private function scheduleInstall(string $downloadPath, string $binaryPath): void
     {
         try {
             $this->filesystem->chmod($downloadPath, 0o755);
+        } catch (IOException $ioException) {
+            throw SelfUpdateFailedException::forFailedReplacement($binaryPath, $ioException);
+        }
+
+        $this->binarySwapScheduler->schedule(function () use ($downloadPath, $binaryPath): void {
+            $this->commitInstall($downloadPath, $binaryPath);
+        });
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    private function commitInstall(string $downloadPath, string $binaryPath): void
+    {
+        try {
             $this->filesystem->rename($downloadPath, $binaryPath, true);
         } catch (IOException $ioException) {
+            $this->filesystem->remove($downloadPath);
+
             throw SelfUpdateFailedException::forFailedReplacement($binaryPath, $ioException);
         }
     }

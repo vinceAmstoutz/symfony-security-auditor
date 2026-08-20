@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
@@ -22,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckStoreInterface;
 
 /** @internal not part of the BC promise — the command *name* (`self-update`) is public, but the PHP class itself is for internal use only. */
@@ -36,6 +38,7 @@ final readonly class SelfUpdateCommand
         private SelfUpdaterInterface $selfUpdater,
         private string $currentVersion,
         private UpdateCheckStoreInterface $updateCheckStore,
+        private ClockInterface $clock,
     ) {}
 
     /**
@@ -48,12 +51,25 @@ final readonly class SelfUpdateCommand
         bool $check = false,
     ): int {
         $selfUpdateResult = $this->selfUpdater->run($this->currentVersion, $check);
-
-        if (SelfUpdateStatus::Updated === $selfUpdateResult->status) {
-            $this->updateCheckStore->clear();
-        }
+        $this->refreshUpdateCheckCache($selfUpdateResult);
 
         return $this->report($symfonyStyle, $selfUpdateResult);
+    }
+
+    /**
+     * This command always reaches the release feed, so its answer supersedes
+     * whatever the throttled passive notice last cached — otherwise the notice
+     * keeps contradicting a version the user has just been shown.
+     */
+    private function refreshUpdateCheckCache(SelfUpdateResult $selfUpdateResult): void
+    {
+        if (SelfUpdateStatus::Updated === $selfUpdateResult->status) {
+            $this->updateCheckStore->clear();
+
+            return;
+        }
+
+        $this->updateCheckStore->write(new UpdateCheckState($this->clock->now(), $selfUpdateResult->latestVersion));
     }
 
     private function report(SymfonyStyle $symfonyStyle, SelfUpdateResult $selfUpdateResult): int

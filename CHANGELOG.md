@@ -41,6 +41,33 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   is available" answer could outlive the update that installed it.
   `UpdateCheckStoreInterface` gained a `clear()` method, and `SelfUpdateCommand`
   now calls it after a successful (non-`--check`) update.
+- **`self-update` ended in a phar corruption fatal error even though the update
+  had succeeded.** The standalone binary is a GZ-compressed PHAR whose classes
+  load lazily, by path, for as long as the process lives.
+  `SelfUpdater::install()` renamed the new binary over that path mid-run, so the
+  next autoload read the new archive at the old archive's offsets and PHP
+  aborted with `zlib: data error` followed by
+  `internal corruption of phar "..." (actual filesize mismatch on file "...")`.
+  Rendering the success message is itself the first thing to need a not-yet-
+  loaded class (`Symfony\Component\Console\Helper\OutputWrapper`), so the run
+  died before printing anything and the failure then cascaded into
+  `ConsoleErrorEvent` — leaving a correctly updated binary on disk behind a
+  fatal error that read like a corrupted install. The move is now deferred:
+  `SelfUpdater` schedules it through the new `BinarySwapSchedulerInterface`, and
+  the standalone entry point (`bin/symfony-security-auditor`) drains the
+  `PendingBinarySwap` from a shutdown function, past the last autoload. Failure
+  handling is unchanged in substance — the download is still verified before
+  anything is moved, and the temp file is still discarded on any failure — but a
+  `chmod` failure is now reported during the run while a failed move surfaces as
+  the process exits.
+- **`self-update --check` left the passive update notice contradicting what it
+  had just reported.** `--check` always reaches the release feed, but discarded
+  the answer, while the after-command notice serves a 24h-throttled cache
+  (`ThrottledUpdateAvailabilityNotifier`). A cache entry written before a
+  release shipped therefore kept the notice silent for up to a day after
+  `--check` had already shown the user the newer version. `SelfUpdateCommand`
+  now records the version it observed, so the notice agrees from the next
+  command onwards.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
