@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\ApplicationTester;
@@ -102,9 +103,10 @@ final class StandaloneAuditEndToEndTest extends TestCase
      * @throws AmbiguousPlatformException
      * @throws UnresolvableAuditCommandException
      */
+    #[DataProvider('auditCommandNames')]
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
-    public function test_an_option_value_the_console_rejects_exits_audit_failed_rather_than_the_gate_code(): void
+    public function test_an_option_value_the_console_rejects_exits_audit_failed_rather_than_the_gate_code(string $commandName): void
     {
         $application = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
@@ -114,10 +116,17 @@ final class StandaloneAuditEndToEndTest extends TestCase
 
         $applicationTester = new ApplicationTester($application);
         $exitCode = $applicationTester->run(
-            ['command' => AuditCommand::NAME, 'project-path' => $this->projectDir, '--format' => 'not-a-format'],
+            ['command' => $commandName, 'project-path' => $this->projectDir, '--format' => 'not-a-format'],
             ['capture_stderr_separately' => true],
         );
 
         self::assertSame(ExitCode::AuditFailed->value, $exitCode);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function auditCommandNames(): iterable
+    {
+        yield 'canonical name' => [AuditCommand::NAME];
+        yield 'alias' => [AuditCommand::ALIAS];
     }
 }
