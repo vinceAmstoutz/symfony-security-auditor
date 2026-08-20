@@ -572,8 +572,10 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        // ceil(100 * (1 + DEFAULT_TOOL_ROUND_TRIP_RATIO)) — only reached if tools default to enabled.
-        self::assertSame(150, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        self::assertSame(
+            (int) ceil(100 * (1.0 + EstimateAuditCostUseCase::DEFAULT_TOOL_ROUND_TRIP_RATIO)),
+            $auditReport->cost()->byRole()['attacker']['input_tokens'],
+        );
     }
 
     /**
@@ -760,13 +762,15 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_tool_round_trip_overhead_uses_ceil_not_floor_or_round(): void
     {
-        // 100 * 1.234 = 123.4 — ceil=124, floor=123, round=123. Picks ceil distinctly.
+        $perRoundTokens = 100;
+        $ratioWhoseProductFloorsAndRoundsAlike = 0.234;
+
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [$this->makeProjectFile('a.php', 'aaa')],
-            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: $perRoundTokens),
             'maxIterations' => 1,
             'toolsEnabled' => true,
-            'toolRoundTripRatio' => 0.234,
+            'toolRoundTripRatio' => $ratioWhoseProductFloorsAndRoundsAlike,
         ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
@@ -781,18 +785,55 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_tool_round_trip_overhead_is_recomputed_every_round_before_scaling_by_iterations(): void
     {
-        // Per-round input = ceil(100 * 1.5) = 150; two rounds = 300. If the ratio were
-        // applied once to the already-iteration-scaled total instead, this would be 275.
+        $perRoundTokens = 100;
+        $rounds = 2;
+
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [$this->makeProjectFile('a.php', 'aaa')],
-            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
-            'maxIterations' => 2,
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: $perRoundTokens),
+            'maxIterations' => $rounds,
             'toolsEnabled' => true,
         ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(300, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        $inflatedPerRound = (int) ceil($perRoundTokens * (1.0 + EstimateAuditCostUseCase::DEFAULT_TOOL_ROUND_TRIP_RATIO));
+
+        self::assertSame($inflatedPerRound * $rounds, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+    }
+
+    /**
+     * The reviewer has its own tool loop (`reviewer_tools_enabled`,
+     * `reviewer_max_tool_iterations`); the attacker's multiplier must not be
+     * charged to it.
+     *
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_tool_round_trip_overhead_never_reaches_the_reviewer_estimate(): void
+    {
+        $reviewerInputWithoutTools = $this->reviewerInputTokensWithTools(false);
+        $reviewerInputWithTools = $this->reviewerInputTokensWithTools(true);
+
+        self::assertSame($reviewerInputWithoutTools, $reviewerInputWithTools);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    private function reviewerInputTokensWithTools(bool $toolsEnabled): int
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'toolsEnabled' => $toolsEnabled,
+        ]);
+
+        return $estimateAuditCostUseCase->execute($this->tmpDir)->cost()->byRole()['reviewer']['input_tokens'];
     }
 
     /**
@@ -802,8 +843,10 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_tool_round_trip_overhead_also_scales_the_skill_prompt_addition(): void
     {
-        // File-content sum = 3 + 3 = 6, skill overhead = 9 * 2 chunks = 18, base = 24.
-        // With tools enabled, the whole per-round input is inflated: ceil(24 * 1.5) = 36.
+        $skillPrompt = 'SKILLTEXT';
+        $fileContentTokens = mb_strlen('aaa') + mb_strlen('bbb');
+        $chunksWhenChunkedOnePerFile = 2;
+
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
                 $this->makeProjectFile('a.php', 'aaa'),
@@ -811,14 +854,19 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             ],
             'tokenEstimator' => $this->lengthEchoingEstimator(),
             'fileChunker' => new FileChunker(ChunkingStrategy::Type, chunkSize: 1),
-            'attackerSkillPromptRenderer' => $this->skillPromptRenderer('SKILLTEXT'),
+            'attackerSkillPromptRenderer' => $this->skillPromptRenderer($skillPrompt),
             'maxIterations' => 1,
             'toolsEnabled' => true,
         ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(36, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        $basePerRound = $fileContentTokens + (mb_strlen($skillPrompt) * $chunksWhenChunkedOnePerFile);
+
+        self::assertSame(
+            (int) ceil($basePerRound * (1.0 + EstimateAuditCostUseCase::DEFAULT_TOOL_ROUND_TRIP_RATIO)),
+            $auditReport->cost()->byRole()['attacker']['input_tokens'],
+        );
     }
 
     /**
