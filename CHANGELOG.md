@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **Two regression gates for a refactor that is supposed to change nothing.**
+  Coverage and MSI prove the code still executes; neither proves the auditor
+  still finds the same vulnerabilities, or that a report written today is still
+  readable by `audit:diff`/`audit:trend` tomorrow. `bin/castor eval` gains
+  `--write-baseline`, recording overall and per-class precision/recall to
+  `examples/vulnerable-app/eval-baseline.json`; a later run compares against
+  that file through the new `Tooling\Eval\EvalBaseline` and fails on any
+  difference in either direction — on a pure move an improvement is as much a
+  signal as a regression. With no baseline present the run warns instead of
+  passing silently. Alongside it, `ReportSchemaFreezeTest` pins every key path
+  and value type of the JSON and SARIF documents against a committed snapshot,
+  plus `Vulnerability::fingerprintOf()` against a known input, so a renamed or
+  retyped key fails the ordinary test suite rather than surfacing later as an
+  unreadable historical report.
+
 ### Changed
 
 - **The Domain-port BC promise is now an enumerated list of 22 ports instead of

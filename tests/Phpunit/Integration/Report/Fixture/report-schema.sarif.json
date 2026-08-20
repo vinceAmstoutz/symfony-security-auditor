@@ -1,0 +1,66 @@
+{
+    "$schema": "string",
+    "version": "string",
+    "runs": [
+        {
+            "tool": {
+                "driver": {
+                    "name": "string",
+                    "version": "string",
+                    "informationUri": "string",
+                    "rules": [
+                        {
+                            "id": "string",
+                            "name": "string",
+                            "shortDescription": {
+                                "text": "string"
+                            },
+                            "helpUri": "string",
+                            "properties": {
+                                "tags": [
+                                    "string"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            "results": [
+                {
+                    "ruleId": "string",
+                    "level": "string",
+                    "message": {
+                        "text": "string"
+                    },
+                    "partialFingerprints": {
+                        "symfonySecurityAuditor/v1": "string"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uri": "string"
+                                },
+                                "region": {
+                                    "startLine": "int",
+                                    "endLine": "int"
+                                }
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "security-severity": "string",
+                        "cvssV4_0Vector": "string"
+                    }
+                }
+            ],
+            "properties": {
+                "input_tokens": "int",
+                "output_tokens": "int",
+                "total_tokens": "int",
+                "estimated_cost_usd": "float",
+                "primary_model": "string"
+            }
+        }
+    ]
+}

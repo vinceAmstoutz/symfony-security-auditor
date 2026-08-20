@@ -1,0 +1,60 @@
+{
+    "audit_id": "string",
+    "project": "string",
+    "started_at": "string",
+    "completed_at": "string",
+    "duration_seconds": "float",
+    "files_scanned": "int",
+    "risk_score": "int",
+    "risk_level": "string",
+    "score": "int",
+    "grade": "string",
+    "total_vulnerabilities": "int",
+    "by_severity": {
+        "critical": "int",
+        "high": "int",
+        "medium": "int",
+        "low": "int",
+        "info": "int"
+    },
+    "vulnerabilities": [
+        {
+            "id": "string",
+            "fingerprint": "string",
+            "type": "string",
+            "category": "string",
+            "owasp": "string",
+            "cwe": "string",
+            "severity": "string",
+            "severity_score": "int",
+            "title": "string",
+            "description": "string",
+            "file": "string",
+            "line_start": "int",
+            "line_end": "int",
+            "vulnerable_code": "string",
+            "attack_vector": "string",
+            "proof": "string",
+            "remediation": "string",
+            "confidence": "float",
+            "reviewer_validated": "bool",
+            "detected_at": "string",
+            "synthesized_poc": "null",
+            "suggested_fix": "null",
+            "cvss": {
+                "version": "string",
+                "vector": "string",
+                "base_score": "float"
+            }
+        }
+    ],
+    "cost": {
+        "input_tokens": "int",
+        "output_tokens": "int",
+        "total_tokens": "int",
+        "estimated_cost_usd": "float",
+        "primary_model": "string",
+        "by_role": []
+    },
+    "coverage": []
+}
