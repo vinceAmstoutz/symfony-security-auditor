@@ -263,10 +263,16 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
             return $this->catalogPath;
         }
 
-        return $this->defaultCatalogPath() ?? $this->catalogPath;
+        return $this->packagedCatalogPath() ?? $this->catalogPath;
     }
 
-    private function defaultCatalogPath(): ?string
+    /**
+     * The catalog shipped with the installed `symfony/models-dev` package —
+     * the only file whose contents `InstalledVersions::getPrettyVersion()`
+     * actually describes, which is why `doctor` compares against it before
+     * naming a version.
+     */
+    public function packagedCatalogPath(): ?string
     {
         try {
             $installPath = InstalledVersions::getInstallPath($this->catalogPackage);
