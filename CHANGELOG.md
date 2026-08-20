@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Removed
 
+- **The three wide `create()` factories deprecated since 1.13 are gone.**
+  `Vulnerability::create()`, `SymfonyMapping::create()` and
+  `LLMResponse::create()` each delegated to the value-object `of()` factory and
+  emitted `…::create() is deprecated, use …::of() instead.` on every call. They
+  are removed along with their `trigger_deprecation()` calls; call `of()`
+  instead, passing
+  `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
+  `ProjectFileInventory`/`AccessControlMap` and `TokenUsageSnapshot`
+  respectively. Because those were the oldest live deprecations, the `$oldest`
+  guard in `.github/workflows/ci.yaml` and the matching note in
+  `docs/versioning.md` now track `1.19` — the `SymfonyMapping` accessor
+  deprecations — instead of `1.13`.
+
 - **`cache.prompt_caching` is gone — a key that had done nothing since 1.7.** It
   once set `cache_control: ephemeral` on every LLM call, but current
   `symfony/ai` bridges stopped reading that option, so from 1.7 onward the key

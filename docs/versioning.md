@@ -336,7 +336,7 @@ to attach one to.
 > not-yet-removed deprecation. `staabm/phpstan-todo-by`'s `todoBy.sfDeprecation`
 > rule reads it through `Composer\InstalledVersions` and reports every
 > `trigger_deprecation()` whose since-version it satisfies, so a root version at
-> or above `1.13` fails PHPStan — and every `Tests + Mutation` leg with it,
+> or above `1.19` fails PHPStan — and every `Tests + Mutation` leg with it,
 > since Infection runs PHPStan as its static-analysis tool.
 >
 > CI therefore pins `COMPOSER_ROOT_VERSION: 1.0.x-dev` in
@@ -345,8 +345,8 @@ to attach one to.
 > holds for neither on a depth-1 detached-HEAD checkout — `extra.branch-alias`
 > alone is not enough, because an alias only applies when its key matches the
 > branch Composer manages to infer. The `Lint` job asserts the resolved version
-> before running PHPStan, so a drift reports itself instead of surfacing as
-> three unexplained deprecation errors.
+> before running PHPStan, so a drift reports itself instead of surfacing as four
+> unexplained deprecation errors.
 >
 > The pin is deliberately not rewritten by `bin/castor release:bump`: raising it
 > to the release actually in development would reintroduce the failure. It can
@@ -354,15 +354,12 @@ to attach one to.
 
 ### Currently deprecated
 
-- **`Vulnerability::create()`, `SymfonyMapping::create()`, and
-  `LLMResponse::create()`** (since 1.13) — superseded by the value-object
-  factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
-  `LLMResponse::of()` (taking
-  `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
-  `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot`
-  respectively). The old methods still work and delegate to the new factories,
-  and emit a runtime deprecation when called. Scheduled for removal in the next
-  `MAJOR`.
+- **The four Symfony-named `SymfonyMapping` accessors** (since 1.19) —
+  `voterCapabilities()`, `firewallRules()`, `controllersWithoutVoters()` and
+  `hasVoterForEntity()`, superseded by their framework-neutral equivalents on
+  `ApplicationSecurityMap` (see [Domain models](#domain-models) for the
+  mapping). They still work, delegate to the neutral model, and emit a runtime
+  deprecation when called. Scheduled for removal in a later `MAJOR`.
 
 ## Branches & maintenance
 
