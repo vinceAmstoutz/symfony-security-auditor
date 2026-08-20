@@ -286,6 +286,34 @@ final class ConfigurationNoticesTest extends TestCase
     /**
      * @throws InvalidAuditExecutionConfigurationException
      */
+    public function test_split_caps_on_one_shared_model_report_both_roles(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('gpt-4o', null, null, attackerMaxOutputTokensOverride: 16384, reviewerMaxOutputTokensOverride: 2048),
+        );
+
+        self::assertCount(2, $notices);
+        self::assertStringContainsString('max_output_tokens is set to 16384', $notices[0]);
+        self::assertStringContainsString('max_output_tokens is set to 2048', $notices[1]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_one_shared_model_and_cap_reports_once(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('gpt-4o', null, null, 16384),
+        );
+
+        self::assertCount(1, $notices);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_a_per_role_override_is_reported_against_the_model_that_ignores_it(): void
     {
         $notices = ConfigurationNotices::of(

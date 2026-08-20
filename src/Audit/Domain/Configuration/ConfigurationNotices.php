@@ -46,7 +46,7 @@ final readonly class ConfigurationNotices
             $notices[] = 'audit.static_prescan.lean_mode has no effect while audit.static_prescan.enabled is false: with no risk markers, lean mode would drop every file, so all files are analysed instead. Enable static_prescan to use lean mode, or set lean_mode: false to silence this.';
         }
 
-        foreach (self::modelsIgnoringTheOutputCap($lLMConfiguration) as $model => $cap) {
+        foreach (self::outputCapsTheirModelIgnores($lLMConfiguration) as ['model' => $model, 'cap' => $cap]) {
             $notices[] = \sprintf('max_output_tokens is set to %d but %s does not use the Anthropic option dialect, so symfony/ai rejects the max_tokens option and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.', $cap, $model);
         }
 
@@ -54,21 +54,29 @@ final readonly class ConfigurationNotices
     }
 
     /**
-     * @return array<string, int>
+     * Keyed on the model *and* the cap, so a split cap on one shared model
+     * reports both roles instead of letting the second overwrite the first,
+     * while the common one-model-one-cap case still reports once.
+     *
+     * @return list<array{model: string, cap: int}>
      */
-    private static function modelsIgnoringTheOutputCap(LLMConfiguration $lLMConfiguration): array
+    private static function outputCapsTheirModelIgnores(LLMConfiguration $lLMConfiguration): array
     {
-        $caps = [
-            $lLMConfiguration->attackerModel() => $lLMConfiguration->attackerMaxOutputTokens(),
-            $lLMConfiguration->reviewerModel() => $lLMConfiguration->reviewerMaxOutputTokens(),
+        $roleCaps = [
+            [$lLMConfiguration->attackerModel(), $lLMConfiguration->attackerMaxOutputTokens()],
+            [$lLMConfiguration->reviewerModel(), $lLMConfiguration->reviewerMaxOutputTokens()],
         ];
 
-        return array_filter(
-            $caps,
-            static fn (int $cap, string $model): bool => LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS !== $cap
-                && !AnthropicOptionDialect::honoredBy($model),
-            \ARRAY_FILTER_USE_BOTH,
-        );
+        $ignored = [];
+        foreach ($roleCaps as [$model, $cap]) {
+            if (LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS === $cap || AnthropicOptionDialect::honoredBy($model)) {
+                continue;
+            }
+
+            $ignored[\sprintf('%s|%d', $model, $cap)] = ['model' => $model, 'cap' => $cap];
+        }
+
+        return array_values($ignored);
     }
 
     private static function escalationSavesNothing(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): bool
