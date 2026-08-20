@@ -83,33 +83,43 @@ final class AuditCostTest extends TestCase
     }
 
     /**
-     * A real run has no per-role breakdown to check, so it cannot see that one
-     * role's model is unpriced while the aggregate is nonzero. Documented in
-     * `AuditCost::hasPublishedPricing()`; pinned here so the day per-role usage
-     * reaches `RunAuditUseCase` this test fails and gets revisited.
+     * A priced cloud attacker paired with an unpriced local reviewer sums to a
+     * nonzero total, so only a breakdown can catch it. A real run has no roles
+     * to attribute, but it does record the model of every call.
      *
      * @throws InvalidAuditCostException
      */
-    public function test_has_published_pricing_falls_back_to_the_aggregate_without_a_role_breakdown(): void
+    public function test_has_published_pricing_spots_an_unpriced_model_in_a_real_run(): void
     {
-        self::assertFalse($this->splitRunReportsPublishedPricing(withRoleBreakdown: true));
-        self::assertTrue($this->splitRunReportsPublishedPricing(withRoleBreakdown: false));
+        $auditCost = AuditCost::of(120_000, 8_000, 1.87, 'claude-opus-5')->withUsageByModel([
+            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 100_000, 'output_tokens' => 7_000, 'estimated_cost_usd' => 1.87],
+            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 20_000, 'output_tokens' => 1_000, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        self::assertFalse($auditCost->hasPublishedPricing());
     }
 
     /**
-     * A priced cloud attacker paired with an unpriced local reviewer: nonzero
-     * in aggregate, unpriced for one role.
-     *
      * @throws InvalidAuditCostException
      */
-    private function splitRunReportsPublishedPricing(bool $withRoleBreakdown): bool
+    public function test_has_published_pricing_is_true_when_every_model_in_a_real_run_prices_above_zero(): void
     {
-        $byRole = $withRoleBreakdown ? [
-            'attacker' => ['model' => 'claude-opus-5', 'input_tokens' => 100_000, 'output_tokens' => 7_000, 'estimated_cost_usd' => 1.87],
-            'reviewer' => ['model' => 'ollama/llama3.2', 'input_tokens' => 20_000, 'output_tokens' => 1_000, 'estimated_cost_usd' => 0.0],
-        ] : [];
+        $auditCost = AuditCost::of(120_000, 8_000, 1.88, 'claude-opus-5')->withUsageByModel([
+            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 100_000, 'output_tokens' => 7_000, 'estimated_cost_usd' => 1.87],
+            'claude-haiku-4-5-20251001' => ['model' => 'claude-haiku-4-5-20251001', 'input_tokens' => 20_000, 'output_tokens' => 1_000, 'estimated_cost_usd' => 0.01],
+        ]);
 
-        return AuditCost::of(120_000, 8_000, 1.87, 'claude-opus-5', $byRole)->hasPublishedPricing();
+        self::assertTrue($auditCost->hasPublishedPricing());
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_still_falls_back_to_the_aggregate_without_any_breakdown(): void
+    {
+        $auditCost = AuditCost::of(120_000, 8_000, 1.87, 'claude-opus-5');
+
+        self::assertTrue($auditCost->hasPublishedPricing());
     }
 
     /**
@@ -149,6 +159,7 @@ final class AuditCostTest extends TestCase
             'estimated_cost_usd' => 0.04,
             'primary_model' => 'claude-sonnet-4-5',
             'by_role' => (object) [],
+            'by_model' => (object) [],
         ], $auditCost->toArray());
     }
 

@@ -29,13 +29,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   it were a genuinely free run — the same caveat `--dry-run` already gives via
   `AuditPresenter::unsupportedModelWarnings()`.
 
-  One gap is documented rather than closed: `hasPublishedPricing()` checks each
-  role separately when a per-role breakdown is present, but only
-  `EstimateAuditCostUseCase` (`--dry-run`) supplies one. A real run builds its
-  `AuditCost` from a `TokenUsageSnapshot`, which carries no per-role usage, so a
-  split attacker/reviewer setup pairing a priced cloud attacker with an unpriced
-  local reviewer prices nonzero in aggregate and is still labeled "published
-  rates". Closing it needs per-role token accounting on the real-run path.
+  The label is decided per model, not from the aggregate. A split
+  attacker/reviewer setup pairing a priced cloud attacker with an unpriced local
+  reviewer sums to a nonzero total, so the aggregate alone would report
+  "published rates" for a run that is half unpriced — the case this feature
+  exists to catch. `BudgetTracker` already prices every call at that call's own
+  model, so it now accumulates per-model totals alongside the running cost and
+  `RunAuditUseCase` attaches them to the `AuditCost` via the new
+  `AuditCost::withUsageByModel()`. `hasPublishedPricing()` checks whichever
+  breakdown it has — per model for a real run, per role for `--dry-run` — and
+  falls back to the aggregate only when there is none, which is correct on its
+  own terms because a single-model run has nothing to disaggregate.
+
+  Per-model rather than per-role because that is what a real run can honestly
+  attribute: it records the model of every call but not the agent that made it,
+  and it also covers models neither role owns — `EscalatingAttackerAgent`'s
+  cheap first pass, PoC and fix synthesis. The JSON report gains a `by_model`
+  object alongside the existing `by_role`; both are additive, and
+  `AuditCost::of()` is unchanged, so existing callers are unaffected.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

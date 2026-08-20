@@ -319,6 +319,92 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_attributes_usage_to_the_model_of_each_call(): void
+    {
+        $budgetTracker = $this->splitModelBudgetTracker();
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'ollama/llama3.2', 'end_turn', TokenUsageSnapshot::of(500_000, 0)));
+
+        self::assertSame([
+            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_000_000, 'output_tokens' => 0, 'estimated_cost_usd' => 3.0],
+            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 500_000, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0],
+        ], $budgetTracker->usageByModel());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_sums_repeated_calls_to_the_same_model(): void
+    {
+        $budgetTracker = $this->splitModelBudgetTracker();
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
+
+        self::assertSame(
+            ['model' => 'claude-opus-5', 'input_tokens' => 2_000_000, 'output_tokens' => 0, 'estimated_cost_usd' => 6.0],
+            $budgetTracker->usageByModel()['claude-opus-5'],
+        );
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_reset_clears_the_per_model_attribution(): void
+    {
+        $budgetTracker = $this->splitModelBudgetTracker();
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
+
+        $budgetTracker->reset();
+
+        self::assertSame([], $budgetTracker->usageByModel());
+    }
+
+    /** A tracker whose pricing provider knows `claude-opus-5` and prices everything else at zero, as an unlisted or self-hosted model does. */
+    private function splitModelBudgetTracker(): BudgetTracker
+    {
+        $pricingProvider = new class implements CacheAwarePricingProviderInterface {
+            #[Override]
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return 'claude-opus-5' === $model ? 3.0 : 0.0;
+            }
+
+            #[Override]
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return 'claude-opus-5' === $model ? 15.0 : 0.0;
+            }
+
+            #[Override]
+            public function cacheReadPricePerMillionTokens(string $model): float
+            {
+                return 0.0;
+            }
+
+            #[Override]
+            public function cacheCreationPricePerMillionTokens(string $model): float
+            {
+                return 0.0;
+            }
+
+            #[Override]
+            public function hasModel(string $model): bool
+            {
+                return 'claude-opus-5' === $model;
+            }
+        };
+
+        return new BudgetTracker(AuditBudget::unlimited(), new CostCalculator($pricingProvider));
+    }
+
     private function budgetTracker(
         AuditBudget $auditBudget,
         float $inputPrice = 0.0,

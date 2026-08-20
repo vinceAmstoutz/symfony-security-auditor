@@ -29,6 +29,7 @@ final readonly class AuditCost
 {
     /**
      * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byRole
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byModel
      */
     private function __construct(
         private int $inputTokens,
@@ -36,6 +37,7 @@ final readonly class AuditCost
         private float $estimatedCostUsd,
         private string $primaryModel,
         private array $byRole = [],
+        private array $byModel = [],
     ) {}
 
     /**
@@ -96,32 +98,29 @@ final readonly class AuditCost
     }
 
     /**
-     * `false` when tokens were actually spent but the total still priced out
-     * to zero — the model has no published rate in the pricing catalog, or is
-     * a free local/self-hosted model. Zero tokens (nothing tracked yet) is
-     * not treated as a pricing gap.
+     * `false` when tokens were actually spent but they priced out to zero —
+     * the model has no published rate in the pricing catalog, or is a free
+     * local/self-hosted model. Zero tokens (nothing tracked yet) is not
+     * treated as a pricing gap.
      *
-     * When a per-role breakdown is present each role is checked on its own
-     * terms, because a split attacker/reviewer configuration can price out
-     * nonzero in aggregate while one role's own model is unpriced — a priced
-     * cloud attacker paired with an unpriced local reviewer, say.
-     *
-     * Only `EstimateAuditCostUseCase` (`--dry-run`) supplies that breakdown.
-     * `RunAuditUseCase` builds its `AuditCost` from a `TokenUsageSnapshot`,
-     * which carries no per-role usage, so a real run falls back to the
-     * aggregate and cannot spot that split-model gap: it reports published
-     * pricing whenever the total is nonzero. Closing that needs per-role token
-     * accounting on the real-run path, not a change here.
+     * The aggregate total cannot answer this for a split configuration: a
+     * priced cloud attacker paired with an unpriced local reviewer still sums
+     * to something nonzero. So each breakdown is checked on its own terms
+     * where one exists — the per-model map for a real run, which records the model
+     * of every call, and `byRole()` for the `--dry-run` estimate, which
+     * projects per role. The aggregate is the last resort, correct on its own
+     * terms because a single-model run has nothing to disaggregate.
      */
     public function hasPublishedPricing(): bool
     {
-        if ([] === $this->byRole) {
+        $breakdown = [] !== $this->byModel ? $this->byModel : $this->byRole;
+
+        if ([] === $breakdown) {
             return 0.0 !== $this->estimatedCostUsd || 0 === $this->totalTokens();
         }
 
-        foreach ($this->byRole as $entry) {
-            $roleTokens = $entry['input_tokens'] + $entry['output_tokens'];
-            if (0.0 === $entry['estimated_cost_usd'] && 0 !== $roleTokens) {
+        foreach ($breakdown as $entry) {
+            if (0.0 === $entry['estimated_cost_usd'] && 0 !== $entry['input_tokens'] + $entry['output_tokens']) {
                 return false;
             }
         }
@@ -135,6 +134,19 @@ final readonly class AuditCost
     public function byRole(): array
     {
         return $this->byRole;
+    }
+
+    /**
+     * A real run records the model of every call but not the agent that made
+     * it, so per-model is the finest attribution it can offer. Applied
+     * copy-on-write rather than through `of()`, which is already at the
+     * project's five-parameter ceiling.
+     *
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byModel keyed by model name
+     */
+    public function withUsageByModel(array $byModel): self
+    {
+        return new self($this->inputTokens, $this->outputTokens, $this->estimatedCostUsd, $this->primaryModel, $this->byRole, $byModel);
     }
 
     /**
@@ -156,6 +168,7 @@ final readonly class AuditCost
             'estimated_cost_usd' => $this->estimatedCostUsd,
             'primary_model' => $this->primaryModel,
             'by_role' => (object) $this->byRole,
+            'by_model' => (object) $this->byModel,
         ];
     }
 }
