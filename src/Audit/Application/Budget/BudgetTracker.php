@@ -60,7 +60,7 @@ final class BudgetTracker
     private function accumulateModelUsage(LLMResponse $llmResponse, float $costUsd): void
     {
         $model = $llmResponse->model();
-        $existing = $this->usageByModel[$model] ?? ['model' => $model, 'input_tokens' => 0, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0];
+        $existing = $this->usageByModel[$model] ?? ['input_tokens' => 0, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0];
 
         $this->usageByModel[$model] = [
             'model' => $model,

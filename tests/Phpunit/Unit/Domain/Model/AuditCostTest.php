@@ -113,6 +113,22 @@ final class AuditCostTest extends TestCase
     }
 
     /**
+     * "Some tokens were spent" is the sum of input and output, not their
+     * difference: an entry that happens to spend as many output tokens as
+     * input ones is still spend, and must still be checked for a price.
+     *
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_counts_input_and_output_tokens_together(): void
+    {
+        $auditCost = AuditCost::of(2_000, 2_000, 0.0, 'ollama/llama3.2')->withUsageByModel([
+            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 2_000, 'output_tokens' => 2_000, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        self::assertFalse($auditCost->hasPublishedPricing());
+    }
+
+    /**
      * @throws InvalidAuditCostException
      */
     public function test_has_published_pricing_still_falls_back_to_the_aggregate_without_any_breakdown(): void
