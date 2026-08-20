@@ -230,12 +230,12 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
-    public function test_command_exits_failure_for_nonexistent_project_path(): void
+    public function test_command_exits_audit_failed_for_nonexistent_project_path(): void
     {
         $commandTester = $this->makeCommandTester('[]', '{}');
         $commandTester->execute(['project-path' => '/nonexistent/path/that/does/not/exist']);
 
-        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertSame(ExitCode::AuditFailed->value, $commandTester->getStatusCode());
     }
 
     /**
@@ -680,12 +680,12 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
-    public function test_command_exits_failure_and_shows_error_for_invalid_directory(): void
+    public function test_command_exits_audit_failed_and_shows_error_for_invalid_directory(): void
     {
         $commandTester = $this->makeCommandTester('[]', '{}');
         $commandTester->execute(['project-path' => '/nonexistent/path/that/does/not/exist']);
 
-        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertSame(ExitCode::AuditFailed->value, $commandTester->getStatusCode());
         self::assertStringContainsString('[ERROR]', $commandTester->getDisplay());
         self::assertStringContainsString('Project path', $commandTester->getDisplay());
     }

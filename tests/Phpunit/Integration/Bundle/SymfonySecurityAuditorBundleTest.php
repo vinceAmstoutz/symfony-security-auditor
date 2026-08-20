@@ -87,6 +87,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
@@ -1459,6 +1460,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['baseline' => '.security-baseline.json']]);
 
         self::assertSame('.security-baseline.json', $containerBuilder->getParameter('symfony_security_auditor.audit.baseline'));
+    }
+
+    public function test_bundle_registers_the_audit_failure_exit_code_listener_on_console_error(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $tags = $containerBuilder->getDefinition(AuditFailureExitCodeListener::class)->getTag('kernel.event_listener');
+
+        self::assertSame([['event' => 'console.error']], $tags);
     }
 
     public function test_bundle_fail_on_parameter_defaults_to_high(): void

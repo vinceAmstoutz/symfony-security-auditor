@@ -92,7 +92,7 @@ final class AuditCommandProviderAbortTest extends TestCase
         preg_match('/(\{.*\})/s', $output, $matches);
         $decoded = json_decode($matches[1] ?? '', true);
 
-        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertSame(ExitCode::AuditFailed->value, $exitCode);
         self::assertIsArray($decoded);
         self::assertSame(1, $decoded['total_vulnerabilities'] ?? null);
     }

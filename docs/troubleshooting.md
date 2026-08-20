@@ -92,16 +92,21 @@ nothing is found, the path is wrong, the layout is non-standard, or
 `No included paths exist in project` at `warning` level confirms the allow-list
 resolved to nothing.
 
-### Audit exits with code `1` even though risk is LOW
+### Audit exits with code `3`
 
-Exit code `1` is also used for:
+Since 2.0, `3` means the audit never produced a verdict — so the absence of
+findings proves nothing about the code. Causes:
 
 - Invalid `project-path` argument.
 - Unhandled exception during pipeline execution (check stderr).
-- Validator errors on the input (e.g. `--format` not one of
-  `console|json|sarif`).
+- An option value the console rejects (e.g. `--format` not one of the supported
+  values).
+- Conflicting options (e.g. `--generate-baseline` with `--dry-run`).
+- A non-transient LLM provider abort (a partial report is still written).
 
-Re-run with `-v` or `-vv` to see the underlying error.
+Re-run with `-v` or `-vv` to see the underlying error. Through 1.x all of these
+shared `1` with the security gate, which is why a `1` on a LOW-risk project used
+to be ambiguous; it no longer is.
 
 ## LLM & Provider Errors
 

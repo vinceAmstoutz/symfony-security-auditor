@@ -148,7 +148,7 @@ final readonly class AuditCommand
         } catch (Throwable $throwable) {
             $this->auditPresenter->error($displayStyle, $throwable);
 
-            return ExitCode::Failure->value;
+            return ExitCode::AuditFailed->value;
         }
     }
 
@@ -297,8 +297,9 @@ final readonly class AuditCommand
 
     /**
      * A budget abort gets its own dedicated exit code (partial report still
-     * emitted, but the run stopped on purpose); every other abort cause
-     * shares the generic failure code.
+     * emitted, but the run stopped on purpose); every other abort cause never
+     * reached a verdict, so it reports the audit-failed code rather than the
+     * gate's.
      *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
@@ -322,6 +323,6 @@ final readonly class AuditCommand
         );
         $this->auditPresenter->error($this->displayStyle($symfonyStyle, $auditCommandInput), $auditAbortedException);
 
-        return $auditAbortedException instanceof AuditAbortedByBudgetException ? ExitCode::BudgetAborted->value : ExitCode::Failure->value;
+        return $auditAbortedException instanceof AuditAbortedByBudgetException ? ExitCode::BudgetAborted->value : ExitCode::AuditFailed->value;
     }
 }

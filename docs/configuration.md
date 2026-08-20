@@ -747,8 +747,9 @@ disagree:
 | Code | Meaning                                                                                                                                                                                                                                                                                                                              |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `0`  | Audit completed; aggregate risk level is below the `fail_on` threshold (default `high` → SAFE, LOW, or MEDIUM) and, when `--min-score` is given, the normalized score is at or above it                                                                                                                                              |
-| `1`  | Aggregate risk level is at or above the `fail_on` threshold (default `high`), the normalized score is below `--min-score`, **the scan discovered no file to audit**, the audit itself failed, or the path was invalid                                                                                                                |
+| `1`  | Audit completed, and the gate tripped: the aggregate risk level is at or above the `fail_on` threshold (default `high`), the normalized score is below `--min-score`, or **the scan discovered no file to audit**                                                                                                                    |
 | `2`  | The audit budget could not be honored: either it aborted mid-run because the configured token or cost budget was exceeded (partial report still emitted), or it never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable and the run was declined or non-interactive (no report emitted in that case) |
+| `3`  | _Since 2.0._ The audit never produced a verdict: an invalid `project-path`, an option value the console rejects, conflicting options, an LLM provider abort, or an unhandled exception. Check stderr                                                                                                                                 |
 
 A run whose scan discovered **no file at all** exits `1` rather than reporting
 SAFE with a perfect score. Nothing was examined, so there is no verdict to pass
@@ -756,6 +757,13 @@ SAFE with a perfect score. Nothing was examined, so there is no verdict to pass
 nothing, or an over-broad `excluded_paths`, instead of letting the gate go
 green. A `--since` run whose diff left nothing changed still exits `0`: there
 the scan did find files, and none of them changed.
+
+`1` and `3` are deliberately distinct. `1` means the auditor worked and is
+telling you something about your code; `3` means the auditor itself did not run,
+so the absence of findings proves nothing. Through 1.x both were `1`, which made
+a crashed or misconfigured auditor indistinguishable from a working one
+reporting real vulnerabilities. A CI job that gates on findings should treat `1`
+as a failing build; one that monitors tool health should alert on `3`.
 
 ### `audit:diff` — comparing two reports
 

@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **A failed audit now exits `3` instead of colliding with the security gate's
+  `1`.** Through 1.x, `audit:run` returned `1` both when the audit completed and
+  the aggregate risk level tripped `audit.fail_on`, and when the auditor never
+  ran at all — an invalid `project-path`, an option value the console rejects,
+  conflicting options such as `--generate-baseline --dry-run`, an LLM provider
+  abort, or an unhandled exception. For a security tool that is the worst
+  collision available: a crashed auditor produced the same signal as a working
+  one reporting real vulnerabilities. `ExitCode` gains `AuditFailed = 3`;
+  `AuditCommand`'s top-level handler and its non-budget abort path return it,
+  and the new `AuditFailureExitCodeListener` (wired on `console.error` in both
+  the bundle and the standalone application) converts the failures that never
+  reach the command body. `0`, `1` and `2` keep their meanings, so a CI job
+  gating on findings needs no change — but one that wants to distinguish "the
+  gate tripped" from "the tool is broken" can now do so. The GitHub Action's
+  `exit-code` output surfaces `3` unchanged.
+
 - **`audit.fail_on` now defaults to `high`, so a HIGH-risk audit fails CI.**
   Through 1.x the default was `critical`, which meant only a `CRITICAL`
   aggregate risk level made `audit:run` exit `1` — a report full of HIGH

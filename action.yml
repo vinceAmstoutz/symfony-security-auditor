@@ -78,7 +78,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: The audit command's exit code (0 = passed, 1 = failed the fail-on or min-score gate, 2 = budget aborted).
+    description: The audit command's exit code (0 = passed, 1 = failed the fail-on or min-score gate, 2 = budget aborted, 3 = the audit never produced a verdict).
     value: ${{ steps.audit.outputs.exit-code }}
   report-path:
     description: The path the report was written to (mirrors the output input; empty when the report was printed to stdout).
@@ -168,7 +168,8 @@ runs:
 
         # Capture the audit exit code without letting the inherited errexit
         # abort before the outputs below are written — the fail-on gate exit 1
-        # (and budget-abort exit 2) are the cases those outputs exist to report.
+        # (plus budget-abort 2 and audit-failed 3) are the cases those outputs
+        # exist to report.
         exit_code=0
         if [ "$SSA_MODE" = "standalone" ]; then
           symfony-security-auditor audit "${args[@]}" || exit_code=$?

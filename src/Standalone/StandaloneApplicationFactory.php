@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Running
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ThrottledUpdateAvailabilityNotifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
@@ -143,7 +144,7 @@ final readonly class StandaloneApplicationFactory
         $application->addCommand($this->selfUpdateCommand());
         $application->addCommand($this->doctorCommand());
         $application->addCommand($this->lazyAuditCommand());
-        $this->registerUpdateAvailabilityNotice($application);
+        $this->registerConsoleListeners($application);
 
         return $application;
     }
@@ -207,14 +208,14 @@ final readonly class StandaloneApplicationFactory
         );
     }
 
-    private function registerUpdateAvailabilityNotice(Application $application): void
+    private function registerConsoleListeners(Application $application): void
     {
-        if (!$this->updateAvailabilityConsoleListener instanceof UpdateAvailabilityConsoleListener) {
-            return;
-        }
-
         $eventDispatcher = new EventDispatcher();
-        $eventDispatcher->addListener(ConsoleEvents::TERMINATE, $this->updateAvailabilityConsoleListener);
+        $eventDispatcher->addListener(ConsoleEvents::ERROR, new AuditFailureExitCodeListener());
+
+        if ($this->updateAvailabilityConsoleListener instanceof UpdateAvailabilityConsoleListener) {
+            $eventDispatcher->addListener(ConsoleEvents::TERMINATE, $this->updateAvailabilityConsoleListener);
+        }
 
         $application->setDispatcher($eventDispatcher);
     }
