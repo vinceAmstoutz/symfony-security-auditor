@@ -125,6 +125,9 @@ final class FilesystemUpdateCheckStoreTest extends TestCase
     public function test_it_logs_the_error_when_clearing_the_cache_fails(): void
     {
         $filesystem = new class extends Filesystem {
+            /**
+             * @param string|iterable<mixed> $files
+             */
             #[Override]
             public function remove(string|iterable $files): void
             {

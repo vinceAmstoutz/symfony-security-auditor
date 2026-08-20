@@ -73,7 +73,7 @@ final class SelfUpdateCommandTest extends TestCase
         $inMemoryUpdateCheckStore = new InMemoryUpdateCheckStore();
         $commandTester = $this->commandTester(
             new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0')),
-            updateCheckStore: $inMemoryUpdateCheckStore,
+            inMemoryUpdateCheckStore: $inMemoryUpdateCheckStore,
         );
 
         $commandTester->execute([]);
@@ -86,7 +86,7 @@ final class SelfUpdateCommandTest extends TestCase
         $inMemoryUpdateCheckStore = new InMemoryUpdateCheckStore();
         $commandTester = $this->commandTester(
             new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::AlreadyUpToDate, '2.0.0', '2.0.0')),
-            updateCheckStore: $inMemoryUpdateCheckStore,
+            inMemoryUpdateCheckStore: $inMemoryUpdateCheckStore,
         );
 
         $commandTester->execute([]);
@@ -99,7 +99,7 @@ final class SelfUpdateCommandTest extends TestCase
         $inMemoryUpdateCheckStore = new InMemoryUpdateCheckStore();
         $commandTester = $this->commandTester(
             new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::UpdateAvailable, '1.0.0', '2.0.0')),
-            updateCheckStore: $inMemoryUpdateCheckStore,
+            inMemoryUpdateCheckStore: $inMemoryUpdateCheckStore,
         );
 
         $commandTester->execute(['--check' => true]);
@@ -107,8 +107,8 @@ final class SelfUpdateCommandTest extends TestCase
         self::assertSame(0, $inMemoryUpdateCheckStore->clearCalls);
     }
 
-    private function commandTester(RecordingSelfUpdater $recordingSelfUpdater, string $currentVersion = '1.0.0', ?InMemoryUpdateCheckStore $updateCheckStore = null): CommandTester
+    private function commandTester(RecordingSelfUpdater $recordingSelfUpdater, string $currentVersion = '1.0.0', ?InMemoryUpdateCheckStore $inMemoryUpdateCheckStore = null): CommandTester
     {
-        return new CommandTester(new SelfUpdateCommand($recordingSelfUpdater, $currentVersion, $updateCheckStore ?? new InMemoryUpdateCheckStore()));
+        return new CommandTester(new SelfUpdateCommand($recordingSelfUpdater, $currentVersion, $inMemoryUpdateCheckStore ?? new InMemoryUpdateCheckStore()));
     }
 }
