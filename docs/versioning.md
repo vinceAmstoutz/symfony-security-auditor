@@ -65,13 +65,6 @@ Every key under `symfony_security_auditor:` documented in
 Default values for these keys are also part of the contract. Changing a default
 is a `MAJOR` change.
 
-> **Planned default change.** `audit.fail_on` ships with the default `critical`
-> (only a `CRITICAL` aggregate risk level fails the build), which preserves the
-> historical exit-code behaviour. The default is **planned to become `high`** in
-> the next `MAJOR` release so a HIGH-risk audit fails CI by default. Pin
-> `audit.fail_on: critical` (or `high`) explicitly now to make your intent
-> immune to that change.
-
 ### CLI surface
 
 - The command name `audit:run` and its `audit` alias (both the bundle and the
@@ -88,11 +81,11 @@ is a `MAJOR` change.
   normalized 0-100 score. The audit exits `1` when either gate trips.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit completed; aggregate risk level is below the `fail_on` threshold
-    (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default) and, when
+    (default `high`, so `SAFE`/`LOW`/`MEDIUM` by default) and, when
     `--min-score` is given, the normalized score is at or above it.
   - `1` — aggregate risk level is at or above the `fail_on` threshold (default
-    `critical`), the normalized score is below `--min-score`, or the audit
-    itself failed.
+    `high`), the normalized score is below `--min-score`, or the audit itself
+    failed.
   - `2` — the audit budget could not be honored: either it aborted mid-run
     because the configured token or cost budget was exceeded (partial report
     still emitted), or it never started because an unpriced model makes

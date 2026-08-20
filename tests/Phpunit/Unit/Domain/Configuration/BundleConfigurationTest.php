@@ -61,7 +61,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
         self::assertFalse($bundleConfiguration->audit->escalationEnabled);
         self::assertNull($bundleConfiguration->audit->escalationCheapModel);
-        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+        self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
         self::assertSame([], $bundleConfiguration->audit->excludedTypes);
         self::assertSame([], $bundleConfiguration->audit->includedTypes);
         self::assertSame([], $bundleConfiguration->audit->customSkills);
@@ -134,25 +134,25 @@ final class BundleConfigurationTest extends TestCase
     public function test_from_array_maps_explicit_fail_on_level(): void
     {
         $config = $this->treeBuilderOutput();
-        $config['audit']['fail_on'] = 'high';
+        $config['audit']['fail_on'] = 'critical';
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
+        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
     }
 
     /**
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
-    public function test_from_array_defaults_fail_on_to_critical_when_key_omitted_for_bc(): void
+    public function test_from_array_defaults_fail_on_to_high_when_key_omitted(): void
     {
         $config = $this->treeBuilderOutput();
         unset($config['audit']['fail_on']);
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+        self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
     }
 
     /**

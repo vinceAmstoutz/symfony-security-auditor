@@ -110,7 +110,7 @@ final readonly class BundleConfiguration
                 reviewerStructuredCollection: $config['audit']['reviewer_structured_collection'] ?? true,
                 stableSystemPrompt: $config['audit']['stable_system_prompt'] ?? true,
                 baseline: $config['audit']['baseline'] ?? null,
-                failOn: RiskLevel::from($config['audit']['fail_on'] ?? 'critical'),
+                failOn: RiskLevel::from($config['audit']['fail_on'] ?? 'high'),
                 excludedTypes: $config['audit']['excluded_types'] ?? [],
                 includedTypes: $config['audit']['included_types'] ?? [],
                 customSkills: self::customSkillsFromConfig($config['audit']['custom_skills'] ?? []),

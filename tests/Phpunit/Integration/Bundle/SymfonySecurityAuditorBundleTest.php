@@ -1461,11 +1461,11 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('.security-baseline.json', $containerBuilder->getParameter('symfony_security_auditor.audit.baseline'));
     }
 
-    public function test_bundle_fail_on_parameter_defaults_to_critical(): void
+    public function test_bundle_fail_on_parameter_defaults_to_high(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame('critical', $containerBuilder->getParameter('symfony_security_auditor.audit.fail_on'));
+        self::assertSame('high', $containerBuilder->getParameter('symfony_security_auditor.audit.fail_on'));
     }
 
     #[DataProvider('failOnLevelCases')]

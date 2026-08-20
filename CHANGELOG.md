@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Changed
+
+- **`audit.fail_on` now defaults to `high`, so a HIGH-risk audit fails CI.**
+  Through 1.x the default was `critical`, which meant only a `CRITICAL`
+  aggregate risk level made `audit:run` exit `1` — a report full of HIGH
+  findings passed the gate. `docs/versioning.md` announced the change as a
+  planned default flip; this release ships it. The four sites that carried the
+  old default all move together: the `fail_on` node in
+  `AuditConfigurationDefinition`, the `?? 'critical'` fallback in
+  `BundleConfiguration::fromArray()`, `AuditExecutionConfiguration::$failOn`,
+  and the `--fail-on` help text. Set `audit.fail_on: critical` (or pass
+  `--fail-on=critical`) to keep the 1.x behaviour.
+
 ### Removed
 
 - **The three wide `create()` factories deprecated since 1.13 are gone.**

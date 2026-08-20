@@ -36,7 +36,7 @@ inputs:
     required: false
     default: ""
   fail-on:
-    description: Minimum aggregate risk level (safe, low, medium, high, critical) that makes the audit exit 1. Leave empty to use the project's audit.fail_on configuration (default critical).
+    description: Minimum aggregate risk level (safe, low, medium, high, critical) that makes the audit exit 1. Leave empty to use the project's audit.fail_on configuration (default high).
     required: false
     default: ""
   min-score:
