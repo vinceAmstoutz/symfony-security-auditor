@@ -145,6 +145,7 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>Symfony LLM Security Auditor</>'), $display);
         self::assertStringContainsString($this->formatted($outputFormatter, \sprintf('<fg=#e71c55>%s</>', str_repeat('─', mb_strlen('◉ Symfony LLM Security Auditor')))), $display);
         self::assertSame(1, substr_count($display, 'Symfony LLM Security Auditor'), 'the plain title() fallback must not also run once the banner has printed');
+        self::assertStringStartsWith(\PHP_EOL, $display, 'SymfonyStyle::title() opens with a blank line; the banner path must not abut whatever printed before it');
     }
 
     private function formatted(OutputFormatterInterface $outputFormatter, string $tag): string

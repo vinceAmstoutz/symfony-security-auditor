@@ -70,12 +70,12 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
     private function identityBanner(SymfonyStyle $symfonyStyle): void
     {
-        $ruleWidth = mb_strlen(self::BANNER_GLYPH) + 1 + mb_strlen(self::WORDMARK);
+        $wordmarkLine = \sprintf('%s %s', self::BANNER_GLYPH, self::WORDMARK);
 
         $symfonyStyle->writeln([
             '',
             \sprintf('<fg=%s>%s</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_GLYPH, self::BANNER_NAVY, self::WORDMARK),
-            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', $ruleWidth)),
+            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', mb_strlen($wordmarkLine))),
             '',
         ]);
     }
