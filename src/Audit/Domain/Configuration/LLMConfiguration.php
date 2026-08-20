@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
 final readonly class LLMConfiguration
 {
-    public const int DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+    public const int DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
     public function __construct(
         private string $model,

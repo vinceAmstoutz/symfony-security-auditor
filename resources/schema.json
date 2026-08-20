@@ -29,7 +29,7 @@
         "max_output_tokens": {
           "type": "integer",
           "minimum": 1,
-          "description": "Maximum output tokens per LLM call (max_tokens). Default: 4096."
+          "description": "Maximum output tokens per LLM call (max_tokens). Default: 8192. Only the Anthropic-dialect bridges accept the option."
         },
         "attacker_max_output_tokens": {
           "type": ["integer", "null"],

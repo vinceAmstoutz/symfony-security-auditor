@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **`model` now defaults to `claude-opus-5`, and `max_output_tokens` to
+  `8192`.** A fresh install with no `model`/`attacker_model`/`reviewer_model`
+  key ran on `claude-opus-4-8` — the previous Opus generation — while every
+  example in the docs had already moved on, so the shipped default and the
+  documentation disagreed by design. Both call sites carrying the old value
+  move: the `model` node in `AuditConfigurationDefinition` and the interactive
+  prompt's fallback in `InitCommand`, the latter being what
+  `init --no-interaction` (and therefore the `SSA_INIT` installer flag and the
+  GitHub Action's standalone mode) writes. `claude-opus-4-8` remains a fully
+  valid, explicitly-settable model and is still priced in the
+  `symfony/models-dev` catalog. The output cap moves with it: on a current
+  Claude model `max_tokens` bounds thinking and response text **together**, so
+  the pre-2.0 `4096` left materially less room for a full `record_vulnerability`
+  argument set than the number suggests — exactly the truncation the key exists
+  to prevent. `LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS` is now the single
+  source for that default and reads `8192`.
+
 - **`max_output_tokens` no longer pretends to work on providers that reject
   it.** The gate that decided whether to forward the cap was
   `str_contains($model, 'claude')` in `PlatformOptionsFactory` — coincidence-

@@ -72,7 +72,7 @@ final readonly class InitCommand
         }
 
         $provider = b($provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic'))->trim()->toString();
-        $model = b($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
+        $model = b($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-5'))->trim()->toString();
 
         $violation = $this->identityViolation($provider, $model);
         if (null !== $violation) {

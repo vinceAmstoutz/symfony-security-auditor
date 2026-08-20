@@ -779,11 +779,11 @@ Extension or Configuration class.
 `configure(DefinitionConfigurator $definition)` defines the config tree under
 root key `symfony_security_auditor`. Top-level scalars:
 
-| Key              | Default             | Purpose                                         |
-| ---------------- | ------------------- | ----------------------------------------------- |
-| `model`          | `'claude-opus-4-8'` | Model name for both Attacker and Reviewer roles |
-| `attacker_model` | `null`              | Override: dedicated model for the Attacker role |
-| `reviewer_model` | `null`              | Override: dedicated model for the Reviewer role |
+| Key              | Default           | Purpose                                         |
+| ---------------- | ----------------- | ----------------------------------------------- |
+| `model`          | `'claude-opus-5'` | Model name for both Attacker and Reviewer roles |
+| `attacker_model` | `null`            | Override: dedicated model for the Attacker role |
+| `reviewer_model` | `null`            | Override: dedicated model for the Reviewer role |
 
 Nested sections:
 

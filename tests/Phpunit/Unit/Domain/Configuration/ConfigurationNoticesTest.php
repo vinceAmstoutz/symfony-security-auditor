@@ -253,11 +253,11 @@ final class ConfigurationNoticesTest extends TestCase
     {
         $notices = ConfigurationNotices::of(
             $this->audit(['reviewerBatchSize' => 1]),
-            new LLMConfiguration('gpt-4o', null, null, 8192),
+            new LLMConfiguration('gpt-4o', null, null, 16384),
         );
 
         self::assertCount(1, $notices);
-        self::assertStringContainsString('max_output_tokens is set to 8192', $notices[0]);
+        self::assertStringContainsString('max_output_tokens is set to 16384', $notices[0]);
         self::assertStringContainsString('gpt-4o', $notices[0]);
     }
 
@@ -268,7 +268,7 @@ final class ConfigurationNoticesTest extends TestCase
     {
         self::assertSame([], ConfigurationNotices::of(
             $this->audit(['reviewerBatchSize' => 1]),
-            new LLMConfiguration('claude-opus-5', null, null, 8192),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
         ));
     }
 
