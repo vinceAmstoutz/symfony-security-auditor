@@ -235,7 +235,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /** @return array<array-key, mixed> */
     private function loadCatalog(): array
     {
-        $path = $this->resolveCatalogPath();
+        $path = $this->effectiveCatalogPath();
         $contents = null !== $path && is_file($path) ? file_get_contents($path) : false;
         if (false === $contents) {
             return $this->disablePricing('catalog file not found or unreadable', $path);
@@ -251,13 +251,13 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     }
 
     /**
-     * `catalogPath` is a writable-override location (e.g. one `self-update`
-     * refreshes) that may not exist yet — falling straight through to
-     * `defaultCatalogPath()` when it's absent, instead of disabling pricing
-     * outright, is what makes it a genuine override rather than a hard
-     * requirement.
+     * The catalog file this provider actually reads, so `doctor` can name it
+     * instead of assuming the packaged one — a `self-update` refresh writes an
+     * override that takes precedence. An override that does not exist yet falls
+     * through to the packaged catalog rather than shadowing it, which is what
+     * makes the override location safe to point at before anything writes there.
      */
-    private function resolveCatalogPath(): ?string
+    public function effectiveCatalogPath(): ?string
     {
         if (null !== $this->catalogPath && is_file($this->catalogPath)) {
             return $this->catalogPath;

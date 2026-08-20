@@ -58,7 +58,7 @@ final readonly class SelfUpdateCommand
         };
 
         if (PricingCatalogRefreshOutcome::Failed === $selfUpdateResult->pricingCatalogRefresh) {
-            $symfonyStyle->warning('Could not refresh the bundled pricing catalog. Cost figures keep using the catalog frozen into the binary at build time; run "self-update" again to retry.');
+            $symfonyStyle->warning('Could not refresh the bundled pricing catalog. Cost figures keep using the catalog already in place — the last successful refresh if there was one, otherwise the one frozen into the binary at build time; run "self-update" again to retry.');
         }
 
         return Command::SUCCESS;
