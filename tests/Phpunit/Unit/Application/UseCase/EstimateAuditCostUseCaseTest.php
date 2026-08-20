@@ -557,8 +557,10 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_skill_prompt_overhead_is_added_once_per_chunk_before_scaling_by_iterations(): void
     {
-        // File-content sum = 3 + 3 = 6. Chunking by type with a chunk size of 1 forces
-        // one chunk per file, so the 9-token skill prompt is added twice: 6 + (9 * 2) = 24.
+        $skillPrompt = 'SKILLTEXT';
+        $fileContentTokens = mb_strlen('aaa') + mb_strlen('bbb');
+        $chunksWhenChunkedOnePerFile = 2;
+
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
                 $this->makeProjectFile('a.php', 'aaa'),
@@ -566,13 +568,55 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             ],
             'tokenEstimator' => $this->lengthEchoingEstimator(),
             'fileChunker' => new FileChunker(ChunkingStrategy::Type, chunkSize: 1),
-            'attackerSkillPromptRenderer' => $this->skillPromptRenderer('SKILLTEXT'),
+            'attackerSkillPromptRenderer' => $this->skillPromptRenderer($skillPrompt),
             'maxIterations' => 1,
         ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(24, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        self::assertSame(
+            $fileContentTokens + (mb_strlen($skillPrompt) * $chunksWhenChunkedOnePerFile),
+            $auditReport->cost()->byRole()['attacker']['input_tokens'],
+        );
+    }
+
+    /**
+     * The reviewer prompt carries no attacker skill blocks, so
+     * `reviewerInputRatio` applies to the file-content sum alone. Deriving it
+     * from the attacker total instead would bill the reviewer for an overhead
+     * it never sends.
+     *
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_skill_prompt_overhead_never_reaches_the_reviewer_estimate(): void
+    {
+        $reviewerInputWithoutSkills = $this->reviewerInputTokensWithSkillPrompt('');
+        $reviewerInputWithSkills = $this->reviewerInputTokensWithSkillPrompt('SKILLTEXT');
+
+        self::assertSame($reviewerInputWithoutSkills, $reviewerInputWithSkills);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    private function reviewerInputTokensWithSkillPrompt(string $skillPrompt): int
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
+                $this->makeProjectFile('a.php', 'aaa'),
+                $this->makeProjectFile('b.php', 'bbb'),
+            ],
+            'tokenEstimator' => $this->lengthEchoingEstimator(),
+            'fileChunker' => new FileChunker(ChunkingStrategy::Type, chunkSize: 1),
+            'attackerSkillPromptRenderer' => $this->skillPromptRenderer($skillPrompt),
+            'maxIterations' => 1,
+        ]);
+
+        return $estimateAuditCostUseCase->execute($this->tmpDir)->cost()->byRole()['reviewer']['input_tokens'];
     }
 
     /**
@@ -589,16 +633,15 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_skill_prompt_overhead_reflects_each_chunks_own_file_types(): void
     {
+        $controllerChunkSkillPrompt = 'CONTROLLERSKILL';
+        $everyOtherChunkSkillPrompt = 'E';
+        $fileContentTokens = mb_strlen('aaa') + mb_strlen('bbb');
+
         $attackerSkillPromptRenderer = self::createStub(AttackerSkillPromptRendererInterface::class);
         $attackerSkillPromptRenderer->method('render')->willReturnCallback(
-            static fn (array $presentTypes): string => [ProjectFileType::CONTROLLER] === $presentTypes ? 'CONTROLLERSKILL' : 'E',
+            static fn (array $presentTypes): string => [ProjectFileType::CONTROLLER] === $presentTypes ? $controllerChunkSkillPrompt : $everyOtherChunkSkillPrompt,
         );
 
-        // File-content sum = 3 + 3 = 6. Chunking by type with a chunk size of 1 puts the
-        // controller and the entity in separate chunks: 15 ('CONTROLLERSKILL') + 1 ('E') = 16.
-        // Total = 6 + 16 = 22. Flattening this back to "render once from the whole project's
-        // types, times chunk count" would instead charge 1 ('E', since the combined type list
-        // no longer matches the controller-only branch) * 2 chunks = 2, for a total of 8.
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
                 $this->makeProjectFile('src/Controller/FooController.php', 'aaa'),
@@ -612,7 +655,10 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(22, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        self::assertSame(
+            $fileContentTokens + mb_strlen($controllerChunkSkillPrompt) + mb_strlen($everyOtherChunkSkillPrompt),
+            $auditReport->cost()->byRole()['attacker']['input_tokens'],
+        );
     }
 
     /**
@@ -622,18 +668,18 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_skill_prompt_overhead_is_skipped_when_the_renderer_has_no_relevant_skills(): void
     {
-        // A flat estimator returns 50 for any text, including an empty skill prompt —
-        // proving the overhead is skipped structurally, not merely zero by coincidence.
+        $tokensChargedForAnyTextIncludingEmpty = 50;
+
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [$this->makeProjectFile('a.php', 'aaa')],
-            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 50),
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: $tokensChargedForAnyTextIncludingEmpty),
             'attackerSkillPromptRenderer' => $this->skillPromptRenderer(''),
             'maxIterations' => 1,
         ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(50, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        self::assertSame($tokensChargedForAnyTextIncludingEmpty, $auditReport->cost()->byRole()['attacker']['input_tokens']);
     }
 
     /**

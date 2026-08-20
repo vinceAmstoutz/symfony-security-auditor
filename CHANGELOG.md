@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   matching its own files, the same filtering
   `AttackerPromptBuilder::skillsForFiles()` applies on a real run.
 
+  The reviewer estimate deliberately stays out of this. `reviewerInputRatio` is
+  applied to the file-content sum alone, not to the attacker total, because the
+  reviewer prompt carries no skill blocks — `ReviewerPromptBuilder` and
+  everything under `Infrastructure/Prompt/Reviewer/` reference none. Deriving it
+  from the attacker total instead would bill the reviewer for an overhead it
+  never sends.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged

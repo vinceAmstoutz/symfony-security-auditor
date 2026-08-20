@@ -42,6 +42,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
  * a real run — and added on top. Output tokens are projected at
  * `outputRatio * input` because audit prompts are heavily input-skewed.
  * Multiplied by `max_iterations` to account for the attacker/reviewer loop.
+ *
+ * `reviewerInputRatio` is applied to the file-content sum alone, never to the
+ * attacker total: the reviewer prompt carries no skill blocks, so folding the
+ * attacker's own overhead into its base would inflate the reviewer estimate by
+ * an overhead it never sends.
  */
 final readonly class EstimateAuditCostUseCase
 {
@@ -97,19 +102,19 @@ final readonly class EstimateAuditCostUseCase
 
         $auditContext->setProjectFiles($files);
 
-        $attackerPerRoundInput = 0;
+        $fileContentPerRoundInput = 0;
         foreach ($files as $file) {
-            $attackerPerRoundInput += $this->tokenEstimator->estimateTokens($file->content(), $this->primaryModel);
+            $fileContentPerRoundInput += $this->tokenEstimator->estimateTokens($file->content(), $this->primaryModel);
         }
 
-        $attackerPerRoundInput += $this->skillPromptTokensAcrossChunks($files);
+        $attackerPerRoundInput = $fileContentPerRoundInput + $this->skillPromptTokensAcrossChunks($files);
 
         $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
         $attackerOutputTokens = (int) ceil($attackerInputTokens * $this->outputRatio);
         $attackerCostUsd = $this->costCalculator->costForCall($attackerInputTokens, $attackerOutputTokens, $this->primaryModel);
 
         $reviewerModel = '' === $this->reviewerModel ? $this->primaryModel : $this->reviewerModel;
-        $reviewerInputTokens = (int) ceil($attackerInputTokens * $this->reviewerInputRatio);
+        $reviewerInputTokens = (int) ceil($fileContentPerRoundInput * $this->maxIterations * $this->reviewerInputRatio);
         $reviewerOutputTokens = (int) ceil($reviewerInputTokens * $this->outputRatio);
         $reviewerCostUsd = $this->costCalculator->costForCall($reviewerInputTokens, $reviewerOutputTokens, $reviewerModel);
 
