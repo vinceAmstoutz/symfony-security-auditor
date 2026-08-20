@@ -181,6 +181,15 @@ When raising the cap, raise `audit.rate_limit.output_tokens_per_minute`
 proportionally — otherwise the output-tokens bucket becomes the binding
 throttle.
 
+**On a non-Anthropic-dialect model this key cannot help you.** `symfony/ai`'s
+Gemini and OpenAI Responses bridges reject the `max_tokens` option outright, so
+the auditor does not send it — and since 2.0 it says so, printing a pre-flight
+notice naming the model and the cap you configured rather than accepting the
+value and ignoring it. There, cap output through the model string instead —
+`max_tokens` passed with the query-string syntax `symfony/ai-bundle` supports
+(see [Model Options](configuration.md#model-options)) reaches the bridge as part
+of the model definition rather than as a rejected per-call option.
+
 When the provider reports why generation stopped (`symfony/ai` ≥ 0.11 exposes a
 normalized finish reason), the auditor logs an explicit
 `LLM response was truncated by the output token limit` warning — no output-token

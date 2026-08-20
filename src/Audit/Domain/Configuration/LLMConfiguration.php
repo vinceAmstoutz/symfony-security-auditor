@@ -15,11 +15,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
 final readonly class LLMConfiguration
 {
+    public const int DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+
     public function __construct(
         private string $model,
         private ?string $attackerModelOverride,
         private ?string $reviewerModelOverride,
-        private int $maxOutputTokens = 4096,
+        private int $maxOutputTokens = self::DEFAULT_MAX_OUTPUT_TOKENS,
         private ?int $attackerMaxOutputTokensOverride = null,
         private ?int $reviewerMaxOutputTokensOverride = null,
         public bool $providerJsonMode = false,

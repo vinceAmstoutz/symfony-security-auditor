@@ -1,0 +1,56 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
+
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AnthropicOptionDialect;
+
+final class AnthropicOptionDialectTest extends TestCase
+{
+    #[DataProvider('honoredModels')]
+    public function test_an_anthropic_dialect_model_honors_the_option_set(string $model): void
+    {
+        self::assertTrue(AnthropicOptionDialect::honoredBy($model));
+    }
+
+    #[DataProvider('unhonoredModels')]
+    public function test_any_other_model_does_not(string $model): void
+    {
+        self::assertFalse(AnthropicOptionDialect::honoredBy($model));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function honoredModels(): iterable
+    {
+        yield 'anthropic api' => ['claude-opus-5'];
+        yield 'vertex' => ['claude-opus-5@20260101'];
+        yield 'vertex dotted' => ['claude.opus.5'];
+        yield 'bedrock' => ['anthropic.claude-opus-5-v1:0'];
+        yield 'bedrock us cross-region' => ['us.anthropic.claude-opus-5-v1:0'];
+        yield 'bedrock eu cross-region' => ['eu.anthropic.claude-opus-5-v1:0'];
+        yield 'bedrock apac cross-region' => ['apac.anthropic.claude-opus-5-v1:0'];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unhonoredModels(): iterable
+    {
+        yield 'openai' => ['gpt-4o'];
+        yield 'gemini' => ['gemini-2.5-pro'];
+        yield 'mistral' => ['mistral-large-latest'];
+        yield 'gateway alias hiding its origin' => ['acme-gateway/fast'];
+        yield 'unrelated model merely containing claude' => ['openrouter/not-claude-at-all'];
+        yield 'empty' => [''];
+    }
+}

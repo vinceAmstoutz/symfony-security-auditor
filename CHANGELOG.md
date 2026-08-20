@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **`max_output_tokens` no longer pretends to work on providers that reject
+  it.** The gate that decided whether to forward the cap was
+  `str_contains($model, 'claude')` in `PlatformOptionsFactory` — coincidence-
+  driven in both directions: it matched any unrelated model whose name happened
+  to contain "claude", and a user on Gemini or OpenAI could set
+  `max_output_tokens: 8192` and get no error, no warning and no effect, even
+  though `docs/troubleshooting.md` sends exactly that user to this key when
+  findings truncate. The substring match is replaced by the new
+  `AnthropicOptionDialect`, which matches anchored model-id prefixes (`claude-`,
+  `claude.`, `anthropic.`, and Bedrock's `us.`/`eu.`/`apac.` cross-region
+  variants), so a Bedrock id keeps its cap and `openrouter/not-claude-at-all` no
+  longer receives an option its bridge would reject. And a cap other than the
+  shipped default configured against a model outside that dialect now prints a
+  pre-flight notice naming the model and the value — the same channel that
+  already reports configuration which silently disables a cost saver — instead
+  of being dropped in silence. `provider_json_mode` is gated by the same prefix
+  check.
+
 - **A failed audit now exits `3` instead of colliding with the security gate's
   `1`.** Through 1.x, `audit:run` returned `1` both when the audit completed and
   the aggregate risk level tripped `audit.fail_on`, and when the auditor never

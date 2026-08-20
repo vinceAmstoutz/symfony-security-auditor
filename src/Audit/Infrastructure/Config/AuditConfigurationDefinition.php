@@ -17,6 +17,7 @@ use Symfony\Component\Config\Definition\Builder\NodeBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -66,9 +67,9 @@ final readonly class AuditConfigurationDefinition
                     ->info('Override: dedicated model for the Reviewer role. Falls back to `model` when null.')
                 ->end()
                 ->integerNode('max_output_tokens')
-                    ->defaultValue(4096)
+                    ->defaultValue(LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS)
                     ->min(1)
-                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. Sets `max_tokens` in every platform request. Default 4096; symfony/ai's Anthropic bridge otherwise defaults to a much smaller value (~1000) that silently truncates findings.")
+                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. Sets `max_tokens` in every platform request. Default 4096; symfony/ai's Anthropic bridge otherwise defaults to a much smaller value (~1000) that silently truncates findings. Only the Anthropic-dialect bridges accept the option — on any other model a value other than the default is reported as a pre-flight notice instead of being dropped in silence.")
                 ->end()
                 ->integerNode('attacker_max_output_tokens')
                     ->defaultNull()

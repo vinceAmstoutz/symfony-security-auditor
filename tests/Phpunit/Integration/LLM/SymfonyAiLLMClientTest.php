@@ -446,6 +446,52 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
      */
+    public function test_complete_omits_max_output_tokens_for_a_model_that_merely_contains_claude(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'openrouter/not-claude-at-all', new NullLogger(), maxOutputTokens: 8192),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_sends_max_output_tokens_for_a_bedrock_anthropic_model_id(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'us.anthropic.claude-opus-5-v1:0', new NullLogger(), maxOutputTokens: 8192),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(8192, $invocationOptionsCapture->options['max_tokens']);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_complete_omits_max_output_tokens_for_non_anthropic_model_even_when_configured(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
