@@ -113,11 +113,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
      */
     private function assertChecksumMatches(GitHubBinaryAsset $gitHubBinaryAsset, string $downloadPath): void
     {
-        if (!is_readable($downloadPath)) {
-            throw SelfUpdateFailedException::forUnreadableDownload($downloadPath);
-        }
-
-        $actual = hash_file('sha256', $downloadPath);
+        $actual = is_readable($downloadPath) ? hash_file('sha256', $downloadPath) : false;
         if (false === $actual) {
             throw SelfUpdateFailedException::forUnreadableDownload($downloadPath);
         }
