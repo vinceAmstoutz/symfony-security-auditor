@@ -83,6 +83,36 @@ final class AuditCostTest extends TestCase
     }
 
     /**
+     * A real run has no per-role breakdown to check, so it cannot see that one
+     * role's model is unpriced while the aggregate is nonzero. Documented in
+     * `AuditCost::hasPublishedPricing()`; pinned here so the day per-role usage
+     * reaches `RunAuditUseCase` this test fails and gets revisited.
+     *
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_falls_back_to_the_aggregate_without_a_role_breakdown(): void
+    {
+        self::assertFalse($this->splitRunReportsPublishedPricing(withRoleBreakdown: true));
+        self::assertTrue($this->splitRunReportsPublishedPricing(withRoleBreakdown: false));
+    }
+
+    /**
+     * A priced cloud attacker paired with an unpriced local reviewer: nonzero
+     * in aggregate, unpriced for one role.
+     *
+     * @throws InvalidAuditCostException
+     */
+    private function splitRunReportsPublishedPricing(bool $withRoleBreakdown): bool
+    {
+        $byRole = $withRoleBreakdown ? [
+            'attacker' => ['model' => 'claude-opus-5', 'input_tokens' => 100_000, 'output_tokens' => 7_000, 'estimated_cost_usd' => 1.87],
+            'reviewer' => ['model' => 'ollama/llama3.2', 'input_tokens' => 20_000, 'output_tokens' => 1_000, 'estimated_cost_usd' => 0.0],
+        ] : [];
+
+        return AuditCost::of(120_000, 8_000, 1.87, 'claude-opus-5', $byRole)->hasPublishedPricing();
+    }
+
+    /**
      * @throws InvalidAuditCostException
      */
     public function test_has_published_pricing_is_true_when_every_split_role_prices_above_zero(): void

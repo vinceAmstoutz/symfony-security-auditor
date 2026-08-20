@@ -101,11 +101,17 @@ final readonly class AuditCost
      * a free local/self-hosted model. Zero tokens (nothing tracked yet) is
      * not treated as a pricing gap.
      *
-     * With a split attacker/reviewer configuration, the aggregate total can
-     * price out nonzero even when one role's own model is unpriced — e.g. a
-     * priced cloud attacker paired with an unpriced local reviewer. `byRole()`
-     * carries each role's own tokens and cost, so each role is checked on its
-     * own terms instead of the misleading total.
+     * When a per-role breakdown is present each role is checked on its own
+     * terms, because a split attacker/reviewer configuration can price out
+     * nonzero in aggregate while one role's own model is unpriced — a priced
+     * cloud attacker paired with an unpriced local reviewer, say.
+     *
+     * Only `EstimateAuditCostUseCase` (`--dry-run`) supplies that breakdown.
+     * `RunAuditUseCase` builds its `AuditCost` from a `TokenUsageSnapshot`,
+     * which carries no per-role usage, so a real run falls back to the
+     * aggregate and cannot spot that split-model gap: it reports published
+     * pricing whenever the total is nonzero. Closing that needs per-role token
+     * accounting on the real-run path, not a change here.
      */
     public function hasPublishedPricing(): bool
     {

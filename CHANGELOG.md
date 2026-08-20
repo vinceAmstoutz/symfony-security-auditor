@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   it were a genuinely free run — the same caveat `--dry-run` already gives via
   `AuditPresenter::unsupportedModelWarnings()`.
 
+  One gap is documented rather than closed: `hasPublishedPricing()` checks each
+  role separately when a per-role breakdown is present, but only
+  `EstimateAuditCostUseCase` (`--dry-run`) supplies one. A real run builds its
+  `AuditCost` from a `TokenUsageSnapshot`, which carries no per-role usage, so a
+  split attacker/reviewer setup pairing a priced cloud attacker with an unpriced
+  local reviewer prices nonzero in aggregate and is still labeled "published
+  rates". Closing it needs per-role token accounting on the real-run path.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged
