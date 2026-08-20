@@ -1431,6 +1431,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
     }
 
+    public function test_bundle_reports_an_output_cap_the_configured_model_cannot_honor(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'max_output_tokens' => 16384]);
+
+        $notices = $containerBuilder->getParameter('symfony_security_auditor.config_notices');
+
+        self::assertIsArray($notices);
+        self::assertContains(
+            'max_output_tokens is set to 16384 but gpt-4o does not use the Anthropic option dialect, so symfony/ai rejects the max_tokens option and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.',
+            $notices,
+        );
+    }
+
+    public function test_bundle_stays_silent_about_an_output_cap_an_anthropic_dialect_model_honors(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'claude-opus-5', 'max_output_tokens' => 16384]);
+
+        self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
+    }
+
     public function test_bundle_lean_mode_is_forced_off_when_the_static_prescanner_is_disabled(): void
     {
         $containerBuilder = $this->loadParameters([
