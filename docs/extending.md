@@ -532,12 +532,13 @@ in `config/services.yaml` to override the bundled behaviour (see
   `ComposerAuditAdvisoryDatabase` running `composer audit`;
   `InMemoryAdvisoryDatabase` is the offline fallback). Implement it to query an
   internal vulnerability feed or a commercial advisory service.
-- `PricingProviderInterface` — per-model USD prices for cost estimation
-  (default: `ModelsDevPricingProvider` reading the `symfony/models-dev`
-  catalog). Also implement `CacheAwarePricingProviderInterface` if your source
-  knows cache-read/cache-write rates — the cost report then prices cached tokens
-  at their discounted rate. Implement for private model deployments or
-  negotiated pricing.
+- `PricingProviderInterface` — per-model USD prices for cost estimation, input
+  and output rates plus the cache-read/cache-write rates the cost report uses to
+  price cached tokens at their discounted rate (default:
+  `ModelsDevPricingProvider` reading the `symfony/models-dev` catalog).
+  Implement for private model deployments or negotiated pricing; return
+  `pricePerMillionInputTokens()` from both cache methods if your source has no
+  cache rates.
 - `RateLimiterInterface` — `acquire()` / `record()` / `pauseUntil()` around
   every LLM call (default: `NullRateLimiter`, or `TokenBucketRateLimiter` when
   any `audit.rate_limit.*` key is set). Implement it to coordinate quota

@@ -41,6 +41,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Removed
 
+- **`CacheAwarePricingProviderInterface` is gone; its two methods moved onto
+  `PricingProviderInterface`.** The split shipped in 1.12 as an explicitly
+  transitional shape — PHP interfaces cannot gain a method without a BC break,
+  so cache rates could not join the base port before a `MAJOR`. They now have:
+  `PricingProviderInterface` declares `cacheReadPricePerMillionTokens()` and
+  `cacheCreationPricePerMillionTokens()` alongside the input/output rates, and
+  `CostCalculator` drops its `instanceof CacheAwarePricingProviderInterface`
+  branch — together with the Anthropic `0.1x`-read / `1.25x`-write heuristic and
+  base-input-rate fallback that branch existed to reach. A custom provider must
+  implement the two new methods; returning `pricePerMillionInputTokens()` from
+  both reproduces the old non-cache-aware behaviour exactly.
+
 - **The three wide `create()` factories deprecated since 1.13 are gone.**
   `Vulnerability::create()`, `SymfonyMapping::create()` and
   `LLMResponse::create()` each delegated to the value-object `of()` factory and

@@ -202,6 +202,18 @@ final class RunAuditUseCaseTest extends TestCase
             }
 
             #[Override]
+            public function cacheReadPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
+            }
+
+            #[Override]
+            public function cacheCreationPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
+            }
+
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;
@@ -334,6 +346,18 @@ final class RunAuditUseCaseTest extends TestCase
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return 0.0;
+            }
+
+            #[Override]
+            public function cacheReadPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
+            }
+
+            #[Override]
+            public function cacheCreationPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
             }
 
             #[Override]

@@ -2841,6 +2841,18 @@ final class SymfonyAiLLMClientTest extends TestCase
             }
 
             #[Override]
+            public function cacheReadPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
+            }
+
+            #[Override]
+            public function cacheCreationPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
+            }
+
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;

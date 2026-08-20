@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Budget;
 use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
 final class CostCalculatorTest extends TestCase
@@ -65,58 +64,23 @@ final class CostCalculatorTest extends TestCase
         self::assertEqualsWithDelta(7.0e-7, $costCalculator->costForCall(7, 0, 'model'), 1e-15);
     }
 
-    public function test_cache_read_tokens_use_the_providers_cache_read_rate_when_cache_aware(): void
+    public function test_cache_read_tokens_use_the_providers_cache_read_rate(): void
     {
-        $costCalculator = new CostCalculator($this->cacheAwarePricing(3.0, 15.0, 0.5, 6.25));
+        $costCalculator = new CostCalculator($this->pricing(3.0, 15.0, 0.5, 6.25));
 
         self::assertEqualsWithDelta(0.5, $costCalculator->costForCall(0, 0, 'model', 1_000_000, 0), 1e-12);
     }
 
-    public function test_cache_creation_tokens_use_the_providers_cache_creation_rate_when_cache_aware(): void
+    public function test_cache_creation_tokens_use_the_providers_cache_creation_rate(): void
     {
-        $costCalculator = new CostCalculator($this->cacheAwarePricing(3.0, 15.0, 0.5, 6.25));
+        $costCalculator = new CostCalculator($this->pricing(3.0, 15.0, 0.5, 6.25));
 
         self::assertEqualsWithDelta(6.25, $costCalculator->costForCall(0, 0, 'model', 0, 1_000_000), 1e-12);
     }
 
-    public function test_cache_read_tokens_fall_back_to_the_input_rate_without_a_cache_aware_provider(): void
+    public function test_cost_sums_input_output_and_both_cache_components(): void
     {
-        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
-
-        self::assertEqualsWithDelta(3.0, $costCalculator->costForCall(0, 0, 'model', 1_000_000, 0), 1e-12);
-    }
-
-    public function test_cache_creation_tokens_fall_back_to_the_input_rate_without_a_cache_aware_provider(): void
-    {
-        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
-
-        self::assertEqualsWithDelta(3.0, $costCalculator->costForCall(0, 0, 'model', 0, 1_000_000), 1e-12);
-    }
-
-    public function test_cache_read_tokens_fall_back_to_the_anthropic_discount_for_claude_models_without_a_cache_aware_provider(): void
-    {
-        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
-
-        self::assertEqualsWithDelta(0.3, $costCalculator->costForCall(0, 0, 'claude-opus-4-8', 1_000_000, 0), 1e-12);
-    }
-
-    public function test_cache_creation_tokens_fall_back_to_the_anthropic_surcharge_for_claude_models_without_a_cache_aware_provider(): void
-    {
-        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
-
-        self::assertEqualsWithDelta(3.75, $costCalculator->costForCall(0, 0, 'claude-opus-4-8', 0, 1_000_000), 1e-12);
-    }
-
-    public function test_cache_aware_rates_win_over_the_claude_heuristic(): void
-    {
-        $costCalculator = new CostCalculator($this->cacheAwarePricing(3.0, 15.0, 0.5, 6.25));
-
-        self::assertEqualsWithDelta(0.5, $costCalculator->costForCall(0, 0, 'claude-opus-4-8', 1_000_000, 0), 1e-12);
-    }
-
-    public function test_cost_sums_input_output_and_both_cache_components_with_cache_aware_rates(): void
-    {
-        $costCalculator = new CostCalculator($this->cacheAwarePricing(3.0, 15.0, 0.5, 6.25));
+        $costCalculator = new CostCalculator($this->pricing(3.0, 15.0, 0.5, 6.25));
 
         self::assertEqualsWithDelta(0.02475, $costCalculator->costForCall(1_000, 1_000, 'model', 1_000, 1_000), 1e-12);
     }
@@ -130,39 +94,16 @@ final class CostCalculatorTest extends TestCase
 
     private function fixedPricing(float $inputPrice, float $outputPrice): PricingProviderInterface
     {
-        return new class($inputPrice, $outputPrice) implements PricingProviderInterface {
-            public function __construct(
-                private readonly float $inputPrice,
-                private readonly float $outputPrice,
-            ) {}
-
-            #[Override]
-            public function pricePerMillionInputTokens(string $model): float
-            {
-                return $this->inputPrice;
-            }
-
-            #[Override]
-            public function pricePerMillionOutputTokens(string $model): float
-            {
-                return $this->outputPrice;
-            }
-
-            #[Override]
-            public function hasModel(string $model): bool
-            {
-                return true;
-            }
-        };
+        return $this->pricing($inputPrice, $outputPrice, $inputPrice, $inputPrice);
     }
 
-    private function cacheAwarePricing(
+    private function pricing(
         float $inputPrice,
         float $outputPrice,
         float $cacheReadPrice,
         float $cacheCreationPrice,
-    ): CacheAwarePricingProviderInterface {
-        return new class($inputPrice, $outputPrice, $cacheReadPrice, $cacheCreationPrice) implements CacheAwarePricingProviderInterface {
+    ): PricingProviderInterface {
+        return new class($inputPrice, $outputPrice, $cacheReadPrice, $cacheCreationPrice) implements PricingProviderInterface {
             public function __construct(
                 private readonly float $inputPrice,
                 private readonly float $outputPrice,

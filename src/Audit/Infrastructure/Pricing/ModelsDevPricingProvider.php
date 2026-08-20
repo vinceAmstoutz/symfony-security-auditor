@@ -18,7 +18,7 @@ use JsonException;
 use OutOfBoundsException;
 use Override;
 use Psr\Log\LoggerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
 /**
  * Sources per-million-token USD pricing (input/output and real prompt-cache
@@ -27,7 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProv
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterface
+final class ModelsDevPricingProvider implements PricingProviderInterface
 {
     private const string CATALOG_PACKAGE = 'symfony/models-dev';
 

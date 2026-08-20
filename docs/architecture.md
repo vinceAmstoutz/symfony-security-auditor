@@ -914,7 +914,7 @@ for unknown models — each a `mb_strlen ÷ ratio` heuristic via the shared
 `TokenEstimatorInterface` to replace the whole strategy.
 
 **Replace pricing provider** — implement
-`Audit\Domain\Port\PricingProviderInterface` (or
-`CacheAwarePricingProviderInterface` to also supply real prompt-cache rates) to
-supply custom per-token prices. Default: `ModelsDevPricingProvider`, which reads
-the daily `symfony/models-dev` catalog snapshot from `vendor/` (no network).
+`Audit\Domain\Port\PricingProviderInterface` — input, output and prompt-cache
+rates in one port — to supply custom per-token prices. Default:
+`ModelsDevPricingProvider`, which reads the daily `symfony/models-dev` catalog
+snapshot from `vendor/` (no network).
