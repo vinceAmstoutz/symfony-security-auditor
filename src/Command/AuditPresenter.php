@@ -73,6 +73,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $ruleWidth = mb_strlen(self::BANNER_GLYPH) + 1 + mb_strlen(self::WORDMARK);
 
         $symfonyStyle->writeln([
+            '',
             \sprintf('<fg=%s>%s</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_GLYPH, self::BANNER_NAVY, self::WORDMARK),
             \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', $ruleWidth)),
             '',
