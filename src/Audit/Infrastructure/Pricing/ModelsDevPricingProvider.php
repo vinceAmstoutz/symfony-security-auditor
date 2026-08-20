@@ -257,22 +257,16 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
      * through to the packaged catalog rather than shadowing it, which is what
      * makes the override location safe to point at before anything writes there.
      */
-    public function effectiveCatalogPath(): ?string
+    private function effectiveCatalogPath(): ?string
     {
         if (null !== $this->catalogPath && is_file($this->catalogPath)) {
             return $this->catalogPath;
         }
 
-        return $this->packagedCatalogPath() ?? $this->catalogPath;
+        return $this->defaultCatalogPath() ?? $this->catalogPath;
     }
 
-    /**
-     * The catalog shipped with the installed `symfony/models-dev` package —
-     * the only file whose contents `InstalledVersions::getPrettyVersion()`
-     * actually describes, which is why `doctor` compares against it before
-     * naming a version.
-     */
-    public function packagedCatalogPath(): ?string
+    private function defaultCatalogPath(): ?string
     {
         try {
             $installPath = InstalledVersions::getInstallPath($this->catalogPackage);
