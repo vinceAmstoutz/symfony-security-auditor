@@ -59,9 +59,7 @@ Every key under `symfony_security_auditor:` documented in
   `audit.rate_limit.requests_per_minute`,
   `audit.rate_limit.input_tokens_per_minute`,
   `audit.rate_limit.output_tokens_per_minute`
-- `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated
-  since 1.7** — see [Deprecation policy](#deprecation-policy) — still accepted
-  but ignored)
+- `cache.enabled`, `cache.dir`
 - `privacy.offline_only`
 
 Default values for these keys are also part of the contract. Changing a default
@@ -356,14 +354,6 @@ to attach one to.
 
 ### Currently deprecated
 
-- **`cache.prompt_caching`** (since 1.7) — once set `cache_control: ephemeral`
-  on every LLM call, but current `symfony/ai` bridges no longer read that
-  option: Anthropic caching is driven by `cache_retention` on the platform in
-  `ai.yaml` (default `short`), and OpenAI/Gemini cache automatically. The key is
-  still accepted and emits a Symfony deprecation when set; it has no effect.
-  Remove it from your config and, if you want a longer Anthropic cache window,
-  set `cache_retention: long` on the `anthropic` platform in `ai.yaml`.
-  Scheduled for removal in the next `MAJOR`.
 - **`Vulnerability::create()`, `SymfonyMapping::create()`, and
   `LLMResponse::create()`** (since 1.13) — superseded by the value-object
   factories `Vulnerability::of()`, `SymfonyMapping::of()`, and

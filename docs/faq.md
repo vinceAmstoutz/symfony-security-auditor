@@ -217,7 +217,7 @@ Provider-side **prompt caching** stacks on top of that for a ~90%
 configured on the `symfony/ai` platform, not in this bundle: set
 `cache_retention` (`short`/`long`) on the `anthropic` platform in `ai.yaml`
 (default `short` already enables it); OpenAI and Gemini cache automatically. The
-old `cache.prompt_caching` bundle flag is deprecated since 1.7 and ignored.
+old `cache.prompt_caching` bundle flag was removed in 2.0.
 
 ## Privacy & Data Handling
 

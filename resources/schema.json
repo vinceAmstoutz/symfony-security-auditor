@@ -381,10 +381,6 @@
             "dir": {
               "type": "string",
               "description": "Cache storage path. Default: %kernel.cache_dir%/symfony_security_auditor/attacker."
-            },
-            "prompt_caching": {
-              "type": "boolean",
-              "description": "Deprecated since 1.7 and ignored. Configure prompt caching on the AI platform in ai.yaml instead."
             }
           }
         },

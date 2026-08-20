@@ -651,18 +651,16 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
-    public function test_bundle_accepts_deprecated_prompt_caching_key_and_still_exposes_its_value(): void
+    public function test_bundle_rejects_the_removed_prompt_caching_key(): void
     {
-        $this->expectUserDeprecationMessageMatches('/The "prompt_caching" option is deprecated and no longer has any effect/');
+        $this->expectException(InvalidConfigurationException::class);
 
-        $kernel = $this->boot([
+        $this->boot([
             'model' => 'gpt-4o',
             'cache' => [
                 'prompt_caching' => false,
             ],
         ]);
-
-        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.cache.prompt_caching'));
     }
 
     #[RunInSeparateProcess]

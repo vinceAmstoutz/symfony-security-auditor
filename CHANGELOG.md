@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Removed
+
+- **`cache.prompt_caching` is gone — a key that had done nothing since 1.7.** It
+  once set `cache_control: ephemeral` on every LLM call, but current
+  `symfony/ai` bridges stopped reading that option, so from 1.7 onward the key
+  was accepted, emitted a Symfony deprecation, and had no effect. The node is
+  now removed from `AuditConfigurationDefinition`, so a config still carrying it
+  fails validation with
+  `Unrecognized option "prompt_caching" under "symfony_security_auditor.cache"`
+  instead of being silently ignored. Delete the key; provider-side prompt
+  caching is configured on the `symfony/ai` platform, not here — set
+  `cache_retention` (`none` | `short` | `long`) on the `anthropic` platform in
+  `ai.yaml` (the default `short` already enables it), while OpenAI and Gemini
+  cache automatically. `CacheConfiguration::$promptCaching` and the
+  `symfony_security_auditor.cache.prompt_caching` container parameter are
+  removed with it.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged

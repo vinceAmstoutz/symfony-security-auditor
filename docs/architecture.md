@@ -795,10 +795,9 @@ Nested sections:
   `budget.max_tokens`, `budget.max_cost_usd` (abort limits);
   `retry.max_attempts`, `retry.initial_delay_ms`, `retry.backoff_multiplier`,
   `retry.jitter_ratio` (LLM resilience)
-- `cache.*` — `enabled`, `dir` (chunk cache). `prompt_caching` is deprecated
-  since 1.7 and ignored; provider-side prompt caching is configured on the
-  `symfony/ai` platform (`cache_retention` in `ai.yaml` for Anthropic; automatic
-  for OpenAI/Gemini).
+- `cache.*` — `enabled`, `dir` (chunk cache). Provider-side prompt caching is
+  configured on the `symfony/ai` platform (`cache_retention` in `ai.yaml` for
+  Anthropic; automatic for OpenAI/Gemini).
 
 Model names must be supported by the platform configured in
 `config/packages/ai.yaml`. See [`docs/configuration.md`](configuration.md) for

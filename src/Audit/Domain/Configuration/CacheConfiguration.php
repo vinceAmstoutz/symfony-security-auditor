@@ -18,6 +18,5 @@ final readonly class CacheConfiguration
     public function __construct(
         public bool $enabled,
         public string $dir,
-        public bool $promptCaching,
     ) {}
 }

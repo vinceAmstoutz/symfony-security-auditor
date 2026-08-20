@@ -434,15 +434,6 @@ final readonly class AuditConfigurationDefinition
                             ->defaultValue('%kernel.cache_dir%/symfony_security_auditor/attacker')
                             ->info('Filesystem path for the attacker cache. Created on first write.')
                         ->end()
-                        ->booleanNode('prompt_caching')
-                            ->defaultTrue()
-                            ->setDeprecated(
-                                'vinceamstoutz/symfony-security-auditor',
-                                '1.7',
-                                'The "%node%" option is deprecated and no longer has any effect. Prompt caching is controlled by your Symfony AI platform: set `cache_retention` (none|short|long) on the anthropic platform in `ai.yaml` (default `short` already enables it); OpenAI and Gemini cache automatically.',
-                            )
-                            ->info('Deprecated and ignored since 1.7. Prompt caching is configured on the Symfony AI platform, not here: set `cache_retention` (none|short|long) on the anthropic platform in `ai.yaml`. OpenAI and Gemini cache automatically.')
-                        ->end()
                     ->end()
                 ->end()
         ;
