@@ -162,16 +162,14 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     private function reviewerRatioPercent(AuditCost $auditCost): ?int
     {
         $byRole = $auditCost->byRole();
-        if (!\array_key_exists(AgentRole::Reviewer->value, $byRole)) {
+        $attackerInputTokens = $byRole[AgentRole::Attacker->value]['input_tokens'] ?? 0;
+        $reviewerInputTokens = $byRole[AgentRole::Reviewer->value]['input_tokens'] ?? null;
+
+        if (null === $reviewerInputTokens || 0 === $attackerInputTokens) {
             return null;
         }
 
-        $attackerInputTokens = $byRole[AgentRole::Attacker->value]['input_tokens'] ?? 0;
-        if (0 === $attackerInputTokens) {
-            return 0;
-        }
-
-        return (int) round($byRole[AgentRole::Reviewer->value]['input_tokens'] / $attackerInputTokens * 100);
+        return (int) round($reviewerInputTokens / $attackerInputTokens * 100);
     }
 
     #[Override]

@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   that size picked up a stray leading bullet and wrapped ragged on narrower
   terminals; it now prints as its own properly-wrapped line.
 
+  When the breakdown carries no attacker input to measure against — no attacker
+  entry, or zero attacker input tokens — the caveat is omitted entirely rather
+  than printing "assumes ~0% of attacker input", which stated a ratio against
+  nothing. Both role lookups are read the same way, so a breakdown missing
+  either entry is handled identically.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged

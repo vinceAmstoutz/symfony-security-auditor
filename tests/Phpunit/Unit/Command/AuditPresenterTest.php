@@ -482,7 +482,7 @@ final class AuditPresenterTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
-    public function test_dry_run_result_caveats_zero_percent_when_the_attacker_took_no_input_tokens(): void
+    public function test_dry_run_result_omits_the_ratio_caveat_when_the_attacker_took_no_input_tokens(): void
     {
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
@@ -495,14 +495,14 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringContainsString('~0% of attacker input', $bufferedOutput->fetch());
+        self::assertStringNotContainsString('Reviewer input assumes', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
     }
 
     /**
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
-    public function test_dry_run_result_caveats_zero_percent_when_the_breakdown_has_no_attacker_entry(): void
+    public function test_dry_run_result_omits_the_ratio_caveat_when_the_breakdown_has_no_attacker_entry(): void
     {
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
@@ -514,7 +514,7 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringContainsString('~0% of attacker input', $bufferedOutput->fetch());
+        self::assertStringNotContainsString('Reviewer input assumes', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
     }
 
     /**
