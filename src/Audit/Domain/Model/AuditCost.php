@@ -168,7 +168,10 @@ final readonly class AuditCost
             'estimated_cost_usd' => $this->estimatedCostUsd,
             'primary_model' => $this->primaryModel,
             'by_role' => (object) $this->byRole,
-            'by_model' => (object) $this->byModel,
+            'by_model' => (object) array_map(
+                static fn (array $usage): array => [...$usage, 'estimated_cost_usd' => round($usage['estimated_cost_usd'], 6)],
+                $this->byModel,
+            ),
         ];
     }
 }

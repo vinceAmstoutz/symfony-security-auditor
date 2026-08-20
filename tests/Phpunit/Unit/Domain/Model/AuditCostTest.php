@@ -180,6 +180,60 @@ final class AuditCostTest extends TestCase
     }
 
     /**
+     * The top-level cost and the dry-run's per-role costs are both rounded to
+     * six decimals, so accumulated float noise must not leave one field in the
+     * same document reading `0.10491600000000001` while another reads
+     * `0.104916`.
+     *
+     * @throws InvalidAuditCostException
+     */
+    public function test_to_array_rounds_per_model_cost_to_the_same_precision_as_the_total(): void
+    {
+        $auditCost = AuditCost::of(1_111, 777, 0.104916, 'claude-opus-5')->withUsageByModel([
+            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_111, 'output_tokens' => 777, 'estimated_cost_usd' => 0.10491600000000001],
+        ]);
+
+        self::assertEquals(
+            (object) ['claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_111, 'output_tokens' => 777, 'estimated_cost_usd' => 0.104916]],
+            $auditCost->toArray()['by_model'],
+        );
+    }
+
+    /**
+     * Six decimals, not seven: the same precision `BudgetTracker::costUsdUsed()`
+     * and the dry-run's per-role costs use.
+     *
+     * @throws InvalidAuditCostException
+     */
+    public function test_to_array_rounds_per_model_cost_to_six_decimals(): void
+    {
+        $auditCost = AuditCost::of(1, 0, 0.0, 'gemini-flash-lite')->withUsageByModel([
+            'gemini-flash-lite' => ['model' => 'gemini-flash-lite', 'input_tokens' => 1, 'output_tokens' => 0, 'estimated_cost_usd' => 0.00000015],
+        ]);
+
+        self::assertEquals(
+            (object) ['gemini-flash-lite' => ['model' => 'gemini-flash-lite', 'input_tokens' => 1, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0]],
+            $auditCost->toArray()['by_model'],
+        );
+    }
+
+    /**
+     * Rounding is for display only. A model too cheap to register at six
+     * decimals is still a priced model, so the published-pricing check must
+     * read the unrounded cost or it would call it self-hosted.
+     *
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_sub_microdollar_cost_still_counts_as_published_pricing(): void
+    {
+        $auditCost = AuditCost::of(1, 0, 0.0, 'gemini-flash-lite')->withUsageByModel([
+            'gemini-flash-lite' => ['model' => 'gemini-flash-lite', 'input_tokens' => 1, 'output_tokens' => 0, 'estimated_cost_usd' => 0.00000015],
+        ]);
+
+        self::assertTrue($auditCost->hasPublishedPricing());
+    }
+
+    /**
      * @throws InvalidAuditCostException
      */
     public function test_to_array_carries_per_role_breakdown_when_provided(): void
