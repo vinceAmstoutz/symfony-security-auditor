@@ -47,6 +47,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
  * attacker total: the reviewer prompt carries no skill blocks, so folding the
  * attacker's own overhead into its base would inflate the reviewer estimate by
  * an overhead it never sends.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class EstimateAuditCostUseCase
 {

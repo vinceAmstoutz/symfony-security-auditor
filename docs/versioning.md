@@ -296,6 +296,10 @@ Anything tagged `@internal` may be refactored, renamed, or removed in any
   `EscalatingAttackerAgent`, `AuditOrchestrator`, `VulnerabilityFactory`,
   `PoCSynthesizer`, `AuditPipeline`, `IngestionStage`, `MappingStage`,
   `AuditStage`, `PoCSynthesisStage`).
+- `Audit\Application\UseCase\EstimateAuditCostUseCase` — the `--dry-run`
+  estimator. `RunAuditUseCase` above is the only BC-protected entry point; this
+  one is a collaborator of `AuditCommand` and its constructor changes whenever
+  the estimate gains a new input.
 - All concrete adapters under `Audit/Infrastructure/` — `SymfonyAiLLMClient`,
   `ProjectFileScanner`, `AttackerPromptBuilder`, `ReviewerPromptBuilder`,
   `FilesystemAttackerCache`, `NullAttackerCache`,
