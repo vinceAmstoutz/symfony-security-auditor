@@ -12,6 +12,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **The Domain-port BC promise is now an enumerated list of 22 ports instead of
+  the whole `src/Audit/Domain/Port/` directory.** The old wording froze every
+  interface in that directory — ~30 of them, most being internal collaboration
+  seams that nobody outside the bundle implements — so changing any signature
+  was a `MAJOR`. That bill was already being paid: #235's transitional
+  `CacheAwarePricingProviderInterface` existed purely because the base pricing
+  port could not gain a method. Eight ports leave the promise and gain
+  `@internal`: `AttackerPromptBuilderInterface`,
+  `ReviewerPromptBuilderInterface`, `AttackerCacheInterface`,
+  `ContextAwareAttackerCacheInterface`, `ReviewerCacheInterface`,
+  `ReviewerFeedbackSnapshotInterface`, `BatchCapableLLMClientInterface` and
+  `ToolBatchCapableLLMClientInterface`. Demoting the last two immediately paid
+  off: `completeBatch()` and `completeBatchWithTools()` now take
+  `list<LLMRequest>` / `list<ToolLLMRequest>` rather than raw
+  `array{system: string, user: string, …}` shapes, so the
+  `LLMRequest::listFromArrays()` / `ToolLLMRequest::listFromArrays()` adapters
+  that existed only to feed a frozen signature are gone and the four remaining
+  Application-side call sites carry value objects end to end. To stop the
+  surface re-widening by accident, a new interface under `Port/` is now
+  `@internal` by default — see `.claude/rules/ddd-layers.md`; joining the list
+  is a documented, deliberate step.
+
 - **`model` now defaults to `claude-opus-5`, and `max_output_tokens` to
   `8192`.** A fresh install with no `model`/`attacker_model`/`reviewer_model`
   key ran on `claude-opus-4-8` — the previous Opus generation — while every

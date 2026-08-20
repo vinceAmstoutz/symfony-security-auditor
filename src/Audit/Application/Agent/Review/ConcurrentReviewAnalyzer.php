@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
@@ -93,15 +94,12 @@ final readonly class ConcurrentReviewAnalyzer
         return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $cached, $coverageRecorder);
     }
 
-    /**
-     * @return array{system: string, user: string}
-     */
-    private function buildRequest(Vulnerability $vulnerability, string $codeContext): array
+    private function buildRequest(Vulnerability $vulnerability, string $codeContext): LLMRequest
     {
-        return [
-            'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
-            'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
-        ];
+        return new LLMRequest(
+            $this->reviewerPromptBuilder->buildSystemPrompt(),
+            $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+        );
     }
 
     /**
@@ -110,8 +108,8 @@ final readonly class ConcurrentReviewAnalyzer
      * before the next window is attempted, so a failure partway through never
      * discards an earlier window's completed work.
      *
-     * @param list<array{system: string, user: string}> $requests
-     * @param list<PendingReview>                       $pending
+     * @param list<LLMRequest>    $requests
+     * @param list<PendingReview> $pending
      *
      * @return array<int, Vulnerability>
      *
@@ -143,8 +141,8 @@ final readonly class ConcurrentReviewAnalyzer
     }
 
     /**
-     * @param list<array{system: string, user: string}> $requestWindow
-     * @param list<PendingReview>                       $pendingWindow
+     * @param list<LLMRequest>    $requestWindow
+     * @param list<PendingReview> $pendingWindow
      *
      * @return array<int, Vulnerability>
      *

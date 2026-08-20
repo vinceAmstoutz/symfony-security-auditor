@@ -25,13 +25,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * `complete()` once per request — the only difference is wall-clock latency.
  * A best-effort implementation that cannot actually parallelise (e.g. a
  * provider with no async transport) is free to resolve sequentially.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 interface BatchCapableLLMClientInterface extends LLMClientInterface
 {
     /**
-     * @param list<array{system: string, user: string}> $requests
-     * @param int                                       $maxConcurrent maximum in-flight requests; the batch is
-     *                                                                 processed in windows of this size
+     * @param list<LLMRequest> $requests
+     * @param int              $maxConcurrent maximum in-flight requests; the batch is processed
+     *                                        in windows of this size
      *
      * @return list<LLMResponse> responses in the same order as $requests
      */

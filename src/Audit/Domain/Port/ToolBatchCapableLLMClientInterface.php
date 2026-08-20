@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
-
 /**
  * Opt-in extension of {@see BatchCapableLLMClientInterface} for clients that
  * can resolve several independent tool-using conversations concurrently.
@@ -28,14 +26,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * against its own registry, and the only difference is wall-clock latency.
  * A best-effort implementation that cannot actually parallelise is free to
  * resolve sequentially.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 interface ToolBatchCapableLLMClientInterface extends BatchCapableLLMClientInterface
 {
     /**
-     * @param list<array{system: string, user: string, tools: ToolRegistry}> $requests
-     * @param int                                                            $maxConcurrent     maximum in-flight requests; the batch is
-     *                                                                                          processed in windows of this size
-     * @param int                                                            $maxToolIterations per-request cap on tool-using rounds
+     * @param list<ToolLLMRequest> $requests
+     * @param int                  $maxConcurrent     maximum in-flight requests; the batch is
+     *                                                processed in windows of this size
+     * @param int                  $maxToolIterations per-request cap on tool-using rounds
      *
      * @return list<LLMResponse> responses in the same order as $requests
      */

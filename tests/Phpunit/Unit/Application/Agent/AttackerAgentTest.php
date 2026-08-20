@@ -73,6 +73,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -3220,11 +3221,9 @@ final class AttackerAgentTest extends TestCase
 
     private static function registryOf(mixed $request): ToolRegistry
     {
-        self::assertIsArray($request);
-        $toolRegistry = $request['tools'] ?? null;
-        self::assertInstanceOf(ToolRegistry::class, $toolRegistry);
+        self::assertInstanceOf(ToolLLMRequest::class, $request);
 
-        return $toolRegistry;
+        return $request->tools;
     }
 
     /**

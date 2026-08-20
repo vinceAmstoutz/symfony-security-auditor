@@ -216,21 +216,24 @@ deprecated by the other.
 
 ### Domain ports (extension points)
 
-All interfaces under `src/Audit/Domain/Port/` plus the documented Domain
-pipeline interfaces. Implementing one of these in your own application and
-overriding the alias in `config/services.yaml` is a supported integration path:
+**An enumerated list, not a directory glob.** Before 2.0 the promise covered
+_every_ interface under `src/Audit/Domain/Port/`, which froze internal
+collaboration seams — prompt builders, cache plumbing, capability-detection
+interfaces — as public API. That cost was real, not theoretical: #235 exists
+only because `PricingProviderInterface` could not gain a cache-rate method
+without a `MAJOR`, so 1.x had to carry a parallel
+`CacheAwarePricingProviderInterface` plus an `instanceof` branch. 2.0 narrowed
+the promise to the ports below. Everything else under `Port/` is tagged
+`@internal` and may change in a `MINOR`.
 
-- `LLMClientInterface`
-- `BatchCapableLLMClientInterface` — opt-in extension of `LLMClientInterface`
-  for clients that resolve several prompts concurrently. Consumers check
-  `instanceof` and fall back to looping `complete()`, so it never breaks an
-  existing client.
-- `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
+Implementing one of these in your own application and overriding the alias in
+`config/services.yaml` is a supported integration path:
+
+- `LLMClientInterface` — the Application ↔ LLM seam (see
+  [`.claude/rules/llm-seam.md`](../.claude/rules/llm-seam.md)).
+- `LLMResponse` — the value object every `LLMClientInterface` implementation
+  returns.
 - `ProjectFileScannerInterface`
-- `AttackerCacheInterface`
-- `ReviewerCacheInterface` — host applications may implement this and alias it
-  to back the reviewer-verdict cache with their own store (Redis, a shared
-  filesystem, …).
 - `StaticPreScannerInterface` — host applications may implement this and alias
   it to supply their own deterministic risk-marker scan.
 - `CodeSlicerInterface` — implement and alias to control how files are trimmed
@@ -245,17 +248,35 @@ overriding the alias in `config/services.yaml` is a supported integration path:
   input and output rates it reports `cacheReadPricePerMillionTokens()` and
   `cacheCreationPricePerMillionTokens()`.
 - `TokenEstimatorInterface`
+- `ProgressReporterInterface`
 - `RateLimiterInterface` — host applications may implement this and alias it to
   swap the throttling strategy (e.g. cross-process Redis-backed bucket). See
   [`docs/extending.md`](extending.md).
+- `ReviewerFeedbackProviderInterface`
+- `TriageMemoryRecorderInterface`
+- `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
+  `FormBindingParserInterface`, `SecurityConfigParserInterface` — the
+  deterministic source extractions feeding the application security map.
+- `Tool\ToolInterface`, `Tool\ToolDefinition`, `Tool\ToolRegistry`,
+  `Tool\ToolRegistryFactoryInterface`
+- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
+  `Pipeline\CoverageRecorderInterface`
 - Configuration value objects in `Audit\Domain\Configuration\*`
   (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
 - Domain exceptions: `LLMProviderException` (signals non-transient platform
   failure; callers may catch this to detect misconfigured or retired models)
-- `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
-- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
-  `Pipeline\CoverageRecorderInterface`
+
+Ports that left the promise in 2.0, now `@internal`:
+`AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`,
+`AttackerCacheInterface`, `ContextAwareAttackerCacheInterface`,
+`ReviewerCacheInterface`, `ReviewerFeedbackSnapshotInterface`,
+`BatchCapableLLMClientInterface`, `ToolBatchCapableLLMClientInterface`. The last
+two are capability-detection interfaces — how _this bundle_ discovers what a
+client can do, not how you implement one — and demoting them is what let
+`completeBatch()`/`completeBatchWithTools()` take `LLMRequest`/`ToolLLMRequest`
+value objects instead of raw array shapes. You may still implement them for the
+concurrency win; their signatures are simply no longer frozen.
 
 ### Domain models and exceptions
 

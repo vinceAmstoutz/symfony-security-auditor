@@ -353,18 +353,23 @@ PHP API surface, the
 [Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html)
 (`@internal` code is exempt). Treat every public-API element as load-bearing:
 configuration keys (and their defaults), the `audit:run` command (and its
-`audit` alias) arguments/options/exit codes, JSON and SARIF output schemas,
-Domain ports under `src/Audit/Domain/Port/` (including
-`AdvisoryDatabaseInterface`), Domain models/enums/exceptions, `RunAuditUseCase`,
-and the Bundle class. A change that removes or alters any of these is a `MAJOR`
-and requires a deprecation cycle.
+`audit` alias) arguments/options/exit codes, JSON and SARIF output schemas, the
+Domain ports enumerated in `docs/versioning.md` (including
+`AdvisoryDatabaseInterface` — the rest of `src/Audit/Domain/Port/` is
+`@internal` since 2.0), Domain models/enums/exceptions, `RunAuditUseCase`, and
+the Bundle class. A change that removes or alters any of these is a `MAJOR` and
+requires a deprecation cycle.
 
 Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
 infrastructure adapters, Command collaborators — may be refactored freely in a
 `MINOR`. When you add a class that is **not** an extension point, add the
-`@internal` tag. When you add a public configuration key, list it in
-`docs/versioning.md` and add it to `resources/schema.json` (the JSON Schema that
-powers editor autocompletion for `symfony_security_auditor.yaml`).
+`@internal` tag. A new interface under `src/Audit/Domain/Port/` is `@internal`
+**by default**; joining the BC list is a deliberate step, documented in
+`docs/versioning.md` and `docs/extending.md` — see
+[`.claude/rules/ddd-layers.md`](.claude/rules/ddd-layers.md). When you add a
+public configuration key, list it in `docs/versioning.md` and add it to
+`resources/schema.json` (the JSON Schema that powers editor autocompletion for
+`symfony_security_auditor.yaml`).
 
 Canonical policy: [`docs/versioning.md`](docs/versioning.md).
 

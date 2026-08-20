@@ -16,6 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
+/**
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 interface AttackerPromptBuilderInterface
 {
     /**

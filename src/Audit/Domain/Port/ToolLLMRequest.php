@@ -28,17 +28,4 @@ final readonly class ToolLLMRequest
         public string $user,
         public ToolRegistry $tools,
     ) {}
-
-    /**
-     * @param list<array{system: string, user: string, tools: ToolRegistry}> $requests
-     *
-     * @return list<self>
-     */
-    public static function listFromArrays(array $requests): array
-    {
-        return array_map(
-            static fn (array $request): self => new self($request['system'], $request['user'], $request['tools']),
-            $requests,
-        );
-    }
 }

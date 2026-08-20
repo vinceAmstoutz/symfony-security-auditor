@@ -514,7 +514,11 @@ in `config/services.yaml` to override the bundled behaviour (see
   `git diff`).
 - `BatchCapableLLMClientInterface` — an opt-in extension of `LLMClientInterface`
   for clients that resolve several prompts concurrently; the reviewer uses it
-  when `audit.reviewer_max_concurrent > 1`.
+  when `audit.reviewer_max_concurrent > 1`. Its tool-using sibling is
+  `ToolBatchCapableLLMClientInterface`. Both are **`@internal` since 2.0** —
+  they are how this bundle detects what a client can do, not part of the seam
+  you implement — so implement them for the concurrency win if you like, but
+  expect their signatures to move in a `MINOR`.
 - `RecordVulnerabilityToolFactoryInterface` — builds the schema-enforced tool
   used in `audit.structured_collection` mode (default:
   `RecordVulnerabilityToolFactory` returning `RecordVulnerabilityTool`). Swap

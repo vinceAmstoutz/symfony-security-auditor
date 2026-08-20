@@ -24,12 +24,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
@@ -218,7 +216,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         $windowSize = max(1, $maxConcurrent);
         $responses = [];
 
-        foreach (array_chunk(LLMRequest::listFromArrays($requests), $windowSize) as $window) {
+        foreach (array_chunk($requests, $windowSize) as $window) {
             foreach ($this->batchWindowResolver->resolveWindow($window) as $llmResponse) {
                 $responses[] = $llmResponse;
             }
@@ -241,7 +239,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         $windowSize = max(1, $maxConcurrent);
         $responses = [];
 
-        foreach (array_chunk(ToolLLMRequest::listFromArrays($requests), $windowSize) as $window) {
+        foreach (array_chunk($requests, $windowSize) as $window) {
             foreach ($this->toolConversationWavefront->resolveToolWindow($window, $maxToolIterations) as $llmResponse) {
                 $responses[] = $llmResponse;
             }

@@ -30,6 +30,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * An empty `$contextKey` MUST address the same entry as the context-free
  * {@see AttackerCacheInterface::get()} / `store()` pair, so entries written
  * before this capability existed stay readable.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 interface ContextAwareAttackerCacheInterface extends AttackerCacheInterface
 {

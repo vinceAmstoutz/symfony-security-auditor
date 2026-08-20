@@ -23,8 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 
 /**
  * Resolves every single-finding review in concurrency windows via the
@@ -96,16 +96,13 @@ final readonly class ConcurrentStructuredReviewAnalyzer
         return array_values($reviewed);
     }
 
-    /**
-     * @return array{system: string, user: string, tools: ToolRegistry}
-     */
-    private function buildRequest(Vulnerability $vulnerability, string $codeContext, StructuredReviewCollectionSession $structuredReviewCollectionSession): array
+    private function buildRequest(Vulnerability $vulnerability, string $codeContext, StructuredReviewCollectionSession $structuredReviewCollectionSession): ToolLLMRequest
     {
-        return [
-            'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
-            'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
-            'tools' => $structuredReviewCollectionSession->toolRegistry,
-        ];
+        return new ToolLLMRequest(
+            $this->reviewerPromptBuilder->buildSystemPrompt(),
+            $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+            $structuredReviewCollectionSession->toolRegistry,
+        );
     }
 
     /**

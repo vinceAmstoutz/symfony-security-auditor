@@ -45,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
@@ -384,11 +385,9 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
 
     private static function registryOf(mixed $request): ToolRegistry
     {
-        self::assertIsArray($request);
-        $toolRegistry = $request['tools'] ?? null;
-        self::assertInstanceOf(ToolRegistry::class, $toolRegistry);
+        self::assertInstanceOf(ToolLLMRequest::class, $request);
 
-        return $toolRegistry;
+        return $request->tools;
     }
 
     /**

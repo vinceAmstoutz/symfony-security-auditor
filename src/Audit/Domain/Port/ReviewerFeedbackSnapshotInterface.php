@@ -19,6 +19,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * container across audits, so a provider that freezes its feedback set for the
  * duration of one run must be told when the next run begins — otherwise every
  * audit after the first serves the first run's stale feedback.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 interface ReviewerFeedbackSnapshotInterface
 {

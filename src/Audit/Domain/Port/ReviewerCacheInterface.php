@@ -26,6 +26,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
  * `adjusted_severity`, `corrected_type`, …), ready to be re-applied. The agent
  * tolerates partial payloads, so implementations need not validate beyond JSON
  * parsing.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 interface ReviewerCacheInterface
 {
