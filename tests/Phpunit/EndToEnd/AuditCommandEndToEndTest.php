@@ -98,6 +98,25 @@ final class AuditCommandEndToEndTest extends TestCase
     }
 
     /**
+     * A project directory with no PHP file at all: the scan discovers nothing,
+     * so the report's SAFE/100/grade-A is about no code whatsoever. That must
+     * read as a failed run, not as a clean bill of health.
+     *
+     * @throws InvalidTokenUsageException
+     */
+    public function test_command_reports_no_verdict_when_the_scan_discovers_no_file(): void
+    {
+        mkdir($this->fixtureDir.'/src', 0o777, true);
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(ExitCode::AuditFailed->value, $commandTester->getStatusCode());
+        self::assertStringContainsString('No file was audited', $commandTester->getDisplay());
+        self::assertStringNotContainsString('Audit complete. Risk:', $commandTester->getDisplay());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      */
     public function test_command_output_contains_risk_level(): void

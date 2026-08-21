@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 
 final class AuditPresenterTest extends TestCase
 {
@@ -117,6 +118,27 @@ final class AuditPresenterTest extends TestCase
 
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
+    }
+
+    /**
+     * A scan that discovered no file exits `AuditFailed`, and that value used to
+     * fall through to the success branch — printing a green "Audit complete.
+     * Risk: SAFE" over a report describing nothing, with the misconfiguration
+     * visible only in `$?`.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_result_for_an_audit_that_reached_no_verdict_reports_that_nothing_was_audited(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)), ExitCode::AuditFailed->value);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('No file was audited', $display);
+        self::assertStringNotContainsString('Audit complete. Risk:', $display);
+        self::assertStringNotContainsString('failed a configured gate', $display);
     }
 
     /**

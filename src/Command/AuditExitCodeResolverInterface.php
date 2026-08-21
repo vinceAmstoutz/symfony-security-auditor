@@ -20,6 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 interface AuditExitCodeResolverInterface
 {
     /**
+     * Returns an `ExitCode` value: `Failure` when a gate trips, `AuditFailed`
+     * when the scan discovered no file and there is therefore no verdict to
+     * gate, `Success` otherwise.
+     *
      * @param ?int $minimumScore normalized-score floor; `null` leaves the risk
      *                           level as the only gate. The audit fails when
      *                           either gate trips.
