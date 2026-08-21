@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`scan.import_sarif` silently dropped every result whose file path a URI has
+  to escape.** `SarifImportingPreScanner::normalizeUri()`
+  (`src/Audit/Infrastructure/Scan/SarifImportingPreScanner.php`) compared the
+  raw `artifactLocation.uri` against the scanned paths, but SARIF 2.1.0 spells
+  that field as an RFC 3986 URI reference — so a producer reports
+  `templates/my page.html.twig` as `templates/my%20page.html.twig`, which
+  matched no scanned file and was discarded with no warning. This project's own
+  `SarifReportRenderer::encodeArtifactUri()` percent-encodes on the way out, so
+  the auditor could not even re-import its own SARIF. A `codeFlows` taint-path
+  step hit it worse: an encoded step collapsed to the `...` placeholder that
+  documents a file outside the scan surface, so an in-scope taint source was
+  reported as unknown. The URI is now percent-decoded before the project-root
+  prefix is stripped — that prefix is a raw filesystem path and may itself
+  contain a space. `rawurldecode()` leaves an invalid escape sequence untouched,
+  so a producer that emits unescaped paths keeps matching.
 - **`self-update` could corrupt the installed binary and leave no readable error
   behind.** `SelfUpdater::assertChecksumMatches()`
   (`src/Audit/Infrastructure/SelfUpdate/SelfUpdater.php`) guarded a failed
