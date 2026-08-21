@@ -120,7 +120,7 @@ final readonly class AuditCost
         }
 
         foreach ($breakdown as $entry) {
-            if (0.0 === $entry['estimated_cost_usd'] && 0 !== self::billableTokens($entry)) {
+            if (0.0 === $entry['estimated_cost_usd'] && 0 !== $this->billableTokens($entry)) {
                 return false;
             }
         }
@@ -137,7 +137,7 @@ final readonly class AuditCost
      *
      * @param array{input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int} $entry
      */
-    private static function billableTokens(array $entry): int
+    private function billableTokens(array $entry): int
     {
         return $entry['input_tokens']
             + $entry['output_tokens']

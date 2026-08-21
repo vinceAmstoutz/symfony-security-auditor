@@ -337,6 +337,27 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /**
+     * Cached prompt traffic accumulates the same way fresh input does: two
+     * calls to one model must report the sum of both, not the last one and
+     * not their difference.
+     *
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_sums_cached_prompt_tokens_across_repeated_calls(): void
+    {
+        $budgetTracker = $this->splitModelBudgetTracker();
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(0, 0, 300_000, 40_000)));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(0, 0, 100_000, 10_000)));
+
+        $usage = $budgetTracker->usageByModel()['claude-opus-5'];
+
+        self::assertSame(400_000, $usage['cache_read_tokens']);
+        self::assertSame(50_000, $usage['cache_creation_tokens']);
+    }
+
+    /**
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      */

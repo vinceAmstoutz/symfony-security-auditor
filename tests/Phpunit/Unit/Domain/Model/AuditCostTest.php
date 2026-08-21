@@ -113,6 +113,23 @@ final class AuditCostTest extends TestCase
     }
 
     /**
+     * The per-role breakdown carries no cache-token keys, so `billableTokens()`
+     * falls back for both. That fallback must be exactly zero: an entry that
+     * spent nothing and priced to nothing is not a pricing gap, and any other
+     * default would invent spend and report one.
+     *
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_treats_a_role_entry_without_tokens_as_no_gap(): void
+    {
+        $auditCost = AuditCost::of(0, 0, 0.0, 'claude-opus-5', [
+            'attacker' => ['model' => 'claude-opus-5', 'input_tokens' => 0, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        self::assertTrue($auditCost->hasPublishedPricing());
+    }
+
+    /**
      * Cache reads are billed, so a model whose entire spend arrived as cached
      * prompt tokens has still been charged — and priced at zero it is still a
      * pricing gap, even though its fresh input and output are both zero.
