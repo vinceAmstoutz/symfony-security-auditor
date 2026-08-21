@@ -70,7 +70,7 @@ final readonly class AuditCommand
         private bool $secretScrubbingEnabled,
         private FindingTypeFilterInterface $findingTypeFilter,
         private array $configNotices = [],
-        private RiskLevel $riskLevel = RiskLevel::Critical,
+        private RiskLevel $riskLevel = RiskLevel::High,
     ) {}
 
     /**
