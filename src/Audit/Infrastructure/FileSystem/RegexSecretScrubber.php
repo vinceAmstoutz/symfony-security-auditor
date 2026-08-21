@@ -26,7 +26,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  * The pattern set covers common high-signal leaks: cloud provider keys, version-control
  * tokens, payment processor keys, generic credential assignments, JWT-shaped tokens,
  * PEM-encoded private keys, env-style token assignments, connection-string URIs with
- * embedded credentials (e.g. `postgres://user:pass@host`), `Authorization: Bearer` headers,
+ * embedded credentials (e.g. `postgres://user:pass@host`), `Authorization: Bearer` and
+ * `Authorization: Basic` headers,
  * OpenAI-style `sk-`/`sk-proj-` keys, and Slack incoming webhook URLs. Each match is replaced
  * with `***REDACTED:<label>***` so downstream prompt builders can still emit a coherent
  * file context without exposing the secret to the LLM.
@@ -45,7 +46,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::AwsAccessKey->value => '/\bAKIA[0-9A-Z]{16}\b/',
         SecretPatternLabel::GithubToken->value => '/\b(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_\w{22,255})\b/',
         SecretPatternLabel::StripeKey->value => '/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,99}\b/',
-        SecretPatternLabel::SlackToken->value => '/\bxox[abprs]-[A-Za-z0-9-]{10,72}\b/',
+        SecretPatternLabel::SlackToken->value => '/\b(?:xox[abprs]-[A-Za-z0-9-]{10,72}|xapp-[0-9]-[A-Za-z0-9-]{10,120})\b/',
         SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}(?![0-9A-Za-z_\-])/',
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/',
@@ -54,6 +55,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|passwd|pwd|passphrase|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key|account[_-]?key)(?:[_-][a-z0-9]+)*["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
         SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|passwd|pwd|passphrase|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key|account[_-]?key)(?:[_-][a-z0-9]+)*["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi',
         SecretPatternLabel::BearerToken->value => '/\bBearer\s+[A-Za-z0-9\-_.]{20,4096}\b/i',
+        SecretPatternLabel::BasicAuthorization->value => '~\b((?:proxy-)?authorization\b["\']?\s*(?::|=>|=)\s*["\']?basic\s+)[A-Za-z0-9+/=_\-]{8,4096}~i',
         SecretPatternLabel::OpenAiApiKey->value => '/\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,200}\b/',
         SecretPatternLabel::SlackWebhookUrl->value => '~\bhttps://hooks\.slack\.com/services/[A-Za-z0-9]+/[A-Za-z0-9]+/[A-Za-z0-9]+\b~',
     ];
@@ -130,6 +132,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         return match (SecretPatternLabel::tryFrom($label)) {
             SecretPatternLabel::EnvAssignment => \sprintf('$1=***REDACTED:%s***', $label),
             SecretPatternLabel::ConnectionUri => \sprintf('$1***REDACTED:%s***@', $label),
+            SecretPatternLabel::BasicAuthorization => \sprintf('$1***REDACTED:%s***', $label),
             default => \sprintf('***REDACTED:%s***', $label),
         };
     }

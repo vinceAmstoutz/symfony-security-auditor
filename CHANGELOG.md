@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Security
+
+- **Secret scrubbing now redacts `Authorization: Basic` credentials and Slack
+  app-level tokens.** `RegexSecretScrubber::DEFAULT_PATTERNS` covered
+  `Authorization: Bearer` but not `Basic`, so a committed
+  `Authorization: Basic <base64>` — which decodes straight back to
+  `user:password` — was sent verbatim to the configured LLM provider on the
+  default `scan.secret_scrubbing.enabled` path. The same gap applied within a
+  provider already covered: `xox[abprs]-` tokens and `hooks.slack.com` webhook
+  URLs were redacted while Slack's `xapp-` app-level tokens were not. Both are
+  now matched, and the Basic pattern keeps the header name and scheme
+  (`Authorization: Basic ***REDACTED:basic_authorization***`) so the audit can
+  still see that the request authenticates and how. The pattern requires the
+  header or an assignment before the credential, so prose such as "use basic
+  authentication over TLS" is left alone. `SecretPatternLabel` gains
+  `BasicAuthorization`.
+
 ### Changed
 
 - **`init`'s success message now prints a copy-pasteable `export` line instead
