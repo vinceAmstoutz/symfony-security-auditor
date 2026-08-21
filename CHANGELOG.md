@@ -71,7 +71,9 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   the pre-2.0 `4096` left materially less room for a full `record_vulnerability`
   argument set than the number suggests — exactly the truncation the key exists
   to prevent. `LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS` is now the single
-  source for that default and reads `8192`.
+  source for that default and reads `8192` — including the
+  `BundleConfiguration::fromArray()` fallback a programmatic caller hits when it
+  omits the key, which had been left on the old `4096`.
 
 - **`max_output_tokens` no longer pretends to work on providers that reject
   it.** The gate that decided whether to forward the cap was

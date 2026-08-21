@@ -71,7 +71,7 @@ final readonly class BundleConfiguration
                 model: $config['model'],
                 attackerModelOverride: $config['attacker_model'],
                 reviewerModelOverride: $config['reviewer_model'],
-                maxOutputTokens: $config['max_output_tokens'] ?? 4096,
+                maxOutputTokens: $config['max_output_tokens'] ?? LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS,
                 attackerMaxOutputTokensOverride: $config['attacker_max_output_tokens'] ?? null,
                 reviewerMaxOutputTokensOverride: $config['reviewer_max_output_tokens'] ?? null,
                 providerJsonMode: $config['provider_json_mode'] ?? false,

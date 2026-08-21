@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
@@ -266,8 +267,8 @@ final class BundleConfigurationTest extends TestCase
     {
         $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
 
-        self::assertSame(4096, $bundleConfiguration->llm->attackerMaxOutputTokens());
-        self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+        self::assertSame(8192, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(8192, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
     /**
@@ -361,15 +362,15 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
-    public function test_from_array_defaults_max_output_tokens_to_4096_when_key_omitted_for_bc(): void
+    public function test_from_array_defaults_max_output_tokens_to_the_shipped_default_when_key_omitted(): void
     {
         $config = $this->treeBuilderOutput();
         unset($config['max_output_tokens'], $config['attacker_max_output_tokens'], $config['reviewer_max_output_tokens']);
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame(4096, $bundleConfiguration->llm->attackerMaxOutputTokens());
-        self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+        self::assertSame(LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
     /**
@@ -626,7 +627,7 @@ final class BundleConfigurationTest extends TestCase
             'model' => 'claude-opus-4-7',
             'attacker_model' => null,
             'reviewer_model' => 'claude-haiku-4-5-20251001',
-            'max_output_tokens' => 4096,
+            'max_output_tokens' => 8192,
             'attacker_max_output_tokens' => null,
             'reviewer_max_output_tokens' => null,
             'provider_json_mode' => false,
