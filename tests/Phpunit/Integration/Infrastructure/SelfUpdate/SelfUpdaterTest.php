@@ -112,12 +112,39 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
-    public function test_it_does_not_refresh_the_pricing_catalog_when_already_up_to_date(): void
+    public function test_it_refreshes_the_pricing_catalog_when_already_up_to_date(): void
     {
         $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
-        $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(SelfUpdateStatus::AlreadyUpToDate, $selfUpdateResult->status);
+        self::assertSame(1, $recordingPricingCatalogRefresher->refreshCount);
+        self::assertSame(PricingCatalogRefreshOutcome::Refreshed, $selfUpdateResult->pricingCatalogRefresh);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_does_not_refresh_the_pricing_catalog_on_a_check_only_run_when_already_up_to_date(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', true);
 
         self::assertSame(0, $recordingPricingCatalogRefresher->refreshCount);
+        self::assertSame(PricingCatalogRefreshOutcome::Skipped, $selfUpdateResult->pricingCatalogRefresh);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_carries_a_failed_refresh_into_an_already_up_to_date_result(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher(PricingCatalogRefreshOutcome::Failed);
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $selfUpdateResult->pricingCatalogRefresh);
     }
 
     /**

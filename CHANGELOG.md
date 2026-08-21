@@ -32,10 +32,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   payload returns `PricingCatalogRefreshOutcome::Failed`, and `self-update` now
   says so instead of failing silently, warning that cost figures keep using the
   catalog already in place — the last successful refresh if there was one,
-  otherwise the one frozen into the binary at build time — and that the next
-  update installing a new binary refreshes it again. It is skipped entirely when
-  `privacy.offline_only` is set or the XDG config path can't be resolved
-  (`StandaloneApplicationFactory::pricingCatalogRefresher()`), and the
+  otherwise the one frozen into the binary at build time — and that re-running
+  `self-update` retries it, which it now can: the refresh no longer rides only
+  on a binary replacement, so a binary already on the latest version still
+  refreshes a catalog that has drifted since its build. A `--check` probe never
+  does, so the background update notifier stays side-effect-free. It is skipped
+  entirely when `privacy.offline_only` is set or the XDG config path can't be
+  resolved (`StandaloneApplicationFactory::pricingCatalogRefresher()`), and the
   `privacy.offline_only` lookup now goes through
   `StandaloneConfig::offlineOnlyIn()` so the key path lives in one place rather
   than being re-read by hand.
