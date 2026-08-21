@@ -19,18 +19,21 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   still finds the same vulnerabilities, or that a report written today is still
   readable by `audit:diff`/`audit:trend` tomorrow. `bin/castor eval` gains
   `--write-baseline`, recording overall and per-class precision/recall to
-  `examples/vulnerable-app/eval-baseline.json` — but only for a run that clears
-  the configured `--min-precision`/`--min-recall` floor, so a degraded run can
-  never be enshrined as the reference, and an unwritable path is reported rather
-  than announced as recorded; a later run compares against that file through the
-  new `Tooling\Eval\EvalBaseline` and fails on any difference in either
-  direction — on a pure move an improvement is as much a signal as a regression.
-  With no baseline present the run warns instead of passing silently. Alongside
-  it, `ReportSchemaFreezeTest` pins every key path and value type of the JSON
-  and SARIF documents against a committed snapshot, plus
+  `examples/vulnerable-app/eval-baseline.json` — and only after the run clears
+  whatever `--min-precision`/`--min-recall` floors were passed, so a recording
+  run cannot skip the check a scoring run makes (both floors default to `0.0`,
+  so pass real ones for that to mean anything), while an unwritable path is
+  reported rather than announced as recorded; a later run compares against that
+  file through the new `Tooling\Eval\EvalBaseline` and fails on any difference
+  in either direction — on a pure move an improvement is as much a signal as a
+  regression. With no baseline present the run warns instead of passing
+  silently. Alongside it, `ReportSchemaFreezeTest` pins the key paths and value
+  types of the JSON and SARIF documents against a committed snapshot, plus
   `Vulnerability::fingerprintOf()` against a known input, so a renamed or
   retyped key fails the ordinary test suite rather than surfacing later as an
-  unreadable historical report.
+  unreadable historical report. That snapshot is one validated finding, so the
+  element shapes inside `cost.by_role` and `coverage` are frozen as empty arrays
+  — extend the fixture when you need those pinned too.
 
 ### Changed
 
@@ -50,11 +53,17 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   `list<LLMRequest>` / `list<ToolLLMRequest>` rather than raw
   `array{system: string, user: string, …}` shapes, so the
   `LLMRequest::listFromArrays()` / `ToolLLMRequest::listFromArrays()` adapters
-  that existed only to feed a frozen signature are gone and the four remaining
-  Application-side call sites carry value objects end to end. To stop the
+  that existed only to feed a frozen signature are gone and the three remaining
+  Application-side invocations carry value objects end to end. To stop the
   surface re-widening by accident, a new interface under `Port/` is now
   `@internal` by default — see `.claude/rules/ddd-layers.md`; joining the list
-  is a documented, deliberate step.
+  is a documented, deliberate step. The same audit reached one directory over:
+  `Pipeline\CoverageRecorderInterface` carried `@internal` while
+  `docs/versioning.md` enumerated it as covered, so the list now matches the
+  source — no stage receives a coverage recorder, so implementing
+  `StageInterface` never depended on its shape — and
+  `Pipeline\NullCoverageRecorder` gains the tag every other null-object port
+  already had.
 
 - **`model` now defaults to `claude-opus-5`, and `max_output_tokens` to
   `8192`.** A fresh install with no `model`/`attacker_model`/`reviewer_model`
@@ -124,13 +133,14 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   Through 1.x the default was `critical`, which meant only a `CRITICAL`
   aggregate risk level made `audit:run` exit `1` — a report full of HIGH
   findings passed the gate. `docs/versioning.md` announced the change as a
-  planned default flip; this release ships it. The five sites that carried the
-  old default all move together: the `fail_on` node in
-  `AuditConfigurationDefinition`, the `?? 'critical'` fallback in
-  `BundleConfiguration::fromArray()`, `AuditExecutionConfiguration::$failOn`,
-  `AuditCommand::$riskLevel`'s own constructor default, and the `--fail-on` help
-  text. Set `audit.fail_on: critical` (or pass `--fail-on=critical`) to keep the
-  1.x behaviour.
+  planned default flip; this release ships it. Every site that carried the old
+  default moves together — the `fail_on` node in `AuditConfigurationDefinition`,
+  the `?? 'critical'` fallback in `BundleConfiguration::fromArray()`,
+  `AuditExecutionConfiguration::$failOn`, `AuditCommand::$riskLevel`'s own
+  constructor default, the `--fail-on` descriptions in `AuditCommandInput` and
+  `AuditCommandHelp`, `resources/schema.json`, `action.yml` and
+  `docs/configuration.md`. Set `audit.fail_on: critical` (or pass
+  `--fail-on=critical`) to keep the 1.x behaviour.
 
 ### Removed
 

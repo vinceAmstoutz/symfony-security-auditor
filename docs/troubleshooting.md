@@ -103,6 +103,12 @@ findings proves nothing about the code. Causes:
   values).
 - Conflicting options (e.g. `--generate-baseline` with `--dry-run`).
 - A non-transient LLM provider abort (a partial report is still written).
+- A scan that discovered no file to audit — a mistyped `project-path` that
+  exists, a `scan.included_paths` entry matching nothing, or an over-broad
+  `excluded_paths`. The console says `No file was audited`, and the report is
+  still written even though it describes nothing. `--dry-run`, `--show-scanned`
+  and `--generate-baseline` never reach the gate, so they still exit `0` on an
+  empty scan.
 
 Re-run with `-v` or `-vv` to see the underlying error. Through 1.x all of these
 shared `1` with the security gate, which is why a `1` on a LOW-risk project used

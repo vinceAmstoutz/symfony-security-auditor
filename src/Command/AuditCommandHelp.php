@@ -52,8 +52,8 @@ final class AuditCommandHelp
                 budget unenforceable and the run was declined or non-interactive (no report emitted in that case)
           <info>3</info>  the audit never produced a verdict: invalid project-path, a rejected option value, conflicting options,
                 an LLM provider abort, an unhandled exception, or a scan that discovered no file to audit at all
-                (details on stderr). An abort that happens after findings were already validated still writes the
-                partial report, so treat the output as incomplete rather than absent
+                (details on stderr). An abort after findings were already validated, and an empty scan, still write
+                their report — the other causes write nothing, so do not assume a report file exists on a 3
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
         and costs a few cents to a few dollars depending on the selected model. Configure

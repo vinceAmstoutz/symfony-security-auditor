@@ -1439,7 +1439,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertIsArray($notices);
         self::assertContains(
-            'max_output_tokens is set to 16384 but gpt-4o does not use the Anthropic option dialect, whose bridge would reject the max_tokens option — so it is not sent and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.',
+            'max_output_tokens is set to 16384 but gpt-4o does not use the Anthropic option dialect, and its own bridge would reject the max_tokens option — so the option is not sent and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.',
             $notices,
         );
     }

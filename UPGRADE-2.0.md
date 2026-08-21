@@ -89,7 +89,9 @@ receives an option its bridge rejects.
 | `3`  | **New** — no verdict was produced        |
 
 An abort that happens after findings were already validated still writes the
-partial report, so treat a `3` as "output incomplete", not "output absent".
+partial report, so a `3` from that path means "output incomplete" rather than
+"output absent" — but the other causes write nothing at all, so a step that
+reads the report on a `3` must tolerate a missing file.
 
 `3` covers an invalid `project-path`, an option value the console rejects,
 conflicting options, an LLM provider abort, and any unhandled exception — all of
