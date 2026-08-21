@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`scan.code_slicing`'s configuration reference no longer promises whole
+  method bodies.** The `info()` text — what
+  `config:dump-reference symfony_security_auditor` prints — said the slicer
+  keeps "the FULL body of methods that touch security-relevant tokens".
+  `RegexCodeSlicer` retains per line, not per method, which
+  `test_inert_body_lines_are_elided()` pins deliberately: on a textbook
+  vulnerable controller the source (`$name = $request->request->get('name')`)
+  and the sink (`$this->conn->executeStatement($sql)`) are both kept while the
+  `$sql` concatenation between them is elided, so the slice shows `$sql` used
+  but never assigned, and a reflected-XSS built the same way disappears
+  entirely. The text now states that retention is per line, that an inert line
+  inside a matched method is still elided, and that a file should go unsliced
+  when the taint flow between source and sink matters more than the tokens.
+  Behaviour is unchanged; only the description was wrong. `code_slicing` follows
+  the active profile when unset, so this is the documented default on `fast`.
 - **`self-update` could corrupt the installed binary and leave no readable error
   behind.** `SelfUpdater::assertChecksumMatches()`
   (`src/Audit/Infrastructure/SelfUpdate/SelfUpdater.php`) guarded a failed
