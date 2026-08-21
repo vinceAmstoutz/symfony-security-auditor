@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline;
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullCoverageRecorder implements CoverageRecorderInterface
 {
     #[Override]

@@ -85,9 +85,9 @@ is a `MAJOR` change.
   - `0` — audit completed; aggregate risk level is below the `fail_on` threshold
     (default `high`, so `SAFE`/`LOW`/`MEDIUM` by default) and, when
     `--min-score` is given, the normalized score is at or above it.
-  - `1` — audit completed and the gate tripped: the aggregate risk level is at
-    or above the `fail_on` threshold (default `high`), the normalized score is
-    below `--min-score`.
+  - `1` — audit completed and either gate tripped: the aggregate risk level is
+    at or above the `fail_on` threshold (default `high`), or the normalized
+    score is below `--min-score`.
   - `2` — the audit budget could not be honored: either it aborted mid-run
     because the configured token or cost budget was exceeded (partial report
     still emitted), or it never started because an unpriced model makes
@@ -261,8 +261,10 @@ Implementing one of these in your own application and overriding the alias in
   deterministic source extractions feeding the application security map.
 - `Tool\ToolInterface`, `Tool\ToolDefinition`, `Tool\ToolRegistry`,
   `Tool\ToolRegistryFactoryInterface`
-- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
-  `Pipeline\CoverageRecorderInterface`
+- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`
+  (`Pipeline\CoverageRecorderInterface` and `Pipeline\NullCoverageRecorder` are
+  `@internal` — a stage never receives one, so implementing `StageInterface`
+  does not depend on their shape)
 - Configuration value objects in `Audit\Domain\Configuration\*`
   (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
