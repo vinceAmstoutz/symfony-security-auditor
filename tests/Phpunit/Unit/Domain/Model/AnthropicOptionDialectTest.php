@@ -40,7 +40,10 @@ final class AnthropicOptionDialectTest extends TestCase
         yield 'bedrock' => ['anthropic.claude-opus-5-v1:0'];
         yield 'bedrock us cross-region' => ['us.anthropic.claude-opus-5-v1:0'];
         yield 'bedrock eu cross-region' => ['eu.anthropic.claude-opus-5-v1:0'];
-        yield 'bedrock apac cross-region' => ['apac.anthropic.claude-opus-5-v1:0'];
+        yield 'bedrock au cross-region' => ['au.anthropic.claude-opus-5-v1:0'];
+        yield 'bedrock jp cross-region' => ['jp.anthropic.claude-opus-5-v1:0'];
+        yield 'bedrock global cross-region' => ['global.anthropic.claude-opus-5-v1:0'];
+        yield 'bedrock a future cross-region prefix' => ['xx.anthropic.claude-opus-5-v1:0'];
         yield 'provider-qualified gateway id' => ['anthropic/claude-opus-5'];
         yield 'nested gateway id' => ['openrouter/anthropic/claude-opus-5'];
         yield 'vertex publisher path' => ['publishers/anthropic/models/claude-opus-5'];
@@ -57,6 +60,8 @@ final class AnthropicOptionDialectTest extends TestCase
         yield 'mistral' => ['mistral-large-latest'];
         yield 'gateway alias hiding its origin' => ['acme-gateway/fast'];
         yield 'unrelated model merely containing claude' => ['openrouter/not-claude-at-all'];
+        yield 'vendor segment without a claude family segment' => ['anthropic.gpt-4o'];
+        yield 'claude segment not preceded by the vendor segment' => ['acme.notclaude'];
         yield 'empty' => [''];
     }
 }

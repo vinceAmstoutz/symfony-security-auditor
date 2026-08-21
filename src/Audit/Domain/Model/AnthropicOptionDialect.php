@@ -19,13 +19,17 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  * per request. Gemini and the OpenAI Responses bridge reject those keys
  * outright, so sending them would fail the call rather than cap it.
  *
- * Matching is on anchored identifier prefixes, covering the Anthropic API and
- * Vertex (`claude-…`) plus Bedrock's plain and cross-region-inference ids
- * (`anthropic.claude-…`, `us.anthropic.claude-…`). The `?options` query string
- * `symfony/ai-bundle` supports is stripped first, then a provider-qualified id
- * is matched on its final `/` segment, so the gateway forms that name the model
- * outright (`anthropic/claude-…`, `publishers/anthropic/models/claude-…`) are
- * recognized too, and an option value containing a `/` cannot hide the model.
+ * Matching is anchored, never a substring. A bare id must start with `claude-`
+ * or `claude.` (the Anthropic API and Vertex). A vendor-qualified id must carry
+ * an `anthropic` dot-segment followed by a `claude…` one, which covers Bedrock's
+ * plain `anthropic.claude-…` and every cross-region-inference prefix it has or
+ * gains (`us.`, `eu.`, `au.`, `jp.`, `global.`, …) without enumerating them —
+ * the shipped `symfony/models-dev` catalog prices all of those. The `?options`
+ * query string `symfony/ai-bundle` supports is stripped first, then a
+ * provider-qualified id is matched on its final `/` segment, so the gateway
+ * forms that name the model outright (`anthropic/claude-…`,
+ * `publishers/anthropic/models/claude-…`) are recognized too, and an option
+ * value containing a `/` cannot hide the model.
  * An unrelated model whose name merely contains "claude" is therefore not
  * mistaken for one, while an opaque gateway alias that hides its
  * Anthropic origin reports honestly that the dialect cannot be confirmed —
@@ -37,21 +41,39 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 final readonly class AnthropicOptionDialect
 {
     /** @var list<string> */
-    private const array MODEL_ID_PREFIXES = [
+    private const array BARE_MODEL_ID_PREFIXES = [
         'claude-',
         'claude.',
-        'anthropic.',
-        'us.anthropic.',
-        'eu.anthropic.',
-        'apac.anthropic.',
     ];
+
+    private const string VENDOR_SEGMENT = 'anthropic';
+
+    private const string FAMILY_SEGMENT_PREFIX = 'claude';
 
     public static function honoredBy(string $model): bool
     {
         $modelId = self::withoutGatewayPrefix(self::withoutOptionsQueryString($model));
 
-        foreach (self::MODEL_ID_PREFIXES as $modelIdPrefix) {
+        return self::isBareClaudeId($modelId) || self::isVendorQualifiedClaudeId($modelId);
+    }
+
+    private static function isBareClaudeId(string $modelId): bool
+    {
+        foreach (self::BARE_MODEL_ID_PREFIXES as $modelIdPrefix) {
             if (str_starts_with($modelId, $modelIdPrefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isVendorQualifiedClaudeId(string $modelId): bool
+    {
+        $segments = explode('.', $modelId);
+
+        foreach ($segments as $position => $segment) {
+            if (self::VENDOR_SEGMENT === $segment && str_starts_with($segments[$position + 1] ?? '', self::FAMILY_SEGMENT_PREFIX)) {
                 return true;
             }
         }
