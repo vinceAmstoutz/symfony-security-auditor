@@ -89,16 +89,16 @@ function evaluate(
 
     printEvalReport($evalReport);
 
-    if ($writeBaseline) {
-        writeEvalBaseline($baseline, $evalReport);
-
-        return;
-    }
-
     if (!$evalReport->meetsThresholds($minPrecision, $minRecall)) {
         io()->error(sprintf('Below thresholds: precision >= %.2f and recall >= %.2f required.', $minPrecision, $minRecall));
 
         exit(1);
+    }
+
+    if ($writeBaseline) {
+        writeEvalBaseline($baseline, $evalReport);
+
+        return;
     }
 
     assertNoEvalDrift($baseline, $evalReport);
@@ -108,7 +108,12 @@ function evaluate(
 
 function writeEvalBaseline(string $baseline, EvalReport $evalReport): void
 {
-    file_put_contents($baseline, EvalBaseline::fromReport($evalReport)->toJson());
+    if (false === file_put_contents($baseline, EvalBaseline::fromReport($evalReport)->toJson())) {
+        io()->error(sprintf('Could not write the eval baseline to %s. Check the path exists and is writable.', $baseline));
+
+        exit(1);
+    }
+
     io()->success(sprintf('Recorded this run as the eval baseline in %s. Commit it alongside the change it certifies.', $baseline));
 }
 
