@@ -281,6 +281,21 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame([], $this->loggedWarnings);
     }
 
+    /**
+     * `InstalledVersions::getInstallPath()` answers relative to the Composer
+     * directory, so the raw join carries a `vendor/composer/../symfony/...`
+     * detour that `doctor` would print verbatim at the user.
+     */
+    public function test_the_packaged_catalog_path_is_free_of_parent_directory_detours(): void
+    {
+        $packagedCatalogPath = (new ModelsDevPricingProvider($this->warningCapturingLogger()))->packagedCatalogPath();
+
+        self::assertIsString($packagedCatalogPath);
+        self::assertStringNotContainsString('/../', $packagedCatalogPath);
+        self::assertStringNotContainsString('/composer/', $packagedCatalogPath);
+        self::assertStringEndsWith('/symfony/models-dev/models-dev.json', $packagedCatalogPath);
+    }
+
     public function test_a_missing_catalog_package_disables_pricing_without_throwing(): void
     {
         $modelsDevPricingProvider = new ModelsDevPricingProvider($this->warningCapturingLogger(), null, 'vinceamstoutz/not-a-real-package');

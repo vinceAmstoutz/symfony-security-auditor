@@ -18,6 +18,7 @@ use JsonException;
 use OutOfBoundsException;
 use Override;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 
 /**
@@ -271,6 +272,11 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
      * the only file whose contents `InstalledVersions::getPrettyVersion()`
      * actually describes, which is why `doctor` compares against it before
      * naming a version.
+     *
+     * `InstalledVersions::getInstallPath()` resolves relative to the Composer
+     * directory, so it hands back a `vendor/composer/../symfony/...` detour.
+     * `Path::canonicalize()` collapses it lexically — `realpath()` cannot, it
+     * returns `false` for the `phar://` path a packaged binary reports.
      */
     public function packagedCatalogPath(): ?string
     {
@@ -280,7 +286,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
             return null;
         }
 
-        return null === $installPath ? null : \sprintf('%s/%s', $installPath, self::CATALOG_FILENAME);
+        return null === $installPath ? null : Path::canonicalize(\sprintf('%s/%s', $installPath, self::CATALOG_FILENAME));
     }
 
     /** @return array<array-key, mixed> */

@@ -18,18 +18,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   newest on Packagist when that release's binary was built, with no way to see
   which snapshot that is. `EnvironmentDoctor::diagnose()`
   (`src/Command/EnvironmentDoctor.php`) gains a "Pricing catalog" check
-  reporting the installed version (`Composer\InstalledVersions`), and the
-  standalone binary's `--version` output now appends it too, via a new
-  `StandaloneApplication` (`src/Standalone/StandaloneApplication.php`)
-  overriding `getLongVersion()` — the bare
-  `Symfony\Component\Console\Application` used by `StandaloneApplicationFactory`
-  had no other extension point for this. The `'symfony/models-dev'` package name
-  now lives in one place, `ModelsDevPricingProvider::CATALOG_PACKAGE` (made
-  `public`); `EnvironmentDoctor` and `StandaloneApplicationFactory` reference it
-  instead of each restating their own copy of the string. The check names the
-  catalog **file** it resolved, not just the packaged version, so it can never
-  report a snapshot the run is not actually pricing from once `self-update`
-  starts writing a refreshed catalog into the XDG cache directory — a new
+  reporting the installed version (`Composer\InstalledVersions`) and the
+  resolved catalog file, canonicalized through
+  `Symfony\Component\Filesystem\Path` — `InstalledVersions::getInstallPath()`
+  answers relative to the Composer directory, so the raw path printed a
+  `vendor/composer/../symfony/models-dev/…` detour at the user, and `realpath()`
+  cannot collapse it because it returns `false` for the `phar://` path a
+  packaged binary reports. The standalone binary's `--version` output now
+  appends it too, via a new `StandaloneApplication`
+  (`src/Standalone/StandaloneApplication.php`) overriding `getLongVersion()` —
+  the bare `Symfony\Component\Console\Application` used by
+  `StandaloneApplicationFactory` had no other extension point for this. The
+  `'symfony/models-dev'` package name now lives in one place,
+  `ModelsDevPricingProvider::CATALOG_PACKAGE` (made `public`);
+  `EnvironmentDoctor` and `StandaloneApplicationFactory` reference it instead of
+  each restating their own copy of the string. The check names the catalog
+  **file** it resolved, not just the packaged version, so it can never report a
+  snapshot the run is not actually pricing from once `self-update` starts
+  writing a refreshed catalog into the XDG cache directory — a new
   `ModelsDevPricingProvider::effectiveCatalogPath()` is the single resolution
   point both `loadCatalog()` and the check go through. An override path that
   does not exist yet falls through to the packaged catalog instead of shadowing
