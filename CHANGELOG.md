@@ -19,13 +19,16 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   still finds the same vulnerabilities, or that a report written today is still
   readable by `audit:diff`/`audit:trend` tomorrow. `bin/castor eval` gains
   `--write-baseline`, recording overall and per-class precision/recall to
-  `examples/vulnerable-app/eval-baseline.json`; a later run compares against
-  that file through the new `Tooling\Eval\EvalBaseline` and fails on any
-  difference in either direction — on a pure move an improvement is as much a
-  signal as a regression. With no baseline present the run warns instead of
-  passing silently. Alongside it, `ReportSchemaFreezeTest` pins every key path
-  and value type of the JSON and SARIF documents against a committed snapshot,
-  plus `Vulnerability::fingerprintOf()` against a known input, so a renamed or
+  `examples/vulnerable-app/eval-baseline.json` — but only for a run that clears
+  the configured `--min-precision`/`--min-recall` floor, so a degraded run can
+  never be enshrined as the reference, and an unwritable path is reported rather
+  than announced as recorded; a later run compares against that file through the
+  new `Tooling\Eval\EvalBaseline` and fails on any difference in either
+  direction — on a pure move an improvement is as much a signal as a regression.
+  With no baseline present the run warns instead of passing silently. Alongside
+  it, `ReportSchemaFreezeTest` pins every key path and value type of the JSON
+  and SARIF documents against a committed snapshot, plus
+  `Vulnerability::fingerprintOf()` against a known input, so a renamed or
   retyped key fails the ordinary test suite rather than surfacing later as an
   unreadable historical report.
 
@@ -79,15 +82,19 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   `docs/troubleshooting.md` sends exactly that user to this key when findings
   truncate. The substring match is replaced by the new `AnthropicOptionDialect`,
   which matches anchored model-id prefixes (`claude-`, `claude.`, `anthropic.`,
-  and Bedrock's `us.`/`eu.`/`apac.` cross-region variants), so a Bedrock id
-  keeps its cap and `openrouter/not-claude-at-all` no longer receives an option
-  its bridge would reject. And a cap other than the shipped default configured
-  against a model outside that dialect now prints a pre-flight notice naming the
-  model and the value — one per affected role when
-  `attacker_max_output_tokens`/`reviewer_max_output_tokens` differ — the same
-  channel that already reports configuration which silently disables a cost
-  saver — instead of being dropped in silence. `provider_json_mode` is gated by
-  the same prefix check.
+  and Bedrock's `us.`/`eu.`/`apac.` cross-region variants) against the
+  identifier's final `/` segment, so a Bedrock id and the provider-qualified
+  gateway forms (`anthropic/claude-…`, `publishers/anthropic/models/claude-…`)
+  all keep their cap, while `openrouter/not-claude-at-all` and an opaque alias
+  like `acme-gateway/fast` no longer receive an option their bridge would
+  reject. And a cap other than the shipped default configured against a model
+  outside that dialect now prints a pre-flight notice naming the model and the
+  value — one per affected role when
+  `attacker_max_output_tokens`/`reviewer_max_output_tokens` differ, and one for
+  `audit.escalation.cheap_model` when escalation is enabled — the same channel
+  that already reports configuration which silently disables a cost saver —
+  instead of being dropped in silence. `provider_json_mode` is gated by the same
+  prefix check.
 
 - **A failed audit now exits `3` instead of colliding with the security gate's
   `1`.** Through 1.x, `audit:run` returned `1` both when the audit completed and
@@ -109,12 +116,13 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   Through 1.x the default was `critical`, which meant only a `CRITICAL`
   aggregate risk level made `audit:run` exit `1` — a report full of HIGH
   findings passed the gate. `docs/versioning.md` announced the change as a
-  planned default flip; this release ships it. The four sites that carried the
+  planned default flip; this release ships it. The five sites that carried the
   old default all move together: the `fail_on` node in
   `AuditConfigurationDefinition`, the `?? 'critical'` fallback in
   `BundleConfiguration::fromArray()`, `AuditExecutionConfiguration::$failOn`,
-  and the `--fail-on` help text. Set `audit.fail_on: critical` (or pass
-  `--fail-on=critical`) to keep the 1.x behaviour.
+  `AuditCommand::$riskLevel`'s own constructor default, and the `--fail-on` help
+  text. Set `audit.fail_on: critical` (or pass `--fail-on=critical`) to keep the
+  1.x behaviour.
 
 ### Removed
 

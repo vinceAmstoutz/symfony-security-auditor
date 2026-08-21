@@ -166,14 +166,14 @@ Logged at `warning` level when the attacker's tool loop ends with an empty final
 content block. Look at the `output_tokens` field: if it sits near a multiple of
 ~1000 (e.g. `1971`, `2000`), the model is being truncated by `symfony/ai`'s
 default `max_tokens = 1000` that ships with the Anthropic bridge. Set
-`max_output_tokens` in the bundle config (default `8192` since 2.0) — or
-`attacker_max_output_tokens` / `reviewer_max_output_tokens` for per-agent
-tuning:
+`max_output_tokens` in the bundle config _above_ its `8192` default (setting it
+to `8192` changes nothing since 2.0) — or `attacker_max_output_tokens` /
+`reviewer_max_output_tokens` for per-agent tuning:
 
 ```yaml
 symfony_security_auditor:
-    max_output_tokens: 8192
-    attacker_max_output_tokens: 8192 # optional, for chunks with many findings
+    max_output_tokens: 16384
+    attacker_max_output_tokens: 24576 # optional, for chunks with many findings
     reviewer_max_output_tokens: 2048 # optional, reviewer needs less headroom
 ```
 

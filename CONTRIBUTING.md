@@ -272,8 +272,9 @@ the release that will carry it:
 ```
 
 Use the next unreleased version — the one your `CHANGELOG.md` entry sits under.
-Removals already follow this convention (see the `Vulnerability::create()`
-family, marked _Deprecated since 1.13_); additions need it for the same reason.
+Removals already follow this convention (see the deprecated `SymfonyMapping`
+accessors, marked _Deprecated since 1.19_); additions need it for the same
+reason.
 
 Do not point documentation or examples at a
 `raw.githubusercontent.com/.../main/` URL. User-facing files are published as

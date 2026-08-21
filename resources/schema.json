@@ -180,7 +180,7 @@
             },
             "fail_on": {
               "enum": ["safe", "low", "medium", "high", "critical"],
-              "description": "Minimum aggregate risk level that makes audit:run exit 1 (the CI gate). Default: critical (only a CRITICAL risk level fails; planned to become high in the next major). The --fail-on CLI option overrides this."
+              "description": "Minimum aggregate risk level that makes audit:run exit 1 (the CI gate). Default: high (a HIGH or CRITICAL risk level fails). The --fail-on CLI option overrides this."
             },
             "since_closure": {
               "enum": ["none", "direct"],

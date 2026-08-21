@@ -860,8 +860,9 @@ Input mapping and resolution live in `AuditCommandInput`; output writing in
 `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in
 `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
-Exit codes: `0` (SAFE/LOW/MEDIUM/HIGH), `1` (CRITICAL risk or invalid path or
-unexpected failure), `2` (budget exceeded — partial report still emitted).
+Exit codes: `0` (SAFE/LOW/MEDIUM), `1` (the gate tripped — HIGH or CRITICAL risk
+by default, or a scan that discovered no file), `2` (budget exceeded — partial
+report still emitted), `3` (the audit never produced a verdict).
 
 ## Extension Points
 

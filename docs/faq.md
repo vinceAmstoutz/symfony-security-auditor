@@ -367,9 +367,9 @@ as a pre-flight notice rather than silently ignored — see
 
 ```yaml
 symfony_security_auditor:
-    max_output_tokens: 8192
+    max_output_tokens: 16384
     # or, split per agent:
-    attacker_max_output_tokens: 16384
+    attacker_max_output_tokens: 24576
     reviewer_max_output_tokens: 2048
 ```
 
