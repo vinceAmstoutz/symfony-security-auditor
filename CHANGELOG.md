@@ -31,7 +31,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   finding _was_ found and then baseline-accepted, and the third fires as a run
   is aborting, where a reassuring line would print immediately before the
   failure. The reporters render "every finding was baseline-accepted — review
-  skipped" and "nothing left to review after the abort" respectively.
+  skipped" and "nothing left to review after the abort" respectively. Each of
+  the three reasons is matched explicitly, and a reason the reporters do not
+  recognise falls back to a bare "review skipped" rather than borrowing the "no
+  new findings" wording: a fourth reason added later would otherwise be
+  announced as the wrong cause, which is worse than naming none.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

@@ -344,9 +344,25 @@ final class ConsoleProgressReporterTest extends TestCase
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
         $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
-        $this->consoleProgressReporter->report('review.skipped');
+        $this->consoleProgressReporter->report('review.skipped', ['reason' => 'no_new_findings']);
 
         self::assertStringContainsString('no new findings this pass', $this->bufferedOutput->fetch());
+    }
+
+    /**
+     * A reason the reporter does not recognise must not borrow another reason's
+     * wording — naming the wrong cause is worse than naming none.
+     */
+    public function test_it_falls_back_to_a_neutral_line_for_an_unrecognised_reason(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.skipped', ['reason' => 'a_reason_added_later']);
+
+        $display = $this->bufferedOutput->fetch();
+
+        self::assertStringContainsString('review skipped', $display);
+        self::assertStringNotContainsString('no new findings this pass', $display);
     }
 
     public function test_it_names_baseline_acceptance_as_the_reason_a_review_pass_was_skipped(): void

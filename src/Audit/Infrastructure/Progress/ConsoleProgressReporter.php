@@ -218,9 +218,10 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     private function reviewSkippedReason(array $context): string
     {
         return match (ProgressContext::string($context, 'reason')) {
+            'no_new_findings' => 'no new findings this pass',
             'all_baseline_accepted' => 'every finding was baseline-accepted — review skipped',
             'nothing_recovered' => 'nothing left to review after the abort',
-            default => 'no new findings this pass',
+            default => 'review skipped',
         };
     }
 

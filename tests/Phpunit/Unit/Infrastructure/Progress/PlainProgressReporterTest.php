@@ -167,11 +167,29 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  2 validated, 1 rejected\n", $this->bufferedOutput->fetch());
     }
 
-    public function test_it_prints_review_skipped(): void
+    public function test_it_names_an_exhausted_pass_as_the_reason_a_review_pass_was_skipped(): void
+    {
+        $this->plainProgressReporter->report('review.skipped', ['reason' => 'no_new_findings']);
+
+        self::assertSame("No new findings this pass.\n", $this->bufferedOutput->fetch());
+    }
+
+    /**
+     * A reason the reporter does not recognise must not borrow another reason's
+     * wording — naming the wrong cause is worse than naming none.
+     */
+    public function test_it_falls_back_to_a_neutral_line_for_an_unrecognised_reason(): void
+    {
+        $this->plainProgressReporter->report('review.skipped', ['reason' => 'a_reason_added_later']);
+
+        self::assertSame("Review skipped.\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_falls_back_to_a_neutral_line_when_no_reason_is_given(): void
     {
         $this->plainProgressReporter->report('review.skipped');
 
-        self::assertSame("No new findings this pass.\n", $this->bufferedOutput->fetch());
+        self::assertSame("Review skipped.\n", $this->bufferedOutput->fetch());
     }
 
     public function test_it_names_baseline_acceptance_as_the_reason_a_review_pass_was_skipped(): void

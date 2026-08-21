@@ -104,9 +104,10 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     private function reviewSkippedLine(array $context): string
     {
         return match (ProgressContext::string($context, 'reason')) {
+            'no_new_findings' => 'No new findings this pass.',
             'all_baseline_accepted' => 'Every finding was baseline-accepted — review skipped.',
             'nothing_recovered' => 'Nothing left to review after the abort.',
-            default => 'No new findings this pass.',
+            default => 'Review skipped.',
         };
     }
 
