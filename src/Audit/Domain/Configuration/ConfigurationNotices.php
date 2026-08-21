@@ -47,7 +47,7 @@ final readonly class ConfigurationNotices
         }
 
         foreach (self::outputCapsTheirModelIgnores($auditExecutionConfiguration, $lLMConfiguration) as ['model' => $model, 'cap' => $cap]) {
-            $notices[] = \sprintf('max_output_tokens is set to %d but %s does not use the Anthropic option dialect, so symfony/ai rejects the max_tokens option and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.', $cap, $model);
+            $notices[] = \sprintf('max_output_tokens is set to %d but %s does not use the Anthropic option dialect, whose bridge would reject the max_tokens option — so it is not sent and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.', $cap, $model);
         }
 
         return $notices;

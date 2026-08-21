@@ -77,9 +77,9 @@ final class AuditExitCodeResolverTest extends TestCase
      */
     public static function thresholdCases(): iterable
     {
-        yield 'critical risk fails the default critical gate' => [5, RiskLevel::Critical, Command::FAILURE];
-        yield 'high risk passes the default critical gate' => [4, RiskLevel::Critical, Command::SUCCESS];
-        yield 'safe risk passes the default critical gate' => [0, RiskLevel::Critical, Command::SUCCESS];
+        yield 'critical risk fails an explicit critical gate' => [5, RiskLevel::Critical, Command::FAILURE];
+        yield 'high risk passes an explicit critical gate' => [4, RiskLevel::Critical, Command::SUCCESS];
+        yield 'safe risk passes an explicit critical gate' => [0, RiskLevel::Critical, Command::SUCCESS];
 
         yield 'high risk fails the high gate' => [4, RiskLevel::High, Command::FAILURE];
         yield 'critical risk fails the high gate' => [5, RiskLevel::High, Command::FAILURE];

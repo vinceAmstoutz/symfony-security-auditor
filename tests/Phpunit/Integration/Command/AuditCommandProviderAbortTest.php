@@ -53,8 +53,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Provi
  * Drives {@see AuditCommand} with a pipeline that adds one already-validated
  * finding and then throws a non-transient LLM provider failure, to verify the
  * partial report is still written (rather than discarded via the generic
- * `catch (Throwable)` branch) and the exit code stays the generic failure
- * code — this is not a budget abort, so it must not reuse that exit code.
+ * `catch (Throwable)` branch) and the run exits `AuditFailed` — this is not a
+ * budget abort, so it must not reuse that exit code, and it never reached a
+ * verdict, so it must not look like a tripped gate either.
  */
 final class AuditCommandProviderAbortTest extends TestCase
 {

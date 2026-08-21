@@ -88,6 +88,9 @@ receives an option its bridge rejects.
 | `2`  | Budget aborted                           |
 | `3`  | **New** — no verdict was produced        |
 
+An abort that happens after findings were already validated still writes the
+partial report, so treat a `3` as "output incomplete", not "output absent".
+
 `3` covers an invalid `project-path`, an option value the console rejects,
 conflicting options, an LLM provider abort, and any unhandled exception — all of
 which returned `1` through 1.x, making a crashed auditor indistinguishable from

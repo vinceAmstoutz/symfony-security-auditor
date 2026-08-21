@@ -25,8 +25,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  * `symfony/ai-bundle` supports is stripped first, then a provider-qualified id
  * is matched on its final `/` segment, so the gateway forms that name the model
  * outright (`anthropic/claude-…`, `publishers/anthropic/models/claude-…`) are
- * recognized too, and an option value containing a `/` cannot hide the model. An unrelated model whose name merely contains "claude" is
- * therefore not mistaken for one, while an opaque gateway alias that hides its
+ * recognized too, and an option value containing a `/` cannot hide the model.
+ * An unrelated model whose name merely contains "claude" is therefore not
+ * mistaken for one, while an opaque gateway alias that hides its
  * Anthropic origin reports honestly that the dialect cannot be confirmed —
  * `ConfigurationNotices` surfaces that as a pre-flight notice instead of
  * dropping the cap in silence.
