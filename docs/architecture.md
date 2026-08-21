@@ -861,8 +861,8 @@ Input mapping and resolution live in `AuditCommandInput`; output writing in
 `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
 Exit codes: `0` (SAFE/LOW/MEDIUM), `1` (the gate tripped — HIGH or CRITICAL risk
-by default, or a scan that discovered no file), `2` (budget exceeded — partial
-report still emitted), `3` (the audit never produced a verdict).
+by default), `2` (budget exceeded — partial report still emitted), `3` (no
+verdict was reached: the run broke, or its scan found no file to audit).
 
 ## Extension Points
 

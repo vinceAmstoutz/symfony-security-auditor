@@ -96,6 +96,14 @@ conflicting options, an LLM provider abort, and any unhandled exception — all 
 which returned `1` through 1.x, making a crashed auditor indistinguishable from
 a working one reporting real vulnerabilities.
 
+**A scan that discovered no file to audit also moved from `1` to `3`.** Nothing
+was examined, so no verdict exists to trip a gate — and a mistyped
+`project-path` that does not exist already exited `3`, so a path that exists but
+matches no file was the same mistake wearing a different code. If your pipeline
+treats `1` as "block the merge, notify the security team", an empty scan no
+longer lands in that bucket; it is a tool-health signal now. Both codes remain
+non-zero, so a build that failed before still fails.
+
 A job that gates on findings still checks `1` and needs no change. A job that
 wants to alert on tool health should check `3`. The GitHub Action's `exit-code`
 output surfaces it unchanged.

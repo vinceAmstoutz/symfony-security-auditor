@@ -744,19 +744,23 @@ disagree:
 
 ### Exit codes
 
-| Code | Meaning                                                                                                                                                                                                                                                                                                                                    |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `0`  | Audit completed; aggregate risk level is below the `fail_on` threshold (default `high` → SAFE, LOW, or MEDIUM) and, when `--min-score` is given, the normalized score is at or above it                                                                                                                                                    |
-| `1`  | Audit completed, and the gate tripped: the aggregate risk level is at or above the `fail_on` threshold (default `high`), the normalized score is below `--min-score`, or **the scan discovered no file to audit**                                                                                                                          |
-| `2`  | The audit budget could not be honored: either it aborted mid-run because the configured token or cost budget was exceeded (partial report still emitted), or it never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable and the run was declined or non-interactive (no report emitted in that case)       |
-| `3`  | _Since 2.0._ The audit never produced a verdict: an invalid `project-path`, an option value the console rejects, conflicting options, an LLM provider abort, or an unhandled exception. Check stderr. An abort after findings were already validated still writes the partial report, so treat its output as incomplete rather than absent |
+| Code | Meaning                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Audit completed; aggregate risk level is below the `fail_on` threshold (default `high` → SAFE, LOW, or MEDIUM) and, when `--min-score` is given, the normalized score is at or above it                                                                                                                                                                                                 |
+| `1`  | Audit completed, and the gate tripped: the aggregate risk level is at or above the `fail_on` threshold (default `high`), or the normalized score is below `--min-score`                                                                                                                                                                                                                 |
+| `2`  | The audit budget could not be honored: either it aborted mid-run because the configured token or cost budget was exceeded (partial report still emitted), or it never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable and the run was declined or non-interactive (no report emitted in that case)                                                    |
+| `3`  | _Since 2.0._ The audit never produced a verdict: an invalid `project-path`, an option value the console rejects, conflicting options, an LLM provider abort, an unhandled exception, or **a scan that discovered no file to audit**. Check stderr. An abort after findings were already validated still writes the partial report, so treat its output as incomplete rather than absent |
 
-A run whose scan discovered **no file at all** exits `1` rather than reporting
+A run whose scan discovered **no file at all** exits `3` rather than reporting
 SAFE with a perfect score. Nothing was examined, so there is no verdict to pass
-— this catches a mistyped `project-path`, a `scan.included_paths` entry matching
-nothing, or an over-broad `excluded_paths`, instead of letting the gate go
-green. A `--since` run whose diff left nothing changed still exits `0`: there
-the scan did find files, and none of them changed.
+or fail — this catches a mistyped `project-path`, a `scan.included_paths` entry
+matching nothing, or an over-broad `excluded_paths`. It shares `3` with the
+nonexistent-`project-path` case because it is the same class of mistake, and
+staying out of `1` keeps "your code has findings" from being claimed about code
+nobody read. A `--since` run whose diff left nothing changed still exits `0`:
+there the scan did find files, and none of them changed.
+
+_Changed in 2.0: this case exited `1` through 1.x._
 
 `1` and `3` are deliberately distinct. `1` means the auditor worked and is
 telling you something about your code; `3` means the auditor itself did not run,

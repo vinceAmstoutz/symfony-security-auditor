@@ -109,10 +109,16 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   `AuditCommand`'s top-level handler and its non-budget abort path return it,
   and the new `AuditFailureExitCodeListener` (wired on `console.error` in both
   the bundle and the standalone application) converts the failures that never
-  reach the command body. `0`, `1` and `2` keep their meanings, so a CI job
-  gating on findings needs no change — but one that wants to distinguish "the
-  gate tripped" from "the tool is broken" can now do so. The GitHub Action's
-  `exit-code` output surfaces `3` unchanged.
+  reach the command body. **A scan that discovered no file to audit moves to `3`
+  as well**: nothing was examined, so no verdict exists for a gate to trip on,
+  and a `project-path` that does not exist already exited `3` — a path that
+  exists but matches no file was the same mistake wearing a different code, so a
+  mistyped `scan.included_paths` entry or an over-broad `excluded_paths` no
+  longer claims your code has findings. `0`, `1` and `2` otherwise keep their
+  meanings, and both codes stay non-zero, so a CI job gating on findings still
+  fails the same builds — but one that wants to distinguish "the gate tripped"
+  from "the tool is broken" can now do so. The GitHub Action's `exit-code`
+  output surfaces `3` unchanged.
 
 - **`audit.fail_on` now defaults to `high`, so a HIGH-risk audit fails CI.**
   Through 1.x the default was `critical`, which meant only a `CRITICAL`

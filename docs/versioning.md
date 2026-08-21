@@ -87,7 +87,7 @@ is a `MAJOR` change.
     `--min-score` is given, the normalized score is at or above it.
   - `1` — audit completed and the gate tripped: the aggregate risk level is at
     or above the `fail_on` threshold (default `high`), the normalized score is
-    below `--min-score`, or the scan discovered no file to audit.
+    below `--min-score`.
   - `2` — the audit budget could not be honored: either it aborted mid-run
     because the configured token or cost budget was exceeded (partial report
     still emitted), or it never started because an unpriced model makes
@@ -96,8 +96,8 @@ is a `MAJOR` change.
     that case).
   - `3` — the audit never produced a verdict: an invalid `project-path`, an
     option value the console rejects, conflicting options, an LLM provider
-    abort, or an unhandled exception. Added in 2.0; through 1.x these paths
-    shared `1` with the gate.
+    abort, an unhandled exception, or a scan that discovered no file to audit.
+    Added in 2.0; through 1.x these paths shared `1` with the gate.
 - The command name `audit:diff` (see
   [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)),
   its `previous-report` and `current-report` arguments, its `--format` option

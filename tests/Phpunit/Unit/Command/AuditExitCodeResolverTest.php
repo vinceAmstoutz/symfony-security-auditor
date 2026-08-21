@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 
 final class AuditExitCodeResolverTest extends TestCase
 {
@@ -145,11 +146,21 @@ final class AuditExitCodeResolverTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_it_fails_a_run_that_found_no_files_to_audit(): void
+    public function test_a_run_that_found_no_files_to_audit_reports_no_verdict_rather_than_a_tripped_gate(): void
     {
         $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
 
-        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical));
+        self::assertSame(ExitCode::AuditFailed->value, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_an_empty_scan_outranks_a_score_gate_it_would_otherwise_pass(): void
+    {
+        $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+
+        self::assertSame(ExitCode::AuditFailed->value, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical, 100));
     }
 
     /**
