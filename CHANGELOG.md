@@ -39,6 +39,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`docs/architecture.md`'s command reference no longer contradicts
+  `docs/configuration.md`.** Its exit-code summary read "`0`
+  (SAFE/LOW/MEDIUM/HIGH), `1` (CRITICAL risk or invalid path or unexpected
+  failure), `2` (budget exceeded)", which predates three behaviours the
+  canonical table in `docs/configuration.md` already documents: `audit.fail_on`
+  is configurable, so HIGH exits `1` whenever it is set below `critical`; a scan
+  that discovers no file at all exits `1`; a score below `--min-score` exits
+  `1`; and `2` also covers a run that never started because an unpriced model
+  makes `audit.budget.max_cost_usd` unenforceable. The same table listed three
+  `--format` values when `OutputFormat` has nine. Both rows are corrected and
+  the exit-code paragraph now points at the canonical table rather than
+  restating it.
 - **`scan.code_slicing`'s configuration reference no longer promises whole
   method bodies.** The `info()` text — what
   `config:dump-reference symfony_security_auditor` prints — said the slicer
