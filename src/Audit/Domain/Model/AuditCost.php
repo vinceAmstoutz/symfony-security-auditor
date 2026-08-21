@@ -28,8 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCost
 final readonly class AuditCost
 {
     /**
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byRole
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byModel
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>                                                       $byRole
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float}> $byModel
      */
     private function __construct(
         private int $inputTokens,
@@ -120,12 +120,29 @@ final readonly class AuditCost
         }
 
         foreach ($breakdown as $entry) {
-            if (0.0 === $entry['estimated_cost_usd'] && 0 !== $entry['input_tokens'] + $entry['output_tokens']) {
+            if (0.0 === $entry['estimated_cost_usd'] && 0 !== self::billableTokens($entry)) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * Cache reads and cache writes are billed, so a model whose whole spend
+     * arrived as cached prompt tokens has still been charged for. Counting
+     * only fresh input/output would read that as "nothing spent" and hide a
+     * pricing gap. The per-role dry-run breakdown projects no cache traffic,
+     * so those keys are absent there.
+     *
+     * @param array{input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int} $entry
+     */
+    private static function billableTokens(array $entry): int
+    {
+        return $entry['input_tokens']
+            + $entry['output_tokens']
+            + ($entry['cache_read_tokens'] ?? 0)
+            + ($entry['cache_creation_tokens'] ?? 0);
     }
 
     /**
@@ -142,7 +159,7 @@ final readonly class AuditCost
      * copy-on-write rather than through `of()`, which is already at the
      * project's five-parameter ceiling.
      *
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byModel keyed by model name
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float}> $byModel keyed by model name
      */
     public function withUsageByModel(array $byModel): self
     {
@@ -169,7 +186,12 @@ final readonly class AuditCost
             'primary_model' => $this->primaryModel,
             'by_role' => (object) $this->byRole,
             'by_model' => (object) array_map(
-                static fn (array $usage): array => [...$usage, 'estimated_cost_usd' => round($usage['estimated_cost_usd'], 6)],
+                static fn (array $usage): array => [
+                    ...$usage,
+                    'cache_read_tokens' => $usage['cache_read_tokens'] ?? 0,
+                    'cache_creation_tokens' => $usage['cache_creation_tokens'] ?? 0,
+                    'estimated_cost_usd' => round($usage['estimated_cost_usd'], 6),
+                ],
                 $this->byModel,
             ),
         ];

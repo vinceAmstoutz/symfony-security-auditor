@@ -331,8 +331,8 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'ollama/llama3.2', 'end_turn', TokenUsageSnapshot::of(500_000, 100_000)));
 
         self::assertSame([
-            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_000_000, 'output_tokens' => 200_000, 'estimated_cost_usd' => 6.0],
-            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 500_000, 'output_tokens' => 100_000, 'estimated_cost_usd' => 0.0],
+            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_000_000, 'output_tokens' => 200_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 6.0],
+            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 500_000, 'output_tokens' => 100_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.0],
         ], $budgetTracker->usageByModel());
     }
 
@@ -348,7 +348,7 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(400_000, 50_000)));
 
         self::assertSame(
-            ['model' => 'claude-opus-5', 'input_tokens' => 1_400_000, 'output_tokens' => 250_000, 'estimated_cost_usd' => 7.95],
+            ['model' => 'claude-opus-5', 'input_tokens' => 1_400_000, 'output_tokens' => 250_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 7.95],
             $budgetTracker->usageByModel()['claude-opus-5'],
         );
     }

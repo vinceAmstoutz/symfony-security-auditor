@@ -46,7 +46,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   and it also covers models neither role owns — `EscalatingAttackerAgent`'s
   cheap first pass, PoC and fix synthesis. The JSON report gains a `by_model`
   object alongside the existing `by_role`; both are additive, and
-  `AuditCost::of()` is unchanged, so existing callers are unaffected.
+  `AuditCost::of()` is unchanged, so existing callers are unaffected. Each
+  `by_model` entry also carries `cache_read_tokens` and `cache_creation_tokens`,
+  because `CostCalculator::costForCall()` bills cached prompt traffic: without
+  them a cached run reported a cost its own token counts could not account for.
+  `AuditCost::hasPublishedPricing()` counts that traffic as spend too, so a
+  model whose whole run arrived from the prompt cache and priced to zero is
+  still reported as a pricing gap instead of passing as free. Both keys are
+  optional in the accepted shape, keeping `withUsageByModel()` callers valid.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

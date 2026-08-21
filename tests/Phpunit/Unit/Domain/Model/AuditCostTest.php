@@ -113,6 +113,22 @@ final class AuditCostTest extends TestCase
     }
 
     /**
+     * Cache reads are billed, so a model whose entire spend arrived as cached
+     * prompt tokens has still been charged — and priced at zero it is still a
+     * pricing gap, even though its fresh input and output are both zero.
+     *
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_counts_cached_prompt_tokens_as_spend(): void
+    {
+        $auditCost = AuditCost::of(0, 0, 0.0, 'ollama/llama3.2')->withUsageByModel([
+            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 0, 'output_tokens' => 0, 'cache_read_tokens' => 4_000, 'cache_creation_tokens' => 1_000, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        self::assertFalse($auditCost->hasPublishedPricing());
+    }
+
+    /**
      * "Some tokens were spent" is the sum of input and output, not their
      * difference: an entry that happens to spend as many output tokens as
      * input ones is still spend, and must still be checked for a price.
@@ -194,7 +210,7 @@ final class AuditCostTest extends TestCase
         ]);
 
         self::assertEquals(
-            (object) ['claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_111, 'output_tokens' => 777, 'estimated_cost_usd' => 0.104916]],
+            (object) ['claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_111, 'output_tokens' => 777, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.104916]],
             $auditCost->toArray()['by_model'],
         );
     }
@@ -212,7 +228,7 @@ final class AuditCostTest extends TestCase
         ]);
 
         self::assertEquals(
-            (object) ['gemini-flash-lite' => ['model' => 'gemini-flash-lite', 'input_tokens' => 1, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0]],
+            (object) ['gemini-flash-lite' => ['model' => 'gemini-flash-lite', 'input_tokens' => 1, 'output_tokens' => 0, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.0]],
             $auditCost->toArray()['by_model'],
         );
     }
