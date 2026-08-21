@@ -46,7 +46,7 @@ final readonly class ConfigurationNotices
             $notices[] = 'audit.static_prescan.lean_mode has no effect while audit.static_prescan.enabled is false: with no risk markers, lean mode would drop every file, so all files are analysed instead. Enable static_prescan to use lean mode, or set lean_mode: false to silence this.';
         }
 
-        foreach (self::outputCapsTheirModelIgnores($lLMConfiguration) as ['model' => $model, 'cap' => $cap]) {
+        foreach (self::outputCapsTheirModelIgnores($auditExecutionConfiguration, $lLMConfiguration) as ['model' => $model, 'cap' => $cap]) {
             $notices[] = \sprintf('max_output_tokens is set to %d but %s does not use the Anthropic option dialect, so symfony/ai rejects the max_tokens option and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.', $cap, $model);
         }
 
@@ -60,12 +60,16 @@ final readonly class ConfigurationNotices
      *
      * @return list<array{model: string, cap: int}>
      */
-    private static function outputCapsTheirModelIgnores(LLMConfiguration $lLMConfiguration): array
+    private static function outputCapsTheirModelIgnores(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array
     {
         $roleCaps = [
             [$lLMConfiguration->attackerModel(), $lLMConfiguration->attackerMaxOutputTokens()],
             [$lLMConfiguration->reviewerModel(), $lLMConfiguration->reviewerMaxOutputTokens()],
         ];
+
+        if ($auditExecutionConfiguration->escalationEnabled) {
+            $roleCaps[] = [self::escalationCheapModel($auditExecutionConfiguration, $lLMConfiguration), $lLMConfiguration->attackerMaxOutputTokens()];
+        }
 
         $ignored = [];
         foreach ($roleCaps as [$model, $cap]) {

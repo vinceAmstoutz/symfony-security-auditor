@@ -286,6 +286,43 @@ final class ConfigurationNoticesTest extends TestCase
     /**
      * @throws InvalidAuditExecutionConfigurationException
      */
+    public function test_a_raised_output_cap_on_a_non_anthropic_escalation_cheap_model_emits_a_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => true, 'escalationCheapModel' => 'gpt-4o-mini']),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('max_output_tokens is set to 16384', $notices[0]);
+        self::assertStringContainsString('gpt-4o-mini', $notices[0]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_raised_output_cap_on_an_anthropic_escalation_cheap_model_emits_no_notice(): void
+    {
+        self::assertSame([], ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => true, 'escalationCheapModel' => 'claude-haiku-4-5-20251001']),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
+        ));
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_raised_output_cap_ignores_the_cheap_model_while_escalation_is_disabled(): void
+    {
+        self::assertSame([], ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => false, 'escalationCheapModel' => 'gpt-4o-mini']),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
+        ));
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_split_caps_on_one_shared_model_report_both_roles(): void
     {
         $notices = ConfigurationNotices::of(
