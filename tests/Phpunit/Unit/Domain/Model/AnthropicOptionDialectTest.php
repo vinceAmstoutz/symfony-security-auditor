@@ -41,6 +41,12 @@ final class AnthropicOptionDialectTest extends TestCase
         yield 'bedrock us cross-region' => ['us.anthropic.claude-opus-5-v1:0'];
         yield 'bedrock eu cross-region' => ['eu.anthropic.claude-opus-5-v1:0'];
         yield 'bedrock apac cross-region' => ['apac.anthropic.claude-opus-5-v1:0'];
+        yield 'provider-qualified gateway id' => ['anthropic/claude-opus-5'];
+        yield 'nested gateway id' => ['openrouter/anthropic/claude-opus-5'];
+        yield 'vertex publisher path' => ['publishers/anthropic/models/claude-opus-5'];
+        yield 'model options query string' => ['claude-opus-5?temperature=0.2'];
+        yield 'option value containing a slash' => ['claude-opus-5?base_url=https://gw.example/v1'];
+        yield 'gateway id with options' => ['anthropic/claude-opus-5?temperature=0.2'];
     }
 
     /** @return iterable<string, array{string}> */

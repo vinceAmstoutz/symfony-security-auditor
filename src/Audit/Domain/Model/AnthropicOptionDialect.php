@@ -21,11 +21,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  *
  * Matching is on anchored identifier prefixes, covering the Anthropic API and
  * Vertex (`claude-…`) plus Bedrock's plain and cross-region-inference ids
- * (`anthropic.claude-…`, `us.anthropic.claude-…`). An unrelated model whose
- * name merely contains "claude" is therefore not mistaken for one, and an
- * opaque gateway alias that hides its Anthropic origin reports honestly that
- * the dialect cannot be confirmed — `ConfigurationNotices` surfaces that as a
- * pre-flight notice instead of dropping the cap in silence.
+ * (`anthropic.claude-…`, `us.anthropic.claude-…`). The `?options` query string
+ * `symfony/ai-bundle` supports is stripped first, then a provider-qualified id
+ * is matched on its final `/` segment, so the gateway forms that name the model
+ * outright (`anthropic/claude-…`, `publishers/anthropic/models/claude-…`) are
+ * recognized too, and an option value containing a `/` cannot hide the model. An unrelated model whose name merely contains "claude" is
+ * therefore not mistaken for one, while an opaque gateway alias that hides its
+ * Anthropic origin reports honestly that the dialect cannot be confirmed —
+ * `ConfigurationNotices` surfaces that as a pre-flight notice instead of
+ * dropping the cap in silence.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -43,12 +47,28 @@ final readonly class AnthropicOptionDialect
 
     public static function honoredBy(string $model): bool
     {
+        $modelId = self::withoutGatewayPrefix(self::withoutOptionsQueryString($model));
+
         foreach (self::MODEL_ID_PREFIXES as $modelIdPrefix) {
-            if (str_starts_with($model, $modelIdPrefix)) {
+            if (str_starts_with($modelId, $modelIdPrefix)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static function withoutOptionsQueryString(string $model): string
+    {
+        $withoutOptions = strstr($model, '?', true);
+
+        return false === $withoutOptions ? $model : $withoutOptions;
+    }
+
+    private static function withoutGatewayPrefix(string $model): string
+    {
+        $lastSeparatorPosition = strrpos($model, '/');
+
+        return false === $lastSeparatorPosition ? $model : substr($model, $lastSeparatorPosition + 1);
     }
 }
