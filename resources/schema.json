@@ -43,7 +43,7 @@
         },
         "provider_json_mode": {
           "type": "boolean",
-          "description": "Send response_format: {type: json_object} on every call (honored by OpenAI/Mistral/Ollama). Default: false."
+          "description": "Send response_format: {type: json_object} on every call to an Anthropic-dialect model so the provider enforces JSON natively; a no-op on every other dialect, decided by the same anchored prefix match as max_output_tokens. Default: false."
         },
         "scan": {
           "type": "object",
