@@ -23,11 +23,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   reviewer/attacker token counts in the cost breakdown itself
   (`AuditPresenter::reviewerRatioPercent()`) rather than restated as a fixed
   string, so it stays correct if the ratio the use case was constructed with
-  ever differs from the default. The note also moved out of the
-  `SymfonyStyle::listing()` block it previously shared with the cost breakdown —
-  every `listing()` element gets its own bullet and no word-wrap, so a caveat
-  that size picked up a stray leading bullet and wrapped ragged on narrower
-  terminals; it now prints as its own properly-wrapped line.
+  ever differs from the default. The note is worded as what this estimate works
+  out to rather than as the configured assumption, because the two need not
+  agree: once the attacker figure carries prompt overhead the reviewer never
+  sends, the derived percentage drops below `reviewer_input_ratio` while
+  remaining an accurate description of the printed breakdown. The note also
+  moved out of the `SymfonyStyle::listing()` block it previously shared with the
+  cost breakdown — every `listing()` element gets its own bullet and no
+  word-wrap, so a caveat that size picked up a stray leading bullet and wrapped
+  ragged on narrower terminals; it now prints as its own properly-wrapped line.
 
   When the breakdown carries no attacker input to measure against — no attacker
   entry, or zero attacker input tokens — the caveat is omitted entirely rather

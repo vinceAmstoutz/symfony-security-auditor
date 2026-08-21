@@ -142,7 +142,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $reviewerRatioPercent = $this->reviewerRatioPercent($cost);
             if (null !== $reviewerRatioPercent) {
                 $symfonyStyle->text(\sprintf(
-                    '<fg=gray>Reviewer input assumes ~%d%% of attacker input — a flat, pre-run heuristic; actual cost scales with real findings.</>',
+                    '<fg=gray>Reviewer input is projected at ~%d%% of attacker input in this estimate — a flat pre-run heuristic, not a measurement; actual cost scales with real findings.</>',
                     $reviewerRatioPercent,
                 ));
             }

@@ -475,7 +475,7 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringNotContainsString('Reviewer input assumes', $bufferedOutput->fetch());
+        self::assertStringNotContainsString('Reviewer input is projected', $bufferedOutput->fetch());
     }
 
     /**
@@ -495,7 +495,7 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringNotContainsString('Reviewer input assumes', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
+        self::assertStringNotContainsString('Reviewer input is projected', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
     }
 
     /**
@@ -514,7 +514,7 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringNotContainsString('Reviewer input assumes', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
+        self::assertStringNotContainsString('Reviewer input is projected', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
     }
 
     /**
