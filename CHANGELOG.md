@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.20.0] — 2026-08-22 — Ledger
+
+A release about knowing the real cost before you pay it, and trusting the binary
+that pays it on your behalf. `--dry-run` now accounts for skill-prompt overhead,
+tool round-trip overhead, and PoC/fix synthesis — the gaps that made prior
+estimates undercount real spend — and reports the reviewer ratio as the rough
+heuristic it is rather than a peer figure. `self-update` now refreshes the
+bundled pricing catalog after replacing the binary and hardens the
+download-verify-swap sequence against corruption. SARIF artifact URIs are now
+percent-decoded correctly, and two more secret-scrubbing gaps (Basic-auth
+headers, Slack `xapp-` tokens) are closed.
+
 ### Added
 
 - **`--dry-run` now caveats the reviewer figure as a flat, pre-run heuristic.**
@@ -4078,6 +4090,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.20.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.0
 [1.19.1]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.19.1
 [1.19.0]:
