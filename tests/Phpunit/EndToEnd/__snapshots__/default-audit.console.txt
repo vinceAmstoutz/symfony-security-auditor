@@ -10,6 +10,7 @@
   Duration: DURATIONs
   Files   : 3 scanned
   Tokens  : 0 in / 0 out (gpt-4o)
+  Cost    : $0.0000 (published rates)
 
 ──────────────────────────────────────────────────────────────────────
   RISK LEVEL: LOW  (Score: 10)

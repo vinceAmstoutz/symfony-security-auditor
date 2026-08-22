@@ -1,7 +1,7 @@
 # Security Audit Report
 
 **Audit ID:** AUDIT-XXXXXXXX · **Project:** PROJECT_PATH · **Started:** TIMESTAMP · **Duration:** DURATIONs
-**Tokens:** 0 in / 0 out · **Model:** gpt-4o
+**Tokens:** 0 in / 0 out · **Model:** gpt-4o · **Cost:** $0.0000 (published rates)
 
 **Risk level:** LOW (score 10) · **Findings:** 1 · **Files scanned:** 3
 

@@ -29,6 +29,7 @@ final class FakeReleaseClient implements ReleaseClientInterface
     public function __construct(
         private readonly array $bodies,
         private readonly string $downloadPayload = '',
+        private readonly bool $vanishAfterDownload = false,
     ) {}
 
     #[Override]
@@ -49,6 +50,10 @@ final class FakeReleaseClient implements ReleaseClientInterface
 
         try {
             (new Filesystem())->dumpFile($destination, $this->downloadPayload);
+
+            if ($this->vanishAfterDownload) {
+                (new Filesystem())->remove($destination);
+            }
         } catch (IOException $ioException) {
             throw SelfUpdateFailedException::forFailedDownload($url, $ioException);
         }

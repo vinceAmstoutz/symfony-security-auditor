@@ -28,7 +28,20 @@ final readonly class StandaloneConfig
 
     public function offlineOnly(): bool
     {
-        $privacy = $this->auditConfig['privacy'] ?? null;
+        return self::offlineOnlyIn($this->auditConfig);
+    }
+
+    /**
+     * Reads `privacy.offline_only` straight off a raw parsed config, for
+     * callers that must answer the question before a full `StandaloneConfig`
+     * can be built — `self-update` runs before "init" has ever written a
+     * platform.
+     *
+     * @param array<array-key, mixed> $auditConfig
+     */
+    public static function offlineOnlyIn(array $auditConfig): bool
+    {
+        $privacy = $auditConfig['privacy'] ?? null;
 
         return \is_array($privacy) && true === ($privacy['offline_only'] ?? false);
     }

@@ -19,6 +19,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\FilesystemUpdateCheckStore;
@@ -93,6 +94,53 @@ final class FilesystemUpdateCheckStoreTest extends TestCase
         self::assertNull($filesystemUpdateCheckStore->read());
     }
 
+    public function test_it_clears_a_previously_written_state(): void
+    {
+        $filesystemUpdateCheckStore = $this->resolvableStore();
+        $filesystemUpdateCheckStore->write(new UpdateCheckState(new DateTimeImmutable('@1700000000'), '2.0.0'));
+
+        $filesystemUpdateCheckStore->clear();
+
+        self::assertNull($filesystemUpdateCheckStore->read());
+    }
+
+    public function test_it_treats_clearing_an_absent_cache_as_a_no_op(): void
+    {
+        $filesystemUpdateCheckStore = $this->resolvableStore();
+
+        $filesystemUpdateCheckStore->clear();
+
+        self::assertNull($filesystemUpdateCheckStore->read());
+    }
+
+    public function test_it_does_not_attempt_to_clear_when_the_cache_path_is_unresolvable(): void
+    {
+        $recordingLogger = new RecordingLogger();
+
+        $this->unresolvableStore($recordingLogger)->clear();
+
+        self::assertSame([], $recordingLogger->contextKeys());
+    }
+
+    public function test_it_logs_the_error_when_clearing_the_cache_fails(): void
+    {
+        $filesystem = new class extends Filesystem {
+            /**
+             * @param string|iterable<mixed> $files
+             */
+            #[Override]
+            public function remove(string|iterable $files): void
+            {
+                throw new IOException('remove refused');
+            }
+        };
+        $recordingLogger = new RecordingLogger();
+
+        (new FilesystemUpdateCheckStore(new XdgConfigPathResolver(null, $this->cacheHome, null), $filesystem, $recordingLogger))->clear();
+
+        self::assertSame([['error']], $recordingLogger->contextKeys());
+    }
+
     public function test_it_treats_an_unreadable_cache_entry_as_absent(): void
     {
         $this->filesystem->mkdir($this->cacheFile());
@@ -134,9 +182,9 @@ final class FilesystemUpdateCheckStoreTest extends TestCase
         return new FilesystemUpdateCheckStore(new XdgConfigPathResolver(null, $this->cacheHome, null), $this->filesystem, $logger ?? new NullLogger());
     }
 
-    private function unresolvableStore(): FilesystemUpdateCheckStore
+    private function unresolvableStore(?LoggerInterface $logger = null): FilesystemUpdateCheckStore
     {
-        return new FilesystemUpdateCheckStore(new XdgConfigPathResolver(null, null, null), $this->filesystem, new NullLogger());
+        return new FilesystemUpdateCheckStore(new XdgConfigPathResolver(null, null, null), $this->filesystem, $logger ?? new NullLogger());
     }
 
     private function cacheDir(): string

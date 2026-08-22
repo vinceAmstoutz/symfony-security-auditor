@@ -19,9 +19,11 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckStoreInterface;
 
 /** @internal not part of the BC promise — the command *name* (`self-update`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
@@ -34,6 +36,7 @@ final readonly class SelfUpdateCommand
     public function __construct(
         private SelfUpdaterInterface $selfUpdater,
         private string $currentVersion,
+        private UpdateCheckStoreInterface $updateCheckStore,
     ) {}
 
     /**
@@ -45,7 +48,13 @@ final readonly class SelfUpdateCommand
         #[Option(description: 'Only report whether a newer version is available; do not modify the binary.')]
         bool $check = false,
     ): int {
-        return $this->report($symfonyStyle, $this->selfUpdater->run($this->currentVersion, $check));
+        $selfUpdateResult = $this->selfUpdater->run($this->currentVersion, $check);
+
+        if (SelfUpdateStatus::Updated === $selfUpdateResult->status) {
+            $this->updateCheckStore->clear();
+        }
+
+        return $this->report($symfonyStyle, $selfUpdateResult);
     }
 
     private function report(SymfonyStyle $symfonyStyle, SelfUpdateResult $selfUpdateResult): int
@@ -55,6 +64,10 @@ final readonly class SelfUpdateCommand
             SelfUpdateStatus::UpdateAvailable => $symfonyStyle->warning(\sprintf('A newer version is available: %s (currently %s). Run "self-update" without --check to install it.', $selfUpdateResult->latestVersion, $selfUpdateResult->currentVersion)),
             SelfUpdateStatus::Updated => $symfonyStyle->success(\sprintf('Updated from %s to %s.', $selfUpdateResult->currentVersion, $selfUpdateResult->latestVersion)),
         };
+
+        if (PricingCatalogRefreshOutcome::Failed === $selfUpdateResult->pricingCatalogRefresh) {
+            $symfonyStyle->warning('Could not refresh the bundled pricing catalog. Cost figures keep using the catalog already in place — the last successful refresh if there was one, otherwise the one frozen into the binary at build time; run "self-update" again to retry.');
+        }
 
         return Command::SUCCESS;
     }
