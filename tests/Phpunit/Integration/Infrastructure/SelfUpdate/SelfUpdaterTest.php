@@ -146,6 +146,24 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function test_it_rejects_a_download_that_vanishes_before_it_can_be_hashed(): void
+    {
+        $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW'), vanishAfterDownload: true));
+
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessage('Could not read the downloaded file');
+
+            $selfUpdater->run('1.0.0', false);
+        } finally {
+            self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function test_it_refuses_to_update_when_the_binary_is_not_writable(): void
     {
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW')), $this->workingDirectory.'/missing/symfony-security-auditor');
@@ -230,14 +248,14 @@ final class SelfUpdaterTest extends TestCase
     /**
      * @throws UnsupportedSelfUpdatePlatformException
      */
-    private function clientFor(string $tagName, string $payload, string $checksum): FakeReleaseClient
+    private function clientFor(string $tagName, string $payload, string $checksum, bool $vanishAfterDownload = false): FakeReleaseClient
     {
         $asset = $this->asset($tagName);
 
         return new FakeReleaseClient([
             self::LATEST_RELEASE_API_URL => \sprintf('{"tag_name":"%s"}', $tagName),
             $asset->checksumUrl => \sprintf("%s\n", $checksum),
-        ], $payload);
+        ], $payload, $vanishAfterDownload);
     }
 
     /**

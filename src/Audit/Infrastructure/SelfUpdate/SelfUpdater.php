@@ -103,10 +103,8 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
             $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath);
             $this->assertChecksumMatches($gitHubBinaryAsset, $downloadPath);
             $this->install($downloadPath, $binaryPath);
-        } catch (SelfUpdateFailedException $selfUpdateFailedException) {
+        } finally {
             $this->filesystem->remove($downloadPath);
-
-            throw $selfUpdateFailedException;
         }
     }
 
@@ -115,8 +113,10 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
      */
     private function assertChecksumMatches(GitHubBinaryAsset $gitHubBinaryAsset, string $downloadPath): void
     {
-        $actual = hash_file('sha256', $downloadPath);
-        \assert(false !== $actual);
+        $actual = is_readable($downloadPath) ? hash_file('sha256', $downloadPath) : false;
+        if (false === $actual) {
+            throw SelfUpdateFailedException::forUnreadableDownload($downloadPath);
+        }
 
         if (!hash_equals($this->expectedChecksum($gitHubBinaryAsset), $actual)) {
             throw SelfUpdateFailedException::forChecksumMismatch($gitHubBinaryAsset->name);

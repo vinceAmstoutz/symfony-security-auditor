@@ -84,6 +84,21 @@ final readonly class FilesystemUpdateCheckStore implements UpdateCheckStoreInter
         }
     }
 
+    #[Override]
+    public function clear(): void
+    {
+        $path = $this->cacheFilePath();
+        if (null === $path) {
+            return;
+        }
+
+        try {
+            $this->filesystem->remove($path);
+        } catch (IOException $ioException) {
+            $this->logger->warning('Failed to clear the update-check cache', ['error' => $ioException->getMessage()]);
+        }
+    }
+
     private function parse(string $raw): ?UpdateCheckState
     {
         try {
