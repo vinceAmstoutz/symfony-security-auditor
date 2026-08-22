@@ -430,6 +430,15 @@ headers, Slack `xapp-` tokens) are closed.
   header or an assignment before the credential, so prose such as "use basic
   authentication over TLS" is left alone. `SecretPatternLabel` gains
   `BasicAuthorization`.
+- **A finding's `file` path could forge a fake section header in the PoC and fix
+  synthesis prompts.** `PoCSynthesizer::buildUserMessage()`
+  (`src/Audit/Application/Agent/PoCSynthesizer.php`) and
+  `FixSynthesizer::buildUserMessage()` escape every other narrative field —
+  `title`, `vulnerable_code`, `attack_vector`, `proof`, `remediation` — with
+  `escapeFences()` so a run of backticks or `#` can't forge a fake code fence or
+  a bogus `### SYSTEM OVERRIDE` heading, but `file` (attacker-controlled via
+  `record_vulnerability`'s unconstrained `file_path` input) only had its
+  newlines stripped. Both now also escape `file` through `escapeFences()`.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
