@@ -388,6 +388,20 @@ headers, Slack `xapp-` tokens) are closed.
   `--check` had already shown the user the newer version. `SelfUpdateCommand`
   now records the version it observed, so the notice agrees from the next
   command onwards.
+- **`RegexCodeSlicer` could silently elide genuinely security-relevant code
+  after a heredoc whose body contains a line starting with the closing
+  identifier word.** `HeredocLineTracker::closeTrailer()`
+  (`src/Audit/Infrastructure/Scan/HeredocLineTracker.php`) matched any line
+  starting with the identifier as the close, with no constraint on what followed
+  it — so a body line like `SQL syntax note: uses index` inside a `<<<SQL` block
+  ended heredoc tracking two lines early. Every line after that false close
+  (including the actual tainted interpolation, e.g. `WHERE name = '$name'`) then
+  went through ordinary per-line elision instead of being retained verbatim,
+  replacing it with `// elided` whenever it didn't independently match a known
+  security token — hiding a real SQL-injection sink from the attacker LLM. The
+  trailer is now restricted to whitespace and the punctuation PHP actually
+  allows after a closing identifier (`;`, `,`, `)`, `]`), so a body line
+  followed by anything else is no longer mistaken for the close.
 
 ### Security
 
