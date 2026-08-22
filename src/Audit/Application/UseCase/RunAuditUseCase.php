@@ -124,8 +124,9 @@ final readonly class RunAuditUseCase
         }
 
         $snapshot = $this->tokenUsageRecorder->snapshot();
+        $auditCost = AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $this->resolveEstimatedCost($snapshot), $this->primaryModel);
 
-        return AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $this->resolveEstimatedCost($snapshot), $this->primaryModel);
+        return $auditCost->withUsageByModel($this->budgetTracker?->usageByModel() ?? []);
     }
 
     private function resolveEstimatedCost(TokenUsageSnapshot $tokenUsageSnapshot): float

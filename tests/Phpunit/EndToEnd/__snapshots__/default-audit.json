@@ -54,7 +54,17 @@
         "total_tokens": 0,
         "estimated_cost_usd": 0.0,
         "primary_model": "gpt-4o",
-        "by_role": []
+        "by_role": [],
+        "by_model": {
+            "gpt-4o": {
+                "model": "gpt-4o",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_creation_tokens": 0,
+                "estimated_cost_usd": 0.0
+            }
+        }
     },
     "coverage": [
         {

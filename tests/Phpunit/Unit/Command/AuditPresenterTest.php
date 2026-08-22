@@ -15,9 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use InvalidArgumentException;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Formatter\OutputFormatterInterface;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -117,6 +119,135 @@ final class AuditPresenterTest extends TestCase
 
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
+    }
+
+    public function test_header_shows_the_mark_and_wordmark_in_the_brand_palette_when_decorated(): void
+    {
+        $display = $this->headerIn(['LC_ALL' => 'en_US.UTF-8'], true);
+        $outputFormatter = (new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true))->getFormatter();
+
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55;options=bold>◉ >> SECURITY</>'), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>AUDITOR</>'), $display);
+        self::assertStringStartsWith(\PHP_EOL, $display, 'the header must not abut whatever printed before it');
+    }
+
+    public function test_header_keeps_the_same_layout_without_colour_when_not_decorated(): void
+    {
+        $display = $this->headerIn(['LC_ALL' => 'en_US.UTF-8'], false);
+
+        self::assertStringContainsString(' ◉ >> SECURITY AUDITOR', $display);
+        self::assertStringContainsString('Symfony - multi-agent LLM audit', $display);
+        self::assertStringNotContainsString("\033[", $display, 'CI output must carry no escape sequences');
+    }
+
+    public function test_the_tagline_starts_under_the_wordmark_not_under_the_mark(): void
+    {
+        $lines = explode(\PHP_EOL, $this->headerIn(['LC_ALL' => 'en_US.UTF-8'], false));
+
+        self::assertSame(
+            mb_strpos($lines[1], 'SECURITY'),
+            mb_strpos($lines[2], 'Symfony'),
+            'the tagline offset is derived from the lead string, so it tracks the mark width',
+        );
+    }
+
+    public function test_a_console_without_utf8_drops_the_mark_and_keeps_the_wordmark(): void
+    {
+        $display = $this->headerIn(['LC_ALL' => 'C'], false);
+
+        self::assertStringNotContainsString('◉', $display, 'the mark is outside CP437/CP850/CP1252 and would be substituted');
+        self::assertStringContainsString(' SECURITY AUDITOR', $display);
+        self::assertStringContainsString('Symfony - multi-agent LLM audit', $display);
+    }
+
+    public function test_a_console_without_utf8_still_gets_the_brand_palette(): void
+    {
+        $display = $this->headerIn(['LC_ALL' => 'C'], true);
+        $outputFormatter = (new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true))->getFormatter();
+
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55;options=bold>SECURITY</>'), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>AUDITOR</>'), $display);
+    }
+
+    /**
+     * @param array<string, string> $locale
+     */
+    #[DataProvider('utf8Announcements')]
+    public function test_any_locale_variable_announcing_utf8_earns_the_mark(array $locale): void
+    {
+        self::assertStringContainsString('◉', $this->headerIn($locale, false));
+    }
+
+    /** @return iterable<string, array{array<string, string>}> */
+    public static function utf8Announcements(): iterable
+    {
+        yield 'LC_ALL' => [['LC_ALL' => 'en_US.UTF-8']];
+        yield 'LC_CTYPE only' => [['LC_CTYPE' => 'en_US.UTF-8']];
+        yield 'LANG only' => [['LANG' => 'en_US.UTF-8']];
+        yield 'lowercase spelling' => [['LANG' => 'en_us.utf-8']];
+        yield 'unhyphenated spelling' => [['LANG' => 'en_US.utf8']];
+    }
+
+    public function test_a_console_that_announces_no_locale_at_all_drops_the_mark(): void
+    {
+        $display = $this->headerIn([], false);
+
+        self::assertStringNotContainsString('◉', $display);
+        self::assertStringContainsString(' SECURITY AUDITOR', $display);
+    }
+
+    #[DataProvider('consoleModes')]
+    public function test_the_header_is_pure_ascii_without_utf8_support(bool $decorated): void
+    {
+        $withoutEscapes = (string) preg_replace('/\033\[[0-9;]*m/', '', $this->headerIn(['LC_ALL' => 'C'], $decorated));
+
+        self::assertMatchesRegularExpression('/^[\x00-\x7F]*$/', $withoutEscapes);
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function consoleModes(): iterable
+    {
+        yield 'decorated' => [true];
+        yield 'plain' => [false];
+    }
+
+    /**
+     * Every locale variable is pinned individually, and any not named is
+     * cleared: setting all three to one value hides which of them
+     * `localeSetting()` actually read.
+     *
+     * @param array<string, string> $locale
+     */
+    private function headerIn(array $locale, bool $decorated): string
+    {
+        $variables = ['LC_ALL', 'LC_CTYPE', 'LANG'];
+        $previous = [];
+
+        foreach ($variables as $variable) {
+            $previous[$variable] = getenv($variable);
+            $value = $locale[$variable] ?? null;
+            putenv(null === $value ? $variable : \sprintf('%s=%s', $variable, $value));
+        }
+
+        try {
+            $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, $decorated);
+            $this->auditPresenter->header(new SymfonyStyle(new StringInput(''), $bufferedOutput), '/path/to/project');
+
+            return $bufferedOutput->fetch();
+        } finally {
+            foreach ($variables as $variable) {
+                $restored = $previous[$variable];
+                putenv(false === $restored ? $variable : \sprintf('%s=%s', $variable, $restored));
+            }
+        }
+    }
+
+    private function formatted(OutputFormatterInterface $outputFormatter, string $tag): string
+    {
+        $formatted = $outputFormatter->format($tag);
+        self::assertNotNull($formatted);
+
+        return $formatted;
     }
 
     /**
@@ -309,6 +440,49 @@ final class AuditPresenterTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     */
+    public function test_dry_run_result_reports_completion_as_a_light_line_not_a_boxed_block(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('✅ Dry run complete.', $display);
+        self::assertStringNotContainsString('[OK]', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_dry_run_result_omits_the_emoji_when_not_decorated(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Dry run complete.', $display);
+        self::assertStringNotContainsString('✅', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_dry_run_result_leaves_a_blank_line_after_the_completion_line(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        self::assertStringEndsWith("Dry run complete.\n\n", $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
     public function test_dry_run_result_shows_cost_breakdown_when_cost_present(): void
@@ -378,6 +552,146 @@ final class AuditPresenterTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_caveats_the_reviewer_figure_with_the_ratio_derived_from_the_breakdown(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 200, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('~25% of attacker input', $display, 'the ratio (200/800) must be derived from the breakdown, not the hardcoded 20% default');
+        self::assertStringContainsString('actual cost scales with real findings', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_caveats_a_different_ratio_when_the_breakdown_differs(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 1000, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 100, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~10% of attacker input', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_rounds_the_reviewer_ratio_up_when_the_fraction_is_at_least_half(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 8, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 3, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~38% of attacker input', $bufferedOutput->fetch(), '3/8 = 37.5% rounds up to 38%, not down to 37%');
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_rounds_the_reviewer_ratio_down_when_the_fraction_is_below_half(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 11, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0100],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 3, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringContainsString('~27% of attacker input', $bufferedOutput->fetch(), '3/11 = 27.27% rounds down to 27%, not up to 28%');
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_omits_the_reviewer_caveat_when_no_reviewer_entry_is_present(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0123],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringNotContainsString('Reviewer input is projected', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_omits_the_ratio_caveat_when_the_attacker_took_no_input_tokens(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(0, 0, 0.0, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 0, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0],
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 0, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringNotContainsString('Reviewer input is projected', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_omits_the_ratio_caveat_when_the_breakdown_has_no_attacker_entry(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'reviewer' => ['model' => 'claude-opus-4-7', 'input_tokens' => 200, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0023],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        self::assertStringNotContainsString('Reviewer input is projected', $bufferedOutput->fetch(), 'a ratio against zero attacker input says nothing; the caveat must be omitted rather than claim ~0%');
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_scanned_files_lists_each_file_grouped_by_type(): void
@@ -397,6 +711,64 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('config (1)', $flattened);
         self::assertStringContainsString('config/packages/security.yaml', $flattened);
         self::assertStringContainsString('2 file(s) in scope.', $flattened);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_labels_the_generic_php_bucket_as_uncategorized(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
+        ]);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('php · uncategorized (1)', $flattened);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_labels_the_generic_other_bucket_as_uncategorized(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('README.md', '/p/README.md', '# readme'),
+        ]);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('other · uncategorized (1)', $flattened);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_renders_the_uncategorized_php_and_other_buckets_last(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
+            ProjectFile::create('README.md', '/p/README.md', '# readme'),
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        $flattened = $bufferedOutput->fetch();
+        $controllerPosition = mb_strpos($flattened, 'controller (1)');
+        $phpPosition = mb_strpos($flattened, 'php · uncategorized (1)');
+        $otherPosition = mb_strpos($flattened, 'other · uncategorized (1)');
+
+        self::assertIsInt($controllerPosition);
+        self::assertIsInt($phpPosition);
+        self::assertIsInt($otherPosition);
+        self::assertLessThan($phpPosition, $controllerPosition);
+        self::assertLessThan($otherPosition, $phpPosition);
     }
 
     /**
@@ -430,6 +802,55 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString("\x1b", $output);
         self::assertStringNotContainsString("\u{202E}", $output);
         self::assertDoesNotMatchRegularExpression('/\n\s*\* \[CRITICAL] forged/', $output);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_reports_the_file_count_as_a_light_line_not_a_boxed_block(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('✅ 1 file(s) in scope.', $display);
+        self::assertStringNotContainsString('[OK]', $display);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_omits_the_emoji_when_not_decorated(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('1 file(s) in scope.', $display);
+        self::assertStringNotContainsString('✅', $display);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_leaves_a_blank_line_after_the_file_count_line(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        self::assertStringEndsWith("1 file(s) in scope.\n\n", $bufferedOutput->fetch());
     }
 
     public function test_scanned_files_warns_when_nothing_matched(): void
@@ -526,6 +947,57 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $this->reportWithRoleModels('made-up-model', 'made-up-model'));
 
         self::assertSame(1, substr_count($bufferedOutput->fetch(), 'made-up-model'));
+    }
+
+    public function test_synthesis_cost_warning_names_poc_synthesis_when_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: true, fixSynthesisEnabled: false);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('PoC synthesis', $display);
+        self::assertStringContainsString('audit.poc_synthesis.enabled', $display);
+        self::assertStringNotContainsString('Fix synthesis', $display);
+    }
+
+    public function test_synthesis_cost_warning_names_fix_synthesis_when_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: false, fixSynthesisEnabled: true);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Fix synthesis', $display);
+        self::assertStringContainsString('audit.fix_synthesis.enabled', $display);
+        self::assertStringNotContainsString('PoC synthesis', $display);
+    }
+
+    public function test_synthesis_cost_warning_combines_both_stages_into_a_single_block_when_both_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: true, fixSynthesisEnabled: true);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('PoC synthesis', $flattened);
+        self::assertStringContainsString('audit.poc_synthesis.enabled', $flattened);
+        self::assertStringContainsString('fix synthesis', $flattened);
+        self::assertStringContainsString('audit.fix_synthesis.enabled', $flattened);
+        self::assertSame(1, substr_count($flattened, '[WARNING]'), 'both stages must share a single warning block, not one apiece');
+    }
+
+    public function test_synthesis_cost_warning_is_silent_when_neither_stage_is_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: false, fixSynthesisEnabled: false);
+
+        self::assertSame('', $bufferedOutput->fetch());
     }
 
     /**

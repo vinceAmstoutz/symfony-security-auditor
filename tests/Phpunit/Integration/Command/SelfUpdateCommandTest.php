@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
@@ -34,6 +35,26 @@ final class SelfUpdateCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringContainsString('Updated from 1.0.0 to 2.0.0', $commandTester->getDisplay());
+    }
+
+    public function test_it_warns_when_the_pricing_catalog_could_not_be_refreshed(): void
+    {
+        $selfUpdateResult = new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0', PricingCatalogRefreshOutcome::Failed);
+        $commandTester = $this->commandTester(new RecordingSelfUpdater($selfUpdateResult));
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Could not refresh the bundled pricing catalog', $commandTester->getDisplay());
+    }
+
+    public function test_it_stays_quiet_when_the_pricing_catalog_was_refreshed(): void
+    {
+        $selfUpdateResult = new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0', PricingCatalogRefreshOutcome::Refreshed);
+        $commandTester = $this->commandTester(new RecordingSelfUpdater($selfUpdateResult));
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('Could not refresh', $commandTester->getDisplay());
     }
 
     public function test_it_reports_when_already_up_to_date(): void

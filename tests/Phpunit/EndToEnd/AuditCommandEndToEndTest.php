@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmColl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
@@ -61,6 +62,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
@@ -660,7 +662,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         $output = $commandTester->getDisplay();
-        self::assertStringContainsString('Symfony LLM Security Auditor', $output);
+        self::assertStringContainsString('SECURITY AUDITOR', $output);
         self::assertStringContainsString('Pipeline:', $output);
     }
 
@@ -943,7 +945,7 @@ final class AuditCommandEndToEndTest extends TestCase
     }
 
     /**
-     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>, maxCostUsd?: float|null} $overrides
+     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>, maxCostUsd?: float|null, pocSynthesisEnabled?: bool, fixSynthesisEnabled?: bool} $overrides
      */
     private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, array $overrides = []): CommandTester
     {
@@ -953,6 +955,8 @@ final class AuditCommandEndToEndTest extends TestCase
         $excludedTypes = $overrides['excludedTypes'] ?? [];
         $includedTypes = $overrides['includedTypes'] ?? [];
         $maxCostUsd = $overrides['maxCostUsd'] ?? null;
+        $pocSynthesisEnabled = $overrides['pocSynthesisEnabled'] ?? false;
+        $fixSynthesisEnabled = $overrides['fixSynthesisEnabled'] ?? false;
 
         $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $auditOrchestrator = new AuditOrchestrator(
@@ -991,6 +995,8 @@ final class AuditCommandEndToEndTest extends TestCase
             new ResolvingTokenEstimator(),
             new CostCalculator(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json')),
             new NullLogger(),
+            new FileChunker(),
+            new AttackerSkillRegistry(),
             'stub',
             1,
         );
@@ -1021,6 +1027,8 @@ final class AuditCommandEndToEndTest extends TestCase
             secretScrubbingEnabled: $secretScrubbingEnabled,
             findingTypeFilter: new FindingTypeFilter($includedTypes, $excludedTypes),
             riskLevel: $riskLevel,
+            pocSynthesisEnabled: $pocSynthesisEnabled,
+            fixSynthesisEnabled: $fixSynthesisEnabled,
         );
 
         return new CommandTester($auditCommand);
@@ -1082,6 +1090,23 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_dry_run_caveats_the_reviewer_estimate_as_a_flat_heuristic(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('Reviewer input is projected at ~', $commandTester->getDisplay());
+        self::assertStringContainsString('% of attacker input', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_warns_when_configured_model_is_unsupported(): void
     {
         $this->createProjectDir();
@@ -1093,6 +1118,54 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
 
         self::assertStringContainsString('No published pricing', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_dry_run_warns_that_poc_synthesis_cost_is_not_included(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', ['pocSynthesisEnabled' => true]);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('PoC synthesis', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_dry_run_warns_that_fix_synthesis_cost_is_not_included(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', ['fixSynthesisEnabled' => true]);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('Fix synthesis', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_dry_run_does_not_warn_about_synthesis_cost_when_neither_stage_is_enabled(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringNotContainsString('synthesis', $commandTester->getDisplay());
     }
 
     /**

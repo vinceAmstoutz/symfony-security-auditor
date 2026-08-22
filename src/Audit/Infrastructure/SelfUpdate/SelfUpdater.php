@@ -42,6 +42,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         private RunningBinaryLocatorInterface $runningBinaryLocator,
         private BinarySwapSchedulerInterface $binarySwapScheduler,
         private Filesystem $filesystem = new Filesystem(),
+        private PricingCatalogRefresherInterface $pricingCatalogRefresher = new NullPricingCatalogRefresher(),
     ) {}
 
     /**
@@ -57,7 +58,12 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         $latestVersion = u($latestTag)->trimPrefix(['v', 'V'])->toString();
 
         if (!version_compare($latestVersion, $currentVersion, '>')) {
-            return new SelfUpdateResult(SelfUpdateStatus::AlreadyUpToDate, $currentVersion, $latestVersion);
+            return new SelfUpdateResult(
+                SelfUpdateStatus::AlreadyUpToDate,
+                $currentVersion,
+                $latestVersion,
+                $this->refreshUnlessProbing($checkOnly),
+            );
         }
 
         if ($checkOnly) {
@@ -66,7 +72,22 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
 
         $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestTag));
 
-        return new SelfUpdateResult(SelfUpdateStatus::Updated, $currentVersion, $latestVersion);
+        return new SelfUpdateResult(
+            SelfUpdateStatus::Updated,
+            $currentVersion,
+            $latestVersion,
+            $this->pricingCatalogRefresher->refresh(),
+        );
+    }
+
+    /**
+     * A `--check` probe answers a question without touching the machine, and
+     * the background update notifier runs on that path, so it must not reach
+     * for the network on a user's behalf.
+     */
+    private function refreshUnlessProbing(bool $checkOnly): PricingCatalogRefreshOutcome
+    {
+        return $checkOnly ? PricingCatalogRefreshOutcome::Skipped : $this->pricingCatalogRefresher->refresh();
     }
 
     /**

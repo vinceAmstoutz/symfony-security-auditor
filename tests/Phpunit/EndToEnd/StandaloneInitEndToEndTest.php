@@ -82,12 +82,12 @@ final class StandaloneInitEndToEndTest extends TestCase
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
 
-        $application = (new StandaloneApplicationFactory(
+        $standaloneApplication = (new StandaloneApplicationFactory(
             new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver()),
             $xdgConfigPathResolver,
             bridgeInstaller: $this->recordingBridgeInstaller,
         ))->create();
 
-        return new CommandTester($application->find(InitCommand::NAME));
+        return new CommandTester($standaloneApplication->find(InitCommand::NAME));
     }
 }

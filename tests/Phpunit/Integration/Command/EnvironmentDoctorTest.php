@@ -15,12 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
@@ -61,7 +63,76 @@ final class EnvironmentDoctorTest extends TestCase
             new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.'),
             new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
-        ], $results);
+        ], \array_slice($results, 0, 3));
+    }
+
+    public function test_it_reports_the_bundled_pricing_catalog_version(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\nmodel: 'gpt-4'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
+
+        self::assertSame('Pricing catalog', $results[3]->label);
+        self::assertSame(DoctorCheckStatus::Ok, $results[3]->status);
+        self::assertMatchesRegularExpression('/^symfony\/models-dev v?[0-9]+(\.[0-9]+)* \(.+models-dev\.json\)\.$/', $results[3]->detail);
+    }
+
+    public function test_it_reports_a_refreshed_catalog_instead_of_the_bundled_one(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+        $refreshed = $this->cacheHome.'/symfony-security-auditor/models-dev.json';
+        (new Filesystem())->dumpFile($refreshed, '{"anthropic":{}}');
+
+        $xdgConfigPathResolver = $this->resolver();
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+
+        $environmentDoctor = new EnvironmentDoctor(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            $composerAvailabilityChecker,
+            self::createStub(AuditPreflightInterface::class),
+            new ModelsDevPricingProvider(new NullLogger(), $refreshed),
+        );
+
+        $results = $environmentDoctor->diagnose();
+
+        self::assertSame(DoctorCheckStatus::Ok, $results[3]->status);
+        self::assertStringContainsString($refreshed, $results[3]->detail, 'doctor must name the refreshed catalog the run actually prices from, not the bundled one');
+        self::assertDoesNotMatchRegularExpression(
+            '/symfony\/models-dev v?[0-9]/',
+            $results[3]->detail,
+            'the bundled package version describes the packaged catalog only; stamping it onto a refreshed override asserts a version that file does not have',
+        );
+    }
+
+    public function test_it_warns_when_the_pricing_catalog_package_is_not_installed(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\nmodel: 'gpt-4'\n");
+        $this->installBridge();
+
+        $xdgConfigPathResolver = $this->resolver();
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+        $auditPreflight = self::createStub(AuditPreflightInterface::class);
+
+        $environmentDoctor = new EnvironmentDoctor(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            $composerAvailabilityChecker,
+            $auditPreflight,
+            new ModelsDevPricingProvider(new NullLogger(), null, 'vinceamstoutz/definitely-not-installed'),
+            'vinceamstoutz/definitely-not-installed',
+        );
+
+        $results = $environmentDoctor->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Warning, 'vinceamstoutz/definitely-not-installed not found — cost figures will show $0.00.'),
+            $results[3],
+        );
     }
 
     public function test_it_fails_the_bridge_check_when_the_installed_bridge_cannot_boot_the_audit(): void
@@ -229,6 +300,7 @@ final class EnvironmentDoctorTest extends TestCase
             $xdgConfigPathResolver,
             $composerAvailabilityChecker,
             $auditPreflight,
+            new ModelsDevPricingProvider(new NullLogger()),
         );
     }
 
