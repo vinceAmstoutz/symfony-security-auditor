@@ -127,7 +127,11 @@ to your user `config.yaml`.
   ```
 
 - **Replacement failed mid-swap** —
-  `Failed to replace the binary at "<path>": <reason>.`
+  `Failed to replace the binary at "<path>": <reason>.` The new binary is moved
+  into place as the command exits, not while it runs — the running process still
+  loads classes from the archive being replaced — so this one surfaces after
+  `Updated from … to ….` has already printed. The previous binary is left in
+  place, so re-running `self-update` is safe.
 
 ### `init` fails to install the provider bridge
 

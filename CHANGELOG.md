@@ -12,6 +12,111 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`--dry-run` now caveats the reviewer figure as a flat, pre-run heuristic.**
+  `EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO` derives the reviewer
+  estimate as a fixed fraction of attacker input alone — there are no findings
+  yet for a dry run to count, so it can't reflect a project's real vulnerability
+  density or the code context each finding pulls in.
+  `AuditPresenter::dryRunResult()` now prints a note stating the actual ratio
+  and that actual cost scales with real findings, so it reads as a rough floor
+  rather than a peer to the attacker figure. The percentage is derived from the
+  reviewer/attacker token counts in the cost breakdown itself
+  (`AuditPresenter::reviewerRatioPercent()`) rather than restated as a fixed
+  string, so it stays correct if the ratio the use case was constructed with
+  ever differs from the default. The note is worded as what this estimate works
+  out to rather than as the configured assumption, because the two need not
+  agree: once the attacker figure carries prompt overhead the reviewer never
+  sends, the derived percentage drops below `reviewer_input_ratio` while
+  remaining an accurate description of the printed breakdown. The note also
+  moved out of the `SymfonyStyle::listing()` block it previously shared with the
+  cost breakdown — every `listing()` element gets its own bullet and no
+  word-wrap, so a caveat that size picked up a stray leading bullet and wrapped
+  ragged on narrower terminals; it now prints as its own properly-wrapped line.
+
+  When the breakdown carries no attacker input to measure against — no attacker
+  entry, or zero attacker input tokens — the caveat is omitted entirely rather
+  than printing "assumes ~0% of attacker input", which stated a ratio against
+  nothing. Both role lookups are read the same way, so a breakdown missing
+  either entry is handled identically.
+
+- **`--dry-run` now warns when PoC or fix synthesis is enabled**, since neither
+  stage's cost was ever included in the estimate. `PoCSynthesizer` and
+  `FixSynthesizer` each make their own LLM call per qualifying finding — a cost
+  that can't be known before the attacker has actually run and found something —
+  so `EstimateAuditCostUseCase`'s cost breakdown has no line item for either.
+  `AuditPresenter::synthesisCostWarnings()` prints a stderr warning naming the
+  enabled stage(s) (`audit.poc_synthesis.enabled` /
+  `audit.fix_synthesis.enabled`) whenever `--dry-run` runs with one on,
+  mirroring the existing unpriced-model warning precedent. The `thorough`
+  profile turns PoC synthesis on by default, making it the case most likely to
+  hit this gap. When both stages are enabled together, a single warning names
+  both instead of printing two near-identical full-width blocks back to back.
+- **`--dry-run` now counts the attacker's skill-prompt overhead**, closing a gap
+  where the estimate undercounted real spend by a fixed amount repeated on every
+  chunk and every iteration. `audit.stable_system_prompt` (default `true`) makes
+  the attacker send every built-in skill block — currently 25 of them, ~66KB of
+  prompt — on every chunk regardless of relevance, and none of that reached the
+  estimate. `EstimateAuditCostUseCase::execute()` now chunks the scanned files
+  the same way a real run does (via `FileChunker`) and, for each chunk, renders
+  its own skill prompt through the new `AttackerSkillPromptRendererInterface`
+  port (implemented by `AttackerSkillRegistry`) and estimates its tokens, adding
+  the sum to the attacker's per-round input before scaling by `max_iterations`.
+  Rendering per chunk — rather than once from the whole project's file-type
+  union and multiplying by the chunk count — keeps the estimate accurate when
+  `stable_system_prompt` is `false`: each chunk then only pulls in the skills
+  matching its own files, the same filtering
+  `AttackerPromptBuilder::skillsForFiles()` applies on a real run.
+- **`--dry-run` now also counts tool round-trip overhead.** With
+  `audit.tools_enabled` (default `true`), the attacker can take several
+  tool-call rounds per chunk, each resending the growing conversation plus the
+  tool schemas — none of which the estimate previously modeled. A new
+  `EstimateAuditCostUseCase::DEFAULT_TOOL_ROUND_TRIP_RATIO` (50%) inflates the
+  per-round attacker input whenever `tools_enabled` is on, before scaling by
+  `max_iterations`, following the same calibrated-ratio pattern as
+  `DEFAULT_OUTPUT_RATIO`. The ratio is scaled by `audit.max_tool_iterations`,
+  the option that actually bounds how many tool rounds a chunk may take, against
+  the `CALIBRATION_MAX_TOOL_ITERATIONS` bound the 50% was measured at: halving
+  the bound to 4 charges 25% instead of 50%, and raising it to 16 charges 100%.
+  Lowering `max_tool_iterations` to cut cost is now reflected in the estimate
+  rather than ignored by it.
+
+  The reviewer estimate deliberately stays out of this. `reviewerInputRatio` is
+  applied to the file-content sum alone, not to the attacker total, because the
+  reviewer prompt carries no skill blocks — `ReviewerPromptBuilder` and
+  everything under `Infrastructure/Prompt/Reviewer/` reference none. Deriving it
+  from the attacker total instead would bill the reviewer for an overhead it
+  never sends.
+
+- **`self-update` now refreshes the bundled pricing catalog after replacing the
+  binary**, so a long-lived install picks up newly-added models and price
+  changes without waiting for the next binary release. `SelfUpdater::run()`
+  calls a new `PricingCatalogRefresherInterface` port after `replaceBinary()`
+  succeeds; `ModelsDevCatalogRefresher` (`src/Audit/Infrastructure/SelfUpdate/`)
+  downloads `models-dev.json` into the XDG cache directory, and
+  `ModelsDevPricingProvider` now reads from that same cache location by default
+  (`config/services.php` wires `%kernel.cache_dir%/models-dev.json`) instead of
+  only the version bundled at build time. The download lands in a temp file and
+  is only moved into place once it has been confirmed both to decode as a JSON
+  object and to carry at least one priced model, so neither a truncated transfer
+  nor an unrelated document served in its place can leave a corrupt catalog
+  behind — the previous good file (or the one frozen into the binary) stays put.
+  The catalog URL tracks upstream `main` deliberately: pinning it to a tag would
+  freeze the catalog at exactly the staleness a new binary release already
+  fixes, so the shape check above is what guards the install. The refresh never
+  throws — a failed download, an unwritable cache directory or an unrecognized
+  payload returns `PricingCatalogRefreshOutcome::Failed`, and `self-update` now
+  says so instead of failing silently, warning that cost figures keep using the
+  catalog already in place — the last successful refresh if there was one,
+  otherwise the one frozen into the binary at build time — and that re-running
+  `self-update` retries it, which it now can: the refresh no longer rides only
+  on a binary replacement, so a binary already on the latest version still
+  refreshes a catalog that has drifted since its build. A `--check` probe never
+  does, so the background update notifier stays side-effect-free. It is skipped
+  entirely when `privacy.offline_only` is set or the XDG config path can't be
+  resolved (`StandaloneApplicationFactory::pricingCatalogRefresher()`), and the
+  `privacy.offline_only` lookup now goes through
+  `StandaloneConfig::offlineOnlyIn()` so the key path lives in one place rather
+  than being re-read by hand.
 - **`doctor` and `--version` now surface which `symfony/models-dev` pricing
   snapshot is bundled.** A standalone install's cost figures (`--dry-run`, the
   report's `Cost` line) come from whatever `symfony/models-dev` catalog was
@@ -192,6 +297,33 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   prefix is stripped — that prefix is a raw filesystem path and may itself
   contain a space. `rawurldecode()` leaves an invalid escape sequence untouched,
   so a producer that emits unescaped paths keeps matching.
+- **`docs/architecture.md`'s command reference no longer contradicts
+  `docs/configuration.md`.** Its exit-code summary read "`0`
+  (SAFE/LOW/MEDIUM/HIGH), `1` (CRITICAL risk or invalid path or unexpected
+  failure), `2` (budget exceeded)", which predates three behaviours the
+  canonical table in `docs/configuration.md` already documents: `audit.fail_on`
+  is configurable, so HIGH exits `1` whenever it is set below `critical`; a scan
+  that discovers no file at all exits `1`; a score below `--min-score` exits
+  `1`; and `2` also covers a run that never started because an unpriced model
+  makes `audit.budget.max_cost_usd` unenforceable. The same table listed three
+  `--format` values when `OutputFormat` has nine. Both rows are corrected and
+  the exit-code paragraph now points at the canonical table rather than
+  restating it.
+- **`scan.code_slicing`'s configuration reference no longer promises whole
+  method bodies.** The `info()` text — what
+  `config:dump-reference symfony_security_auditor` prints — said the slicer
+  keeps "the FULL body of methods that touch security-relevant tokens".
+  `RegexCodeSlicer` retains per line, not per method, which
+  `test_inert_body_lines_are_elided()` pins deliberately: on a textbook
+  vulnerable controller the source (`$name = $request->request->get('name')`)
+  and the sink (`$this->conn->executeStatement($sql)`) are both kept while the
+  `$sql` concatenation between them is elided, so the slice shows `$sql` used
+  but never assigned, and a reflected-XSS built the same way disappears
+  entirely. The text now states that retention is per line, that an inert line
+  inside a matched method is still elided, and that a file should go unsliced
+  when the taint flow between source and sink matters more than the tokens.
+  Behaviour is unchanged; only the description was wrong. `code_slicing` follows
+  the active profile when unset, so this is the documented default on `fast`.
 - **The pipeline line printed two characters a Windows console cannot show.**
   `AuditPresenter::header()` emitted
   `Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)`. `→` (U+2192)
@@ -217,6 +349,50 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   is available" answer could outlive the update that installed it.
   `UpdateCheckStoreInterface` gained a `clear()` method, and `SelfUpdateCommand`
   now calls it after a successful (non-`--check`) update.
+- **`self-update` ended in a phar corruption fatal error even though the update
+  had succeeded.** The standalone binary is a GZ-compressed PHAR whose classes
+  load lazily, by path, for as long as the process lives.
+  `SelfUpdater::install()` renamed the new binary over that path mid-run, so the
+  next autoload read the new archive at the old archive's offsets and PHP
+  aborted with `zlib: data error` followed by
+  `internal corruption of phar "..." (actual filesize mismatch on file "...")`.
+  Rendering the success message is itself the first thing to need a not-yet-
+  loaded class (`Symfony\Component\Console\Helper\OutputWrapper`), so the run
+  died before printing anything and the failure then cascaded into
+  `ConsoleErrorEvent` — leaving a correctly updated binary on disk behind a
+  fatal error that read like a corrupted install. The move is now deferred:
+  `SelfUpdater` schedules it through the new `BinarySwapSchedulerInterface`, and
+  the standalone entry point (`bin/symfony-security-auditor`) drains the
+  `PendingBinarySwap` from a shutdown function, past the last autoload. Failure
+  handling is unchanged in substance — the download is still verified before
+  anything is moved, and the temp file is still discarded on any failure — but a
+  `chmod` failure is now reported during the run while a failed move surfaces as
+  the process exits.
+- **`self-update --check` left the passive update notice contradicting what it
+  had just reported.** `--check` always reaches the release feed, but discarded
+  the answer, while the after-command notice serves a 24h-throttled cache
+  (`ThrottledUpdateAvailabilityNotifier`). A cache entry written before a
+  release shipped therefore kept the notice silent for up to a day after
+  `--check` had already shown the user the newer version. `SelfUpdateCommand`
+  now records the version it observed, so the notice agrees from the next
+  command onwards.
+
+### Security
+
+- **Secret scrubbing now redacts `Authorization: Basic` credentials and Slack
+  app-level tokens.** `RegexSecretScrubber::DEFAULT_PATTERNS` covered
+  `Authorization: Bearer` but not `Basic`, so a committed
+  `Authorization: Basic <base64>` — which decodes straight back to
+  `user:password` — was sent verbatim to the configured LLM provider on the
+  default `scan.secret_scrubbing.enabled` path. The same gap applied within a
+  provider already covered: `xox[abprs]-` tokens and `hooks.slack.com` webhook
+  URLs were redacted while Slack's `xapp-` app-level tokens were not. Both are
+  now matched, and the Basic pattern keeps the header name and scheme
+  (`Authorization: Basic ***REDACTED:basic_authorization***`) so the audit can
+  still see that the request authenticates and how. The pattern requires the
+  header or an assignment before the credential, so prose such as "use basic
+  authentication over TLS" is left alone. `SecretPatternLabel` gains
+  `BasicAuthorization`.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

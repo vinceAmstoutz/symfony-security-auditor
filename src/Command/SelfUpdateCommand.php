@@ -13,15 +13,18 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckStoreInterface;
 
 /** @internal not part of the BC promise — the command *name* (`self-update`) is public, but the PHP class itself is for internal use only. */
@@ -36,6 +39,7 @@ final readonly class SelfUpdateCommand
         private SelfUpdaterInterface $selfUpdater,
         private string $currentVersion,
         private UpdateCheckStoreInterface $updateCheckStore,
+        private ClockInterface $clock,
     ) {}
 
     /**
@@ -48,12 +52,25 @@ final readonly class SelfUpdateCommand
         bool $check = false,
     ): int {
         $selfUpdateResult = $this->selfUpdater->run($this->currentVersion, $check);
-
-        if (SelfUpdateStatus::Updated === $selfUpdateResult->status) {
-            $this->updateCheckStore->clear();
-        }
+        $this->refreshUpdateCheckCache($selfUpdateResult);
 
         return $this->report($symfonyStyle, $selfUpdateResult);
+    }
+
+    /**
+     * This command always reaches the release feed, so its answer supersedes
+     * whatever the throttled passive notice last cached — otherwise the notice
+     * keeps contradicting a version the user has just been shown.
+     */
+    private function refreshUpdateCheckCache(SelfUpdateResult $selfUpdateResult): void
+    {
+        if (SelfUpdateStatus::Updated === $selfUpdateResult->status) {
+            $this->updateCheckStore->clear();
+
+            return;
+        }
+
+        $this->updateCheckStore->write(new UpdateCheckState($this->clock->now(), $selfUpdateResult->latestVersion));
     }
 
     private function report(SymfonyStyle $symfonyStyle, SelfUpdateResult $selfUpdateResult): int
@@ -63,6 +80,10 @@ final readonly class SelfUpdateCommand
             SelfUpdateStatus::UpdateAvailable => $symfonyStyle->warning(\sprintf('A newer version is available: %s (currently %s). Run "self-update" without --check to install it.', $selfUpdateResult->latestVersion, $selfUpdateResult->currentVersion)),
             SelfUpdateStatus::Updated => $symfonyStyle->success(\sprintf('Updated from %s to %s.', $selfUpdateResult->currentVersion, $selfUpdateResult->latestVersion)),
         };
+
+        if (PricingCatalogRefreshOutcome::Failed === $selfUpdateResult->pricingCatalogRefresh) {
+            $symfonyStyle->warning('Could not refresh the bundled pricing catalog. Cost figures keep using the catalog already in place — the last successful refresh if there was one, otherwise the one frozen into the binary at build time; run "self-update" again to retry.');
+        }
 
         return Command::SUCCESS;
     }

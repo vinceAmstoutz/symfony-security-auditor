@@ -293,7 +293,7 @@ final readonly class AuditConfigurationDefinition
                         ->end()
                         ->arrayNode('code_slicing')
                             ->addDefaultsIfNotSet()
-                            ->info('Trim large PHP files down to security-relevant slices before they reach the LLM. The slicer keeps imports, attributes, class signatures, properties, and the FULL body of methods that touch security-relevant tokens (Request, Doctrine query builder, unserialize, shell exec, mailer, HttpClient, …). All other lines are replaced one-for-one with a `// elided` placeholder so line numbers stay accurate. Typical saving: 50-70% input tokens on controllers / services over 100 lines.')
+                            ->info('Trim large PHP files down to security-relevant slices before they reach the LLM. The slicer keeps imports, attributes, class signatures, properties, and the individual lines that touch security-relevant tokens (Request, Doctrine query builder, unserialize, shell exec, mailer, HttpClient, …), extended across a multi-line signature or heredoc body such a line opens. Retention is per line, not per method: an inert line inside a method that matched is still elided, so a variable assigned on an elided line can appear used but undefined in the slice — send the file unsliced when the taint flow between source and sink matters more than the tokens. All other lines are replaced one-for-one with a `// elided` placeholder so line numbers stay accurate. Typical saving: 50-70% input tokens on controllers / services over 100 lines.')
                             ->children()
                                 ->booleanNode('enabled')
                                     ->defaultNull()
