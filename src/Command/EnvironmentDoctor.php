@@ -22,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\P
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 
 use function Symfony\Component\String\b;
 
@@ -46,6 +48,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private ComposerAvailabilityCheckerInterface $composerAvailabilityChecker,
         private AuditPreflightInterface $auditPreflight,
+        private ModelsDevPricingProvider $modelsDevPricingProvider,
+        private string $pricingCatalogPackage = ModelsDevPricingProvider::CATALOG_PACKAGE,
     ) {}
 
     /**
@@ -60,6 +64,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             $doctorCheckResult,
             $this->bridgeCheck(DoctorCheckStatus::Ok === $doctorCheckResult->status),
             $this->composerCheck(),
+            $this->pricingCatalogCheck(),
         ];
     }
 
@@ -126,5 +131,37 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         return $this->composerAvailabilityChecker->isAvailable()
             ? new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.')
             : new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not found — needed only to run "init" or switch providers, not to audit.');
+    }
+
+    /**
+     * Names the catalog file actually in use rather than only the packaged
+     * version: once `self-update` has refreshed the catalog, the run reads an
+     * override and reporting the package version alone would describe a file
+     * the audit is not pricing from.
+     */
+    private function pricingCatalogCheck(): DoctorCheckResult
+    {
+        $catalogPath = $this->modelsDevPricingProvider->effectiveCatalogPath();
+
+        if (null === $catalogPath || !is_file($catalogPath)) {
+            return new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Warning, \sprintf('%s not found — cost figures will show $0.00.', $this->pricingCatalogPackage));
+        }
+
+        return new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Ok, $this->pricingCatalogDetail($catalogPath));
+    }
+
+    /**
+     * The package version describes the packaged catalog and nothing else. A
+     * `self-update` refresh writes an override whose contents come from
+     * upstream `main` at refresh time, so stamping the bundled version onto it
+     * would assert a version that file does not have.
+     */
+    private function pricingCatalogDetail(string $catalogPath): string
+    {
+        if ($catalogPath !== $this->modelsDevPricingProvider->packagedCatalogPath()) {
+            return \sprintf('refreshed catalog (%s); bundled %s unused.', $catalogPath, $this->pricingCatalogPackage);
+        }
+
+        return \sprintf('%s %s (%s).', $this->pricingCatalogPackage, (new ReportPackage($this->pricingCatalogPackage))->version(), $catalogPath);
     }
 }

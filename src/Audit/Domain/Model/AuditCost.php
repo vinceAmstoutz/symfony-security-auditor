@@ -28,7 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCost
 final readonly class AuditCost
 {
     /**
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byRole
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>                                                       $byRole
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float}> $byModel
      */
     private function __construct(
         private int $inputTokens,
@@ -36,6 +37,7 @@ final readonly class AuditCost
         private float $estimatedCostUsd,
         private string $primaryModel,
         private array $byRole = [],
+        private array $byModel = [],
     ) {}
 
     /**
@@ -96,11 +98,72 @@ final readonly class AuditCost
     }
 
     /**
+     * `false` when tokens were actually spent but they priced out to zero —
+     * the model has no published rate in the pricing catalog, or is a free
+     * local/self-hosted model. Zero tokens (nothing tracked yet) is not
+     * treated as a pricing gap.
+     *
+     * The aggregate total cannot answer this for a split configuration: a
+     * priced cloud attacker paired with an unpriced local reviewer still sums
+     * to something nonzero. So each breakdown is checked on its own terms
+     * where one exists — the per-model map for a real run, which records the model
+     * of every call, and `byRole()` for the `--dry-run` estimate, which
+     * projects per role. The aggregate is the last resort, correct on its own
+     * terms because a single-model run has nothing to disaggregate.
+     */
+    public function hasPublishedPricing(): bool
+    {
+        $breakdown = [] !== $this->byModel ? $this->byModel : $this->byRole;
+
+        if ([] === $breakdown) {
+            return 0.0 !== $this->estimatedCostUsd || 0 === $this->totalTokens();
+        }
+
+        foreach ($breakdown as $entry) {
+            if (0.0 === $entry['estimated_cost_usd'] && 0 !== $this->billableTokens($entry)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Cache reads and cache writes are billed, so a model whose whole spend
+     * arrived as cached prompt tokens has still been charged for. Counting
+     * only fresh input/output would read that as "nothing spent" and hide a
+     * pricing gap. The per-role dry-run breakdown projects no cache traffic,
+     * so those keys are absent there.
+     *
+     * @param array{input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int} $entry
+     */
+    private function billableTokens(array $entry): int
+    {
+        return $entry['input_tokens']
+            + $entry['output_tokens']
+            + ($entry['cache_read_tokens'] ?? 0)
+            + ($entry['cache_creation_tokens'] ?? 0);
+    }
+
+    /**
      * @return array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>
      */
     public function byRole(): array
     {
         return $this->byRole;
+    }
+
+    /**
+     * A real run records the model of every call but not the agent that made
+     * it, so per-model is the finest attribution it can offer. Applied
+     * copy-on-write rather than through `of()`, which is already at the
+     * project's five-parameter ceiling.
+     *
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float}> $byModel keyed by model name
+     */
+    public function withUsageByModel(array $byModel): self
+    {
+        return new self($this->inputTokens, $this->outputTokens, $this->estimatedCostUsd, $this->primaryModel, $this->byRole, $byModel);
     }
 
     /**
@@ -122,6 +185,15 @@ final readonly class AuditCost
             'estimated_cost_usd' => $this->estimatedCostUsd,
             'primary_model' => $this->primaryModel,
             'by_role' => (object) $this->byRole,
+            'by_model' => (object) array_map(
+                static fn (array $usage): array => [
+                    ...$usage,
+                    'cache_read_tokens' => $usage['cache_read_tokens'] ?? 0,
+                    'cache_creation_tokens' => $usage['cache_creation_tokens'] ?? 0,
+                    'estimated_cost_usd' => round($usage['estimated_cost_usd'], 6),
+                ],
+                $this->byModel,
+            ),
         ];
     }
 }

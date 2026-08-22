@@ -51,74 +51,94 @@ final class StandaloneApplicationFactoryTest extends TestCase
     #[RunInSeparateProcess]
     public function test_it_builds_a_console_application_exposing_the_audit_command_and_alias(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('audit:run'));
-        self::assertTrue($application->has('audit'));
+        self::assertTrue($standaloneApplication->has('audit:run'));
+        self::assertTrue($standaloneApplication->has('audit'));
     }
 
     public function test_it_registers_the_audit_command_without_reading_a_config_file(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('audit:run'));
+        self::assertTrue($standaloneApplication->has('audit:run'));
     }
 
     public function test_it_reports_the_installed_package_version_instead_of_unknown(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertSame((new ReportPackage())->version(), $application->getVersion());
+        self::assertSame((new ReportPackage())->version(), $standaloneApplication->getVersion());
+    }
+
+    public function test_it_includes_the_bundled_models_dev_version_in_the_long_version(): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertStringContainsString(
+            \sprintf('symfony/models-dev %s', (new ReportPackage('symfony/models-dev'))->version()),
+            $standaloneApplication->getLongVersion(),
+        );
     }
 
     public function test_it_registers_the_init_command(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('init'));
+        self::assertTrue($standaloneApplication->has('init'));
     }
 
     public function test_it_registers_the_self_update_command(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ], '/usr/local/bin/symfony-security-auditor')->create();
 
-        self::assertTrue($application->has('self-update'));
+        self::assertTrue($standaloneApplication->has('self-update'));
+    }
+
+    public function test_it_builds_the_application_when_no_cache_directory_can_be_resolved(): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([])->create();
+
+        self::assertTrue($standaloneApplication->has('doctor'), 'an environment with no HOME and no XDG variables leaves the refreshed-catalog location unresolvable, which must not stop the application from building');
     }
 
     public function test_it_registers_the_doctor_command(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('doctor'));
+        self::assertTrue($standaloneApplication->has('doctor'));
     }
 
     public function test_it_builds_the_application_when_update_checks_are_disabled(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
             'SSA_NO_UPDATE_CHECK' => '1',
         ])->create();
 
-        self::assertTrue($application->has('audit:run'));
+        self::assertTrue($standaloneApplication->has('audit:run'));
     }
 
     /**
@@ -144,12 +164,12 @@ final class StandaloneApplicationFactoryTest extends TestCase
 
     public function test_it_registers_the_audit_command_as_visible(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertFalse($application->get('audit:run')->isHidden());
+        self::assertFalse($standaloneApplication->get('audit:run')->isHidden());
     }
 
     /**
@@ -197,12 +217,12 @@ final class StandaloneApplicationFactoryTest extends TestCase
     #[MaximumDuration(4000)]
     public function test_the_registered_audit_command_keeps_the_full_cli_option_surface(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        $inputDefinition = $application->find('audit:run')->getDefinition();
+        $inputDefinition = $standaloneApplication->find('audit:run')->getDefinition();
         $optionNames = array_keys($inputDefinition->getOptions());
 
         self::assertSame([], array_diff(
