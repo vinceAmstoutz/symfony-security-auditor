@@ -54,6 +54,88 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   model whose whole run arrived from the prompt cache and priced to zero is
   still reported as a pricing gap instead of passing as free. Both keys are
   optional in the accepted shape, keeping `withUsageByModel()` callers valid.
+- **The CLI header now carries the project's identity, and renders the same way
+  everywhere.** `AuditPresenter::header()` (`src/Command/AuditPresenter.php`)
+  printed `$symfonyStyle->title('Symfony LLM Security Auditor')` — a plain
+  underlined line with no visual identity. It now prints `◉ >> SECURITY AUDITOR`
+  with the mark and `SECURITY` in the logo's pink (`#e71c55`) and `AUDITOR` in
+  its navy (`#5b6fd6`), over a `Symfony - multi-agent LLM audit` tagline whose
+  indent is derived from the lead string rather than hardcoded, so it always
+  starts under the wordmark.
+
+  Colour is the only thing that varies by terminal. A single `writeln()`
+  produces every state, because `OutputFormatter` strips the style tags when the
+  output is not decorated — so a CI log shows the identical layout rather than a
+  different header, instead of the previous `title()` fallback.
+
+  `◉` (U+25C9) is outside CP437, CP850 and CP1252, so a console left on a legacy
+  code page would substitute it. `AuditPresenter::scanMark()` drops the mark
+  unless `LC_ALL`, `LC_CTYPE` or `LANG` announces UTF-8, leaving the coloured
+  wordmark, which carries the identity on its own. A Windows console sets none
+  of those unless the shell is UTF-8 aware, so it lands on the ASCII wordmark.
+  Every other character in the header is ASCII.
+
+### Changed
+
+- **`--show-scanned`'s generic `php` and `other` buckets no longer read as
+  "every PHP file"/"every other file."** `AuditPresenter::scannedFiles()`
+  (`src/Command/AuditPresenter.php`) printed the fallback `ProjectFileType::PHP`
+  and `::OTHER` buckets — the catch-all for files matching no specific archetype
+  — as plain `php (N)`/`other (N)` siblings of
+  `entity`/`voter`/`event_subscriber`/etc., with nothing marking them as the
+  leftover buckets they are. Both are now labeled `php · uncategorized`/
+  `other · uncategorized` and always render last, after every specific
+  archetype. Presentation only — the underlying `ProjectFileType` backed values
+  (`'php'`/`'other'`, used by `included_types`/`excluded_types` config) are
+  unchanged.
+- **`--show-scanned` and `--dry-run` no longer close with a heavy `[OK]` block
+  for an intermediate confirmation.** `AuditPresenter::scannedFiles()` and
+  `AuditPresenter::dryRunResult()` (`src/Command/AuditPresenter.php`) used
+  `SymfonyStyle::success()` for the files-in-scope count and the
+  dry-run-complete message, so `--show-scanned --dry-run` printed two `[OK]`
+  boxes and a `[NOTE]` block within a few lines. Both now go through a shared
+  `lightConfirmation()` helper printing a single light line, matching the style
+  the console report already uses for its own success line — the boxed block is
+  reserved for a command's true final pass/fail outcome
+  (`AuditPresenter::result()`). The `✅` marker is gated on `isDecorated()`, so
+  a redirected or CI log gets the plain text without it, matching the pattern
+  the branded identity banner already uses; and the line keeps the trailing
+  blank line `success()` used to add, so it doesn't abut whatever prints next.
+- **`init`'s success message now prints a copy-pasteable `export` line instead
+  of naming the variable in prose.** `InitCommand::__invoke()`
+  (`src/Command/InitCommand.php`) used to say
+  `Export ANTHROPIC_API_KEY, then run "audit <path>".`, leaving the user to know
+  their shell's export syntax and retype the variable name. It now prints
+  `Run: export ANTHROPIC_API_KEY=, then "audit <path>".`, a line that can be
+  pasted as-is.
+
+### Fixed
+
+- **The pipeline line printed two characters a Windows console cannot show.**
+  `AuditPresenter::header()` emitted
+  `Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)`. `→` (U+2192)
+  and `⚔` (U+2694) are both outside CP437/CP850/CP1252, and `⚔` is frequently
+  rendered double-width, which shifts every column after it. The line now reads
+  `Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)`.
+- **`self-update` could corrupt the installed binary and leave no readable error
+  behind.** `SelfUpdater::assertChecksumMatches()`
+  (`src/Audit/Infrastructure/SelfUpdate/SelfUpdater.php`) guarded a failed
+  `hash_file()` call with `\assert(false !== $actual)` — a no-op in production,
+  since `zend.assertions` is off by default, so an unreadable download fell
+  through to `hash_equals()` with a `bool` instead of a `string`: an uncaught
+  `TypeError` instead of an actionable message. It now checks readability
+  explicitly and throws `SelfUpdateFailedException::forUnreadableDownload()`.
+  `SelfUpdater::replaceBinary()` also now cleans up the downloaded temp file on
+  any failure — previously only on `SelfUpdateFailedException` — via a `finally`
+  block instead of a narrow `catch`, so the original binary is left untouched
+  regardless of which step failed.
+- **`self-update` could report a stale "update available" notice for up to a day
+  after actually updating.** `ThrottledUpdateAvailabilityNotifier` caches the
+  latest-version check for 24h (`DEFAULT_THROTTLE_SECONDS`), but nothing cleared
+  that cache when `self-update` itself succeeded, so a cached "a newer version
+  is available" answer could outlive the update that installed it.
+  `UpdateCheckStoreInterface` gained a `clear()` method, and `SelfUpdateCommand`
+  now calls it after a successful (non-`--check`) update.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
