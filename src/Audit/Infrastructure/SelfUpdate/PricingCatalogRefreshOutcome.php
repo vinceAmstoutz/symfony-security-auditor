@@ -14,12 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SelfUpdateResult
+enum PricingCatalogRefreshOutcome
 {
-    public function __construct(
-        public SelfUpdateStatus $status,
-        public string $currentVersion,
-        public string $latestVersion,
-        public PricingCatalogRefreshOutcome $pricingCatalogRefresh = PricingCatalogRefreshOutcome::Skipped,
-    ) {}
+    case Refreshed;
+    case Skipped;
+    case Failed;
 }
