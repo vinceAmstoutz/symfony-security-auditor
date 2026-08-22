@@ -81,6 +81,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   version onto a file that does not have it.
   `ModelsDevPricingProvider::packagedCatalogPath()` (the former private
   `defaultCatalogPath()`, now `public`) is what the check compares against.
+
 - **A clean run (zero findings) no longer leaves the reviewer step looking like
   it silently disappeared.** `ConsoleProgressReporter::onReviewStarted()` (and
   its `PlainProgressReporter` counterpart) only ever fired when the attacker
@@ -105,6 +106,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   recognise falls back to a bare "review skipped" rather than borrowing the "no
   new findings" wording: a fourth reason added later would otherwise be
   announced as the wrong cause, which is worse than naming none.
+
 - **The console, Markdown, and HTML reports now show the audit's real cost, not
   just token counts.** `RunAuditUseCase::buildCost()` already assembled an
   `AuditCost` from the LLM provider's own per-call token usage, but
@@ -147,6 +149,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   model whose whole run arrived from the prompt cache and priced to zero is
   still reported as a pricing gap instead of passing as free. Both keys are
   optional in the accepted shape, keeping `withUsageByModel()` callers valid.
+
 - **The CLI header now carries the project's identity, and renders the same way
   everywhere.** `AuditPresenter::header()` (`src/Command/AuditPresenter.php`)
   printed `$symfonyStyle->title('Symfony LLM Security Auditor')` — a plain
