@@ -402,6 +402,17 @@ headers, Slack `xapp-` tokens) are closed.
   trailer is now restricted to whitespace and the punctuation PHP actually
   allows after a closing identifier (`;`, `,`, `)`, `]`), so a body line
   followed by anything else is no longer mistaken for the close.
+- **A fully positional `#[Route(...)]` attribute silently dropped its `methods`
+  restriction.** `RouteAttributeParser::resolveRouteArgName()`
+  (`src/Audit/Infrastructure/Scan/RouteAttributeParser.php`) only mapped unnamed
+  arguments at position 0 (`path`) and 1 (`name`) — matching Symfony's own
+  `Route::__construct()` order for those two, but not for `methods`, which sits
+  at position 6. A controller action declaring
+  `#[Route('/admin/x', null, [], [], [], '', ['DELETE'])]` — valid, real-world
+  positional syntax — reported `routeMethods()` as `[]` instead of `['DELETE']`,
+  understating a DELETE-only admin route's actual method restriction to the
+  attacker/reviewer prompt and the access-control map. Position 6 now resolves
+  to `methods` as well.
 
 ### Security
 

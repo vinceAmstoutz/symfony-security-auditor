@@ -812,6 +812,33 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     }
 
     /**
+     * `methods` sits at positional index 6 in Symfony's real
+     * `Route::__construct()` order (path, name, requirements, options,
+     * defaults, host, methods, ...) — a fully positional attribute must
+     * resolve it there too, the same as the named form.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_methods_from_a_fully_positional_route_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route('/admin/x', null, [], [], [], '', ['DELETE'])]
+                public function deleteUser(int $id): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['DELETE'], $entries[0]->routeMethods());
+        self::assertSame('/admin/x', $entries[0]->routePath());
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_it_extracts_a_path_from_a_locale_keyed_array_route_path(): void
