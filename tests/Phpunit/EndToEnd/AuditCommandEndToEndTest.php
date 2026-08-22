@@ -660,7 +660,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         $output = $commandTester->getDisplay();
-        self::assertStringContainsString('Symfony LLM Security Auditor', $output);
+        self::assertStringContainsString('SECURITY AUDITOR', $output);
         self::assertStringContainsString('Pipeline:', $output);
     }
 

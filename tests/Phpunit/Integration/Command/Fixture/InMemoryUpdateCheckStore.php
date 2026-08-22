@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate\Fixture;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
@@ -19,6 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateC
 
 final class InMemoryUpdateCheckStore implements UpdateCheckStoreInterface
 {
+    public int $clearCalls = 0;
+
     public function __construct(
         private ?UpdateCheckState $updateCheckState = null,
     ) {}
@@ -38,6 +40,7 @@ final class InMemoryUpdateCheckStore implements UpdateCheckStoreInterface
     #[Override]
     public function clear(): void
     {
+        ++$this->clearCalls;
         $this->updateCheckState = null;
     }
 }

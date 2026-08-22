@@ -19,4 +19,6 @@ interface UpdateCheckStoreInterface
     public function read(): ?UpdateCheckState;
 
     public function write(UpdateCheckState $updateCheckState): void;
+
+    public function clear(): void;
 }

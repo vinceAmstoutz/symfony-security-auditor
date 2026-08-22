@@ -369,6 +369,16 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Configuration written to', $commandTester->getDisplay());
     }
 
+    public function test_it_prints_a_copy_pasteable_export_command_for_the_api_key_variable(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'MY_CUSTOM_KEY']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('export MY_CUSTOM_KEY=', $commandTester->getDisplay());
+    }
+
     public function test_it_treats_an_empty_answer_as_declining_the_overwrite(): void
     {
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");

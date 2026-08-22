@@ -44,6 +44,11 @@ final class SelfUpdateFailedException extends RuntimeException
         return new self(\sprintf('Checksum verification failed for "%s"; the download was not trusted and has been discarded.', $asset));
     }
 
+    public static function forUnreadableDownload(string $downloadPath): self
+    {
+        return new self(\sprintf('Could not read the downloaded file at "%s" to verify its checksum; the download was not trusted and has been discarded.', $downloadPath));
+    }
+
     public static function forUnwritableBinary(string $binaryPath): self
     {
         return new self(\sprintf('The binary at "%s" is not writable; re-run the update with the necessary permissions (e.g. sudo) or reinstall with the install script.', $binaryPath));
