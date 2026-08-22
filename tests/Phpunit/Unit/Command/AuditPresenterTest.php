@@ -309,6 +309,49 @@ final class AuditPresenterTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     */
+    public function test_dry_run_result_reports_completion_as_a_light_line_not_a_boxed_block(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('✅ Dry run complete.', $display);
+        self::assertStringNotContainsString('[OK]', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_dry_run_result_omits_the_emoji_when_not_decorated(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Dry run complete.', $display);
+        self::assertStringNotContainsString('✅', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_dry_run_result_leaves_a_blank_line_after_the_completion_line(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        self::assertStringEndsWith("Dry run complete.\n\n", $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
     public function test_dry_run_result_shows_cost_breakdown_when_cost_present(): void
@@ -488,6 +531,55 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString("\x1b", $output);
         self::assertStringNotContainsString("\u{202E}", $output);
         self::assertDoesNotMatchRegularExpression('/\n\s*\* \[CRITICAL] forged/', $output);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_reports_the_file_count_as_a_light_line_not_a_boxed_block(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('✅ 1 file(s) in scope.', $display);
+        self::assertStringNotContainsString('[OK]', $display);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_omits_the_emoji_when_not_decorated(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('1 file(s) in scope.', $display);
+        self::assertStringNotContainsString('✅', $display);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_leaves_a_blank_line_after_the_file_count_line(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        self::assertStringEndsWith("1 file(s) in scope.\n\n", $bufferedOutput->fetch());
     }
 
     public function test_scanned_files_warns_when_nothing_matched(): void

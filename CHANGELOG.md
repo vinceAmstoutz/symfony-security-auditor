@@ -23,6 +23,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   archetype. Presentation only — the underlying `ProjectFileType` backed values
   (`'php'`/`'other'`, used by `included_types`/`excluded_types` config) are
   unchanged.
+- **`--show-scanned` and `--dry-run` no longer close with a heavy `[OK]` block
+  for an intermediate confirmation.** `AuditPresenter::scannedFiles()` and
+  `AuditPresenter::dryRunResult()` (`src/Command/AuditPresenter.php`) used
+  `SymfonyStyle::success()` for the files-in-scope count and the
+  dry-run-complete message, so `--show-scanned --dry-run` printed two `[OK]`
+  boxes and a `[NOTE]` block within a few lines. Both now go through a shared
+  `lightConfirmation()` helper printing a single light line, matching the style
+  the console report already uses for its own success line — the boxed block is
+  reserved for a command's true final pass/fail outcome
+  (`AuditPresenter::result()`). The `✅` marker is gated on `isDecorated()`, so
+  a redirected or CI log gets the plain text without it, matching the pattern
+  the branded identity banner already uses; and the line keeps the trailing
+  blank line `success()` used to add, so it doesn't abut whatever prints next.
+- **`init`'s success message now prints a copy-pasteable `export` line instead
+  of naming the variable in prose.** `InitCommand::__invoke()`
+  (`src/Command/InitCommand.php`) used to say
+  `Export ANTHROPIC_API_KEY, then run "audit <path>".`, leaving the user to know
+  their shell's export syntax and retype the variable name. It now prints
+  `Run: export ANTHROPIC_API_KEY=, then "audit <path>".`, a line that can be
+  pasted as-is.
+
+### Fixed
+
+- **`self-update` could corrupt the installed binary and leave no readable error
+  behind.** `SelfUpdater::assertChecksumMatches()`
+  (`src/Audit/Infrastructure/SelfUpdate/SelfUpdater.php`) guarded a failed
+  `hash_file()` call with `\assert(false !== $actual)` — a no-op in production,
+  since `zend.assertions` is off by default, so an unreadable download fell
+  through to `hash_equals()` with a `bool` instead of a `string`: an uncaught
+  `TypeError` instead of an actionable message. It now checks readability
+  explicitly and throws `SelfUpdateFailedException::forUnreadableDownload()`.
+  `SelfUpdater::replaceBinary()` also now cleans up the downloaded temp file on
+  any failure — previously only on `SelfUpdateFailedException` — via a `finally`
+  block instead of a narrow `catch`, so the original binary is left untouched
+  regardless of which step failed.
+- **`self-update` could report a stale "update available" notice for up to a day
+  after actually updating.** `ThrottledUpdateAvailabilityNotifier` caches the
+  latest-version check for 24h (`DEFAULT_THROTTLE_SECONDS`), but nothing cleared
+  that cache when `self-update` itself succeeded, so a cached "a newer version
+  is available" answer could outlive the update that installed it.
+  `UpdateCheckStoreInterface` gained a `clear()` method, and `SelfUpdateCommand`
+  now calls it after a successful (non-`--check`) update.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 

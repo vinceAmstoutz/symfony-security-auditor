@@ -93,7 +93,7 @@ final readonly class InitCommand
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar));
 
-        $symfonyStyle->success(\sprintf('Configuration written to %s. Export %s, then run "audit <path>".', $configFile, $envVar));
+        $symfonyStyle->success(\sprintf('Configuration written to %s. Run: export %s=, then "audit <path>".', $configFile, $envVar));
 
         return Command::SUCCESS;
     }
