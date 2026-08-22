@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\FilesystemUpdateCheckStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
@@ -136,16 +137,16 @@ final readonly class StandaloneApplicationFactory
         return \sprintf('%s/vendor/autoload.php', self::resolverFromEnvironment($environment)->dataDir());
     }
 
-    public function create(): Application
+    public function create(): StandaloneApplication
     {
-        $application = new Application(self::APPLICATION_NAME, (new ReportPackage())->version());
-        $application->addCommand($this->initCommand());
-        $application->addCommand($this->selfUpdateCommand());
-        $application->addCommand($this->doctorCommand());
-        $application->addCommand($this->lazyAuditCommand());
-        $this->registerUpdateAvailabilityNotice($application);
+        $standaloneApplication = new StandaloneApplication(self::APPLICATION_NAME, (new ReportPackage())->version(), (new ReportPackage(ModelsDevPricingProvider::CATALOG_PACKAGE))->version());
+        $standaloneApplication->addCommand($this->initCommand());
+        $standaloneApplication->addCommand($this->selfUpdateCommand());
+        $standaloneApplication->addCommand($this->doctorCommand());
+        $standaloneApplication->addCommand($this->lazyAuditCommand());
+        $this->registerUpdateAvailabilityNotice($standaloneApplication);
 
-        return $application;
+        return $standaloneApplication;
     }
 
     private static function processWorkingDirectory(): ?string
@@ -238,8 +239,23 @@ final readonly class StandaloneApplicationFactory
                     $this->standaloneContainerFactory,
                     $this->standaloneConsoleCommandFactory,
                 ),
+                new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
             ),
         );
+    }
+
+    /**
+     * Where a refreshed pricing catalog lands. `doctor` builds its provider
+     * with the same override the audit container passes, so the two never
+     * disagree about which catalog file the run prices from.
+     */
+    private function refreshedCatalogPath(): ?string
+    {
+        try {
+            return \sprintf('%s/%s', $this->xdgConfigPathResolver->cacheDir(), ModelsDevPricingProvider::CATALOG_FILENAME);
+        } catch (UnresolvableConfigPathException) {
+            return null;
+        }
     }
 
     private function lazyAuditCommand(): LazyCommand
