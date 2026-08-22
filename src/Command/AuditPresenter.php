@@ -74,18 +74,19 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     private function wordmark(SymfonyStyle $symfonyStyle): void
     {
         $scanMark = $this->scanMark();
-        $lead = '' === $scanMark ? self::WORDMARK_LEAD : \sprintf('%s %s', $scanMark, self::WORDMARK_LEAD);
+        $markedLead = '' === $scanMark ? '' : \sprintf('%s ', $scanMark);
 
         $symfonyStyle->writeln([
             '',
             \sprintf(
-                ' <fg=%s;options=bold>%s</> <fg=%s;options=bold>%s</>',
+                ' <fg=%s;options=bold>%s%s</> <fg=%s;options=bold>%s</>',
                 self::BANNER_PINK,
-                $lead,
+                $markedLead,
+                self::WORDMARK_LEAD,
                 self::BANNER_NAVY,
                 self::WORDMARK_TAIL,
             ),
-            \sprintf(' %s%s', str_repeat(' ', mb_strlen($lead) - mb_strlen(self::WORDMARK_LEAD)), self::TAGLINE),
+            \sprintf(' %s%s', str_repeat(' ', mb_strlen($markedLead)), self::TAGLINE),
             '',
         ]);
     }
