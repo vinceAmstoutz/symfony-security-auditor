@@ -18,6 +18,7 @@ use JsonException;
 use OutOfBoundsException;
 use Override;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 
 /**
@@ -29,9 +30,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProv
  */
 final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterface
 {
-    private const string CATALOG_PACKAGE = 'symfony/models-dev';
+    public const string CATALOG_PACKAGE = 'symfony/models-dev';
 
-    private const string CATALOG_FILENAME = 'models-dev.json';
+    public const string CATALOG_FILENAME = 'models-dev.json';
 
     /**
      * Official first-party provider keys, in resolution priority order. A bare
@@ -257,16 +258,27 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
      * through to the packaged catalog rather than shadowing it, which is what
      * makes the override location safe to point at before anything writes there.
      */
-    private function effectiveCatalogPath(): ?string
+    public function effectiveCatalogPath(): ?string
     {
         if (null !== $this->catalogPath && is_file($this->catalogPath)) {
             return $this->catalogPath;
         }
 
-        return $this->defaultCatalogPath() ?? $this->catalogPath;
+        return $this->packagedCatalogPath() ?? $this->catalogPath;
     }
 
-    private function defaultCatalogPath(): ?string
+    /**
+     * The catalog shipped with the installed `symfony/models-dev` package —
+     * the only file whose contents `InstalledVersions::getPrettyVersion()`
+     * actually describes, which is why `doctor` compares against it before
+     * naming a version.
+     *
+     * `InstalledVersions::getInstallPath()` resolves relative to the Composer
+     * directory, so it hands back a `vendor/composer/../symfony/...` detour.
+     * `Path::canonicalize()` collapses it lexically — `realpath()` cannot, it
+     * returns `false` for the `phar://` path a packaged binary reports.
+     */
+    public function packagedCatalogPath(): ?string
     {
         try {
             $installPath = InstalledVersions::getInstallPath($this->catalogPackage);
@@ -274,7 +286,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
             return null;
         }
 
-        return null === $installPath ? null : \sprintf('%s/%s', $installPath, self::CATALOG_FILENAME);
+        return null === $installPath ? null : Path::canonicalize(\sprintf('%s/%s', $installPath, self::CATALOG_FILENAME));
     }
 
     /** @return array<array-key, mixed> */

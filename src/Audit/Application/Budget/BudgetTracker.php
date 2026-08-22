@@ -34,6 +34,9 @@ final class BudgetTracker
 
     private float $costUsdUsed = 0.0;
 
+    /** @var array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cache_creation_tokens: int, estimated_cost_usd: float}> */
+    private array $usageByModel = [];
+
     public function __construct(
         private readonly AuditBudget $auditBudget,
         private readonly CostCalculator $costCalculator,
@@ -41,14 +44,45 @@ final class BudgetTracker
 
     public function recordCall(LLMResponse $llmResponse): void
     {
-        $this->tokensUsed += $llmResponse->totalTokens();
-        $this->costUsdUsed += $this->costCalculator->costForCall(
+        $costUsd = $this->costCalculator->costForCall(
             $llmResponse->inputTokens(),
             $llmResponse->outputTokens(),
             $llmResponse->model(),
             $llmResponse->cacheReadTokens(),
             $llmResponse->cacheCreationTokens(),
         );
+
+        $this->tokensUsed += $llmResponse->totalTokens();
+        $this->costUsdUsed += $costUsd;
+        $this->accumulateModelUsage($llmResponse, $costUsd);
+    }
+
+    private function accumulateModelUsage(LLMResponse $llmResponse, float $costUsd): void
+    {
+        $model = $llmResponse->model();
+        $existing = $this->usageByModel[$model] ?? ['input_tokens' => 0, 'output_tokens' => 0, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.0];
+
+        $this->usageByModel[$model] = [
+            'model' => $model,
+            'input_tokens' => $existing['input_tokens'] + $llmResponse->inputTokens(),
+            'output_tokens' => $existing['output_tokens'] + $llmResponse->outputTokens(),
+            'cache_read_tokens' => $existing['cache_read_tokens'] + $llmResponse->cacheReadTokens(),
+            'cache_creation_tokens' => $existing['cache_creation_tokens'] + $llmResponse->cacheCreationTokens(),
+            'estimated_cost_usd' => $existing['estimated_cost_usd'] + $costUsd,
+        ];
+    }
+
+    /**
+     * Per-model totals for the run, so a report can tell a model that priced
+     * to zero because it is unlisted from one that simply went unused. The
+     * aggregate cannot: a priced attacker paired with an unpriced reviewer
+     * still sums to a nonzero total.
+     *
+     * @return array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cache_creation_tokens: int, estimated_cost_usd: float}>
+     */
+    public function usageByModel(): array
+    {
+        return $this->usageByModel;
     }
 
     /**
@@ -82,5 +116,6 @@ final class BudgetTracker
     {
         $this->tokensUsed = 0;
         $this->costUsdUsed = 0.0;
+        $this->usageByModel = [];
     }
 }

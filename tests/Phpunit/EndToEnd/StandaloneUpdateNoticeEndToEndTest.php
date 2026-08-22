@@ -84,15 +84,15 @@ final class StandaloneUpdateNoticeEndToEndTest extends TestCase
         $updateAvailabilityNotifier->method('availableUpdateNotice')->willReturn($notice);
 
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, $this->cacheHome, null);
-        $application = (new StandaloneApplicationFactory(
+        $standaloneApplication = (new StandaloneApplicationFactory(
             new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver()),
             $xdgConfigPathResolver,
             self::createStub(BridgeInstallerInterface::class),
             updateAvailabilityConsoleListener: new UpdateAvailabilityConsoleListener($updateAvailabilityNotifier, '1.0.0', $disabled),
         ))->create();
-        $application->setAutoExit(false);
+        $standaloneApplication->setAutoExit(false);
 
-        $applicationTester = new ApplicationTester($application);
+        $applicationTester = new ApplicationTester($standaloneApplication);
         $applicationTester->run(['command' => 'list'], ['interactive' => $interactive, 'capture_stderr_separately' => true]);
 
         return $applicationTester;
