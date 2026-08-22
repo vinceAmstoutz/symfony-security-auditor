@@ -169,12 +169,20 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>AUDITOR</>'), $display);
     }
 
+    public function test_a_console_that_announces_no_locale_at_all_drops_the_mark(): void
+    {
+        $display = $this->headerIn(null, false);
+
+        self::assertStringNotContainsString('◉', $display);
+        self::assertStringContainsString(' SECURITY AUDITOR', $display);
+    }
+
     #[DataProvider('consoleModes')]
     public function test_the_header_is_pure_ascii_without_utf8_support(bool $decorated): void
     {
         $withoutEscapes = (string) preg_replace('/\033\[[0-9;]*m/', '', $this->headerIn('C', $decorated));
 
-        self::assertSame(1, preg_match('/^[\x00-\x7F]*$/', $withoutEscapes));
+        self::assertMatchesRegularExpression('/^[\x00-\x7F]*$/', $withoutEscapes);
     }
 
     /** @return iterable<string, array{bool}> */
@@ -184,10 +192,20 @@ final class AuditPresenterTest extends TestCase
         yield 'plain' => [false];
     }
 
-    private function headerIn(string $locale, bool $decorated): string
+    /**
+     * All three variables are pinned, not just `LC_ALL`: leaving the others to
+     * the runner makes which branch of `localeSetting()` executes depend on
+     * the machine, which is how this drifted between a local run and CI.
+     */
+    private function headerIn(?string $locale, bool $decorated): string
     {
-        $previous = getenv('LC_ALL');
-        putenv(\sprintf('LC_ALL=%s', $locale));
+        $variables = ['LC_ALL', 'LC_CTYPE', 'LANG'];
+        $previous = [];
+
+        foreach ($variables as $variable) {
+            $previous[$variable] = getenv($variable);
+            putenv(null === $locale ? $variable : \sprintf('%s=%s', $variable, $locale));
+        }
 
         try {
             $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, $decorated);
@@ -195,7 +213,10 @@ final class AuditPresenterTest extends TestCase
 
             return $bufferedOutput->fetch();
         } finally {
-            putenv(false === $previous ? 'LC_ALL' : \sprintf('LC_ALL=%s', $previous));
+            foreach ($variables as $variable) {
+                $restored = $previous[$variable];
+                putenv(false === $restored ? $variable : \sprintf('%s=%s', $variable, $restored));
+            }
         }
     }
 
