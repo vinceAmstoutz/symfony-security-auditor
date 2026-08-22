@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use InvalidArgumentException;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -120,32 +121,82 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
     }
 
-    public function test_header_falls_back_to_the_plain_title_when_not_decorated(): void
+    public function test_header_shows_the_mark_and_wordmark_in_the_brand_palette_when_decorated(): void
     {
-        $bufferedOutput = new BufferedOutput();
-        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $display = $this->headerIn('en_US.UTF-8', true);
+        $outputFormatter = (new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true))->getFormatter();
 
-        $this->auditPresenter->header($symfonyStyle, '/path/to/project');
-
-        $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('Symfony LLM Security Auditor', $display);
-        self::assertStringNotContainsString('◉', $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55;options=bold>◉ >> SECURITY</>'), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>AUDITOR</>'), $display);
+        self::assertStringStartsWith(\PHP_EOL, $display, 'the header must not abut whatever printed before it');
     }
 
-    public function test_header_shows_a_branded_banner_when_decorated(): void
+    public function test_header_keeps_the_same_layout_without_colour_when_not_decorated(): void
     {
-        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
-        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $display = $this->headerIn('en_US.UTF-8', false);
 
-        $this->auditPresenter->header($symfonyStyle, '/path/to/project');
+        self::assertStringContainsString(' ◉ >> SECURITY AUDITOR', $display);
+        self::assertStringContainsString('Symfony - multi-agent LLM audit', $display);
+        self::assertStringNotContainsString("\033[", $display, 'CI output must carry no escape sequences');
+    }
 
-        $display = $bufferedOutput->fetch();
-        $outputFormatter = $bufferedOutput->getFormatter();
-        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55>◉</>'), $display);
-        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>Symfony LLM Security Auditor</>'), $display);
-        self::assertStringContainsString($this->formatted($outputFormatter, \sprintf('<fg=#e71c55>%s</>', str_repeat('─', mb_strlen('◉ Symfony LLM Security Auditor')))), $display);
-        self::assertSame(1, substr_count($display, 'Symfony LLM Security Auditor'), 'the plain title() fallback must not also run once the banner has printed');
-        self::assertStringStartsWith(\PHP_EOL, $display, 'SymfonyStyle::title() opens with a blank line; the banner path must not abut whatever printed before it');
+    public function test_the_tagline_starts_under_the_wordmark_not_under_the_mark(): void
+    {
+        $lines = explode(\PHP_EOL, $this->headerIn('en_US.UTF-8', false));
+
+        self::assertSame(
+            mb_strpos($lines[1], 'SECURITY'),
+            mb_strpos($lines[2], 'Symfony'),
+            'the tagline offset is derived from the lead string, so it tracks the mark width',
+        );
+    }
+
+    public function test_a_console_without_utf8_drops_the_mark_and_keeps_the_wordmark(): void
+    {
+        $display = $this->headerIn('C', false);
+
+        self::assertStringNotContainsString('◉', $display, 'the mark is outside CP437/CP850/CP1252 and would be substituted');
+        self::assertStringContainsString(' SECURITY AUDITOR', $display);
+        self::assertStringContainsString('Symfony - multi-agent LLM audit', $display);
+    }
+
+    public function test_a_console_without_utf8_still_gets_the_brand_palette(): void
+    {
+        $display = $this->headerIn('C', true);
+        $outputFormatter = (new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true))->getFormatter();
+
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55;options=bold>SECURITY</>'), $display);
+        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>AUDITOR</>'), $display);
+    }
+
+    #[DataProvider('consoleModes')]
+    public function test_the_header_is_pure_ascii_without_utf8_support(bool $decorated): void
+    {
+        $withoutEscapes = (string) preg_replace('/\033\[[0-9;]*m/', '', $this->headerIn('C', $decorated));
+
+        self::assertSame(1, preg_match('/^[\x00-\x7F]*$/', $withoutEscapes));
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function consoleModes(): iterable
+    {
+        yield 'decorated' => [true];
+        yield 'plain' => [false];
+    }
+
+    private function headerIn(string $locale, bool $decorated): string
+    {
+        $previous = getenv('LC_ALL');
+        putenv(\sprintf('LC_ALL=%s', $locale));
+
+        try {
+            $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, $decorated);
+            $this->auditPresenter->header(new SymfonyStyle(new StringInput(''), $bufferedOutput), '/path/to/project');
+
+            return $bufferedOutput->fetch();
+        } finally {
+            putenv(false === $previous ? 'LC_ALL' : \sprintf('LC_ALL=%s', $previous));
+        }
     }
 
     private function formatted(OutputFormatterInterface $outputFormatter, string $tag): string

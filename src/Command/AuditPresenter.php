@@ -28,9 +28,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
-    private const string WORDMARK = 'Symfony LLM Security Auditor';
+    private const string SCAN_MARK = '◉ >>';
 
-    private const string BANNER_GLYPH = '◉';
+    private const string SCAN_MARK_PORTABLE = '';
+
+    private const string WORDMARK_LEAD = 'SECURITY';
+
+    private const string WORDMARK_TAIL = 'AUDITOR';
+
+    private const string TAGLINE = 'Symfony - multi-agent LLM audit';
 
     /** Sampled from the circular bug glyph in `assets/banner.webp`. */
     private const string BANNER_PINK = '#e71c55';
@@ -52,32 +58,71 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
         $symfonyStyle->text([
             \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
-            'Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)',
+            'Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)',
             '',
         ]);
     }
 
+    /**
+     * One code path for both terminal states: `OutputFormatter` drops the
+     * style tags when the output is not decorated, so CI logs and a colour
+     * terminal show the same layout rather than two different headers. Every
+     * character is ASCII, so a Windows console on a legacy code page renders
+     * it without substitution and without the double-width cells that break
+     * column alignment.
+     */
     private function wordmark(SymfonyStyle $symfonyStyle): void
     {
-        if ($symfonyStyle->isDecorated()) {
-            $this->identityBanner($symfonyStyle);
-
-            return;
-        }
-
-        $symfonyStyle->title(self::WORDMARK);
-    }
-
-    private function identityBanner(SymfonyStyle $symfonyStyle): void
-    {
-        $wordmarkLine = \sprintf('%s %s', self::BANNER_GLYPH, self::WORDMARK);
+        $scanMark = $this->scanMark();
+        $lead = '' === $scanMark ? self::WORDMARK_LEAD : \sprintf('%s %s', $scanMark, self::WORDMARK_LEAD);
 
         $symfonyStyle->writeln([
             '',
-            \sprintf('<fg=%s>%s</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_GLYPH, self::BANNER_NAVY, self::WORDMARK),
-            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', mb_strlen($wordmarkLine))),
+            \sprintf(
+                ' <fg=%s;options=bold>%s</> <fg=%s;options=bold>%s</>',
+                self::BANNER_PINK,
+                $lead,
+                self::BANNER_NAVY,
+                self::WORDMARK_TAIL,
+            ),
+            \sprintf(' %s%s', str_repeat(' ', mb_strlen($lead) - mb_strlen(self::WORDMARK_LEAD)), self::TAGLINE),
             '',
         ]);
+    }
+
+    /**
+     * `◉` is outside CP437/CP850/CP1252, so a console on a legacy code page
+     * substitutes it. Dropping the mark there keeps the colour and the
+     * wordmark, which carry the identity on their own.
+     */
+    private function scanMark(): string
+    {
+        return $this->consoleRendersUtf8() ? self::SCAN_MARK : self::SCAN_MARK_PORTABLE;
+    }
+
+    /**
+     * The locale variables are the portable signal, and a Windows console
+     * sets none of them unless the shell is UTF-8 aware — so Windows lands on
+     * the ASCII wordmark without this needing a platform branch, which could
+     * only ever be exercised on one platform's CI leg.
+     */
+    private function consoleRendersUtf8(): bool
+    {
+        $locale = strtoupper($this->localeSetting());
+
+        return str_contains($locale, 'UTF-8') || str_contains($locale, 'UTF8');
+    }
+
+    private function localeSetting(): string
+    {
+        foreach (['LC_ALL', 'LC_CTYPE', 'LANG'] as $variable) {
+            $value = getenv($variable);
+            if (\is_string($value) && '' !== $value) {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     /**
