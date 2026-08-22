@@ -22,23 +22,109 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
+    private const string SCAN_MARK = '◉ >>';
+
+    private const string SCAN_MARK_PORTABLE = '';
+
+    private const string WORDMARK_LEAD = 'SECURITY';
+
+    private const string WORDMARK_TAIL = 'AUDITOR';
+
+    private const string TAGLINE = 'Symfony - multi-agent LLM audit';
+
+    /** Sampled from the circular bug glyph in `assets/banner.webp`. */
+    private const string BANNER_PINK = '#e71c55';
+
+    /**
+     * Brightened from the wordmark's `#242d5c` in `assets/banner.webp` — that
+     * navy sits on the banner image's light background, but as terminal
+     * foreground text it degrades toward black on a 16-colour palette and
+     * disappears on the dark background most terminals default to.
+     */
+    private const string BANNER_NAVY = '#5b6fd6';
+
     public function __construct(private PricingProviderInterface $pricingProvider) {}
 
     #[Override]
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void
     {
-        $symfonyStyle->title('Symfony LLM Security Auditor');
+        $this->wordmark($symfonyStyle);
+
         $symfonyStyle->text([
             \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
-            'Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)',
+            'Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)',
             '',
         ]);
+    }
+
+    /**
+     * One code path for both terminal states: `OutputFormatter` drops the
+     * style tags when the output is not decorated, so CI logs and a colour
+     * terminal show the same layout rather than two different headers. Every
+     * character is ASCII, so a Windows console on a legacy code page renders
+     * it without substitution and without the double-width cells that break
+     * column alignment.
+     */
+    private function wordmark(SymfonyStyle $symfonyStyle): void
+    {
+        $scanMark = $this->scanMark();
+        $markedLead = '' === $scanMark ? '' : \sprintf('%s ', $scanMark);
+
+        $symfonyStyle->writeln([
+            '',
+            \sprintf(
+                ' <fg=%s;options=bold>%s%s</> <fg=%s;options=bold>%s</>',
+                self::BANNER_PINK,
+                $markedLead,
+                self::WORDMARK_LEAD,
+                self::BANNER_NAVY,
+                self::WORDMARK_TAIL,
+            ),
+            \sprintf(' %s%s', str_repeat(' ', mb_strlen($markedLead)), self::TAGLINE),
+            '',
+        ]);
+    }
+
+    /**
+     * `◉` is outside CP437/CP850/CP1252, so a console on a legacy code page
+     * substitutes it. Dropping the mark there keeps the colour and the
+     * wordmark, which carry the identity on their own.
+     */
+    private function scanMark(): string
+    {
+        return $this->consoleRendersUtf8() ? self::SCAN_MARK : self::SCAN_MARK_PORTABLE;
+    }
+
+    /**
+     * The locale variables are the portable signal, and a Windows console
+     * sets none of them unless the shell is UTF-8 aware — so Windows lands on
+     * the ASCII wordmark without this needing a platform branch, which could
+     * only ever be exercised on one platform's CI leg.
+     */
+    private function consoleRendersUtf8(): bool
+    {
+        $locale = strtoupper($this->localeSetting());
+
+        return str_contains($locale, 'UTF-8') || str_contains($locale, 'UTF8');
+    }
+
+    private function localeSetting(): string
+    {
+        foreach (['LC_ALL', 'LC_CTYPE', 'LANG'] as $variable) {
+            $value = getenv($variable);
+            if (\is_string($value) && '' !== $value) {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -158,7 +244,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
-        $symfonyStyle->success('Dry run complete.');
+        $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
     }
 
     #[Override]
@@ -173,11 +259,24 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->section(\sprintf('Scanned files (%d)', \count($projectFiles)));
 
         foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
-            $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $type, \count($relativePaths)));
+            $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $this->bucketLabel($type), \count($relativePaths)));
             $symfonyStyle->listing(array_map($this->sanitizePathForListing(...), $relativePaths));
         }
 
-        $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));
+        $this->lightConfirmation($symfonyStyle, \sprintf('%d file(s) in scope.', \count($projectFiles)));
+    }
+
+    /**
+     * A lighter-weight replacement for `SymfonyStyle::success()` on
+     * intermediate confirmations — no boxed `[OK]` block, just a short line —
+     * but keeping its leading marker (gated on `isDecorated()`, since a
+     * redirected/CI log has no use for an emoji) and its trailing blank line,
+     * so it doesn't abut whatever prints next.
+     */
+    private function lightConfirmation(SymfonyStyle $symfonyStyle, string $message): void
+    {
+        $symfonyStyle->writeln(\sprintf($symfonyStyle->isDecorated() ? '  ✅ %s' : '  %s', $message));
+        $symfonyStyle->newLine();
     }
 
     #[Override]
@@ -214,7 +313,34 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $byType[$projectFile->type()][] = $projectFile->relativePath();
         }
 
-        return $byType;
+        return $this->withUncategorizedBucketsLast($byType);
+    }
+
+    /**
+     * @param array<string, list<string>> $byType
+     *
+     * @return array<string, list<string>>
+     */
+    private function withUncategorizedBucketsLast(array $byType): array
+    {
+        $trailing = [];
+        foreach ([ProjectFileType::PHP->value, ProjectFileType::OTHER->value] as $trailingType) {
+            if (\array_key_exists($trailingType, $byType)) {
+                $trailing[$trailingType] = $byType[$trailingType];
+                unset($byType[$trailingType]);
+            }
+        }
+
+        return $byType + $trailing;
+    }
+
+    private function bucketLabel(string $type): string
+    {
+        return match ($type) {
+            ProjectFileType::PHP->value => 'php · uncategorized',
+            ProjectFileType::OTHER->value => 'other · uncategorized',
+            default => $type,
+        };
     }
 
     #[Override]

@@ -91,6 +91,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             if ([] === $filtered) {
                 $this->logger->info('Attacker found no new findings, stopping');
+                $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'no_new_findings']);
                 break;
             }
 
@@ -98,6 +99,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             if ([] === $reviewCandidates) {
                 $this->logger->info('Every remaining finding is baseline-accepted, stopping');
+                $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'all_baseline_accepted']);
                 break;
             }
 
@@ -224,6 +226,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $filtered = $this->withoutBaselineAccepted($this->filterByConfidence($rawFindings), $auditContext);
 
         if ([] === $filtered) {
+            $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'nothing_recovered']);
+
             return;
         }
 

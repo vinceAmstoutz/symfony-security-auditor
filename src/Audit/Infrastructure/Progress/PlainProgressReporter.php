@@ -46,6 +46,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             ProgressEvent::AttackerChunkCompleted => $this->writeln($this->chunkDoneLine($context)),
             ProgressEvent::AttackerFindingRecorded => $this->writeln($this->findingLine($context)),
             ProgressEvent::ReviewStarted => $this->writeln($this->reviewStartLine($context)),
+            ProgressEvent::ReviewSkipped => $this->writeln($this->reviewSkippedLine($context)),
             ProgressEvent::ReviewFindingReviewed => $this->writeln($this->reviewedLine($context)),
             ProgressEvent::BaselineFindingSkipped => $this->writeln($this->baselineSkippedLine($context)),
             ProgressEvent::ReviewCompleted => $this->writeln($this->reviewSummaryLine($context)),
@@ -97,6 +98,17 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     private function reviewStartLine(array $context): string
     {
         return \sprintf('Reviewing %d finding(s)…', ProgressContext::int($context, 'findings'));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function reviewSkippedLine(array $context): string
+    {
+        return match (ProgressContext::string($context, 'reason')) {
+            'no_new_findings' => 'No new findings this pass.',
+            'all_baseline_accepted' => 'Every finding was baseline-accepted — review skipped.',
+            'nothing_recovered' => 'Nothing left to review after the abort.',
+            default => 'Review skipped.',
+        };
     }
 
     /** @param array<string, mixed> $context */
