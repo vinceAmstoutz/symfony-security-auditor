@@ -178,6 +178,7 @@ final readonly class StandaloneApplicationFactory
         return new SelfUpdateCommand(
             self::selfUpdater($this->runningBinaryPath, $this->pathEnvironment),
             (new ReportPackage())->version(),
+            self::updateCheckStore($this->xdgConfigPathResolver),
         );
     }
 
@@ -199,12 +200,17 @@ final readonly class StandaloneApplicationFactory
         return new UpdateAvailabilityConsoleListener(
             new ThrottledUpdateAvailabilityNotifier(
                 self::selfUpdater($runningBinaryPath, $pathEnvironment),
-                new FilesystemUpdateCheckStore($xdgConfigPathResolver, new Filesystem(), new NullLogger()),
+                self::updateCheckStore($xdgConfigPathResolver),
                 new NativeClock(),
             ),
             (new ReportPackage())->version(),
             $disabled,
         );
+    }
+
+    private static function updateCheckStore(XdgConfigPathResolver $xdgConfigPathResolver): FilesystemUpdateCheckStore
+    {
+        return new FilesystemUpdateCheckStore($xdgConfigPathResolver, new Filesystem(), new NullLogger());
     }
 
     private function registerUpdateAvailabilityNotice(Application $application): void

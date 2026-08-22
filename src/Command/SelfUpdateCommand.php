@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckStoreInterface;
 
 /** @internal not part of the BC promise — the command *name* (`self-update`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
@@ -34,6 +35,7 @@ final readonly class SelfUpdateCommand
     public function __construct(
         private SelfUpdaterInterface $selfUpdater,
         private string $currentVersion,
+        private UpdateCheckStoreInterface $updateCheckStore,
     ) {}
 
     /**
@@ -45,7 +47,13 @@ final readonly class SelfUpdateCommand
         #[Option(description: 'Only report whether a newer version is available; do not modify the binary.')]
         bool $check = false,
     ): int {
-        return $this->report($symfonyStyle, $this->selfUpdater->run($this->currentVersion, $check));
+        $selfUpdateResult = $this->selfUpdater->run($this->currentVersion, $check);
+
+        if (SelfUpdateStatus::Updated === $selfUpdateResult->status) {
+            $this->updateCheckStore->clear();
+        }
+
+        return $this->report($symfonyStyle, $selfUpdateResult);
     }
 
     private function report(SymfonyStyle $symfonyStyle, SelfUpdateResult $selfUpdateResult): int

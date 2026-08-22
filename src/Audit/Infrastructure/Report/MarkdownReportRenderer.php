@@ -43,10 +43,12 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
                 number_format($auditReport->durationSeconds(), 1, '.', ''),
             ),
             \sprintf(
-                '**Tokens:** %s in / %s out · **Model:** %s',
+                '**Tokens:** %s in / %s out · **Model:** %s · **Cost:** $%s (%s)',
                 number_format($cost->inputTokens()),
                 number_format($cost->outputTokens()),
                 '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
+                number_format($cost->estimatedCostUsd(), 4, '.', ''),
+                $cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model',
             ),
             '',
             \sprintf(

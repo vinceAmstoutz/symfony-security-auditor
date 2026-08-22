@@ -36,6 +36,130 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   recognise falls back to a bare "review skipped" rather than borrowing the "no
   new findings" wording: a fourth reason added later would otherwise be
   announced as the wrong cause, which is worse than naming none.
+- **The console, Markdown, and HTML reports now show the audit's real cost, not
+  just token counts.** `RunAuditUseCase::buildCost()` already assembled an
+  `AuditCost` from the LLM provider's own per-call token usage, but
+  `ConsoleReportRenderer`, `MarkdownReportRenderer`, and `HtmlReportRenderer`
+  (`src/Audit/Infrastructure/Report/`) only ever rendered
+  `inputTokens()`/`outputTokens()`/`primaryModel()` — `estimatedCostUsd()` was
+  computed but never shown outside `--format=json`/`--format=sarif` or
+  `--dry-run`. All three renderers now show a `Cost` line labeled "published
+  rates" — the token counts are the provider's exact figures, but the USD
+  conversion comes from `symfony/models-dev`'s published pricing snapshot, which
+  can drift from a negotiated rate or an unpriced model. When tokens were
+  actually spent but the model has no published rate (a self-hosted or unlisted
+  model), the new `AuditCost::hasPublishedPricing()` flips the label to "no
+  published pricing, or a self-hosted model" instead of showing `$0.0000` as if
+  it were a genuinely free run — the same caveat `--dry-run` already gives via
+  `AuditPresenter::unsupportedModelWarnings()`.
+
+  The label is decided per model, not from the aggregate. A split
+  attacker/reviewer setup pairing a priced cloud attacker with an unpriced local
+  reviewer sums to a nonzero total, so the aggregate alone would report
+  "published rates" for a run that is half unpriced — the case this feature
+  exists to catch. `BudgetTracker` already prices every call at that call's own
+  model, so it now accumulates per-model totals alongside the running cost and
+  `RunAuditUseCase` attaches them to the `AuditCost` via the new
+  `AuditCost::withUsageByModel()`. `hasPublishedPricing()` checks whichever
+  breakdown it has — per model for a real run, per role for `--dry-run` — and
+  falls back to the aggregate only when there is none, which is correct on its
+  own terms because a single-model run has nothing to disaggregate.
+
+  Per-model rather than per-role because that is what a real run can honestly
+  attribute: it records the model of every call but not the agent that made it,
+  and it also covers models neither role owns — `EscalatingAttackerAgent`'s
+  cheap first pass, PoC and fix synthesis. The JSON report gains a `by_model`
+  object alongside the existing `by_role`; both are additive, and
+  `AuditCost::of()` is unchanged, so existing callers are unaffected. Each
+  `by_model` entry also carries `cache_read_tokens` and `cache_creation_tokens`,
+  because `CostCalculator::costForCall()` bills cached prompt traffic: without
+  them a cached run reported a cost its own token counts could not account for.
+  `AuditCost::hasPublishedPricing()` counts that traffic as spend too, so a
+  model whose whole run arrived from the prompt cache and priced to zero is
+  still reported as a pricing gap instead of passing as free. Both keys are
+  optional in the accepted shape, keeping `withUsageByModel()` callers valid.
+- **The CLI header now carries the project's identity, and renders the same way
+  everywhere.** `AuditPresenter::header()` (`src/Command/AuditPresenter.php`)
+  printed `$symfonyStyle->title('Symfony LLM Security Auditor')` — a plain
+  underlined line with no visual identity. It now prints `◉ >> SECURITY AUDITOR`
+  with the mark and `SECURITY` in the logo's pink (`#e71c55`) and `AUDITOR` in
+  its navy (`#5b6fd6`), over a `Symfony - multi-agent LLM audit` tagline whose
+  indent is derived from the lead string rather than hardcoded, so it always
+  starts under the wordmark.
+
+  Colour is the only thing that varies by terminal. A single `writeln()`
+  produces every state, because `OutputFormatter` strips the style tags when the
+  output is not decorated — so a CI log shows the identical layout rather than a
+  different header, instead of the previous `title()` fallback.
+
+  `◉` (U+25C9) is outside CP437, CP850 and CP1252, so a console left on a legacy
+  code page would substitute it. `AuditPresenter::scanMark()` drops the mark
+  unless `LC_ALL`, `LC_CTYPE` or `LANG` announces UTF-8, leaving the coloured
+  wordmark, which carries the identity on its own. A Windows console sets none
+  of those unless the shell is UTF-8 aware, so it lands on the ASCII wordmark.
+  Every other character in the header is ASCII.
+
+### Changed
+
+- **`--show-scanned`'s generic `php` and `other` buckets no longer read as
+  "every PHP file"/"every other file."** `AuditPresenter::scannedFiles()`
+  (`src/Command/AuditPresenter.php`) printed the fallback `ProjectFileType::PHP`
+  and `::OTHER` buckets — the catch-all for files matching no specific archetype
+  — as plain `php (N)`/`other (N)` siblings of
+  `entity`/`voter`/`event_subscriber`/etc., with nothing marking them as the
+  leftover buckets they are. Both are now labeled `php · uncategorized`/
+  `other · uncategorized` and always render last, after every specific
+  archetype. Presentation only — the underlying `ProjectFileType` backed values
+  (`'php'`/`'other'`, used by `included_types`/`excluded_types` config) are
+  unchanged.
+- **`--show-scanned` and `--dry-run` no longer close with a heavy `[OK]` block
+  for an intermediate confirmation.** `AuditPresenter::scannedFiles()` and
+  `AuditPresenter::dryRunResult()` (`src/Command/AuditPresenter.php`) used
+  `SymfonyStyle::success()` for the files-in-scope count and the
+  dry-run-complete message, so `--show-scanned --dry-run` printed two `[OK]`
+  boxes and a `[NOTE]` block within a few lines. Both now go through a shared
+  `lightConfirmation()` helper printing a single light line, matching the style
+  the console report already uses for its own success line — the boxed block is
+  reserved for a command's true final pass/fail outcome
+  (`AuditPresenter::result()`). The `✅` marker is gated on `isDecorated()`, so
+  a redirected or CI log gets the plain text without it, matching the pattern
+  the branded identity banner already uses; and the line keeps the trailing
+  blank line `success()` used to add, so it doesn't abut whatever prints next.
+- **`init`'s success message now prints a copy-pasteable `export` line instead
+  of naming the variable in prose.** `InitCommand::__invoke()`
+  (`src/Command/InitCommand.php`) used to say
+  `Export ANTHROPIC_API_KEY, then run "audit <path>".`, leaving the user to know
+  their shell's export syntax and retype the variable name. It now prints
+  `Run: export ANTHROPIC_API_KEY=, then "audit <path>".`, a line that can be
+  pasted as-is.
+
+### Fixed
+
+- **The pipeline line printed two characters a Windows console cannot show.**
+  `AuditPresenter::header()` emitted
+  `Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)`. `→` (U+2192)
+  and `⚔` (U+2694) are both outside CP437/CP850/CP1252, and `⚔` is frequently
+  rendered double-width, which shifts every column after it. The line now reads
+  `Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)`.
+- **`self-update` could corrupt the installed binary and leave no readable error
+  behind.** `SelfUpdater::assertChecksumMatches()`
+  (`src/Audit/Infrastructure/SelfUpdate/SelfUpdater.php`) guarded a failed
+  `hash_file()` call with `\assert(false !== $actual)` — a no-op in production,
+  since `zend.assertions` is off by default, so an unreadable download fell
+  through to `hash_equals()` with a `bool` instead of a `string`: an uncaught
+  `TypeError` instead of an actionable message. It now checks readability
+  explicitly and throws `SelfUpdateFailedException::forUnreadableDownload()`.
+  `SelfUpdater::replaceBinary()` also now cleans up the downloaded temp file on
+  any failure — previously only on `SelfUpdateFailedException` — via a `finally`
+  block instead of a narrow `catch`, so the original binary is left untouched
+  regardless of which step failed.
+- **`self-update` could report a stale "update available" notice for up to a day
+  after actually updating.** `ThrottledUpdateAvailabilityNotifier` caches the
+  latest-version check for 24h (`DEFAULT_THROTTLE_SECONDS`), but nothing cleared
+  that cache when `self-update` itself succeeded, so a cached "a newer version
+  is available" answer could outlive the update that installed it.
+  `UpdateCheckStoreInterface` gained a `clear()` method, and `SelfUpdateCommand`
+  now calls it after a successful (non-`--check`) update.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
