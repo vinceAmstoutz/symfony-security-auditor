@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.20.1] — 2026-08-23 — Herald
+
+A release about the binary saying who it is and what it just did. The identity
+banner now prints for every command rather than only `audit` — `--version`,
+`-h`, `doctor`, `init` and `self-update --check` all used to open anonymously —
+and exactly one collaborator prints it per run, so it never doubles up. It
+carries the project homepage, and a rendered error now ends with the command
+line that produced it, which is the piece a pasted CI log was always missing.
+`--dry-run` no longer demands a provider credential it never uses, so a project
+can be priced before anyone signs up for an API key.
+
 ### Fixed
 
 - **The standalone binary now shows its identity banner on every command, not
@@ -4195,6 +4206,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.20.1]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.1
 [1.20.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.0
 [1.19.1]:
