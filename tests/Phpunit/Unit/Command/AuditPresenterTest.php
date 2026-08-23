@@ -366,6 +366,22 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_the_dry_run_caveat_does_not_abut_the_completion_line(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        self::assertStringEndsWith(
+            "costs less than shown.\n\n  Dry run complete.\n\n",
+            $bufferedOutput->fetch(),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_dry_run_result_leaves_a_blank_line_after_the_completion_line(): void
     {
         $bufferedOutput = new BufferedOutput();

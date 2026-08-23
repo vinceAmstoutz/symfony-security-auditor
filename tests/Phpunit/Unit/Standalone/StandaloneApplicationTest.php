@@ -36,6 +36,8 @@ final class StandaloneApplicationTest extends TestCase
 
     private const string FAILING_COMMAND = 'boom';
 
+    private const string FAILURE_MESSAGE = 'the audit could not start';
+
     public function test_it_appends_the_models_dev_version_to_the_long_version(): void
     {
         self::assertSame(
@@ -103,6 +105,14 @@ final class StandaloneApplicationTest extends TestCase
     {
         self::assertStringContainsString(
             \sprintf(' Command: symfony-security-auditor %s', self::FAILING_COMMAND),
+            $this->displayOfFailure(new StringInput(self::FAILING_COMMAND)),
+        );
+    }
+
+    public function test_the_echoed_command_line_follows_the_error_block_rather_than_replacing_it(): void
+    {
+        self::assertMatchesRegularExpression(
+            \sprintf('/%s.*Command: symfony-security-auditor %s/s', preg_quote(self::FAILURE_MESSAGE, '/'), self::FAILING_COMMAND),
             $this->displayOfFailure(new StringInput(self::FAILING_COMMAND)),
         );
     }
@@ -175,7 +185,7 @@ final class StandaloneApplicationTest extends TestCase
     {
         $command = new Command(self::FAILING_COMMAND);
         $command->addArgument('path', InputArgument::OPTIONAL);
-        $command->setCode(static fn (): int => throw new RuntimeException('the audit could not start'));
+        $command->setCode(static fn (): int => throw new RuntimeException(self::FAILURE_MESSAGE));
 
         return $command;
     }
