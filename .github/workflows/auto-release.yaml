@@ -200,8 +200,9 @@ jobs:
           REPO: ${{ github.repository }}
           VERSION: ${{ needs.detect.outputs.version }}
           PUBLISH_WHEN_DONE: ${{ steps.publish-state.outputs.publish }}
+          RELEASE_NAME: ${{ steps.release-name.outputs.name }}
         run: |
           set -euo pipefail
 
           # GITHUB_TOKEN-authored events don't cascade into other workflows (GitHub's anti-recursion guard), so dispatch explicitly rather than rely on release:published.
-          gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION" --field keep_draft=true --field publish_when_done="$PUBLISH_WHEN_DONE"
+          gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION" --field keep_draft=true --field publish_when_done="$PUBLISH_WHEN_DONE" --field release_name="$RELEASE_NAME"

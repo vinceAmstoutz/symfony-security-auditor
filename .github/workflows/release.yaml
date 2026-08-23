@@ -1,5 +1,10 @@
 name: Release
 
+# A dispatched run would otherwise display as a bare "Release" in the Actions
+# list, indistinguishable from every other one; a release-event run already
+# shows the release name, so mirror that.
+run-name: ${{ inputs.release_name || github.event.release.name || inputs.tag || github.ref_name }}
+
 on:
   release:
     types:
@@ -24,6 +29,14 @@ on:
         required: false
         type: boolean
         default: false
+      release_name:
+        description:
+          "Display name for this run, e.g. \"1.20.1 - Herald\". Set by Auto
+          Release from the changelog codename; leave empty on a manual repair
+          and the run is named after the tag."
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
