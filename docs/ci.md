@@ -176,7 +176,7 @@ jobs:
           fetch-depth: 0 # full history so `since` can diff against the base branch
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.19.1
+        uses: vinceamstoutz/symfony-security-auditor@1.20.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -212,7 +212,7 @@ aggregate `risk_level`) and `grade` (its `A`-`F` letter).
 ```yaml
       - name: Symfony Security Audit
         id: audit
-        uses: vinceamstoutz/symfony-security-auditor@1.19.1
+        uses: vinceamstoutz/symfony-security-auditor@1.20.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -243,7 +243,7 @@ tradeoffs.
 
 ```yaml
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.19.1
+        uses: vinceamstoutz/symfony-security-auditor@1.20.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -432,7 +432,7 @@ permissions:
 # …
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.19.1
+        uses: vinceamstoutz/symfony-security-auditor@1.20.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required by comment-pr
@@ -467,7 +467,7 @@ default branch rather than whichever pull request ran last.
 
 ```yaml
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.19.1
+        uses: vinceamstoutz/symfony-security-auditor@1.20.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:

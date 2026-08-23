@@ -290,6 +290,10 @@ Expect the capture to stay empty for the whole run. Two notes on reading it:
 - With `privacy.offline_only` off, an audit legitimately talks to your LLM
   provider and (through `composer audit`) to the Packagist advisory feed, so a
   non-empty capture there is expected, not a leak.
+- This applies to the `audit` command specifically. Standalone's `self-update`
+  is a separate command that also refreshes the bundled pricing catalog from
+  `symfony/models-dev` unless `privacy.offline_only` is set — it is not covered
+  by the capture above unless you run it too.
 
 For a stricter guarantee, run the audit in a network namespace or container that
 has no route off the host at all except to the Ollama socket — if the auditor

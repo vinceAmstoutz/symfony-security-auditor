@@ -83,10 +83,15 @@ jobs:
           fi
 
           second_parent="${parents[2]}"
-          git fetch origin 1.x --quiet
-          if ! git merge-base --is-ancestor "$second_parent" origin/1.x; then
-            echo "::error::This release commit's second parent ($second_parent) is not part of 1.x's history, so it doesn't look like a genuine 1.x-into-main merge — see docs/versioning.md#branches--maintenance."
-            exit 1
+          # 1.x can already be gone by the time this runs (e.g. "delete branch
+          # on merge"), so only cross-check against it when it still exists —
+          # the parent-count check above is what actually catches #305.
+          if git ls-remote --exit-code --heads origin 1.x >/dev/null 2>&1; then
+            git fetch origin 1.x --quiet
+            if ! git merge-base --is-ancestor "$second_parent" origin/1.x; then
+              echo "::error::This release commit's second parent ($second_parent) is not part of 1.x's history, so it doesn't look like a genuine 1.x-into-main merge — see docs/versioning.md#branches--maintenance."
+              exit 1
+            fi
           fi
 
   tag-and-draft-release:
@@ -171,18 +176,11 @@ jobs:
             echo "name=$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Resolve whether to publish immediately
+      - name: Resolve whether the built release should auto-publish
         id: publish-state
         env:
           PUBLISH: ${{ github.event.inputs.publish }}
-        run: |
-          set -euo pipefail
-
-          if [ "$PUBLISH" = "true" ]; then
-            echo "draft=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "draft=true" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "publish=${PUBLISH:-false}" >> "$GITHUB_OUTPUT"
 
       - name: Draft the GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
@@ -190,15 +188,20 @@ jobs:
           tag_name: ${{ needs.detect.outputs.version }}
           name: ${{ steps.release-name.outputs.name }}
           body_path: release-notes.md
-          draft: ${{ steps.publish-state.outputs.draft }}
+          # Always starts as a draft, whatever `publish` was dispatched with:
+          # the binaries don't exist yet, so the release can't be finished at
+          # this point regardless of intent. release.yaml's `finalize` job
+          # publishes it once every asset is actually attached.
+          draft: true
 
       - name: Trigger the binary build against the drafted release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           VERSION: ${{ needs.detect.outputs.version }}
+          PUBLISH_WHEN_DONE: ${{ steps.publish-state.outputs.publish }}
         run: |
           set -euo pipefail
 
           # GITHUB_TOKEN-authored events don't cascade into other workflows (GitHub's anti-recursion guard), so dispatch explicitly rather than rely on release:published.
-          gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION"
+          gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION" --field keep_draft=true --field publish_when_done="$PUBLISH_WHEN_DONE"

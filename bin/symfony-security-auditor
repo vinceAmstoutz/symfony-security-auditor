@@ -45,4 +45,11 @@ $environment = getenv();
 
 $runningBinaryPath = \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) ? $_SERVER['SCRIPT_FILENAME'] : '';
 
-exit(StandaloneApplicationFactory::fromEnvironment($environment, $runningBinaryPath)->create()->run());
+$standaloneApplicationFactory = StandaloneApplicationFactory::fromEnvironment($environment, $runningBinaryPath);
+
+// Committed at shutdown, past the last autoload from the archive being replaced.
+register_shutdown_function(static function () use ($standaloneApplicationFactory): void {
+    $standaloneApplicationFactory->pendingBinarySwap()->commit();
+});
+
+exit($standaloneApplicationFactory->create()->run());

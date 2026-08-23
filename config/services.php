@@ -54,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
@@ -233,7 +234,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(TokenUsageRecorder::class);
 
     $defaultsConfigurator->set(ModelsDevPricingProvider::class)
-        ->args([service('logger')]);
+        ->args([service('logger'), '%kernel.cache_dir%/models-dev.json']);
     $defaultsConfigurator->alias(PricingProviderInterface::class, ModelsDevPricingProvider::class);
 
     $defaultsConfigurator->set(CostCalculator::class)
@@ -327,6 +328,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
     $defaultsConfigurator->set(AttackerSkillRegistry::class)
         ->args([tagged_iterator('symfony_security_auditor.attacker_skill')]);
+    $defaultsConfigurator->alias(AttackerSkillPromptRendererInterface::class, AttackerSkillRegistry::class);
 
     $defaultsConfigurator->set(AttackerPromptBuilder::class)
         ->args([
@@ -648,12 +650,18 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(TokenEstimatorInterface::class),
             service(CostCalculator::class),
             service('logger'),
+            service(FileChunker::class),
+            service(AttackerSkillPromptRendererInterface::class),
             param('symfony_security_auditor.attacker_model'),
             param('symfony_security_auditor.audit.max_iterations'),
             EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
             param('symfony_security_auditor.reviewer_model'),
             EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO,
             service(GitChangedFilesResolverInterface::class),
+            param('symfony_security_auditor.audit.stable_system_prompt'),
+            param('symfony_security_auditor.audit.tools_enabled'),
+            EstimateAuditCostUseCase::DEFAULT_TOOL_ROUND_TRIP_RATIO,
+            param('symfony_security_auditor.audit.max_tool_iterations'),
         ]);
 
     $defaultsConfigurator->set(ListScannedFilesUseCase::class)
@@ -700,6 +708,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             inline_service(RiskLevel::class)
                 ->factory([RiskLevel::class, 'from'])
                 ->args([param('symfony_security_auditor.audit.fail_on')]),
+            param('symfony_security_auditor.audit.poc_synthesis.enabled'),
+            param('symfony_security_auditor.audit.fix_synthesis.enabled'),
         ])
         ->tag('console.command');
 

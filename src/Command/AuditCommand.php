@@ -71,6 +71,8 @@ final readonly class AuditCommand
         private FindingTypeFilterInterface $findingTypeFilter,
         private array $configNotices = [],
         private RiskLevel $riskLevel = RiskLevel::Critical,
+        private bool $pocSynthesisEnabled = false,
+        private bool $fixSynthesisEnabled = false,
     ) {}
 
     /**
@@ -195,6 +197,7 @@ final readonly class AuditCommand
         $auditReport = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths, $auditCommandInput->since);
 
         $this->auditPresenter->unsupportedModelWarnings($displayStyle, $auditReport);
+        $this->auditPresenter->synthesisCostWarnings($displayStyle, $this->pocSynthesisEnabled, $this->fixSynthesisEnabled);
 
         if ($auditCommandInput->isMachineReadableFormat() || null !== $auditCommandInput->output) {
             $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);

@@ -169,7 +169,7 @@ deprecated by the other.
   renaming or removing one is a `MAJOR`. The Marketplace `name`
   (`Symfony Security Auditor`) is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —
-  `uses: vinceamstoutz/symfony-security-auditor@1.19.1` — matching the tag
+  `uses: vinceamstoutz/symfony-security-auditor@1.20.0` — matching the tag
   format used on Packagist. Bump the pin when upgrading. There is intentionally
   no floating `v1` tag: the `uses:` ref and the config-schema URL both point at
   the same release tag, so a given pin always resolves to one immutable release.
@@ -252,6 +252,9 @@ overriding the alias in `config/services.yaml` is a supported integration path:
   prompt-cache rates. `CostCalculator` checks `instanceof` and falls back to the
   base input rate, so it never breaks an existing pricing provider.
 - `TokenEstimatorInterface`
+- `AttackerSkillPromptRendererInterface` — host applications may implement this
+  and alias it to control how the attacker's skill-block text is rendered for a
+  set of file types. See [`docs/extending.md`](extending.md).
 - `RateLimiterInterface` — host applications may implement this and alias it to
   swap the throttling strategy (e.g. cross-process Redis-backed bucket). See
   [`docs/extending.md`](extending.md).
@@ -293,6 +296,10 @@ Anything tagged `@internal` may be refactored, renamed, or removed in any
   `EscalatingAttackerAgent`, `AuditOrchestrator`, `VulnerabilityFactory`,
   `PoCSynthesizer`, `AuditPipeline`, `IngestionStage`, `MappingStage`,
   `AuditStage`, `PoCSynthesisStage`).
+- `Audit\Application\UseCase\EstimateAuditCostUseCase` — the `--dry-run`
+  estimator. `RunAuditUseCase` above is the only BC-protected entry point; this
+  one is a collaborator of `AuditCommand` and its constructor changes whenever
+  the estimate gains a new input.
 - All concrete adapters under `Audit/Infrastructure/` — `SymfonyAiLLMClient`,
   `ProjectFileScanner`, `AttackerPromptBuilder`, `ReviewerPromptBuilder`,
   `FilesystemAttackerCache`, `NullAttackerCache`,

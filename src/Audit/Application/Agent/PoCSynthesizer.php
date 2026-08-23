@@ -199,7 +199,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
             $data['type'],
             $data['severity'],
             $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
-            $this->stripEmbeddedNewline($data['file']),
+            $this->stripEmbeddedNewline($this->escapeFences($data['file'])),
             $data['line_start'],
             $data['line_end'],
             $this->escapeFences($data['vulnerable_code']),

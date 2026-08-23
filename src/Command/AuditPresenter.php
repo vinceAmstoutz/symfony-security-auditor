@@ -19,6 +19,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -159,6 +160,24 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         ));
     }
 
+    #[Override]
+    public function synthesisCostWarnings(SymfonyStyle $symfonyStyle, bool $pocSynthesisEnabled, bool $fixSynthesisEnabled): void
+    {
+        if ($pocSynthesisEnabled && $fixSynthesisEnabled) {
+            $symfonyStyle->getErrorStyle()->warning('PoC synthesis (audit.poc_synthesis.enabled) and fix synthesis (audit.fix_synthesis.enabled) are both enabled. Their LLM calls are not included in this cost estimate, so a real run will cost more than the figure shown.');
+
+            return;
+        }
+
+        if ($pocSynthesisEnabled) {
+            $symfonyStyle->getErrorStyle()->warning('PoC synthesis is enabled (audit.poc_synthesis.enabled). Its LLM calls are not included in this cost estimate, so a real run will cost more than the figure shown.');
+        }
+
+        if ($fixSynthesisEnabled) {
+            $symfonyStyle->getErrorStyle()->warning('Fix synthesis is enabled (audit.fix_synthesis.enabled). Its LLM calls are not included in this cost estimate, so a real run will cost more than the figure shown.');
+        }
+    }
+
     /** @return array<string, string> */
     private function unsupportedModels(AuditCost $auditCost): array
     {
@@ -223,10 +242,38 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             }
 
             $symfonyStyle->listing($lines);
+
+            $reviewerRatioPercent = $this->reviewerRatioPercent($cost);
+            if (null !== $reviewerRatioPercent) {
+                $symfonyStyle->text(\sprintf(
+                    '<fg=gray>Reviewer input is projected at ~%d%% of attacker input in this estimate — a flat pre-run heuristic, not a measurement; actual cost scales with real findings.</>',
+                    $reviewerRatioPercent,
+                ));
+            }
         }
 
         $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
         $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
+    }
+
+    /**
+     * Derived from the cost breakdown itself rather than restating
+     * `EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO` as a fixed
+     * string — a caller constructing the use case with a different ratio, or
+     * a future change to the default, would otherwise silently drift from
+     * this caveat.
+     */
+    private function reviewerRatioPercent(AuditCost $auditCost): ?int
+    {
+        $byRole = $auditCost->byRole();
+        $attackerInputTokens = $byRole[AgentRole::Attacker->value]['input_tokens'] ?? 0;
+        $reviewerInputTokens = $byRole[AgentRole::Reviewer->value]['input_tokens'] ?? null;
+
+        if (null === $reviewerInputTokens || 0 === $attackerInputTokens) {
+            return null;
+        }
+
+        return (int) round($reviewerInputTokens / $attackerInputTokens * 100);
     }
 
     #[Override]
