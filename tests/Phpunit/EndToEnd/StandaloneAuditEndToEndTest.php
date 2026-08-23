@@ -17,6 +17,8 @@ use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Input\StringInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
@@ -89,5 +91,63 @@ final class StandaloneAuditEndToEndTest extends TestCase
 
         self::assertSame(0, $exitCode);
         self::assertStringContainsString('Dry run complete.', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     * @throws UnresolvableAuditCommandException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_dry_run_estimates_cost_without_a_provider_credential(): void
+    {
+        self::assertSame(
+            0,
+            $this->runWithCredentialFromEnvironment(\sprintf('%s %s --dry-run', AuditCommand::NAME, $this->projectDir)),
+        );
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     * @throws UnresolvableAuditCommandException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_real_run_still_refuses_to_start_without_a_provider_credential(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage('PROVIDER_API_KEY');
+
+        $this->runWithCredentialFromEnvironment(\sprintf('%s %s', AuditCommand::NAME, $this->projectDir));
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    private function runWithCredentialFromEnvironment(string $commandLine): int
+    {
+        $this->filesystem->dumpFile(
+            $this->configHome.'/symfony-security-auditor/config.yaml',
+            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\n      api_key: '%env(PROVIDER_API_KEY)%'\nmodel: 'gpt-4'\n",
+        );
+
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+        $standaloneApplication->setAutoExit(false);
+        $standaloneApplication->setCatchExceptions(false);
+
+        return $standaloneApplication->run(new StringInput($commandLine), new BufferedOutput());
     }
 }

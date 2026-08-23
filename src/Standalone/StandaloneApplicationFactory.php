@@ -163,7 +163,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->initCommand());
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
-        $standaloneApplication->addCommand($this->lazyAuditCommand());
+        $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
         $this->registerUpdateAvailabilityNotice($standaloneApplication);
 
         return $standaloneApplication;
@@ -331,14 +331,14 @@ final readonly class StandaloneApplicationFactory
         }
     }
 
-    private function lazyAuditCommand(): LazyCommand
+    private function lazyAuditCommand(StandaloneApplication $standaloneApplication): LazyCommand
     {
         return new LazyCommand(
             AuditCommand::NAME,
             [AuditCommand::ALIAS],
             AuditCommand::DESCRIPTION,
             false,
-            $this->loadAuditCommand(...),
+            fn (): Command => $this->loadAuditCommand($standaloneApplication->needsProviderCredentials()),
         );
     }
 
@@ -355,9 +355,9 @@ final readonly class StandaloneApplicationFactory
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
      */
-    private function loadAuditCommand(): Command
+    private function loadAuditCommand(bool $credentialsRequired): Command
     {
-        return $this->standaloneConsoleCommandFactory->create($this->buildContainer());
+        return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired));
     }
 
     /**
@@ -372,10 +372,10 @@ final readonly class StandaloneApplicationFactory
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
      */
-    private function buildContainer(): ContainerBuilder
+    private function buildContainer(bool $credentialsRequired): ContainerBuilder
     {
         return $this->standaloneContainerFactory->create(
-            $this->standaloneConfigLoader->load(),
+            $this->standaloneConfigLoader->load($credentialsRequired),
             $this->xdgConfigPathResolver->cacheDir(),
         );
     }

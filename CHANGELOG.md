@@ -29,6 +29,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   styling into the output. Only a real command line is echoed — a programmatic
   `ArrayInput` has no invocation to reproduce.
 
+- **`--dry-run` no longer needs a provider credential in the standalone
+  binary.** `symfony-security-auditor audit <path> --dry-run` aborted before it
+  scanned a single file:
+
+  ```text
+  The environment variable "ANTHROPIC_API_KEY", referenced by your config, is not set.
+  ```
+
+  A dry run estimates cost from the scanned files and never reaches the
+  provider, so pricing a project should not have meant signing up for an API key
+  first. `StandalonePlatformConfigResolver::resolve()`
+  (`src/Audit/Infrastructure/Config/`) now takes a `$credentialsRequired` flag;
+  when it is off, an unresolved `%env(...)%` placeholder in the `platform` block
+  yields `UNNEEDED_CREDENTIAL` instead of throwing — a deliberately unusable
+  stand-in, so a code path that somehow reached the provider with it would be
+  rejected rather than billed to someone. `StandaloneApplication` reads
+  `--dry-run` off the raw invocation and answers `needsProviderCredentials()`
+  for the lazily-built audit command, because the failure it prevents happens
+  while that command is still being constructed. A real run is unchanged and
+  still refuses to start, as does `doctor`, whose whole job is to report the
+  missing key.
+
+### Changed
+
+- **The `--dry-run` caveat is a dimmed footnote instead of a framed `[NOTE]`
+  block.** `AuditPresenter::dryRunResult()` (`src/Command/AuditPresenter.php`)
+  used `SymfonyStyle::note()`, which frames the text full-width and runs a `!`
+  gutter down every wrapped line — weight that belongs to something the reader
+  must act on, not to a footnote about cache discounts. It now prints through
+  the same `caveat()` helper as the reviewer-ratio note beside it, so the two
+  read as one voice.
+
 ### Fixed
 
 - **The standalone binary now shows its identity banner on every command, not

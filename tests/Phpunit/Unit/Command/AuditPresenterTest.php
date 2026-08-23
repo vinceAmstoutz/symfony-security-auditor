@@ -350,6 +350,22 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_the_dry_run_caveat_reads_as_a_footnote_not_a_framed_note_block(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('no LLM calls were made', $display);
+        self::assertStringNotContainsString('[NOTE]', $display, 'a caveat does not earn a full-width block with a gutter');
+        self::assertStringNotContainsString('!', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_dry_run_result_leaves_a_blank_line_after_the_completion_line(): void
     {
         $bufferedOutput = new BufferedOutput();

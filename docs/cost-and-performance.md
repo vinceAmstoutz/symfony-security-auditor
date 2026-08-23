@@ -51,7 +51,8 @@ Each key a profile sets is documented in
   `audit.budget.max_cost_usd`, and preview spend with `audit:run --dry-run`
   before committing to a full run. The preview's token counts are a heuristic
   projection from file size, not the real per-call usage a completed run
-  reports.
+  reports. The standalone binary runs it without a provider credential, so you
+  can price a project before signing up for one.
 
 ## Avoiding rate limits (`429`)
 

@@ -33,8 +33,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
  * listener could not cover it.
  *
  * Mutable by design — non-readonly because the invocation is captured on the
- * way in and read back only if something throws. See
- * .claude/rules/php-classes.md for the opt-out policy.
+ * way in and read back later: the command line if something throws, and
+ * whether the run needs provider credentials when the audit command is built.
+ * See .claude/rules/php-classes.md for the opt-out policy.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -47,6 +48,8 @@ final class StandaloneApplication extends Application
     private const array COMPLETION_COMMANDS = ['_complete', 'completion'];
 
     private string $invocation = '';
+
+    private bool $dryRun = false;
 
     public function __construct(
         string $name,
@@ -67,12 +70,25 @@ final class StandaloneApplication extends Application
     public function doRun(InputInterface $input, OutputInterface $output): int
     {
         $this->invocation = $input instanceof ArgvInput ? (string) $input : '';
+        $this->dryRun = $input->hasParameterOption('--dry-run', true);
 
         if (!$this->completionRun($input)) {
             $this->consoleBanner->render($this->errorOutput($output));
         }
 
         return parent::doRun($input, $output);
+    }
+
+    /**
+     * A `--dry-run` estimates cost from the scanned files and never reaches
+     * the provider, so the standalone configuration does not have to resolve
+     * a provider credential for it. Read here rather than from the command,
+     * because the failure it prevents happens while that command is still
+     * being built.
+     */
+    public function needsProviderCredentials(): bool
+    {
+        return !$this->dryRun;
     }
 
     /**

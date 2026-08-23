@@ -20,6 +20,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\ConsoleOutput;
@@ -120,6 +121,24 @@ final class StandaloneApplicationTest extends TestCase
         self::assertStringNotContainsString('Command:', $display);
     }
 
+    #[DataProvider('credentialRequirements')]
+    public function test_only_a_dry_run_may_skip_the_provider_credential(string $commandLine, bool $expected): void
+    {
+        $standaloneApplication = $this->application();
+        $standaloneApplication->doRun(new StringInput($commandLine), new BufferedOutput());
+
+        self::assertSame($expected, $standaloneApplication->needsProviderCredentials());
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function credentialRequirements(): iterable
+    {
+        yield 'a dry run never reaches the provider' => [\sprintf('%s --dry-run', AuditCommand::ALIAS), false];
+        yield 'a real audit does' => [AuditCommand::ALIAS, true];
+        yield 'so does one whose path merely looks like the flag' => [\sprintf('%s -- --dry-run', AuditCommand::ALIAS), true];
+        yield 'and so does any other command' => [self::SILENT_COMMAND, true];
+    }
+
     private function displayOfFailure(InputInterface $input): string
     {
         $bufferedOutput = new BufferedOutput();
@@ -167,6 +186,7 @@ final class StandaloneApplicationTest extends TestCase
         $command = new Command($name);
         $command->setAliases($aliases);
         $command->addArgument('path', InputArgument::OPTIONAL);
+        $command->addOption('dry-run', null, InputOption::VALUE_NONE);
         $command->setCode(static fn (): int => Command::SUCCESS);
 
         return $command;

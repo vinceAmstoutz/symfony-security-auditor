@@ -161,14 +161,15 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
             $reviewerRatioPercent = $this->reviewerRatioPercent($cost);
             if (null !== $reviewerRatioPercent) {
-                $symfonyStyle->text(\sprintf(
-                    '<fg=gray>Reviewer input is projected at ~%d%% of attacker input in this estimate — a flat pre-run heuristic, not a measurement; actual cost scales with real findings.</>',
+                $this->caveat($symfonyStyle, \sprintf(
+                    'Reviewer input is projected at ~%d%% of attacker input in this estimate — a flat pre-run heuristic, not a measurement; actual cost scales with real findings.',
                     $reviewerRatioPercent,
                 ));
             }
         }
 
-        $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
+        $this->caveat($symfonyStyle, 'Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
+        $symfonyStyle->newLine();
         $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
     }
 
@@ -218,6 +219,17 @@ final readonly class AuditPresenter implements AuditPresenterInterface
      * redirected/CI log has no use for an emoji) and its trailing blank line,
      * so it doesn't abut whatever prints next.
      */
+    /**
+     * `SymfonyStyle::note()` frames a caveat in a full-width `[NOTE]` block
+     * with a `!` gutter down every wrapped line — weight this earns only for
+     * something the reader must act on. A dimmed line reads as the footnote
+     * it is, and matches the other estimate caveats printed alongside it.
+     */
+    private function caveat(SymfonyStyle $symfonyStyle, string $message): void
+    {
+        $symfonyStyle->text(\sprintf('<fg=gray>%s</>', $message));
+    }
+
     private function lightConfirmation(SymfonyStyle $symfonyStyle, string $message): void
     {
         $symfonyStyle->writeln(\sprintf($symfonyStyle->isDecorated() ? '  ✅ %s' : '  %s', $message));
