@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -22,7 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class ConsoleBanner
+final readonly class ConsoleBanner implements ConsoleBannerInterface
 {
     private const string SCAN_MARK = '◉ >>';
 
@@ -33,6 +34,8 @@ final readonly class ConsoleBanner
     private const string WORDMARK_TAIL = 'AUDITOR';
 
     private const string TAGLINE = 'Symfony - multi-agent LLM audit';
+
+    private const string HOMEPAGE = 'https://github.com/vinceAmstoutz/symfony-security-auditor';
 
     /** Sampled from the circular bug glyph in `assets/banner.webp`. */
     private const string BANNER_PINK = '#e71c55';
@@ -53,6 +56,7 @@ final readonly class ConsoleBanner
      * it without substitution and without the double-width cells that break
      * column alignment.
      */
+    #[Override]
     public function render(OutputInterface $output): void
     {
         $scanMark = $this->scanMark();
@@ -68,9 +72,15 @@ final readonly class ConsoleBanner
                 self::BANNER_NAVY,
                 self::WORDMARK_TAIL,
             ),
-            \sprintf(' %s%s', str_repeat(' ', mb_strlen($markedLead)), self::TAGLINE),
+            $this->alignedUnderWordmark($markedLead, self::TAGLINE),
+            $this->alignedUnderWordmark($markedLead, \sprintf('<fg=gray>%s</>', self::HOMEPAGE)),
             '',
         ]);
+    }
+
+    private function alignedUnderWordmark(string $markedLead, string $line): string
+    {
+        return \sprintf(' %s%s', str_repeat(' ', mb_strlen($markedLead)), $line);
     }
 
     /**

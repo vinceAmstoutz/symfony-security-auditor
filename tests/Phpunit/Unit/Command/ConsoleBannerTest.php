@@ -40,14 +40,31 @@ final class ConsoleBannerTest extends TestCase
         self::assertStringNotContainsString("\033[", $display, 'CI output must carry no escape sequences');
     }
 
-    public function test_the_tagline_starts_under_the_wordmark_not_under_the_mark(): void
+    #[DataProvider('alignedLines')]
+    public function test_every_line_under_the_wordmark_starts_where_the_wordmark_does(int $line, string $needle): void
     {
         $lines = explode(\PHP_EOL, $this->bannerIn(['LC_ALL' => 'en_US.UTF-8'], false));
 
         self::assertSame(
             mb_strpos($lines[1], 'SECURITY'),
-            mb_strpos($lines[2], 'Symfony'),
-            'the tagline offset is derived from the lead string, so it tracks the mark width',
+            mb_strpos($lines[$line], $needle),
+            'the offset is derived from the lead string, so it tracks the mark width',
+        );
+    }
+
+    /** @return iterable<string, array{int, string}> */
+    public static function alignedLines(): iterable
+    {
+        yield 'the tagline' => [2, 'Symfony'];
+        yield 'the homepage' => [3, 'https://'];
+    }
+
+    #[DataProvider('consoleModes')]
+    public function test_it_points_at_the_project_homepage(bool $decorated): void
+    {
+        self::assertStringContainsString(
+            'https://github.com/vinceAmstoutz/symfony-security-auditor',
+            $this->bannerIn(['LC_ALL' => 'en_US.UTF-8'], $decorated),
         );
     }
 

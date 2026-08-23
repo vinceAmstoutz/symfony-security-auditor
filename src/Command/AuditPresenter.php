@@ -32,7 +32,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 {
     public function __construct(
         private PricingProviderInterface $pricingProvider,
-        private ConsoleBanner $consoleBanner = new ConsoleBanner(),
+        private ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
     ) {}
 
     #[Override]

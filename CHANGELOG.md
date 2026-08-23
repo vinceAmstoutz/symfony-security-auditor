@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **The identity banner now carries the project homepage.** A third line under
+  the wordmark prints
+  `https://github.com/vinceAmstoutz/symfony-security-auditor` in grey, aligned
+  with the tagline, so a screenshot or a CI log carries a way back to the
+  project. Both lines share one `ConsoleBanner::alignedUnderWordmark()` helper,
+  so they track the scan mark's width together.
+- **A failed command now echoes the command line under the rendered error.**
+  Symfony's error block names the exception and the file but never the
+  invocation, which is the piece missing from a pasted CI log or bug report.
+  `StandaloneApplication::renderThrowable()`
+  (`src/Standalone/StandaloneApplication.php`) prints
+  `Command: symfony-security-auditor <args>` after the block, at
+  `VERBOSITY_QUIET` so `-q` keeps it, and run through
+  `OutputFormatter::escape()` so a path containing console markup cannot smuggle
+  styling into the output. Only a real command line is echoed — a programmatic
+  `ArrayInput` has no invocation to reproduce.
+
 ### Fixed
 
 - **The standalone binary now shows its identity banner on every command, not
@@ -17,17 +36,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Command/AuditCommand.php`), so `symfony-security-auditor --version`,
   `-h`, `doctor`, `init` and `self-update --check` all opened with nothing
   saying which binary was talking. The wordmark moved into a dedicated
-  `ConsoleBanner` (`src/Command/ConsoleBanner.php`), and
-  `StandaloneApplication::doRun()` renders it before delegating to the base
-  application — `--version` returns before any command is resolved, so a
-  `ConsoleEvents` listener could never have covered it. It is written to stderr,
-  so `--version` piped into a version check and `list --format=json` keep a
-  clean stdout, and `audit` keeps printing it itself on whichever stream its
-  `--format` dictates, so it never appears twice. Three runs stay bare: a quiet
-  one (`-q`), the `_complete` hook the shell runs on every TAB press, and the
-  `completion` script the shell evaluates. Only the binary is affected — a
-  bundle install's `bin/console` still prints the banner for `audit` alone, and
-  nothing for the host application's own commands.
+  `ConsoleBanner` (`src/Command/ConsoleBanner.php`) behind a
+  `ConsoleBannerInterface` port, and `StandaloneApplication::doRun()` renders it
+  before delegating to the base application — `--version` returns before any
+  command is resolved, so a `ConsoleEvents` listener could never have covered
+  it. It is written to stderr, so `--version` piped into a version check and
+  `list --format=json` keep a clean stdout.
+
+  Exactly one collaborator prints it per run, with no command-name special case:
+  `StandaloneContainerFactory` wires the audit command's own banner to
+  `NullConsoleBanner`, because in the binary the application has already printed
+  one by the time that command is even resolved. A bundle install is unchanged —
+  there `ConsoleBannerInterface` resolves to the real banner and `audit` prints
+  it itself, while the host application's own commands print nothing. The two
+  completion commands stay bare on every stream: `_complete` runs on every TAB
+  press and `completion` emits a script the shell evaluates.
 
 ## [1.20.0] — 2026-08-22 — Ledger
 

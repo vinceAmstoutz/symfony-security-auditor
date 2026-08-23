@@ -15,8 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Standalone;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\ConsoleOutput;
@@ -29,6 +32,8 @@ final class StandaloneApplicationTest extends TestCase
     private const string WORDMARK = 'SECURITY AUDITOR';
 
     private const string SILENT_COMMAND = 'doctor';
+
+    private const string FAILING_COMMAND = 'boom';
 
     public function test_it_appends_the_models_dev_version_to_the_long_version(): void
     {
@@ -43,36 +48,34 @@ final class StandaloneApplicationTest extends TestCase
         self::assertSame('1.2.3', $this->application()->getVersion());
     }
 
-    #[DataProvider('brandedInvocations')]
+    #[DataProvider('everyInvocation')]
     public function test_it_announces_its_identity_before_the_command_runs(string $commandLine): void
     {
         self::assertStringContainsString(self::WORDMARK, $this->displayOf($commandLine));
     }
 
     /** @return iterable<string, array{string}> */
-    public static function brandedInvocations(): iterable
+    public static function everyInvocation(): iterable
     {
         yield 'the version flag, which never reaches a command' => ['--version'];
         yield 'the help flag on its own' => ['-h'];
-        yield 'the long help flag on the audit command' => [\sprintf('%s --help', AuditCommand::NAME)];
-        yield 'the short help flag on the audit command' => [\sprintf('%s -h', AuditCommand::ALIAS)];
+        yield 'the audit command' => [AuditCommand::NAME];
+        yield 'the audit alias' => [AuditCommand::ALIAS];
+        yield 'help for the audit command' => [\sprintf('%s --help', AuditCommand::ALIAS)];
         yield 'an ordinary command' => [self::SILENT_COMMAND];
     }
 
-    #[DataProvider('unbrandedInvocations')]
-    public function test_it_stays_silent_where_a_banner_would_be_noise(string $commandLine): void
+    #[DataProvider('completionInvocations')]
+    public function test_it_stays_silent_for_the_completion_commands(string $commandLine): void
     {
         self::assertStringNotContainsString(self::WORDMARK, $this->displayOf($commandLine));
     }
 
     /** @return iterable<string, array{string}> */
-    public static function unbrandedInvocations(): iterable
+    public static function completionInvocations(): iterable
     {
-        yield 'the audit command, which prints its own banner' => [AuditCommand::NAME];
-        yield 'the audit alias' => [AuditCommand::ALIAS];
-        yield 'the audit command asked to treat -h as an argument' => [\sprintf('%s -- -h', AuditCommand::ALIAS)];
-        yield 'the completion hook the shell runs on every TAB press' => ['_complete'];
-        yield 'the completion script the shell evaluates' => ['completion'];
+        yield 'the hook the shell runs on every TAB press' => ['_complete'];
+        yield 'the script the shell evaluates' => ['completion'];
     }
 
     public function test_a_quiet_run_gets_no_banner(): void
@@ -95,6 +98,39 @@ final class StandaloneApplicationTest extends TestCase
         self::assertStringContainsString(self::WORDMARK, $errorOutput->fetch());
     }
 
+    public function test_it_echoes_the_failing_command_line_under_the_rendered_error(): void
+    {
+        self::assertStringContainsString(
+            \sprintf(' Command: symfony-security-auditor %s', self::FAILING_COMMAND),
+            $this->displayOfFailure(new StringInput(self::FAILING_COMMAND)),
+        );
+    }
+
+    public function test_the_echoed_command_line_cannot_smuggle_console_markup(): void
+    {
+        $display = $this->displayOfFailure(new StringInput(\sprintf('%s "<comment>oops</comment>"', self::FAILING_COMMAND)));
+
+        self::assertStringContainsString("'<comment>oops</comment>'", $display);
+    }
+
+    public function test_a_programmatic_invocation_has_no_command_line_to_echo(): void
+    {
+        $display = $this->displayOfFailure(new ArrayInput(['command' => self::FAILING_COMMAND]));
+
+        self::assertStringNotContainsString('Command:', $display);
+    }
+
+    private function displayOfFailure(InputInterface $input): string
+    {
+        $bufferedOutput = new BufferedOutput();
+        $standaloneApplication = $this->application();
+        $standaloneApplication->setAutoExit(false);
+
+        $standaloneApplication->run($input, $bufferedOutput);
+
+        return $bufferedOutput->fetch();
+    }
+
     private function displayOf(string $commandLine): string
     {
         $bufferedOutput = new BufferedOutput();
@@ -111,8 +147,18 @@ final class StandaloneApplicationTest extends TestCase
         $standaloneApplication->addCommand($this->silentCommand(self::SILENT_COMMAND));
         $standaloneApplication->addCommand($this->silentCommand('_complete'));
         $standaloneApplication->addCommand($this->silentCommand('completion'));
+        $standaloneApplication->addCommand($this->failingCommand());
 
         return $standaloneApplication;
+    }
+
+    private function failingCommand(): Command
+    {
+        $command = new Command(self::FAILING_COMMAND);
+        $command->addArgument('path', InputArgument::OPTIONAL);
+        $command->setCode(static fn (): int => throw new RuntimeException('the audit could not start'));
+
+        return $command;
     }
 
     /** @param list<string> $aliases */

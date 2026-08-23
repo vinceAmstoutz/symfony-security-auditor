@@ -169,6 +169,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
@@ -386,6 +388,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(AuditExitCodeResolver::class);
     $defaultsConfigurator->alias(AuditExitCodeResolverInterface::class, AuditExitCodeResolver::class);
+
+    $defaultsConfigurator->set(ConsoleBanner::class);
+    $defaultsConfigurator->alias(ConsoleBannerInterface::class, ConsoleBanner::class);
 
     $defaultsConfigurator->set(AuditPresenter::class);
     $defaultsConfigurator->alias(AuditPresenterInterface::class, AuditPresenter::class);

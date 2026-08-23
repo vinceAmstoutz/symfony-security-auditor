@@ -15,18 +15,26 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
 use Override;
 use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 
 /**
  * Extends the bare Symfony `Application` to append the bundled
- * `symfony/models-dev` pricing-catalog version to `--version`, and to put the
- * identity banner in front of every command rather than only `audit` — the
- * base class offers no other extension point for either. `--version` never
- * reaches a command at all, so an event listener could not cover it.
+ * `symfony/models-dev` pricing-catalog version to `--version`, to put the
+ * identity banner in front of every command, and to echo the failing command
+ * line under a rendered error — the base class offers no extension point for
+ * any of the three. `--version` never reaches a command at all, so an event
+ * listener could not cover it.
+ *
+ * Mutable by design — non-readonly because the invocation is captured on the
+ * way in and read back only if something throws. See
+ * .claude/rules/php-classes.md for the opt-out policy.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -38,11 +46,13 @@ final class StandaloneApplication extends Application
      */
     private const array COMPLETION_COMMANDS = ['_complete', 'completion'];
 
+    private string $invocation = '';
+
     public function __construct(
         string $name,
         string $version,
         private readonly string $modelsDevVersion,
-        private readonly ConsoleBanner $consoleBanner = new ConsoleBanner(),
+        private readonly ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
     ) {
         parent::__construct($name, $version);
     }
@@ -56,7 +66,9 @@ final class StandaloneApplication extends Application
     #[Override]
     public function doRun(InputInterface $input, OutputInterface $output): int
     {
-        if ($this->announcesIdentity($input)) {
+        $this->invocation = $input instanceof ArgvInput ? (string) $input : '';
+
+        if (!$this->completionRun($input)) {
             $this->consoleBanner->render($this->errorOutput($output));
         }
 
@@ -64,24 +76,28 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * The banner goes to stderr so it never mixes into a machine-readable
-     * stdout — `list --format=json`, `--version` piped into a version check.
-     * `audit` is the one command that prints the banner itself, on the stream
-     * its own `--format` dictates; asking for its help runs the `help`
-     * command instead, which does not.
+     * The error block alone does not say what produced it, which is what a
+     * pasted CI log or bug report is missing. Only a real command line is
+     * echoed — a programmatic `ArrayInput` has no invocation to reproduce.
      */
-    private function announcesIdentity(InputInterface $input): bool
+    #[Override]
+    public function renderThrowable(Throwable $throwable, OutputInterface $output): void
     {
-        if (\in_array($this->getCommandName($input), self::COMPLETION_COMMANDS, true)) {
-            return false;
+        parent::renderThrowable($throwable, $output);
+
+        if ('' === $this->invocation) {
+            return;
         }
 
-        return $input->hasParameterOption(['--help', '-h'], true) || !$this->auditRequested($input);
+        $output->writeln(
+            \sprintf(' <comment>Command:</comment> %s %s', $this->getName(), OutputFormatter::escape($this->invocation)),
+            OutputInterface::VERBOSITY_QUIET,
+        );
     }
 
-    private function auditRequested(InputInterface $input): bool
+    private function completionRun(InputInterface $input): bool
     {
-        return \in_array($this->getCommandName($input), [AuditCommand::NAME, AuditCommand::ALIAS], true);
+        return \in_array($this->getCommandName($input), self::COMPLETION_COMMANDS, true);
     }
 
     private function errorOutput(OutputInterface $output): OutputInterface
