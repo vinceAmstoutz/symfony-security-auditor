@@ -90,13 +90,13 @@ final class StandaloneApplicationTest extends TestCase
 
     public function test_the_banner_goes_to_the_error_output_so_it_never_pollutes_a_piped_stdout(): void
     {
-        $errorOutput = new BufferedOutput();
+        $bufferedOutput = new BufferedOutput();
         $consoleOutput = new ConsoleOutput();
-        $consoleOutput->setErrorOutput($errorOutput);
+        $consoleOutput->setErrorOutput($bufferedOutput);
 
         $this->application()->doRun(new StringInput(self::SILENT_COMMAND), $consoleOutput);
 
-        self::assertStringContainsString(self::WORDMARK, $errorOutput->fetch());
+        self::assertStringContainsString(self::WORDMARK, $bufferedOutput->fetch());
     }
 
     public function test_it_echoes_the_failing_command_line_under_the_rendered_error(): void
