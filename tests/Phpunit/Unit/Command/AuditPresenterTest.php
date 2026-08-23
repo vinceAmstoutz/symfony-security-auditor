@@ -15,11 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use InvalidArgumentException;
 use Override;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Formatter\OutputFormatterInterface;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -121,133 +119,14 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
     }
 
-    public function test_header_shows_the_mark_and_wordmark_in_the_brand_palette_when_decorated(): void
+    public function test_header_opens_with_the_identity_banner(): void
     {
-        $display = $this->headerIn(['LC_ALL' => 'en_US.UTF-8'], true);
-        $outputFormatter = (new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true))->getFormatter();
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
-        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55;options=bold>◉ >> SECURITY</>'), $display);
-        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>AUDITOR</>'), $display);
-        self::assertStringStartsWith(\PHP_EOL, $display, 'the header must not abut whatever printed before it');
-    }
+        $this->auditPresenter->header($symfonyStyle, '/path/to/project');
 
-    public function test_header_keeps_the_same_layout_without_colour_when_not_decorated(): void
-    {
-        $display = $this->headerIn(['LC_ALL' => 'en_US.UTF-8'], false);
-
-        self::assertStringContainsString(' ◉ >> SECURITY AUDITOR', $display);
-        self::assertStringContainsString('Symfony - multi-agent LLM audit', $display);
-        self::assertStringNotContainsString("\033[", $display, 'CI output must carry no escape sequences');
-    }
-
-    public function test_the_tagline_starts_under_the_wordmark_not_under_the_mark(): void
-    {
-        $lines = explode(\PHP_EOL, $this->headerIn(['LC_ALL' => 'en_US.UTF-8'], false));
-
-        self::assertSame(
-            mb_strpos($lines[1], 'SECURITY'),
-            mb_strpos($lines[2], 'Symfony'),
-            'the tagline offset is derived from the lead string, so it tracks the mark width',
-        );
-    }
-
-    public function test_a_console_without_utf8_drops_the_mark_and_keeps_the_wordmark(): void
-    {
-        $display = $this->headerIn(['LC_ALL' => 'C'], false);
-
-        self::assertStringNotContainsString('◉', $display, 'the mark is outside CP437/CP850/CP1252 and would be substituted');
-        self::assertStringContainsString(' SECURITY AUDITOR', $display);
-        self::assertStringContainsString('Symfony - multi-agent LLM audit', $display);
-    }
-
-    public function test_a_console_without_utf8_still_gets_the_brand_palette(): void
-    {
-        $display = $this->headerIn(['LC_ALL' => 'C'], true);
-        $outputFormatter = (new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true))->getFormatter();
-
-        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#e71c55;options=bold>SECURITY</>'), $display);
-        self::assertStringContainsString($this->formatted($outputFormatter, '<fg=#5b6fd6;options=bold>AUDITOR</>'), $display);
-    }
-
-    /**
-     * @param array<string, string> $locale
-     */
-    #[DataProvider('utf8Announcements')]
-    public function test_any_locale_variable_announcing_utf8_earns_the_mark(array $locale): void
-    {
-        self::assertStringContainsString('◉', $this->headerIn($locale, false));
-    }
-
-    /** @return iterable<string, array{array<string, string>}> */
-    public static function utf8Announcements(): iterable
-    {
-        yield 'LC_ALL' => [['LC_ALL' => 'en_US.UTF-8']];
-        yield 'LC_CTYPE only' => [['LC_CTYPE' => 'en_US.UTF-8']];
-        yield 'LANG only' => [['LANG' => 'en_US.UTF-8']];
-        yield 'lowercase spelling' => [['LANG' => 'en_us.utf-8']];
-        yield 'unhyphenated spelling' => [['LANG' => 'en_US.utf8']];
-    }
-
-    public function test_a_console_that_announces_no_locale_at_all_drops_the_mark(): void
-    {
-        $display = $this->headerIn([], false);
-
-        self::assertStringNotContainsString('◉', $display);
-        self::assertStringContainsString(' SECURITY AUDITOR', $display);
-    }
-
-    #[DataProvider('consoleModes')]
-    public function test_the_header_is_pure_ascii_without_utf8_support(bool $decorated): void
-    {
-        $withoutEscapes = (string) preg_replace('/\033\[[0-9;]*m/', '', $this->headerIn(['LC_ALL' => 'C'], $decorated));
-
-        self::assertMatchesRegularExpression('/^[\x00-\x7F]*$/', $withoutEscapes);
-    }
-
-    /** @return iterable<string, array{bool}> */
-    public static function consoleModes(): iterable
-    {
-        yield 'decorated' => [true];
-        yield 'plain' => [false];
-    }
-
-    /**
-     * Every locale variable is pinned individually, and any not named is
-     * cleared: setting all three to one value hides which of them
-     * `localeSetting()` actually read.
-     *
-     * @param array<string, string> $locale
-     */
-    private function headerIn(array $locale, bool $decorated): string
-    {
-        $variables = ['LC_ALL', 'LC_CTYPE', 'LANG'];
-        $previous = [];
-
-        foreach ($variables as $variable) {
-            $previous[$variable] = getenv($variable);
-            $value = $locale[$variable] ?? null;
-            putenv(null === $value ? $variable : \sprintf('%s=%s', $variable, $value));
-        }
-
-        try {
-            $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, $decorated);
-            $this->auditPresenter->header(new SymfonyStyle(new StringInput(''), $bufferedOutput), '/path/to/project');
-
-            return $bufferedOutput->fetch();
-        } finally {
-            foreach ($variables as $variable) {
-                $restored = $previous[$variable];
-                putenv(false === $restored ? $variable : \sprintf('%s=%s', $variable, $restored));
-            }
-        }
-    }
-
-    private function formatted(OutputFormatterInterface $outputFormatter, string $tag): string
-    {
-        $formatted = $outputFormatter->format($tag);
-        self::assertNotNull($formatted);
-
-        return $formatted;
+        self::assertStringContainsString('SECURITY AUDITOR', $bufferedOutput->fetch());
     }
 
     /**

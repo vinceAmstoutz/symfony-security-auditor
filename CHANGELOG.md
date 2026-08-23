@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **The standalone binary now shows its identity banner on every command, not
+  only `audit`.** `AuditPresenter::header()` was its sole caller
+  (`src/Command/AuditCommand.php`), so `symfony-security-auditor --version`,
+  `-h`, `doctor`, `init` and `self-update --check` all opened with nothing
+  saying which binary was talking. The wordmark moved into a dedicated
+  `ConsoleBanner` (`src/Command/ConsoleBanner.php`), and
+  `StandaloneApplication::doRun()` renders it before delegating to the base
+  application — `--version` returns before any command is resolved, so a
+  `ConsoleEvents` listener could never have covered it. It is written to stderr,
+  so `--version` piped into a version check and `list --format=json` keep a
+  clean stdout, and `audit` keeps printing it itself on whichever stream its
+  `--format` dictates, so it never appears twice. Three runs stay bare: a quiet
+  one (`-q`), the `_complete` hook the shell runs on every TAB press, and the
+  `completion` script the shell evaluates. Only the binary is affected — a
+  bundle install's `bin/console` still prints the banner for `audit` alone, and
+  nothing for the host application's own commands.
+
 ## [1.20.0] — 2026-08-22 — Ledger
 
 A release about knowing the real cost before you pay it, and trusting the binary

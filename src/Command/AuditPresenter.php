@@ -30,33 +30,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
-    private const string SCAN_MARK = '◉ >>';
-
-    private const string SCAN_MARK_PORTABLE = '';
-
-    private const string WORDMARK_LEAD = 'SECURITY';
-
-    private const string WORDMARK_TAIL = 'AUDITOR';
-
-    private const string TAGLINE = 'Symfony - multi-agent LLM audit';
-
-    /** Sampled from the circular bug glyph in `assets/banner.webp`. */
-    private const string BANNER_PINK = '#e71c55';
-
-    /**
-     * Brightened from the wordmark's `#242d5c` in `assets/banner.webp` — that
-     * navy sits on the banner image's light background, but as terminal
-     * foreground text it degrades toward black on a 16-colour palette and
-     * disappears on the dark background most terminals default to.
-     */
-    private const string BANNER_NAVY = '#5b6fd6';
-
-    public function __construct(private PricingProviderInterface $pricingProvider) {}
+    public function __construct(
+        private PricingProviderInterface $pricingProvider,
+        private ConsoleBanner $consoleBanner = new ConsoleBanner(),
+    ) {}
 
     #[Override]
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void
     {
-        $this->wordmark($symfonyStyle);
+        $this->consoleBanner->render($symfonyStyle);
 
         $symfonyStyle->text([
             \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
@@ -65,72 +47,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         ]);
     }
 
-    /**
-     * One code path for both terminal states: `OutputFormatter` drops the
-     * style tags when the output is not decorated, so CI logs and a colour
-     * terminal show the same layout rather than two different headers. Every
-     * character is ASCII, so a Windows console on a legacy code page renders
-     * it without substitution and without the double-width cells that break
-     * column alignment.
-     */
-    private function wordmark(SymfonyStyle $symfonyStyle): void
-    {
-        $scanMark = $this->scanMark();
-        $markedLead = '' === $scanMark ? '' : \sprintf('%s ', $scanMark);
-
-        $symfonyStyle->writeln([
-            '',
-            \sprintf(
-                ' <fg=%s;options=bold>%s%s</> <fg=%s;options=bold>%s</>',
-                self::BANNER_PINK,
-                $markedLead,
-                self::WORDMARK_LEAD,
-                self::BANNER_NAVY,
-                self::WORDMARK_TAIL,
-            ),
-            \sprintf(' %s%s', str_repeat(' ', mb_strlen($markedLead)), self::TAGLINE),
-            '',
-        ]);
-    }
-
-    /**
-     * `◉` is outside CP437/CP850/CP1252, so a console on a legacy code page
-     * substitutes it. Dropping the mark there keeps the colour and the
-     * wordmark, which carry the identity on their own.
-     */
-    private function scanMark(): string
-    {
-        return $this->consoleRendersUtf8() ? self::SCAN_MARK : self::SCAN_MARK_PORTABLE;
-    }
-
-    /**
-     * The locale variables are the portable signal, and a Windows console
-     * sets none of them unless the shell is UTF-8 aware — so Windows lands on
-     * the ASCII wordmark without this needing a platform branch, which could
-     * only ever be exercised on one platform's CI leg.
-     */
-    private function consoleRendersUtf8(): bool
-    {
-        $locale = strtoupper($this->localeSetting());
-
-        return str_contains($locale, 'UTF-8') || str_contains($locale, 'UTF8');
-    }
-
-    private function localeSetting(): string
-    {
-        foreach (['LC_ALL', 'LC_CTYPE', 'LANG'] as $variable) {
-            $value = getenv($variable);
-            if (\is_string($value) && '' !== $value) {
-                return $value;
-            }
-        }
-
-        return '';
-    }
-
-    /**
-     * @param list<string> $configNotices
-     */
     #[Override]
     public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void
     {
