@@ -25,8 +25,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CoreCompositionRoot;
 
-use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
-
 /**
  * @phpstan-import-type BundleConfigArray from BundleConfiguration
  */

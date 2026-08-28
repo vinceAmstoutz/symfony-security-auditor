@@ -54,17 +54,17 @@ final readonly class AttackerContextPromptRenderer
     }
 
     /**
-     * @param list<Vulnerability> $previousFindings
+     * @param list<Vulnerability> $findings
      */
-    public function renderPreviousFindings(array $previousFindings): string
+    public function renderPreviousFindings(array $findings): string
     {
         $byType = [];
-        foreach ($previousFindings as $previousFinding) {
-            $byType[$previousFinding->type()->value][] = \sprintf(
+        foreach ($findings as $finding) {
+            $byType[$finding->type()->value][] = \sprintf(
                 '%s:%d-%d',
-                $this->sanitizeLine($previousFinding->filePath()),
-                $previousFinding->lineStart(),
-                $previousFinding->lineEnd(),
+                $this->sanitizeLine($finding->filePath()),
+                $finding->lineStart(),
+                $finding->lineEnd(),
             );
         }
 
