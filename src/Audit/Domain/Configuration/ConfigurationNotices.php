@@ -13,11 +13,17 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AnthropicOptionDialect;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\Notice\ConcurrentAttackerHasNoEffectNotice;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\Notice\ConcurrentReviewsHaveNoEffectNotice;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\Notice\ConfigurationNoticeInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\Notice\EscalationSavesNothingNotice;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\Notice\IgnoredOutputCapNotice;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\Notice\LeanModeHasNoEffectNotice;
 
 /**
- * Derives the pre-flight notices `audit:run` prints for configuration
- * combinations that silently disable a cost saver.
+ * Collects every {@see ConfigurationNoticeInterface} rule and emits the
+ * pre-flight notices `audit:run` prints. A new footgun is a new rule class
+ * listed in {@see self::defaultNotices()}; nothing else changes.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -29,83 +35,26 @@ final readonly class ConfigurationNotices
     public static function of(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array
     {
         $notices = [];
-
-        if (self::escalationSavesNothing($auditExecutionConfiguration, $lLMConfiguration)) {
-            $notices[] = 'Cheap-then-expensive escalation is enabled but its cheap model resolves to the attacker model, so the cheap sweep costs as much as the expensive pass and saves nothing. Set audit.escalation.cheap_model to a genuinely cheaper model (e.g. claude-haiku-4-5-20251001).';
-        }
-
-        if (self::concurrentReviewsHaveNoEffect($auditExecutionConfiguration)) {
-            $notices[] = 'audit.reviewer_max_concurrent > 1 has no effect while audit.reviewer_tools_enabled is true: tool-using reviews run sequentially. Drop reviewer_tools_enabled to review concurrently, or set reviewer_max_concurrent: 1 to silence this.';
-        }
-
-        if (self::concurrentAttackerHasNoEffect($auditExecutionConfiguration)) {
-            $notices[] = 'audit.attacker_max_concurrent > 1 has no effect while audit.structured_collection is false: the JSON-parsing attacker analyses chunks sequentially. Re-enable structured_collection to analyse concurrently, or set attacker_max_concurrent: 1 to silence this.';
-        }
-
-        if (self::leanModeHasNoEffect($auditExecutionConfiguration)) {
-            $notices[] = 'audit.static_prescan.lean_mode has no effect while audit.static_prescan.enabled is false: with no risk markers, lean mode would drop every file, so all files are analysed instead. Enable static_prescan to use lean mode, or set lean_mode: false to silence this.';
-        }
-
-        foreach (self::outputCapsTheirModelIgnores($auditExecutionConfiguration, $lLMConfiguration) as ['model' => $model, 'cap' => $cap]) {
-            $notices[] = \sprintf('max_output_tokens is set to %d but %s does not use the Anthropic option dialect, and its own bridge would reject the max_tokens option — so the option is not sent and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.', $cap, $model);
+        foreach (self::defaultNotices() as $notice) {
+            foreach ($notice->noticesFor($auditExecutionConfiguration, $lLMConfiguration) as $message) {
+                $notices[] = $message;
+            }
         }
 
         return $notices;
     }
 
     /**
-     * Keyed on the model *and* the cap, so a split cap on one shared model
-     * reports both roles instead of letting the second overwrite the first,
-     * while the common one-model-one-cap case still reports once.
-     *
-     * @return list<array{model: string, cap: int}>
+     * @return list<ConfigurationNoticeInterface>
      */
-    private static function outputCapsTheirModelIgnores(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array
+    private static function defaultNotices(): array
     {
-        $roleCaps = [
-            [$lLMConfiguration->attackerModel(), $lLMConfiguration->attackerMaxOutputTokens()],
-            [$lLMConfiguration->reviewerModel(), $lLMConfiguration->reviewerMaxOutputTokens()],
+        return [
+            new EscalationSavesNothingNotice(),
+            new ConcurrentReviewsHaveNoEffectNotice(),
+            new ConcurrentAttackerHasNoEffectNotice(),
+            new LeanModeHasNoEffectNotice(),
+            new IgnoredOutputCapNotice(),
         ];
-
-        if ($auditExecutionConfiguration->escalationEnabled) {
-            $roleCaps[] = [self::escalationCheapModel($auditExecutionConfiguration, $lLMConfiguration), $lLMConfiguration->attackerMaxOutputTokens()];
-        }
-
-        $ignored = [];
-        foreach ($roleCaps as [$model, $cap]) {
-            if (LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS === $cap || AnthropicOptionDialect::honoredBy($model)) {
-                continue;
-            }
-
-            $ignored[\sprintf('%s|%d', $model, $cap)] = ['model' => $model, 'cap' => $cap];
-        }
-
-        return array_values($ignored);
-    }
-
-    private static function escalationSavesNothing(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): bool
-    {
-        return $auditExecutionConfiguration->escalationEnabled
-            && self::escalationCheapModel($auditExecutionConfiguration, $lLMConfiguration) === $lLMConfiguration->attackerModel();
-    }
-
-    private static function concurrentReviewsHaveNoEffect(AuditExecutionConfiguration $auditExecutionConfiguration): bool
-    {
-        return $auditExecutionConfiguration->reviewerMaxConcurrent > 1 && $auditExecutionConfiguration->reviewerToolsEnabled;
-    }
-
-    private static function concurrentAttackerHasNoEffect(AuditExecutionConfiguration $auditExecutionConfiguration): bool
-    {
-        return $auditExecutionConfiguration->attackerMaxConcurrent > 1 && !$auditExecutionConfiguration->structuredCollection;
-    }
-
-    private static function leanModeHasNoEffect(AuditExecutionConfiguration $auditExecutionConfiguration): bool
-    {
-        return $auditExecutionConfiguration->staticPreScanLeanMode && !$auditExecutionConfiguration->staticPreScanEnabled;
-    }
-
-    private static function escalationCheapModel(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): string
-    {
-        return $auditExecutionConfiguration->escalationCheapModel ?? $lLMConfiguration->reviewerModel();
     }
 }

@@ -70,6 +70,11 @@ final readonly class AuditExecutionConfiguration
      * pre-scanner is too; a caller that disabled the pre-scanner analyses every
      * file regardless of the configured lean-mode flag.
      */
+    public function effectiveEscalationCheapModel(string $reviewerModel): string
+    {
+        return $this->escalationCheapModel ?? $reviewerModel;
+    }
+
     public function effectiveStaticPreScanLeanMode(): bool
     {
         return $this->staticPreScanLeanMode && $this->staticPreScanEnabled;

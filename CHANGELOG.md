@@ -37,6 +37,21 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 ### Changed
 
+- **Adding a pre-flight configuration notice is now one new class.**
+  `ConfigurationNotices` held five hardcoded checks, each with a private
+  predicate and an inline message, so a sixth footgun meant editing the
+  collector, adding a predicate and embedding a message — three places, and a
+  growing `of()` that never stopped growing. Each check is now a
+  `ConfigurationNoticeInterface` implementation under
+  `Audit\Domain\Configuration\Notice\`, collected by `ConfigurationNotices` the
+  same way `AttackerSkillRegistry` collects attacker skills, so a new notice is
+  a new class plus one line in `defaultNotices()`. The rule that reports a
+  dropped `max_output_tokens` keeps its own dedup logic instead of leaking it
+  into the collector, and the escalation cheap-model fallback moves onto
+  `AuditExecutionConfiguration::effectiveEscalationCheapModel()` so the two
+  rules that need it share one definition. `ConfigurationNotices::of()` keeps
+  its signature, so every existing test exercises the new structure unchanged.
+
 - **The Domain-port BC promise is now an enumerated list of 23 ports instead of
   the whole `src/Audit/Domain/Port/` directory.** The old wording froze every
   interface in that directory — ~30 of them, most being internal collaboration
