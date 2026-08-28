@@ -25,18 +25,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
 /**
  * Renders an animated Symfony ProgressBar to a decorated (TTY) console.
  *
- * The pipeline events drive the bar itself: pipeline.started creates a bar
- * sized to the stage count, stage.started/audit.iteration.started/
- * attacker.chunk.started/review.started refresh its message (the chunk message
- * reads "⏳ querying model …" so a slow model call reads as waiting, not hung),
- * stage.completed advances it, and pipeline.completed finishes it. The audit
- * narrative is printed as lines above the bar: audit.started (attack-surface
- * overview), attacker.finding.recorded (each finding as it is flagged),
- * attacker.chunk.completed (each chunk with its elapsed time), review.skipped
- * (acknowledges a zero-finding pass so the reviewer step doesn't read as
- * having silently disappeared), and review.completed (the reviewer tally).
- * Unhandled events are ignored. The non-decorated counterpart is
- * PlainProgressReporter.
+ * Pipeline events drive the bar; audit events print as lines above it. The
+ * chunk message reads "⏳ querying model …" so a slow call reads as waiting
+ * rather than hung, and review.skipped is announced so a zero-finding pass does
+ * not look like the reviewer silently disappeared. Unhandled events are
+ * ignored; `PlainProgressReporter` is the non-decorated counterpart.
  *
  * Mutable because ProgressBar is stateful (tracks current step, format, and
  * output position).

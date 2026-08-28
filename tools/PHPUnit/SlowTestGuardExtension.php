@@ -34,16 +34,12 @@ use PHPUnit\TextUI\Configuration\Configuration;
  * and `Test\Finished` subscribers, which honour per-test
  * `#[Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration]` overrides)
  * to collect tests that exceed the threshold, reads that collector, and fails
- * the run when it is non-empty. Both halves derive from the single
- * `maximum-duration` declared on the
- * `Ergebnis\PHPUnit\SlowTestDetector\Extension` bootstrap, so they never drift
- * apart, but they do not use the same value: the report surfaces anything over
- * the declared duration, while the gate only fails past
- * `GUARD_HEADROOM_FACTOR` times it. A single wall-clock sample on a shared CI
- * runner is noisy enough to push a 3ms test over a 500ms bar, so failing the
- * build on the declared duration alone turns every trivial test into a
- * potential red build. Per-test `#[MaximumDuration]` attributes replace the
- * bar outright and stay authoritative.
+ * the run when it is non-empty. Both halves read the single `maximum-duration`
+ * declared on the detector's bootstrap so they cannot drift, but the report
+ * surfaces anything over it while the gate only fails past
+ * `GUARD_HEADROOM_FACTOR` times it: one wall-clock sample on a shared runner
+ * can push a 3ms test over a 500ms bar. Per-test `#[MaximumDuration]`
+ * attributes replace the bar outright.
  */
 final readonly class SlowTestGuardExtension implements Extension
 {

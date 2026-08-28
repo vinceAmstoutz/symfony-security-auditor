@@ -30,6 +30,13 @@ cannot be expressed in code and would take a reader hours to rediscover:
 
 Even then: one line, no multi-sentence prose.
 
+## Enforced
+
+`OversizedDocblockRule` (PHPStan, `tools/PHPStan/`) fails the build on any
+docblock with more than 12 prose lines. Annotation lines — including the
+continuation lines of a multi-line `array{...}` shape — never count, so type
+information is always free.
+
 ## Never
 
 - Multi-line `//` blocks explaining design rationale.

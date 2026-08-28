@@ -32,17 +32,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exce
  * a server-issued `Retry-After` into the bucket so chunks scheduled after the
  * 429 cooperatively wait instead of stampeding the provider.
  *
- * Class invariant: at least one rate-limit dimension is set. The bundle wires
- * `NullRateLimiter` when all dimensions are null, so this class is never
- * instantiated with a fully-disabled configuration — enforced in the
- * constructor.
+ * Class invariant, enforced in the constructor: at least one dimension is set.
+ * The bundle wires `NullRateLimiter` when all are null.
  *
- * State is per-process: multiple processes sharing one API key still need
- * out-of-process coordination (Redis/file lock) — out of scope here.
- *
- * Not `readonly` because the bucket carries mutable accounting state; see
- * `.claude/rules/php-classes.md` (stateful collaborator carve-out — same
- * shape as `BudgetTracker`).
+ * State is per-process, so processes sharing one API key still need
+ * out-of-process coordination. Not `readonly` for that state — see
+ * `.claude/rules/php-classes.md`.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

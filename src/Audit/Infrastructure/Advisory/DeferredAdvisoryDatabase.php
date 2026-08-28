@@ -22,18 +22,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  * running `composer audit` — until the first {@see self::lookup()} call,
  * memoizing the result for as long as the holder's path stays unchanged.
  *
- * `ComposerAuditAdvisoryDatabase` is `final readonly`, so it cannot be a
- * Symfony `->lazy()` service: proxy generation requires either a native PHP
- * 8.4+ lazy ghost (this project supports 8.3+) or a subclassing proxy, and
- * neither works for a final readonly class. This hand-rolled wrapper achieves
- * the same goal — `AuditedProjectPathHolder::path()` must not be read before
- * `AuditCommand` sets it — without relying on proxy generation.
+ * `ComposerAuditAdvisoryDatabase` is `final readonly`, so Symfony `->lazy()`
+ * cannot proxy it: that needs a native 8.4+ lazy ghost (this project supports
+ * 8.3) or a subclass. Hence the hand-rolled wrapper — the holder's path must
+ * not be read before `AuditCommand` sets it.
  *
- * Not readonly: it memoizes the inner database on first use, and rebuilds it
- * whenever the holder is re-targeted to a different project — a service
- * instance reused across two audits must not keep serving the first
- * project's stale snapshot (stateful collaborator carve-out — same shape as
- * `AuditedProjectPathHolder`).
+ * Not readonly: it rebuilds whenever the holder is re-targeted, so an instance
+ * reused across two audits never serves the first project's snapshot.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

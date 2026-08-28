@@ -66,6 +66,12 @@ rules:
 
 services:
     -
+        class: VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\OversizedDocblockRule
+        arguments:
+            maxProseLines: 12
+        tags:
+            - phpstan.rules.rule
+    -
         class: VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\ConcatRootMarkingVisitor
         tags:
             - phpstan.parser.richParserNodeVisitor

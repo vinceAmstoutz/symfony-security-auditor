@@ -41,17 +41,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
  * tools against that conversation's own registry, and queues the follow-up
  * round. On an async transport (the symfony/ai DeferredResult contract) the
  * per-round invocations overlap on the wire. Any dispatch or resolution
- * failure first retries the same conversation through
- * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
- * sequential path uses. Once that retry gives up, a conversation that hasn't
- * run a tool yet always falls back to the proven sequential
- * completeWithTools() path (full restart) — safe to retry from scratch
- * regardless of why the retry failed. One that already ran a tool cannot
- * restart without executing it twice, so it finalizes as an empty
- * `empty_content` response instead — unless the retry's own failure was
- * classified non-transient, which is rethrown instead of masked, per the LLM
- * seam's contract that non-transient provider failures must never be
- * swallowed into a false-negative SAFE result.
+ * failure retries through `RetryingPlatformInvoker` first. Once that gives up,
+ * a conversation that has not yet run a tool restarts on the sequential path,
+ * which is safe because nothing has been executed; one that already ran a tool
+ * cannot restart without executing it twice, so it finalizes as an
+ * `empty_content` response. A non-transient failure is rethrown rather than
+ * masked, so a provider outage can never become a false-negative SAFE result.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

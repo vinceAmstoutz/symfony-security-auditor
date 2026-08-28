@@ -30,20 +30,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 final readonly class ChunkContextKeyDeriver
 {
     /**
-     * Hashing each input individually before joining fixes each to 64 hex
-     * characters, which can never contain the raw-text join's own separator —
-     * so a rejected/previous preamble embedding a null byte (both are
-     * rendered from LLM-echoed `Vulnerability::filePath()` values, which are
-     * never null-byte-sanitized) can't shift content across the join
-     * boundary and collide with a genuinely different combination. Mirrors
-     * `FilesystemAttackerCache::keyForChunk()`'s per-file hash-then-join.
+     * Hashing each input individually fixes it to 64 hex characters, which can
+     * never contain the join separator — so a preamble embedding a null byte
+     * (rendered from never-sanitized LLM-echoed paths) cannot shift content
+     * across the boundary and collide. Mirrors
+     * `FilesystemAttackerCache::keyForChunk()`.
      *
-     * The marker preamble is included so a chunk cache entry is invalidated
-     * whenever the risk markers it was built from change — e.g. a custom
-     * `StaticPreScannerInterface` implementation (a documented extension
-     * point) starts flagging a file differently on an unchanged content hash.
-     * The mapping fingerprint serves the same purpose for the access-control
-     * data {@see self::mappingFingerprint()} folds in.
+     * The marker preamble is folded in so an entry is invalidated when the risk
+     * markers change on an unchanged content hash; the mapping fingerprint does
+     * the same for access-control data.
      */
     public function derive(string $markerPreamble, string $rejectedPreamble, string $previousPreamble, SymfonyMapping $symfonyMapping): string
     {
@@ -57,23 +52,16 @@ final readonly class ChunkContextKeyDeriver
     }
 
     /**
-     * `AttackerPromptBuilder::buildUserMessage()` renders the firewall,
-     * route-access-control, voter-coverage and form-binding sections straight
-     * from the mapping, but the chunk cache is keyed only by file content and
-     * this class's context key — so, unfingerprinted, a `security.yaml` edit
-     * or a voter added elsewhere in the project would replay a verdict
-     * computed under the old mapping for a file whose own content never
-     * changed. Each list is sorted before hashing since project scanning
-     * makes no ordering guarantee, so two scans of the same unchanged
-     * codebase still agree.
+     * The chunk cache is keyed only by file content and this context key, so
+     * without fingerprinting the mapping a `security.yaml` edit or a voter
+     * added elsewhere would replay a verdict computed under the old mapping.
+     * Lists are sorted first because project scanning makes no ordering
+     * guarantee.
      *
-     * Each signature is hashed individually before joining, for the same
-     * reason as {@see self::derive()}: a firewall rule or serialized
-     * route/voter/form signature can itself contain a newline (e.g. a
-     * `security.yaml` access-control path parsed from a double-quoted YAML
-     * string), so joining raw signatures with "\n" before a single hash
-     * could let one signature spanning two entries collide with two
-     * genuinely different, shorter entries.
+     * Each signature is hashed individually before joining, as in
+     * {@see self::derive()}: a signature can itself contain a newline, so
+     * joining raw signatures could let one spanning two entries collide with
+     * two genuinely different, shorter ones.
      */
     private function mappingFingerprint(SymfonyMapping $symfonyMapping): string
     {

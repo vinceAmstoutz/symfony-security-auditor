@@ -25,21 +25,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnaps
  * the reviewer's own cross-run rejections — into the single feedback set the
  * reviewer prompt and cache key see, snapshotting it once per run.
  *
- * The merged set is memoized on first read. The triage-memory secondary is
- * written to mid-run — every reviewer rejection appends an entry — so reading
- * it live would shift the reviewer cache-key digest between findings within a
- * single run, making every verdict after the first miss its own freshly-written
- * cache entry. Freezing the set on first read keeps the digest and the reviewer
- * system prompt stable for the whole run.
+ * The set is frozen on first read because triage memory is appended to mid-run:
+ * reading it live would shift the reviewer cache-key digest between findings,
+ * so every verdict after the first would miss its own freshly-written entry.
  *
- * The snapshot is discarded at the start of each run via
- * {@see resetForNewRun()} — called by `RunAuditUseCase::execute()` — so a
- * long-lived process (`mcp:serve`) picks up the entries recorded during the
- * previous run instead of serving the first run's frozen feedback forever.
- *
- * Mutable by design — non-readonly because the snapshot is filled lazily on
- * first read and cleared per run. See .claude/rules/php-classes.md for the
- * opt-out policy.
+ * {@see resetForNewRun()} discards the snapshot per run, so a long-lived
+ * `mcp:serve` process picks up the previous run's entries instead of serving
+ * the first run's feedback forever. Non-readonly for that reason — see
+ * .claude/rules/php-classes.md.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

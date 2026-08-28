@@ -37,20 +37,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
  * estimate as its `AuditCost`. Never invokes the LLM platform — `--dry-run`
  * stays free regardless of project size.
  *
- * Estimation strategy: every scanned file contributes its content to a
- * synthetic "attacker prompt" (input). The attacker system prompt's skill
- * blocks are sent once per chunk — chunked the same way `FileChunker` chunks
- * a real run — and added on top. When `audit.tools_enabled` is on, the
- * attacker may take several tool-call rounds per chunk, each resending the
- * growing conversation plus the tool schemas — `toolRoundTripRatio` inflates
- * the per-round input to account for that. Output tokens are projected at
- * `outputRatio * input` because audit prompts are heavily input-skewed.
- * Multiplied by `max_iterations` to account for the attacker/reviewer loop.
+ * Skill blocks are counted once per chunk, chunked as `FileChunker` chunks a
+ * real run, and `toolRoundTripRatio` inflates per-round input for the tool
+ * rounds that resend the growing conversation. Output is projected from input
+ * because audit prompts are heavily input-skewed.
  *
- * `reviewerInputRatio` is applied to the file-content sum alone, never to the
+ * `reviewerInputRatio` applies to the file-content sum alone, never to the
  * attacker total: the reviewer prompt carries no skill blocks, so folding the
- * attacker's own overhead into its base would inflate the reviewer estimate by
- * an overhead it never sends.
+ * attacker's overhead into its base would bill the reviewer for bytes it never
+ * sends.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

@@ -22,26 +22,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Two-pass attacker for cost-sensitive audits.
+ * Two-pass attacker for cost-sensitive audits: a cheap model sweeps every
+ * chunk, then an expensive model re-analyses only the files the sweep flagged,
+ * with the cheap findings injected as `previousFindings` so the deeper model
+ * starts at concrete locations.
  *
- *   1. A cheap-model attacker (e.g. claude-haiku-4-5) sweeps every chunk.
- *      In typical Symfony projects most files are inert — the cheap sweep
- *      converges quickly with no findings.
- *
- *   2. If the cheap pass found anything, an expensive-model attacker
- *      (e.g. claude-opus-4-7) re-analyses ONLY the files the cheap pass
- *      flagged. Those re-runs benefit from the cheap findings being
- *      injected as previousFindings context, steering the deeper model
- *      at concrete locations to refine / escalate / discover related
- *      issues.
- *
- *   3. The two result sets are merged by Vulnerability::id() (which is
- *      deterministic from type+file+lineStart): the expensive verdict
- *      wins on overlap, cheap findings on cold files pass through.
- *
- * Net effect: full-project coverage at roughly 1/3 to 1/5 of running the
- * expensive model on every chunk, with detection quality close to the
- * pure expensive baseline because hot zones still get the deep treatment.
+ * Results merge by `Vulnerability::id()`, which is deterministic from
+ * type+file+lineStart: the expensive verdict wins on overlap and cheap findings
+ * on cold files pass through. Most files in a typical Symfony project are
+ * inert, so this covers the whole project at roughly a third to a fifth of the
+ * cost of running the expensive model everywhere.
  */
 final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
 {
