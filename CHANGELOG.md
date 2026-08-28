@@ -37,7 +37,7 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 ### Changed
 
-- **The Domain-port BC promise is now an enumerated list of 22 ports instead of
+- **The Domain-port BC promise is now an enumerated list of 23 ports instead of
   the whole `src/Audit/Domain/Port/` directory.** The old wording froze every
   interface in that directory — ~30 of them, most being internal collaboration
   seams that nobody outside the bundle implements — so changing any signature
@@ -80,7 +80,9 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   the pre-2.0 `4096` left materially less room for a full `record_vulnerability`
   argument set than the number suggests — exactly the truncation the key exists
   to prevent. `LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS` is now the single
-  source for that default and reads `8192` — including the
+  source for both defaults — `DEFAULT_MODEL` and `DEFAULT_MAX_OUTPUT_TOKENS`, so
+  the config tree and `InitCommand`'s prompt no longer carry their own copies of
+  the model id — and reads `8192` — including the
   `BundleConfiguration::fromArray()` fallback a programmatic caller hits when it
   omits the key, which had been left on the old `4096`.
 

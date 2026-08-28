@@ -41,7 +41,7 @@ final readonly class AuditConfigurationDefinition
     {
         $nodeBuilder
                 ->scalarNode('model')
-                    ->defaultValue('claude-opus-5')
+                    ->defaultValue(LLMConfiguration::DEFAULT_MODEL)
                     ->cannotBeEmpty()
                     ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.')
                 ->end()

@@ -18,6 +18,7 @@ use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
@@ -72,7 +73,7 @@ final readonly class InitCommand
         }
 
         $provider = b($provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic'))->trim()->toString();
-        $model = b($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-5'))->trim()->toString();
+        $model = b($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', LLMConfiguration::DEFAULT_MODEL))->trim()->toString();
 
         $violation = $this->identityViolation($provider, $model);
         if (null !== $violation) {

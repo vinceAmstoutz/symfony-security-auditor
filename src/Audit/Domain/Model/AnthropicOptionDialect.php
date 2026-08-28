@@ -16,25 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 /**
  * Whether a model identifier belongs to the Anthropic option dialect — the one
  * `symfony/ai` bridge family that accepts `max_tokens` and `response_format`
- * per request. Gemini and the OpenAI Responses bridge reject those keys
- * outright, so sending them would fail the call rather than cap it.
- *
- * Matching is anchored, never a substring. A bare id must start with `claude-`
- * or `claude.` (the Anthropic API and Vertex). A vendor-qualified id must carry
- * an `anthropic` dot-segment followed by a `claude…` one, which covers Bedrock's
- * plain `anthropic.claude-…` and every cross-region-inference prefix it has or
- * gains (`us.`, `eu.`, `au.`, `jp.`, `global.`, …) without enumerating them —
- * the shipped `symfony/models-dev` catalog prices all of those. The `?options`
- * query string `symfony/ai-bundle` supports is stripped first, then a
- * provider-qualified id is matched on its final `/` segment, so the gateway
- * forms that name the model outright (`anthropic/claude-…`,
- * `publishers/anthropic/models/claude-…`) are recognized too, and an option
- * value containing a `/` cannot hide the model.
- * An unrelated model whose name merely contains "claude" is therefore not
- * mistaken for one, while an opaque gateway alias that hides its
- * Anthropic origin reports honestly that the dialect cannot be confirmed —
- * `ConfigurationNotices` surfaces that as a pre-flight notice instead of
- * dropping the cap in silence.
+ * per request. Other bridges reject those keys, failing the call rather than
+ * capping it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
