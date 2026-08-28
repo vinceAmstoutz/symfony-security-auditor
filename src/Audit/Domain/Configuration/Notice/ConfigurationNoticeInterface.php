@@ -27,5 +27,5 @@ interface ConfigurationNoticeInterface
     /**
      * @return list<string>
      */
-    public function noticesFor(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array;
+    public function noticesFor(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $llmConfiguration): array;
 }

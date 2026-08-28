@@ -35,8 +35,8 @@ final readonly class ConfigurationNotices
     public static function of(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array
     {
         $notices = [];
-        foreach (self::defaultNotices() as $notice) {
-            foreach ($notice->noticesFor($auditExecutionConfiguration, $lLMConfiguration) as $message) {
+        foreach (self::defaultNotices() as $configurationNotice) {
+            foreach ($configurationNotice->noticesFor($auditExecutionConfiguration, $lLMConfiguration) as $message) {
                 $notices[] = $message;
             }
         }

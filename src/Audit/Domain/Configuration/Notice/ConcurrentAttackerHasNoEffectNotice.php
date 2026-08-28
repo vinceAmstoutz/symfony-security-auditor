@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfigura
 final readonly class ConcurrentAttackerHasNoEffectNotice implements ConfigurationNoticeInterface
 {
     #[Override]
-    public function noticesFor(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array
+    public function noticesFor(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $llmConfiguration): array
     {
         if ($auditExecutionConfiguration->attackerMaxConcurrent <= 1 || $auditExecutionConfiguration->structuredCollection) {
             return [];

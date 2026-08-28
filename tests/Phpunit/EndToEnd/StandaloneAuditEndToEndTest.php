@@ -110,13 +110,13 @@ final class StandaloneAuditEndToEndTest extends TestCase
     #[MaximumDuration(4000)]
     public function test_an_option_value_the_console_rejects_exits_audit_failed_rather_than_the_gate_code(string $commandName): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
-        $application->setAutoExit(false);
+        $standaloneApplication->setAutoExit(false);
 
-        $applicationTester = new ApplicationTester($application);
+        $applicationTester = new ApplicationTester($standaloneApplication);
         $exitCode = $applicationTester->run(
             ['command' => $commandName, 'project-path' => $this->projectDir, '--format' => 'not-a-format'],
             ['capture_stderr_separately' => true],

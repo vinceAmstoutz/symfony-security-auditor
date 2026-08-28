@@ -51,7 +51,7 @@ final readonly class OversizedDocblockRule implements Rule
         $errors = [];
         foreach ([$node, ...$node->stmts] as $documented) {
             $error = $this->errorFor($documented->getDocComment());
-            if (null !== $error) {
+            if ($error instanceof IdentifierRuleError) {
                 $errors[] = $error;
             }
         }
@@ -62,13 +62,13 @@ final readonly class OversizedDocblockRule implements Rule
     /**
      * @throws ShouldNotHappenException
      */
-    private function errorFor(?Doc $docComment): ?IdentifierRuleError
+    private function errorFor(?Doc $doc): ?IdentifierRuleError
     {
-        if (null === $docComment) {
+        if (!$doc instanceof Doc) {
             return null;
         }
 
-        $proseLineCount = $this->countProseLines($docComment->getText());
+        $proseLineCount = $this->countProseLines($doc->getText());
         if ($proseLineCount <= $this->maxProseLines) {
             return null;
         }
@@ -79,7 +79,7 @@ final readonly class OversizedDocblockRule implements Rule
             $this->maxProseLines,
         ))
             ->identifier('ssa.oversizedDocblock')
-            ->line($docComment->getStartLine())
+            ->line($doc->getStartLine())
             ->build();
     }
 
