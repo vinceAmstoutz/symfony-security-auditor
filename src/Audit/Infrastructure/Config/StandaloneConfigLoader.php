@@ -45,14 +45,14 @@ final readonly class StandaloneConfigLoader
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
      */
-    public function load(): StandaloneConfig
+    public function load(bool $credentialsRequired = true): StandaloneConfig
     {
         $rawConfig = $this->merge(
             $this->read($this->xdgConfigPathResolver->configFile()),
             $this->readProjectConfig(),
         );
 
-        $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig);
+        $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig, $credentialsRequired);
         $auditConfig = array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS));
 
         return new StandaloneConfig($auditConfig, $standalonePlatformConfig);

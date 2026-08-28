@@ -17,6 +17,7 @@ use JsonException;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 
@@ -39,7 +40,9 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         private ReleaseClientInterface $releaseClient,
         private GitHubBinaryAssetResolver $gitHubBinaryAssetResolver,
         private RunningBinaryLocatorInterface $runningBinaryLocator,
+        private BinarySwapSchedulerInterface $binarySwapScheduler,
         private Filesystem $filesystem = new Filesystem(),
+        private PricingCatalogRefresherInterface $pricingCatalogRefresher = new NullPricingCatalogRefresher(),
     ) {}
 
     /**
@@ -55,7 +58,12 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         $latestVersion = u($latestTag)->trimPrefix(['v', 'V'])->toString();
 
         if (!version_compare($latestVersion, $currentVersion, '>')) {
-            return new SelfUpdateResult(SelfUpdateStatus::AlreadyUpToDate, $currentVersion, $latestVersion);
+            return new SelfUpdateResult(
+                SelfUpdateStatus::AlreadyUpToDate,
+                $currentVersion,
+                $latestVersion,
+                $this->refreshUnlessProbing($checkOnly),
+            );
         }
 
         if ($checkOnly) {
@@ -64,7 +72,22 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
 
         $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestTag));
 
-        return new SelfUpdateResult(SelfUpdateStatus::Updated, $currentVersion, $latestVersion);
+        return new SelfUpdateResult(
+            SelfUpdateStatus::Updated,
+            $currentVersion,
+            $latestVersion,
+            $this->pricingCatalogRefresher->refresh(),
+        );
+    }
+
+    /**
+     * A `--check` probe answers a question without touching the machine, and
+     * the background update notifier runs on that path, so it must not reach
+     * for the network on a user's behalf.
+     */
+    private function refreshUnlessProbing(bool $checkOnly): PricingCatalogRefreshOutcome
+    {
+        return $checkOnly ? PricingCatalogRefreshOutcome::Skipped : $this->pricingCatalogRefresher->refresh();
     }
 
     /**
@@ -102,11 +125,11 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         try {
             $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath);
             $this->assertChecksumMatches($gitHubBinaryAsset, $downloadPath);
-            $this->install($downloadPath, $binaryPath);
-        } catch (SelfUpdateFailedException $selfUpdateFailedException) {
+            $this->scheduleInstall($downloadPath, $binaryPath);
+        } catch (Throwable $throwable) {
             $this->filesystem->remove($downloadPath);
 
-            throw $selfUpdateFailedException;
+            throw $throwable;
         }
     }
 
@@ -115,8 +138,10 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
      */
     private function assertChecksumMatches(GitHubBinaryAsset $gitHubBinaryAsset, string $downloadPath): void
     {
-        $actual = hash_file('sha256', $downloadPath);
-        \assert(false !== $actual);
+        $actual = is_readable($downloadPath) ? hash_file('sha256', $downloadPath) : false;
+        if (false === $actual) {
+            throw SelfUpdateFailedException::forUnreadableDownload($downloadPath);
+        }
 
         if (!hash_equals($this->expectedChecksum($gitHubBinaryAsset), $actual)) {
             throw SelfUpdateFailedException::forChecksumMismatch($gitHubBinaryAsset->name);
@@ -134,12 +159,29 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     /**
      * @throws SelfUpdateFailedException
      */
-    private function install(string $downloadPath, string $binaryPath): void
+    private function scheduleInstall(string $downloadPath, string $binaryPath): void
     {
         try {
             $this->filesystem->chmod($downloadPath, 0o755);
+        } catch (IOException $ioException) {
+            throw SelfUpdateFailedException::forFailedReplacement($binaryPath, $ioException);
+        }
+
+        $this->binarySwapScheduler->schedule(function () use ($downloadPath, $binaryPath): void {
+            $this->commitInstall($downloadPath, $binaryPath);
+        });
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    private function commitInstall(string $downloadPath, string $binaryPath): void
+    {
+        try {
             $this->filesystem->rename($downloadPath, $binaryPath, true);
         } catch (IOException $ioException) {
+            $this->filesystem->remove($downloadPath);
+
             throw SelfUpdateFailedException::forFailedReplacement($binaryPath, $ioException);
         }
     }

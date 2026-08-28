@@ -20,5 +20,6 @@ final readonly class SelfUpdateResult
         public SelfUpdateStatus $status,
         public string $currentVersion,
         public string $latestVersion,
+        public PricingCatalogRefreshOutcome $pricingCatalogRefresh = PricingCatalogRefreshOutcome::Skipped,
     ) {}
 }

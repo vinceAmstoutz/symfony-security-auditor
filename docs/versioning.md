@@ -166,7 +166,7 @@ deprecated by the other.
   renaming or removing one is a `MAJOR`. The Marketplace `name`
   (`Symfony Security Auditor`) is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —
-  `uses: vinceamstoutz/symfony-security-auditor@1.19.1` — matching the tag
+  `uses: vinceamstoutz/symfony-security-auditor@1.20.1` — matching the tag
   format used on Packagist. Bump the pin when upgrading. There is intentionally
   no floating `v1` tag: the `uses:` ref and the config-schema URL both point at
   the same release tag, so a given pin always resolves to one immutable release.
@@ -251,6 +251,9 @@ Implementing one of these in your own application and overriding the alias in
   `cacheCreationPricePerMillionTokens()`.
 - `TokenEstimatorInterface`
 - `ProgressReporterInterface`
+- `AttackerSkillPromptRendererInterface` — host applications may implement this
+  and alias it to control how the attacker's skill-block text is rendered for a
+  set of file types. See [`docs/extending.md`](extending.md).
 - `RateLimiterInterface` — host applications may implement this and alias it to
   swap the throttling strategy (e.g. cross-process Redis-backed bucket). See
   [`docs/extending.md`](extending.md).
@@ -311,6 +314,10 @@ Anything tagged `@internal` may be refactored, renamed, or removed in any
   `EscalatingAttackerAgent`, `AuditOrchestrator`, `VulnerabilityFactory`,
   `PoCSynthesizer`, `AuditPipeline`, `IngestionStage`, `MappingStage`,
   `AuditStage`, `PoCSynthesisStage`).
+- `Audit\Application\UseCase\EstimateAuditCostUseCase` — the `--dry-run`
+  estimator. `RunAuditUseCase` above is the only BC-protected entry point; this
+  one is a collaborator of `AuditCommand` and its constructor changes whenever
+  the estimate gains a new input.
 - All concrete adapters under `Audit/Infrastructure/` — `SymfonyAiLLMClient`,
   `ProjectFileScanner`, `AttackerPromptBuilder`, `ReviewerPromptBuilder`,
   `FilesystemAttackerCache`, `NullAttackerCache`,
@@ -426,13 +433,14 @@ push red for a commit nobody can amend. A regular merge lands `main` exactly on
 — it already has every commit, unchanged. Once the release commit lands, the
 [Auto Release](../.github/workflows/auto-release.yaml) workflow tags it `X.Y.Z`,
 generates a `What's Changed` summary from the merged pull requests since the
-previous tag, and drafts the GitHub Release — publish it when ready, which
-triggers the binary-build workflow. Its `push` trigger only fires going forward,
-so it cannot cover a release commit that already landed on `main` before the
-workflow existed (or before the workflow's `if:` could match it); for that case,
-dispatch it manually with the `version` `workflow_dispatch` input — it always
-tags and diffs against `main`'s history regardless of which ref the dispatch
-itself runs from.
+previous tag, and drafts the GitHub Release, dispatching the binary-build
+workflow immediately against that draft — every binary is already attached by
+the time you publish it, so publishing is just a visibility flip, not a trigger.
+Its `push` trigger only fires going forward, so it cannot cover a release commit
+that already landed on `main` before the workflow existed (or before the
+workflow's `if:` could match it); for that case, dispatch it manually with the
+`version` `workflow_dispatch` input — it always tags and diffs against `main`'s
+history regardless of which ref the dispatch itself runs from.
 
 Because `main` is the default branch, a pull request opens against it by default
 even though almost nothing should land there directly. **Retarget the base** to

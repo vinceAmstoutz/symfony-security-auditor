@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill;
 
+use Override;
 use Traversable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 
 /**
  * Collects every {@see AttackerSkillInterface} strategy and emits the blocks
@@ -22,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class AttackerSkillRegistry
+final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendererInterface
 {
     /** @var array<AttackerSkillInterface> */
     private array $orderedSkills;
@@ -45,6 +47,7 @@ final readonly class AttackerSkillRegistry
     /**
      * @param list<ProjectFileType> $presentTypes
      */
+    #[Override]
     public function render(array $presentTypes, bool $emitAll): string
     {
         $blocks = [];

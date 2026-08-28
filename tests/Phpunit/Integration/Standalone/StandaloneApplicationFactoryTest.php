@@ -20,7 +20,10 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ModelsDevCatalogRefresher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 final class StandaloneApplicationFactoryTest extends TestCase
@@ -51,74 +54,104 @@ final class StandaloneApplicationFactoryTest extends TestCase
     #[RunInSeparateProcess]
     public function test_it_builds_a_console_application_exposing_the_audit_command_and_alias(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('audit:run'));
-        self::assertTrue($application->has('audit'));
+        self::assertTrue($standaloneApplication->has('audit:run'));
+        self::assertTrue($standaloneApplication->has('audit'));
     }
 
     public function test_it_registers_the_audit_command_without_reading_a_config_file(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('audit:run'));
+        self::assertTrue($standaloneApplication->has('audit:run'));
     }
 
     public function test_it_reports_the_installed_package_version_instead_of_unknown(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertSame((new ReportPackage())->version(), $application->getVersion());
+        self::assertSame((new ReportPackage())->version(), $standaloneApplication->getVersion());
+    }
+
+    public function test_it_includes_the_bundled_models_dev_version_in_the_long_version(): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertStringContainsString(
+            \sprintf('symfony/models-dev %s', (new ReportPackage('symfony/models-dev'))->version()),
+            $standaloneApplication->getLongVersion(),
+        );
     }
 
     public function test_it_registers_the_init_command(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('init'));
+        self::assertTrue($standaloneApplication->has('init'));
     }
 
     public function test_it_registers_the_self_update_command(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ], '/usr/local/bin/symfony-security-auditor')->create();
 
-        self::assertTrue($application->has('self-update'));
+        self::assertTrue($standaloneApplication->has('self-update'));
+    }
+
+    public function test_it_builds_the_application_when_no_cache_directory_can_be_resolved(): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([])->create();
+
+        self::assertTrue($standaloneApplication->has('doctor'), 'an environment with no HOME and no XDG variables leaves the refreshed-catalog location unresolvable, which must not stop the application from building');
+    }
+
+    public function test_it_exposes_one_pending_binary_swap_for_the_entry_point_to_commit(): void
+    {
+        $standaloneApplicationFactory = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ]);
+
+        self::assertSame($standaloneApplicationFactory->pendingBinarySwap(), $standaloneApplicationFactory->pendingBinarySwap());
     }
 
     public function test_it_registers_the_doctor_command(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertTrue($application->has('doctor'));
+        self::assertTrue($standaloneApplication->has('doctor'));
     }
 
     public function test_it_builds_the_application_when_update_checks_are_disabled(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
             'SSA_NO_UPDATE_CHECK' => '1',
         ])->create();
 
-        self::assertTrue($application->has('audit:run'));
+        self::assertTrue($standaloneApplication->has('audit:run'));
     }
 
     /**
@@ -142,14 +175,126 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'opt-out variable set to an arbitrary value' => [['SSA_NO_UPDATE_CHECK' => 'true'], true];
     }
 
+    public function test_pricing_catalog_refresher_downloads_when_no_config_file_exists_yet(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)), $this->cacheHome, null);
+
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_downloads_when_the_config_file_holds_no_mapping(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig('');
+
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_downloads_when_the_privacy_key_has_no_offline_only_entry(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    secret_scrubbing:\n        enabled: true\n");
+
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_downloads_when_the_config_file_explicitly_disables_offline_only(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline_only: false\n");
+
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_fails_closed_when_the_config_file_is_malformed(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("platform: [a, b\n");
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_fails_closed_when_the_home_directory_is_unresolvable(): void
+    {
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher(new XdgConfigPathResolver(null, null, null)),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_is_null_when_offline_only_is_enabled(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline_only: true\n");
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_downloads_when_offline_only_is_disabled(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+
+        self::assertInstanceOf(
+            ModelsDevCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    public function test_pricing_catalog_refresher_fails_closed_when_only_the_config_path_is_unresolvable(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, $this->cacheHome, null);
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+            'an unreadable config path must fail closed on its own, not rely on the cache path also being unresolvable',
+        );
+    }
+
+    public function test_pricing_catalog_refresher_is_null_when_the_cache_directory_is_unresolvable(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
+    private function resolverForConfig(string $yaml): XdgConfigPathResolver
+    {
+        $this->writeConfig($yaml);
+
+        return new XdgConfigPathResolver($this->configHome, $this->cacheHome, null);
+    }
+
+    private function writeConfig(string $yaml): void
+    {
+        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $yaml);
+    }
+
     public function test_it_registers_the_audit_command_as_visible(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        self::assertFalse($application->get('audit:run')->isHidden());
+        self::assertFalse($standaloneApplication->get('audit:run')->isHidden());
     }
 
     /**
@@ -197,12 +342,12 @@ final class StandaloneApplicationFactoryTest extends TestCase
     #[MaximumDuration(4000)]
     public function test_the_registered_audit_command_keeps_the_full_cli_option_surface(): void
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        $inputDefinition = $application->find('audit:run')->getDefinition();
+        $inputDefinition = $standaloneApplication->find('audit:run')->getDefinition();
         $optionNames = array_keys($inputDefinition->getOptions());
 
         self::assertSame([], array_diff(

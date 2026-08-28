@@ -21,6 +21,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
  */
 final readonly class HeredocLineTracker
 {
+    private const string VALID_CLOSING_TRAILER = '[\s;,)\]]*';
+
     public function __construct(
         private ParenContinuationTracker $parenContinuationTracker = new ParenContinuationTracker(),
     ) {}
@@ -52,7 +54,7 @@ final readonly class HeredocLineTracker
     // Matched at line start, not column 0: PHP's flexible heredoc syntax (7.3+) allows an indented closing identifier.
     private function closeTrailer(string $line, string $identifier): ?string
     {
-        if (1 !== preg_match(\sprintf('/^\s*%s\b(?<trailer>.*)$/', $identifier), $line, $matches)) {
+        if (1 !== preg_match(\sprintf('/^\s*%s(?<trailer>%s)$/', $identifier, self::VALID_CLOSING_TRAILER), $line, $matches)) {
             return null;
         }
 

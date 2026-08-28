@@ -343,6 +343,112 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws MalformedSarifFileException
      * @throws InvalidCustomRiskPatternException
      */
+    #[DataProvider('percentEncodedUriSpellings')]
+    public function test_a_percent_encoded_artifact_uri_matches_the_scanned_file(string $relativePath, string $uri): void
+    {
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [
+            $this->sarifResult('TaintedSql', 'Detected tainted SQL', $uri, 3),
+        ])]);
+
+        $markers = $this->scanner([$sarif])->scan([$this->projectFile($relativePath)]);
+
+        self::assertCount(1, $markers, \sprintf('SARIF spells %s as %s, which must still resolve to the scanned file.', $relativePath, $uri));
+        self::assertSame($relativePath, $markers[0]->filePath());
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function percentEncodedUriSpellings(): iterable
+    {
+        yield 'encoded space' => ['templates/my page.html.twig', 'templates/my%20page.html.twig'];
+        yield 'encoded non-ascii' => ['templates/café.html.twig', 'templates/caf%C3%A9.html.twig'];
+        yield 'encoded fragment delimiter' => ['src/A#1.php', 'src/A%231.php'];
+        yield 'encoded under a dot-slash prefix' => ['templates/my page.html.twig', './templates/my%20page.html.twig'];
+        yield 'encoded under a file scheme' => ['templates/my page.html.twig', 'file:///app/templates/my%20page.html.twig'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_a_percent_encoded_absolute_uri_resolves_under_a_project_root_holding_a_space(): void
+    {
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [
+            $this->sarifResult('TaintedSql', 'Detected tainted SQL', 'file:///srv/my%20app/src/A.php', 3),
+        ])]);
+
+        $markers = $this->scanner([$sarif], projectRoot: '/srv/my app')
+            ->scan([$this->projectFile('src/A.php', '/srv/my app')]);
+
+        self::assertCount(1, $markers, 'The project-root prefix is a raw filesystem path, so decoding must precede stripping it.');
+        self::assertSame('src/A.php', $markers[0]->filePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_a_percent_encoded_taint_path_step_is_kept_rather_than_elided(): void
+    {
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [
+            $this->sarifResultWithCodeFlow('TaintedSql', 'Detected tainted SQL', 'src/A.php', 9, [
+                ['templates/my%20page.html.twig', 4],
+                ['src/A.php', 9],
+            ]),
+        ])]);
+
+        $markers = $this->scanner([$sarif])->scan([
+            $this->projectFile('src/A.php'),
+            $this->projectFile('templates/my page.html.twig'),
+        ]);
+
+        self::assertCount(1, $markers);
+        self::assertSame(
+            'Detected tainted SQL (taint path: templates/my page.html.twig:4 -> src/A.php:9)',
+            $markers[0]->description(),
+            'An encoded step names a scanned file, so it must not be dropped as outside the scan surface.',
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
+     */
+    #[DataProvider('unescapedUriSpellings')]
+    public function test_an_artifact_uri_left_unescaped_by_its_producer_still_matches(string $relativePath): void
+    {
+        $sarif = $this->writeSarif([$this->sarifRun('Semgrep', [
+            $this->sarifResult('TaintedSql', 'Detected tainted SQL', $relativePath, 3),
+        ])]);
+
+        $markers = $this->scanner([$sarif])->scan([$this->projectFile($relativePath)]);
+
+        self::assertCount(1, $markers, \sprintf('%s carries no valid escape sequence, so decoding must leave it untouched.', $relativePath));
+        self::assertSame($relativePath, $markers[0]->filePath());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unescapedUriSpellings(): iterable
+    {
+        yield 'literal percent' => ['src/100%.php'];
+        yield 'literal plus' => ['src/a+b.php'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
+     */
     public function test_a_missing_or_non_positive_start_line_clamps_to_line_one(): void
     {
         $result = $this->sarifResult('TaintedSql', 'Detected tainted SQL', 'src/A.php', 0);
@@ -614,22 +720,22 @@ final class SarifImportingPreScannerTest extends TestCase
      *
      * @throws InvalidCustomRiskPatternException
      */
-    private function scanner(array $sarifPaths, ?RegexStaticPreScanner $regexStaticPreScanner = null): SarifImportingPreScanner
+    private function scanner(array $sarifPaths, ?RegexStaticPreScanner $regexStaticPreScanner = null, string $projectRoot = '/app'): SarifImportingPreScanner
     {
         return new SarifImportingPreScanner(
             $regexStaticPreScanner ?? new RegexStaticPreScanner(),
             $sarifPaths,
             $this->filesystem,
-            new AuditedProjectPathHolder('/app'),
+            new AuditedProjectPathHolder($projectRoot),
         );
     }
 
     /**
      * @throws InvalidProjectFileException
      */
-    private function projectFile(string $relativePath): ProjectFile
+    private function projectFile(string $relativePath, string $projectRoot = '/app'): ProjectFile
     {
-        return ProjectFile::create($relativePath, '/app/'.$relativePath, "<?php\n");
+        return ProjectFile::create($relativePath, $projectRoot.'/'.$relativePath, "<?php\n");
     }
 
     /**

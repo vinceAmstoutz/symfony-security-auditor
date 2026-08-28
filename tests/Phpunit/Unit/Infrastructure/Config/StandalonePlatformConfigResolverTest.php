@@ -63,6 +63,33 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      */
+    public function test_a_run_that_needs_no_credential_substitutes_an_unusable_stand_in(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]], false);
+
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     */
+    public function test_a_run_that_needs_no_credential_still_prefers_the_real_one_when_it_is_set(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => 'sk-from-env']))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]], false);
+
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-from-env']]], $standalonePlatformConfig->toAiConfig());
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     */
     public function test_it_carries_the_active_provider_selector(): void
     {
         $standalonePlatformConfig = (new StandalonePlatformConfigResolver())->resolve([

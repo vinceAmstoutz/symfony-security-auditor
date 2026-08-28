@@ -101,12 +101,12 @@ final class StandaloneDoctorEndToEndTest extends TestCase
 
     private function doctorCommandTester(): CommandTester
     {
-        $application = StandaloneApplicationFactory::fromEnvironment([
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
             'XDG_CACHE_HOME' => $this->cacheHome,
             'XDG_DATA_HOME' => $this->dataHome,
         ])->create();
 
-        return new CommandTester($application->find(DoctorCommand::NAME));
+        return new CommandTester($standaloneApplication->find(DoctorCommand::NAME));
     }
 }

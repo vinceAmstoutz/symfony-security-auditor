@@ -24,6 +24,15 @@ final readonly class StandalonePlatformConfigResolver
     private const string ENV_PLACEHOLDER = '/^%env\(([^)]+)\)%$/';
 
     /**
+     * Stands in for a credential a run has been told it will not need — a
+     * `--dry-run`, which estimates cost from the scanned files and never
+     * reaches the provider. It is deliberately not a plausible key: were a
+     * code path ever to send it, the provider rejects it outright rather than
+     * charging someone.
+     */
+    public const string UNNEEDED_CREDENTIAL = 'unneeded-for-this-run';
+
+    /**
      * @param array<string, string> $environment
      */
     public function __construct(
@@ -36,7 +45,7 @@ final readonly class StandalonePlatformConfigResolver
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      */
-    public function resolve(array $rawConfig): StandalonePlatformConfig
+    public function resolve(array $rawConfig, bool $credentialsRequired = true): StandalonePlatformConfig
     {
         $platform = $rawConfig['platform'] ?? null;
         if (!\is_array($platform) || [] === $platform) {
@@ -46,7 +55,7 @@ final readonly class StandalonePlatformConfigResolver
         $activeProvider = $rawConfig['provider'] ?? null;
 
         return new StandalonePlatformConfig(
-            $this->resolveEnvPlaceholders($platform),
+            $this->resolveEnvPlaceholders($platform, $credentialsRequired),
             \is_string($activeProvider) && '' !== $activeProvider ? $activeProvider : null,
         );
     }
@@ -58,13 +67,13 @@ final readonly class StandalonePlatformConfigResolver
      *
      * @throws MissingEnvironmentVariableException
      */
-    private function resolveEnvPlaceholders(array $config): array
+    private function resolveEnvPlaceholders(array $config, bool $credentialsRequired): array
     {
         $resolved = [];
         foreach ($config as $key => $value) {
             $resolved[$key] = match (true) {
-                \is_array($value) => $this->resolveEnvPlaceholders($value),
-                \is_string($value) => $this->resolveValue($value),
+                \is_array($value) => $this->resolveEnvPlaceholders($value, $credentialsRequired),
+                \is_string($value) => $this->resolveValue($value, $credentialsRequired),
                 default => $value,
             };
         }
@@ -75,17 +84,21 @@ final readonly class StandalonePlatformConfigResolver
     /**
      * @throws MissingEnvironmentVariableException
      */
-    private function resolveValue(string $value): string
+    private function resolveValue(string $value, bool $credentialsRequired): string
     {
         if (1 !== preg_match(self::ENV_PLACEHOLDER, $value, $matches)) {
             return $value;
         }
 
         $resolved = $this->environment[$matches[1]] ?? '';
-        if ('' === $resolved) {
+        if ('' !== $resolved) {
+            return $resolved;
+        }
+
+        if ($credentialsRequired) {
             throw MissingEnvironmentVariableException::forName($matches[1]);
         }
 
-        return $resolved;
+        return self::UNNEEDED_CREDENTIAL;
     }
 }

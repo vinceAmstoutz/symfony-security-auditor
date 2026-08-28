@@ -18,6 +18,7 @@ use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use stdClass;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
@@ -67,6 +68,30 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
 
         self::assertSame('audit:run', $command->getName());
         self::assertContains('audit', $command->getAliases());
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws UnresolvableAuditCommandException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_wrapped_command_leaves_the_banner_to_the_application(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+
+        $commandTester = new CommandTester((new StandaloneConsoleCommandFactory())->create($containerBuilder));
+        $commandTester->execute(['project-path' => __DIR__.'/Fixture', '--dry-run' => true]);
+
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('Project:', $display);
+        self::assertStringNotContainsString('SECURITY AUDITOR', $display);
     }
 
     /**

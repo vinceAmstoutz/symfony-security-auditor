@@ -334,14 +334,29 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
     /**
      * SARIF producers emit artifact URIs in several equivalent spellings for
      * the same repository-relative file (`src/A.php`, `./src/A.php`,
-     * `file:///<project root>/src/A.php` when no uriBaseId applies) —
-     * normalize to the project-relative form the scanner uses.
+     * `file:///<project root>/src/A.php` when no uriBaseId applies,
+     * `src/my%20page.twig` for any segment a URI must escape) — normalize to
+     * the project-relative form the scanner uses.
      */
     private function normalizeUri(string $uri): string
     {
-        $normalized = u($uri)->trimPrefix('file://')->trimPrefix('./');
+        $normalized = u($this->decodePercentEncoding($uri))->trimPrefix('./');
         $projectRootPrefix = u($this->auditedProjectPathHolder->path())->ensureEnd('/');
 
         return $normalized->trimPrefix($projectRootPrefix->toString())->trimStart('/')->toString();
+    }
+
+    /**
+     * `artifactLocation.uri` is an RFC 3986 URI reference, so a segment
+     * holding a space, a `#` or a non-ASCII character arrives percent-encoded
+     * — the exact inverse of what `SarifReportRenderer::encodeArtifactUri()`
+     * emits. Decoding precedes stripping the project-root prefix because that
+     * prefix is a raw filesystem path, which may itself contain a space.
+     * `rawurldecode()` leaves an invalid escape sequence untouched, so a
+     * producer that emits raw paths keeps matching.
+     */
+    private function decodePercentEncoding(string $uri): string
+    {
+        return rawurldecode(u($uri)->trimPrefix('file://')->toString());
     }
 }

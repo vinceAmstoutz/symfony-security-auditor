@@ -547,13 +547,34 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
         ));
         $output = $this->renderer->render($auditReport);
 
-        self::assertStringNotContainsString('Cost', $output);
-        self::assertStringNotContainsString('$0.3755', $output);
-        self::assertStringNotContainsString('$0.0350', $output);
-        self::assertStringNotContainsString('$0.0050', $output);
+        self::assertStringContainsString('$0.3755', $output);
+        self::assertStringNotContainsString('(estimate)', $output);
         self::assertStringNotContainsString('{{cost}}', $output);
-        self::assertStringNotContainsString('{{costBreakdown}}', $output);
         self::assertStringContainsString('100 in / 50 out (claude-opus-4-7)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_labels_cost_as_computed_from_published_rates(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.0123, 'claude-opus-4-7'));
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString('$0.0123 (published rates)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_caveats_zero_cost_when_tokens_were_spent_but_the_model_has_no_published_pricing(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2'));
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString('$0.0000 (no published pricing, or a self-hosted model)', $output);
     }
 
     /**

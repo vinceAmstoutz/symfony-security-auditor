@@ -127,10 +127,49 @@ final class RegexSecretScrubberTest extends TestCase
             self::OPENAI_SK.'-'.str_repeat('a1B2', 10),
             '***REDACTED:openai_api_key***',
         ];
+        yield 'basic_authorization_header' => [
+            'Authorization: Basic '.base64_encode('admin:s3cr3tValue1'),
+            '***REDACTED:basic_authorization***',
+        ];
+        yield 'basic_authorization_proxy_header' => [
+            'Proxy-Authorization: Basic '.base64_encode('admin:s3cr3tValue1'),
+            '***REDACTED:basic_authorization***',
+        ];
+        yield 'basic_authorization_php_array' => [
+            "'Authorization' => 'Basic ".base64_encode('admin:s3cr3tValue1')."'",
+            '***REDACTED:basic_authorization***',
+        ];
+        yield 'slack_app_level_token' => [
+            'xapp-1-A012345678-1234567890123-'.str_repeat('a1B2', 8),
+            '***REDACTED:slack_token***',
+        ];
         yield 'slack_incoming_webhook_url' => [
             'https://hooks.slack.com/services/T00000000/B00000000/'.str_repeat('X', 24),
             '***REDACTED:slack_webhook_url***',
         ];
+    }
+
+    /**
+     * The credential is redacted but the header name and scheme are kept, so the
+     * LLM still sees that the request authenticates and how — removing them
+     * would hide the auth mechanism the audit is meant to reason about.
+     */
+    public function test_a_basic_authorization_header_keeps_its_scheme_and_redacts_only_the_credential(): void
+    {
+        $scrubbed = $this->regexSecretScrubber->scrub('Authorization: Basic '.base64_encode('admin:s3cr3tValue'));
+
+        self::assertSame('Authorization: Basic ***REDACTED:basic_authorization***', $scrubbed);
+    }
+
+    /**
+     * `basic` and `authorization` are ordinary English words; only the two
+     * together, in an assignment, followed by a credential-shaped value, are a
+     * secret. Prose that happens to use them must survive untouched.
+     */
+    public function test_prose_mentioning_basic_authorization_is_not_redacted(): void
+    {
+        self::assertSame('Use basic authentication over TLS.', $this->regexSecretScrubber->scrub('Use basic authentication over TLS.'));
+        self::assertSame('Authorization: required', $this->regexSecretScrubber->scrub('Authorization: required'));
     }
 
     public function test_an_azure_storage_account_key_is_redacted(): void

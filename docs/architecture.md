@@ -849,12 +849,12 @@ Parameters exposed for debugging: `symfony_security_auditor.attacker_model`,
 
 Console command `audit:run` (alias `audit`). Arguments and options:
 
-| Name            | Type     | Default    | Purpose                                           |
-| --------------- | -------- | ---------- | ------------------------------------------------- |
-| `project-path`  | argument | `getcwd()` | Path to target project; defaults to CWD           |
-| `--format / -f` | option   | `console`  | `console`, `json`, or `sarif`                     |
-| `--output / -o` | option   | `null`     | Write JSON/SARIF report to file                   |
-| `--dry-run`     | option   | `false`    | Estimate cost without invoking the LLM; exits `0` |
+| Name            | Type     | Default    | Purpose                                                                                                                    |
+| --------------- | -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `project-path`  | argument | `getcwd()` | Path to target project; defaults to CWD                                                                                    |
+| `--format / -f` | option   | `console`  | Any `OutputFormat` value: `console`, `executive`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`, `github-comment` |
+| `--output / -o` | option   | `null`     | Write JSON/SARIF report to file                                                                                            |
+| `--dry-run`     | option   | `false`    | Estimate cost without invoking the LLM; exits `0`                                                                          |
 
 Input mapping and resolution live in `AuditCommandInput`; output writing in
 `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in

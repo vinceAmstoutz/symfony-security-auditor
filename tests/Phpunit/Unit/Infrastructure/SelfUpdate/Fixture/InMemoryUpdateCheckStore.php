@@ -34,4 +34,10 @@ final class InMemoryUpdateCheckStore implements UpdateCheckStoreInterface
     {
         $this->updateCheckState = $updateCheckState;
     }
+
+    #[Override]
+    public function clear(): void
+    {
+        $this->updateCheckState = null;
+    }
 }

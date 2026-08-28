@@ -257,6 +257,31 @@ final class RegexCodeSlicerTest extends TestCase
     }
 
     /**
+     * A heredoc body line that merely starts with the closing identifier word
+     * — followed by more text, not by `;`/`,`/`)` — is not a real PHP closing
+     * marker, only a body line that happens to share its first word.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_heredoc_body_line_starting_with_the_identifier_word_does_not_close_the_heredoc(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$name = \$request->get('name');\n"
+            ."        \$sql = <<<SQL\n"
+            ."            SELECT * FROM t\n"
+            ."            SQL syntax note: uses index\n"
+            ."            WHERE name = '\$name'\n"
+            ."            SQL;\n"
+            ."        return \$connection->executeQuery(\$sql);\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString("WHERE name = '\$name'", $sliced);
+    }
+
+    /**
      * When a still-open multi-line call's closing `)`/`;` sits on the same
      * line as the heredoc's closing identifier (a common Doctrine/DBAL idiom
      * — `->executeQuery(<<<SQL ... SQL);`), that line is consumed entirely by

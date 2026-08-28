@@ -19,31 +19,34 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
-    public function __construct(private PricingProviderInterface $pricingProvider) {}
+    public function __construct(
+        private PricingProviderInterface $pricingProvider,
+        private ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
+    ) {}
 
     #[Override]
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void
     {
-        $symfonyStyle->title('Symfony LLM Security Auditor');
+        $this->consoleBanner->render($symfonyStyle);
+
         $symfonyStyle->text([
             \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
-            'Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)',
+            'Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)',
             '',
         ]);
     }
 
-    /**
-     * @param list<string> $configNotices
-     */
     #[Override]
     public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void
     {
@@ -71,6 +74,24 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             'No published pricing for the configured model(s): %s. The dry-run cost estimate shows $0.00 for these. If you are running a local or self-hosted model (e.g. Ollama, LM Studio), $0.00 is correct — you can ignore this notice. Otherwise the name is likely a typo or an unlisted model: check it in your symfony_security_auditor configuration against the models supported by your symfony/ai platform.',
             implode(', ', $unsupportedModels),
         ));
+    }
+
+    #[Override]
+    public function synthesisCostWarnings(SymfonyStyle $symfonyStyle, bool $pocSynthesisEnabled, bool $fixSynthesisEnabled): void
+    {
+        if ($pocSynthesisEnabled && $fixSynthesisEnabled) {
+            $symfonyStyle->getErrorStyle()->warning('PoC synthesis (audit.poc_synthesis.enabled) and fix synthesis (audit.fix_synthesis.enabled) are both enabled. Their LLM calls are not included in this cost estimate, so a real run will cost more than the figure shown.');
+
+            return;
+        }
+
+        if ($pocSynthesisEnabled) {
+            $symfonyStyle->getErrorStyle()->warning('PoC synthesis is enabled (audit.poc_synthesis.enabled). Its LLM calls are not included in this cost estimate, so a real run will cost more than the figure shown.');
+        }
+
+        if ($fixSynthesisEnabled) {
+            $symfonyStyle->getErrorStyle()->warning('Fix synthesis is enabled (audit.fix_synthesis.enabled). Its LLM calls are not included in this cost estimate, so a real run will cost more than the figure shown.');
+        }
     }
 
     /** @return array<string, string> */
@@ -137,10 +158,39 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             }
 
             $symfonyStyle->listing($lines);
+
+            $reviewerRatioPercent = $this->reviewerRatioPercent($cost);
+            if (null !== $reviewerRatioPercent) {
+                $this->caveat($symfonyStyle, \sprintf(
+                    'Reviewer input is projected at ~%d%% of attacker input in this estimate — a flat pre-run heuristic, not a measurement; actual cost scales with real findings.',
+                    $reviewerRatioPercent,
+                ));
+            }
         }
 
-        $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
-        $symfonyStyle->success('Dry run complete.');
+        $this->caveat($symfonyStyle, 'Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
+        $symfonyStyle->newLine();
+        $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
+    }
+
+    /**
+     * Derived from the cost breakdown itself rather than restating
+     * `EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO` as a fixed
+     * string — a caller constructing the use case with a different ratio, or
+     * a future change to the default, would otherwise silently drift from
+     * this caveat.
+     */
+    private function reviewerRatioPercent(AuditCost $auditCost): ?int
+    {
+        $byRole = $auditCost->byRole();
+        $attackerInputTokens = $byRole[AgentRole::Attacker->value]['input_tokens'] ?? 0;
+        $reviewerInputTokens = $byRole[AgentRole::Reviewer->value]['input_tokens'] ?? null;
+
+        if (null === $reviewerInputTokens || 0 === $attackerInputTokens) {
+            return null;
+        }
+
+        return (int) round($reviewerInputTokens / $attackerInputTokens * 100);
     }
 
     #[Override]
@@ -155,11 +205,35 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->section(\sprintf('Scanned files (%d)', \count($projectFiles)));
 
         foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
-            $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $type, \count($relativePaths)));
+            $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $this->bucketLabel($type), \count($relativePaths)));
             $symfonyStyle->listing(array_map($this->sanitizePathForListing(...), $relativePaths));
         }
 
-        $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));
+        $this->lightConfirmation($symfonyStyle, \sprintf('%d file(s) in scope.', \count($projectFiles)));
+    }
+
+    /**
+     * A lighter-weight replacement for `SymfonyStyle::success()` on
+     * intermediate confirmations — no boxed `[OK]` block, just a short line —
+     * but keeping its leading marker (gated on `isDecorated()`, since a
+     * redirected/CI log has no use for an emoji) and its trailing blank line,
+     * so it doesn't abut whatever prints next.
+     */
+    /**
+     * `SymfonyStyle::note()` frames a caveat in a full-width `[NOTE]` block
+     * with a `!` gutter down every wrapped line — weight this earns only for
+     * something the reader must act on. A dimmed line reads as the footnote
+     * it is, and matches the other estimate caveats printed alongside it.
+     */
+    private function caveat(SymfonyStyle $symfonyStyle, string $message): void
+    {
+        $symfonyStyle->text(\sprintf('<fg=gray>%s</>', $message));
+    }
+
+    private function lightConfirmation(SymfonyStyle $symfonyStyle, string $message): void
+    {
+        $symfonyStyle->writeln(\sprintf($symfonyStyle->isDecorated() ? '  ✅ %s' : '  %s', $message));
+        $symfonyStyle->newLine();
     }
 
     #[Override]
@@ -196,7 +270,34 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $byType[$projectFile->type()][] = $projectFile->relativePath();
         }
 
-        return $byType;
+        return $this->withUncategorizedBucketsLast($byType);
+    }
+
+    /**
+     * @param array<string, list<string>> $byType
+     *
+     * @return array<string, list<string>>
+     */
+    private function withUncategorizedBucketsLast(array $byType): array
+    {
+        $trailing = [];
+        foreach ([ProjectFileType::PHP->value, ProjectFileType::OTHER->value] as $trailingType) {
+            if (\array_key_exists($trailingType, $byType)) {
+                $trailing[$trailingType] = $byType[$trailingType];
+                unset($byType[$trailingType]);
+            }
+        }
+
+        return $byType + $trailing;
+    }
+
+    private function bucketLabel(string $type): string
+    {
+        return match ($type) {
+            ProjectFileType::PHP->value => 'php · uncategorized',
+            ProjectFileType::OTHER->value => 'other · uncategorized',
+            default => $type,
+        };
     }
 
     #[Override]

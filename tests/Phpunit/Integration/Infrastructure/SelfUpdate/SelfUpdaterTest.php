@@ -23,11 +23,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAsset;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PendingBinarySwap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefresherInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture\FakeReleaseClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture\RecordingPricingCatalogRefresher;
 
 final class SelfUpdaterTest extends TestCase
 {
@@ -37,6 +42,8 @@ final class SelfUpdaterTest extends TestCase
 
     private string $binaryPath;
 
+    private PendingBinarySwap $pendingBinarySwap;
+
     #[Override]
     protected function setUp(): void
     {
@@ -44,6 +51,7 @@ final class SelfUpdaterTest extends TestCase
         (new Filesystem())->mkdir($this->workingDirectory);
         $this->binaryPath = $this->workingDirectory.'/symfony-security-auditor';
         (new Filesystem())->dumpFile($this->binaryPath, 'OLD-BINARY');
+        $this->pendingBinarySwap = new PendingBinarySwap();
     }
 
     #[Override]
@@ -60,9 +68,112 @@ final class SelfUpdaterTest extends TestCase
     {
         $payload = 'NEW-BINARY';
         $selfUpdateResult = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+        $this->pendingBinarySwap->commit();
 
         self::assertSame(SelfUpdateStatus::Updated, $selfUpdateResult->status);
         self::assertStringEqualsFile($this->binaryPath, $payload);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_leaves_the_running_binary_in_place_until_the_process_ends(): void
+    {
+        $payload = 'NEW-BINARY';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+
+        self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_keeps_the_verified_download_until_the_swap_is_committed(): void
+    {
+        $payload = 'NEW-BINARY';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+
+        self::assertCount(1, (new Finder())->in($this->workingDirectory)->files()->name('/\.download$/')->ignoreDotFiles(false));
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_refreshes_the_pricing_catalog_after_a_successful_update(): void
+    {
+        $payload = 'NEW-BINARY';
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(1, $recordingPricingCatalogRefresher->refreshCount);
+        self::assertSame(PricingCatalogRefreshOutcome::Refreshed, $selfUpdateResult->pricingCatalogRefresh);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_carries_a_failed_pricing_catalog_refresh_into_the_result(): void
+    {
+        $payload = 'NEW-BINARY';
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher(PricingCatalogRefreshOutcome::Failed);
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $selfUpdateResult->pricingCatalogRefresh);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_does_not_refresh_the_pricing_catalog_on_a_check_only_run(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', true);
+
+        self::assertSame(0, $recordingPricingCatalogRefresher->refreshCount);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_refreshes_the_pricing_catalog_when_already_up_to_date(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(SelfUpdateStatus::AlreadyUpToDate, $selfUpdateResult->status);
+        self::assertSame(1, $recordingPricingCatalogRefresher->refreshCount);
+        self::assertSame(PricingCatalogRefreshOutcome::Refreshed, $selfUpdateResult->pricingCatalogRefresh);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_does_not_refresh_the_pricing_catalog_on_a_check_only_run_when_already_up_to_date(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher();
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', true);
+
+        self::assertSame(0, $recordingPricingCatalogRefresher->refreshCount);
+        self::assertSame(PricingCatalogRefreshOutcome::Skipped, $selfUpdateResult->pricingCatalogRefresh);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_carries_a_failed_refresh_into_an_already_up_to_date_result(): void
+    {
+        $recordingPricingCatalogRefresher = new RecordingPricingCatalogRefresher(PricingCatalogRefreshOutcome::Failed);
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')), pricingCatalogRefresher: $recordingPricingCatalogRefresher)->run('1.0.0', false);
+
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $selfUpdateResult->pricingCatalogRefresh);
     }
 
     /**
@@ -73,6 +184,7 @@ final class SelfUpdaterTest extends TestCase
     {
         $payload = 'NEW-BINARY';
         $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+        $this->pendingBinarySwap->commit();
 
         self::assertSame(0o755, fileperms($this->binaryPath) & 0o777);
     }
@@ -86,6 +198,7 @@ final class SelfUpdaterTest extends TestCase
     {
         $payload = 'NEW-BINARY';
         $selfUpdateResult = $this->selfUpdater($this->clientFor($tagName, $payload, hash('sha256', $payload)))->run('1.0.0', false);
+        $this->pendingBinarySwap->commit();
 
         self::assertSame('9.9.9', $selfUpdateResult->latestVersion);
         self::assertStringEqualsFile($this->binaryPath, $payload);
@@ -146,6 +259,24 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function test_it_rejects_a_download_that_vanishes_before_it_can_be_hashed(): void
+    {
+        $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW'), vanishAfterDownload: true));
+
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessage('Could not read the downloaded file');
+
+            $selfUpdater->run('1.0.0', false);
+        } finally {
+            self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function test_it_refuses_to_update_when_the_binary_is_not_writable(): void
     {
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW')), $this->workingDirectory.'/missing/symfony-security-auditor');
@@ -171,11 +302,67 @@ final class SelfUpdaterTest extends TestCase
         };
         $payload = 'NEW';
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem);
+        $selfUpdater->run('1.0.0', false);
+
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessage('Failed to replace the binary');
+
+            $this->pendingBinarySwap->commit();
+        } finally {
+            self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_reports_a_failure_to_make_the_download_executable_before_scheduling_a_swap(): void
+    {
+        $filesystem = new class extends Filesystem {
+            /**
+             * @param string|iterable<mixed> $files
+             */
+            #[Override]
+            public function chmod(string|iterable $files, int $mode, int $umask = 0o000, bool $recursive = false): void
+            {
+                throw new IOException('chmod refused');
+            }
+        };
+        $payload = 'NEW';
+        $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem);
+
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessage('Failed to replace the binary');
+
+            $selfUpdater->run('1.0.0', false);
+        } finally {
+            self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_discards_the_download_when_the_deferred_swap_fails(): void
+    {
+        $filesystem = new class extends Filesystem {
+            #[Override]
+            public function rename(string $origin, string $target, bool $overwrite = false): void
+            {
+                throw new IOException('rename refused');
+            }
+        };
+        $payload = 'NEW';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem)->run('1.0.0', false);
 
         try {
             $this->expectException(SelfUpdateFailedException::class);
 
-            $selfUpdater->run('1.0.0', false);
+            $this->pendingBinarySwap->commit();
         } finally {
             self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('/\.download$/')->ignoreDotFiles(false));
         }
@@ -190,7 +377,7 @@ final class SelfUpdaterTest extends TestCase
         $fakeReleaseClient = new FakeReleaseClient([]);
         $locator = self::createStub(RunningBinaryLocatorInterface::class);
         $locator->method('path')->willReturn($this->binaryPath);
-        $selfUpdater = new SelfUpdater($fakeReleaseClient, new GitHubBinaryAssetResolver('Windows', 'x86_64'), $locator);
+        $selfUpdater = new SelfUpdater($fakeReleaseClient, new GitHubBinaryAssetResolver('Windows', 'x86_64'), $locator, $this->pendingBinarySwap);
 
         try {
             $this->expectException(UnsupportedSelfUpdatePlatformException::class);
@@ -230,14 +417,14 @@ final class SelfUpdaterTest extends TestCase
     /**
      * @throws UnsupportedSelfUpdatePlatformException
      */
-    private function clientFor(string $tagName, string $payload, string $checksum): FakeReleaseClient
+    private function clientFor(string $tagName, string $payload, string $checksum, bool $vanishAfterDownload = false): FakeReleaseClient
     {
         $asset = $this->asset($tagName);
 
         return new FakeReleaseClient([
             self::LATEST_RELEASE_API_URL => \sprintf('{"tag_name":"%s"}', $tagName),
             $asset->checksumUrl => \sprintf("%s\n", $checksum),
-        ], $payload);
+        ], $payload, $vanishAfterDownload);
     }
 
     /**
@@ -248,11 +435,11 @@ final class SelfUpdaterTest extends TestCase
         return (new GitHubBinaryAssetResolver('Linux', 'x86_64'))->resolve($version);
     }
 
-    private function selfUpdater(ReleaseClientInterface $releaseClient, ?string $binaryPath = null, ?Filesystem $filesystem = null): SelfUpdater
+    private function selfUpdater(ReleaseClientInterface $releaseClient, ?string $binaryPath = null, ?Filesystem $filesystem = null, ?PricingCatalogRefresherInterface $pricingCatalogRefresher = null): SelfUpdater
     {
         $locator = self::createStub(RunningBinaryLocatorInterface::class);
         $locator->method('path')->willReturn($binaryPath ?? $this->binaryPath);
 
-        return new SelfUpdater($releaseClient, new GitHubBinaryAssetResolver('Linux', 'x86_64'), $locator, $filesystem ?? new Filesystem());
+        return new SelfUpdater($releaseClient, new GitHubBinaryAssetResolver('Linux', 'x86_64'), $locator, $this->pendingBinarySwap, $filesystem ?? new Filesystem(), $pricingCatalogRefresher ?? new NullPricingCatalogRefresher());
     }
 }

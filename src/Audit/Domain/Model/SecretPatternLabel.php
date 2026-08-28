@@ -28,6 +28,7 @@ enum SecretPatternLabel: string
     case MultilineAssignment = 'multiline_assignment';
     case ConnectionUri = 'connection_uri';
     case BearerToken = 'bearer_token';
+    case BasicAuthorization = 'basic_authorization';
     case OpenAiApiKey = 'openai_api_key';
     case SlackWebhookUrl = 'slack_webhook_url';
     case Unscannable = 'unscannable';
