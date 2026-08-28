@@ -155,8 +155,8 @@ everything that only makes sense for a Symfony application:
   `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and
   `SymfonyYamlSecurityConfigParser`.
 - the container-building classes in `Infrastructure/Config/` —
-  `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory` and
-  `ContainerParameterRegistrar`.
+  `AuditConfigurationDefinition`, `CoreCompositionRoot`,
+  `AttackerAgentDefinitionFactory` and `ContainerParameterRegistrar`.
 
 The `Infrastructure` layer is then everything under `Infrastructure/` that is
 _not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain`
@@ -773,11 +773,14 @@ Three render methods:
 
 ### `SymfonySecurityAuditorBundle`
 
-Extends `AbstractBundle`. All wiring lives directly in this class — no separate
-Extension or Configuration class.
+Extends `AbstractBundle`, and delegates both halves of its job rather than
+carrying them: `configure()` hands the config tree to
+`AuditConfigurationDefinition`, and `loadExtension()` hands the object graph to
+`CoreCompositionRoot`. There is still no separate Extension class — the bundle
+remains the entry point Symfony calls.
 
-`configure(DefinitionConfigurator $definition)` defines the config tree under
-root key `symfony_security_auditor`. Top-level scalars:
+The config tree is defined under root key `symfony_security_auditor`. Top-level
+scalars:
 
 | Key              | Default           | Purpose                                         |
 | ---------------- | ----------------- | ----------------------------------------------- |
@@ -827,9 +830,10 @@ ai:
             api_key: '%env(ANTHROPIC_API_KEY)%'
 ```
 
-The `loadExtension()` method (receiving `$config`, `ContainerConfigurator`,
-`ContainerBuilder`) imports `config/services.php`, then registers two
-`SymfonyAiLLMClient` service definitions (`security_auditor.attacker_client` and
+`CoreCompositionRoot::register()` (receiving the `ContainerConfigurator`, the
+`ContainerBuilder` and the parsed `BundleConfiguration`) imports
+`config/services.php`, then registers two `SymfonyAiLLMClient` service
+definitions (`security_auditor.attacker_client` and
 `security_auditor.reviewer_client`). Each receives `PlatformInterface`, the
 resolved model name (`attacker_model` or `reviewer_model`, falling back to
 `model`) and the default temperature, so `AttackerAgent` and `ReviewerAgent`

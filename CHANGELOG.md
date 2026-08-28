@@ -39,15 +39,15 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 - **The audit object graph is described in one named place instead of inside the
   bundle extension.** `SymfonySecurityAuditorBundle` carried the wiring itself —
-  the `config/services.php` import, the container parameters and seven
-  conditional registrations — so the only description of the graph was reachable
-  only through a Symfony bundle. `CoreCompositionRoot` now owns it and the
-  bundle delegates, dropping from 394 lines to 117: a config tree and one call.
-  Partial progress on #250; the standalone binary still reaches the composition
-  root through the bundle extension rather than calling it directly, because
-  doing that needs the conditional wiring ported off the `ContainerConfigurator`
-  DSL — which `config/services.php` and the shared
-  `AttackerAgentDefinitionFactory` also speak — plus hand-building a
+  the `config/services.php` import, the container parameters and six conditional
+  registrations — so the only description of the graph was reachable only
+  through a Symfony bundle. `CoreCompositionRoot` now owns it and the bundle
+  delegates, dropping from 394 lines to 57: one call to the config definition
+  and one to the composition root. Partial progress on #250; the standalone
+  binary still reaches the composition root through the bundle extension rather
+  than calling it directly, because doing that needs the conditional wiring
+  ported off the `ContainerConfigurator` DSL — which `config/services.php` and
+  the shared `AttackerAgentDefinitionFactory` also speak — plus hand-building a
   `ContainerConfigurator` across Symfony 7.4/8.0/8.1.
 
 - **Adding a pre-flight configuration notice is now one new class.**
@@ -107,10 +107,10 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   Claude model `max_tokens` bounds thinking and response text **together**, so
   the pre-2.0 `4096` left materially less room for a full `record_vulnerability`
   argument set than the number suggests — exactly the truncation the key exists
-  to prevent. `LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS` is now the single
-  source for both defaults — `DEFAULT_MODEL` and `DEFAULT_MAX_OUTPUT_TOKENS`, so
-  the config tree and `InitCommand`'s prompt no longer carry their own copies of
-  the model id — and reads `8192` — including the
+  to prevent. `LLMConfiguration` is now the single source for both defaults —
+  `DEFAULT_MODEL` and `DEFAULT_MAX_OUTPUT_TOKENS` — so the config tree and
+  `InitCommand`'s prompt no longer carry their own copies of the model id, and
+  `8192` reaches every site that reads the cap, including the
   `BundleConfiguration::fromArray()` fallback a programmatic caller hits when it
   omits the key, which had been left on the old `4096`.
 
