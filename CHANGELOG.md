@@ -37,6 +37,19 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 ### Changed
 
+- **The audit object graph is described in one named place instead of inside the
+  bundle extension.** `SymfonySecurityAuditorBundle` carried the wiring itself —
+  the `config/services.php` import, the container parameters and seven
+  conditional registrations — so the only description of the graph was reachable
+  only through a Symfony bundle. `CoreCompositionRoot` now owns it and the
+  bundle delegates, dropping from 394 lines to 117: a config tree and one call.
+  Partial progress on #250; the standalone binary still reaches the composition
+  root through the bundle extension rather than calling it directly, because
+  doing that needs the conditional wiring ported off the `ContainerConfigurator`
+  DSL — which `config/services.php` and the shared
+  `AttackerAgentDefinitionFactory` also speak — plus hand-building a
+  `ContainerConfigurator` across Symfony 7.4/8.0/8.1.
+
 - **Adding a pre-flight configuration notice is now one new class.**
   `ConfigurationNotices` held five hardcoded checks, each with a private
   predicate and an inline message, so a sixth footgun meant editing the
