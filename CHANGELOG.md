@@ -37,6 +37,25 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 ### Changed
 
+- **File classification is a Domain port instead of a static call, so a
+  non-Symfony profile can be plugged in.** `ProjectFile::create()` classified
+  itself by calling `ProjectFileTypeClassifier::classify()` — a static method,
+  living in `Audit\Domain\Model\`, that hardcoded `extends AbstractController`,
+  `#[Route]`, `.twig`, EasyAdmin and Sonata. The audit engine therefore could
+  not be pointed at a Laravel or Laminas project even in principle: everything
+  downstream switches on `ProjectFileType`, and nothing could supply a different
+  one. The heuristics are unchanged but now live in
+  `SymfonyProjectFileTypeClassifier` (`Infrastructure/Scan/`, inside the
+  `SymfonyProfile` deptrac layer), reached through the new
+  `ProjectFileTypeClassifierInterface` — the 24th port on the BC list, joined
+  deliberately because it is exactly the framework extension point.
+  `ProjectFile` no longer classifies at all: `create()` becomes `of()` and takes
+  the `ProjectFileType` as data, and `ProjectFileScanner` — which is what
+  discovers files — takes the classifier as a required constructor argument
+  rather than defaulting to a Symfony one, so the portable half of
+  `Infrastructure` cannot reach `SymfonyProfile`. No detection behaviour
+  changes: every one of the 4,688 tests passes with its expectations untouched.
+
 - **The audit object graph is described in one named place, and every host
   reaches it the same way.** `SymfonySecurityAuditorBundle` carried the wiring
   itself — the `config/services.php` import, the container parameters and six

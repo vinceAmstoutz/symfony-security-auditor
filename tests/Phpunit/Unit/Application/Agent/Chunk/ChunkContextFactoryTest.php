@@ -24,7 +24,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
@@ -34,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilder
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ChunkContextFactoryTest extends TestCase
 {
@@ -50,7 +50,7 @@ final class ChunkContextFactoryTest extends TestCase
             new ChunkContextKeyDeriver(),
         );
 
-        $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
+        $projectFile = SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
         $chunk = [$projectFile];
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, $symfonyMapping);
@@ -82,7 +82,7 @@ final class ChunkContextFactoryTest extends TestCase
             new ChunkContextKeyDeriver(),
         );
 
-        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
+        $chunk = [SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
 
         $chunkContext = $chunkContextFactory->create($chunk, new AttackerAnalysisRequest($chunk, $before), new RiskMarkerIndex([]), true);
         $withMapping = $chunkContextFactory->create($chunk, new AttackerAnalysisRequest($chunk, $after), new RiskMarkerIndex([]), true);
@@ -140,8 +140,8 @@ final class ChunkContextFactoryTest extends TestCase
             )),
         ];
 
-        $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
-        $protectedController = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php #[IsGranted("ROLE_ADMIN")] class A {}');
+        $projectFile = SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
+        $protectedController = SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php #[IsGranted("ROLE_ADMIN")] class A {}');
         yield 'a controller gains a security annotation' => [
             SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]), new AccessControlMap()),
             SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$protectedController]]), new AccessControlMap()),
@@ -165,7 +165,7 @@ final class ChunkContextFactoryTest extends TestCase
             new ChunkContextKeyDeriver(),
         );
 
-        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
+        $chunk = [SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
 
         $formBindingA = new FormBinding('src/Controller/A.php', 'new', 'App\Form\UserType');
         $formBindingB = new FormBinding('src/Controller/B.php', 'edit', 'App\Form\PostType');
@@ -197,7 +197,7 @@ final class ChunkContextFactoryTest extends TestCase
             new ChunkContextKeyDeriver(),
         );
 
-        $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
+        $projectFile = SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
         $chunk = [$projectFile];
         $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
@@ -222,7 +222,7 @@ final class ChunkContextFactoryTest extends TestCase
             new ChunkContextKeyDeriver(),
         );
 
-        $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', "<?php\n\$a = 1;\n\$b = 2;\nDANGER_LINE_HERE\n\$d = 4;");
+        $projectFile = SymfonyProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', "<?php\n\$a = 1;\n\$b = 2;\nDANGER_LINE_HERE\n\$d = 4;");
         $chunk = [$projectFile];
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, $symfonyMapping);
@@ -248,7 +248,7 @@ final class ChunkContextFactoryTest extends TestCase
             new ChunkContextKeyDeriver(),
         );
 
-        $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', "<?php\nORIGINAL_ONLY_TOKEN\n// more");
+        $projectFile = SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', "<?php\nORIGINAL_ONLY_TOKEN\n// more");
         $chunk = [$projectFile];
         $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 

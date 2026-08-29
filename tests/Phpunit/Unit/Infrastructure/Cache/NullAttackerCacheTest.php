@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Cache;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class NullAttackerCacheTest extends TestCase
 {
@@ -26,7 +26,7 @@ final class NullAttackerCacheTest extends TestCase
     public function test_get_always_returns_null(): void
     {
         $nullAttackerCache = new NullAttackerCache();
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         self::assertNull($nullAttackerCache->get($chunk));
     }
@@ -37,7 +37,7 @@ final class NullAttackerCacheTest extends TestCase
     public function test_store_is_noop_and_does_not_affect_subsequent_get(): void
     {
         $nullAttackerCache = new NullAttackerCache();
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         $nullAttackerCache->store($chunk, [['type' => 'sql_injection', 'severity' => 'high']]);
 

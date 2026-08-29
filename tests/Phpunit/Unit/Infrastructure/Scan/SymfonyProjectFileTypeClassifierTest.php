@@ -11,19 +11,19 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileTypeClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 
-final class ProjectFileTypeClassifierTest extends TestCase
+final class SymfonyProjectFileTypeClassifierTest extends TestCase
 {
     #[DataProvider('classificationCases')]
     public function test_it_classifies_a_path_and_content_pair(string $path, string $content, ProjectFileType $projectFileType): void
     {
-        self::assertSame($projectFileType, ProjectFileTypeClassifier::classify($path, $content));
+        self::assertSame($projectFileType, (new SymfonyProjectFileTypeClassifier())->classify($path, $content));
     }
 
     /** @return iterable<string, array{string, string, ProjectFileType}> */
@@ -83,28 +83,28 @@ final class ProjectFileTypeClassifierTest extends TestCase
 
     public function test_a_non_php_file_in_a_webhook_directory_is_not_forced_into_webhook_consumer(): void
     {
-        $projectFileType = ProjectFileTypeClassifier::classify('src/Webhook/config.yaml', 'foo: bar');
+        $projectFileType = (new SymfonyProjectFileTypeClassifier())->classify('src/Webhook/config.yaml', 'foo: bar');
 
         self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }
 
     public function test_a_non_php_file_in_a_message_handler_directory_is_not_forced_into_messenger_handler(): void
     {
-        $projectFileType = ProjectFileTypeClassifier::classify('src/MessageHandler/config.yaml', 'foo: bar');
+        $projectFileType = (new SymfonyProjectFileTypeClassifier())->classify('src/MessageHandler/config.yaml', 'foo: bar');
 
         self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }
 
     public function test_a_non_php_file_in_a_ldap_directory_is_not_forced_into_ldap_service(): void
     {
-        $projectFileType = ProjectFileTypeClassifier::classify('src/Ldap/config.yaml', 'foo: bar');
+        $projectFileType = (new SymfonyProjectFileTypeClassifier())->classify('src/Ldap/config.yaml', 'foo: bar');
 
         self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }
 
     public function test_a_non_php_file_in_an_admin_directory_is_not_forced_into_sonata_admin(): void
     {
-        $projectFileType = ProjectFileTypeClassifier::classify('src/Admin/config.yaml', 'foo: bar');
+        $projectFileType = (new SymfonyProjectFileTypeClassifier())->classify('src/Admin/config.yaml', 'foo: bar');
 
         self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }

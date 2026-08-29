@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 
 /**
  * End-to-end tests exercise the full audit workflow against a realistic Symfony project fixture.
@@ -273,7 +274,7 @@ final class FullAuditEndToEndTest extends TestCase
 
         $auditPipeline = new AuditPipeline(
             [
-                new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
+                new IngestionStage(new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger()), new NullLogger()),
                 new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],

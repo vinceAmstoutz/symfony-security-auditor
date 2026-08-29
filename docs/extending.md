@@ -343,6 +343,15 @@ Beyond the seams above, these Domain ports can each be implemented and aliased
 in `config/services.yaml` to override the bundled behaviour (see
 [`docs/versioning.md`](versioning.md) for the full BC-protected list):
 
+- `ProjectFileTypeClassifierInterface` — decide what a discovered file _is_
+  (default: `SymfonyProjectFileTypeClassifier`). This is the seam for teaching
+  the auditor a framework other than Symfony: the chunker, the skill blocks and
+  the access-control and form-binding maps all switch on the `ProjectFileType`
+  it returns and on that type's framework-neutral
+  `ProjectFileType::archetype()`. Implementations must be pure — classification
+  is derived from the path and content alone, with no I/O — and a framework
+  profile normally pairs one with its own `FrameworkVocabulary` so the PoC and
+  fix synthesizers speak the right idiom.
 - `StaticPreScannerInterface` — supply your own deterministic risk-marker scan
   (default: `RegexStaticPreScanner`, or set
   `audit.static_prescan.enabled: false` for the null scanner). Project-specific

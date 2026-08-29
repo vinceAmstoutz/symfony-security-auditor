@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class NullVoterCapabilityParserTest extends TestCase
 {
@@ -27,7 +27,7 @@ final class NullVoterCapabilityParserTest extends TestCase
     {
         $nullVoterCapabilityParser = new NullVoterCapabilityParser();
 
-        $projectFile = ProjectFile::create('src/Security/UserVoter.php', '/app/x', '<?php class UserVoter {}');
+        $projectFile = SymfonyProjectFile::create('src/Security/UserVoter.php', '/app/x', '<?php class UserVoter {}');
 
         self::assertNull($nullVoterCapabilityParser->parse($projectFile));
     }

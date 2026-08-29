@@ -1,0 +1,36 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
+
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+
+/**
+ * Decides what a discovered file *is*, which is the one piece of framework
+ * knowledge the audit engine cannot infer for itself: everything downstream —
+ * the chunker, the skill blocks, the access-control and form-binding maps —
+ * switches on {@see ProjectFileType} and its
+ * {@see ProjectFileType::archetype()}. Implement this to teach the auditor a
+ * framework whose conventions differ from Symfony's.
+ *
+ * Implementations MUST be pure: classification is derived from the path and
+ * content alone, with no I/O, so the same file always classifies the same way.
+ */
+interface ProjectFileTypeClassifierInterface
+{
+    /**
+     * @param string $relativePath project-relative path, as {@see ProjectFile::relativePath()} reports it
+     */
+    public function classify(string $relativePath, string $content): ProjectFileType;
+}

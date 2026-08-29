@@ -81,6 +81,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Inv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
@@ -321,7 +322,7 @@ final class AttackerAgentTest extends TestCase
     {
         $inertLines = str_repeat("        \$x = 1;\n", 40);
         $content = "<?php\n".$inertLines.'        $qb->where("u.username = $username");'."\n".$inertLines;
-        $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', $content);
+        $projectFile = SymfonyProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', $content);
 
         $captured = '';
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -363,7 +364,7 @@ final class AttackerAgentTest extends TestCase
     {
         $inertLines = str_repeat("        \$x = 1;\n", 40);
         $content = "<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        return null;\n    }\n}\n".$inertLines;
-        $projectFile = ProjectFile::create('src/Security/LoginAuthenticator.php', '/app/src/Security/LoginAuthenticator.php', $content);
+        $projectFile = SymfonyProjectFile::create('src/Security/LoginAuthenticator.php', '/app/src/Security/LoginAuthenticator.php', $content);
 
         $captured = '';
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -1966,7 +1967,7 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner]);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
@@ -1991,7 +1992,7 @@ final class AttackerAgentTest extends TestCase
                 return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
-        $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
@@ -2007,7 +2008,7 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
+        $projectFile = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['leanMode' => true]);
 
         $result = $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
@@ -2048,8 +2049,8 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
-        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true]);
 
         $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
@@ -2086,8 +2087,8 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
-        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true]);
 
         $coverageRecorder = new class implements CoverageRecorderInterface {
@@ -2155,7 +2156,7 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache, 'staticPreScanner' => $scanner]);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
@@ -2175,7 +2176,7 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::of('', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
@@ -2185,7 +2186,7 @@ final class AttackerAgentTest extends TestCase
      */
     private function makeFile(string $path): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
+        return SymfonyProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
     }
 
     /**

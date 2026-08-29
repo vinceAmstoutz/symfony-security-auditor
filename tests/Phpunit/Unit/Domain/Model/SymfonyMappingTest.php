@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class SymfonyMappingTest extends TestCase
 {
@@ -204,7 +205,7 @@ final class SymfonyMappingTest extends TestCase
      */
     public function test_it_detects_voter_for_entity(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/UserVoter.php',
             '/app/src/Security/UserVoter.php',
             '<?php class UserVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof User; } }',
@@ -221,7 +222,7 @@ final class SymfonyMappingTest extends TestCase
      */
     public function test_it_does_not_match_an_entity_name_that_is_only_a_substring_of_an_unrelated_identifier(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/AdminUserVoter.php',
             '/app/src/Security/AdminUserVoter.php',
             '<?php class AdminUserVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof AdminUser; } }',
@@ -238,7 +239,7 @@ final class SymfonyMappingTest extends TestCase
      */
     public function test_it_treats_a_regex_metacharacter_in_the_entity_name_literally(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/RegexVoter.php',
             '/app/src/Security/RegexVoter.php',
             '<?php class RegexVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof UserX; } }',
@@ -254,13 +255,13 @@ final class SymfonyMappingTest extends TestCase
      */
     public function test_it_finds_controllers_without_security_annotations(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/SecureController.php',
             '/app/src/Controller/SecureController.php',
             '<?php #[IsGranted("ROLE_ADMIN")] class SecureController {}',
         );
 
-        $insecure = ProjectFile::create(
+        $insecure = SymfonyProjectFile::create(
             'src/Controller/PublicController.php',
             '/app/src/Controller/PublicController.php',
             '<?php class PublicController {}',
@@ -353,7 +354,7 @@ final class SymfonyMappingTest extends TestCase
     #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_has_voter_for_entity_still_answers_for_the_model(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/UserVoter.php',
             '/app/src/Security/UserVoter.php',
             '<?php class UserVoter { public function supports($a, $s): bool { return $s instanceof User; } }',
@@ -370,6 +371,6 @@ final class SymfonyMappingTest extends TestCase
      */
     private function makeFile(string $path): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, '<?php');
+        return SymfonyProjectFile::create($path, '/app/'.$path, '<?php');
     }
 }

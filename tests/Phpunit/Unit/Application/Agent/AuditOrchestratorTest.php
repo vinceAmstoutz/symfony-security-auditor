@@ -41,7 +41,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -58,6 +57,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
@@ -166,7 +166,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $files = [];
         for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+            $files[] = SymfonyProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
         }
 
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -210,7 +210,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $files = [];
         for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+            $files[] = SymfonyProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
         }
 
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -261,7 +261,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $files = [];
         for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+            $files[] = SymfonyProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
         }
 
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -1814,22 +1814,22 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
-            ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
-            ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
-            ProjectFile::create('src/Entity/E.php', '/e', '<?php'),
-            ProjectFile::create('src/Form/F.php', '/f', '<?php'),
+            SymfonyProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+            SymfonyProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+            SymfonyProjectFile::create('src/Entity/E.php', '/e', '<?php'),
+            SymfonyProjectFile::create('src/Form/F.php', '/f', '<?php'),
         ]);
         $auditContext->setMapping(SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
                 'controllers' => [
-                    ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
-                    ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+                    SymfonyProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+                    SymfonyProjectFile::create('src/Controller/B.php', '/b', '<?php'),
                 ],
-                'voters' => [ProjectFile::create('src/Security/V.php', '/v', '<?php')],
+                'voters' => [SymfonyProjectFile::create('src/Security/V.php', '/v', '<?php')],
                 'forms' => [
-                    ProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
-                    ProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
-                    ProjectFile::create('src/Form/F3.php', '/f3', '<?php'),
+                    SymfonyProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
+                    SymfonyProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
+                    SymfonyProjectFile::create('src/Form/F3.php', '/f3', '<?php'),
                 ],
             ]),
             new AccessControlMap(),
@@ -2289,7 +2289,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: $acceptedFingerprints);
         $auditContext->setProjectFiles([
-            ProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
+            SymfonyProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
         ]);
         $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 

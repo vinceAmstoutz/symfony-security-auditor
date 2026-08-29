@@ -25,7 +25,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -34,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class AuditExitCodeResolverTest extends TestCase
 {
@@ -170,7 +170,7 @@ final class AuditExitCodeResolverTest extends TestCase
     public function test_it_passes_a_diff_run_whose_reference_left_no_changed_file_to_audit(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setMappingFiles([ProjectFile::create('src/Untouched.php', $this->tmpDir.'/src/Untouched.php', '<?php')]);
+        $auditContext->setMappingFiles([SymfonyProjectFile::create('src/Untouched.php', $this->tmpDir.'/src/Untouched.php', '<?php')]);
         $auditContext->setProjectFiles([]);
 
         $auditReport = AuditReport::fromContext($auditContext);
@@ -188,7 +188,7 @@ final class AuditExitCodeResolverTest extends TestCase
     private function reportWith(int $criticalFindings): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setProjectFiles([ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
+        $auditContext->setProjectFiles([SymfonyProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
         for ($i = 1; $i <= $criticalFindings; ++$i) {
             $auditContext->addVulnerability(
                 Vulnerability::of(

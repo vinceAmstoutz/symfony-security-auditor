@@ -23,7 +23,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -31,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassif
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class AuditContextTest extends TestCase
 {
@@ -177,8 +177,8 @@ final class AuditContextTest extends TestCase
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
         $files = [
-            ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
-            ProjectFile::create('src/B.php', '/app/src/B.php', '<?php'),
+            SymfonyProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
+            SymfonyProjectFile::create('src/B.php', '/app/src/B.php', '<?php'),
         ];
 
         $auditContext->setProjectFiles($files);
@@ -193,7 +193,7 @@ final class AuditContextTest extends TestCase
     public function test_mapping_files_falls_back_to_project_files_when_never_explicitly_set(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $files = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
+        $files = [SymfonyProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
 
         $auditContext->setProjectFiles($files);
 
@@ -207,10 +207,10 @@ final class AuditContextTest extends TestCase
     public function test_mapping_files_can_be_set_independently_of_the_diff_filtered_project_files(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $projectFiles = [ProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php')];
+        $projectFiles = [SymfonyProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php')];
         $mappingFiles = [
-            ProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php'),
-            ProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
+            SymfonyProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php'),
+            SymfonyProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
         ];
 
         $auditContext->setProjectFiles($projectFiles);

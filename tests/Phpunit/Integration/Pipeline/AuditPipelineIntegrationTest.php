@@ -48,6 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 
 final class AuditPipelineIntegrationTest extends TestCase
 {
@@ -208,7 +209,7 @@ final class AuditPipelineIntegrationTest extends TestCase
 
         return new AuditPipeline(
             [
-                new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
+                new IngestionStage(new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger()), new NullLogger()),
                 new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],

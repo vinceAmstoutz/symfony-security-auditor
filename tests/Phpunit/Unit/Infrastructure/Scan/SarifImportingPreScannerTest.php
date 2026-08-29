@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Mal
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\SarifFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class SarifImportingPreScannerTest extends TestCase
 {
@@ -281,7 +282,7 @@ final class SarifImportingPreScannerTest extends TestCase
         $regexStaticPreScanner = new RegexStaticPreScanner([
             'php' => ['inner_marker' => ['regex' => '/legacyQuery/', 'description' => 'test']],
         ]);
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', "<?php\nlegacyQuery(\$input);\n");
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', "<?php\nlegacyQuery(\$input);\n");
 
         $markers = $this->scanner([$sarif], $regexStaticPreScanner)->scan([$projectFile]);
 
@@ -735,7 +736,7 @@ final class SarifImportingPreScannerTest extends TestCase
      */
     private function projectFile(string $relativePath, string $projectRoot = '/app'): ProjectFile
     {
-        return ProjectFile::create($relativePath, $projectRoot.'/'.$relativePath, "<?php\n");
+        return SymfonyProjectFile::create($relativePath, $projectRoot.'/'.$relativePath, "<?php\n");
     }
 
     /**

@@ -28,10 +28,11 @@ final readonly class ProjectFile
     /**
      * @throws InvalidProjectFileException
      */
-    public static function create(
+    public static function of(
         string $relativePath,
         string $absolutePath,
         string $content,
+        ProjectFileType $projectFileType,
     ): self {
         if ('' === trim($relativePath)) {
             throw InvalidProjectFileException::forBlankRelativePath();
@@ -41,7 +42,7 @@ final readonly class ProjectFile
             relativePath: $relativePath,
             absolutePath: $absolutePath,
             content: $content,
-            projectFileType: ProjectFileTypeClassifier::classify($relativePath, $content),
+            projectFileType: $projectFileType,
             linesCount: substr_count($content, "\n") + 1,
         );
     }

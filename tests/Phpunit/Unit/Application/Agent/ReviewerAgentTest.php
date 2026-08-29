@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class ReviewerAgentTest extends TestCase
@@ -406,7 +407,7 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerability();
         $fileContent = '<?php class UserController { public function edit() {} }';
         $files = [
-            ProjectFile::create(
+            SymfonyProjectFile::create(
                 'src/Controller/UserController.php',
                 '/app/src/Controller/UserController.php',
                 $fileContent,
@@ -1101,7 +1102,7 @@ final class ReviewerAgentTest extends TestCase
         // the file's actual source code would NOT appear in the LLM user message.
         $fileContent = '<?php class UserController { public function sensitiveAction() {} }';
         $files = [
-            ProjectFile::create(
+            SymfonyProjectFile::create(
                 'src/Controller/UserController.php',
                 '/app/src/Controller/UserController.php',
                 $fileContent,
@@ -5647,6 +5648,6 @@ final class ReviewerAgentTest extends TestCase
      */
     private function makeFile(string $path): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, '<?php class UserController {}');
+        return SymfonyProjectFile::create($path, '/app/'.$path, '<?php class UserController {}');
     }
 }

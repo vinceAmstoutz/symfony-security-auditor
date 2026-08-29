@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class PhpParserControllerAccessControlParserTest extends TestCase
 {
@@ -1498,7 +1499,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
      */
     private function makeFile(string $relativePath, string $content): ProjectFile
     {
-        return ProjectFile::create($relativePath, '/app/'.$relativePath, $content);
+        return SymfonyProjectFile::create($relativePath, '/app/'.$relativePath, $content);
     }
 
     /**

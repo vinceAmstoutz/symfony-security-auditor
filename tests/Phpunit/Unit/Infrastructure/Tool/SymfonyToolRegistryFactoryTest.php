@@ -17,10 +17,10 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class SymfonyToolRegistryFactoryTest extends TestCase
 {
@@ -33,7 +33,7 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
         $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
 
         $toolRegistry = $symfonyToolRegistryFactory->forProjectFiles([
-            ProjectFile::create('src/A.php', '/app/x', '<?php'),
+            SymfonyProjectFile::create('src/A.php', '/app/x', '<?php'),
         ]);
 
         $names = array_map(static fn (ToolDefinition $toolDefinition): string => $toolDefinition->name, $toolRegistry->definitions());
@@ -51,7 +51,7 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
         $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
 
         $toolRegistry = $symfonyToolRegistryFactory->forProjectFiles([
-            ProjectFile::create('src/A.php', '/app/x', '<?php echo "marker-7";'),
+            SymfonyProjectFile::create('src/A.php', '/app/x', '<?php echo "marker-7";'),
         ]);
 
         self::assertSame('<?php echo "marker-7";', $toolRegistry->execute('read_file', ['relative_path' => 'src/A.php']));
@@ -65,8 +65,8 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
     {
         $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
 
-        $toolRegistry = $symfonyToolRegistryFactory->forProjectFiles([ProjectFile::create('src/A.php', '/x', 'aaa')]);
-        $secondRegistry = $symfonyToolRegistryFactory->forProjectFiles([ProjectFile::create('src/B.php', '/x', 'bbb')]);
+        $toolRegistry = $symfonyToolRegistryFactory->forProjectFiles([SymfonyProjectFile::create('src/A.php', '/x', 'aaa')]);
+        $secondRegistry = $symfonyToolRegistryFactory->forProjectFiles([SymfonyProjectFile::create('src/B.php', '/x', 'bbb')]);
 
         self::assertSame('aaa', $toolRegistry->execute('read_file', ['relative_path' => 'src/A.php']));
         self::assertSame('bbb', $secondRegistry->execute('read_file', ['relative_path' => 'src/B.php']));

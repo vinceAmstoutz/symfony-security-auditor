@@ -18,10 +18,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationSecurityMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ApplicationSecurityMapTest extends TestCase
 {
@@ -55,9 +55,9 @@ final class ApplicationSecurityMapTest extends TestCase
      */
     public function test_it_groups_scanned_files_under_neutral_names(): void
     {
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php');
-        $entity = ProjectFile::create('src/Entity/User.php', '/app/src/Entity/User.php', '<?php');
-        $voter = ProjectFile::create('src/Security/UserVoter.php', '/app/src/Security/UserVoter.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php');
+        $entity = SymfonyProjectFile::create('src/Entity/User.php', '/app/src/Entity/User.php', '<?php');
+        $voter = SymfonyProjectFile::create('src/Security/UserVoter.php', '/app/src/Security/UserVoter.php', '<?php');
 
         $applicationSecurityMap = ApplicationSecurityMap::of(
             ProjectFileInventory::fromGroups([
@@ -101,7 +101,7 @@ final class ApplicationSecurityMapTest extends TestCase
     {
         $applicationSecurityMap = ApplicationSecurityMap::of(
             ProjectFileInventory::fromGroups([
-                'voters' => [ProjectFile::create(
+                'voters' => [SymfonyProjectFile::create(
                     'src/Security/UserVoter.php',
                     '/app/src/Security/UserVoter.php',
                     '<?php class UserVoter { protected function supports($attribute, $subject): bool { return $subject instanceof User; } }',
@@ -121,7 +121,7 @@ final class ApplicationSecurityMapTest extends TestCase
      */
     public function test_it_reports_entrypoints_left_without_an_authorization_rule(): void
     {
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php');
 
         $applicationSecurityMap = ApplicationSecurityMap::of(
             ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),

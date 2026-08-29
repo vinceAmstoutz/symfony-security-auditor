@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ListScannedFilesUseCaseTest extends TestCase
 {
@@ -129,6 +130,6 @@ final class ListScannedFilesUseCaseTest extends TestCase
      */
     private function makeProjectFile(string $relativePath): ProjectFile
     {
-        return ProjectFile::create($relativePath, '/project/'.$relativePath, '<?php');
+        return SymfonyProjectFile::create($relativePath, '/project/'.$relativePath, '<?php');
     }
 }

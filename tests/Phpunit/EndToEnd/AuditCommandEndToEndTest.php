@@ -70,6 +70,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
@@ -1000,7 +1001,7 @@ final class AuditCommandEndToEndTest extends TestCase
         );
         $auditPipeline = new AuditPipeline(
             [
-                new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
+                new IngestionStage(new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger()), new NullLogger()),
                 new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],
@@ -1008,7 +1009,7 @@ final class AuditCommandEndToEndTest extends TestCase
             $progressReporterHolder,
         );
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger());
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger());
         $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
             $projectFileScanner,
             new ResolvingTokenEstimator(),

@@ -122,6 +122,38 @@ Deprecated since 1.13. Pass the value objects to `of()` instead:
 | `SymfonyMapping::create()` | `SymfonyMapping::of()` — `ProjectFileInventory`, `AccessControlMap`                             |
 | `LLMResponse::create()`    | `LLMResponse::of()` — `TokenUsageSnapshot`                                                      |
 
+### Changed: `ProjectFile::create()` is now `ProjectFile::of()` and takes a type
+
+`ProjectFile` no longer classifies itself. The classification heuristics moved
+out of the Domain into `SymfonyProjectFileTypeClassifier`, behind the new
+`ProjectFileTypeClassifierInterface` port, so the audit engine can be pointed at
+a framework other than Symfony.
+
+```php
+// Before
+$projectFile = ProjectFile::create($relativePath, $absolutePath, $content);
+
+// After
+$projectFile = ProjectFile::of(
+    relativePath: $relativePath,
+    absolutePath: $absolutePath,
+    content: $content,
+    projectFileType: (new SymfonyProjectFileTypeClassifier())->classify($relativePath, $content),
+);
+```
+
+`ProjectFileScanner` takes the classifier as its **first** constructor argument,
+required rather than defaulted — a portable scanner must not silently assume
+Symfony. Only construct it directly if you are not using the bundle; the
+container wires `SymfonyProjectFileTypeClassifier` for you.
+
+```php
+new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger);
+```
+
+To audit a different framework, implement `ProjectFileTypeClassifierInterface`
+and alias it — see [`docs/extending.md`](docs/extending.md).
+
 ### Removed: `CacheAwarePricingProviderInterface`
 
 Its two methods moved onto `PricingProviderInterface`, which every

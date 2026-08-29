@@ -21,7 +21,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -29,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassif
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class AttackerAnalysisRequestTest extends TestCase
 {
@@ -90,7 +90,7 @@ final class AttackerAnalysisRequestTest extends TestCase
      */
     public function test_it_exposes_the_constructor_arguments(): void
     {
-        $files = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
+        $files = [SymfonyProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $findings = [$this->makeVulnerability()];
 
@@ -112,13 +112,13 @@ final class AttackerAnalysisRequestTest extends TestCase
     {
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $attackerAnalysisRequest = new AttackerAnalysisRequest(
-            [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')],
+            [SymfonyProjectFile::create('src/A.php', '/app/src/A.php', '<?php')],
             $symfonyMapping,
             true,
             [],
         );
 
-        $newFiles = [ProjectFile::create('src/B.php', '/app/src/B.php', '<?php')];
+        $newFiles = [SymfonyProjectFile::create('src/B.php', '/app/src/B.php', '<?php')];
         $newFindings = [$this->makeVulnerability()];
         $derived = $attackerAnalysisRequest->withFilesAndFindings($newFiles, $newFindings);
 

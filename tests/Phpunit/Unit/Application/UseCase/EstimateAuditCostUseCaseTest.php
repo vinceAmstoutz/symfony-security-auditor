@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\MeasuringTokenEstimator;
 
 final class EstimateAuditCostUseCaseTest extends TestCase
@@ -1150,7 +1151,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     private function makeProjectFile(string $relative, string $content): ProjectFile
     {
-        return ProjectFile::create($relative, $this->tmpDir.'/'.$relative, $content);
+        return SymfonyProjectFile::create($relative, $this->tmpDir.'/'.$relative, $content);
     }
 
     #[Override]

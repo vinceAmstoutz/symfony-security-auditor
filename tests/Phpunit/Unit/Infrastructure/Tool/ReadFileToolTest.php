@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\ReadFileTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ReadFileToolTest extends TestCase
 {
@@ -53,7 +53,7 @@ final class ReadFileToolTest extends TestCase
      */
     public function test_execute_returns_file_content_for_known_path(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', '<?php echo 1;');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', '<?php echo 1;');
         $readFileTool = new ReadFileTool([$projectFile]);
 
         $result = $readFileTool->execute(['relative_path' => 'src/A.php']);
@@ -106,7 +106,7 @@ final class ReadFileToolTest extends TestCase
     {
         // Boundary: `>` mutated to `>=` would truncate at exactly MAX_BYTES; original passes through.
         $content = str_repeat('a', self::MAX_BYTES);
-        $projectFile = ProjectFile::create('src/Edge.php', '/app/src/Edge.php', $content);
+        $projectFile = SymfonyProjectFile::create('src/Edge.php', '/app/src/Edge.php', $content);
         $readFileTool = new ReadFileTool([$projectFile]);
 
         self::assertSame($content, $readFileTool->execute(['relative_path' => 'src/Edge.php']));
@@ -118,7 +118,7 @@ final class ReadFileToolTest extends TestCase
     public function test_execute_truncates_file_content_over_size_limit(): void
     {
         $largeContent = str_repeat('a', self::MAX_BYTES + 100);
-        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $largeContent);
+        $projectFile = SymfonyProjectFile::create('src/Big.php', '/app/src/Big.php', $largeContent);
         $readFileTool = new ReadFileTool([$projectFile]);
 
         $result = $readFileTool->execute(['relative_path' => 'src/Big.php']);
@@ -139,7 +139,7 @@ final class ReadFileToolTest extends TestCase
         // Kills DecrementInteger / IncrementInteger on substr offset: truncated output must start
         // with the first byte of the original content.
         $content = 'Z'.str_repeat('a', self::MAX_BYTES + 10);
-        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+        $projectFile = SymfonyProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
         $readFileTool = new ReadFileTool([$projectFile]);
 
         $result = $readFileTool->execute(['relative_path' => 'src/Big.php']);
@@ -153,7 +153,7 @@ final class ReadFileToolTest extends TestCase
     public function test_execute_truncation_does_not_split_a_multi_byte_character_straddling_the_limit(): void
     {
         $content = str_repeat('a', self::MAX_BYTES - 1).'é'.str_repeat('b', 100);
-        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+        $projectFile = SymfonyProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
         $readFileTool = new ReadFileTool([$projectFile]);
 
         $result = $readFileTool->execute(['relative_path' => 'src/Big.php']);
@@ -168,7 +168,7 @@ final class ReadFileToolTest extends TestCase
     public function test_execute_does_not_truncate_when_file_fits_in_limit(): void
     {
         $smallContent = str_repeat('x', 1024);
-        $projectFile = ProjectFile::create('src/Small.php', '/app/src/Small.php', $smallContent);
+        $projectFile = SymfonyProjectFile::create('src/Small.php', '/app/src/Small.php', $smallContent);
         $readFileTool = new ReadFileTool([$projectFile]);
 
         $result = $readFileTool->execute(['relative_path' => 'src/Small.php']);

@@ -22,6 +22,7 @@ use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileTypeClassifierInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -67,6 +68,7 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
      * @param ?Closure(SplFileInfo): string $fileReader    defaults to SplFileInfo::getContents; tests inject a stub
      */
     public function __construct(
+        private ProjectFileTypeClassifierInterface $projectFileTypeClassifier,
         private LoggerInterface $logger,
         private array $includedPaths = self::DEFAULT_INCLUDED_PATHS,
         private bool $respectGitignore = false,
@@ -239,10 +241,13 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
                 $content = $this->secretScrubber->scrub($content);
             }
 
-            return ProjectFile::create(
-                relativePath: Path::makeRelative($splFile->getPathname(), $projectPath),
+            $relativePath = Path::makeRelative($splFile->getPathname(), $projectPath);
+
+            return ProjectFile::of(
+                relativePath: $relativePath,
                 absolutePath: $splFile->getPathname(),
                 content: $content,
+                projectFileType: $this->projectFileTypeClassifier->classify($relativePath, $content),
             );
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to read file', [

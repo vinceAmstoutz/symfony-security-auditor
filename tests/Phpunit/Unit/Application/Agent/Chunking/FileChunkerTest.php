@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\Chunki
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class FileChunkerTest extends TestCase
 {
@@ -30,7 +31,7 @@ final class FileChunkerTest extends TestCase
     {
         $files = [
             $this->makeFile('README.md'),
-            ProjectFile::create($path, '/app/'.$path, $content),
+            SymfonyProjectFile::create($path, '/app/'.$path, $content),
         ];
 
         $chunks = (new FileChunker(ChunkingStrategy::Type, 10))->chunk($files);
@@ -554,7 +555,7 @@ final class FileChunkerTest extends TestCase
      */
     private function makeFile(string $path): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, '<?php');
+        return SymfonyProjectFile::create($path, '/app/'.$path, '<?php');
     }
 
     /**
@@ -562,7 +563,7 @@ final class FileChunkerTest extends TestCase
      */
     private function makeFileWithContent(string $path, string $content): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, $content);
+        return SymfonyProjectFile::create($path, '/app/'.$path, $content);
     }
 
     /**

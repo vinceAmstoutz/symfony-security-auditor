@@ -15,7 +15,7 @@ deptrac:
         - type: directory
           value: src/Audit/Infrastructure/Prompt/.*
         - type: classLike
-          value: .*\\Infrastructure\\Scan\\(IsGrantedAttributeParser|PhpParserControllerAccessControlParser|PhpParserFormBindingParser|PhpParserVoterCapabilityParser|RouteAttributeParser|SymfonyYamlSecurityConfigParser)$
+          value: .*\\Infrastructure\\Scan\\(IsGrantedAttributeParser|PhpParserControllerAccessControlParser|PhpParserFormBindingParser|PhpParserVoterCapabilityParser|RouteAttributeParser|SymfonyProjectFileTypeClassifier|SymfonyYamlSecurityConfigParser)$
         - type: classLike
           value: .*\\Infrastructure\\Config\\(AttackerAgentDefinitionFactory|AuditConfigurationDefinition|AuditConfigurationProcessor|CompositionRootLoader|ContainerParameterRegistrar|CoreCompositionRoot|HostCompositionRootLoader|LlmClientDefinitionFactory)$
         - type: directory

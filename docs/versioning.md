@@ -236,6 +236,10 @@ Implementing one of these in your own application and overriding the alias in
 - `LLMResponse` — the value object every `LLMClientInterface` implementation
   returns.
 - `ProjectFileScannerInterface`
+- `ProjectFileTypeClassifierInterface` — decides what a discovered file _is_.
+  Implement and alias it to teach the auditor a framework whose conventions
+  differ from Symfony's; everything downstream switches on the resulting
+  `ProjectFileType` and its framework-neutral `archetype()`.
 - `StaticPreScannerInterface` — host applications may implement this and alias
   it to supply their own deterministic risk-marker scan.
 - `CodeSlicerInterface` — implement and alias to control how files are trimmed

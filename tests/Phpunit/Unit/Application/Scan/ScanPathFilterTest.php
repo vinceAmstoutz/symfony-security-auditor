@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ScanPathFilterTest extends TestCase
 {
@@ -144,7 +145,7 @@ final class ScanPathFilterTest extends TestCase
      */
     public function test_normalizes_windows_separators_in_project_files(): void
     {
-        $projectFile = ProjectFile::create('apps\\api\\src\\A.php', '/app/apps/api/src/A.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('apps\\api\\src\\A.php', '/app/apps/api/src/A.php', '<?php');
 
         $filtered = ScanPathFilter::apply([$projectFile], ['apps/api']);
 
@@ -203,6 +204,6 @@ final class ScanPathFilterTest extends TestCase
      */
     private function file(string $relativePath): ProjectFile
     {
-        return ProjectFile::create($relativePath, '/abs/'.$relativePath, '<?php');
+        return SymfonyProjectFile::create($relativePath, '/abs/'.$relativePath, '<?php');
     }
 }

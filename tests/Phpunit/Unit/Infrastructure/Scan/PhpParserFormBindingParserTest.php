@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class PhpParserFormBindingParserTest extends TestCase
 {
@@ -34,7 +34,7 @@ final class PhpParserFormBindingParserTest extends TestCase
      */
     public function test_it_returns_empty_for_non_controller_file(): void
     {
-        $projectFile = ProjectFile::create('src/Service/Mailer.php', '/app/x', '<?php class Mailer {}');
+        $projectFile = SymfonyProjectFile::create('src/Service/Mailer.php', '/app/x', '<?php class Mailer {}');
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -54,7 +54,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Service/Helper.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Service/Helper.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -77,7 +77,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Twig/Components/Cart.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Twig/Components/Cart.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -105,7 +105,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -137,7 +137,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -162,7 +162,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/MixedController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/MixedController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -187,7 +187,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/HelpController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/HelpController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -213,7 +213,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -240,7 +240,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -264,7 +264,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -294,7 +294,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -317,7 +317,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -330,7 +330,7 @@ final class PhpParserFormBindingParserTest extends TestCase
      */
     public function test_it_returns_empty_for_unparseable_controller(): void
     {
-        $projectFile = ProjectFile::create('src/Controller/Broken.php', '/app/x', '<?php class Broken { public function');
+        $projectFile = SymfonyProjectFile::create('src/Controller/Broken.php', '/app/x', '<?php class Broken { public function');
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -350,7 +350,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -375,7 +375,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -400,7 +400,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -423,7 +423,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -442,7 +442,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 public function list(): void {}
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -464,7 +464,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/BaseController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/BaseController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -489,7 +489,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 
@@ -512,7 +512,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -531,7 +531,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -550,7 +550,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -569,7 +569,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -588,7 +588,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -607,7 +607,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -626,7 +626,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
@@ -648,7 +648,7 @@ final class PhpParserFormBindingParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         $bindings = $this->phpParserFormBindingParser->parse($projectFile);
 

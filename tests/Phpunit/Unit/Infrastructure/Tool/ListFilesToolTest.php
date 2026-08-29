@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\ListFilesTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ListFilesToolTest extends TestCase
 {
@@ -50,8 +50,8 @@ final class ListFilesToolTest extends TestCase
      */
     public function test_execute_lists_all_files_when_no_filter(): void
     {
-        $projectFile = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
-        $entity = ProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
+        $entity = SymfonyProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
         $listFilesTool = new ListFilesTool([$projectFile, $entity]);
 
         $result = $listFilesTool->execute([]);
@@ -67,8 +67,8 @@ final class ListFilesToolTest extends TestCase
      */
     public function test_execute_filters_by_file_type_when_specified(): void
     {
-        $projectFile = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
-        $entity = ProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
+        $entity = SymfonyProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
         $listFilesTool = new ListFilesTool([$projectFile, $entity]);
 
         $result = $listFilesTool->execute(['file_type' => 'controller']);
@@ -84,8 +84,8 @@ final class ListFilesToolTest extends TestCase
     {
         // Kills Continue_→break: with `break`, iteration stops at first non-matching file and the
         // matching one further down the list never appears in output.
-        $projectFile = ProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
-        $controller = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
+        $controller = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
         $listFilesTool = new ListFilesTool([$projectFile, $controller]);
 
         $result = $listFilesTool->execute(['file_type' => 'controller']);
@@ -99,7 +99,7 @@ final class ListFilesToolTest extends TestCase
      */
     public function test_execute_returns_no_files_match_when_filter_excludes_all(): void
     {
-        $projectFile = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
         $listFilesTool = new ListFilesTool([$projectFile]);
 
         $result = $listFilesTool->execute(['file_type' => 'voter']);
@@ -112,7 +112,7 @@ final class ListFilesToolTest extends TestCase
      */
     public function test_execute_treats_empty_file_type_as_unset(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/x', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/x', '<?php');
         $listFilesTool = new ListFilesTool([$projectFile]);
 
         $result = $listFilesTool->execute(['file_type' => '']);
@@ -136,7 +136,7 @@ final class ListFilesToolTest extends TestCase
     {
         $files = [];
         for ($i = 0; $i < 2500; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Generated/File%d.php', $i), '/app/x'.$i, '<?php');
+            $files[] = SymfonyProjectFile::create(\sprintf('src/Generated/File%d.php', $i), '/app/x'.$i, '<?php');
         }
 
         $listFilesTool = new ListFilesTool($files);

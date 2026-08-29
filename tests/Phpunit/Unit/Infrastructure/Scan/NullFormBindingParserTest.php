@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class NullFormBindingParserTest extends TestCase
 {
@@ -27,7 +27,7 @@ final class NullFormBindingParserTest extends TestCase
     {
         $nullFormBindingParser = new NullFormBindingParser();
 
-        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', '<?php class UserController {}');
+        $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/x', '<?php class UserController {}');
 
         self::assertSame([], $nullFormBindingParser->parse($projectFile));
     }
