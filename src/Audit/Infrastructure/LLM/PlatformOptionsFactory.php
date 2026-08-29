@@ -13,10 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AnthropicOptionDialect;
+
 /**
  * Builds the per-invocation platform options: temperature plus the
  * Anthropic-dialect knobs (provider JSON mode, max output tokens) that other
- * providers reject.
+ * providers reject. A cap that cannot be forwarded is reported to the operator
+ * as a pre-flight notice rather than dropped silently — see
+ * `ConfigurationNotices`.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -54,6 +58,6 @@ final readonly class PlatformOptionsFactory
 
     private function usesAnthropicOptionDialect(): bool
     {
-        return str_contains($this->model, 'claude');
+        return AnthropicOptionDialect::honoredBy($this->model);
     }
 }

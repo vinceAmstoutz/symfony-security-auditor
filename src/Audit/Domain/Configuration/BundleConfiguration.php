@@ -39,7 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
  *     provider_json_mode?: bool,
  *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
  *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, baseline?: string|null, triage_memory?: bool, fail_on?: string, since_closure?: string|null, excluded_types?: list<string>, included_types?: list<string>, custom_skills?: array<string, array{file_type: string, instructions: string, priority: int}>, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
- *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
+ *     cache: array{enabled: bool, dir: string},
  *     privacy?: array{offline_only: bool},
  * }
  */
@@ -71,7 +71,7 @@ final readonly class BundleConfiguration
                 model: $config['model'],
                 attackerModelOverride: $config['attacker_model'],
                 reviewerModelOverride: $config['reviewer_model'],
-                maxOutputTokens: $config['max_output_tokens'] ?? 4096,
+                maxOutputTokens: $config['max_output_tokens'] ?? LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS,
                 attackerMaxOutputTokensOverride: $config['attacker_max_output_tokens'] ?? null,
                 reviewerMaxOutputTokensOverride: $config['reviewer_max_output_tokens'] ?? null,
                 providerJsonMode: $config['provider_json_mode'] ?? false,
@@ -110,7 +110,7 @@ final readonly class BundleConfiguration
                 reviewerStructuredCollection: $config['audit']['reviewer_structured_collection'] ?? true,
                 stableSystemPrompt: $config['audit']['stable_system_prompt'] ?? true,
                 baseline: $config['audit']['baseline'] ?? null,
-                failOn: RiskLevel::from($config['audit']['fail_on'] ?? 'critical'),
+                failOn: RiskLevel::from($config['audit']['fail_on'] ?? 'high'),
                 excludedTypes: $config['audit']['excluded_types'] ?? [],
                 includedTypes: $config['audit']['included_types'] ?? [],
                 customSkills: self::customSkillsFromConfig($config['audit']['custom_skills'] ?? []),
@@ -130,7 +130,6 @@ final readonly class BundleConfiguration
             cache: new CacheConfiguration(
                 enabled: $config['cache']['enabled'],
                 dir: $config['cache']['dir'],
-                promptCaching: $config['cache']['prompt_caching'],
             ),
             rateLimit: new RateLimitConfiguration(
                 requestsPerMinute: $config['audit']['rate_limit']['requests_per_minute'],

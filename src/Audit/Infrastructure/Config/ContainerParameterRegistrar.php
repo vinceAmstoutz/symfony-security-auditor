@@ -108,7 +108,6 @@ final readonly class ContainerParameterRegistrar
             'cache.reviewer_dir' => \sprintf('%s/reviewer', $cache->dir),
             'cache.triage_memory_dir' => \sprintf('%s/triage-memory', $cache->dir),
             'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm, $audit),
-            'cache.prompt_caching' => $cache->promptCaching,
             'cache.key_salt' => $this->attackerKeySalt($bundleConfiguration, $llm->attackerModel()),
             'cache.cheap_attacker_key_salt' => $this->attackerKeySalt(
                 $bundleConfiguration,

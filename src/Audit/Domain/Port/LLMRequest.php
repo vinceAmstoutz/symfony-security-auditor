@@ -24,17 +24,4 @@ final readonly class LLMRequest
         public string $system,
         public string $user,
     ) {}
-
-    /**
-     * @param list<array{system: string, user: string}> $requests
-     *
-     * @return list<self>
-     */
-    public static function listFromArrays(array $requests): array
-    {
-        return array_map(
-            static fn (array $request): self => new self($request['system'], $request['user']),
-            $requests,
-        );
-    }
 }

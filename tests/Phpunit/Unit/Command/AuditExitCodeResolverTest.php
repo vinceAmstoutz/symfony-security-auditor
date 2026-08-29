@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 
 final class AuditExitCodeResolverTest extends TestCase
 {
@@ -77,9 +78,9 @@ final class AuditExitCodeResolverTest extends TestCase
      */
     public static function thresholdCases(): iterable
     {
-        yield 'critical risk fails the default critical gate' => [5, RiskLevel::Critical, Command::FAILURE];
-        yield 'high risk passes the default critical gate' => [4, RiskLevel::Critical, Command::SUCCESS];
-        yield 'safe risk passes the default critical gate' => [0, RiskLevel::Critical, Command::SUCCESS];
+        yield 'critical risk fails an explicit critical gate' => [5, RiskLevel::Critical, Command::FAILURE];
+        yield 'high risk passes an explicit critical gate' => [4, RiskLevel::Critical, Command::SUCCESS];
+        yield 'safe risk passes an explicit critical gate' => [0, RiskLevel::Critical, Command::SUCCESS];
 
         yield 'high risk fails the high gate' => [4, RiskLevel::High, Command::FAILURE];
         yield 'critical risk fails the high gate' => [5, RiskLevel::High, Command::FAILURE];
@@ -145,11 +146,21 @@ final class AuditExitCodeResolverTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_it_fails_a_run_that_found_no_files_to_audit(): void
+    public function test_a_run_that_found_no_files_to_audit_reports_no_verdict_rather_than_a_tripped_gate(): void
     {
         $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
 
-        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical));
+        self::assertSame(ExitCode::AuditFailed->value, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_an_empty_scan_outranks_a_score_gate_it_would_otherwise_pass(): void
+    {
+        $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+
+        self::assertSame(ExitCode::AuditFailed->value, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical, 100));
     }
 
     /**

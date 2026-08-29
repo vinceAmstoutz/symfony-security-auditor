@@ -149,10 +149,42 @@ bin/castor eval --target=path/to/app --ground-truth=path/to/manifest.json \
     --min-precision=0.8 --min-recall=0.9
 ```
 
+### Certifying a refactor with a recorded baseline
+
+A minimum threshold catches a collapse; it does not catch a refactor that
+quietly trades two findings for two others. For a change that is supposed to
+alter no behaviour at all — a file move, a namespace change, a package split —
+record the scores **before** the change and require an exact match after:
+
+```bash
+# Before the change, on the pre-change tree:
+bin/castor eval --write-baseline
+
+# After the change:
+bin/castor eval
+```
+
+`--write-baseline` writes precision and recall, overall and per class, to
+`examples/vulnerable-app/eval-baseline.json` (override with `--baseline`). A
+later `bin/castor eval` compares against that file and **fails on any
+difference**, in either direction — on a pure move an improvement is as much a
+signal as a regression, and re-recording is a deliberate act with its own
+commit. With no baseline file present the run warns and continues, so the gate
+announces its own absence instead of passing silently.
+
+The JSON and SARIF report schemas have their own, cheaper gate:
+`ReportSchemaFreezeTest` pins every key path and value type of both documents
+against a committed snapshot, plus the finding-fingerprint algorithm against a
+known input. `audit:diff` and `audit:trend` read reports written by older
+releases keyed by fingerprint, so those documents are a cross-version data
+contract — the test runs in the ordinary suite and fails on any added, renamed,
+removed or retyped key.
+
 The harness lives in [`tools/Eval/`](tools/Eval/) (namespace `Tooling\Eval`) —
 `GroundTruthManifest` loads and validates the manifest, `EvalScorer` computes
-the `EvalReport`. It is a maintainer tool, not part of the shipped bundle, so it
-is excluded from coverage and mutation scope like the rest of `tools/`.
+the `EvalReport`, and `EvalBaseline` records and compares one. It is a
+maintainer tool, not part of the shipped bundle, so it is excluded from coverage
+and mutation scope like the rest of `tools/`.
 
 ## Code Quality
 
@@ -240,8 +272,9 @@ the release that will carry it:
 ```
 
 Use the next unreleased version — the one your `CHANGELOG.md` entry sits under.
-Removals already follow this convention (see `cache.prompt_caching`, marked
-_Deprecated since 1.7_); additions need it for the same reason.
+Removals already follow this convention (see the deprecated `SymfonyMapping`
+accessors, marked _Deprecated since 1.19_); additions need it for the same
+reason.
 
 Do not point documentation or examples at a
 `raw.githubusercontent.com/.../main/` URL. User-facing files are published as

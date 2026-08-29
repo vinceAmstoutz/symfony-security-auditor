@@ -24,14 +24,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
 /**
- * With `audit.since_closure: direct`, widens a `--since` diff-mode run's
- * audited file set with the first-degree dependents of any changed voter —
- * the controllers guarded by an attribute the voter's `supports()` accepts,
- * whether that guard is a method-level or class-level `#[IsGranted]` or a
- * `denyAccessUnlessGranted()`/`isGranted()` call — so a voter edit that
- * silently weakens an unrelated controller's access control is still caught.
- * Runs after `MappingStage`,
- * which builds the full-project `AccessControlMap` this stage reads from
+ * With `audit.since_closure: direct`, widens a `--since` diff-mode run's audited
+ * file set with the first-degree dependents of any changed voter — the
+ * controllers guarded by an attribute the voter's `supports()` accepts, whether
+ * that guard is a method- or class-level `#[IsGranted]` or a
+ * `denyAccessUnlessGranted()`/`isGranted()` call — so a voter edit that silently
+ * weakens an unrelated controller's access control is still caught. Runs after
+ * `MappingStage`, which builds the full-project `AccessControlMap` it reads
  * regardless of diff filtering.
  *
  * @internal not part of the BC promise — see docs/versioning.md

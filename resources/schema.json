@@ -29,7 +29,7 @@
         "max_output_tokens": {
           "type": "integer",
           "minimum": 1,
-          "description": "Maximum output tokens per LLM call (max_tokens). Default: 4096."
+          "description": "Maximum output tokens per LLM call (max_tokens). Default: 8192. Only the Anthropic-dialect bridges accept the option."
         },
         "attacker_max_output_tokens": {
           "type": ["integer", "null"],
@@ -43,7 +43,7 @@
         },
         "provider_json_mode": {
           "type": "boolean",
-          "description": "Send response_format: {type: json_object} on every call (honored by OpenAI/Mistral/Ollama). Default: false."
+          "description": "Send response_format: {type: json_object} on every call to an Anthropic-dialect model so the provider enforces JSON natively; a no-op on every other dialect, decided by the same anchored prefix match as max_output_tokens. Default: false."
         },
         "scan": {
           "type": "object",
@@ -180,7 +180,7 @@
             },
             "fail_on": {
               "enum": ["safe", "low", "medium", "high", "critical"],
-              "description": "Minimum aggregate risk level that makes audit:run exit 1 (the CI gate). Default: critical (only a CRITICAL risk level fails; planned to become high in the next major). The --fail-on CLI option overrides this."
+              "description": "Minimum aggregate risk level that makes audit:run exit 1 (the CI gate). Default: high (a HIGH or CRITICAL risk level fails). The --fail-on CLI option overrides this."
             },
             "since_closure": {
               "enum": ["none", "direct"],
@@ -381,10 +381,6 @@
             "dir": {
               "type": "string",
               "description": "Cache storage path. Default: %kernel.cache_dir%/symfony_security_auditor/attacker."
-            },
-            "prompt_caching": {
-              "type": "boolean",
-              "description": "Deprecated since 1.7 and ignored. Configure prompt caching on the AI platform in ai.yaml instead."
             }
           }
         },

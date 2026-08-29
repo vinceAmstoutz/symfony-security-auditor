@@ -39,58 +39,6 @@ final readonly class SymfonyMapping
         return $this->applicationSecurityMap;
     }
 
-    /**
-     * @param list<ProjectFile>           $controllers
-     * @param list<ProjectFile>           $entities
-     * @param list<ProjectFile>           $voters
-     * @param list<ProjectFile>           $repositories
-     * @param list<ProjectFile>           $forms
-     * @param list<ProjectFile>           $services
-     * @param list<ProjectFile>           $templates
-     * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>                $firewallRules
-     * @param list<RouteAccessControl>    $routeAccessControls
-     * @param list<VoterCapability>       $voterCapabilities
-     * @param list<FormBinding>           $formBindings
-     *
-     * @deprecated since 1.13, use {@see self::of()} with a ProjectFileInventory and an AccessControlMap instead.
-     */
-    public static function create(
-        array $controllers = [],
-        array $entities = [],
-        array $voters = [],
-        array $repositories = [],
-        array $forms = [],
-        array $services = [],
-        array $templates = [],
-        array $routeAccessMap = [],
-        array $firewallRules = [],
-        array $routeAccessControls = [],
-        array $voterCapabilities = [],
-        array $formBindings = [],
-    ): self {
-        trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.13', 'SymfonyMapping::create() is deprecated, use SymfonyMapping::of() instead.');
-
-        return self::of(
-            ProjectFileInventory::fromGroups([
-                'controllers' => $controllers,
-                'entities' => $entities,
-                'voters' => $voters,
-                'repositories' => $repositories,
-                'forms' => $forms,
-                'services' => $services,
-                'templates' => $templates,
-            ]),
-            new AccessControlMap(
-                $routeAccessMap,
-                $firewallRules,
-                $routeAccessControls,
-                $voterCapabilities,
-                $formBindings,
-            ),
-        );
-    }
-
     /** @return list<ProjectFile> */
     public function controllers(): array
     {

@@ -226,7 +226,7 @@ Provider-side **prompt caching** stacks on top of that for a ~90%
 configured on the `symfony/ai` platform, not by the auditor itself: set
 `cache_retention` (`short`/`long`) on the `anthropic` platform in `ai.yaml`
 (default `short` already enables it); OpenAI and Gemini cache automatically. The
-old `cache.prompt_caching` flag is deprecated since 1.7 and ignored.
+old `cache.prompt_caching` bundle flag was removed in 2.0.
 
 ## Privacy & Data Handling
 
@@ -372,16 +372,17 @@ class of issue this tool exists to find.
 
 ### Can I tune model parameters (temperature, max_tokens)?
 
-Yes. For `max_tokens`, use the dedicated `max_output_tokens` key — it defaults
-to `4096` and avoids `symfony/ai`'s built-in ~1000-token cap. This key currently
-only takes effect for Claude/Anthropic-dialect models — see
+Yes. For `max_tokens`, use the dedicated bundle key — it defaults to `8192` and
+avoids `symfony/ai`'s built-in ~1000-token cap. It only takes effect for
+Anthropic-dialect models; on any other provider a non-default value is reported
+as a pre-flight notice rather than silently ignored — see
 [Configuration → Top-level](configuration.md#top-level):
 
 ```yaml
 symfony_security_auditor:
-    max_output_tokens: 4096
+    max_output_tokens: 16384
     # or, split per agent:
-    attacker_max_output_tokens: 8192
+    attacker_max_output_tokens: 24576
     reviewer_max_output_tokens: 2048
 ```
 

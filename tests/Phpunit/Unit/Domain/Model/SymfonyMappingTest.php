@@ -366,63 +366,6 @@ final class SymfonyMappingTest extends TestCase
     }
 
     /**
-     * @deprecated covers the deprecated {@see SymfonyMapping::create()} delegator until it is removed in 2.0.
-     *
-     * @throws InvalidProjectFileException
-     */
-    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
-    public function test_deprecated_create_maps_every_group_to_of(): void
-    {
-        $controllers = [$this->makeFile('src/Controller/A.php')];
-        $entities = [$this->makeFile('src/Entity/B.php')];
-        $voters = [$this->makeFile('src/Security/C.php')];
-        $repositories = [$this->makeFile('src/Repository/D.php')];
-        $forms = [$this->makeFile('src/Form/E.php')];
-        $services = [$this->makeFile('src/Service/F.php')];
-        $templates = [$this->makeFile('templates/g.html.twig')];
-
-        $this->expectUserDeprecationMessageMatches('/SymfonyMapping::create\(\) is deprecated, use SymfonyMapping::of\(\) instead\./');
-
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: $controllers,
-            entities: $entities,
-            voters: $voters,
-            repositories: $repositories,
-            forms: $forms,
-            services: $services,
-            templates: $templates,
-            routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
-            firewallRules: ['^/admin'],
-        );
-
-        self::assertSame($controllers, $symfonyMapping->controllers());
-        self::assertSame($entities, $symfonyMapping->entities());
-        self::assertSame($voters, $symfonyMapping->voters());
-        self::assertSame($repositories, $symfonyMapping->repositories());
-        self::assertSame($forms, $symfonyMapping->forms());
-        self::assertSame($services, $symfonyMapping->services());
-        self::assertSame($templates, $symfonyMapping->templates());
-        self::assertSame(['/admin' => ['ROLE_ADMIN']], $symfonyMapping->routeAccessMap());
-        self::assertSame(['^/admin'], $symfonyMapping->toApplicationSecurityMap()->perimeterRules());
-
-        self::assertEquals(
-            SymfonyMapping::of(
-                ProjectFileInventory::fromGroups([
-                    'controllers' => $controllers,
-                    'entities' => $entities,
-                    'voters' => $voters,
-                    'repositories' => $repositories,
-                    'forms' => $forms,
-                    'services' => $services,
-                    'templates' => $templates,
-                ]),
-                new AccessControlMap(['/admin' => ['ROLE_ADMIN']], ['^/admin']),
-            ),
-            $symfonyMapping,
-        );
-    }
-
-    /**
      * @throws InvalidProjectFileException
      */
     private function makeFile(string $path): ProjectFile

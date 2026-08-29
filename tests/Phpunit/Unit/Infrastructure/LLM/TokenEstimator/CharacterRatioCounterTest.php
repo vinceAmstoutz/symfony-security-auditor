@@ -24,15 +24,12 @@ final class CharacterRatioCounterTest extends TestCase
     }
 
     /**
-     * BPE tokenizers operate on UTF-8 bytes, not characters — a
-     * multi-byte-per-character script (CJK, emoji) needs far more than one
-     * token per character, but `charsPerToken` ratios are calibrated
-     * assuming the byte-length-per-character of the target language stays
-     * roughly 1, which only holds for Latin scripts. Counting bytes keeps
-     * the ratio's assumption valid across scripts without any per-script
-     * detection: an ASCII string's byte count already equals its character
-     * count, so this is a no-op for the common case and only changes the
-     * estimate where character-counting was undercounting.
+     * BPE tokenizers operate on UTF-8 bytes, not characters: a multi-byte script
+     * needs far more than one token per character, but `charsPerToken` ratios
+     * assume roughly one byte per character, which holds only for Latin scripts.
+     * Counting bytes keeps that assumption valid without per-script detection —
+     * an ASCII string's byte count equals its character count, so this is a
+     * no-op for the common case and only changes where it was undercounting.
      */
     public function test_multibyte_characters_count_by_byte_length_not_character_count(): void
     {

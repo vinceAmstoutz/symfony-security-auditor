@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 
 final class AuditPresenterTest extends TestCase
 {
@@ -127,6 +128,27 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->header($symfonyStyle, '/path/to/project');
 
         self::assertStringContainsString('SECURITY AUDITOR', $bufferedOutput->fetch());
+    }
+
+    /**
+     * A scan that discovered no file exits `AuditFailed`, and that value used to
+     * fall through to the success branch — printing a green "Audit complete.
+     * Risk: SAFE" over a report describing nothing, with the misconfiguration
+     * visible only in `$?`.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_result_for_an_audit_that_reached_no_verdict_reports_that_nothing_was_audited(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)), ExitCode::AuditFailed->value);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('No file was audited', $display);
+        self::assertStringNotContainsString('Audit complete. Risk:', $display);
+        self::assertStringNotContainsString('failed a configured gate', $display);
     }
 
     /**
@@ -941,6 +963,18 @@ final class AuditPresenterTest extends TestCase
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return 0.0;
+            }
+
+            #[Override]
+            public function cacheReadPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
+            }
+
+            #[Override]
+            public function cacheCreationPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
             }
 
             #[Override]

@@ -20,19 +20,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
 /**
  * Resolves every single-finding review in concurrency windows via the
- * batch-capable client, then applies each verdict. Findings are dispatched one
- * `maxConcurrent`-sized window at a time — never as a single oversized batch —
- * so a budget/provider failure in a later window cannot discard an earlier
- * window's already-applied verdicts; the failing window and every window not
- * yet dispatched are marked `aborted`/`errored` before the exception
- * propagates. Per-finding parse/transient failures degrade to a rejected
- * verdict exactly as the sequential path does. Cached verdicts are served
- * first; only the misses are dispatched.
+ * batch-capable client, serving cached verdicts first and dispatching only the
+ * misses. Windows are `maxConcurrent`-sized and dispatched one at a time — never
+ * as one oversized batch — so a budget/provider failure in a later window cannot
+ * discard an earlier window's applied verdicts; the failing window and every
+ * undispatched one are marked `aborted`/`errored` before the exception
+ * propagates. Per-finding parse and transient failures degrade to a rejected
+ * verdict exactly as the sequential path does.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -93,15 +93,12 @@ final readonly class ConcurrentReviewAnalyzer
         return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $cached, $coverageRecorder);
     }
 
-    /**
-     * @return array{system: string, user: string}
-     */
-    private function buildRequest(Vulnerability $vulnerability, string $codeContext): array
+    private function buildRequest(Vulnerability $vulnerability, string $codeContext): LLMRequest
     {
-        return [
-            'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
-            'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
-        ];
+        return new LLMRequest(
+            $this->reviewerPromptBuilder->buildSystemPrompt(),
+            $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+        );
     }
 
     /**
@@ -110,8 +107,8 @@ final readonly class ConcurrentReviewAnalyzer
      * before the next window is attempted, so a failure partway through never
      * discards an earlier window's completed work.
      *
-     * @param list<array{system: string, user: string}> $requests
-     * @param list<PendingReview>                       $pending
+     * @param list<LLMRequest>    $requests
+     * @param list<PendingReview> $pending
      *
      * @return array<int, Vulnerability>
      *
@@ -143,8 +140,8 @@ final readonly class ConcurrentReviewAnalyzer
     }
 
     /**
-     * @param list<array{system: string, user: string}> $requestWindow
-     * @param list<PendingReview>                       $pendingWindow
+     * @param list<LLMRequest>    $requestWindow
+     * @param list<PendingReview> $pendingWindow
      *
      * @return array<int, Vulnerability>
      *

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 
 /**
  * Immutable input snapshot of one concurrency window: the per-finding requests
@@ -26,11 +26,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 final readonly class ConcurrentReviewBatch
 {
     /**
-     * @param list<array{system: string, user: string, tools: ToolRegistry}> $requests
-     * @param list<int>                                                      $pendingIndexes
-     * @param array<int, StructuredReviewCollectionSession>                  $sessions
-     * @param list<Vulnerability>                                            $vulnerabilities
-     * @param array<int, string>                                             $codeContexts
+     * @param list<ToolLLMRequest>                          $requests
+     * @param list<int>                                     $pendingIndexes
+     * @param array<int, StructuredReviewCollectionSession> $sessions
+     * @param list<Vulnerability>                           $vulnerabilities
+     * @param array<int, string>                            $codeContexts
      */
     public function __construct(
         public array $requests,

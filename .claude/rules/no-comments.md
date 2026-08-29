@@ -30,6 +30,20 @@ cannot be expressed in code and would take a reader hours to rediscover:
 
 Even then: one line, no multi-sentence prose.
 
+## Enforced
+
+`OversizedDocblockRule` (PHPStan, `tools/PHPStan/`) fails the build on any
+docblock with more than 8 prose lines.
+
+The budget is for prose that explains something genuinely complex — never for
+type information. An `@`-line and every continuation line under it are free, so
+a wrapped `@param` description, a multi-line `array{...}` shape and a long
+`@throws` list all cost nothing. A blank line ends an annotation block and
+returns the following lines to prose.
+
+Eight lines is roughly one dense paragraph. If an explanation needs more, that
+is the signal to extract and name the thing it is describing.
+
 ## Never
 
 - Multi-line `//` blocks explaining design rationale.

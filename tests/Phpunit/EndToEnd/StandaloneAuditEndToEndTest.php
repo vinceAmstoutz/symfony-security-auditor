@@ -15,16 +15,19 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Tester\ApplicationTester;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
@@ -91,6 +94,42 @@ final class StandaloneAuditEndToEndTest extends TestCase
 
         self::assertSame(0, $exitCode);
         self::assertStringContainsString('Dry run complete.', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     * @throws UnresolvableAuditCommandException
+     */
+    #[DataProvider('auditCommandNames')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_option_value_the_console_rejects_exits_audit_failed_rather_than_the_gate_code(string $commandName): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+        $exitCode = $applicationTester->run(
+            ['command' => $commandName, 'project-path' => $this->projectDir, '--format' => 'not-a-format'],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(ExitCode::AuditFailed->value, $exitCode);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function auditCommandNames(): iterable
+    {
+        yield 'canonical name' => [AuditCommand::NAME];
+        yield 'alias' => [AuditCommand::ALIAS];
     }
 
     /**

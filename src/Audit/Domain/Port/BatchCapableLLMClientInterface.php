@@ -14,24 +14,24 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Opt-in extension of {@see LLMClientInterface} for clients that can resolve
- * several independent prompts concurrently. Consumers check
- * `instanceof BatchCapableLLMClientInterface` and fall back to looping
- * {@see LLMClientInterface::complete()} when it is not implemented, so adding
- * this capability never breaks an existing client.
+ * Opt-in extension of {@see LLMClientInterface} for clients that resolve
+ * several independent prompts concurrently. Consumers check `instanceof` and
+ * fall back to looping {@see LLMClientInterface::complete()}, so adding this
+ * capability never breaks an existing client.
  *
- * Implementations MUST preserve input order in the returned list (response[i]
- * corresponds to requests[i]) and MUST be behaviourally identical to calling
- * `complete()` once per request — the only difference is wall-clock latency.
- * A best-effort implementation that cannot actually parallelise (e.g. a
- * provider with no async transport) is free to resolve sequentially.
+ * Implementations MUST preserve input order (response[i] answers requests[i])
+ * and MUST be behaviourally identical to calling `complete()` per request — the
+ * only difference is latency. One that cannot actually parallelise is free to
+ * resolve sequentially.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 interface BatchCapableLLMClientInterface extends LLMClientInterface
 {
     /**
-     * @param list<array{system: string, user: string}> $requests
-     * @param int                                       $maxConcurrent maximum in-flight requests; the batch is
-     *                                                                 processed in windows of this size
+     * @param list<LLMRequest> $requests
+     * @param int              $maxConcurrent maximum in-flight requests; the batch is processed
+     *                                        in windows of this size
      *
      * @return list<LLMResponse> responses in the same order as $requests
      */

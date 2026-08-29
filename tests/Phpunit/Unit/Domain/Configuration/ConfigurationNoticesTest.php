@@ -247,6 +247,123 @@ final class ConfigurationNoticesTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_raised_output_cap_on_a_non_anthropic_dialect_model_emits_a_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('gpt-4o', null, null, 16384),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('max_output_tokens is set to 16384', $notices[0]);
+        self::assertStringContainsString('gpt-4o', $notices[0]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_raised_output_cap_on_an_anthropic_dialect_model_emits_no_notice(): void
+    {
+        self::assertSame([], ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
+        ));
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_the_default_output_cap_on_a_non_anthropic_dialect_model_emits_no_notice(): void
+    {
+        self::assertSame([], ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('gpt-4o', null, null),
+        ));
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_raised_output_cap_on_a_non_anthropic_escalation_cheap_model_emits_a_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => true, 'escalationCheapModel' => 'gpt-4o-mini']),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('max_output_tokens is set to 16384', $notices[0]);
+        self::assertStringContainsString('gpt-4o-mini', $notices[0]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_raised_output_cap_on_an_anthropic_escalation_cheap_model_emits_no_notice(): void
+    {
+        self::assertSame([], ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => true, 'escalationCheapModel' => 'claude-haiku-4-5-20251001']),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
+        ));
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_raised_output_cap_ignores_the_cheap_model_while_escalation_is_disabled(): void
+    {
+        self::assertSame([], ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => false, 'escalationCheapModel' => 'gpt-4o-mini']),
+            new LLMConfiguration('claude-opus-5', null, null, 16384),
+        ));
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_split_caps_on_one_shared_model_report_both_roles(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('gpt-4o', null, null, attackerMaxOutputTokensOverride: 16384, reviewerMaxOutputTokensOverride: 2048),
+        );
+
+        self::assertCount(2, $notices);
+        self::assertStringContainsString('max_output_tokens is set to 16384', $notices[0]);
+        self::assertStringContainsString('max_output_tokens is set to 2048', $notices[1]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_one_shared_model_and_cap_reports_once(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('gpt-4o', null, null, 16384),
+        );
+
+        self::assertCount(1, $notices);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_per_role_override_is_reported_against_the_model_that_ignores_it(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1]),
+            new LLMConfiguration('claude-opus-5', null, 'gpt-4o', reviewerMaxOutputTokensOverride: 2048),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('max_output_tokens is set to 2048', $notices[0]);
+        self::assertStringContainsString('gpt-4o', $notices[0]);
+    }
+
+    /**
      * @param array{
      *     reviewerBatchSize?: int,
      *     escalationEnabled?: bool,

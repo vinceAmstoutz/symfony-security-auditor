@@ -22,18 +22,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 /**
- * Test fake: a real AttackerAgentInterface implementation that returns a fixed
- * finding set on every call and records what it was invoked with, so tests can
- * assert on call count, the files passed, and the previousFindings context
- * without mocking an internal Application collaborator. Like a real attacker,
- * every returned finding is pushed through the coverage recorder's
- * `recordFoundVulnerability()` side channel before the call resolves; an
- * optional `$throwsBeforeReturning` lets a test simulate a mid-run abort after
- * those findings were already recorded. `$hiddenRecordedFindings` additionally
- * simulates a chunk whose own conversation swallowed a generic (non-abort)
- * `Throwable` after a partial `record_vulnerability` success: recorded via the
- * coverage recorder like any other finding, but deliberately excluded from the
- * returned list — a real chunk analyzer never surfaces it there either.
+ * Test fake returning a fixed finding set and recording what it was invoked
+ * with, so tests can assert on call count, files and previous-findings context
+ * without mocking an internal collaborator. Like a real attacker, every returned
+ * finding goes through the coverage recorder before the call resolves;
+ * `$throwsBeforeReturning` simulates a mid-run abort after that.
+ * `$hiddenRecordedFindings` simulates a chunk that swallowed a generic
+ * `Throwable` after a partial success: recorded via the coverage recorder but
+ * absent from the returned list, as a real chunk analyzer leaves it.
  */
 final class RecordingAttackerAgent implements AttackerAgentInterface
 {

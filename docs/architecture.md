@@ -155,8 +155,8 @@ everything that only makes sense for a Symfony application:
   `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and
   `SymfonyYamlSecurityConfigParser`.
 - the container-building classes in `Infrastructure/Config/` —
-  `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory` and
-  `ContainerParameterRegistrar`.
+  `AuditConfigurationDefinition`, `CoreCompositionRoot`,
+  `AttackerAgentDefinitionFactory` and `ContainerParameterRegistrar`.
 
 The `Infrastructure` layer is then everything under `Infrastructure/` that is
 _not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain`
@@ -773,17 +773,37 @@ Three render methods:
 
 ### `SymfonySecurityAuditorBundle`
 
-Extends `AbstractBundle`. All wiring lives directly in this class — no separate
-Extension or Configuration class.
+Extends `AbstractBundle`, and delegates both halves of its job rather than
+carrying them: `configure()` hands the config tree to
+`AuditConfigurationDefinition`, and `loadExtension()` hands the object graph to
+`CoreCompositionRoot`. There is still no separate Extension class — the bundle
+remains the entry point Symfony calls.
 
-`configure(DefinitionConfigurator $definition)` defines the config tree under
-root key `symfony_security_auditor`. Top-level scalars:
+`CoreCompositionRoot` is the single description of the graph, and it is not
+bundle-specific. It imports `config/services.php`, registers the container
+parameters, then runs six `ServiceRegistrarInterface` implementations
+(`Audit\Infrastructure\Config\Registrar\`): `BudgetRegistrar`,
+`RateLimiterRegistrar`, `LlmClientRegistrar`, `ImplementationAliasRegistrar`,
+`CustomSkillRegistrar` and `EscalationRegistrar`. Adding a conditional wiring
+concern means adding a registrar and listing it, not adding a branch.
 
-| Key              | Default             | Purpose                                         |
-| ---------------- | ------------------- | ----------------------------------------------- |
-| `model`          | `'claude-opus-4-8'` | Model name for both Attacker and Reviewer roles |
-| `attacker_model` | `null`              | Override: dedicated model for the Attacker role |
-| `reviewer_model` | `null`              | Override: dedicated model for the Reviewer role |
+The standalone binary reaches the same object, not a copy of it.
+`StandaloneContainerFactory` calls `HostCompositionRootLoader`, which runs the
+raw configuration through the config tree (`AuditConfigurationProcessor`),
+builds a `ContainerConfigurator` over a plain `ContainerBuilder`
+(`CompositionRootLoader`), and invokes `CoreCompositionRoot`. Only third-party
+bundles — `AiBundle` — still go through `BundleExtensionLoader`. So a
+non-Symfony host wires the auditor without instantiating a bundle, and there is
+exactly one wiring source to keep correct.
+
+The config tree is defined under root key `symfony_security_auditor`. Top-level
+scalars:
+
+| Key              | Default           | Purpose                                         |
+| ---------------- | ----------------- | ----------------------------------------------- |
+| `model`          | `'claude-opus-5'` | Model name for both Attacker and Reviewer roles |
+| `attacker_model` | `null`            | Override: dedicated model for the Attacker role |
+| `reviewer_model` | `null`            | Override: dedicated model for the Reviewer role |
 
 Nested sections:
 
@@ -795,10 +815,9 @@ Nested sections:
   `budget.max_tokens`, `budget.max_cost_usd` (abort limits);
   `retry.max_attempts`, `retry.initial_delay_ms`, `retry.backoff_multiplier`,
   `retry.jitter_ratio` (LLM resilience)
-- `cache.*` — `enabled`, `dir` (chunk cache). `prompt_caching` is deprecated
-  since 1.7 and ignored; provider-side prompt caching is configured on the
-  `symfony/ai` platform (`cache_retention` in `ai.yaml` for Anthropic; automatic
-  for OpenAI/Gemini).
+- `cache.*` — `enabled`, `dir` (chunk cache). Provider-side prompt caching is
+  configured on the `symfony/ai` platform (`cache_retention` in `ai.yaml` for
+  Anthropic; automatic for OpenAI/Gemini).
 
 Model names must be supported by the platform configured in
 `config/packages/ai.yaml`. See [`docs/configuration.md`](configuration.md) for
@@ -828,9 +847,10 @@ ai:
             api_key: '%env(ANTHROPIC_API_KEY)%'
 ```
 
-The `loadExtension()` method (receiving `$config`, `ContainerConfigurator`,
-`ContainerBuilder`) imports `config/services.php`, then registers two
-`SymfonyAiLLMClient` service definitions (`security_auditor.attacker_client` and
+`CoreCompositionRoot::register()` (receiving the `ContainerConfigurator`, the
+`ContainerBuilder` and the parsed `BundleConfiguration`) imports
+`config/services.php`, then registers two `SymfonyAiLLMClient` service
+definitions (`security_auditor.attacker_client` and
 `security_auditor.reviewer_client`). Each receives `PlatformInterface`, the
 resolved model name (`attacker_model` or `reviewer_model`, falling back to
 `model`) and the default temperature, so `AttackerAgent` and `ReviewerAgent`
@@ -861,14 +881,9 @@ Input mapping and resolution live in `AuditCommandInput`; output writing in
 `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in
 `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
-Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold
-(default `critical`, so SAFE/LOW/MEDIUM/HIGH) and any `--min-score` is met; `1`
-when it is at or above the threshold, the normalized score is below
-`--min-score`, the scan discovered no file to audit at all, the path was
-invalid, or the audit itself failed; `2` when the budget could not be honored —
-either aborted mid-run with a partial report still emitted, or never started
-because an unpriced model makes `audit.budget.max_cost_usd` unenforceable. The
-canonical table lives in [`docs/configuration.md`](configuration.md#exit-codes).
+Exit codes: `0` (SAFE/LOW/MEDIUM), `1` (the gate tripped — HIGH or CRITICAL risk
+by default), `2` (budget exceeded — partial report still emitted), `3` (no
+verdict was reached: the run broke, or its scan found no file to audit).
 
 ## Extension Points
 
@@ -921,7 +936,7 @@ for unknown models — each a `mb_strlen ÷ ratio` heuristic via the shared
 `TokenEstimatorInterface` to replace the whole strategy.
 
 **Replace pricing provider** — implement
-`Audit\Domain\Port\PricingProviderInterface` (or
-`CacheAwarePricingProviderInterface` to also supply real prompt-cache rates) to
-supply custom per-token prices. Default: `ModelsDevPricingProvider`, which reads
-the daily `symfony/models-dev` catalog snapshot from `vendor/` (no network).
+`Audit\Domain\Port\PricingProviderInterface` — input, output and prompt-cache
+rates in one port — to supply custom per-token prices. Default:
+`ModelsDevPricingProvider`, which reads the daily `symfony/models-dev` catalog
+snapshot from `vendor/` (no network).

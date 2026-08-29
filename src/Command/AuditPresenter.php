@@ -313,6 +313,12 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
+        if (ExitCode::AuditFailed->value === $exitCode) {
+            $symfonyStyle->error('No file was audited, so this report describes nothing. Check your included_paths configuration and any --path filters.');
+
+            return;
+        }
+
         if (Command::FAILURE === $exitCode) {
             $totalVulnerabilities = $auditReport->totalVulnerabilities();
             $symfonyStyle->caution(\sprintf(

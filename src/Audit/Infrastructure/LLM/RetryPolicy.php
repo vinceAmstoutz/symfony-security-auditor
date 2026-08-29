@@ -83,14 +83,12 @@ final readonly class RetryPolicy
     /**
      * Returns the delay before retrying a rate-limited (429) request.
      *
-     * When `$serverHintSeconds` is a positive integer (typically parsed from a
-     * `Retry-After` response header via `RetryAfterHeaderParser`), the hint
-     * wins over the local exponential schedule. Otherwise the delay is
-     * `rateLimitInitialDelayMs` grown by `backoffMultiplier ** (attempt − 1)`
-     * jittered upward-only (unlike `delayMs()`'s symmetric jitter) so it never
-     * undercuts a provider's requested wait. The result is always clamped to
-     * `rateLimitMaxDelayMs` so a hostile provider cannot push the wait past
-     * a sane ceiling.
+     * A positive `$serverHintSeconds` (parsed from `Retry-After`) wins over the
+     * local schedule. Otherwise the delay is `rateLimitInitialDelayMs` grown by
+     * `backoffMultiplier ** (attempt − 1)`, jittered upward-only — unlike
+     * `delayMs()`'s symmetric jitter — so it never undercuts the provider's
+     * requested wait. Always clamped to `rateLimitMaxDelayMs`, so a hostile
+     * provider cannot push the wait past a sane ceiling.
      *
      * @throws InvalidRetryConfigurationException
      */

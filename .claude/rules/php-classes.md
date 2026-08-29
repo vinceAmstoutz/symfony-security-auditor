@@ -14,6 +14,10 @@ are documented **context carriers**:
 - `Command\AuditCommandInput` — Symfony Console MapInput requires public mutable
   properties with property-level defaults; promoted readonly constructor params
   are invisible to its reflection.
+- `Audit\Infrastructure\Config\CompositionRootLoader` — extends Symfony's
+  `PhpFileLoader` to expose the `ContainerConfigurator` it builds for itself;
+  the loader state it inherits is mutable by design, so the subclass cannot be
+  readonly. It stays `final`.
 
 Each opt-out site declares the reason in a leading code comment and cites this
 rule. Anything outside that list must be `final readonly`. If inheritance feels

@@ -17,6 +17,7 @@ use Symfony\Component\Config\Definition\Builder\NodeBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -40,7 +41,7 @@ final readonly class AuditConfigurationDefinition
     {
         $nodeBuilder
                 ->scalarNode('model')
-                    ->defaultValue('claude-opus-4-8')
+                    ->defaultValue(LLMConfiguration::DEFAULT_MODEL)
                     ->cannotBeEmpty()
                     ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.')
                 ->end()
@@ -66,9 +67,9 @@ final readonly class AuditConfigurationDefinition
                     ->info('Override: dedicated model for the Reviewer role. Falls back to `model` when null.')
                 ->end()
                 ->integerNode('max_output_tokens')
-                    ->defaultValue(4096)
+                    ->defaultValue(LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS)
                     ->min(1)
-                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. Sets `max_tokens` in every platform request. Default 4096; symfony/ai's Anthropic bridge otherwise defaults to a much smaller value (~1000) that silently truncates findings.")
+                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. Sets `max_tokens` in every platform request. Default 8192; symfony/ai's Anthropic bridge otherwise defaults to a much smaller value (~1000) that silently truncates findings, and on a current Claude model the cap covers thinking and response text together. Only the Anthropic-dialect bridges accept the option — on any other model a value other than the default is reported as a pre-flight notice instead of being dropped in silence.")
                 ->end()
                 ->integerNode('attacker_max_output_tokens')
                     ->defaultNull()
@@ -82,7 +83,7 @@ final readonly class AuditConfigurationDefinition
                 ->end()
                 ->booleanNode('provider_json_mode')
                     ->defaultFalse()
-                    ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call. Honored by OpenAI/Mistral/Ollama; silently ignored by Anthropic (which has no equivalent knob). Default false because behaviour is provider-dependent — only enable if your provider supports it. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
+                    ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call to an Anthropic-dialect model. A no-op on every other dialect — the Gemini and OpenAI Responses bridges reject the option outright, so it is not sent — decided by the same anchored prefix match as `max_output_tokens`. Default false. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
                 ->end()
         ;
     }
@@ -218,8 +219,8 @@ final readonly class AuditConfigurationDefinition
                         ->end()
                         ->enumNode('fail_on')
                             ->values(['safe', 'low', 'medium', 'high', 'critical'])
-                            ->defaultValue('critical')
-                            ->info("Minimum aggregate risk level that makes `audit:run` exit 1 (the CI gate). The audit exits 1 when the report's risk level is at or above this threshold, 0 otherwise (a budget abort still exits 2). Default `critical` preserves the historical behaviour (only a CRITICAL risk level fails). Set `high`/`medium`/`low` to fail PRs earlier. `safe` fails on every completed audit. The --fail-on CLI option overrides this per run.")
+                            ->defaultValue('high')
+                            ->info("Minimum aggregate risk level that makes `audit:run` exit 1 (the CI gate). The audit exits 1 when the report's risk level is at or above this threshold, 0 otherwise (a budget abort still exits 2). Default `high`, so a HIGH-risk audit fails CI. Set `medium`/`low` to fail PRs earlier, `critical` for the pre-2.0 behaviour where only a CRITICAL risk level fails, or `safe` to fail on every completed audit. The --fail-on CLI option overrides this per run.")
                         ->end()
                         ->enumNode('since_closure')
                             ->values(['none', 'direct'])
@@ -433,15 +434,6 @@ final readonly class AuditConfigurationDefinition
                         ->scalarNode('dir')
                             ->defaultValue('%kernel.cache_dir%/symfony_security_auditor/attacker')
                             ->info('Filesystem path for the attacker cache. Created on first write.')
-                        ->end()
-                        ->booleanNode('prompt_caching')
-                            ->defaultTrue()
-                            ->setDeprecated(
-                                'vinceamstoutz/symfony-security-auditor',
-                                '1.7',
-                                'The "%node%" option is deprecated and no longer has any effect. Prompt caching is controlled by your Symfony AI platform: set `cache_retention` (none|short|long) on the anthropic platform in `ai.yaml` (default `short` already enables it); OpenAI and Gemini cache automatically.',
-                            )
-                            ->info('Deprecated and ignored since 1.7. Prompt caching is configured on the Symfony AI platform, not here: set `cache_retention` (none|short|long) on the anthropic platform in `ai.yaml`. OpenAI and Gemini cache automatically.')
                         ->end()
                     ->end()
                 ->end()

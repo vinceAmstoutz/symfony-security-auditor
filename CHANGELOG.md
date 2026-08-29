@@ -10,6 +10,228 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
+
+### Added
+
+- **Two regression gates for a refactor that is supposed to change nothing.**
+  Coverage and MSI prove the code still executes; neither proves the auditor
+  still finds the same vulnerabilities, or that a report written today is still
+  readable by `audit:diff`/`audit:trend` tomorrow. `bin/castor eval` gains
+  `--write-baseline`, recording overall and per-class precision/recall to
+  `examples/vulnerable-app/eval-baseline.json` — and only after the run clears
+  whatever `--min-precision`/`--min-recall` floors were passed, so a recording
+  run cannot skip the check a scoring run makes (both floors default to `0.0`,
+  so pass real ones for that to mean anything), while an unwritable path is
+  reported rather than announced as recorded; a later run compares against that
+  file through the new `Tooling\Eval\EvalBaseline` and fails on any difference
+  in either direction — on a pure move an improvement is as much a signal as a
+  regression. With no baseline present the run warns instead of passing
+  silently. Alongside it, `ReportSchemaFreezeTest` pins the key paths and value
+  types of the JSON and SARIF documents against a committed snapshot, plus
+  `Vulnerability::fingerprintOf()` against a known input, so a renamed or
+  retyped key fails the ordinary test suite rather than surfacing later as an
+  unreadable historical report. That snapshot is one validated finding, so the
+  element shapes inside `cost.by_role` and `coverage` are frozen as empty arrays
+  — extend the fixture when you need those pinned too.
+
+### Changed
+
+- **The audit object graph is described in one named place, and every host
+  reaches it the same way.** `SymfonySecurityAuditorBundle` carried the wiring
+  itself — the `config/services.php` import, the container parameters and six
+  conditional registrations — so the only description of the graph was reachable
+  only through a Symfony bundle, and the standalone binary had to instantiate
+  that bundle to get a container. `CoreCompositionRoot` owns the graph now and
+  the bundle delegates, dropping from 394 lines to 57: one call to the config
+  definition and one to the composition root. The six registrations are no
+  longer branches inside it either — each is a `ServiceRegistrarInterface`
+  implementation under `Audit\Infrastructure\Config\Registrar\` (budget, rate
+  limiter, LLM clients, implementation aliases, custom skills, escalation),
+  collected the same way `ConfigurationNotices` collects its rules, so a new
+  conditional wiring concern is a new class rather than another branch. The
+  argument list every `SymfonyAiLLMClient` definition takes moved to a shared
+  `LlmClientDefinitionFactory`, so the attacker, reviewer and escalation
+  cheap-model clients cannot drift apart, and the escalation cheap-model
+  fallback now reads
+  `AuditExecutionConfiguration::effectiveEscalationCheapModel()` rather than
+  repeating the `??`.
+
+  `StandaloneContainerFactory` no longer loads the bundle extension for the
+  auditor: `HostCompositionRootLoader` runs the config tree over the raw
+  configuration through `AuditConfigurationProcessor`, builds the
+  `ContainerConfigurator` via `CompositionRootLoader`, and calls
+  `CoreCompositionRoot` directly — one wiring source, no per-host duplication.
+  The compiled standalone container is byte-identical to the one the bundle
+  extension produced: dumping the generated container class for the default,
+  escalation, rate-limited, triage-memory, secret-scrubbing-off, custom-skill
+  and offline-only configurations yields the same SHA-1 on both paths, inlined
+  private services included. Closes #250.
+
+- **Adding a pre-flight configuration notice is now one new class.**
+  `ConfigurationNotices` held five hardcoded checks, each with a private
+  predicate and an inline message, so a sixth footgun meant editing the
+  collector, adding a predicate and embedding a message — three places, and a
+  growing `of()` that never stopped growing. Each check is now a
+  `ConfigurationNoticeInterface` implementation under
+  `Audit\Domain\Configuration\Notice\`, collected by `ConfigurationNotices` the
+  same way `AttackerSkillRegistry` collects attacker skills, so a new notice is
+  a new class plus one line in `defaultNotices()`. The rule that reports a
+  dropped `max_output_tokens` keeps its own dedup logic instead of leaking it
+  into the collector, and the escalation cheap-model fallback moves onto
+  `AuditExecutionConfiguration::effectiveEscalationCheapModel()` so the two
+  rules that need it share one definition. `ConfigurationNotices::of()` keeps
+  its signature, so every existing test exercises the new structure unchanged.
+
+- **The Domain-port BC promise is now an enumerated list of 23 ports instead of
+  the whole `src/Audit/Domain/Port/` directory.** The old wording froze every
+  interface in that directory — ~30 of them, most being internal collaboration
+  seams that nobody outside the bundle implements — so changing any signature
+  was a `MAJOR`. That bill was already being paid: #235's transitional
+  `CacheAwarePricingProviderInterface` existed purely because the base pricing
+  port could not gain a method. Eight ports leave the promise and gain
+  `@internal`: `AttackerPromptBuilderInterface`,
+  `ReviewerPromptBuilderInterface`, `AttackerCacheInterface`,
+  `ContextAwareAttackerCacheInterface`, `ReviewerCacheInterface`,
+  `ReviewerFeedbackSnapshotInterface`, `BatchCapableLLMClientInterface` and
+  `ToolBatchCapableLLMClientInterface`. Demoting the last two immediately paid
+  off: `completeBatch()` and `completeBatchWithTools()` now take
+  `list<LLMRequest>` / `list<ToolLLMRequest>` rather than raw
+  `array{system: string, user: string, …}` shapes, so the
+  `LLMRequest::listFromArrays()` / `ToolLLMRequest::listFromArrays()` adapters
+  that existed only to feed a frozen signature are gone and the three remaining
+  Application-side invocations carry value objects end to end. To stop the
+  surface re-widening by accident, a new interface under `Port/` is now
+  `@internal` by default — see `.claude/rules/ddd-layers.md`; joining the list
+  is a documented, deliberate step. The same audit reached one directory over:
+  `Pipeline\CoverageRecorderInterface` carried `@internal` while
+  `docs/versioning.md` enumerated it as covered, so the list now matches the
+  source — no stage receives a coverage recorder, so implementing
+  `StageInterface` never depended on its shape — and
+  `Pipeline\NullCoverageRecorder` gains the tag every other null-object port
+  already had.
+
+- **`model` now defaults to `claude-opus-5`, and `max_output_tokens` to
+  `8192`.** A fresh install with no `model`/`attacker_model`/`reviewer_model`
+  key ran on `claude-opus-4-8` — the previous Opus generation — while every
+  example in the docs had already moved on, so the shipped default and the
+  documentation disagreed by design. Both call sites carrying the old value
+  move: the `model` node in `AuditConfigurationDefinition` and the interactive
+  prompt's fallback in `InitCommand`, the latter being what
+  `init --no-interaction` (and therefore the `SSA_INIT` installer flag and the
+  GitHub Action's standalone mode) writes. `claude-opus-4-8` remains a fully
+  valid, explicitly-settable model and is still priced in the
+  `symfony/models-dev` catalog. The output cap moves with it: on a current
+  Claude model `max_tokens` bounds thinking and response text **together**, so
+  the pre-2.0 `4096` left materially less room for a full `record_vulnerability`
+  argument set than the number suggests — exactly the truncation the key exists
+  to prevent. `LLMConfiguration` is now the single source for both defaults —
+  `DEFAULT_MODEL` and `DEFAULT_MAX_OUTPUT_TOKENS` — so the config tree and
+  `InitCommand`'s prompt no longer carry their own copies of the model id, and
+  `8192` reaches every site that reads the cap, including the
+  `BundleConfiguration::fromArray()` fallback a programmatic caller hits when it
+  omits the key, which had been left on the old `4096`.
+
+- **`max_output_tokens` no longer pretends to work on providers that reject
+  it.** The gate that decided whether to forward the cap was
+  `str_contains($model, 'claude')` in `PlatformOptionsFactory` — coincidence-
+  driven in both directions: it matched any unrelated model whose name happened
+  to contain "claude", and a user on Gemini or OpenAI could raise
+  `max_output_tokens` and get no error, no warning and no effect, even though
+  `docs/troubleshooting.md` sends exactly that user to this key when findings
+  truncate. The substring match is replaced by the new `AnthropicOptionDialect`,
+  which matches anchored model-id prefixes (`claude-`, `claude.`, `anthropic.`,
+  and Bedrock's `us.`/`eu.`/`apac.` cross-region variants) against the
+  identifier's final `/` segment, so a Bedrock id and the provider-qualified
+  gateway forms (`anthropic/claude-…`, `publishers/anthropic/models/claude-…`)
+  all keep their cap, while `openrouter/not-claude-at-all` and an opaque alias
+  like `acme-gateway/fast` no longer receive an option their bridge would
+  reject. And a cap other than the shipped default configured against a model
+  outside that dialect now prints a pre-flight notice naming the model and the
+  value — one per affected role when
+  `attacker_max_output_tokens`/`reviewer_max_output_tokens` differ, and one for
+  `audit.escalation.cheap_model` when escalation is enabled — the same channel
+  that already reports configuration which silently disables a cost saver —
+  instead of being dropped in silence. `provider_json_mode` is gated by the same
+  prefix check.
+
+- **A failed audit now exits `3` instead of colliding with the security gate's
+  `1`.** Through 1.x, `audit:run` returned `1` both when the audit completed and
+  the aggregate risk level tripped `audit.fail_on`, and when the auditor never
+  ran at all — an invalid `project-path`, an option value the console rejects,
+  conflicting options such as `--generate-baseline --dry-run`, an LLM provider
+  abort, or an unhandled exception. For a security tool that is the worst
+  collision available: a crashed auditor produced the same signal as a working
+  one reporting real vulnerabilities. `ExitCode` gains `AuditFailed = 3`;
+  `AuditCommand`'s top-level handler and its non-budget abort path return it,
+  and the new `AuditFailureExitCodeListener` (wired on `console.error` in both
+  the bundle and the standalone application) converts the failures that never
+  reach the command body. **A scan that discovered no file to audit moves to `3`
+  as well**: nothing was examined, so no verdict exists for a gate to trip on,
+  and a `project-path` that does not exist already exited `3` — a path that
+  exists but matches no file was the same mistake wearing a different code, so a
+  mistyped `scan.included_paths` entry or an over-broad `excluded_paths` no
+  longer claims your code has findings. `0`, `1` and `2` otherwise keep their
+  meanings, and both codes stay non-zero, so a CI job gating on findings still
+  fails the same builds — but one that wants to distinguish "the gate tripped"
+  from "the tool is broken" can now do so. The GitHub Action's `exit-code`
+  output surfaces `3` unchanged.
+
+- **`audit.fail_on` now defaults to `high`, so a HIGH-risk audit fails CI.**
+  Through 1.x the default was `critical`, which meant only a `CRITICAL`
+  aggregate risk level made `audit:run` exit `1` — a report full of HIGH
+  findings passed the gate. `docs/versioning.md` announced the change as a
+  planned default flip; this release ships it. Every site that carried the old
+  default moves together — the `fail_on` node in `AuditConfigurationDefinition`,
+  the `?? 'critical'` fallback in `BundleConfiguration::fromArray()`,
+  `AuditExecutionConfiguration::$failOn`, `AuditCommand::$riskLevel`'s own
+  constructor default, the `--fail-on` descriptions in `AuditCommandInput` and
+  `AuditCommandHelp`, `resources/schema.json`, `action.yml` and
+  `docs/configuration.md`. Set `audit.fail_on: critical` (or pass
+  `--fail-on=critical`) to keep the 1.x behaviour.
+
+### Removed
+
+- **`CacheAwarePricingProviderInterface` is gone; its two methods moved onto
+  `PricingProviderInterface`.** The split shipped in 1.12 as an explicitly
+  transitional shape — PHP interfaces cannot gain a method without a BC break,
+  so cache rates could not join the base port before a `MAJOR`. They now have:
+  `PricingProviderInterface` declares `cacheReadPricePerMillionTokens()` and
+  `cacheCreationPricePerMillionTokens()` alongside the input/output rates, and
+  `CostCalculator` drops its `instanceof CacheAwarePricingProviderInterface`
+  branch — together with the Anthropic `0.1x`-read / `1.25x`-write heuristic and
+  base-input-rate fallback that branch existed to reach. A custom provider must
+  implement the two new methods; returning `pricePerMillionInputTokens()` from
+  both reproduces the old non-cache-aware behaviour exactly.
+
+- **The three wide `create()` factories deprecated since 1.13 are gone.**
+  `Vulnerability::create()`, `SymfonyMapping::create()` and
+  `LLMResponse::create()` each delegated to the value-object `of()` factory and
+  emitted `…::create() is deprecated, use …::of() instead.` on every call. They
+  are removed along with their `trigger_deprecation()` calls; call `of()`
+  instead, passing
+  `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
+  `ProjectFileInventory`/`AccessControlMap` and `TokenUsageSnapshot`
+  respectively. Because those were the oldest live deprecations, the `$oldest`
+  guard in `.github/workflows/ci.yaml` and the matching note in
+  `docs/versioning.md` now track `1.19` — the `SymfonyMapping` accessor
+  deprecations — instead of `1.13`.
+
+- **`cache.prompt_caching` is gone — a key that had done nothing since 1.7.** It
+  once set `cache_control: ephemeral` on every LLM call, but current
+  `symfony/ai` bridges stopped reading that option, so from 1.7 onward the key
+  was accepted, emitted a Symfony deprecation, and had no effect. The node is
+  now removed from `AuditConfigurationDefinition`, so a config still carrying it
+  fails validation with
+  `Unrecognized option "prompt_caching" under "symfony_security_auditor.cache"`
+  instead of being silently ignored. Delete the key; provider-side prompt
+  caching is configured on the `symfony/ai` platform, not here — set
+  `cache_retention` (`none` | `short` | `long`) on the `anthropic` platform in
+  `ai.yaml` (the default `short` already enables it), while OpenAI and Gemini
+  cache automatically. `CacheConfiguration::$promptCaching` and the
+  `symfony_security_auditor.cache.prompt_caching` container parameter are
+  removed with it.
+
 ## [1.20.1] — 2026-08-23 — Herald
 
 A release about the binary saying who it is and what it just did. The identity

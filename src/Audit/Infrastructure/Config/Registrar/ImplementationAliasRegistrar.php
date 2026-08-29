@@ -1,0 +1,137 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar;
+
+use Override;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
+use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
+
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
+
+/**
+ * Points each port at the implementation the configuration selected.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
+final readonly class ImplementationAliasRegistrar implements ServiceRegistrarInterface
+{
+    #[Override]
+    public function register(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        $servicesConfigurator->alias(AttackerCacheInterface::class, $bundleConfiguration->cache->enabled
+            ? FilesystemAttackerCache::class
+            : NullAttackerCache::class);
+
+        $servicesConfigurator->alias(ReviewerCacheInterface::class, $bundleConfiguration->cache->enabled
+            ? FilesystemReviewerCache::class
+            : NullReviewerCache::class);
+
+        $servicesConfigurator->alias(SecretScrubberInterface::class, $bundleConfiguration->scan->secretScrubbingEnabled
+            ? RegexSecretScrubber::class
+            : NullSecretScrubber::class);
+
+        $servicesConfigurator->alias(AdvisoryDatabaseInterface::class, $bundleConfiguration->privacy->offlineOnly
+            ? InMemoryAdvisoryDatabase::class
+            : DeferredAdvisoryDatabase::class);
+
+        $servicesConfigurator->alias(ComposerAuditRunnerInterface::class, $bundleConfiguration->cache->enabled
+            ? LockfileHashedAdvisoryCache::class
+            : SymfonyProcessComposerAuditRunner::class);
+
+        $this->registerStaticPreScanner($servicesConfigurator, $bundleConfiguration);
+        $this->registerTriageMemory($servicesConfigurator, $bundleConfiguration);
+
+        $servicesConfigurator->alias(CodeSlicerInterface::class, $bundleConfiguration->audit->codeSlicingEnabled
+            ? RegexCodeSlicer::class
+            : NullCodeSlicer::class);
+    }
+
+    /**
+     * With `audit.triage_memory` enabled, the reviewer's own rejections persist
+     * across runs and merge with any baseline-sourced feedback; disabled, the
+     * feedback seam is the baseline-only behaviour of earlier releases.
+     */
+    private function registerTriageMemory(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        if (!$bundleConfiguration->audit->triageMemory) {
+            $servicesConfigurator->alias(TriageMemoryRecorderInterface::class, NullTriageMemoryRecorder::class);
+            $servicesConfigurator->alias(ReviewerFeedbackProviderInterface::class, ReviewerFeedbackHolder::class);
+
+            return;
+        }
+
+        $servicesConfigurator->alias(TriageMemoryRecorderInterface::class, FilesystemTriageMemoryStore::class);
+        $servicesConfigurator->alias(ReviewerFeedbackProviderInterface::class, CompositeReviewerFeedbackProvider::class);
+        $servicesConfigurator->alias(ReviewerFeedbackSnapshotInterface::class, CompositeReviewerFeedbackProvider::class);
+    }
+
+    /**
+     * With `scan.import_sarif` configured, the effective pre-scanner is the
+     * SARIF importer decorating whichever scanner `audit.static_prescan`
+     * selected — imports work even with the regex pre-scan disabled.
+     */
+    private function registerStaticPreScanner(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        $staticPreScanner = $bundleConfiguration->audit->staticPreScanEnabled
+            ? RegexStaticPreScanner::class
+            : NullStaticPreScanner::class;
+
+        if ([] === $bundleConfiguration->scan->importSarifPaths) {
+            $servicesConfigurator->alias(StaticPreScannerInterface::class, $staticPreScanner);
+
+            return;
+        }
+
+        $servicesConfigurator->set(SarifImportingPreScanner::class)
+            ->private()
+            ->args([
+                service($staticPreScanner),
+                $bundleConfiguration->scan->importSarifPaths,
+                service(Filesystem::class),
+                service(AuditedProjectPathHolder::class),
+            ]);
+        $servicesConfigurator->alias(StaticPreScannerInterface::class, SarifImportingPreScanner::class);
+    }
+}

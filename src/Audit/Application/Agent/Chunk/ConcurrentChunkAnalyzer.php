@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 
 /**
  * Analyzes cache-miss chunks concurrently as a structured-collection wavefront:
@@ -240,7 +241,7 @@ final readonly class ConcurrentChunkAnalyzer
     private function dispatchWindow(array $window, CoverageRecorderInterface $coverageRecorder): array
     {
         $requests = array_values(array_map(
-            static fn (PendingChunk $pendingChunk): array => ['system' => $pendingChunk->systemPrompt, 'user' => $pendingChunk->userMessage, 'tools' => $pendingChunk->session->toolRegistry],
+            static fn (PendingChunk $pendingChunk): ToolLLMRequest => new ToolLLMRequest($pendingChunk->systemPrompt, $pendingChunk->userMessage, $pendingChunk->session->toolRegistry),
             $window,
         ));
 

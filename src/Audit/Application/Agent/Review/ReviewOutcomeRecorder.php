@@ -96,15 +96,13 @@ final readonly class ReviewOutcomeRecorder
     }
 
     /**
-     * Recovers a verdict already recorded via a `record_review` tool call in
-     * an earlier round of a conversation that later aborted — otherwise it
-     * vanishes with the exception even though the verdict was genuinely
-     * reached. Returns `null` when nothing was recorded, so the caller falls
-     * back to its own not-reached handling via {@see recordUnreached()}. A
-     * recovered verdict is cached the same way a normal, non-aborted verdict
-     * already is — it was genuinely reached, so a retried run should not pay
-     * for an LLM call that already produced a reliable answer — bypassed
-     * when the caller passes no code context (mirrors `bypassCache`).
+     * Recovers a verdict recorded via `record_review` in an earlier round of a
+     * conversation that later aborted — otherwise it vanishes with the exception
+     * though it was genuinely reached. Returns `null` when nothing was recorded,
+     * so the caller falls back to {@see recordUnreached()}. A recovered verdict
+     * is cached like any non-aborted one — it was genuinely reached, so a retry
+     * should not pay for an answer already produced — bypassed when the caller
+     * passes no code context (mirrors `bypassCache`).
      */
     public function recoverDrainedVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): ?Vulnerability
     {

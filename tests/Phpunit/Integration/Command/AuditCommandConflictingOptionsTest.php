@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
@@ -46,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
@@ -91,7 +91,7 @@ final class AuditCommandConflictingOptionsTest extends TestCase
             '--generate-baseline' => $baselineFile,
         ]);
 
-        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertSame(ExitCode::AuditFailed->value, $commandTester->getStatusCode());
         self::assertFileDoesNotExist($baselineFile);
         self::assertStringContainsString('--generate-baseline', $commandTester->getDisplay());
     }
@@ -112,7 +112,7 @@ final class AuditCommandConflictingOptionsTest extends TestCase
             '--generate-baseline' => $baselineFile,
         ]);
 
-        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertSame(ExitCode::AuditFailed->value, $commandTester->getStatusCode());
         self::assertFileDoesNotExist($baselineFile);
         self::assertStringContainsString('--generate-baseline', $commandTester->getDisplay());
     }

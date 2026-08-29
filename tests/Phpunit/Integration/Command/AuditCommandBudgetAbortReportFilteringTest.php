@@ -186,7 +186,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
             '--format' => 'sarif',
         ]);
 
-        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertSame(ExitCode::AuditFailed->value, $exitCode);
         self::assertStringContainsString('Unexpected error', $commandTester->getDisplay());
         self::assertStringContainsString('Syntax error', $commandTester->getDisplay());
     }

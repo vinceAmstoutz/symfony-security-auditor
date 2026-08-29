@@ -43,13 +43,17 @@ final class AuditCommandHelp
           <info>%command.full_name% --baseline=.security-baseline.json</info>           suppress them on later runs
         Baselined findings are dropped from the report and do not affect the exit code.
 
-        Exit codes (the failure threshold is configurable via <info>audit.fail_on</info> / <info>--fail-on</info>, default <info>critical</info>;
+        Exit codes (the failure threshold is configurable via <info>audit.fail_on</info> / <info>--fail-on</info>, default <info>high</info>;
         <info>--min-score</info> adds a second, independent gate — the audit fails when either one trips):
           <info>0</info>  audit completed; risk level is below the fail-on threshold and the score is at or above --min-score
-          <info>1</info>  audit completed with risk level at or above the fail-on threshold, or a score below --min-score, or the audit itself failed
+          <info>1</info>  audit completed with risk level at or above the fail-on threshold, or a score below --min-score
           <info>2</info>  audit budget could not be honored: it aborted mid-run because the configured token or cost budget was
                 exceeded (partial report still emitted), or it never started because an unpriced model makes the cost
                 budget unenforceable and the run was declined or non-interactive (no report emitted in that case)
+          <info>3</info>  the audit never produced a verdict: invalid project-path, a rejected option value, conflicting options,
+                an LLM provider abort, an unhandled exception, or a scan that discovered no file to audit at all
+                (details on stderr). An abort after findings were already validated, and an empty scan, still write
+                their report — the other causes write nothing, so do not assume a report file exists on a 3
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
         and costs a few cents to a few dollars depending on the selected model. Configure

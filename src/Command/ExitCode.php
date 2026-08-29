@@ -17,6 +17,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * The process exit codes of `audit:run`. The integer VALUES are public API
  * (see docs/versioning.md); this enum is the internal source of truth for them.
  *
+ * `Failure` means the audit reached a verdict and the gate tripped on it;
+ * `AuditFailed` means no verdict was reached — the run broke, or its scan found
+ * nothing to examine. Keeping them apart is the whole point of the split: a
+ * crashed or misconfigured auditor must not look like a working one reporting
+ * real vulnerabilities.
+ *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 enum ExitCode: int
@@ -26,4 +32,6 @@ enum ExitCode: int
     case Failure = 1;
 
     case BudgetAborted = 2;
+
+    case AuditFailed = 3;
 }

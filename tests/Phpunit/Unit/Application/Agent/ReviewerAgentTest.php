@@ -48,6 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
@@ -5564,11 +5565,9 @@ final class ReviewerAgentTest extends TestCase
 
     private static function registryOf(mixed $request): ToolRegistry
     {
-        self::assertIsArray($request);
-        $toolRegistry = $request['tools'] ?? null;
-        self::assertInstanceOf(ToolRegistry::class, $toolRegistry);
+        self::assertInstanceOf(ToolLLMRequest::class, $request);
 
-        return $toolRegistry;
+        return $request->tools;
     }
 
     /**

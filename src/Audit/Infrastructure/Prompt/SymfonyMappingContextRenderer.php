@@ -236,18 +236,13 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * A rule's `methods: GET|POST`-style requirement (recorded verbatim by
-     * {@see SymfonyYamlSecurityConfigParser}) only actually governs a route
-     * whose own declared methods are a subset of it — Symfony evaluates
-     * `access_control` rules in order and skips to the next one on a method
-     * mismatch, it does not treat a path-only match as sufficient. A route
-     * with no declared methods answers to every HTTP verb, so a
-     * method-restricted rule can never fully cover it. A second (or third, …)
-     * `access_control` rule for the same path is recorded as one `or: ...`
-     * entry per rule ({@see SymfonyYamlSecurityConfigParser::recordAccessControlEntry()}),
-     * each its own independent alternative Symfony tries in turn — the path
-     * is covered for a route if ANY alternative covers it, not just the
-     * first.
+     * A rule's `methods: GET|POST` requirement only governs a route whose own
+     * declared methods are a subset of it: Symfony evaluates `access_control` in
+     * order and skips to the next rule on a method mismatch rather than treating
+     * a path-only match as sufficient. A route with no declared methods answers
+     * every verb, so a method-restricted rule can never fully cover it. Further
+     * rules for the same path are recorded one `or: ...` entry each, independent
+     * alternatives Symfony tries in turn — the path is covered if ANY covers it.
      *
      * @param list<string> $roles
      * @param list<string> $routeMethods

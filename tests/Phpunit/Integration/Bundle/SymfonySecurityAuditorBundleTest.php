@@ -87,6 +87,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
@@ -146,12 +147,12 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
     }
 
-    public function test_bundle_default_model_is_claude_opus_4_8(): void
+    public function test_bundle_default_model_is_claude_opus_5(): void
     {
         $containerBuilder = $this->loadParameters([]);
 
-        self::assertSame('claude-opus-4-8', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
-        self::assertSame('claude-opus-4-8', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
+        self::assertSame('claude-opus-5', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
+        self::assertSame('claude-opus-5', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
     public function test_bundle_uses_shared_model_for_both_agents_when_split_overrides_omitted(): void
@@ -174,12 +175,12 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('claude-sonnet', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
-    public function test_bundle_defaults_max_output_tokens_to_4096_for_both_agents(): void
+    public function test_bundle_defaults_max_output_tokens_to_8192_for_both_agents(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame(4096, $containerBuilder->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
-        self::assertSame(4096, $containerBuilder->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+        self::assertSame(8192, $containerBuilder->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(8192, $containerBuilder->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
     }
 
     public function test_bundle_honors_split_max_output_tokens_overrides(): void
@@ -651,18 +652,16 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
-    public function test_bundle_accepts_deprecated_prompt_caching_key_and_still_exposes_its_value(): void
+    public function test_bundle_rejects_the_removed_prompt_caching_key(): void
     {
-        $this->expectUserDeprecationMessageMatches('/The "prompt_caching" option is deprecated and no longer has any effect/');
+        $this->expectException(InvalidConfigurationException::class);
 
-        $kernel = $this->boot([
+        $this->boot([
             'model' => 'gpt-4o',
             'cache' => [
                 'prompt_caching' => false,
             ],
         ]);
-
-        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.cache.prompt_caching'));
     }
 
     #[RunInSeparateProcess]
@@ -750,7 +749,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertSame('/custom/cache/reviewer', $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_dir'));
         self::assertSame(
-            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d|collect-tool|tools-off|batch-1|max-output-4096', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
+            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d|collect-tool|tools-off|batch-1|max-output-8192', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
             $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
         );
     }
@@ -1187,7 +1186,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         $expectedPatternHash = substr(hash('sha256', json_encode([], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16);
         $expectedKeySalt = \sprintf(
-            'gpt-4o|prompt-v%d|prescan-v%d|prescan-on|tools-on-8|patterns-%s|collect-tool|skills-full|slice-off|max-output-4096',
+            'gpt-4o|prompt-v%d|prescan-v%d|prescan-on|tools-on-8|patterns-%s|collect-tool|skills-full|slice-off|max-output-8192',
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
             $expectedPatternHash,
@@ -1350,7 +1349,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     {
         $defaultKeySalt = $this->loadParameters(['model' => 'gpt-4o'])
             ->getParameter('symfony_security_auditor.cache.key_salt');
-        $raisedKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'attacker_max_output_tokens' => 8192])
+        $raisedKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'attacker_max_output_tokens' => 16384])
             ->getParameter('symfony_security_auditor.cache.key_salt');
 
         self::assertNotSame($defaultKeySalt, $raisedKeySalt);
@@ -1360,7 +1359,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     {
         $defaultKeySalt = $this->loadParameters(['model' => 'gpt-4o'])
             ->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
-        $raisedKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 8192])
+        $raisedKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 16384])
             ->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
 
         self::assertNotSame($defaultKeySalt, $raisedKeySalt);
@@ -1432,6 +1431,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
     }
 
+    public function test_bundle_reports_an_output_cap_the_configured_model_cannot_honor(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'max_output_tokens' => 16384]);
+
+        $notices = $containerBuilder->getParameter('symfony_security_auditor.config_notices');
+
+        self::assertIsArray($notices);
+        self::assertContains(
+            'max_output_tokens is set to 16384 but gpt-4o does not use the Anthropic option dialect, and its own bridge would reject the max_tokens option — so the option is not sent and the cap is not applied. Remove the key, or cap output on a model whose bridge honors it.',
+            $notices,
+        );
+    }
+
+    public function test_bundle_stays_silent_about_an_output_cap_an_anthropic_dialect_model_honors(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'claude-opus-5', 'max_output_tokens' => 16384]);
+
+        self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
+    }
+
     public function test_bundle_lean_mode_is_forced_off_when_the_static_prescanner_is_disabled(): void
     {
         $containerBuilder = $this->loadParameters([
@@ -1463,11 +1482,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('.security-baseline.json', $containerBuilder->getParameter('symfony_security_auditor.audit.baseline'));
     }
 
-    public function test_bundle_fail_on_parameter_defaults_to_critical(): void
+    public function test_bundle_registers_the_audit_failure_exit_code_listener_on_console_error(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame('critical', $containerBuilder->getParameter('symfony_security_auditor.audit.fail_on'));
+        $tags = $containerBuilder->getDefinition(AuditFailureExitCodeListener::class)->getTag('kernel.event_listener');
+
+        self::assertSame([['event' => 'console.error']], $tags);
+    }
+
+    public function test_bundle_fail_on_parameter_defaults_to_high(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertSame('high', $containerBuilder->getParameter('symfony_security_auditor.audit.fail_on'));
     }
 
     #[DataProvider('failOnLevelCases')]

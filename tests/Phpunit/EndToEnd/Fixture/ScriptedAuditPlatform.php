@@ -37,10 +37,9 @@ use Symfony\AI\Platform\Tool\Tool;
  * responses are derived from the prompt alone, so the same project fixture
  * always yields byte-identical findings regardless of profile.
  *
- * Attacker turns emit one `record_vulnerability` tool call per source file that
- * carries the {@see self::VULNERABLE_MARKER} sentinel; reviewer turns accept
- * every finding id present in the prompt via `record_review`; tool-free turns
- * (PoC / fix synthesis, or the JSON-array fallback path) return a fixed text.
+ * Attacker turns emit one `record_vulnerability` per source file carrying the
+ * {@see self::VULNERABLE_MARKER} sentinel; reviewer turns accept every finding
+ * id in the prompt; tool-free turns return a fixed text.
  */
 final class ScriptedAuditPlatform implements PlatformInterface
 {

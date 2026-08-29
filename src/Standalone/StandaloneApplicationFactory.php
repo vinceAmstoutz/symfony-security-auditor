@@ -24,6 +24,8 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
@@ -52,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Running
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ThrottledUpdateAvailabilityNotifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
@@ -151,6 +154,8 @@ final readonly class StandaloneApplicationFactory
      * @param array<string, string> $environment
      *
      * @throws UnresolvableConfigPathException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public static function bridgeAutoloadFile(array $environment): string
     {
@@ -164,7 +169,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
-        $this->registerUpdateAvailabilityNotice($standaloneApplication);
+        $this->registerConsoleListeners($standaloneApplication);
 
         return $standaloneApplication;
     }
@@ -287,14 +292,14 @@ final readonly class StandaloneApplicationFactory
         return new FilesystemUpdateCheckStore($xdgConfigPathResolver, new Filesystem(), new NullLogger());
     }
 
-    private function registerUpdateAvailabilityNotice(Application $application): void
+    private function registerConsoleListeners(Application $application): void
     {
-        if (!$this->updateAvailabilityConsoleListener instanceof UpdateAvailabilityConsoleListener) {
-            return;
-        }
-
         $eventDispatcher = new EventDispatcher();
-        $eventDispatcher->addListener(ConsoleEvents::TERMINATE, $this->updateAvailabilityConsoleListener);
+        $eventDispatcher->addListener(ConsoleEvents::ERROR, new AuditFailureExitCodeListener());
+
+        if ($this->updateAvailabilityConsoleListener instanceof UpdateAvailabilityConsoleListener) {
+            $eventDispatcher->addListener(ConsoleEvents::TERMINATE, $this->updateAvailabilityConsoleListener);
+        }
 
         $application->setDispatcher($eventDispatcher);
     }
@@ -354,6 +359,8 @@ final readonly class StandaloneApplicationFactory
      * @throws NonLocalPlatformEndpointException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     private function loadAuditCommand(bool $credentialsRequired): Command
     {
@@ -371,6 +378,8 @@ final readonly class StandaloneApplicationFactory
      * @throws NonLocalPlatformEndpointException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     private function buildContainer(bool $credentialsRequired): ContainerBuilder
     {

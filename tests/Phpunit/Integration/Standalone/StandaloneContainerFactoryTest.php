@@ -20,6 +20,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
@@ -50,6 +52,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -68,6 +72,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_offline_only_refuses_to_boot_against_a_remote_platform(): void
     {
@@ -88,6 +94,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -109,6 +117,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -129,6 +139,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -153,6 +165,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     public function test_it_rejects_a_selector_absent_from_the_platform_block(): void
@@ -170,6 +184,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -193,6 +209,8 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     public function test_it_rejects_several_platforms_without_a_selector(): void

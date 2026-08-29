@@ -39,15 +39,13 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     public const int DEFAULT_MAX_FILE_SIZE_KB = 512;
 
     /**
-     * Default allow-list of project-relative paths scanned for security
-     * findings. Matches the Symfony Flex skeleton (`src/` for PHP, `config/`
-     * for YAML/XML, `templates/` for Twig, `public/index.php` for the HTTP
-     * front controller, plus the root dotenv files where committed secrets
-     * hide — the gitignored `.env.local` variants are pruned by the default
-     * `respect_gitignore: true`). Anything outside this list is silently
-     * skipped — including ad-hoc root-level scripts, `bin/`, custom `app/`
-     * or `lib/` trees, and the build artefacts in `var/`, `public/build`,
-     * `vendor/`. Override via `scan.included_paths` for non-standard layouts.
+     * Default allow-list of project-relative paths scanned for findings, matching
+     * the Symfony Flex skeleton plus the root dotenv files where committed
+     * secrets hide (gitignored `.env.local` variants are pruned by the default
+     * `respect_gitignore: true`). Anything outside is silently skipped —
+     * root-level scripts, `bin/`, custom `app/` or `lib/` trees, and the build
+     * artefacts in `var/`, `public/build`, `vendor/`. Override via
+     * `scan.included_paths` for non-standard layouts.
      *
      * @var list<string>
      */

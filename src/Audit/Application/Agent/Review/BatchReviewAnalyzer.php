@@ -309,17 +309,14 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * Recovers any verdicts the LLM already recorded via `record_review` tool
-     * calls in an earlier round of this batch's conversation before a later
-     * round aborted it — otherwise they vanish with the exception even
-     * though they were genuinely reached. A batch member with no matching
-     * verdict is marked not-reached rather than routed through
-     * {@see BatchVerdictApplier::applyBatchReview()}, which would otherwise
-     * treat its absence as an implicit rejection — correct when the model
-     * finished the batch and chose not to flag it, but wrong when the
-     * conversation was cut off before it was ever considered. Falls back to
-     * the existing not-reached handling for the whole batch only when
-     * nothing was recorded at all.
+     * Recovers verdicts the LLM recorded via `record_review` in an earlier round
+     * of this batch's conversation before a later round aborted it — otherwise
+     * they vanish with the exception though they were genuinely reached. A batch
+     * member with no matching verdict is marked not-reached rather than routed
+     * through {@see BatchVerdictApplier::applyBatchReview()}, which would treat
+     * its absence as an implicit rejection: correct when the model finished and
+     * chose not to flag it, wrong when the conversation was cut off first. Falls
+     * back to whole-batch not-reached handling only when nothing was recorded.
      *
      * @param list<Vulnerability>   $batch
      * @param array<string, string> $cacheContexts

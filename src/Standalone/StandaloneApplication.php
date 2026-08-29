@@ -26,16 +26,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 
 /**
  * Extends the bare Symfony `Application` to append the bundled
- * `symfony/models-dev` pricing-catalog version to `--version`, to put the
- * identity banner in front of every command, and to echo the failing command
- * line under a rendered error — the base class offers no extension point for
- * any of the three. `--version` never reaches a command at all, so an event
- * listener could not cover it.
+ * `symfony/models-dev` catalog version to `--version`, put the identity banner
+ * in front of every command, and echo the failing command line under a rendered
+ * error — the base class offers no extension point for any of the three, and
+ * `--version` never reaches a command, so a listener could not cover it.
  *
- * Mutable by design — non-readonly because the invocation is captured on the
- * way in and read back later: the command line if something throws, and
- * whether the run needs provider credentials when the audit command is built.
- * See .claude/rules/php-classes.md for the opt-out policy.
+ * Non-readonly because the invocation is captured on the way in and read back
+ * later: the command line if something throws, and whether the run needs
+ * provider credentials when the audit command is built.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

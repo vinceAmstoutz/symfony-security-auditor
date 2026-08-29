@@ -22,8 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
 final class BudgetTrackerTest extends TestCase
 {
@@ -391,7 +391,7 @@ final class BudgetTrackerTest extends TestCase
     /** A tracker whose pricing provider knows `claude-opus-5` and prices everything else at zero, as an unlisted or self-hosted model does. */
     private function splitModelBudgetTracker(): BudgetTracker
     {
-        $pricingProvider = new class implements CacheAwarePricingProviderInterface {
+        $pricingProvider = new class implements PricingProviderInterface {
             #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
@@ -433,7 +433,7 @@ final class BudgetTrackerTest extends TestCase
         float $cacheReadPrice = 0.0,
         float $cacheCreationPrice = 0.0,
     ): BudgetTracker {
-        $pricingProvider = new class($inputPrice, $outputPrice, $cacheReadPrice, $cacheCreationPrice) implements CacheAwarePricingProviderInterface {
+        $pricingProvider = new class($inputPrice, $outputPrice, $cacheReadPrice, $cacheCreationPrice) implements PricingProviderInterface {
             public function __construct(
                 private readonly float $inputPrice,
                 private readonly float $outputPrice,

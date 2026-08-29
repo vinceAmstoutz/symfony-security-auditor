@@ -32,25 +32,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 /**
- * Walks the ingestion stage of the audit pipeline, estimates how many tokens
- * an actual run would consume, and returns an `AuditReport` carrying the
- * estimate as its `AuditCost`. Never invokes the LLM platform — `--dry-run`
- * stays free regardless of project size.
+ * Estimates how many tokens a real run would consume and returns an
+ * `AuditReport` carrying it as `AuditCost`. Never invokes the platform, so
+ * `--dry-run` stays free at any project size.
  *
- * Estimation strategy: every scanned file contributes its content to a
- * synthetic "attacker prompt" (input). The attacker system prompt's skill
- * blocks are sent once per chunk — chunked the same way `FileChunker` chunks
- * a real run — and added on top. When `audit.tools_enabled` is on, the
- * attacker may take several tool-call rounds per chunk, each resending the
- * growing conversation plus the tool schemas — `toolRoundTripRatio` inflates
- * the per-round input to account for that. Output tokens are projected at
- * `outputRatio * input` because audit prompts are heavily input-skewed.
- * Multiplied by `max_iterations` to account for the attacker/reviewer loop.
- *
- * `reviewerInputRatio` is applied to the file-content sum alone, never to the
- * attacker total: the reviewer prompt carries no skill blocks, so folding the
- * attacker's own overhead into its base would inflate the reviewer estimate by
- * an overhead it never sends.
+ * Skill blocks are counted once per chunk, `toolRoundTripRatio` inflates
+ * per-round input for the rounds that resend the growing conversation, and
+ * output is projected from input because audit prompts are input-skewed.
+ * `reviewerInputRatio` applies to the file-content sum alone: the reviewer
+ * prompt carries no skill blocks to bill it for.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

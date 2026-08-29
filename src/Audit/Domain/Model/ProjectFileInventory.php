@@ -40,15 +40,13 @@ final readonly class ProjectFileInventory
     }
 
     /**
-     * The residual bucket for every `.php` file not already tracked by one of
-     * the other six buckets — deliberately independent of
-     * {@see ProjectFile::isService()}, whose own, narrower "plain,
-     * non-specialized service" contract additionally excludes authenticators,
-     * messenger handlers, event subscribers, normalizers, webhook consumers,
-     * schedulers, Twig extensions, API resources, and Live Components. None
-     * of those has a bucket of its own here, so relying on `isService()`
-     * silently dropped every one of them from `totalFiles()` and the LLM-
-     * facing project summary instead of counting them as a generic service.
+     * The residual bucket for every `.php` file not tracked by the other six —
+     * deliberately independent of {@see ProjectFile::isService()}, whose
+     * narrower contract also excludes authenticators, messenger handlers, event
+     * subscribers, normalizers, webhook consumers, schedulers, Twig extensions,
+     * API resources and Live Components. None of those has a bucket here, so
+     * relying on `isService()` silently dropped them from `totalFiles()` and the
+     * project summary instead of counting them as generic services.
      */
     private static function isUncategorizedPhpFile(ProjectFile $projectFile): bool
     {

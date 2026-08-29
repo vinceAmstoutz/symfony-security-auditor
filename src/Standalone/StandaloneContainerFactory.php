@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
+use JsonException;
 use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
 use Symfony\AI\AiBundle\AiBundle;
@@ -21,7 +22,10 @@ use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HostCompositionRootLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
@@ -31,13 +35,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
-use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class StandaloneContainerFactory
 {
+    private const string ENVIRONMENT = 'prod';
+
     private const string PLATFORM_TAG = 'ai.platform';
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
@@ -45,6 +50,7 @@ final readonly class StandaloneContainerFactory
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
         private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
+        private HostCompositionRootLoader $hostCompositionRootLoader = new HostCompositionRootLoader(),
     ) {}
 
     /**
@@ -52,6 +58,9 @@ final readonly class StandaloneContainerFactory
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      * @throws NonLocalPlatformEndpointException
+     * @throws JsonException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function create(StandaloneConfig $standaloneConfig, string $cacheDir): ContainerBuilder
     {
@@ -65,7 +74,7 @@ final readonly class StandaloneContainerFactory
             'kernel.cache_dir' => $cacheDir,
             'kernel.build_dir' => $cacheDir,
             'kernel.project_dir' => false !== $workingDirectory ? $workingDirectory : $cacheDir,
-            'kernel.environment' => 'prod',
+            'kernel.environment' => self::ENVIRONMENT,
             'kernel.debug' => false,
         ]));
 
@@ -74,7 +83,7 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->register(ClockInterface::class, NativeClock::class);
 
         $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
-        $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), $standaloneConfig->auditConfig, $containerBuilder);
+        $this->hostCompositionRootLoader->load($standaloneConfig->auditConfig, $containerBuilder, self::ENVIRONMENT);
 
         $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
 

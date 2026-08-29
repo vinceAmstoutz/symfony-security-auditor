@@ -21,7 +21,9 @@ element keeps working until at least the next `MAJOR`.
 | `PATCH`      | Bug fixes and internal changes only — no public API additions or removals.               |
 
 Every `MAJOR` release ships a migration note in
-[`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt.
+[`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt, plus
+an `UPGRADE-<MAJOR>.0.md` at the repository root collecting every break in one
+place — see [`UPGRADE-2.0.md`](../UPGRADE-2.0.md).
 
 ## Public API — what is covered by the BC promise
 
@@ -59,20 +61,11 @@ Every key under `symfony_security_auditor:` documented in
   `audit.rate_limit.requests_per_minute`,
   `audit.rate_limit.input_tokens_per_minute`,
   `audit.rate_limit.output_tokens_per_minute`
-- `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated
-  since 1.7** — see [Deprecation policy](#deprecation-policy) — still accepted
-  but ignored)
+- `cache.enabled`, `cache.dir`
 - `privacy.offline_only`
 
 Default values for these keys are also part of the contract. Changing a default
 is a `MAJOR` change.
-
-> **Planned default change.** `audit.fail_on` ships with the default `critical`
-> (only a `CRITICAL` aggregate risk level fails the build), which preserves the
-> historical exit-code behaviour. The default is **planned to become `high`** in
-> the next `MAJOR` release so a HIGH-risk audit fails CI by default. Pin
-> `audit.fail_on: critical` (or `high`) explicitly now to make your intent
-> immune to that change.
 
 ### CLI surface
 
@@ -90,17 +83,21 @@ is a `MAJOR` change.
   normalized 0-100 score. The audit exits `1` when either gate trips.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit completed; aggregate risk level is below the `fail_on` threshold
-    (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default) and, when
+    (default `high`, so `SAFE`/`LOW`/`MEDIUM` by default) and, when
     `--min-score` is given, the normalized score is at or above it.
-  - `1` — aggregate risk level is at or above the `fail_on` threshold (default
-    `critical`), the normalized score is below `--min-score`, or the audit
-    itself failed.
+  - `1` — audit completed and either gate tripped: the aggregate risk level is
+    at or above the `fail_on` threshold (default `high`), or the normalized
+    score is below `--min-score`.
   - `2` — the audit budget could not be honored: either it aborted mid-run
     because the configured token or cost budget was exceeded (partial report
     still emitted), or it never started because an unpriced model makes
     `audit.budget.max_cost_usd` unenforceable and either the user declined the
     interactive confirmation or the run is non-interactive (no report emitted in
     that case).
+  - `3` — the audit never produced a verdict: an invalid `project-path`, an
+    option value the console rejects, conflicting options, an LLM provider
+    abort, an unhandled exception, or a scan that discovered no file to audit.
+    Added in 2.0; through 1.x these paths shared `1` with the gate.
 - The command name `audit:diff` (see
   [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)),
   its `previous-report` and `current-report` arguments, its `--format` option
@@ -221,21 +218,24 @@ deprecated by the other.
 
 ### Domain ports (extension points)
 
-All interfaces under `src/Audit/Domain/Port/` plus the documented Domain
-pipeline interfaces. Implementing one of these in your own application and
-overriding the alias in `config/services.yaml` is a supported integration path:
+**An enumerated list, not a directory glob.** Before 2.0 the promise covered
+_every_ interface under `src/Audit/Domain/Port/`, which froze internal
+collaboration seams — prompt builders, cache plumbing, capability-detection
+interfaces — as public API. That cost was real, not theoretical: #235 exists
+only because `PricingProviderInterface` could not gain a cache-rate method
+without a `MAJOR`, so 1.x had to carry a parallel
+`CacheAwarePricingProviderInterface` plus an `instanceof` branch. 2.0 narrowed
+the promise to the ports below. Everything else under `Port/` is tagged
+`@internal` and may change in a `MINOR`.
 
-- `LLMClientInterface`
-- `BatchCapableLLMClientInterface` — opt-in extension of `LLMClientInterface`
-  for clients that resolve several prompts concurrently. Consumers check
-  `instanceof` and fall back to looping `complete()`, so it never breaks an
-  existing client.
-- `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
+Implementing one of these in your own application and overriding the alias in
+`config/services.yaml` is a supported integration path:
+
+- `LLMClientInterface` — the Application ↔ LLM seam (see
+  [`.claude/rules/llm-seam.md`](../.claude/rules/llm-seam.md)).
+- `LLMResponse` — the value object every `LLMClientInterface` implementation
+  returns.
 - `ProjectFileScannerInterface`
-- `AttackerCacheInterface`
-- `ReviewerCacheInterface` — host applications may implement this and alias it
-  to back the reviewer-verdict cache with their own store (Redis, a shared
-  filesystem, …).
 - `StaticPreScannerInterface` — host applications may implement this and alias
   it to supply their own deterministic risk-marker scan.
 - `CodeSlicerInterface` — implement and alias to control how files are trimmed
@@ -246,26 +246,44 @@ overriding the alias in `config/services.yaml` is a supported integration path:
   it to swap the CVE feed (Snyk, internal database, …). See
   [`docs/extending.md`](extending.md).
 - `SecretScrubberInterface`
-- `PricingProviderInterface`
-- `CacheAwarePricingProviderInterface` — opt-in extension of
-  `PricingProviderInterface` for providers that expose real per-model
-  prompt-cache rates. `CostCalculator` checks `instanceof` and falls back to the
-  base input rate, so it never breaks an existing pricing provider.
+- `PricingProviderInterface` — one cache-aware port since 2.0: alongside the
+  input and output rates it reports `cacheReadPricePerMillionTokens()` and
+  `cacheCreationPricePerMillionTokens()`.
 - `TokenEstimatorInterface`
+- `ProgressReporterInterface`
 - `AttackerSkillPromptRendererInterface` — host applications may implement this
   and alias it to control how the attacker's skill-block text is rendered for a
   set of file types. See [`docs/extending.md`](extending.md).
 - `RateLimiterInterface` — host applications may implement this and alias it to
   swap the throttling strategy (e.g. cross-process Redis-backed bucket). See
   [`docs/extending.md`](extending.md).
+- `ReviewerFeedbackProviderInterface`
+- `TriageMemoryRecorderInterface`
+- `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
+  `FormBindingParserInterface`, `SecurityConfigParserInterface` — the
+  deterministic source extractions feeding the application security map.
+- `Tool\ToolInterface`, `Tool\ToolDefinition`, `Tool\ToolRegistry`,
+  `Tool\ToolRegistryFactoryInterface`
+- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`
+  (`Pipeline\CoverageRecorderInterface` and `Pipeline\NullCoverageRecorder` are
+  `@internal` — a stage never receives one, so implementing `StageInterface`
+  does not depend on their shape)
 - Configuration value objects in `Audit\Domain\Configuration\*`
   (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
 - Domain exceptions: `LLMProviderException` (signals non-transient platform
   failure; callers may catch this to detect misconfigured or retired models)
-- `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
-- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
-  `Pipeline\CoverageRecorderInterface`
+
+Ports that left the promise in 2.0, now `@internal`:
+`AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`,
+`AttackerCacheInterface`, `ContextAwareAttackerCacheInterface`,
+`ReviewerCacheInterface`, `ReviewerFeedbackSnapshotInterface`,
+`BatchCapableLLMClientInterface`, `ToolBatchCapableLLMClientInterface`. The last
+two are capability-detection interfaces — how _this bundle_ discovers what a
+client can do, not how you implement one — and demoting them is what let
+`completeBatch()`/`completeBatchWithTools()` take `LLMRequest`/`ToolLLMRequest`
+value objects instead of raw array shapes. You may still implement them for the
+concurrency win; their signatures are simply no longer frozen.
 
 ### Domain models and exceptions
 
@@ -345,7 +363,7 @@ to attach one to.
 > not-yet-removed deprecation. `staabm/phpstan-todo-by`'s `todoBy.sfDeprecation`
 > rule reads it through `Composer\InstalledVersions` and reports every
 > `trigger_deprecation()` whose since-version it satisfies, so a root version at
-> or above `1.13` fails PHPStan — and every `Tests + Mutation` leg with it,
+> or above `1.19` fails PHPStan — and every `Tests + Mutation` leg with it,
 > since Infection runs PHPStan as its static-analysis tool.
 >
 > CI therefore pins `COMPOSER_ROOT_VERSION: 1.0.x-dev` in
@@ -354,8 +372,8 @@ to attach one to.
 > holds for neither on a depth-1 detached-HEAD checkout — `extra.branch-alias`
 > alone is not enough, because an alias only applies when its key matches the
 > branch Composer manages to infer. The `Lint` job asserts the resolved version
-> before running PHPStan, so a drift reports itself instead of surfacing as
-> three unexplained deprecation errors.
+> before running PHPStan, so a drift reports itself instead of surfacing as four
+> unexplained deprecation errors.
 >
 > The pin is deliberately not rewritten by `bin/castor release:bump`: raising it
 > to the release actually in development would reintroduce the failure. It can
@@ -363,23 +381,12 @@ to attach one to.
 
 ### Currently deprecated
 
-- **`cache.prompt_caching`** (since 1.7) — once set `cache_control: ephemeral`
-  on every LLM call, but current `symfony/ai` bridges no longer read that
-  option: Anthropic caching is driven by `cache_retention` on the platform in
-  `ai.yaml` (default `short`), and OpenAI/Gemini cache automatically. The key is
-  still accepted and emits a Symfony deprecation when set; it has no effect.
-  Remove it from your config and, if you want a longer Anthropic cache window,
-  set `cache_retention: long` on the `anthropic` platform in `ai.yaml`.
-  Scheduled for removal in the next `MAJOR`.
-- **`Vulnerability::create()`, `SymfonyMapping::create()`, and
-  `LLMResponse::create()`** (since 1.13) — superseded by the value-object
-  factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
-  `LLMResponse::of()` (taking
-  `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
-  `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot`
-  respectively). The old methods still work and delegate to the new factories,
-  and emit a runtime deprecation when called. Scheduled for removal in the next
-  `MAJOR`.
+- **The four Symfony-named `SymfonyMapping` accessors** (since 1.19) —
+  `voterCapabilities()`, `firewallRules()`, `controllersWithoutVoters()` and
+  `hasVoterForEntity()`, superseded by their framework-neutral equivalents on
+  `ApplicationSecurityMap` (see [Domain models](#domain-models) for the
+  mapping). They still work, delegate to the neutral model, and emit a runtime
+  deprecation when called. Scheduled for removal in a later `MAJOR`.
 
 ## Branches & maintenance
 

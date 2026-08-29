@@ -17,19 +17,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 
 /**
- * Deterministic, zero-token pre-scanner that tags files with risk markers
- * (e.g. `unserialize`, `|raw`, `csrf_protection: false`, missing
- * `setParameter`) before the LLM ever sees them. Three uses:
+ * Deterministic, zero-token pre-scanner tagging files with risk markers before
+ * the LLM sees them. Three uses:
  *
- *  1. Markers are injected into the attacker prompt so the LLM focuses on
- *     concrete locations instead of re-discovering smells.
- *  2. Files with markers can be batched ahead of files without markers,
- *     improving signal-per-token on the early chunks.
- *  3. In `lean mode`, files with zero markers can be skipped entirely —
- *     the biggest token saver on large codebases.
+ *  1. Markers go into the attacker prompt so the LLM starts at concrete
+ *     locations instead of re-discovering smells.
+ *  2. Marker-bearing files can be batched first, improving signal-per-token.
+ *  3. In lean mode, files with zero markers are skipped entirely.
  *
- * Implementations MUST be pure and fast. No I/O beyond reading the
- * already-loaded `ProjectFile::content()`. No network calls.
+ * Implementations MUST be pure and fast: no I/O beyond the already-loaded
+ * `ProjectFile::content()`, no network calls.
  */
 interface StaticPreScannerInterface
 {

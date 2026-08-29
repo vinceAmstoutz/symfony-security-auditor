@@ -58,11 +58,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsag
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
@@ -170,7 +172,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = $this->scriptedPlatform([$textResult]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
 
-        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+        $responses = $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 4);
 
         self::assertSame('max_tokens', $responses[0]->stopReason());
     }
@@ -190,7 +192,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger())],
+            new ToolLLMRequest('s', 'u', new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger())),
         ], 4, 3);
 
         self::assertSame('max_tokens', $responses[0]->stopReason());
@@ -446,6 +448,52 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
      */
+    public function test_complete_omits_max_output_tokens_for_a_model_that_merely_contains_claude(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'openrouter/not-claude-at-all', new NullLogger(), maxOutputTokens: 8192),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_sends_max_output_tokens_for_a_bedrock_anthropic_model_id(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'us.anthropic.claude-opus-5-v1:0', new NullLogger(), maxOutputTokens: 8192),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(8192, $invocationOptionsCapture->options['max_tokens']);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_complete_omits_max_output_tokens_for_non_anthropic_model_even_when_configured(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -588,7 +636,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $this->expectException(MissingAiPlatformException::class);
         $this->expectExceptionMessage('No AI platform is configured');
 
-        $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
+        $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 2);
     }
 
     /**
@@ -611,9 +659,9 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('batched'), 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([
-            ['system' => 's1', 'user' => 'u1'],
-            ['system' => 's2', 'user' => 'u2'],
-            ['system' => 's3', 'user' => 'u3'],
+            new LLMRequest('s1', 'u1'),
+            new LLMRequest('s2', 'u2'),
+            new LLMRequest('s3', 'u3'),
         ], 2);
 
         self::assertCount(3, $responses);
@@ -632,7 +680,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $requests = [];
         for ($i = 0; $i < 5; ++$i) {
-            $requests[] = ['system' => 'sys'.$i, 'user' => 'usr'.$i];
+            $requests[] = new LLMRequest('sys'.$i, 'usr'.$i);
         }
 
         $responses = $symfonyAiLLMClient->completeBatch($requests, 2);
@@ -649,8 +697,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([
-            ['system' => 's', 'user' => 'u'],
-            ['system' => 's', 'user' => 'u'],
+            new LLMRequest('s', 'u'),
+            new LLMRequest('s', 'u'),
         ], 0);
 
         self::assertCount(2, $responses);
@@ -674,8 +722,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatch([
-            ['system' => 's1', 'user' => 'u1'],
-            ['system' => 's2', 'user' => 'u2'],
+            new LLMRequest('s1', 'u1'),
+            new LLMRequest('s2', 'u2'),
         ], 2);
 
         self::assertSame(11, $responses[0]->inputTokens());
@@ -698,9 +746,9 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient->completeBatch([
-            ['system' => 's1', 'user' => 'u1'],
-            ['system' => 's2', 'user' => 'u2'],
-            ['system' => 's3', 'user' => 'u3'],
+            new LLMRequest('s1', 'u1'),
+            new LLMRequest('s2', 'u2'),
+            new LLMRequest('s3', 'u3'),
         ], 2);
 
         self::assertSame([246, 246, 246], $fakeRateLimiter->acquired);
@@ -720,7 +768,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([
-            ['system' => 's', 'user' => 'u'],
+            new LLMRequest('s', 'u'),
         ], 4);
 
         self::assertCount(1, $responses);
@@ -745,7 +793,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient->completeBatch([
-            ['system' => 's', 'user' => 'u'],
+            new LLMRequest('s', 'u'),
         ], 4);
 
         // The dispatch-loop acquire() for the request whose dispatch failed
@@ -787,15 +835,12 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
-     * The negative-token guard above only fires through
-     * `TokenUsageRecorder::record()`, reached via
-     * `PlatformResultExtractor::extractTokens()`'s optional, nullable
-     * `$tokenUsageRecorder` collaborator. `PlatformAccountingConfig` defaults
-     * that collaborator to `null` — a legitimate, supported configuration —
-     * so building the client without one (as this test does) must not let a
-     * provider-reported negative token count reach the rate limiter
-     * unvalidated: `extractTokens()` itself must reject it before any caller
-     * ever sees the value.
+     * The negative-token guard above fires only through
+     * `TokenUsageRecorder::record()`, reached via `extractTokens()`'s nullable
+     * `$tokenUsageRecorder`. `PlatformAccountingConfig` defaults it to `null` —
+     * a supported configuration — so building the client without one must not
+     * let a provider-reported negative count reach the rate limiter:
+     * `extractTokens()` must reject it before any caller sees the value.
      *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
@@ -927,7 +972,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
-        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+        $responses = $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 4);
 
         self::assertSame('recovered', $responses[0]->content());
         self::assertSame([[0, 0], [9, 4]], $fakeRateLimiter->recorded);
@@ -955,7 +1000,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
-        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+        $responses = $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 4);
 
         self::assertSame('recovered', $responses[0]->content());
         self::assertSame([[0, 0], [5, 2]], $fakeRateLimiter->recorded);
@@ -992,8 +1037,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's0', 'user' => 'u0', 'tools' => $firstRegistry],
-            ['system' => 's1', 'user' => 'u1', 'tools' => $secondRegistry],
+            new ToolLLMRequest('s0', 'u0', $firstRegistry),
+            new ToolLLMRequest('s1', 'u1', $secondRegistry),
         ], 4, 3);
 
         self::assertCount(2, $responses);
@@ -1042,7 +1087,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 'sys', 'user' => 'usr', 'tools' => $toolRegistry],
+            new ToolLLMRequest('sys', 'usr', $toolRegistry),
         ], 1, 5);
 
         self::assertSame([20, 30], $fakeRateLimiter->acquired);
@@ -1079,7 +1124,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 2);
 
         self::assertSame('max_tool_iterations', $responses[0]->stopReason());
@@ -1105,7 +1150,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
-        $symfonyAiLLMClient->completeBatch([['system' => 'sys-prompt', 'user' => 'usr-prompt']], 4);
+        $symfonyAiLLMClient->completeBatch([new LLMRequest('sys-prompt', 'usr-prompt')], 4);
 
         $messages = $platformInvocationLog->messageSnapshots[0];
         self::assertInstanceOf(SystemMessage::class, $messages[0]);
@@ -1129,7 +1174,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 'sys-prompt', 'user' => 'usr-prompt', 'tools' => $toolRegistry],
+            new ToolLLMRequest('sys-prompt', 'usr-prompt', $toolRegistry),
         ], 4, 2);
 
         $messages = $platformInvocationLog->messageSnapshots[0];
@@ -1173,7 +1218,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 2);
 
         $capContexts = array_values(array_map(
@@ -1205,7 +1250,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('recovered', $responses[0]->content());
@@ -1235,7 +1280,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('recovered-via-full-restart', $responses[0]->content());
@@ -1265,7 +1310,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertCount(2, $fakeRateLimiter->recorded);
@@ -1314,7 +1359,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('recovered', $responses[0]->content());
@@ -1348,7 +1393,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('recovered', $responses[0]->content());
@@ -1411,7 +1456,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('recovered', $responses[0]->content());
@@ -1457,7 +1502,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('empty_content', $responses[0]->stopReason());
@@ -1500,7 +1545,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $this->expectException(NonTransientLLMFailureException::class);
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
     }
 
@@ -1535,7 +1580,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('recovered-through-retry', $responses[0]->content());
@@ -1609,7 +1654,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $this->expectException(BudgetExceededException::class);
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
     }
 
@@ -1667,7 +1712,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('empty_content', $responses[0]->stopReason());
@@ -1698,7 +1743,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame('done', $responses[0]->content());
@@ -1730,7 +1775,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertCount(2, $fakeRateLimiter->recorded);
@@ -1756,7 +1801,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
 
         self::assertSame(2, $platformInvocationLog->invocations);
@@ -1813,8 +1858,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()), platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $rateLimiter));
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's0', 'user' => 'u0', 'tools' => $toolRegistry],
-            ['system' => 's1', 'user' => 'u1', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s0', 'u0', $toolRegistry),
+            new ToolLLMRequest('s1', 'u1', $toolRegistry),
         ], 1, 3);
 
         self::assertSame(['acquire', 'record', 'acquire', 'record'], $rateLimiter->events);
@@ -1841,8 +1886,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's0', 'user' => 'u0', 'tools' => $firstRegistry],
-            ['system' => 's1', 'user' => 'u1', 'tools' => $secondRegistry],
+            new ToolLLMRequest('s0', 'u0', $firstRegistry),
+            new ToolLLMRequest('s1', 'u1', $secondRegistry),
         ], 4, 3);
 
         self::assertCount(2, $responses);
@@ -1878,7 +1923,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $this->expectException(BudgetExceededException::class);
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s', 'u', $toolRegistry),
         ], 4, 3);
     }
 
@@ -1900,8 +1945,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's1', 'user' => 'u1', 'tools' => $toolRegistry],
-            ['system' => 's2', 'user' => 'u2', 'tools' => $toolRegistry],
+            new ToolLLMRequest('s1', 'u1', $toolRegistry),
+            new ToolLLMRequest('s2', 'u2', $toolRegistry),
         ], 4, 3);
 
         self::assertSame([246, 246], $fakeRateLimiter->acquired);
@@ -1929,7 +1974,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $this->expectException(BudgetExceededException::class);
 
-        $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+        $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 4);
     }
 
     /**
@@ -1964,8 +2009,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient->completeBatch([
-            ['system' => 's1', 'user' => 'u1'],
-            ['system' => 's2', 'user' => 'u2'],
+            new LLMRequest('s1', 'u1'),
+            new LLMRequest('s2', 'u2'),
         ], 1);
 
         // window size 1 ⇒ acquire+resolve one request before the next; a larger
@@ -2005,7 +2050,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
-        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+        $responses = $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 4);
 
         self::assertSame('recovered', $responses[0]->content());
     }
@@ -2047,7 +2092,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
 
-        $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+        $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 4);
 
         self::assertCount(1, $warnings);
         self::assertSame('Batch-window response failed to resolve after dispatch; falling back to a fresh complete() call that may duplicate provider billing for the already-dispatched request', $warnings[0][0]);
@@ -2095,7 +2140,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $budgetExceeded = false;
         try {
-            $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+            $symfonyAiLLMClient->completeBatch([new LLMRequest('s', 'u')], 4);
         } catch (BudgetExceededException) {
             $budgetExceeded = true;
         }
@@ -2838,6 +2883,18 @@ final class SymfonyAiLLMClientTest extends TestCase
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return $this->outputPrice;
+            }
+
+            #[Override]
+            public function cacheReadPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
+            }
+
+            #[Override]
+            public function cacheCreationPricePerMillionTokens(string $model): float
+            {
+                return $this->pricePerMillionInputTokens($model);
             }
 
             #[Override]

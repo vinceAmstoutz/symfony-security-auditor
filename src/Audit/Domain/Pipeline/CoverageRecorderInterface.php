@@ -52,16 +52,13 @@ interface CoverageRecorderInterface
     public function drainReviewedFindings(): array;
 
     /**
-     * Records a raw candidate the attacker has actually found (cache-served or
-     * freshly analyzed), at the moment it's produced — separately from the
-     * attacker's own return value, which a caller only receives once every
-     * chunk/window in the call has been processed. If a later chunk/window in
-     * the same call aborts with a budget/provider exception, that return
-     * value never materializes; this side channel lets the caller recover
-     * candidates already found before the abort via
-     * {@see drainFoundVulnerabilities()} instead of losing them. These are
-     * unreviewed candidates, not confirmed findings — a caller must still run
-     * them through the reviewer before treating them as validated.
+     * Records a raw candidate the moment the attacker finds it, separately from
+     * the attacker's return value, which a caller only receives once every
+     * chunk in the call has been processed. If a later chunk aborts on a
+     * budget/provider exception that return value never materializes; this side
+     * channel lets the caller recover what was found first, via
+     * {@see drainFoundVulnerabilities()}. These are unreviewed candidates, not
+     * findings — the caller must still run them through the reviewer.
      */
     public function recordFoundVulnerability(Vulnerability $vulnerability): void;
 

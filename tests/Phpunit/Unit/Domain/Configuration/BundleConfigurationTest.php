@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
@@ -61,7 +62,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
         self::assertFalse($bundleConfiguration->audit->escalationEnabled);
         self::assertNull($bundleConfiguration->audit->escalationCheapModel);
-        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+        self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
         self::assertSame([], $bundleConfiguration->audit->excludedTypes);
         self::assertSame([], $bundleConfiguration->audit->includedTypes);
         self::assertSame([], $bundleConfiguration->audit->customSkills);
@@ -77,7 +78,6 @@ final class BundleConfigurationTest extends TestCase
 
         self::assertTrue($bundleConfiguration->cache->enabled);
         self::assertSame('/cache', $bundleConfiguration->cache->dir);
-        self::assertTrue($bundleConfiguration->cache->promptCaching);
 
         self::assertNull($bundleConfiguration->rateLimit->requestsPerMinute);
         self::assertNull($bundleConfiguration->rateLimit->inputTokensPerMinute);
@@ -135,25 +135,25 @@ final class BundleConfigurationTest extends TestCase
     public function test_from_array_maps_explicit_fail_on_level(): void
     {
         $config = $this->treeBuilderOutput();
-        $config['audit']['fail_on'] = 'high';
+        $config['audit']['fail_on'] = 'critical';
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
+        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
     }
 
     /**
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
-    public function test_from_array_defaults_fail_on_to_critical_when_key_omitted_for_bc(): void
+    public function test_from_array_defaults_fail_on_to_high_when_key_omitted(): void
     {
         $config = $this->treeBuilderOutput();
         unset($config['audit']['fail_on']);
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+        self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
     }
 
     /**
@@ -267,8 +267,8 @@ final class BundleConfigurationTest extends TestCase
     {
         $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
 
-        self::assertSame(4096, $bundleConfiguration->llm->attackerMaxOutputTokens());
-        self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+        self::assertSame(8192, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(8192, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
     /**
@@ -362,15 +362,15 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
-    public function test_from_array_defaults_max_output_tokens_to_4096_when_key_omitted_for_bc(): void
+    public function test_from_array_defaults_max_output_tokens_to_the_shipped_default_when_key_omitted(): void
     {
         $config = $this->treeBuilderOutput();
         unset($config['max_output_tokens'], $config['attacker_max_output_tokens'], $config['reviewer_max_output_tokens']);
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame(4096, $bundleConfiguration->llm->attackerMaxOutputTokens());
-        self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+        self::assertSame(LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(LLMConfiguration::DEFAULT_MAX_OUTPUT_TOKENS, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
     /**
@@ -586,7 +586,7 @@ final class BundleConfigurationTest extends TestCase
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, triage_memory?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
-     *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
+     *     cache: array{enabled: bool, dir: string},
      * }
      */
     private function profileShapedConfig(?string $profile): array
@@ -618,7 +618,7 @@ final class BundleConfigurationTest extends TestCase
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, triage_memory?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
-     *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
+     *     cache: array{enabled: bool, dir: string},
      * }
      */
     private function treeBuilderOutput(): array
@@ -627,7 +627,7 @@ final class BundleConfigurationTest extends TestCase
             'model' => 'claude-opus-4-7',
             'attacker_model' => null,
             'reviewer_model' => 'claude-haiku-4-5-20251001',
-            'max_output_tokens' => 4096,
+            'max_output_tokens' => 8192,
             'attacker_max_output_tokens' => null,
             'reviewer_max_output_tokens' => null,
             'provider_json_mode' => false,
@@ -693,7 +693,6 @@ final class BundleConfigurationTest extends TestCase
             'cache' => [
                 'enabled' => true,
                 'dir' => '/cache',
-                'prompt_caching' => true,
             ],
         ];
     }

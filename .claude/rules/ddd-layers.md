@@ -16,6 +16,20 @@ Dependency direction: `Command → Application → Domain ← Infrastructure`.
 Application needs I/O, define an interface in Domain and implement it in
 Infrastructure.
 
+## A new port is `@internal` by default
+
+`Port/` is where the DDD layout puts any interface the Application layer depends
+on — not a list of things users are invited to implement. So **every new
+interface added under `src/Audit/Domain/Port/` carries the `@internal` tag**.
+
+Joining the backward-compatibility promise is a separate, deliberate step: add
+the port to the enumerated list in
+[`docs/versioning.md`](../../docs/versioning.md#domain-ports-extension-points),
+explain in [`docs/extending.md`](../../docs/extending.md) what implementing it
+achieves, and drop the tag in the same commit. Before 2.0 the promise was a
+directory glob, so ~30 internal collaboration seams became frozen public API by
+accident; the tag-first default is what stops that from happening again.
+
 ## The framework-specific boundary
 
 `Infrastructure` is split again in `deptrac.yaml`: a **`SymfonyProfile`** layer

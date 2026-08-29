@@ -57,11 +57,6 @@ LLMResponse::of(
 );
 ```
 
-> The legacy
-> `LLMResponse::create(content, inputTokens, outputTokens, model, stopReason)`
-> factory is **deprecated since 1.13** and removed in the next `MAJOR`; use
-> `of()` in new code.
-
 Key read methods: `content()`, `parseJson(): array` (strips markdown fences then
 JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
 
@@ -360,7 +355,11 @@ in `config/services.yaml` to override the bundled behaviour (see
   `git diff`).
 - `BatchCapableLLMClientInterface` — an opt-in extension of `LLMClientInterface`
   for clients that resolve several prompts concurrently; the reviewer uses it
-  when `audit.reviewer_max_concurrent > 1`.
+  when `audit.reviewer_max_concurrent > 1`. Its tool-using sibling is
+  `ToolBatchCapableLLMClientInterface`. Both are **`@internal` since 2.0** —
+  they are how this bundle detects what a client can do, not part of the seam
+  you implement — so implement them for the concurrency win if you like, but
+  expect their signatures to move in a `MINOR`.
 - `RecordVulnerabilityToolFactoryInterface` — builds the schema-enforced tool
   used in `audit.structured_collection` mode (default:
   `RecordVulnerabilityToolFactory` returning `RecordVulnerabilityTool`). Swap
@@ -379,12 +378,13 @@ in `config/services.yaml` to override the bundled behaviour (see
   running `composer audit`; `InMemoryAdvisoryDatabase` is the offline fallback).
   Implement it to query an internal vulnerability feed or a commercial advisory
   service.
-- `PricingProviderInterface` — per-model USD prices for cost estimation
-  (default: `ModelsDevPricingProvider` reading the `symfony/models-dev`
-  catalog). Also implement `CacheAwarePricingProviderInterface` if your source
-  knows cache-read/cache-write rates — the cost report then prices cached tokens
-  at their discounted rate. Implement for private model deployments or
-  negotiated pricing.
+- `PricingProviderInterface` — per-model USD prices for cost estimation, input
+  and output rates plus the cache-read/cache-write rates the cost report uses to
+  price cached tokens at their discounted rate (default:
+  `ModelsDevPricingProvider` reading the `symfony/models-dev` catalog).
+  Implement for private model deployments or negotiated pricing; return
+  `pricePerMillionInputTokens()` from both cache methods if your source has no
+  cache rates.
 - `RateLimiterInterface` — `acquire()` / `record()` / `pauseUntil()` around
   every LLM call (default: `NullRateLimiter`, or `TokenBucketRateLimiter` when
   any `audit.rate_limit.*` key is set). Implement it to coordinate quota

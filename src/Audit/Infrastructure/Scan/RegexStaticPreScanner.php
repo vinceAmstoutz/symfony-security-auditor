@@ -469,20 +469,13 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     }
 
     /**
-     * The `php` bucket's generic sink patterns (unserialize, eval, shell exec,
-     * weak crypto, insecure RNG, SSRF-prone HttpClient calls, mailer header
-     * setters, non-constant-time compares, ExpressionLanguage evaluation) are
-     * dangerous in any PHP source file, not only plain services: a controller
-     * or messenger handler calling `unserialize()` on request input is at least
-     * as exploitable. `scan()` selects a single type bucket per file, so
-     * without this every non-`php` component (controller, voter, entity,
-     * repository, form, authenticator, …) would miss those markers — and under
-     * the `fast` profile's lean-mode filter, which drops files carrying zero
-     * markers, such a file would be excluded from the audit entirely. Keyed by
-     * label, so a `php`-typed file (whose own bucket already is the `php` set)
-     * gets each pattern exactly once after the spread merge. Non-PHP files
-     * (Twig templates, YAML config) are excluded — these patterns are
-     * PHP-source specific.
+     * The `php` bucket's generic sink patterns are dangerous in any PHP file,
+     * not only plain services. `scan()` picks one type bucket per file, so
+     * without merging these in, every non-`php` component would miss them —
+     * and lean mode, which drops files carrying zero markers, would exclude
+     * such a file from the audit entirely. Keyed by label so a `php`-typed file
+     * gets each pattern once after the spread. Non-PHP files are excluded:
+     * these patterns are PHP-source specific.
      *
      * @return array<string, array{regex: string, description: string}>
      */
@@ -496,17 +489,13 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     }
 
     /**
-     * The request-input markers (`request_get`, `redirect_with_input`,
-     * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
-     * bucket, but `#[ApiResource]` classes, `#[AsLiveComponent]` classes, and
-     * EasyAdmin `AbstractCrudController` classes classify as their own type
-     * while still declaring `#[Route]`-mapped or custom actions that read
-     * `$request` — the controller-like pattern the mapping parsers and the
-     * chunker already honour via {@see ProjectFileType::isControllerLike()}.
-     * Without this merge, such an action produces zero markers and is excluded
-     * by the `fast` profile's lean-mode filter, which drops files carrying no
-     * markers. Keyed by label, so a CONTROLLER-typed file (whose own bucket is
-     * this set) gets each pattern exactly once after the spread merge.
+     * The request-input markers live in the CONTROLLER bucket, but
+     * `#[ApiResource]`, `#[AsLiveComponent]` and EasyAdmin crud classes classify
+     * as their own type while still declaring actions that read `$request` — the
+     * controller-like pattern {@see ProjectFileType::isControllerLike()} already
+     * honours. Without this merge such an action produces zero markers and the
+     * `fast` profile's lean mode drops it. Keyed by label, so a CONTROLLER-typed
+     * file gets each pattern exactly once after the spread merge.
      *
      * @return array<string, array{regex: string, description: string}>
      */

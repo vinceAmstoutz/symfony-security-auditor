@@ -242,9 +242,10 @@ nothing is found, the path is wrong, the layout is non-standard, or
 `No included paths exist in project` at `warning` level confirms the allow-list
 resolved to nothing.
 
-### Audit exits with code `1` even though risk is LOW
+### Audit exits with code `3`
 
-Exit code `1` is also used for:
+Since 2.0, `3` means the audit never produced a verdict — so the absence of
+findings proves nothing about the code. Causes:
 
 - Invalid `project-path` argument.
 - The scan discovered no file to audit at all — a mistyped path, a
@@ -253,10 +254,20 @@ Exit code `1` is also used for:
   no _changed_ files still exits `0`.
 - The normalized score fell below `--min-score`, if set.
 - Unhandled exception during pipeline execution (check stderr).
-- Validator errors on the input (e.g. `--format` set to a value it does not
-  support — see [Configuration → Options](configuration.md#options)).
+- An option value the console rejects (e.g. `--format` set to a value it does
+  not support — see [Configuration → Options](configuration.md#options)).
+- Conflicting options (e.g. `--generate-baseline` with `--dry-run`).
+- A non-transient LLM provider abort (a partial report is still written).
+- A scan that discovered no file to audit — a mistyped `project-path` that
+  exists, a `scan.included_paths` entry matching nothing, or an over-broad
+  `excluded_paths`. The console says `No file was audited`, and the report is
+  still written even though it describes nothing. `--dry-run`, `--show-scanned`
+  and `--generate-baseline` never reach the gate, so they still exit `0` on an
+  empty scan.
 
-Re-run with `-v` or `-vv` to see the underlying error.
+Re-run with `-v` or `-vv` to see the underlying error. Through 1.x all of these
+shared `1` with the security gate, which is why a `1` on a LOW-risk project used
+to be ambiguous; it no longer is.
 
 ## LLM & Provider Errors
 
@@ -322,20 +333,29 @@ text rather than filtering on `warning` alone if the loop used tools first. Look
 at the `output_tokens` field: if it sits near a multiple of ~1000 (e.g. `1971`,
 `2000`), the model is being truncated by `symfony/ai`'s default
 `max_tokens = 1000` that ships with the Anthropic bridge. Set
-`max_output_tokens` in the bundle config (default `4096` since this fix) — or
-`attacker_max_output_tokens` / `reviewer_max_output_tokens` for per-agent
-tuning:
+`max_output_tokens` in the bundle config _above_ its `8192` default (setting it
+to `8192` changes nothing since 2.0) — or `attacker_max_output_tokens` /
+`reviewer_max_output_tokens` for per-agent tuning:
 
 ```yaml
 symfony_security_auditor:
-    max_output_tokens: 4096
-    attacker_max_output_tokens: 8192 # optional, for chunks with many findings
+    max_output_tokens: 16384
+    attacker_max_output_tokens: 24576 # optional, for chunks with many findings
     reviewer_max_output_tokens: 2048 # optional, reviewer needs less headroom
 ```
 
 When raising the cap, raise `audit.rate_limit.output_tokens_per_minute`
 proportionally — otherwise the output-tokens bucket becomes the binding
 throttle.
+
+**On a non-Anthropic-dialect model this key cannot help you.** `symfony/ai`'s
+Gemini and OpenAI Responses bridges reject the `max_tokens` option outright, so
+the auditor does not send it — and since 2.0 it says so, printing a pre-flight
+notice naming the model and the cap you configured rather than accepting the
+value and ignoring it. There, cap output through the model string instead —
+`max_tokens` passed with the query-string syntax `symfony/ai-bundle` supports
+(see [Model Options](configuration.md#model-options)) reaches the bridge as part
+of the model definition rather than as a rejected per-call option.
 
 When the provider reports why generation stopped (`symfony/ai` ≥ 0.11 exposes a
 normalized finish reason), the auditor logs an explicit

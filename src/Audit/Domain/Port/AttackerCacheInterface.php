@@ -23,6 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * Stored payloads are raw vulnerability dicts ready for VulnerabilityFactory::fromList().
  * The factory tolerates partially malformed entries, so cache implementations are
  * not required to validate structure beyond JSON parsing.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 interface AttackerCacheInterface
 {

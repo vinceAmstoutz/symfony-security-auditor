@@ -229,7 +229,7 @@ standalone binary instead of requiring the bundle in your project's
 Composer even for the standalone binary. Non-Anthropic providers currently
 require running `symfony-security-auditor init` interactively once outside CI to
 pick a provider; standalone mode in this action always configures the
-`anthropic`/`claude-opus-4-8` default non-interactively.
+`anthropic`/`claude-opus-5` default non-interactively.
 
 `mode` defaults to `bundle`, not `standalone`, so upgrading to a newer action
 version never silently changes what an existing workflow does — `bundle` is

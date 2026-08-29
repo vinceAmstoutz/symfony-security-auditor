@@ -13,20 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
-
 /**
- * Shared defenses for any LLM-sourced text about to reach a real terminal —
- * used by both the final console report ({@see ConsoleReportRenderer}) and the
- * live progress narration ({@see ConsoleProgressReporter},
- * {@see PlainProgressReporter}).
- * Bypassing Symfony Console's own `<tag>` formatter (`OUTPUT_RAW`, or
- * `OutputFormatter::escape()` on the `<`/`>` characters alone) does not strip a
- * raw ANSI escape byte, a carriage return, or a Unicode bidi override already
- * present in the string — any of which let a crafted finding erase/overwrite
- * adjacent output, forge a fake status line, or visually reorder its own
- * rendered text (a Trojan-Source-style spoof).
+ * Shared defenses for any LLM-sourced text about to reach a real terminal, used
+ * by the console report and the live progress narration. Bypassing Symfony
+ * Console's `<tag>` formatter (`OUTPUT_RAW`, or `OutputFormatter::escape()` on
+ * `<`/`>` alone) does not strip a raw ANSI escape byte, a carriage return or a
+ * Unicode bidi override already in the string — any of which let a crafted
+ * finding overwrite adjacent output, forge a status line, or visually reorder
+ * its own text.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

@@ -167,6 +167,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRe
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolverInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
@@ -717,6 +718,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.fix_synthesis.enabled'),
         ])
         ->tag('console.command');
+
+    $defaultsConfigurator->set(AuditFailureExitCodeListener::class)
+        ->tag('kernel.event_listener', ['event' => 'console.error']);
 
     $defaultsConfigurator->set(DiffCommand::class)
         ->args([

@@ -37,16 +37,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInte
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Walks each public controller-like method body looking for
- * `$this->createForm(SomeFormType::class)` (or `self::`/`static::createForm(...)`)
- * call sites, following calls into same-class helper methods via {@see
- * ThisCallReachability} so a call moved behind a shared private/protected
- * helper is still attributed to the public action that reaches it. Only
- * literal `FooType::class` arguments are recorded — dynamic class names
- * (variables, method calls returning class strings) are intentionally ignored
- * because the binding cannot be resolved statically. "Controller-like" also
- * covers `#[AsLiveComponent]`/`#[ApiResource]` classes that also extend
- * `AbstractController`.
+ * Walks each public controller-like method body for
+ * `$this->createForm(SomeFormType::class)` call sites, following calls into
+ * same-class helpers via {@see ThisCallReachability} so a call moved behind a
+ * shared helper is still attributed to the public action reaching it. Only
+ * literal `FooType::class` arguments are recorded — dynamic class names cannot
+ * be resolved statically. "Controller-like" also covers
+ * `#[AsLiveComponent]`/`#[ApiResource]` classes extending `AbstractController`.
  */
 final readonly class PhpParserFormBindingParser implements FormBindingParserInterface
 {

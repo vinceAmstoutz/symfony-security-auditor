@@ -12,6 +12,7 @@
 declare(strict_types=1);
 
 use Castor\Attribute\AsTask;
+use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\EvalBaseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\EvalReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\EvalScorer;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\GroundTruthManifest;
@@ -75,6 +76,8 @@ function evaluate(
     string $groundTruth = 'examples/vulnerable-app/ground-truth.json',
     float $minPrecision = 0.0,
     float $minRecall = 0.0,
+    string $baseline = 'examples/vulnerable-app/eval-baseline.json',
+    bool $writeBaseline = false,
 ): void {
     $reportPath = sprintf('%s/ssa-eval-%s.json', sys_get_temp_dir(), bin2hex(random_bytes(4)));
 
@@ -92,7 +95,52 @@ function evaluate(
         exit(1);
     }
 
+    if ($writeBaseline) {
+        writeEvalBaseline($baseline, $evalReport);
+
+        return;
+    }
+
+    assertNoEvalDrift($baseline, $evalReport);
+
     io()->success('Detection quality meets the configured thresholds.');
+}
+
+function writeEvalBaseline(string $baseline, EvalReport $evalReport): void
+{
+    if (false === file_put_contents($baseline, EvalBaseline::fromReport($evalReport)->toJson())) {
+        io()->error(sprintf('Could not write the eval baseline to %s. Check the path exists and is writable.', $baseline));
+
+        exit(1);
+    }
+
+    io()->success(sprintf('Recorded this run as the eval baseline in %s. Commit it alongside the change it certifies.', $baseline));
+}
+
+/**
+ * Detection quality is the only gate that proves a wide no-behaviour-change
+ * refactor still finds the same vulnerabilities — coverage and MSI only prove
+ * the code still executes. A missing baseline is reported, not ignored.
+ */
+function assertNoEvalDrift(string $baseline, EvalReport $evalReport): void
+{
+    if (!is_file($baseline)) {
+        io()->warning(sprintf('No eval baseline at %s, so detection quality was not compared. Record one with `bin/castor eval --write-baseline`.', $baseline));
+
+        return;
+    }
+
+    $drift = EvalBaseline::fromFile($baseline)->driftAgainst($evalReport);
+    if ([] === $drift) {
+        io()->writeln(sprintf('  <info>OK</info> Detection quality matches the baseline in %s.', $baseline));
+
+        return;
+    }
+
+    io()->error(sprintf('Detection quality drifted from the baseline in %s:', $baseline));
+    io()->listing($drift);
+
+    exit(1);
 }
 
 /**
