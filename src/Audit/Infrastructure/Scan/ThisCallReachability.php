@@ -40,17 +40,13 @@ final readonly class ThisCallReachability
     ) {}
 
     /**
-     * Walks the call graph depth-first with an explicit stack, visiting each
-     * method's helper calls in the order they appear (pushed in reverse, so
-     * the first call encountered is the next one popped) and appending each
-     * statement once to a single shared result — replacing an earlier
-     * recursive version that copied a growing `$visited` set and
-     * return-and-concatenated a growing result array at every recursion
-     * level. That was quadratic in the length of a
-     * `$this->b1()->b2()->…` helper chain: an ordinary-looking file with a
-     * few thousand such methods took minutes, and enough of them exhausted
-     * PHP's memory limit outright, instead of resolving in a fraction of a
-     * second.
+     * Walks the call graph depth-first with an explicit stack, visiting helper
+     * calls in source order (pushed in reverse, so the first encountered is the
+     * next popped) and appending each statement once to one shared result. The
+     * earlier recursive version copied a growing `$visited` set and
+     * concatenated a growing array at every level, making it quadratic in the
+     * length of a `$this->b1()->b2()->…` chain: a file with a few thousand such
+     * methods took minutes, or exhausted the memory limit outright.
      *
      * @param array<string, ClassMethod> $methodsByName
      *

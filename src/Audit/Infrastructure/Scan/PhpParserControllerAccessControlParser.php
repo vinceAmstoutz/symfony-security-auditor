@@ -34,18 +34,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessContr
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Walks a controller-like file's AST to extract one RouteAccessControl per
- * stacked `#[Route(path:, methods:)]` attribute on each public action method
- * (via {@see RouteAttributeParser}), plus `#[IsGranted(...)]`/`#[Security(...)]`
- * on both class and method level and `denyAccessUnlessGranted()` calls in
- * method bodies (a first-class callable reference to it does not count — it
- * is never actually invoked). Attribute names are resolved against their
- * imports (`NameResolver`) before short-name matching, so an aliased import
- * (`use Route as Get;`) is still recognised. "Controller-like" also covers
- * `#[AsLiveComponent]`/`#[ApiResource]` classes ({@see
- * ProjectFileType::isControllerLike()}), which may still declare routed,
- * access-controlled actions. Returns [] for any other file type or any parse
- * error — the mapping stage must never abort because of a single broken file.
+ * Walks a controller-like file's AST for one RouteAccessControl per stacked
+ * `#[Route]` on each public action, plus class- and method-level
+ * `#[IsGranted]`/`#[Security]` and `denyAccessUnlessGranted()` calls in method
+ * bodies (a first-class callable reference does not count — it is never
+ * invoked). Attribute names resolve against their imports before short-name
+ * matching, so `use Route as Get;` is still recognised. "Controller-like" also
+ * covers `#[AsLiveComponent]`/`#[ApiResource]` classes. Returns [] for any other
+ * file type or parse error — the mapping stage never aborts over one bad file.
  */
 final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
 {

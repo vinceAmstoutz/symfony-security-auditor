@@ -23,14 +23,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
 /**
  * Replaces credential-shaped strings in file content with redacted placeholders.
  *
- * The pattern set covers common high-signal leaks: cloud provider keys, version-control
- * tokens, payment processor keys, generic credential assignments, JWT-shaped tokens,
- * PEM-encoded private keys, env-style token assignments, connection-string URIs with
- * embedded credentials (e.g. `postgres://user:pass@host`), `Authorization: Bearer` and
- * `Authorization: Basic` headers,
- * OpenAI-style `sk-`/`sk-proj-` keys, and Slack incoming webhook URLs. Each match is replaced
- * with `***REDACTED:<label>***` so downstream prompt builders can still emit a coherent
- * file context without exposing the secret to the LLM.
+ * The pattern set covers common high-signal leaks: cloud provider keys,
+ * version-control and payment tokens, generic credential assignments, JWTs,
+ * PEM private keys, env-style assignments, connection-string URIs with embedded
+ * credentials, `Authorization` headers, `sk-`/`sk-proj-` keys and Slack webhook
+ * URLs. Each match becomes `***REDACTED:<label>***`, so prompt builders still
+ * emit coherent file context without exposing the secret to the LLM.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

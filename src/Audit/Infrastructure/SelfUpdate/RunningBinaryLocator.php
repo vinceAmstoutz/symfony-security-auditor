@@ -17,18 +17,14 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 
 /**
- * Locates the running executable to replace. Only the self-contained standalone
- * binary (the phpmicro `micro` SAPI) may be replaced: under a normal PHP
- * interpreter `/proc/self/exe` resolves to the interpreter itself, so resolving
- * a path there and renaming a downloaded binary over it would destroy the
- * interpreter. When running as `micro`, the kernel exposes the binary at
- * `/proc/self/exe` (Linux); elsewhere (notably macOS, which has no
- * `/proc/self/exe`) it falls back to the resolved entry path, and — when the
- * binary was invoked by a bare name found on `PATH` so the entry path is not a
- * resolvable file — to a `PATH` lookup of that name. Both fallbacks accept only
- * an executable regular file, the way the shell resolves commands, so a
- * same-named stray file or directory is never mistaken for the running binary
- * and overwritten by an update.
+ * Locates the running executable to replace. Only the standalone binary (the
+ * phpmicro `micro` SAPI) may be replaced: under a normal interpreter
+ * `/proc/self/exe` resolves to the interpreter itself, and renaming a download
+ * over it would destroy it. Under `micro`, Linux exposes the binary at
+ * `/proc/self/exe`; elsewhere (macOS has none) it falls back to the resolved
+ * entry path, then to a `PATH` lookup when the binary was invoked by bare name.
+ * Both fallbacks accept only an executable regular file, as the shell resolves
+ * commands, so a same-named stray file is never overwritten by an update.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

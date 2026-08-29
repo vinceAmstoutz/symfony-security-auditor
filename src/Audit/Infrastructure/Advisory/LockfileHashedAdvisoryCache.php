@@ -27,15 +27,12 @@ use function Symfony\Component\String\u;
  * Decorator over `ComposerAuditRunnerInterface` that persists the JSON payload
  * across audit runs, keyed by a SHA-256 hash of the project's `composer.lock`.
  *
- * Hit: the cached JSON is returned without ever spawning composer, provided
- * the entry is younger than `TTL_SECONDS` — the lockfile hash alone cannot
- * detect newly-disclosed advisories against an unchanged dependency set.
- * Miss / stale / no lockfile: delegates to the inner runner, caches the
- * result on success (only when a lockfile exists), and either way returns
- * the raw JSON.
- *
- * Cache I/O failures degrade gracefully — they are logged and swallowed so the
- * audit never aborts because of a stale or unreadable advisory cache entry.
+ * Hit: the cached JSON is returned without spawning composer, provided the entry
+ * is younger than `TTL_SECONDS` — the lockfile hash alone cannot detect
+ * newly-disclosed advisories against an unchanged dependency set. Miss, stale or
+ * no lockfile: delegates to the inner runner and caches on success. Cache I/O
+ * failures are logged and swallowed, so the audit never aborts over an
+ * unreadable advisory cache entry.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

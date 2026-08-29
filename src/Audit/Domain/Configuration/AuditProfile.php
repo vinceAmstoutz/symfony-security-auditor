@@ -15,16 +15,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
 /**
  * One-knob preset bundling the cost/speed/depth levers. A profile only fills
- * the keys the user left unset — any explicitly configured key always wins.
+ * keys the user left unset — an explicitly configured key always wins.
  *
- * - `fast` — cheapest and quickest: a single attacker iteration over
- *   marker-bearing files only (lean pre-scan), large files sliced to their
- *   security-relevant lines, and up to four concurrent attacker and reviewer
- *   calls.
+ * - `fast` — one attacker iteration over marker-bearing files only (lean
+ *   pre-scan), large files sliced, four concurrent attacker/reviewer calls.
  * - `balanced` — the default; identical to configuring nothing.
- * - `thorough` — adds PoC synthesis for high-severity validated findings, and
- *   widens `--since` diff-mode runs to a changed voter's guarded controllers
- *   (`since_closure: direct`), on top of the balanced depth.
+ * - `thorough` — adds PoC synthesis for high-severity findings and widens
+ *   `--since` runs to a changed voter's guarded controllers.
  */
 enum AuditProfile: string
 {

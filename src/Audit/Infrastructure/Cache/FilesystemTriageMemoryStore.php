@@ -29,18 +29,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\In
 use function Symfony\Component\String\u;
 
 /**
- * Filesystem-backed cross-run memory of the reviewer's own rejections: every
- * finding the reviewer rejects with a non-empty `reviewer_notes` is persisted
- * here, keyed by type+file+title, and surfaced back as
- * {@see ReviewerFeedbackProviderInterface} feedback on later runs — so a
- * recurring false positive teaches the reviewer once instead of every run,
- * without a maintainer hand-curating a baseline entry for it.
+ * Filesystem-backed cross-run memory of the reviewer's rejections: every finding
+ * rejected with non-empty `reviewer_notes` is persisted here, keyed by
+ * type+file+title, and surfaced back as
+ * {@see ReviewerFeedbackProviderInterface} feedback later — so a recurring false
+ * positive teaches the reviewer once rather than every run.
  *
- * Memory is scoped to the audited project: each project gets its own file
- * under the configured directory, keyed by a hash of its path. A user-global
- * cache directory (the standalone binary's default) is therefore not a
- * cross-project channel — project A's rejections never surface in, or
- * overwrite, project B's feedback.
+ * Memory is scoped per audited project, each keyed by a hash of its path, so a
+ * user-global cache directory is not a cross-project channel: project A's
+ * rejections never surface in or overwrite project B's feedback.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

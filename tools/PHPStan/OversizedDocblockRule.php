@@ -86,31 +86,27 @@ final readonly class OversizedDocblockRule implements Rule
     private function countProseLines(string $docComment): int
     {
         $proseLineCount = 0;
-        $unclosedBraces = 0;
+        $insideAnnotation = false;
         foreach (explode("\n", $docComment) as $line) {
             $stripped = trim(ltrim(trim($line), '/*'));
-            if ($unclosedBraces > 0) {
-                $unclosedBraces += $this->braceBalance($stripped);
+
+            if ('' === $stripped) {
+                $insideAnnotation = false;
 
                 continue;
             }
 
             if (str_starts_with($stripped, '@')) {
-                $unclosedBraces = max(0, $this->braceBalance($stripped));
+                $insideAnnotation = true;
 
                 continue;
             }
 
-            if ('' !== $stripped) {
+            if (!$insideAnnotation) {
                 ++$proseLineCount;
             }
         }
 
         return $proseLineCount;
-    }
-
-    private function braceBalance(string $line): int
-    {
-        return substr_count($line, '{') - substr_count($line, '}');
     }
 }

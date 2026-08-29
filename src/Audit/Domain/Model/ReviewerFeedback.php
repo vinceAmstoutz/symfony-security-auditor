@@ -39,20 +39,15 @@ final readonly class ReviewerFeedback
     }
 
     /**
-     * Empty feedback digests to the empty string so cache signatures built
-     * without feedback stay byte-identical to those of earlier releases.
-     *
-     * The digest is order-independent: the entries are sorted before hashing
-     * so that re-ordering the same set (e.g. the triage-memory store re-writing
-     * its file in a different order between runs) does not spuriously
-     * invalidate cached reviewer verdicts.
+     * Empty feedback digests to the empty string, so cache signatures built
+     * without feedback stay byte-identical to earlier releases. Entries are
+     * sorted before hashing, so re-ordering the same set does not spuriously
+     * invalidate cached verdicts.
      *
      * Fields are hashed individually before joining, then each line again —
      * mirroring `ChunkContextKeyDeriver::derive()`. `file`/`title` are LLM- or
      * path-sourced and never NUL-sanitized, so without the field-level hash a
-     * NUL could shift a value across the join and make two different entries
-     * produce an identical line (`file="A\0B", title="C"` vs `file="A",
-     * title="B\0C"`), which the line-level hash alone cannot catch.
+     * NUL could shift a value across the join and collide two entries.
      */
     public function digest(): string
     {

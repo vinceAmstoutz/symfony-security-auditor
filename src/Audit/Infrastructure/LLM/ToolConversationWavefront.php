@@ -36,17 +36,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
 
 /**
  * Runs every tool-using conversation in a concurrency window as a wavefront:
- * each round dispatches the next platform invocation for every still-pending
- * conversation WITHOUT blocking, then resolves them, executes the requested
- * tools against that conversation's own registry, and queues the follow-up
- * round. On an async transport (the symfony/ai DeferredResult contract) the
- * per-round invocations overlap on the wire. Any dispatch or resolution
- * failure retries through `RetryingPlatformInvoker` first. Once that gives up,
- * a conversation that has not yet run a tool restarts on the sequential path,
- * which is safe because nothing has been executed; one that already ran a tool
- * cannot restart without executing it twice, so it finalizes as an
- * `empty_content` response. A non-transient failure is rethrown rather than
- * masked, so a provider outage can never become a false-negative SAFE result.
+ * each round dispatches the next invocation for every pending conversation
+ * without blocking, resolves them, executes the requested tools against that
+ * conversation's own registry, and queues the follow-up round — so on an async
+ * transport the per-round invocations overlap on the wire. Retry and abort
+ * semantics are {@see self::retryOrAbortConversation()}'s.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -254,15 +248,13 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Retries a failed dispatch/resolution through the same
-     * classify-then-retry-or-fail seam the sequential path uses. Falls back to
-     * `abortConversation()` once that retry itself fails — which restarts
-     * from scratch via completeWithTools() for a conversation that hasn't run
-     * a tool yet, or finalizes as `empty_content` for one that has (it cannot
-     * restart without executing that tool a second time). The one exception:
-     * a tool-ran conversation whose retry failure is classified non-transient
-     * is rethrown rather than finalized, since a restart can't happen and
-     * masking the failure would produce a false-negative SAFE result.
+     * Retries through the same classify-then-retry-or-fail seam the sequential
+     * path uses, falling back to `abortConversation()` once that retry fails:
+     * restart via `completeWithTools()` for a conversation that has run no tool,
+     * or finalize as `empty_content` for one that has, since it cannot restart
+     * without executing that tool twice. The exception is a tool-ran
+     * conversation whose failure is non-transient — rethrown rather than
+     * finalized, because masking it would produce a false-negative SAFE.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException

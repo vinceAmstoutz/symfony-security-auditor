@@ -20,19 +20,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProvi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 
 /**
- * Merges feedback from two sources — the baseline-backed
- * {@see ReviewerFeedbackHolder} and, when `audit.triage_memory` is enabled,
- * the reviewer's own cross-run rejections — into the single feedback set the
- * reviewer prompt and cache key see, snapshotting it once per run.
+ * Merges the baseline-backed {@see ReviewerFeedbackHolder} and, when
+ * `audit.triage_memory` is on, the reviewer's own cross-run rejections into the
+ * single feedback set the reviewer prompt and cache key see.
  *
- * The set is frozen on first read because triage memory is appended to mid-run:
- * reading it live would shift the reviewer cache-key digest between findings,
- * so every verdict after the first would miss its own freshly-written entry.
- *
+ * The set is frozen on first read because triage memory is appended mid-run:
+ * reading it live would shift the reviewer cache-key digest between findings, so
+ * every verdict after the first would miss its own entry.
  * {@see resetForNewRun()} discards the snapshot per run, so a long-lived
- * `mcp:serve` process picks up the previous run's entries instead of serving
- * the first run's feedback forever. Non-readonly for that reason — see
- * .claude/rules/php-classes.md.
+ * `mcp:serve` process does not serve the first run's feedback forever.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -60,11 +56,10 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
      * occupies a single reviewer-prompt slot instead of two — the baseline
      * reason wins, since primary is spread first.
      *
-     * `file`/`title` are LLM- or file-path-sourced and never NUL-sanitized, so
-     * each field is hashed individually before joining the key — mirroring
-     * `ChunkContextKeyDeriver::derive()` — so a NUL byte cannot shift a value
-     * across the `file`/`title` boundary and collide two distinct findings
-     * onto the same dedup key, silently dropping one's guidance.
+     * `file`/`title` are LLM- or path-sourced and never NUL-sanitized, so each
+     * field is hashed individually before joining the key — mirroring
+     * `ChunkContextKeyDeriver::derive()` — so a NUL cannot shift a value across
+     * the boundary and collide two findings onto one dedup key.
      *
      * @param list<AcceptedFindingFeedback> $entries
      *

@@ -171,15 +171,13 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
     }
 
     /**
-     * `htmlspecialchars()` neutralizes markup injection (`<`, `>`, `&`,
-     * quotes) but a browser still honours the Unicode Bidirectional
-     * Algorithm on the escaped text — a bidi override (`U+202A`-`U+202E`,
-     * `U+2066`-`U+2069`) in an LLM-sourced field can visually reorder the
-     * rendered characters, a Trojan-Source-style spoof of the finding text.
-     * Invalid UTF-8 is repaired with `mb_scrub()` first, the same defense the
-     * sibling console/Markdown/annotation renderers apply: a `/u` regex aborts
-     * (returns `null`) on an invalid subject byte, so without the scrub a
-     * single stray byte would defeat the bidi strip entirely.
+     * `htmlspecialchars()` neutralizes markup injection, but a browser still
+     * honours the Unicode Bidirectional Algorithm on the escaped text — a bidi
+     * override in an LLM-sourced field can visually reorder the rendered
+     * characters, a Trojan-Source-style spoof. Invalid UTF-8 is repaired with
+     * `mb_scrub()` first, as the sibling renderers do: a `/u` regex returns
+     * `null` on an invalid byte, so without the scrub one stray byte would
+     * defeat the bidi strip entirely.
      */
     private function escape(string $value): string
     {

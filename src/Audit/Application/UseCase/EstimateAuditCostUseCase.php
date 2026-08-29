@@ -32,20 +32,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 /**
- * Walks the ingestion stage of the audit pipeline, estimates how many tokens
- * an actual run would consume, and returns an `AuditReport` carrying the
- * estimate as its `AuditCost`. Never invokes the LLM platform — `--dry-run`
- * stays free regardless of project size.
+ * Estimates how many tokens a real run would consume and returns an
+ * `AuditReport` carrying it as `AuditCost`. Never invokes the platform, so
+ * `--dry-run` stays free at any project size.
  *
- * Skill blocks are counted once per chunk, chunked as `FileChunker` chunks a
- * real run, and `toolRoundTripRatio` inflates per-round input for the tool
- * rounds that resend the growing conversation. Output is projected from input
- * because audit prompts are heavily input-skewed.
- *
- * `reviewerInputRatio` applies to the file-content sum alone, never to the
- * attacker total: the reviewer prompt carries no skill blocks, so folding the
- * attacker's overhead into its base would bill the reviewer for bytes it never
- * sends.
+ * Skill blocks are counted once per chunk, `toolRoundTripRatio` inflates
+ * per-round input for the rounds that resend the growing conversation, and
+ * output is projected from input because audit prompts are input-skewed.
+ * `reviewerInputRatio` applies to the file-content sum alone: the reviewer
+ * prompt carries no skill blocks to bill it for.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

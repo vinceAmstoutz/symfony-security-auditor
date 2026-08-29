@@ -59,9 +59,8 @@ final readonly class ChunkContextKeyDeriver
      * guarantee.
      *
      * Each signature is hashed individually before joining, as in
-     * {@see self::derive()}: a signature can itself contain a newline, so
-     * joining raw signatures could let one spanning two entries collide with
-     * two genuinely different, shorter ones.
+     * {@see self::derive()}: signatures can contain newlines, so joining them
+     * raw would let one spanning two entries collide with two shorter ones.
      */
     private function mappingFingerprint(SymfonyMapping $symfonyMapping): string
     {

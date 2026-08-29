@@ -124,14 +124,11 @@ final readonly class LLMResponse
      * Walks every `[`/`{` position outside JSON string literals and returns the
      * first balanced block that decodes as JSON, or `null` when none do.
      *
-     * When the content itself spans a single balanced block (`[ ... ]` or
-     * `{ ... }` with no surrounding prose), the top-level `json_decode` has
-     * already attempted exactly that payload — re-trying nested openers within
-     * it would silently accept shallower inner blocks (defeating depth limits,
-     * for one), so recovery is skipped in that case.
-     *
-     * Returns the decoded value as `mixed` so the existing not-array guard in
-     * `parseJson` remains the single place that enforces the array contract.
+     * When the content is itself one balanced block, the top-level `json_decode`
+     * already attempted exactly that payload — re-trying nested openers would
+     * silently accept shallower inner blocks (defeating depth limits), so
+     * recovery is skipped. Returns `mixed` so the not-array guard in `parseJson`
+     * stays the single place enforcing the array contract.
      */
     private function recoverDecodedJsonBlock(string $content): mixed
     {
@@ -185,17 +182,14 @@ final readonly class LLMResponse
     }
 
     /**
-     * An unescaped double-quote toggles "inside a string" on and off as
-     * `recoverDecodedJsonBlock` scans for the first genuine `[`/`{` opener —
-     * meant to skip a bracket embedded in a quoted prose phrase (see
-     * `test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array`).
-     * That toggle only makes sense when every quote in the content is
-     * genuinely paired; a single unpaired literal quote before the real
-     * JSON (e.g. a measurement like `5"`) would otherwise flip the running
-     * state permanently, hiding every opener after it — including the real
-     * one. Running the same state machine across the whole content and
-     * checking whether it ends still "inside a string" detects that case,
-     * so the scan can fall back to trying every opener directly instead.
+     * An unescaped double-quote toggles "inside a string" as
+     * `recoverDecodedJsonBlock` scans for the first genuine `[`/`{`, so a
+     * bracket inside a quoted phrase is skipped. That toggle only makes sense
+     * when every quote is paired: one unpaired literal quote before the real
+     * JSON (a measurement like `5"`) would flip the state permanently and hide
+     * every opener after it. Running the same machine across the whole content
+     * and checking whether it ends inside a string detects that, so the scan can
+     * fall back to trying every opener directly.
      */
     private function hasBalancedQuotes(string $content): bool
     {

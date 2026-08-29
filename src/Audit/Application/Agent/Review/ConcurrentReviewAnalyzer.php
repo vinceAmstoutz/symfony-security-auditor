@@ -26,14 +26,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 
 /**
  * Resolves every single-finding review in concurrency windows via the
- * batch-capable client, then applies each verdict. Findings are dispatched one
- * `maxConcurrent`-sized window at a time — never as a single oversized batch —
- * so a budget/provider failure in a later window cannot discard an earlier
- * window's already-applied verdicts; the failing window and every window not
- * yet dispatched are marked `aborted`/`errored` before the exception
- * propagates. Per-finding parse/transient failures degrade to a rejected
- * verdict exactly as the sequential path does. Cached verdicts are served
- * first; only the misses are dispatched.
+ * batch-capable client, serving cached verdicts first and dispatching only the
+ * misses. Windows are `maxConcurrent`-sized and dispatched one at a time — never
+ * as one oversized batch — so a budget/provider failure in a later window cannot
+ * discard an earlier window's applied verdicts; the failing window and every
+ * undispatched one are marked `aborted`/`errored` before the exception
+ * propagates. Per-finding parse and transient failures degrade to a rejected
+ * verdict exactly as the sequential path does.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

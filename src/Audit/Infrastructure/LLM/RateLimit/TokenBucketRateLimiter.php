@@ -25,19 +25,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exce
 /**
  * Fixed-minute token bucket with three independent dimensions (RPM, ITPM, OTPM).
  *
- * `acquire()` blocks until the next request fits inside the current window —
- * either because capacity is available or because the next reset is reached.
- * `record()` reconciles the pre-call input estimate with the post-call actual
- * so subsequent `acquire()` decisions stay accurate. `pauseUntil()` propagates
- * a server-issued `Retry-After` into the bucket so chunks scheduled after the
- * 429 cooperatively wait instead of stampeding the provider.
+ * `acquire()` blocks until the next request fits the current window. `record()`
+ * reconciles the pre-call estimate with the actual so later `acquire()`
+ * decisions stay accurate. `pauseUntil()` propagates a server `Retry-After` so
+ * chunks scheduled after a 429 wait cooperatively instead of stampeding.
  *
- * Class invariant, enforced in the constructor: at least one dimension is set.
- * The bundle wires `NullRateLimiter` when all are null.
- *
- * State is per-process, so processes sharing one API key still need
- * out-of-process coordination. Not `readonly` for that state — see
- * `.claude/rules/php-classes.md`.
+ * Constructor invariant: at least one dimension is set; the bundle wires
+ * `NullRateLimiter` when all are null. State is per-process, so processes
+ * sharing one API key still need out-of-process coordination.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

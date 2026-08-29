@@ -30,16 +30,12 @@ use function Symfony\Component\String\u;
  * Merges committed (`<ref>...HEAD`), staged and unstaged changes, deduplicated
  * and deterministically ordered. Genuinely untracked files are invisible here.
  *
- * Every invocation is a plumbing form that compares already-hashed objects, or
+ * Every invocation is a plumbing form comparing already-hashed objects, or
  * `diff-files` for the working tree. Porcelain `git diff HEAD` is deliberately
- * avoided: it normalizes a working-tree file through the `.gitattributes`
- * `filter=<name>` `clean` command, and both the attribute and the command come
- * from the audited repository, making it as exploitable as the `core.fsmonitor`
- * hook neutralized below. `diff-files` answers the same question without
- * running a content filter.
- *
- * `--relative` keeps paths aligned with `ProjectFile::relativePath()` when the
- * audited project is a subdirectory of a larger repository.
+ * avoided: it normalizes working-tree files through the `.gitattributes`
+ * `filter=<name>` `clean` command, both of which come from the audited
+ * repository — as exploitable as the `core.fsmonitor` hook neutralized below.
+ * `--relative` aligns paths with `ProjectFile::relativePath()`.
  */
 final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesResolverInterface
 {

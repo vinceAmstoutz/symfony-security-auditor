@@ -16,12 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * Opt-in extension of {@see AttackerCacheInterface} for caches that key an
- * entry by the chunk plus the prompt context injected ahead of it: the
- * cross-iteration preambles and the risk-marker preamble, which changes the
- * prompt on an unchanged content hash. Consumers check `instanceof` and skip
- * the cache for context-carrying chunks otherwise, so adding this never breaks
- * an existing cache.
+ * Opt-in extension of {@see AttackerCacheInterface} for caches keyed by the
+ * chunk plus the prompt context injected ahead of it — the cross-iteration and
+ * risk-marker preambles, which change the prompt on an unchanged content hash.
+ * Consumers check `instanceof` and otherwise skip the cache for
+ * context-carrying chunks, so adding this never breaks an existing cache.
  *
  * An empty `$contextKey` MUST address the same entry as the context-free
  * {@see AttackerCacheInterface::get()} / `store()` pair, so entries written

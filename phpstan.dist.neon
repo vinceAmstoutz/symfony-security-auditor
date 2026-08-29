@@ -68,7 +68,7 @@ services:
     -
         class: VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\OversizedDocblockRule
         arguments:
-            maxProseLines: 12
+            maxProseLines: 8
         tags:
             - phpstan.rules.rule
     -

@@ -182,15 +182,13 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * Shared by both the attacker and reviewer recovery paths. A chunk/finding
-     * whose own conversation swallowed a generic (non-abort) `Throwable` after
-     * a partial `record_vulnerability`/`record_review` success records that
-     * finding via the coverage recorder, but the agent's own return value can
-     * still come back missing it — draining and merging by id here recovers
-     * it. Draining unconditionally (not only on an abort) also keeps the
-     * coverage recorder's buffer from accumulating findings across iterations
-     * that a later abort would otherwise re-review as if they were never
-     * persisted.
+     * Shared by the attacker and reviewer recovery paths. A conversation that
+     * swallowed a generic (non-abort) `Throwable` after a partial
+     * `record_vulnerability`/`record_review` success records that finding via
+     * the coverage recorder while the agent's return value comes back missing
+     * it; draining and merging by id recovers it. Draining unconditionally also
+     * keeps the recorder's buffer from carrying findings across iterations that
+     * a later abort would re-review as if they were never persisted.
      *
      * @param list<Vulnerability> $rawFindings
      * @param list<Vulnerability> $recoveredFindings
@@ -262,16 +260,12 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * Consumes at most as many findings per fingerprint as
-     * `$auditContext->acceptedFingerprints()` contains that value — a plain
-     * membership test would let one baseline-accepted occurrence of a shared
-     * fingerprint (`Vulnerability::fingerprint()` is line-independent by
-     * design) suppress every current finding sharing it, including ones that
-     * were never actually reviewed. The budget itself lives on
-     * `$auditContext` (via `consumeBaselineCredit()`) rather than being
-     * recomputed here, so it is shared — and spent at most once — across
-     * every iteration of this method's own attacker/reviewer loop, not just
-     * within a single call.
+     * Consumes one credit per accepted occurrence rather than testing
+     * membership: `Vulnerability::fingerprint()` is line-independent by design,
+     * so a membership test would let one baseline-accepted occurrence suppress
+     * every current finding sharing that fingerprint. The budget lives on
+     * `$auditContext` (`consumeBaselineCredit()`) so it is spent at most once
+     * across every iteration of the attacker/reviewer loop, not per call.
      *
      * @param list<Vulnerability> $findings
      *

@@ -22,16 +22,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Two-pass attacker for cost-sensitive audits: a cheap model sweeps every
- * chunk, then an expensive model re-analyses only the files the sweep flagged,
- * with the cheap findings injected as `previousFindings` so the deeper model
- * starts at concrete locations.
- *
- * Results merge by `Vulnerability::id()`, which is deterministic from
- * type+file+lineStart: the expensive verdict wins on overlap and cheap findings
- * on cold files pass through. Most files in a typical Symfony project are
- * inert, so this covers the whole project at roughly a third to a fifth of the
- * cost of running the expensive model everywhere.
+ * Two-pass attacker for cost-sensitive audits: a cheap model sweeps every chunk,
+ * then an expensive model re-analyses only the files the sweep flagged, with the
+ * cheap findings injected as `previousFindings` so it starts at concrete
+ * locations. Results merge by `Vulnerability::id()`, deterministic from
+ * type+file+lineStart: the expensive verdict wins on overlap, cheap findings on
+ * cold files pass through. Most files in a Symfony project are inert, so this
+ * covers everything at a third to a fifth of the expensive-everywhere cost.
  */
 final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
 {

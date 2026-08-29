@@ -835,15 +835,12 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
-     * The negative-token guard above only fires through
-     * `TokenUsageRecorder::record()`, reached via
-     * `PlatformResultExtractor::extractTokens()`'s optional, nullable
-     * `$tokenUsageRecorder` collaborator. `PlatformAccountingConfig` defaults
-     * that collaborator to `null` — a legitimate, supported configuration —
-     * so building the client without one (as this test does) must not let a
-     * provider-reported negative token count reach the rate limiter
-     * unvalidated: `extractTokens()` itself must reject it before any caller
-     * ever sees the value.
+     * The negative-token guard above fires only through
+     * `TokenUsageRecorder::record()`, reached via `extractTokens()`'s nullable
+     * `$tokenUsageRecorder`. `PlatformAccountingConfig` defaults it to `null` —
+     * a supported configuration — so building the client without one must not
+     * let a provider-reported negative count reach the rate limiter:
+     * `extractTokens()` must reject it before any caller sees the value.
      *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException

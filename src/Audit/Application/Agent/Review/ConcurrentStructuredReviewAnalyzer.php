@@ -29,13 +29,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 /**
  * Resolves every single-finding review in concurrency windows via the
  * tool-batch-capable client, each verdict arriving through its own
- * schema-enforced `record_review` tool. Pending findings are dispatched one
- * `maxConcurrent`-sized window at a time — never as a single oversized batch —
- * so a budget/provider failure in a later window cannot discard an earlier
- * window's already-applied verdicts; the failing window and every window not
- * yet dispatched are marked `aborted`/`errored` before the exception
- * propagates. Cached verdicts are served first; only the misses are
- * dispatched.
+ * schema-enforced `record_review` tool. Cached verdicts are served first; the
+ * misses are dispatched one `maxConcurrent`-sized window at a time — never as
+ * one oversized batch — so a budget/provider failure in a later window cannot
+ * discard an earlier window's applied verdicts; the failing window and every
+ * undispatched one are marked `aborted`/`errored` before the exception
+ * propagates.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

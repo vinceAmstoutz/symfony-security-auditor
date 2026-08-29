@@ -123,15 +123,13 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
-     * The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
-     * CommonMark-style `[display text](target)` hyperlink, and mandates
-     * that every viewer — even one with no Markdown support — render it as
-     * a clickable link. `Vulnerability::title()` is free LLM-influenced
-     * text with no character restrictions, so an unescaped title lets a
-     * crafted finding forge a live link into a report a reviewer trusts.
-     * Escaping the backslash first, then the two characters that open the
-     * link syntax, neutralizes it the same way CommonMark's own
-     * backslash-escape mechanism does.
+     * SARIF 2.1.0 lets a plain-text `message.text` embed a CommonMark
+     * `[display text](target)` hyperlink and mandates every viewer render it as
+     * clickable. `Vulnerability::title()` is free LLM-influenced text, so an
+     * unescaped title lets a crafted finding forge a live link into a report a
+     * reviewer trusts. Escaping the backslash first, then the two characters
+     * that open the link syntax, neutralizes it as CommonMark's own
+     * backslash-escape does.
      */
     private function escapeEmbeddedLinkSyntax(string $title): string
     {

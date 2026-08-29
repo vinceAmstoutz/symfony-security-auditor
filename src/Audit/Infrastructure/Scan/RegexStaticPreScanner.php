@@ -489,17 +489,13 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     }
 
     /**
-     * The request-input markers (`request_get`, `redirect_with_input`,
-     * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
-     * bucket, but `#[ApiResource]` classes, `#[AsLiveComponent]` classes, and
-     * EasyAdmin `AbstractCrudController` classes classify as their own type
-     * while still declaring `#[Route]`-mapped or custom actions that read
-     * `$request` — the controller-like pattern the mapping parsers and the
-     * chunker already honour via {@see ProjectFileType::isControllerLike()}.
-     * Without this merge, such an action produces zero markers and is excluded
-     * by the `fast` profile's lean-mode filter, which drops files carrying no
-     * markers. Keyed by label, so a CONTROLLER-typed file (whose own bucket is
-     * this set) gets each pattern exactly once after the spread merge.
+     * The request-input markers live in the CONTROLLER bucket, but
+     * `#[ApiResource]`, `#[AsLiveComponent]` and EasyAdmin crud classes classify
+     * as their own type while still declaring actions that read `$request` — the
+     * controller-like pattern {@see ProjectFileType::isControllerLike()} already
+     * honours. Without this merge such an action produces zero markers and the
+     * `fast` profile's lean mode drops it. Keyed by label, so a CONTROLLER-typed
+     * file gets each pattern exactly once after the spread merge.
      *
      * @return array<string, array{regex: string, description: string}>
      */

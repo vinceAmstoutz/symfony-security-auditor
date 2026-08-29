@@ -24,11 +24,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  *
  * `ComposerAuditAdvisoryDatabase` is `final readonly`, so Symfony `->lazy()`
  * cannot proxy it: that needs a native 8.4+ lazy ghost (this project supports
- * 8.3) or a subclass. Hence the hand-rolled wrapper — the holder's path must
- * not be read before `AuditCommand` sets it.
- *
- * Not readonly: it rebuilds whenever the holder is re-targeted, so an instance
- * reused across two audits never serves the first project's snapshot.
+ * 8.3) or a subclass. Hence the hand-rolled wrapper. Not readonly: it rebuilds
+ * whenever the holder is re-targeted, so an instance reused across two audits
+ * never serves the first project's snapshot.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

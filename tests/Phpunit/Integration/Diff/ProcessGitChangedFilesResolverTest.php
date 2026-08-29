@@ -329,16 +329,13 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * `core.fsmonitor=` (added above) only closes one config-driven command
-     * hook. A `.gitattributes` `filter=` assignment plus a matching
-     * `filter.<name>.clean` command in the same untrusted `.git/config`
-     * reaches an arbitrary command too — git runs the clean filter to
-     * normalize a working-tree file before comparing it against the index,
-     * which `git diff HEAD` (the plain worktree-vs-HEAD comparison this
-     * resolver used for uncommitted changes) triggers for any file whose
-     * stat info looks changed. `git diff-index --cached` (index vs HEAD) and
-     * `git diff-files` (worktree vs index) together cover the same ground
-     * without ever invoking a content filter.
+     * `core.fsmonitor=` closes only one config-driven command hook. A
+     * `.gitattributes` `filter=` plus a matching `filter.<name>.clean` in the
+     * same untrusted `.git/config` reaches an arbitrary command too: git runs
+     * the clean filter to normalize a working-tree file before comparing it to
+     * the index, which `git diff HEAD` triggers for any file whose stat info
+     * looks changed. `diff-index --cached` and `diff-files` cover the same
+     * ground without ever invoking a content filter.
      *
      * @throws GitChangedFilesUnavailableException
      */
