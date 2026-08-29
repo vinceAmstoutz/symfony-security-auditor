@@ -21,6 +21,8 @@ use stdClass;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
@@ -54,6 +56,8 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
      * @throws UnknownPlatformProviderException
      * @throws UnresolvableAuditCommandException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -76,6 +80,8 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
      * @throws UnknownPlatformProviderException
      * @throws UnresolvableAuditCommandException
      * @throws NonLocalPlatformEndpointException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -96,6 +102,8 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
 
     /**
      * @throws UnresolvableAuditCommandException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_it_rejects_a_container_whose_audit_service_is_not_the_audit_command(): void
     {

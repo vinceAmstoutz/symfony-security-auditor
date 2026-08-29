@@ -14,365 +14,53 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use JsonException;
-use Psr\Clock\ClockInterface;
-use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
-use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResilienceConfig;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
-
-use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
-use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
-use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\BudgetRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\CustomSkillRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\EscalationRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\ImplementationAliasRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\LlmClientRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\RateLimiterRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\ServiceRegistrarInterface;
 
 /**
- * Composition root for the audit object graph, so the wiring lives in one named
- * place instead of inside the bundle extension.
+ * The single description of the audit object graph. The bundle extension, the
+ * standalone binary and any other host call this; a host adds only its own
+ * framework-integration services on top.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class CoreCompositionRoot
 {
     /**
-     * The single description of the audit object graph. The bundle extension
-     * and any other host call this; a host adds only its own
-     * framework-integration services on top.
-     *
      * @throws JsonException
      */
     public function register(ContainerConfigurator $containerConfigurator, ContainerBuilder $containerBuilder, BundleConfiguration $bundleConfiguration): void
     {
         $containerConfigurator->import(\sprintf('%s/../../../../config/services.php', __DIR__));
 
-        $this->registerParameters($containerBuilder, $bundleConfiguration);
+        (new ContainerParameterRegistrar())->register($bundleConfiguration, $containerBuilder);
 
         $servicesConfigurator = $containerConfigurator->services();
-        $this->registerBudget($servicesConfigurator, $bundleConfiguration);
-        $this->registerRateLimiter($servicesConfigurator, $bundleConfiguration);
-        $this->registerLlmClients($servicesConfigurator, $bundleConfiguration);
-        $this->registerImplementationAliases($servicesConfigurator, $bundleConfiguration);
-        $this->registerCustomSkills($servicesConfigurator, $bundleConfiguration);
-        $this->registerEscalation($servicesConfigurator, $bundleConfiguration);
-    }
-
-    /**
-     * Each configured `audit.custom_skills` entry becomes a tagged
-     * `ConfiguredAttackerSkill`, so `AttackerSkillRegistry`'s tagged iterator
-     * collects it beside the built-in skills with no registry change.
-     */
-    private function registerCustomSkills(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        foreach ($bundleConfiguration->audit->customSkills as $index => $customSkill) {
-            $servicesConfigurator->set(\sprintf('security_auditor.custom_skill.%d', $index), ConfiguredAttackerSkill::class)
-                ->private()
-                ->args([
-                    inline_service(CustomAttackerSkill::class)->args([
-                        $customSkill->name,
-                        $customSkill->fileType,
-                        $customSkill->instructions,
-                        $customSkill->priority,
-                    ]),
-                ])
-                ->tag('symfony_security_auditor.attacker_skill');
+        foreach ($this->coreRegistrars() as $serviceRegistrar) {
+            $serviceRegistrar->register($servicesConfigurator, $bundleConfiguration);
         }
     }
 
     /**
-     * @throws JsonException
+     * @return list<ServiceRegistrarInterface>
      */
-    private function registerParameters(ContainerBuilder $containerBuilder, BundleConfiguration $bundleConfiguration): void
-    {
-        (new ContainerParameterRegistrar())->register($bundleConfiguration, $containerBuilder);
-    }
-
-    private function registerBudget(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        $maxTokens = $bundleConfiguration->budget->maxTokens;
-        $maxCostUsd = $bundleConfiguration->budget->maxCostUsd;
-        [$auditBudgetFactory, $auditBudgetArgs] = match (true) {
-            null === $maxTokens && null === $maxCostUsd => [[AuditBudget::class, 'unlimited'], []],
-            null !== $maxTokens && null !== $maxCostUsd => [[AuditBudget::class, 'forBoth'], [$maxTokens, $maxCostUsd]],
-            null !== $maxTokens => [[AuditBudget::class, 'forTokens'], [$maxTokens]],
-            default => [[AuditBudget::class, 'forCost'], [$maxCostUsd]],
-        };
-
-        $servicesConfigurator->set(AuditBudget::class)
-            ->private()
-            ->factory($auditBudgetFactory)
-            ->args($auditBudgetArgs);
-    }
-
-    private function registerRateLimiter(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        $servicesConfigurator->set(NullRateLimiter::class)->private();
-
-        if (!$bundleConfiguration->rateLimit->isEnabled()) {
-            $servicesConfigurator->alias(RateLimiterInterface::class, NullRateLimiter::class);
-
-            return;
-        }
-
-        $servicesConfigurator->set(RateLimitConfiguration::class)
-            ->private()
-            ->args([
-                $bundleConfiguration->rateLimit->requestsPerMinute,
-                $bundleConfiguration->rateLimit->inputTokensPerMinute,
-                $bundleConfiguration->rateLimit->outputTokensPerMinute,
-            ]);
-        $servicesConfigurator->set(TokenBucketRateLimiter::class)
-            ->private()
-            ->args([
-                service(RateLimitConfiguration::class),
-                service(ClockInterface::class),
-                service(SleeperInterface::class),
-            ]);
-        $servicesConfigurator->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
-    }
-
-    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        $servicesConfigurator->set(RetryAfterHeaderParser::class)->private();
-
-        $servicesConfigurator->set('security_auditor.attacker_client', SymfonyAiLLMClient::class)
-            ->private()
-            ->args($this->llmClientArguments(
-                $bundleConfiguration,
-                $bundleConfiguration->llm->attackerModel(),
-                $bundleConfiguration->llm->attackerMaxOutputTokens(),
-            ));
-
-        $servicesConfigurator->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
-            ->private()
-            ->args($this->llmClientArguments(
-                $bundleConfiguration,
-                $bundleConfiguration->llm->reviewerModel(),
-                $bundleConfiguration->llm->reviewerMaxOutputTokens(),
-            ));
-
-        $servicesConfigurator->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
-    }
-
-    private function registerImplementationAliases(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        $servicesConfigurator->alias(AttackerCacheInterface::class, $bundleConfiguration->cache->enabled
-            ? FilesystemAttackerCache::class
-            : NullAttackerCache::class);
-
-        $servicesConfigurator->alias(ReviewerCacheInterface::class, $bundleConfiguration->cache->enabled
-            ? FilesystemReviewerCache::class
-            : NullReviewerCache::class);
-
-        $servicesConfigurator->alias(SecretScrubberInterface::class, $bundleConfiguration->scan->secretScrubbingEnabled
-            ? RegexSecretScrubber::class
-            : NullSecretScrubber::class);
-
-        $servicesConfigurator->alias(AdvisoryDatabaseInterface::class, $bundleConfiguration->privacy->offlineOnly
-            ? InMemoryAdvisoryDatabase::class
-            : DeferredAdvisoryDatabase::class);
-
-        $servicesConfigurator->alias(ComposerAuditRunnerInterface::class, $bundleConfiguration->cache->enabled
-            ? LockfileHashedAdvisoryCache::class
-            : SymfonyProcessComposerAuditRunner::class);
-
-        $this->registerStaticPreScanner($servicesConfigurator, $bundleConfiguration);
-        $this->registerTriageMemory($servicesConfigurator, $bundleConfiguration);
-
-        $servicesConfigurator->alias(CodeSlicerInterface::class, $bundleConfiguration->audit->codeSlicingEnabled
-            ? RegexCodeSlicer::class
-            : NullCodeSlicer::class);
-    }
-
-    /**
-     * With `audit.triage_memory` enabled, the reviewer's own rejections
-     * persist across runs and merge with any baseline-sourced feedback via
-     * {@see CompositeReviewerFeedbackProvider}; disabled (the default), the
-     * feedback seam is exactly the baseline-only behaviour of earlier
-     * releases.
-     */
-    private function registerTriageMemory(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        if (!$bundleConfiguration->audit->triageMemory) {
-            $servicesConfigurator->alias(TriageMemoryRecorderInterface::class, NullTriageMemoryRecorder::class);
-            $servicesConfigurator->alias(ReviewerFeedbackProviderInterface::class, ReviewerFeedbackHolder::class);
-
-            return;
-        }
-
-        $servicesConfigurator->alias(TriageMemoryRecorderInterface::class, FilesystemTriageMemoryStore::class);
-        $servicesConfigurator->alias(ReviewerFeedbackProviderInterface::class, CompositeReviewerFeedbackProvider::class);
-        $servicesConfigurator->alias(ReviewerFeedbackSnapshotInterface::class, CompositeReviewerFeedbackProvider::class);
-    }
-
-    /**
-     * With `scan.import_sarif` configured, the effective pre-scanner is the
-     * SARIF importer decorating whichever scanner `audit.static_prescan`
-     * selected — imports work even with the regex pre-scan disabled.
-     */
-    private function registerStaticPreScanner(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        $staticPreScanner = $bundleConfiguration->audit->staticPreScanEnabled
-            ? RegexStaticPreScanner::class
-            : NullStaticPreScanner::class;
-
-        if ([] === $bundleConfiguration->scan->importSarifPaths) {
-            $servicesConfigurator->alias(StaticPreScannerInterface::class, $staticPreScanner);
-
-            return;
-        }
-
-        $servicesConfigurator->set(SarifImportingPreScanner::class)
-            ->private()
-            ->args([
-                service($staticPreScanner),
-                $bundleConfiguration->scan->importSarifPaths,
-                service(Filesystem::class),
-                service(AuditedProjectPathHolder::class),
-            ]);
-        $servicesConfigurator->alias(StaticPreScannerInterface::class, SarifImportingPreScanner::class);
-    }
-
-    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        if (!$bundleConfiguration->audit->escalationEnabled) {
-            return;
-        }
-
-        $cheapModel = $bundleConfiguration->audit->escalationCheapModel ?? $bundleConfiguration->llm->reviewerModel();
-
-        $servicesConfigurator->set('security_auditor.cheap_attacker_client', SymfonyAiLLMClient::class)
-            ->private()
-            ->args($this->llmClientArguments(
-                $bundleConfiguration,
-                $cheapModel,
-                $bundleConfiguration->llm->attackerMaxOutputTokens(),
-            ));
-
-        $this->registerCheapAttackerCache($servicesConfigurator, $bundleConfiguration);
-
-        $servicesConfigurator->set('security_auditor.cheap_attacker', AttackerAgent::class)
-            ->private()
-            ->args((new AttackerAgentDefinitionFactory())->args(
-                'security_auditor.cheap_attacker_client',
-                'security_auditor.cheap_attacker_cache',
-            ));
-
-        $servicesConfigurator->set(EscalatingAttackerAgent::class)
-            ->private()
-            ->args([
-                service('security_auditor.cheap_attacker'),
-                service(AttackerAgent::class),
-                service('logger'),
-            ]);
-
-        $servicesConfigurator->alias(AttackerAgentInterface::class, EscalatingAttackerAgent::class);
-    }
-
-    /**
-     * The cheap attacker must never share cache entries with the primary
-     * attacker: both would otherwise read and write the same keys, and a
-     * cheap-model "no findings" result cached during an escalation run would
-     * later be served to the full-price attacker as its own analysis.
-     */
-    private function registerCheapAttackerCache(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
-    {
-        if (!$bundleConfiguration->cache->enabled) {
-            $servicesConfigurator->alias('security_auditor.cheap_attacker_cache', NullAttackerCache::class);
-
-            return;
-        }
-
-        $servicesConfigurator->set('security_auditor.cheap_attacker_cache', FilesystemAttackerCache::class)
-            ->private()
-            ->args([
-                param('symfony_security_auditor.cache.dir'),
-                service(Filesystem::class),
-                service('logger'),
-                param('symfony_security_auditor.cache.cheap_attacker_key_salt'),
-            ]);
-    }
-
-    /**
-     * @return list<mixed>
-     */
-    private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens): array
+    private function coreRegistrars(): array
     {
         return [
-            inline_service(PlatformBinding::class)->args([
-                service(PlatformInterface::class)->nullOnInvalid(),
-                $model,
-                service('logger'),
-                $maxOutputTokens,
-            ]),
-            inline_service(PlatformRequestConfig::class)->args([
-                SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
-                $bundleConfiguration->llm->providerJsonMode,
-                service(TokenEstimatorInterface::class),
-            ]),
-            inline_service(PlatformResilienceConfig::class)->args([
-                service(RetryPolicy::class),
-                service(TransientFailureClassifier::class),
-                service(RetryAfterHeaderParser::class),
-                service(SleeperInterface::class),
-                service(RateLimiterInterface::class),
-            ]),
-            inline_service(PlatformAccountingConfig::class)->args([
-                service(TokenUsageRecorder::class),
-                service(BudgetTracker::class),
-            ]),
+            new BudgetRegistrar(),
+            new RateLimiterRegistrar(),
+            new LlmClientRegistrar(),
+            new ImplementationAliasRegistrar(),
+            new CustomSkillRegistrar(),
+            new EscalationRegistrar(),
         ];
     }
 }

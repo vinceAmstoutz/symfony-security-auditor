@@ -17,7 +17,9 @@ deptrac:
         - type: classLike
           value: .*\\Infrastructure\\Scan\\(IsGrantedAttributeParser|PhpParserControllerAccessControlParser|PhpParserFormBindingParser|PhpParserVoterCapabilityParser|RouteAttributeParser|SymfonyYamlSecurityConfigParser)$
         - type: classLike
-          value: .*\\Infrastructure\\Config\\(AttackerAgentDefinitionFactory|AuditConfigurationDefinition|ContainerParameterRegistrar|CoreCompositionRoot)$
+          value: .*\\Infrastructure\\Config\\(AttackerAgentDefinitionFactory|AuditConfigurationDefinition|AuditConfigurationProcessor|CompositionRootLoader|ContainerParameterRegistrar|CoreCompositionRoot|HostCompositionRootLoader|LlmClientDefinitionFactory)$
+        - type: directory
+          value: src/Audit/Infrastructure/Config/Registrar/.*
     - name: Infrastructure
       collectors:
         - type: bool

@@ -24,6 +24,8 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
@@ -152,6 +154,8 @@ final readonly class StandaloneApplicationFactory
      * @param array<string, string> $environment
      *
      * @throws UnresolvableConfigPathException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public static function bridgeAutoloadFile(array $environment): string
     {
@@ -355,6 +359,8 @@ final readonly class StandaloneApplicationFactory
      * @throws NonLocalPlatformEndpointException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     private function loadAuditCommand(bool $credentialsRequired): Command
     {
@@ -372,6 +378,8 @@ final readonly class StandaloneApplicationFactory
      * @throws NonLocalPlatformEndpointException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     private function buildContainer(bool $credentialsRequired): ContainerBuilder
     {

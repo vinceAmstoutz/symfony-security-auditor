@@ -779,6 +779,23 @@ carrying them: `configure()` hands the config tree to
 `CoreCompositionRoot`. There is still no separate Extension class — the bundle
 remains the entry point Symfony calls.
 
+`CoreCompositionRoot` is the single description of the graph, and it is not
+bundle-specific. It imports `config/services.php`, registers the container
+parameters, then runs six `ServiceRegistrarInterface` implementations
+(`Audit\Infrastructure\Config\Registrar\`): `BudgetRegistrar`,
+`RateLimiterRegistrar`, `LlmClientRegistrar`, `ImplementationAliasRegistrar`,
+`CustomSkillRegistrar` and `EscalationRegistrar`. Adding a conditional wiring
+concern means adding a registrar and listing it, not adding a branch.
+
+The standalone binary reaches the same object, not a copy of it.
+`StandaloneContainerFactory` calls `HostCompositionRootLoader`, which runs the
+raw configuration through the config tree (`AuditConfigurationProcessor`),
+builds a `ContainerConfigurator` over a plain `ContainerBuilder`
+(`CompositionRootLoader`), and invokes `CoreCompositionRoot`. Only third-party
+bundles — `AiBundle` — still go through `BundleExtensionLoader`. So a
+non-Symfony host wires the auditor without instantiating a bundle, and there is
+exactly one wiring source to keep correct.
+
 The config tree is defined under root key `symfony_security_auditor`. Top-level
 scalars:
 

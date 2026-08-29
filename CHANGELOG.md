@@ -37,18 +37,36 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 ### Changed
 
-- **The audit object graph is described in one named place instead of inside the
-  bundle extension.** `SymfonySecurityAuditorBundle` carried the wiring itself —
-  the `config/services.php` import, the container parameters and six conditional
-  registrations — so the only description of the graph was reachable only
-  through a Symfony bundle. `CoreCompositionRoot` now owns it and the bundle
-  delegates, dropping from 394 lines to 57: one call to the config definition
-  and one to the composition root. Partial progress on #250; the standalone
-  binary still reaches the composition root through the bundle extension rather
-  than calling it directly, because doing that needs the conditional wiring
-  ported off the `ContainerConfigurator` DSL — which `config/services.php` and
-  the shared `AttackerAgentDefinitionFactory` also speak — plus hand-building a
-  `ContainerConfigurator` across Symfony 7.4/8.0/8.1.
+- **The audit object graph is described in one named place, and every host
+  reaches it the same way.** `SymfonySecurityAuditorBundle` carried the wiring
+  itself — the `config/services.php` import, the container parameters and six
+  conditional registrations — so the only description of the graph was reachable
+  only through a Symfony bundle, and the standalone binary had to instantiate
+  that bundle to get a container. `CoreCompositionRoot` owns the graph now and
+  the bundle delegates, dropping from 394 lines to 57: one call to the config
+  definition and one to the composition root. The six registrations are no
+  longer branches inside it either — each is a `ServiceRegistrarInterface`
+  implementation under `Audit\Infrastructure\Config\Registrar\` (budget, rate
+  limiter, LLM clients, implementation aliases, custom skills, escalation),
+  collected the same way `ConfigurationNotices` collects its rules, so a new
+  conditional wiring concern is a new class rather than another branch. The
+  argument list every `SymfonyAiLLMClient` definition takes moved to a shared
+  `LlmClientDefinitionFactory`, so the attacker, reviewer and escalation
+  cheap-model clients cannot drift apart, and the escalation cheap-model
+  fallback now reads
+  `AuditExecutionConfiguration::effectiveEscalationCheapModel()` rather than
+  repeating the `??`.
+
+  `StandaloneContainerFactory` no longer loads the bundle extension for the
+  auditor: `HostCompositionRootLoader` runs the config tree over the raw
+  configuration through `AuditConfigurationProcessor`, builds the
+  `ContainerConfigurator` via `CompositionRootLoader`, and calls
+  `CoreCompositionRoot` directly — one wiring source, no per-host duplication.
+  The compiled standalone container is byte-identical to the one the bundle
+  extension produced: dumping the generated container class for the default,
+  escalation, rate-limited, triage-memory, secret-scrubbing-off, custom-skill
+  and offline-only configurations yields the same SHA-1 on both paths, inlined
+  private services included. Closes #250.
 
 - **Adding a pre-flight configuration notice is now one new class.**
   `ConfigurationNotices` held five hardcoded checks, each with a private
