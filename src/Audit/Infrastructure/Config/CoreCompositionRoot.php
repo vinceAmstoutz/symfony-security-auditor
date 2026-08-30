@@ -35,6 +35,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\S
 final readonly class CoreCompositionRoot
 {
     /**
+     * @var list<ServiceRegistrarInterface>
+     */
+    private array $serviceRegistrars;
+
+    /**
+     * @param list<ServiceRegistrarInterface> $profileRegistrars the host's framework profile — the
+     *                                                           attacker skills and source parsers
+     *                                                           that only make sense for the
+     *                                                           framework being audited
+     */
+    public function __construct(array $profileRegistrars = [])
+    {
+        $this->serviceRegistrars = [...$this->coreRegistrars(), ...$profileRegistrars];
+    }
+
+    /**
      * @throws JsonException
      */
     public function register(ContainerConfigurator $containerConfigurator, ContainerBuilder $containerBuilder, BundleConfiguration $bundleConfiguration): void
@@ -44,7 +60,7 @@ final readonly class CoreCompositionRoot
         (new ContainerParameterRegistrar())->register($bundleConfiguration, $containerBuilder);
 
         $servicesConfigurator = $containerConfigurator->services();
-        foreach ($this->coreRegistrars() as $serviceRegistrar) {
+        foreach ($this->serviceRegistrars as $serviceRegistrar) {
             $serviceRegistrar->register($servicesConfigurator, $bundleConfiguration);
         }
     }

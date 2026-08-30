@@ -17,6 +17,7 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileTypeClassifierInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
@@ -37,7 +38,10 @@ final readonly class GrepTool implements ToolInterface
     /**
      * @param list<ProjectFile> $files
      */
-    public function __construct(private array $files) {}
+    public function __construct(
+        private array $files,
+        private ProjectFileTypeClassifierInterface $projectFileTypeClassifier,
+    ) {}
 
     /**
      * @throws InvalidToolDefinitionException
@@ -69,7 +73,7 @@ final readonly class GrepTool implements ToolInterface
     {
         return implode(', ', array_map(
             static fn (ProjectFileType $projectFileType): string => $projectFileType->value,
-            ProjectFileType::cases(),
+            $this->projectFileTypeClassifier->supportedTypes(),
         ));
     }
 

@@ -349,9 +349,13 @@ in `config/services.yaml` to override the bundled behaviour (see
   the access-control and form-binding maps all switch on the `ProjectFileType`
   it returns and on that type's framework-neutral
   `ProjectFileType::archetype()`. Implementations must be pure — classification
-  is derived from the path and content alone, with no I/O — and a framework
-  profile normally pairs one with its own `FrameworkVocabulary` so the PoC and
-  fix synthesizers speak the right idiom.
+  is derived from the path and content alone, with no I/O — and must declare
+  `supportedTypes()`, the vocabulary it can produce, which is what the `grep`
+  and `list_files` tools offer the LLM as filter values. A framework profile
+  normally pairs one with its own `FrameworkVocabulary` so the PoC and fix
+  synthesizers speak the right idiom, and with its own attacker skills passed to
+  `CoreCompositionRoot` as profile registrars (see `SymfonyProfileRegistrars`)
+  so the model is never prompted with another framework's surfaces.
 - `StaticPreScannerInterface` — supply your own deterministic risk-marker scan
   (default: `RegexStaticPreScanner`, or set
   `audit.static_prescan.enabled: false` for the null scanner). Project-specific

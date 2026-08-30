@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
@@ -30,7 +31,7 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
      */
     public function test_registry_exposes_all_four_built_in_tools(): void
     {
-        $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
+        $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase(), new SymfonyProjectFileTypeClassifier());
 
         $toolRegistry = $symfonyToolRegistryFactory->forProjectFiles([
             SymfonyProjectFile::create('src/A.php', '/app/x', '<?php'),
@@ -48,7 +49,7 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
      */
     public function test_read_file_tool_can_access_provided_project_files(): void
     {
-        $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
+        $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase(), new SymfonyProjectFileTypeClassifier());
 
         $toolRegistry = $symfonyToolRegistryFactory->forProjectFiles([
             SymfonyProjectFile::create('src/A.php', '/app/x', '<?php echo "marker-7";'),
@@ -63,7 +64,7 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
      */
     public function test_each_call_returns_an_independent_registry(): void
     {
-        $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
+        $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase(), new SymfonyProjectFileTypeClassifier());
 
         $toolRegistry = $symfonyToolRegistryFactory->forProjectFiles([SymfonyProjectFile::create('src/A.php', '/x', 'aaa')]);
         $secondRegistry = $symfonyToolRegistryFactory->forProjectFiles([SymfonyProjectFile::create('src/B.php', '/x', 'bbb')]);

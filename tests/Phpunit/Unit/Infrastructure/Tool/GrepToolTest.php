@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\GrepTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
@@ -28,7 +29,7 @@ final class GrepToolTest extends TestCase
      */
     public function test_definition_matches_expected_full_schema(): void
     {
-        $grepTool = new GrepTool([]);
+        $grepTool = new GrepTool([], new SymfonyProjectFileTypeClassifier());
 
         $definition = $grepTool->definition();
 
@@ -58,7 +59,7 @@ final class GrepToolTest extends TestCase
     public function test_execute_returns_no_matches_message_when_pattern_not_found(): void
     {
         $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', "line1\nline2\n");
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'banana']);
 
@@ -71,7 +72,7 @@ final class GrepToolTest extends TestCase
     public function test_execute_returns_path_line_number_and_trimmed_content_for_each_match(): void
     {
         $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', "first\n  foo bar  \nthird\nfoo baz\n");
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'foo']);
 
@@ -89,7 +90,7 @@ final class GrepToolTest extends TestCase
         $projectFile = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', 'echo foo;');
         $entity = SymfonyProjectFile::create('src/Entity/User.php', '/app/y', 'echo foo;');
 
-        $grepTool = new GrepTool([$projectFile, $entity]);
+        $grepTool = new GrepTool([$projectFile, $entity], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'foo', 'file_type' => 'controller']);
 
@@ -107,7 +108,7 @@ final class GrepToolTest extends TestCase
         $projectFile = SymfonyProjectFile::create('src/Entity/User.php', '/app/y', 'echo foo;');
         $controllerSecond = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', 'echo foo;');
 
-        $grepTool = new GrepTool([$projectFile, $controllerSecond]);
+        $grepTool = new GrepTool([$projectFile, $controllerSecond], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'foo', 'file_type' => 'controller']);
 
@@ -121,7 +122,7 @@ final class GrepToolTest extends TestCase
     public function test_execute_ignores_invalid_file_type_filter(): void
     {
         $projectFile = SymfonyProjectFile::create('src/A.php', '/app/x', 'echo foo;');
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'foo', 'file_type' => 'nonexistent']);
 
@@ -130,7 +131,7 @@ final class GrepToolTest extends TestCase
 
     public function test_execute_returns_error_for_missing_pattern(): void
     {
-        $grepTool = new GrepTool([]);
+        $grepTool = new GrepTool([], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute([]);
 
@@ -140,7 +141,7 @@ final class GrepToolTest extends TestCase
 
     public function test_execute_returns_error_for_empty_pattern(): void
     {
-        $grepTool = new GrepTool([]);
+        $grepTool = new GrepTool([], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => '']);
 
@@ -149,7 +150,7 @@ final class GrepToolTest extends TestCase
 
     public function test_execute_returns_error_for_non_string_pattern(): void
     {
-        $grepTool = new GrepTool([]);
+        $grepTool = new GrepTool([], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 123]);
 
@@ -171,7 +172,7 @@ final class GrepToolTest extends TestCase
         $projectFile = SymfonyProjectFile::create('src/A.php', '/app/A', $contentA);
         $fileB = SymfonyProjectFile::create('src/B.php', '/app/B', $contentB);
 
-        $grepTool = new GrepTool([$projectFile, $fileB]);
+        $grepTool = new GrepTool([$projectFile, $fileB], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'foo']);
 
@@ -189,7 +190,7 @@ final class GrepToolTest extends TestCase
         $hugeLine = str_repeat('A', 20_000).'NEEDLE';
         $projectFile = SymfonyProjectFile::create('src/Huge.php', '/app/Huge', "header\n{$hugeLine}\nfooter\n");
 
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'NEEDLE']);
 
@@ -203,7 +204,7 @@ final class GrepToolTest extends TestCase
     public function test_execute_treats_empty_file_type_as_unset(): void
     {
         $projectFile = SymfonyProjectFile::create('src/A.php', '/app/x', 'foo bar');
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'foo', 'file_type' => '']);
 
@@ -217,7 +218,7 @@ final class GrepToolTest extends TestCase
     {
         $line = 'NEEDLE'.str_repeat('a', 494); // exactly 500 chars
         $projectFile = SymfonyProjectFile::create('src/Bound.php', '/app/Bound', $line."\n");
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'NEEDLE']);
 
@@ -231,7 +232,7 @@ final class GrepToolTest extends TestCase
     {
         $line = 'Z'.str_repeat('y', 600); // 601 chars, distinct first char
         $projectFile = SymfonyProjectFile::create('src/Off.php', '/app/Off', $line."\n");
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'Z']);
 
@@ -247,7 +248,7 @@ final class GrepToolTest extends TestCase
         // broken half-character, a character-safe cut stops before it.
         $line = str_repeat('a', 499).'€NEEDLE'; // 508 bytes, match past the cut
         $projectFile = SymfonyProjectFile::create('src/Mb.php', '/app/Mb', $line."\n");
-        $grepTool = new GrepTool([$projectFile]);
+        $grepTool = new GrepTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $grepTool->execute(['pattern' => 'NEEDLE']);
 

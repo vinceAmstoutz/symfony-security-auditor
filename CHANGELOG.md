@@ -37,6 +37,29 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 ### Changed
 
+- **A framework profile now owns its own vocabulary and its own attacker
+  skills.** Two things still tied the auditor to Symfony after classification
+  became a port. `ProjectFileType` had only Symfony nouns, so a Laravel Policy
+  would have had to masquerade as a `VOTER` and an Eloquent model as an
+  `ENTITY`; the enum gains `POLICY`, `ELOQUENT_MODEL`, `FORM_REQUEST`,
+  `BLADE_TEMPLATE`, `JOB`, `MIDDLEWARE` and `GUARD`, each mapped onto the
+  framework-neutral `SurfaceArchetype` that core logic already switches on, and
+  none of them widens `HTTP_ENTRYPOINT` — `isControllerLike()` stays exactly the
+  route-guarded set it was. The port gains `supportedTypes()` so a profile
+  declares which of those it can actually produce, and
+  `GrepTool`/`ListFilesTool` offer that list rather than every case, so no
+  project is invited to filter on a type its framework has no concept of (the
+  Symfony tool schema is unchanged: the same 21 types).
+
+  The 25 built-in attacker skills were registered in the shared
+  `config/services.php`, which every host imports through `CoreCompositionRoot`
+  — so a Laravel host would have been prompted with Symfony's voter, Twig and
+  Doctrine surfaces on top of its own. They move into `SymfonySkillRegistrar`,
+  listed by `SymfonyProfileRegistrars`, and `CoreCompositionRoot` now takes the
+  host's profile registrars alongside its core ones. Both Symfony hosts — the
+  bundle and the standalone binary — pass that profile, so the skill set is
+  byte-identical; a host auditing another framework passes its own instead.
+
 - **File classification is a Domain port instead of a static call, so a
   non-Symfony profile can be plugged in.** `ProjectFile::create()` classified
   itself by calling `ProjectFileTypeClassifier::classify()` — a static method,

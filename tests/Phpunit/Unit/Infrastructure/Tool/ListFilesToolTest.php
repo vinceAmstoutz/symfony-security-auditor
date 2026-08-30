@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\ListFilesTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
@@ -26,7 +27,7 @@ final class ListFilesToolTest extends TestCase
      */
     public function test_definition_matches_expected_full_schema(): void
     {
-        $listFilesTool = new ListFilesTool([]);
+        $listFilesTool = new ListFilesTool([], new SymfonyProjectFileTypeClassifier());
 
         $definition = $listFilesTool->definition();
 
@@ -52,7 +53,7 @@ final class ListFilesToolTest extends TestCase
     {
         $projectFile = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
         $entity = SymfonyProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
-        $listFilesTool = new ListFilesTool([$projectFile, $entity]);
+        $listFilesTool = new ListFilesTool([$projectFile, $entity], new SymfonyProjectFileTypeClassifier());
 
         $result = $listFilesTool->execute([]);
 
@@ -69,7 +70,7 @@ final class ListFilesToolTest extends TestCase
     {
         $projectFile = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
         $entity = SymfonyProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
-        $listFilesTool = new ListFilesTool([$projectFile, $entity]);
+        $listFilesTool = new ListFilesTool([$projectFile, $entity], new SymfonyProjectFileTypeClassifier());
 
         $result = $listFilesTool->execute(['file_type' => 'controller']);
 
@@ -86,7 +87,7 @@ final class ListFilesToolTest extends TestCase
         // matching one further down the list never appears in output.
         $projectFile = SymfonyProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
         $controller = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
-        $listFilesTool = new ListFilesTool([$projectFile, $controller]);
+        $listFilesTool = new ListFilesTool([$projectFile, $controller], new SymfonyProjectFileTypeClassifier());
 
         $result = $listFilesTool->execute(['file_type' => 'controller']);
 
@@ -100,7 +101,7 @@ final class ListFilesToolTest extends TestCase
     public function test_execute_returns_no_files_match_when_filter_excludes_all(): void
     {
         $projectFile = SymfonyProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
-        $listFilesTool = new ListFilesTool([$projectFile]);
+        $listFilesTool = new ListFilesTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $listFilesTool->execute(['file_type' => 'voter']);
 
@@ -113,7 +114,7 @@ final class ListFilesToolTest extends TestCase
     public function test_execute_treats_empty_file_type_as_unset(): void
     {
         $projectFile = SymfonyProjectFile::create('src/A.php', '/app/x', '<?php');
-        $listFilesTool = new ListFilesTool([$projectFile]);
+        $listFilesTool = new ListFilesTool([$projectFile], new SymfonyProjectFileTypeClassifier());
 
         $result = $listFilesTool->execute(['file_type' => '']);
 
@@ -122,7 +123,7 @@ final class ListFilesToolTest extends TestCase
 
     public function test_execute_returns_no_files_match_when_files_list_is_empty(): void
     {
-        $listFilesTool = new ListFilesTool([]);
+        $listFilesTool = new ListFilesTool([], new SymfonyProjectFileTypeClassifier());
 
         $result = $listFilesTool->execute([]);
 
@@ -139,7 +140,7 @@ final class ListFilesToolTest extends TestCase
             $files[] = SymfonyProjectFile::create(\sprintf('src/Generated/File%d.php', $i), '/app/x'.$i, '<?php');
         }
 
-        $listFilesTool = new ListFilesTool($files);
+        $listFilesTool = new ListFilesTool($files, new SymfonyProjectFileTypeClassifier());
 
         $result = $listFilesTool->execute([]);
 

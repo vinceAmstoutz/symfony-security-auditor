@@ -17,6 +17,7 @@ use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileTypeClassifierInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 
@@ -32,6 +33,7 @@ final readonly class SymfonyToolRegistryFactory implements ToolRegistryFactoryIn
     public function __construct(
         private LoggerInterface $logger,
         private AdvisoryDatabaseInterface $advisoryDatabase,
+        private ProjectFileTypeClassifierInterface $projectFileTypeClassifier,
     ) {}
 
     /**
@@ -43,8 +45,8 @@ final readonly class SymfonyToolRegistryFactory implements ToolRegistryFactoryIn
         return new ToolRegistry(
             tools: [
                 new ReadFileTool($projectFiles),
-                new GrepTool($projectFiles),
-                new ListFilesTool($projectFiles),
+                new GrepTool($projectFiles, $this->projectFileTypeClassifier),
+                new ListFilesTool($projectFiles, $this->projectFileTypeClassifier),
                 new LookupAdvisoryTool($this->advisoryDatabase),
             ],
             logger: $this->logger,

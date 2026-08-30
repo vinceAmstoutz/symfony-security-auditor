@@ -34,6 +34,13 @@ enum ProjectFileType: string
     case TWIG_EXTENSION = 'twig_extension';
     case TEMPLATE = 'template';
     case CONFIG = 'config';
+    case POLICY = 'policy';
+    case ELOQUENT_MODEL = 'eloquent_model';
+    case FORM_REQUEST = 'form_request';
+    case BLADE_TEMPLATE = 'blade_template';
+    case JOB = 'job';
+    case MIDDLEWARE = 'middleware';
+    case GUARD = 'guard';
     case PHP = 'php';
     case OTHER = 'other';
 
@@ -47,18 +54,18 @@ enum ProjectFileType: string
     {
         return match ($this) {
             self::CONTROLLER, self::API_RESOURCE, self::LIVE_COMPONENT, self::EASYADMIN_CRUD => SurfaceArchetype::HTTP_ENTRYPOINT,
-            self::VOTER => SurfaceArchetype::AUTHORIZATION_RULE,
-            self::AUTHENTICATOR, self::LDAP_SERVICE => SurfaceArchetype::AUTHENTICATION,
-            self::ENTITY => SurfaceArchetype::DOMAIN_MODEL,
+            self::VOTER, self::POLICY => SurfaceArchetype::AUTHORIZATION_RULE,
+            self::AUTHENTICATOR, self::LDAP_SERVICE, self::GUARD => SurfaceArchetype::AUTHENTICATION,
+            self::ENTITY, self::ELOQUENT_MODEL => SurfaceArchetype::DOMAIN_MODEL,
             self::REPOSITORY => SurfaceArchetype::PERSISTENCE_QUERY,
             // A Sonata `AbstractAdmin` self-declares its own routes and
             // per-action roles too; `INPUT_BINDING` is the closest fit short
             // of widening `HTTP_ENTRYPOINT`, which `isControllerLike()` locks.
-            self::FORM, self::SONATA_ADMIN => SurfaceArchetype::INPUT_BINDING,
-            self::MESSENGER_HANDLER, self::WEBHOOK_CONSUMER, self::SCHEDULER => SurfaceArchetype::ASYNC_HANDLER,
-            self::EVENT_SUBSCRIBER => SurfaceArchetype::EVENT_HOOK,
+            self::FORM, self::SONATA_ADMIN, self::FORM_REQUEST => SurfaceArchetype::INPUT_BINDING,
+            self::MESSENGER_HANDLER, self::WEBHOOK_CONSUMER, self::SCHEDULER, self::JOB => SurfaceArchetype::ASYNC_HANDLER,
+            self::EVENT_SUBSCRIBER, self::MIDDLEWARE => SurfaceArchetype::EVENT_HOOK,
             self::NORMALIZER => SurfaceArchetype::SERIALIZATION,
-            self::TEMPLATE, self::TWIG_EXTENSION => SurfaceArchetype::TEMPLATE,
+            self::TEMPLATE, self::TWIG_EXTENSION, self::BLADE_TEMPLATE => SurfaceArchetype::TEMPLATE,
             self::CONFIG => SurfaceArchetype::CONFIG,
             self::PHP, self::OTHER => SurfaceArchetype::OTHER,
         };

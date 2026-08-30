@@ -118,33 +118,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSections;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSectionsInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ApiResourceAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerEasyAdminAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerTrustBoundaryAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityFileUploadAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LdapServiceAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LiveComponentAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\MessengerHandlerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\NormalizerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SonataAdminAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ExecutiveSummaryReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
@@ -310,31 +285,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger')->ignoreOnInvalid(),
             inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
         ]);
-    $defaultsConfigurator->set(ApiResourceAttackerSkill::class);
-    $defaultsConfigurator->set(AuthenticatorAttackerSkill::class);
-    $defaultsConfigurator->set(ConfigAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerEasyAdminAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerFileUploadAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerTrustBoundaryAttackerSkill::class);
-    $defaultsConfigurator->set(EntityAttackerSkill::class);
-    $defaultsConfigurator->set(EntityFileUploadAttackerSkill::class);
-    $defaultsConfigurator->set(EventSubscriberAttackerSkill::class);
-    $defaultsConfigurator->set(FileUploadAttackerSkill::class);
-    $defaultsConfigurator->set(FormAttackerSkill::class);
-    $defaultsConfigurator->set(LdapServiceAttackerSkill::class);
-    $defaultsConfigurator->set(LiveComponentAttackerSkill::class);
-    $defaultsConfigurator->set(MessengerHandlerAttackerSkill::class);
-    $defaultsConfigurator->set(NormalizerAttackerSkill::class);
-    $defaultsConfigurator->set(PhpAttackerSkill::class);
-    $defaultsConfigurator->set(RepositoryAttackerSkill::class);
-    $defaultsConfigurator->set(SchedulerAttackerSkill::class);
-    $defaultsConfigurator->set(SonataAdminAttackerSkill::class);
-    $defaultsConfigurator->set(TemplateAttackerSkill::class);
-    $defaultsConfigurator->set(TrustBoundaryAttackerSkill::class);
-    $defaultsConfigurator->set(TwigExtensionAttackerSkill::class);
-    $defaultsConfigurator->set(VoterAttackerSkill::class);
-    $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
     $defaultsConfigurator->set(AttackerSkillRegistry::class)
         ->args([tagged_iterator('symfony_security_auditor.attacker_skill')]);
     $defaultsConfigurator->alias(AttackerSkillPromptRendererInterface::class, AttackerSkillRegistry::class);
@@ -604,7 +554,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
 
     $defaultsConfigurator->set(SymfonyToolRegistryFactory::class)
-        ->args([service('logger'), service(AdvisoryDatabaseInterface::class)]);
+        ->args([service('logger'), service(AdvisoryDatabaseInterface::class), service(ProjectFileTypeClassifierInterface::class)]);
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
 
     $defaultsConfigurator->set(NullStaticPreScanner::class);

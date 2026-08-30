@@ -33,4 +33,13 @@ interface ProjectFileTypeClassifierInterface
      * @param string $relativePath project-relative path, as {@see ProjectFile::relativePath()} reports it
      */
     public function classify(string $relativePath, string $content): ProjectFileType;
+
+    /**
+     * The vocabulary this profile can actually produce. Tools offer these as
+     * filter values, so a project is never invited to filter on a type its own
+     * framework has no concept of.
+     *
+     * @return list<ProjectFileType>
+     */
+    public function supportedTypes(): array;
 }

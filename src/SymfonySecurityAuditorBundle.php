@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExec
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CoreCompositionRoot;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\SymfonyProfileRegistrars;
 
 /**
  * @phpstan-import-type BundleConfigArray from BundleConfiguration
@@ -50,6 +51,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         /** @var BundleConfigArray $config */
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        (new CoreCompositionRoot())->register($container, $builder, $bundleConfiguration);
+        (new CoreCompositionRoot(SymfonyProfileRegistrars::all()))->register($container, $builder, $bundleConfiguration);
     }
 }

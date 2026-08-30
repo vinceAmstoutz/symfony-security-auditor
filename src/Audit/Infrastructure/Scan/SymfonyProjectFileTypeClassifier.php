@@ -24,6 +24,30 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileTypeClassi
  */
 final readonly class SymfonyProjectFileTypeClassifier implements ProjectFileTypeClassifierInterface
 {
+    private const array FOREIGN_TYPES = [
+        ProjectFileType::POLICY,
+        ProjectFileType::ELOQUENT_MODEL,
+        ProjectFileType::FORM_REQUEST,
+        ProjectFileType::BLADE_TEMPLATE,
+        ProjectFileType::JOB,
+        ProjectFileType::MIDDLEWARE,
+        ProjectFileType::GUARD,
+    ];
+
+    /**
+     * Every case except the ones another framework's profile owns.
+     *
+     * @return list<ProjectFileType>
+     */
+    #[Override]
+    public function supportedTypes(): array
+    {
+        return array_values(array_filter(
+            ProjectFileType::cases(),
+            static fn (ProjectFileType $projectFileType): bool => !\in_array($projectFileType, self::FOREIGN_TYPES, true),
+        ));
+    }
+
     #[Override]
     public function classify(string $relativePath, string $content): ProjectFileType
     {

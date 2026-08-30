@@ -24,11 +24,13 @@ use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBa
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CoreCompositionRoot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HostCompositionRootLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\SymfonyProfileRegistrars;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
@@ -47,11 +49,17 @@ final readonly class StandaloneContainerFactory
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
+    private HostCompositionRootLoader $hostCompositionRootLoader;
+
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
         private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
-        private HostCompositionRootLoader $hostCompositionRootLoader = new HostCompositionRootLoader(),
-    ) {}
+        ?HostCompositionRootLoader $hostCompositionRootLoader = null,
+    ) {
+        $this->hostCompositionRootLoader = $hostCompositionRootLoader ?? new HostCompositionRootLoader(
+            coreCompositionRoot: new CoreCompositionRoot(SymfonyProfileRegistrars::all()),
+        );
+    }
 
     /**
      * @throws MissingBundleExtensionException
