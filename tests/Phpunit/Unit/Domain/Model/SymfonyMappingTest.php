@@ -137,9 +137,9 @@ final class SymfonyMappingTest extends TestCase
     {
         $symfonyMapping = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
-                'controllers' => [$this->makeFile('src/Controller/Foo.php')],
-                'entities' => [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
-                'voters' => [$this->makeFile('src/Security/UserVoter.php')],
+                'entrypoints' => [$this->makeFile('src/Controller/Foo.php')],
+                'domainModels' => [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
+                'authorizationRules' => [$this->makeFile('src/Security/UserVoter.php')],
             ]),
             new AccessControlMap(),
         );
@@ -154,7 +154,7 @@ final class SymfonyMappingTest extends TestCase
     {
         $symfonyMapping = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
-                'forms' => [$this->makeFile('src/Form/UserType.php')],
+                'inputBindings' => [$this->makeFile('src/Form/UserType.php')],
                 'services' => [$this->makeFile('src/Service/FooService.php'), $this->makeFile('src/Service/BarService.php')],
             ]),
             new AccessControlMap(),
@@ -170,7 +170,7 @@ final class SymfonyMappingTest extends TestCase
     {
         $symfonyMapping = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
-                'repositories' => [$this->makeFile('src/Repository/UserRepository.php'), $this->makeFile('src/Repository/PostRepository.php')],
+                'persistenceQueries' => [$this->makeFile('src/Repository/UserRepository.php'), $this->makeFile('src/Repository/PostRepository.php')],
                 'templates' => [$this->makeFile('templates/user/index.html.twig')],
             ]),
             new AccessControlMap(),
@@ -186,11 +186,11 @@ final class SymfonyMappingTest extends TestCase
     {
         $symfonyMapping = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
-                'controllers' => [$this->makeFile('src/Controller/FooController.php')],
-                'entities' => [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
-                'voters' => [$this->makeFile('src/Security/UserVoter.php')],
-                'repositories' => [$this->makeFile('src/Repository/UserRepository.php')],
-                'forms' => [$this->makeFile('src/Form/UserType.php')],
+                'entrypoints' => [$this->makeFile('src/Controller/FooController.php')],
+                'domainModels' => [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
+                'authorizationRules' => [$this->makeFile('src/Security/UserVoter.php')],
+                'persistenceQueries' => [$this->makeFile('src/Repository/UserRepository.php')],
+                'inputBindings' => [$this->makeFile('src/Form/UserType.php')],
                 'services' => [$this->makeFile('src/Service/FooService.php')],
                 'templates' => [$this->makeFile('templates/user/index.html.twig')],
             ]),
@@ -211,7 +211,7 @@ final class SymfonyMappingTest extends TestCase
             '<?php class UserVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof User; } }',
         );
 
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['authorizationRules' => [$projectFile]]), new AccessControlMap());
 
         self::assertTrue($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('User'));
         self::assertFalse($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('Post'));
@@ -228,7 +228,7 @@ final class SymfonyMappingTest extends TestCase
             '<?php class AdminUserVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof AdminUser; } }',
         );
 
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['authorizationRules' => [$projectFile]]), new AccessControlMap());
 
         self::assertFalse($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('User'));
         self::assertTrue($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('AdminUser'));
@@ -245,7 +245,7 @@ final class SymfonyMappingTest extends TestCase
             '<?php class RegexVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof UserX; } }',
         );
 
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['authorizationRules' => [$projectFile]]), new AccessControlMap());
 
         self::assertFalse($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('User.'));
     }
@@ -267,7 +267,7 @@ final class SymfonyMappingTest extends TestCase
             '<?php class PublicController {}',
         );
 
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile, $insecure]]), new AccessControlMap());
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile, $insecure]]), new AccessControlMap());
         $unprotected = $symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule();
 
         self::assertCount(1, $unprotected);
@@ -281,8 +281,8 @@ final class SymfonyMappingTest extends TestCase
     {
         $symfonyMapping = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
-                'controllers' => [$this->makeFile('src/Controller/Foo.php')],
-                'entities' => [$this->makeFile('src/Entity/User.php')],
+                'entrypoints' => [$this->makeFile('src/Controller/Foo.php')],
+                'domainModels' => [$this->makeFile('src/Entity/User.php')],
             ]),
             new AccessControlMap(
                 routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
@@ -339,7 +339,7 @@ final class SymfonyMappingTest extends TestCase
     public function test_deprecated_controllers_without_voters_still_returns_the_unguarded_entrypoints(): void
     {
         $projectFile = $this->makeFile('src/Controller/A.php');
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]), new AccessControlMap());
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]), new AccessControlMap());
 
         $this->expectUserDeprecationMessageMatches('/SymfonyMapping::controllersWithoutVoters\(\) is deprecated, use ApplicationSecurityMap::entrypointsWithoutAuthorizationRule\(\) instead\./');
 
@@ -359,7 +359,7 @@ final class SymfonyMappingTest extends TestCase
             '/app/src/Security/UserVoter.php',
             '<?php class UserVoter { public function supports($a, $s): bool { return $s instanceof User; } }',
         );
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['authorizationRules' => [$projectFile]]), new AccessControlMap());
 
         $this->expectUserDeprecationMessageMatches('/SymfonyMapping::hasVoterForEntity\(\) is deprecated, use ApplicationSecurityMap::hasAuthorizationRuleForModel\(\) instead\./');
 

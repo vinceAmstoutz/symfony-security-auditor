@@ -255,3 +255,38 @@ Symfony parsers (`PhpParserControllerAccessControlParser`,
 `PhpParserVoterCapabilityParser`, `SymfonyYamlSecurityConfigParser`) keep their
 names too: they really do read Symfony, and they now implement the renamed
 ports.
+
+### Changed: `ProjectFileInventory` buckets by archetype, and its buckets are renamed
+
+The role grouping inside `SymfonyMapping` filtered on one exact
+`ProjectFileType` per bucket, so an API Platform resource, a Live Component and
+an EasyAdmin CRUD controller were counted as generic services rather than
+entrypoints, a Sonata admin was not an input binding, and a Twig extension was
+not a template surface. It now buckets on `ProjectFileType::archetype()`, which
+is what the rest of the engine already switches on, and the buckets are named
+after the archetype they hold:
+
+| 1.x                          | 2.0                                     |
+| ---------------------------- | --------------------------------------- |
+| `controllers()`              | `entrypoints()`                         |
+| `entities()`                 | `domainModels()`                        |
+| `voters()`                   | `authorizationRules()`                  |
+| `repositories()`             | `persistenceQueries()`                  |
+| `forms()`                    | `inputBindings()`                       |
+| `controllersWithoutVoters()` | `entrypointsWithoutAuthorizationRule()` |
+| `hasVoterForEntity()`        | `hasAuthorizationRuleForModel()`        |
+
+`services()`, `templates()` and `totalFiles()` keep their names.
+`ProjectFileInventory::fromGroups()` takes the same new keys (`entrypoints`,
+`domainModels`, `authorizationRules`, `persistenceQueries`, `inputBindings`,
+`services`, `templates`).
+
+**This changes what the attacker sees.** For a project using API Platform, Live
+Components, EasyAdmin, Sonata or Twig extensions, the mapping summary's per-role
+counts shift, more entrypoints are checked for a missing authorization rule, and
+every attacker cache key for the affected chunks changes. Nothing is dropped:
+`totalFiles()` is unchanged, because every file that moves out of `services()`
+moves into a bucket of its own.
+
+`SymfonyMapping`'s own accessors are untouched — it is the Symfony-flavoured
+facade, and it now delegates to the renamed inventory methods.

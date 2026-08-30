@@ -417,7 +417,7 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => $files]),
+            ProjectFileInventory::fromGroups(['entrypoints' => $files]),
             new AccessControlMap(),
         );
 

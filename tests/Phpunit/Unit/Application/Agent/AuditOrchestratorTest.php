@@ -1821,12 +1821,12 @@ final class AuditOrchestratorTest extends TestCase
         ]);
         $auditContext->setMapping(SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
-                'controllers' => [
+                'entrypoints' => [
                     SymfonyProjectFile::create('src/Controller/A.php', '/a', '<?php'),
                     SymfonyProjectFile::create('src/Controller/B.php', '/b', '<?php'),
                 ],
-                'voters' => [SymfonyProjectFile::create('src/Security/V.php', '/v', '<?php')],
-                'forms' => [
+                'authorizationRules' => [SymfonyProjectFile::create('src/Security/V.php', '/v', '<?php')],
+                'inputBindings' => [
                     SymfonyProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
                     SymfonyProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
                     SymfonyProjectFile::create('src/Form/F3.php', '/f3', '<?php'),

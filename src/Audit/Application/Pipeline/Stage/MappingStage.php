@@ -70,7 +70,7 @@ final readonly class MappingStage implements StageInterface
 
         [$routeAccessMap, $perimeterRules] = $this->extractAccessControlConfig($files);
         $entrypointAccessControls = $this->parseEntrypointAccessControls($entrypointFiles);
-        $authorizationRules = $this->parseAuthorizationRules($projectFileInventory->voters());
+        $authorizationRules = $this->parseAuthorizationRules($projectFileInventory->authorizationRules());
         $formBindings = $this->parseFormBindings($entrypointFiles);
 
         $symfonyMapping = SymfonyMapping::of(
@@ -85,9 +85,9 @@ final readonly class MappingStage implements StageInterface
         );
 
         $auditContext->setMapping($symfonyMapping);
-        $auditContext->setMeta('mapping.controllers', \count($projectFileInventory->controllers()));
-        $auditContext->setMeta('mapping.entities', \count($projectFileInventory->entities()));
-        $auditContext->setMeta('mapping.voters', \count($projectFileInventory->voters()));
+        $auditContext->setMeta('mapping.controllers', \count($projectFileInventory->entrypoints()));
+        $auditContext->setMeta('mapping.entities', \count($projectFileInventory->domainModels()));
+        $auditContext->setMeta('mapping.voters', \count($projectFileInventory->authorizationRules()));
         $auditContext->setMeta('mapping.no_voter_controllers', \count($symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule()));
         $auditContext->setMeta('mapping.routes', \count($entrypointAccessControls));
         $auditContext->setMeta('mapping.routes_without_access_check', \count($symfonyMapping->controllersWithoutAccessCheck()));

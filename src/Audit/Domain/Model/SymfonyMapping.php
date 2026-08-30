@@ -42,31 +42,31 @@ final readonly class SymfonyMapping
     /** @return list<ProjectFile> */
     public function controllers(): array
     {
-        return $this->projectFileInventory->controllers();
+        return $this->projectFileInventory->entrypoints();
     }
 
     /** @return list<ProjectFile> */
     public function entities(): array
     {
-        return $this->projectFileInventory->entities();
+        return $this->projectFileInventory->domainModels();
     }
 
     /** @return list<ProjectFile> */
     public function voters(): array
     {
-        return $this->projectFileInventory->voters();
+        return $this->projectFileInventory->authorizationRules();
     }
 
     /** @return list<ProjectFile> */
     public function repositories(): array
     {
-        return $this->projectFileInventory->repositories();
+        return $this->projectFileInventory->persistenceQueries();
     }
 
     /** @return list<ProjectFile> */
     public function forms(): array
     {
-        return $this->projectFileInventory->forms();
+        return $this->projectFileInventory->inputBindings();
     }
 
     /** @return list<ProjectFile> */
@@ -171,11 +171,11 @@ final readonly class SymfonyMapping
     public function toSummary(): string
     {
         $lines = [
-            \sprintf('Controllers: %d', \count($this->projectFileInventory->controllers())),
-            \sprintf('Entities: %d', \count($this->projectFileInventory->entities())),
-            \sprintf('Voters: %d', \count($this->projectFileInventory->voters())),
-            \sprintf('Repositories: %d', \count($this->projectFileInventory->repositories())),
-            \sprintf('Forms: %d', \count($this->projectFileInventory->forms())),
+            \sprintf('Controllers: %d', \count($this->projectFileInventory->entrypoints())),
+            \sprintf('Entities: %d', \count($this->projectFileInventory->domainModels())),
+            \sprintf('Voters: %d', \count($this->projectFileInventory->authorizationRules())),
+            \sprintf('Repositories: %d', \count($this->projectFileInventory->persistenceQueries())),
+            \sprintf('Forms: %d', \count($this->projectFileInventory->inputBindings())),
             \sprintf('Services: %d', \count($this->projectFileInventory->services())),
             \sprintf('Templates: %d', \count($this->projectFileInventory->templates())),
             \sprintf('Routes mapped: %d', \count($this->accessControlMap->routeAccessMap())),

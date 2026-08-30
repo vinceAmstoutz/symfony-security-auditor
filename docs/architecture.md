@@ -326,9 +326,14 @@ file whose `fileType()` is none of the above). `isConfiguration()` is
 deliberately independent of `fileType()` — it matches every
 `.yaml`/`.yml`/`.xml`/dotenv path regardless of directory, which `MappingStage`
 relies on to extract security config from every config file in the project.
-These predicates and `SymfonyMapping` construction (`ProjectFileInventory`)
-drive metadata/reporting buckets; `AttackerAgent` chunking priority and skill
-selection key off `fileType()` directly. `ProjectFileType` is the single source
+These predicates drive metadata/reporting; `AttackerAgent` chunking priority and
+skill selection key off `fileType()` directly. `ProjectFileInventory` — the role
+grouping inside `SymfonyMapping` — deliberately does **not** use them: it
+buckets by `archetype()`, so an API Platform resource, a Live Component and an
+EasyAdmin CRUD controller all land in `entrypoints()` beside a plain controller,
+a Sonata admin lands in `inputBindings()` beside a form type, and a Twig
+extension lands in `templates()`. Only the residual `services()` bucket and
+`totalFiles()` stay defined by exclusion. `ProjectFileType` is the single source
 of truth for the file-type vocabulary, referenced by the profile's
 `ChunkingVocabulary`, the static pre-scanner buckets, and the attacker
 skill-block ordering.

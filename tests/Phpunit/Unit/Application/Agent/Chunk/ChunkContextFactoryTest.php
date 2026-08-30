@@ -143,8 +143,8 @@ final class ChunkContextFactoryTest extends TestCase
         $projectFile = SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
         $protectedController = SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php #[IsGranted("ROLE_ADMIN")] class A {}');
         yield 'a controller gains a security annotation' => [
-            SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]), new AccessControlMap()),
-            SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$protectedController]]), new AccessControlMap()),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]), new AccessControlMap()),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups(['entrypoints' => [$protectedController]]), new AccessControlMap()),
         ];
     }
 

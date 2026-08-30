@@ -41,13 +41,13 @@ final readonly class ApplicationSecurityMap
      */
     public function entrypoints(): array
     {
-        return $this->projectFileInventory->controllers();
+        return $this->projectFileInventory->entrypoints();
     }
 
     /** @return list<ProjectFile> */
     public function domainModels(): array
     {
-        return $this->projectFileInventory->entities();
+        return $this->projectFileInventory->domainModels();
     }
 
     /**
@@ -57,13 +57,13 @@ final readonly class ApplicationSecurityMap
      */
     public function authorizationRuleFiles(): array
     {
-        return $this->projectFileInventory->voters();
+        return $this->projectFileInventory->authorizationRules();
     }
 
     /** @return list<ProjectFile> */
     public function persistenceQueries(): array
     {
-        return $this->projectFileInventory->repositories();
+        return $this->projectFileInventory->persistenceQueries();
     }
 
     /**
@@ -73,7 +73,7 @@ final readonly class ApplicationSecurityMap
      */
     public function inputBindingFiles(): array
     {
-        return $this->projectFileInventory->forms();
+        return $this->projectFileInventory->inputBindings();
     }
 
     /** @return list<ProjectFile> */
@@ -147,12 +147,12 @@ final readonly class ApplicationSecurityMap
 
     public function hasAuthorizationRuleForModel(string $modelName): bool
     {
-        return $this->projectFileInventory->hasVoterForEntity($modelName);
+        return $this->projectFileInventory->hasAuthorizationRuleForModel($modelName);
     }
 
     /** @return list<ProjectFile> */
     public function entrypointsWithoutAuthorizationRule(): array
     {
-        return $this->projectFileInventory->controllersWithoutVoters();
+        return $this->projectFileInventory->entrypointsWithoutAuthorizationRule();
     }
 }

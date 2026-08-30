@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * @phpstan-type RoleMap array{controllers: list<ProjectFile>, entities: list<ProjectFile>, voters: list<ProjectFile>, repositories: list<ProjectFile>, forms: list<ProjectFile>, services: list<ProjectFile>, templates: list<ProjectFile>}
+ * @phpstan-type RoleMap array{entrypoints: list<ProjectFile>, domainModels: list<ProjectFile>, authorizationRules: list<ProjectFile>, persistenceQueries: list<ProjectFile>, inputBindings: list<ProjectFile>, services: list<ProjectFile>, templates: list<ProjectFile>}
  */
 final readonly class ProjectFileInventory
 {
@@ -24,38 +24,56 @@ final readonly class ProjectFileInventory
     private function __construct(private array $byRole) {}
 
     /**
+     * @var array<string, SurfaceArchetype>
+     */
+    private const array BUCKETED_ARCHETYPES = [
+        'entrypoints' => SurfaceArchetype::HTTP_ENTRYPOINT,
+        'domainModels' => SurfaceArchetype::DOMAIN_MODEL,
+        'authorizationRules' => SurfaceArchetype::AUTHORIZATION_RULE,
+        'persistenceQueries' => SurfaceArchetype::PERSISTENCE_QUERY,
+        'inputBindings' => SurfaceArchetype::INPUT_BINDING,
+        'templates' => SurfaceArchetype::TEMPLATE,
+    ];
+
+    /**
      * @param list<ProjectFile> $files
      */
     public static function fromFiles(array $files): self
     {
         return new self([
-            'controllers' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isController()),
-            'entities' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isEntity()),
-            'voters' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isVoter()),
-            'repositories' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isRepository()),
-            'forms' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isForm()),
-            'services' => self::filter($files, self::isUncategorizedPhpFile(...)),
-            'templates' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isTemplate()),
+            'entrypoints' => self::withArchetype($files, SurfaceArchetype::HTTP_ENTRYPOINT),
+            'domainModels' => self::withArchetype($files, SurfaceArchetype::DOMAIN_MODEL),
+            'authorizationRules' => self::withArchetype($files, SurfaceArchetype::AUTHORIZATION_RULE),
+            'persistenceQueries' => self::withArchetype($files, SurfaceArchetype::PERSISTENCE_QUERY),
+            'inputBindings' => self::withArchetype($files, SurfaceArchetype::INPUT_BINDING),
+            'services' => self::filter($files, self::isUnbucketedPhpFile(...)),
+            'templates' => self::withArchetype($files, SurfaceArchetype::TEMPLATE),
         ]);
     }
 
     /**
-     * The residual bucket for every `.php` file not tracked by the other six —
-     * deliberately independent of {@see ProjectFile::isService()}, whose
-     * narrower contract also excludes authenticators, messenger handlers, event
-     * subscribers, normalizers, webhook consumers, schedulers, Twig extensions,
-     * API resources and Live Components. None of those has a bucket here, so
-     * relying on `isService()` silently dropped them from `totalFiles()` and the
-     * project summary instead of counting them as generic services.
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
      */
-    private static function isUncategorizedPhpFile(ProjectFile $projectFile): bool
+    private static function withArchetype(array $files, SurfaceArchetype $surfaceArchetype): array
     {
-        return !$projectFile->isController()
-            && !$projectFile->isEntity()
-            && !$projectFile->isVoter()
-            && !$projectFile->isRepository()
-            && !$projectFile->isForm()
-            && !$projectFile->isTemplate()
+        return self::filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => $surfaceArchetype === $projectFile->fileType()->archetype(),
+        );
+    }
+
+    /**
+     * The residual bucket for every `.php` file whose archetype has no bucket of
+     * its own — authentication, async handlers, event hooks, serialization and
+     * anything unrecognized. Deliberately independent of
+     * {@see ProjectFile::isService()}, whose narrower contract would drop those
+     * from `totalFiles()` and the project summary instead of counting them.
+     */
+    private static function isUnbucketedPhpFile(ProjectFile $projectFile): bool
+    {
+        return !\in_array($projectFile->fileType()->archetype(), self::BUCKETED_ARCHETYPES, true)
             && str_ends_with($projectFile->relativePath(), '.php');
     }
 
@@ -65,44 +83,44 @@ final readonly class ProjectFileInventory
     public static function fromGroups(array $byRole): self
     {
         return new self([
-            'controllers' => $byRole['controllers'] ?? [],
-            'entities' => $byRole['entities'] ?? [],
-            'voters' => $byRole['voters'] ?? [],
-            'repositories' => $byRole['repositories'] ?? [],
-            'forms' => $byRole['forms'] ?? [],
+            'entrypoints' => $byRole['entrypoints'] ?? [],
+            'domainModels' => $byRole['domainModels'] ?? [],
+            'authorizationRules' => $byRole['authorizationRules'] ?? [],
+            'persistenceQueries' => $byRole['persistenceQueries'] ?? [],
+            'inputBindings' => $byRole['inputBindings'] ?? [],
             'services' => $byRole['services'] ?? [],
             'templates' => $byRole['templates'] ?? [],
         ]);
     }
 
     /** @return list<ProjectFile> */
-    public function controllers(): array
+    public function entrypoints(): array
     {
-        return $this->byRole['controllers'];
+        return $this->byRole['entrypoints'];
     }
 
     /** @return list<ProjectFile> */
-    public function entities(): array
+    public function domainModels(): array
     {
-        return $this->byRole['entities'];
+        return $this->byRole['domainModels'];
     }
 
     /** @return list<ProjectFile> */
-    public function voters(): array
+    public function authorizationRules(): array
     {
-        return $this->byRole['voters'];
+        return $this->byRole['authorizationRules'];
     }
 
     /** @return list<ProjectFile> */
-    public function repositories(): array
+    public function persistenceQueries(): array
     {
-        return $this->byRole['repositories'];
+        return $this->byRole['persistenceQueries'];
     }
 
     /** @return list<ProjectFile> */
-    public function forms(): array
+    public function inputBindings(): array
     {
-        return $this->byRole['forms'];
+        return $this->byRole['inputBindings'];
     }
 
     /** @return list<ProjectFile> */
@@ -119,20 +137,20 @@ final readonly class ProjectFileInventory
 
     public function totalFiles(): int
     {
-        return \count($this->byRole['controllers'])
-            + \count($this->byRole['entities'])
-            + \count($this->byRole['voters'])
-            + \count($this->byRole['repositories'])
-            + \count($this->byRole['forms'])
+        return \count($this->byRole['entrypoints'])
+            + \count($this->byRole['domainModels'])
+            + \count($this->byRole['authorizationRules'])
+            + \count($this->byRole['persistenceQueries'])
+            + \count($this->byRole['inputBindings'])
             + \count($this->byRole['services'])
             + \count($this->byRole['templates']);
     }
 
-    public function hasVoterForEntity(string $entityName): bool
+    public function hasAuthorizationRuleForModel(string $modelName): bool
     {
-        $pattern = \sprintf('/\b%s\b/', preg_quote($entityName, '/'));
-        foreach ($this->byRole['voters'] as $voter) {
-            if (1 === preg_match($pattern, $voter->content())) {
+        $pattern = \sprintf('/\b%s\b/', preg_quote($modelName, '/'));
+        foreach ($this->byRole['authorizationRules'] as $authorizationRule) {
+            if (1 === preg_match($pattern, $authorizationRule->content())) {
                 return true;
             }
         }
@@ -141,10 +159,10 @@ final readonly class ProjectFileInventory
     }
 
     /** @return list<ProjectFile> */
-    public function controllersWithoutVoters(): array
+    public function entrypointsWithoutAuthorizationRule(): array
     {
         return self::filter(
-            $this->byRole['controllers'],
+            $this->byRole['entrypoints'],
             static fn (ProjectFile $projectFile): bool => !$projectFile->hasSecurityAnnotations(),
         );
     }

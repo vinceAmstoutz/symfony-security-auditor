@@ -49,7 +49,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -67,7 +67,7 @@ final class AttackerPromptBuilderTest extends TestCase
         $projectFile = SymfonyProjectFile::create($maliciousPath, '/app/Foo.php', '<?php class PublicController {}');
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -85,7 +85,7 @@ final class AttackerPromptBuilderTest extends TestCase
         $projectFile = SymfonyProjectFile::create($maliciousPath, '/app/Foo.php', '<?php class PublicController {}');
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -106,7 +106,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(perimeterRules: ['main (security: false)', 'api (stateless)']),
         );
 
@@ -126,7 +126,7 @@ final class AttackerPromptBuilderTest extends TestCase
         $projectFile = SymfonyProjectFile::create('src/Controller/X.php', '/app/x', '<?php class X {}');
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(perimeterRules: ['main'.$maliciousMarker]),
         );
 
@@ -147,7 +147,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -200,7 +200,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$entrypointAccessControl]),
         );
 
@@ -236,7 +236,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$entrypointAccessControl]),
         );
 
@@ -277,7 +277,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$constructorEntry, $routedEntry]),
         );
 
@@ -306,7 +306,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$entrypointAccessControl]),
         );
 
@@ -334,7 +334,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$entrypointAccessControl]),
         );
 
@@ -366,7 +366,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => ['ROLE_ADMIN'.$maliciousMarker]],
                 routeAccessControls: [$entrypointAccessControl],
@@ -400,7 +400,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -436,7 +436,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -471,7 +471,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -506,7 +506,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET|DELETE']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -542,7 +542,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => [$publicRole]],
                 routeAccessControls: [$entrypointAccessControl],
@@ -585,7 +585,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET', 'or: PUBLIC_ACCESS, methods: DELETE']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -627,7 +627,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/api/orders' => ['ROLE_USER', 'methods: GET', 'or: ROLE_ADMIN, methods: POST']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -662,7 +662,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin(?#internal)' => ['ROLE_ADMIN']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -697,7 +697,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/reports/export}' => ['ROLE_ADMIN']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -732,7 +732,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['#~!%@' => ['ROLE_ADMIN']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -768,7 +768,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['route: admin_dashboard' => ['ROLE_ADMIN']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -803,7 +803,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(
                 routeAccessMap: ['^/admin' => ['ROLE_ADMIN']],
                 routeAccessControls: [$entrypointAccessControl],
@@ -838,7 +838,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$entrypointAccessControl]),
         );
 
@@ -862,7 +862,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -893,7 +893,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$entrypointAccessControl]),
         );
 
@@ -924,7 +924,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(routeAccessControls: [$entrypointAccessControl]),
         );
 
@@ -951,7 +951,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['voters' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['authorizationRules' => [$projectFile]]),
             new AccessControlMap(authorizationRules: [$authorizationRuleCapability]),
         );
 
@@ -978,7 +978,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['voters' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['authorizationRules' => [$projectFile]]),
             new AccessControlMap(authorizationRules: [$authorizationRuleCapability]),
         );
 
@@ -999,7 +999,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -1025,7 +1025,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(formBindings: [$formBinding]),
         );
 
@@ -1050,7 +1050,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(formBindings: [$formBinding]),
         );
 
@@ -1139,7 +1139,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -1160,7 +1160,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
@@ -1186,7 +1186,7 @@ final class AttackerPromptBuilderTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile, $controllerB]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile, $controllerB]]),
             new AccessControlMap(),
         );
 

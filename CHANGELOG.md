@@ -60,6 +60,28 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   standalone binary — pass that profile, so the skill set is byte-identical; a
   host auditing another framework passes its own instead.
 
+- **The project inventory counts an API resource as an entrypoint.**
+  `ProjectFileInventory` — the role grouping inside `SymfonyMapping` — filtered
+  each bucket on one exact `ProjectFileType`, while everything else in the
+  engine had already moved to `ProjectFileType::archetype()`. So an API Platform
+  resource, a Live Component and an EasyAdmin CRUD controller were counted as
+  generic services rather than entrypoints, a Sonata admin was not an input
+  binding, and a Twig extension was not a template surface — even though
+  `MappingStage` was already parsing all of them as entrypoints for
+  access-control extraction. Bucketing on the archetype closes that gap and
+  renames the buckets after what they hold: `entrypoints()`, `domainModels()`,
+  `authorizationRules()`, `persistenceQueries()`, `inputBindings()`, plus the
+  unchanged `services()` and `templates()`.
+
+  This is a visible change for projects using those components: the mapping
+  summary's per-role counts shift, more entrypoints are checked for a missing
+  authorization rule, and the affected chunks' attacker cache keys change.
+  Nothing is dropped — `totalFiles()` is unchanged, because every file leaving
+  `services()` lands in a bucket of its own. The committed end-to-end report
+  snapshots are byte-identical: the fixture project has none of the five file
+  types, which is also why a `ProjectFileInventoryTest` case now pins each one.
+  `SymfonyMapping`'s own accessors are untouched.
+
 - **The Domain models describing the audited application stopped naming
   Symfony.** `RouteAccessControl` and `VoterCapability`, and the three ports
   producing them, described what Symfony calls things rather than what they are

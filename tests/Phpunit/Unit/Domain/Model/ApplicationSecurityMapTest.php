@@ -61,9 +61,9 @@ final class ApplicationSecurityMapTest extends TestCase
 
         $applicationSecurityMap = ApplicationSecurityMap::of(
             ProjectFileInventory::fromGroups([
-                'controllers' => [$projectFile],
-                'entities' => [$entity],
-                'voters' => [$voter],
+                'entrypoints' => [$projectFile],
+                'domainModels' => [$entity],
+                'authorizationRules' => [$voter],
             ]),
             new AccessControlMap(),
         );
@@ -101,7 +101,7 @@ final class ApplicationSecurityMapTest extends TestCase
     {
         $applicationSecurityMap = ApplicationSecurityMap::of(
             ProjectFileInventory::fromGroups([
-                'voters' => [SymfonyProjectFile::create(
+                'authorizationRules' => [SymfonyProjectFile::create(
                     'src/Security/UserVoter.php',
                     '/app/src/Security/UserVoter.php',
                     '<?php class UserVoter { protected function supports($attribute, $subject): bool { return $subject instanceof User; } }',
@@ -124,7 +124,7 @@ final class ApplicationSecurityMapTest extends TestCase
         $projectFile = SymfonyProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php');
 
         $applicationSecurityMap = ApplicationSecurityMap::of(
-            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            ProjectFileInventory::fromGroups(['entrypoints' => [$projectFile]]),
             new AccessControlMap(),
         );
 
