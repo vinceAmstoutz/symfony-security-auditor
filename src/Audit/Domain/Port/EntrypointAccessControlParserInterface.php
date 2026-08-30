@@ -13,18 +13,18 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 
 /**
- * Extracts route/access-control metadata from a single controller file. Implementations
- * must degrade silently (return an empty list) when the file cannot be parsed — a
- * single broken controller must not abort the mapping stage.
+ * Extracts route and access-control metadata from a single entrypoint file.
+ * Implementations must degrade silently (return an empty list) when the file
+ * cannot be parsed — one broken entrypoint must not abort the mapping stage.
  */
-interface ControllerAccessControlParserInterface
+interface EntrypointAccessControlParserInterface
 {
     /**
-     * @return list<RouteAccessControl> one entry per public action method discovered in the file
+     * @return list<EntrypointAccessControl> one entry per public handler method discovered in the file
      */
     public function parse(ProjectFile $projectFile): array;
 }

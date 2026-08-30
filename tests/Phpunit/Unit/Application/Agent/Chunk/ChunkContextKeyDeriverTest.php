@@ -27,11 +27,11 @@ final class ChunkContextKeyDeriverTest extends TestCase
 
         $symfonyMapping = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([]),
-            new AccessControlMap(firewallRules: ['ab', 'c']),
+            new AccessControlMap(perimeterRules: ['ab', 'c']),
         );
         $shifted = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([]),
-            new AccessControlMap(firewallRules: ['a', 'bc']),
+            new AccessControlMap(perimeterRules: ['a', 'bc']),
         );
 
         self::assertNotSame(

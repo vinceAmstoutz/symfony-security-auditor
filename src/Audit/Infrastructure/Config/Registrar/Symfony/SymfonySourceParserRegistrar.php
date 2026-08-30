@@ -16,10 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Regis
 use Override;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AccessControlConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AuthorizationRuleParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\EntrypointAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\ServiceRegistrarInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
@@ -40,16 +40,16 @@ final readonly class SymfonySourceParserRegistrar implements ServiceRegistrarInt
     public function register(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
         $servicesConfigurator->set(PhpParserControllerAccessControlParser::class);
-        $servicesConfigurator->alias(ControllerAccessControlParserInterface::class, PhpParserControllerAccessControlParser::class);
+        $servicesConfigurator->alias(EntrypointAccessControlParserInterface::class, PhpParserControllerAccessControlParser::class);
 
         $servicesConfigurator->set(PhpParserVoterCapabilityParser::class);
-        $servicesConfigurator->alias(VoterCapabilityParserInterface::class, PhpParserVoterCapabilityParser::class);
+        $servicesConfigurator->alias(AuthorizationRuleParserInterface::class, PhpParserVoterCapabilityParser::class);
 
         $servicesConfigurator->set(PhpParserFormBindingParser::class);
         $servicesConfigurator->alias(FormBindingParserInterface::class, PhpParserFormBindingParser::class);
 
         $servicesConfigurator->set(SymfonyYamlSecurityConfigParser::class)
             ->args([service('logger')]);
-        $servicesConfigurator->alias(SecurityConfigParserInterface::class, SymfonyYamlSecurityConfigParser::class);
+        $servicesConfigurator->alias(AccessControlConfigParserInterface::class, SymfonyYamlSecurityConfigParser::class);
     }
 }

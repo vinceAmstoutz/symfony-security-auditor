@@ -15,20 +15,20 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullAuthorizationRuleParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
-final class NullControllerAccessControlParserTest extends TestCase
+final class NullAuthorizationRuleParserTest extends TestCase
 {
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_it_returns_empty_for_any_controller(): void
+    public function test_it_returns_null_for_any_voter(): void
     {
-        $nullControllerAccessControlParser = new NullControllerAccessControlParser();
+        $nullAuthorizationRuleParser = new NullAuthorizationRuleParser();
 
-        $projectFile = SymfonyProjectFile::create('src/Controller/AdminController.php', '/app/x', '<?php class AdminController {}');
+        $projectFile = SymfonyProjectFile::create('src/Security/UserVoter.php', '/app/x', '<?php class UserVoter {}');
 
-        self::assertSame([], $nullControllerAccessControlParser->parse($projectFile));
+        self::assertNull($nullAuthorizationRuleParser->parse($projectFile));
     }
 }

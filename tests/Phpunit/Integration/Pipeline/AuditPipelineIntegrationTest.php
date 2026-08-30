@@ -37,13 +37,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullAccessControlConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullAuthorizationRuleParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullEntrypointAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -210,7 +210,7 @@ final class AuditPipelineIntegrationTest extends TestCase
         return new AuditPipeline(
             [
                 new IngestionStage(new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger()), new NullLogger()),
-                new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
+                new MappingStage(new NullLogger(), new NullEntrypointAccessControlParser(), new NullAuthorizationRuleParser(), new NullFormBindingParser(), new NullAccessControlConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],
             new NullLogger(),

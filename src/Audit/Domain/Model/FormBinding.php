@@ -16,14 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 final readonly class FormBinding
 {
     public function __construct(
-        private string $controllerFilePath,
+        private string $entrypointFilePath,
         private string $controllerMethod,
         private string $formTypeClass,
     ) {}
 
-    public function controllerFilePath(): string
+    public function entrypointFilePath(): string
     {
-        return $this->controllerFilePath;
+        return $this->entrypointFilePath;
     }
 
     public function controllerMethod(): string

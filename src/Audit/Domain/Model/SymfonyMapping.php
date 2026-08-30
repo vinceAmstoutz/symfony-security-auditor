@@ -99,20 +99,20 @@ final readonly class SymfonyMapping
         return $this->applicationSecurityMap->perimeterRules();
     }
 
-    /** @return list<RouteAccessControl> */
+    /** @return list<EntrypointAccessControl> */
     public function routeAccessControls(): array
     {
         return $this->accessControlMap->routeAccessControls();
     }
 
-    /** @return list<RouteAccessControl> */
+    /** @return list<EntrypointAccessControl> */
     public function controllersWithoutAccessCheck(): array
     {
-        return $this->accessControlMap->controllersWithoutAccessCheck();
+        return $this->accessControlMap->entrypointsWithoutAccessCheck();
     }
 
     /**
-     * @return list<VoterCapability>
+     * @return list<AuthorizationRuleCapability>
      *
      * @deprecated since 1.19, use {@see ApplicationSecurityMap::authorizationRules()} via {@see self::toApplicationSecurityMap()} instead.
      */
@@ -123,10 +123,10 @@ final readonly class SymfonyMapping
         return $this->applicationSecurityMap->authorizationRules();
     }
 
-    /** @return list<VoterCapability> */
+    /** @return list<AuthorizationRuleCapability> */
     public function votersFor(string $attribute, string $subject): array
     {
-        return $this->accessControlMap->votersFor($attribute, $subject);
+        return $this->accessControlMap->authorizationRulesFor($attribute, $subject);
     }
 
     /** @return list<FormBinding> */
@@ -136,9 +136,9 @@ final readonly class SymfonyMapping
     }
 
     /** @return list<FormBinding> */
-    public function formBindingsForController(string $controllerFilePath): array
+    public function formBindingsForController(string $entrypointFilePath): array
     {
-        return $this->accessControlMap->formBindingsForController($controllerFilePath);
+        return $this->accessControlMap->fieldBindingsForEntrypoint($entrypointFilePath);
     }
 
     public function totalFiles(): int
@@ -179,7 +179,7 @@ final readonly class SymfonyMapping
             \sprintf('Services: %d', \count($this->projectFileInventory->services())),
             \sprintf('Templates: %d', \count($this->projectFileInventory->templates())),
             \sprintf('Routes mapped: %d', \count($this->accessControlMap->routeAccessMap())),
-            \sprintf('Firewall rules: %d', \count($this->accessControlMap->firewallRules())),
+            \sprintf('Firewall rules: %d', \count($this->accessControlMap->perimeterRules())),
         ];
 
         return implode("\n", $lines);

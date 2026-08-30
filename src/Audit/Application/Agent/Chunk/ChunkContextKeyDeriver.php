@@ -13,11 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 
 /**
  * Derives the `ChunkContext` cache key everything that isn't the chunk's own
@@ -70,7 +70,7 @@ final readonly class ChunkContextKeyDeriver
             ...$applicationSecurityMap->perimeterRules(),
             ...$this->routeAccessMapSignatures($symfonyMapping->routeAccessMap()),
             ...$this->routeAccessControlSignatures($symfonyMapping->routeAccessControls()),
-            ...$this->voterCapabilitySignatures($applicationSecurityMap->authorizationRules()),
+            ...$this->authorizationRuleSignatures($applicationSecurityMap->authorizationRules()),
             ...$this->formBindingSignatures($symfonyMapping->formBindings()),
             ...$this->entrypointsWithoutAuthorizationRulePaths($applicationSecurityMap->entrypointsWithoutAuthorizationRule()),
         ];
@@ -100,7 +100,7 @@ final readonly class ChunkContextKeyDeriver
     }
 
     /**
-     * @param list<RouteAccessControl> $routeAccessControls
+     * @param list<EntrypointAccessControl> $routeAccessControls
      *
      * @return list<string>
      */
@@ -110,13 +110,13 @@ final readonly class ChunkContextKeyDeriver
     }
 
     /**
-     * @param list<VoterCapability> $voterCapabilities
+     * @param list<AuthorizationRuleCapability> $authorizationRules
      *
      * @return list<string>
      */
-    private function voterCapabilitySignatures(array $voterCapabilities): array
+    private function authorizationRuleSignatures(array $authorizationRules): array
     {
-        return array_map(serialize(...), $voterCapabilities);
+        return array_map(serialize(...), $authorizationRules);
     }
 
     /**

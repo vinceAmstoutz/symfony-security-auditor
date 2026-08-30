@@ -23,12 +23,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
@@ -99,10 +99,10 @@ final class ChunkContextFactoryTest extends TestCase
     {
         yield 'a firewall definition changes' => [
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
-                firewallRules: ['main: pattern=^/, security=true'],
+                perimeterRules: ['main: pattern=^/, security=true'],
             )),
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
-                firewallRules: ['main: pattern=^/, security=false'],
+                perimeterRules: ['main: pattern=^/, security=false'],
             )),
         ];
 
@@ -117,19 +117,19 @@ final class ChunkContextFactoryTest extends TestCase
 
         yield 'a controller action gains a class-level #[IsGranted]' => [
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
-                routeAccessControls: [new RouteAccessControl('src/Controller/A.php', 'index', '/admin', ['GET'], true, [], false, false)],
+                routeAccessControls: [new EntrypointAccessControl('src/Controller/A.php', 'index', '/admin', ['GET'], true, [], false, false)],
             )),
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
-                routeAccessControls: [new RouteAccessControl('src/Controller/A.php', 'index', '/admin', ['GET'], true, [], false, true)],
+                routeAccessControls: [new EntrypointAccessControl('src/Controller/A.php', 'index', '/admin', ['GET'], true, [], false, true)],
             )),
         ];
 
         yield 'a voter starts supporting a new attribute' => [
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
-                voterCapabilities: [new VoterCapability('src/Security/Voter/PostVoter.php', 'PostVoter', ['EDIT'], ['Post'])],
+                authorizationRules: [new AuthorizationRuleCapability('src/Security/Voter/PostVoter.php', 'PostVoter', ['EDIT'], ['Post'])],
             )),
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
-                voterCapabilities: [new VoterCapability('src/Security/Voter/PostVoter.php', 'PostVoter', ['EDIT', 'DELETE'], ['Post'])],
+                authorizationRules: [new AuthorizationRuleCapability('src/Security/Voter/PostVoter.php', 'PostVoter', ['EDIT', 'DELETE'], ['Post'])],
             )),
         ];
 

@@ -17,21 +17,20 @@ use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationSecurityMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
 /**
  * With `audit.since_closure: direct`, widens a `--since` diff-mode run's audited
- * file set with the first-degree dependents of any changed voter — the
- * controllers guarded by an attribute the voter's `supports()` accepts, whether
- * that guard is a method- or class-level `#[IsGranted]` or a
- * `denyAccessUnlessGranted()`/`isGranted()` call — so a voter edit that silently
- * weakens an unrelated controller's access control is still caught. Runs after
- * `MappingStage`, which builds the full-project `AccessControlMap` it reads
- * regardless of diff filtering.
+ * file set with the first-degree dependents of any changed authorization rule —
+ * the entrypoints guarded by an attribute that rule covers, whichever guard form
+ * the profile reported — so a rule edit that silently weakens an unrelated
+ * entrypoint's access control is still caught. Runs after `MappingStage`, which
+ * builds the full-project `AccessControlMap` it reads regardless of diff
+ * filtering.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -64,8 +63,8 @@ final readonly class DependencyExpansionStage implements StageInterface
 
         $projectFiles = $auditContext->projectFiles();
         $changedPaths = array_flip(array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFiles));
-        $changedVoterAttributes = $this->changedVoterAttributes($changedPaths, $securityMap->authorizationRules());
-        $guardedPaths = $this->guardedControllerPaths($securityMap->entrypointAccessControls(), $changedVoterAttributes);
+        $changedRuleAttributes = $this->changedRuleAttributes($changedPaths, $securityMap->authorizationRules());
+        $guardedPaths = $this->guardedEntrypointPaths($securityMap->entrypointAccessControls(), $changedRuleAttributes);
 
         $newPaths = array_values(array_filter($guardedPaths, static fn (string $path): bool => !\array_key_exists($path, $changedPaths)));
 
@@ -78,23 +77,23 @@ final readonly class DependencyExpansionStage implements StageInterface
         $auditContext->setMeta('dependency_expansion.files_added', \count($added));
 
         $this->logger->info('Dependency expansion complete', [
-            'changed_voter_attributes' => $changedVoterAttributes,
+            'changed_voter_attributes' => $changedRuleAttributes,
             'files_added' => \count($added),
         ]);
     }
 
     /**
-     * @param array<string, int>    $changedPaths
-     * @param list<VoterCapability> $voterCapabilities
+     * @param array<string, int>                $changedPaths
+     * @param list<AuthorizationRuleCapability> $authorizationRules
      *
      * @return list<string>
      */
-    private function changedVoterAttributes(array $changedPaths, array $voterCapabilities): array
+    private function changedRuleAttributes(array $changedPaths, array $authorizationRules): array
     {
         $attributes = [];
-        foreach ($voterCapabilities as $voterCapability) {
-            if (\array_key_exists($voterCapability->filePath(), $changedPaths)) {
-                $attributes = [...$attributes, ...$voterCapability->supportedAttributes()];
+        foreach ($authorizationRules as $authorizationRule) {
+            if (\array_key_exists($authorizationRule->filePath(), $changedPaths)) {
+                $attributes = [...$attributes, ...$authorizationRule->supportedAttributes()];
             }
         }
 
@@ -102,17 +101,17 @@ final readonly class DependencyExpansionStage implements StageInterface
     }
 
     /**
-     * @param list<RouteAccessControl> $routeAccessControls
-     * @param list<string>             $changedVoterAttributes
+     * @param list<EntrypointAccessControl> $entrypointAccessControls
+     * @param list<string>                  $changedRuleAttributes
      *
      * @return list<string>
      */
-    private function guardedControllerPaths(array $routeAccessControls, array $changedVoterAttributes): array
+    private function guardedEntrypointPaths(array $entrypointAccessControls, array $changedRuleAttributes): array
     {
         $paths = [];
-        foreach ($routeAccessControls as $routeAccessControl) {
-            if ([] !== array_intersect($routeAccessControl->guardAttributes(), $changedVoterAttributes)) {
-                $paths[] = $routeAccessControl->filePath();
+        foreach ($entrypointAccessControls as $entrypointAccessControl) {
+            if ([] !== array_intersect($entrypointAccessControl->guardAttributes(), $changedRuleAttributes)) {
+                $paths[] = $entrypointAccessControl->filePath();
             }
         }
 

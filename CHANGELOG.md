@@ -60,6 +60,31 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   standalone binary — pass that profile, so the skill set is byte-identical; a
   host auditing another framework passes its own instead.
 
+- **The Domain models describing the audited application stopped naming
+  Symfony.** `RouteAccessControl` and `VoterCapability`, and the three ports
+  producing them, described what Symfony calls things rather than what they are
+  — so a Laravel profile would have had to fill a `VoterCapability` from a
+  policy and set `methodLevelIsGranted` from a middleware. They become
+  `EntrypointAccessControl`, `AuthorizationRuleCapability`,
+  `EntrypointAccessControlParserInterface`, `AuthorizationRuleParserInterface`
+  and `AccessControlConfigParserInterface`, and the rename goes all the way
+  down: `hasRouteAttribute()` is `isRouted()`, `methodLevelIsGranted()` is
+  `handlerRequiredAttributes()`, `methodHasDenyAccess()` is
+  `handlerChecksAccessInBody()`, and so on for every accessor that named a
+  Symfony attribute or helper. `AccessControlMap` and `FormBinding` adopt the
+  vocabulary `ApplicationSecurityMap` already used (`perimeterRules()`,
+  `authorizationRules()`, `entrypointsWithoutAccessCheck()`,
+  `fieldBindingsForEntrypoint()`, `entrypointFilePath()`), and `MappingStage`,
+  `DependencyExpansionStage` and `ChunkContextKeyDeriver` — all portable
+  Application code — lost their `$voterCapabilities` and `$firewallRules` locals
+  with them.
+
+  `SymfonyMapping` is deliberately untouched: it is the Symfony-flavoured facade
+  over `ApplicationSecurityMap`, so its Symfony-named accessors (including the
+  four deprecated since 1.19) keep working. So do the bundled Symfony parsers,
+  which really do read Symfony and now implement the renamed ports. No behaviour
+  changes — the full migration table is in [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
+
 - **The chunker no longer knows what a controller is called.** `FileChunker`
   decides which surfaces the attacker sees first, which files belong to which
   feature, and which extension a template hides behind — and it did all three

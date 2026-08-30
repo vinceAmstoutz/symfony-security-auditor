@@ -17,18 +17,18 @@ use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AccessControlConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AuthorizationRuleParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\EntrypointAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
 /**
  * `config/services.php` always aliases the four parser ports to their
@@ -41,10 +41,10 @@ final readonly class MappingStage implements StageInterface
 {
     public function __construct(
         private LoggerInterface $logger,
-        private ControllerAccessControlParserInterface $controllerAccessControlParser,
-        private VoterCapabilityParserInterface $voterCapabilityParser,
+        private EntrypointAccessControlParserInterface $entrypointAccessControlParser,
+        private AuthorizationRuleParserInterface $authorizationRuleParser,
         private FormBindingParserInterface $formBindingParser,
-        private SecurityConfigParserInterface $securityConfigParser,
+        private AccessControlConfigParserInterface $accessControlConfigParser,
     ) {}
 
     #[Override]
@@ -66,20 +66,20 @@ final readonly class MappingStage implements StageInterface
         }
 
         $projectFileInventory = ProjectFileInventory::fromFiles($files);
-        $controllerLikeFiles = $this->controllerLikeFiles($files);
+        $entrypointFiles = $this->entrypointFiles($files);
 
-        [$routeAccessMap, $firewallRules] = $this->extractSecurityConfig($files);
-        $routeAccessControls = $this->parseControllerAccessControls($controllerLikeFiles);
-        $voterCapabilities = $this->parseVoterCapabilities($projectFileInventory->voters());
-        $formBindings = $this->parseFormBindings($controllerLikeFiles);
+        [$routeAccessMap, $perimeterRules] = $this->extractAccessControlConfig($files);
+        $entrypointAccessControls = $this->parseEntrypointAccessControls($entrypointFiles);
+        $authorizationRules = $this->parseAuthorizationRules($projectFileInventory->voters());
+        $formBindings = $this->parseFormBindings($entrypointFiles);
 
         $symfonyMapping = SymfonyMapping::of(
             $projectFileInventory,
             new AccessControlMap(
                 $routeAccessMap,
-                $firewallRules,
-                $routeAccessControls,
-                $voterCapabilities,
+                $perimeterRules,
+                $entrypointAccessControls,
+                $authorizationRules,
                 $formBindings,
             ),
         );
@@ -89,16 +89,16 @@ final readonly class MappingStage implements StageInterface
         $auditContext->setMeta('mapping.entities', \count($projectFileInventory->entities()));
         $auditContext->setMeta('mapping.voters', \count($projectFileInventory->voters()));
         $auditContext->setMeta('mapping.no_voter_controllers', \count($symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule()));
-        $auditContext->setMeta('mapping.routes', \count($routeAccessControls));
+        $auditContext->setMeta('mapping.routes', \count($entrypointAccessControls));
         $auditContext->setMeta('mapping.routes_without_access_check', \count($symfonyMapping->controllersWithoutAccessCheck()));
-        $auditContext->setMeta('mapping.voter_capabilities', \count($voterCapabilities));
+        $auditContext->setMeta('mapping.voter_capabilities', \count($authorizationRules));
         $auditContext->setMeta('mapping.form_bindings', \count($formBindings));
 
         $this->logger->info('Mapping complete', [
             'summary' => $symfonyMapping->toSummary(),
             'unprotected_controllers' => \count($symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule()),
             'routes_without_access_check' => \count($symfonyMapping->controllersWithoutAccessCheck()),
-            'voter_capabilities' => \count($voterCapabilities),
+            'voter_capabilities' => \count($authorizationRules),
             'form_bindings' => \count($formBindings),
         ]);
     }
@@ -114,7 +114,7 @@ final readonly class MappingStage implements StageInterface
      *
      * @return list<ProjectFile>
      */
-    private function controllerLikeFiles(array $files): array
+    private function entrypointFiles(array $files): array
     {
         return array_values(array_filter(
             $files,
@@ -125,14 +125,14 @@ final readonly class MappingStage implements StageInterface
     /**
      * @param list<ProjectFile> $controllers
      *
-     * @return list<RouteAccessControl>
+     * @return list<EntrypointAccessControl>
      */
-    private function parseControllerAccessControls(array $controllers): array
+    private function parseEntrypointAccessControls(array $controllers): array
     {
         $entries = [];
 
         foreach ($controllers as $controller) {
-            $entries = [...$entries, ...$this->controllerAccessControlParser->parse($controller)];
+            $entries = [...$entries, ...$this->entrypointAccessControlParser->parse($controller)];
         }
 
         return $entries;
@@ -141,15 +141,15 @@ final readonly class MappingStage implements StageInterface
     /**
      * @param list<ProjectFile> $voters
      *
-     * @return list<VoterCapability>
+     * @return list<AuthorizationRuleCapability>
      */
-    private function parseVoterCapabilities(array $voters): array
+    private function parseAuthorizationRules(array $voters): array
     {
         $entries = [];
 
         foreach ($voters as $voter) {
-            $capability = $this->voterCapabilityParser->parse($voter);
-            if ($capability instanceof VoterCapability) {
+            $capability = $this->authorizationRuleParser->parse($voter);
+            if ($capability instanceof AuthorizationRuleCapability) {
                 $entries[] = $capability;
             }
         }
@@ -178,10 +178,10 @@ final readonly class MappingStage implements StageInterface
      *
      * @return array{array<string, list<string>>, list<string>}
      */
-    private function extractSecurityConfig(array $files): array
+    private function extractAccessControlConfig(array $files): array
     {
         $routeAccessMap = [];
-        $firewallRules = [];
+        $perimeterRules = [];
 
         foreach ($files as $file) {
             if (!$file->isConfiguration()) {
@@ -189,11 +189,11 @@ final readonly class MappingStage implements StageInterface
             }
 
             $content = $file->content();
-            $routeAccessMap = $this->mergeRouteAccessMaps($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
-            $firewallRules = [...$firewallRules, ...$this->securityConfigParser->parseFirewallRules($content)];
+            $routeAccessMap = $this->mergeRouteAccessMaps($routeAccessMap, $this->accessControlConfigParser->parseEntrypointAccessMap($content));
+            $perimeterRules = [...$perimeterRules, ...$this->accessControlConfigParser->parsePerimeterRules($content)];
         }
 
-        return [$routeAccessMap, $firewallRules];
+        return [$routeAccessMap, $perimeterRules];
     }
 
     /**

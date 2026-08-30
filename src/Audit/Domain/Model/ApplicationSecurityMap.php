@@ -101,31 +101,31 @@ final readonly class ApplicationSecurityMap
      */
     public function perimeterRules(): array
     {
-        return $this->accessControlMap->firewallRules();
+        return $this->accessControlMap->perimeterRules();
     }
 
-    /** @return list<RouteAccessControl> */
+    /** @return list<EntrypointAccessControl> */
     public function entrypointAccessControls(): array
     {
         return $this->accessControlMap->routeAccessControls();
     }
 
-    /** @return list<RouteAccessControl> */
+    /** @return list<EntrypointAccessControl> */
     public function entrypointsWithoutAccessCheck(): array
     {
-        return $this->accessControlMap->controllersWithoutAccessCheck();
+        return $this->accessControlMap->entrypointsWithoutAccessCheck();
     }
 
-    /** @return list<VoterCapability> */
+    /** @return list<AuthorizationRuleCapability> */
     public function authorizationRules(): array
     {
-        return $this->accessControlMap->voterCapabilities();
+        return $this->accessControlMap->authorizationRules();
     }
 
-    /** @return list<VoterCapability> */
+    /** @return list<AuthorizationRuleCapability> */
     public function authorizationRulesFor(string $attribute, string $subject): array
     {
-        return $this->accessControlMap->votersFor($attribute, $subject);
+        return $this->accessControlMap->authorizationRulesFor($attribute, $subject);
     }
 
     /** @return list<FormBinding> */
@@ -137,7 +137,7 @@ final readonly class ApplicationSecurityMap
     /** @return list<FormBinding> */
     public function fieldBindingsForEntrypoint(string $entrypointFilePath): array
     {
-        return $this->accessControlMap->formBindingsForController($entrypointFilePath);
+        return $this->accessControlMap->fieldBindingsForEntrypoint($entrypointFilePath);
     }
 
     public function totalFiles(): int

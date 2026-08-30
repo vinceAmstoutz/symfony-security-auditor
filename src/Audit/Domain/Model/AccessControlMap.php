@@ -16,17 +16,17 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 final readonly class AccessControlMap
 {
     /**
-     * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>                $firewallRules
-     * @param list<RouteAccessControl>    $routeAccessControls
-     * @param list<VoterCapability>       $voterCapabilities
-     * @param list<FormBinding>           $formBindings
+     * @param array<string, list<string>>       $routeAccessMap
+     * @param list<string>                      $perimeterRules
+     * @param list<EntrypointAccessControl>     $routeAccessControls
+     * @param list<AuthorizationRuleCapability> $authorizationRules
+     * @param list<FormBinding>                 $formBindings
      */
     public function __construct(
         private array $routeAccessMap = [],
-        private array $firewallRules = [],
+        private array $perimeterRules = [],
         private array $routeAccessControls = [],
-        private array $voterCapabilities = [],
+        private array $authorizationRules = [],
         private array $formBindings = [],
     ) {}
 
@@ -37,38 +37,38 @@ final readonly class AccessControlMap
     }
 
     /** @return list<string> */
-    public function firewallRules(): array
+    public function perimeterRules(): array
     {
-        return $this->firewallRules;
+        return $this->perimeterRules;
     }
 
-    /** @return list<RouteAccessControl> */
+    /** @return list<EntrypointAccessControl> */
     public function routeAccessControls(): array
     {
         return $this->routeAccessControls;
     }
 
-    /** @return list<RouteAccessControl> */
-    public function controllersWithoutAccessCheck(): array
+    /** @return list<EntrypointAccessControl> */
+    public function entrypointsWithoutAccessCheck(): array
     {
         return array_values(array_filter(
             $this->routeAccessControls,
-            static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->lacksAccessCheck(),
+            static fn (EntrypointAccessControl $entrypointAccessControl): bool => $entrypointAccessControl->lacksAccessCheck(),
         ));
     }
 
-    /** @return list<VoterCapability> */
-    public function voterCapabilities(): array
+    /** @return list<AuthorizationRuleCapability> */
+    public function authorizationRules(): array
     {
-        return $this->voterCapabilities;
+        return $this->authorizationRules;
     }
 
-    /** @return list<VoterCapability> */
-    public function votersFor(string $attribute, string $subject): array
+    /** @return list<AuthorizationRuleCapability> */
+    public function authorizationRulesFor(string $attribute, string $subject): array
     {
         return array_values(array_filter(
-            $this->voterCapabilities,
-            static fn (VoterCapability $voterCapability): bool => $voterCapability->coversAttribute($attribute) && $voterCapability->coversSubject($subject),
+            $this->authorizationRules,
+            static fn (AuthorizationRuleCapability $authorizationRuleCapability): bool => $authorizationRuleCapability->coversAttribute($attribute) && $authorizationRuleCapability->coversSubject($subject),
         ));
     }
 
@@ -79,11 +79,11 @@ final readonly class AccessControlMap
     }
 
     /** @return list<FormBinding> */
-    public function formBindingsForController(string $controllerFilePath): array
+    public function fieldBindingsForEntrypoint(string $entrypointFilePath): array
     {
         return array_values(array_filter(
             $this->formBindings,
-            static fn (FormBinding $formBinding): bool => $formBinding->controllerFilePath() === $controllerFilePath,
+            static fn (FormBinding $formBinding): bool => $formBinding->entrypointFilePath() === $entrypointFilePath,
         ));
     }
 }

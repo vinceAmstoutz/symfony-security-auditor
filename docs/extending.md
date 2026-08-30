@@ -410,14 +410,14 @@ in `config/services.yaml` to override the bundled behaviour (see
   service implementing the Infrastructure-level
   `ProviderTokenEstimatorInterface` — it is auto-tagged and joins the resolver's
   candidate list.
-- `SecurityConfigParserInterface` — extracts the route access-control map and
-  firewall rules from raw security configuration content (default:
+- `AccessControlConfigParserInterface` — extracts the entrypoint access map and
+  the perimeter rules from raw security configuration content (default:
   `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse). Implement it
   when your project encodes access control outside standard YAML — e.g. PHP or
   XML security config, or a custom DSL.
-- `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
+- `EntrypointAccessControlParserInterface`, `AuthorizationRuleParserInterface`,
   `FormBindingParserInterface` — the deterministic AST extractions
-  (`#[IsGranted]`/`denyAccessUnlessGranted`, voter attributes, form
+  (`#[IsGranted]`/`denyAccessUnlessGranted`, authorization-rule attributes, form
   field-to-entity bindings) that feed the `SymfonyMapping` given to the attacker
   (defaults: the `PhpParser*` implementations in `Infrastructure/Scan/`).
   Implement one when your project encodes access control in a custom idiom the

@@ -10,17 +10,18 @@ Full detail for each item, including root cause and exact file paths, is in
 
 ## At a glance
 
-| What changed                               | Do you need to act?                            |
-| ------------------------------------------ | ---------------------------------------------- |
-| `audit.fail_on` defaults to `high`         | Only if a HIGH-risk audit must keep passing CI |
-| `model` defaults to `claude-opus-5`        | Only if you relied on the unconfigured default |
-| `max_output_tokens` defaults to `8192`     | No                                             |
-| `cache.prompt_caching` removed             | Yes, if the key is still in your configuration |
-| Exit code `3` for a failed audit           | Only if CI branches on `1`                     |
-| `*::create()` factories removed            | Only if you call them                          |
-| `PricingProviderInterface` widened         | Only if you implement it                       |
-| Eight Domain ports now `@internal`         | Only if you implement one                      |
-| Batch client signatures take value objects | Only if you implement a batch-capable client   |
+| What changed                                  | Do you need to act?                            |
+| --------------------------------------------- | ---------------------------------------------- |
+| `audit.fail_on` defaults to `high`            | Only if a HIGH-risk audit must keep passing CI |
+| `model` defaults to `claude-opus-5`           | Only if you relied on the unconfigured default |
+| `max_output_tokens` defaults to `8192`        | No                                             |
+| `cache.prompt_caching` removed                | Yes, if the key is still in your configuration |
+| Exit code `3` for a failed audit              | Only if CI branches on `1`                     |
+| `*::create()` factories removed               | Only if you call them                          |
+| `PricingProviderInterface` widened            | Only if you implement it                       |
+| Eight Domain ports now `@internal`            | Only if you implement one                      |
+| Batch client signatures take value objects    | Only if you implement a batch-capable client   |
+| Symfony-named Domain models and ports renamed | Only if you name one in your own code          |
 
 ## Configuration
 
@@ -205,3 +206,52 @@ public function completeBatch(array $requests, int $maxConcurrent): array;
 three fields (`system`, `user`, `tools`) as constructor arguments. The
 `LLMRequest::listFromArrays()` / `ToolLLMRequest::listFromArrays()` adapters are
 gone.
+
+### Renamed: the Domain models and ports that named Symfony
+
+Two Domain models and three ports described the audited application in Symfony's
+words, which a framework profile for anything else could not honestly fill in.
+They keep their behaviour; only the names changed:
+
+| 1.x                                      | 2.0                                      |
+| ---------------------------------------- | ---------------------------------------- |
+| `RouteAccessControl`                     | `EntrypointAccessControl`                |
+| `VoterCapability`                        | `AuthorizationRuleCapability`            |
+| `ControllerAccessControlParserInterface` | `EntrypointAccessControlParserInterface` |
+| `VoterCapabilityParserInterface`         | `AuthorizationRuleParserInterface`       |
+| `SecurityConfigParserInterface`          | `AccessControlConfigParserInterface`     |
+
+`EntrypointAccessControl`'s accessors moved with it, from the Symfony API each
+one reads to the check it represents:
+
+| 1.x                             | 2.0                                 |
+| ------------------------------- | ----------------------------------- |
+| `hasRouteAttribute()`           | `isRouted()`                        |
+| `methodLevelIsGranted()`        | `handlerRequiredAttributes()`       |
+| `classLevelIsGranted()`         | `classRequiredAttributes()`         |
+| `denyAccessAttributes()`        | `bodyRequiredAttributes()`          |
+| `methodHasDenyAccess()`         | `handlerChecksAccessInBody()`       |
+| `classHasIsGranted()`           | `classHasAccessCheck()`             |
+| `methodHasIsGrantedAttribute()` | `handlerHasUnresolvedAccessCheck()` |
+
+`AccessControlMap` and `AccessControlConfigParserInterface` followed the same
+rule, adopting the vocabulary `ApplicationSecurityMap` already used:
+
+| 1.x                                                        | 2.0                               |
+| ---------------------------------------------------------- | --------------------------------- |
+| `AccessControlMap::firewallRules()`                        | `perimeterRules()`                |
+| `AccessControlMap::voterCapabilities()`                    | `authorizationRules()`            |
+| `AccessControlMap::votersFor()`                            | `authorizationRulesFor()`         |
+| `AccessControlMap::controllersWithoutAccessCheck()`        | `entrypointsWithoutAccessCheck()` |
+| `AccessControlMap::formBindingsForController()`            | `fieldBindingsForEntrypoint()`    |
+| `FormBinding::controllerFilePath()`                        | `entrypointFilePath()`            |
+| `AccessControlConfigParserInterface::parseAccessControl()` | `parseEntrypointAccessMap()`      |
+| `AccessControlConfigParserInterface::parseFirewallRules()` | `parsePerimeterRules()`           |
+
+`SymfonyMapping` is untouched. It is the Symfony-flavoured facade over
+`ApplicationSecurityMap` by design, so its Symfony-named accessors — including
+the four deprecated since 1.19 — keep working exactly as before. The bundled
+Symfony parsers (`PhpParserControllerAccessControlParser`,
+`PhpParserVoterCapabilityParser`, `SymfonyYamlSecurityConfigParser`) keep their
+names too: they really do read Symfony, and they now implement the renamed
+ports.

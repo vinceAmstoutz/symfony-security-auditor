@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
 /**
@@ -85,7 +85,7 @@ final readonly class SymfonyMappingContextRenderer
         $lines = ['## Form Bindings'];
         $lines[] = 'Each line records a `$this->createForm(FormType::class)` call site. Cross-reference with the form type to spot mass-assignment vectors (`allow_extra_fields: true`, unbounded `EntityType` choices, missing CSRF on state-changing actions).';
         foreach ($formBindings as $formBinding) {
-            $lines[] = \sprintf('- %s::%s — %s', self::sanitizeLine($formBinding->controllerFilePath()), $formBinding->controllerMethod(), $formBinding->formTypeClass());
+            $lines[] = \sprintf('- %s::%s — %s', self::sanitizeLine($formBinding->entrypointFilePath()), $formBinding->controllerMethod(), $formBinding->formTypeClass());
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
@@ -117,22 +117,22 @@ final readonly class SymfonyMappingContextRenderer
     /**
      * @return list<string>
      */
-    private static function accessCheckLabelsFor(RouteAccessControl $routeAccessControl): array
+    private static function accessCheckLabelsFor(EntrypointAccessControl $entrypointAccessControl): array
     {
         $checks = [];
-        if ($routeAccessControl->classHasIsGranted()) {
+        if ($entrypointAccessControl->classHasAccessCheck()) {
             $checks[] = 'class:#[IsGranted]';
         }
 
-        if ([] !== $routeAccessControl->methodLevelIsGranted()) {
-            $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->methodLevelIsGranted())));
+        if ([] !== $entrypointAccessControl->handlerRequiredAttributes()) {
+            $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', array_map(self::sanitizeLine(...), $entrypointAccessControl->handlerRequiredAttributes())));
         }
 
-        if ([] === $routeAccessControl->methodLevelIsGranted() && $routeAccessControl->methodHasIsGrantedAttribute()) {
+        if ([] === $entrypointAccessControl->handlerRequiredAttributes() && $entrypointAccessControl->handlerHasUnresolvedAccessCheck()) {
             $checks[] = 'method:#[IsGranted(unresolved)]';
         }
 
-        if ($routeAccessControl->methodHasDenyAccess()) {
+        if ($entrypointAccessControl->handlerChecksAccessInBody()) {
             $checks[] = 'body:denyAccessUnlessGranted()';
         }
 
@@ -140,22 +140,22 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * `PhpParserControllerAccessControlParser` emits a `RouteAccessControl`
+     * `PhpParserControllerAccessControlParser` emits a `EntrypointAccessControl`
      * entry for every public method on a controller-like class, not just its
      * routed actions — a plain constructor or helper method still gets one,
-     * with `hasRouteAttribute() === false`. Rendering those would tag every
+     * with `isRouted() === false`. Rendering those would tag every
      * such method `LACKS_ACCESS_CHECK` even though it is not an HTTP action
      * at all, injecting a false-positive `broken_access_control` candidate
      * for virtually every controller (which almost always has a
      * constructor).
      *
-     * @return list<RouteAccessControl>
+     * @return list<EntrypointAccessControl>
      */
     private static function routedControls(SymfonyMapping $symfonyMapping): array
     {
         return array_values(array_filter(
             $symfonyMapping->routeAccessControls(),
-            static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->hasRouteAttribute(),
+            static fn (EntrypointAccessControl $entrypointAccessControl): bool => $entrypointAccessControl->isRouted(),
         ));
     }
 
@@ -163,14 +163,14 @@ final readonly class SymfonyMappingContextRenderer
      * @param list<string>                $checks
      * @param array<string, list<string>> $routeAccessMap
      */
-    private static function checkLabelFor(array $checks, RouteAccessControl $routeAccessControl, array $routeAccessMap): string
+    private static function checkLabelFor(array $checks, EntrypointAccessControl $entrypointAccessControl, array $routeAccessMap): string
     {
         if ([] !== $checks) {
             return implode(' + ', $checks);
         }
 
-        $firewallRoles = self::firewallRolesForPath($routeAccessControl->routePath(), $routeAccessControl->routeMethods(), $routeAccessMap)
-            ?? self::firewallRolesForRouteName($routeAccessControl->routeName(), $routeAccessControl->routeMethods(), $routeAccessMap);
+        $firewallRoles = self::firewallRolesForPath($entrypointAccessControl->routePath(), $entrypointAccessControl->routeMethods(), $routeAccessMap)
+            ?? self::firewallRolesForRouteName($entrypointAccessControl->routeName(), $entrypointAccessControl->routeMethods(), $routeAccessMap);
 
         return self::firewallCoverageLabel($firewallRoles);
     }

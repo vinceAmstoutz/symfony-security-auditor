@@ -17,12 +17,12 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class SymfonyMappingTest extends TestCase
@@ -49,20 +49,20 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_it_exposes_voter_capabilities_and_can_find_voters_for_attribute_and_subject(): void
     {
-        $userVoter = new VoterCapability(
+        $userVoter = new AuthorizationRuleCapability(
             filePath: 'src/Security/UserVoter.php',
             className: 'App\\Security\\UserVoter',
             supportedAttributes: ['EDIT', 'DELETE'],
             supportedSubjects: ['App\\Entity\\User'],
         );
-        $commentVoter = new VoterCapability(
+        $commentVoter = new AuthorizationRuleCapability(
             filePath: 'src/Security/CommentVoter.php',
             className: 'App\\Security\\CommentVoter',
             supportedAttributes: ['VIEW'],
             supportedSubjects: ['App\\Entity\\Comment'],
         );
 
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$userVoter, $commentVoter]));
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(authorizationRules: [$userVoter, $commentVoter]));
 
         self::assertSame([$userVoter, $commentVoter], $symfonyMapping->toApplicationSecurityMap()->authorizationRules());
         self::assertSame([$userVoter], $symfonyMapping->votersFor('EDIT', 'User'));
@@ -72,18 +72,18 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_voters_for_excludes_voter_matching_attribute_but_not_subject(): void
     {
-        $voterCapability = new VoterCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
+        $authorizationRuleCapability = new AuthorizationRuleCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
 
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$voterCapability]));
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(authorizationRules: [$authorizationRuleCapability]));
 
         self::assertSame([], $symfonyMapping->votersFor('EDIT', 'Comment'));
     }
 
     public function test_voters_for_excludes_voter_matching_subject_but_not_attribute(): void
     {
-        $voterCapability = new VoterCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
+        $authorizationRuleCapability = new AuthorizationRuleCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
 
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$voterCapability]));
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(authorizationRules: [$authorizationRuleCapability]));
 
         self::assertSame([], $symfonyMapping->votersFor('PUBLISH', 'User'));
     }
@@ -103,25 +103,25 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_it_exposes_route_access_controls(): void
     {
-        $protected = new RouteAccessControl(
+        $protected = new EntrypointAccessControl(
             filePath: 'src/Controller/AdminController.php',
             methodName: 'list',
             routePath: '/admin',
             routeMethods: ['GET'],
-            hasRouteAttribute: true,
-            methodLevelIsGranted: ['ROLE_ADMIN'],
-            methodHasDenyAccess: false,
-            classHasIsGranted: false,
+            isRouted: true,
+            handlerRequiredAttributes: ['ROLE_ADMIN'],
+            handlerChecksAccessInBody: false,
+            classHasAccessCheck: false,
         );
-        $unprotected = new RouteAccessControl(
+        $unprotected = new EntrypointAccessControl(
             filePath: 'src/Controller/PublicController.php',
             methodName: 'leak',
             routePath: '/leak',
             routeMethods: [],
-            hasRouteAttribute: true,
-            methodLevelIsGranted: [],
-            methodHasDenyAccess: false,
-            classHasIsGranted: false,
+            isRouted: true,
+            handlerRequiredAttributes: [],
+            handlerChecksAccessInBody: false,
+            classHasAccessCheck: false,
         );
 
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(routeAccessControls: [$protected, $unprotected]));
@@ -286,7 +286,7 @@ final class SymfonyMappingTest extends TestCase
             ]),
             new AccessControlMap(
                 routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
-                firewallRules: ['^/admin'],
+                perimeterRules: ['^/admin'],
             ),
         );
 
@@ -304,17 +304,17 @@ final class SymfonyMappingTest extends TestCase
     #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_voter_capabilities_still_returns_the_authorization_rules(): void
     {
-        $voterCapability = new VoterCapability(
+        $authorizationRuleCapability = new AuthorizationRuleCapability(
             filePath: 'src/Security/UserVoter.php',
             className: 'App\\Security\\UserVoter',
             supportedAttributes: ['EDIT'],
             supportedSubjects: ['App\\Entity\\User'],
         );
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$voterCapability]));
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(authorizationRules: [$authorizationRuleCapability]));
 
         $this->expectUserDeprecationMessageMatches('/SymfonyMapping::voterCapabilities\(\) is deprecated, use ApplicationSecurityMap::authorizationRules\(\) instead\./');
 
-        self::assertSame([$voterCapability], $symfonyMapping->voterCapabilities());
+        self::assertSame([$authorizationRuleCapability], $symfonyMapping->voterCapabilities());
     }
 
     /**
@@ -323,7 +323,7 @@ final class SymfonyMappingTest extends TestCase
     #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_firewall_rules_still_returns_the_perimeter_rules(): void
     {
-        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: ['^/admin']));
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(perimeterRules: ['^/admin']));
 
         $this->expectUserDeprecationMessageMatches('/SymfonyMapping::firewallRules\(\) is deprecated, use ApplicationSecurityMap::perimeterRules\(\) instead\./');
 

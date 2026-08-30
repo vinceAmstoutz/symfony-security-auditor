@@ -18,17 +18,17 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AccessControlConfigParserInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigParserInterface
+final readonly class SymfonyYamlSecurityConfigParser implements AccessControlConfigParserInterface
 {
     public function __construct(
         private LoggerInterface $logger = new NullLogger(),
     ) {}
 
     #[Override]
-    public function parseAccessControl(string $configContent): array
+    public function parseEntrypointAccessMap(string $configContent): array
     {
         $routeAccessMap = [];
         foreach ($this->securitySections($configContent) as $section) {
@@ -39,7 +39,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
     }
 
     #[Override]
-    public function parseFirewallRules(string $configContent): array
+    public function parsePerimeterRules(string $configContent): array
     {
         $rules = [];
         foreach ($this->securitySections($configContent) as $section) {

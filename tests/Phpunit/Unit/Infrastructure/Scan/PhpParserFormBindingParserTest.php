@@ -357,7 +357,7 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertCount(1, $bindings);
         self::assertSame('edit', $bindings[0]->controllerMethod());
         self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
-        self::assertSame('src/Controller/UserController.php', $bindings[0]->controllerFilePath());
+        self::assertSame('src/Controller/UserController.php', $bindings[0]->entrypointFilePath());
     }
 
     /**

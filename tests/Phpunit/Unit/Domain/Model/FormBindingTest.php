@@ -21,12 +21,12 @@ final class FormBindingTest extends TestCase
     public function test_it_exposes_controller_action_and_form_type(): void
     {
         $formBinding = new FormBinding(
-            controllerFilePath: 'src/Controller/UserController.php',
+            entrypointFilePath: 'src/Controller/UserController.php',
             controllerMethod: 'edit',
             formTypeClass: 'App\\Form\\UserType',
         );
 
-        self::assertSame('src/Controller/UserController.php', $formBinding->controllerFilePath());
+        self::assertSame('src/Controller/UserController.php', $formBinding->entrypointFilePath());
         self::assertSame('edit', $formBinding->controllerMethod());
         self::assertSame('App\\Form\\UserType', $formBinding->formTypeClass());
     }

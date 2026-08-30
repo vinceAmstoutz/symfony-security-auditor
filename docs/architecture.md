@@ -56,13 +56,13 @@ src/
 │   │       │              TokenEstimatorInterface, RateLimiterInterface,
 │   │       │              PricingProviderInterface, ProgressReporterInterface,
 │   │       │              StaticPreScannerInterface, CodeSlicerInterface,
-│   │       │              ControllerAccessControlParserInterface,
-│   │       │              VoterCapabilityParserInterface,
+│   │       │              EntrypointAccessControlParserInterface,
+│   │       │              AuthorizationRuleParserInterface,
 │   │       │              FormBindingParserInterface,
 │   │       │              GitChangedFilesResolverInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
 │   │       │              (+ null-object port defaults: NullStaticPreScanner, NullCodeSlicer,
-│   │       │              NullControllerAccessControlParser, NullVoterCapabilityParser,
+│   │       │              NullEntrypointAccessControlParser, NullAuthorizationRuleParser,
 │   │       │              NullFormBindingParser, NullProgressReporter)
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
@@ -359,42 +359,45 @@ security surface rather than file contents alone. Notable helpers:
 
 - `controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
   `denyAccessUnlessGranted` calls (filename-heuristic).
-- `routeAccessControls()` returns the route → controller graph: one
-  `RouteAccessControl` per public action with its parsed `#[Route]`, class- and
-  method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call sites.
-- `controllersWithoutAccessCheck()` filters the graph to actions that carry a
+- `routeAccessControls()` returns the route → entrypoint graph: one
+  `EntrypointAccessControl` per public handler with its parsed `#[Route]`,
+  class- and method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call
+  sites.
+- `entrypointsWithoutAccessCheck()` filters the graph to actions that carry a
   route but no enforcement.
 
-### `RouteAccessControl` — immutable per-action access-control summary
+### `EntrypointAccessControl` — immutable per-handler access-control summary
 
-One entry per public controller action emitted by
-`ControllerAccessControlParserInterface` (default impl
+One entry per public entrypoint handler emitted by
+`EntrypointAccessControlParserInterface` (default impl
 `PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`).
-Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus four
-boolean / list signals — `methodLevelIsGranted`, `methodHasIsGrantedAttribute`
-(a method-level `#[IsGranted]`/`#[Security]` value present but not resolvable to
-a literal string, e.g. an enum case or `new Expression(...)`),
-`methodHasDenyAccess`, `classHasIsGranted` — combined by `hasAccessCheck()` and
-`lacksAccessCheck()`. The attacker prompt renders the full graph as a
-`Route Access-Control Map` block so the LLM can spot missing enforcement without
-re-deriving it from source.
+Named after what each signal _is_, not what Symfony spells it with: captures
+`filePath`, `methodName`, `routePath`, `routeMethods`, `isRouted`, plus four
+boolean / list signals — `handlerRequiredAttributes`,
+`handlerHasUnresolvedAccessCheck` (a declarative check on the handler whose
+attribute is present but not resolvable to a literal string, e.g. an enum case
+or `new Expression(...)`), `handlerChecksAccessInBody`, `classHasAccessCheck` —
+combined by `hasAccessCheck()` and `lacksAccessCheck()`. The attacker prompt
+renders the full graph as a `Route Access-Control Map` block so the LLM can spot
+missing enforcement without re-deriving it from source.
 
-### `VoterCapability` — immutable per-voter `supports()` summary
+### `AuthorizationRuleCapability` — immutable per-rule capability summary
 
-One entry per voter file emitted by `VoterCapabilityParserInterface` (default
-impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`,
-`supportedAttributes` (string literals seen inside `supports()`) and
-`supportedSubjects` (right-hand class names of `instanceof` checks). Helpers
-`coversAttribute(string)` and `coversSubject(string)` answer "is there a voter
-that handles this access decision?" so the prompt's `Voter Coverage` block lets
-the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually
-backs.
+One entry per authorization-rule file emitted by
+`AuthorizationRuleParserInterface` (default impl
+`PhpParserVoterCapabilityParser`, which reads a Symfony voter's `supports()`).
+Captures `filePath`, `className`, `supportedAttributes` (string literals seen
+inside `supports()`) and `supportedSubjects` (right-hand class names of
+`instanceof` checks). Helpers `coversAttribute(string)` and
+`coversSubject(string)` answer "is there a rule that handles this access
+decision?" so the prompt's `Voter Coverage` block lets the LLM flag
+`#[IsGranted('ATTR', $subject)]` calls that no voter actually backs.
 
 ### `FormBinding` — immutable controller → form-type binding
 
 One entry per `$this->createForm(SomeFormType::class)` call site emitted by
 `FormBindingParserInterface` (default impl `PhpParserFormBindingParser`).
-Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The
+Captures `entrypointFilePath`, `controllerMethod`, and `formTypeClass`. The
 attacker prompt renders the list as a `Form Bindings` block so the LLM can
 cross-reference call sites against the form types involved for mass-assignment /
 CSRF analysis without re-deriving the binding from source.
@@ -430,13 +433,13 @@ so `MappingStage` always sees the whole project.
 
 **`MappingStage`** — classifies `AuditContext::mappingFiles()` into roles,
 constructs `SymfonyMapping`, calls `AuditContext::setMapping()`. May use the LLM
-client for semantic mapping or fall back to heuristic classification. The route
-access-control map and firewall rules come from `SecurityConfigParserInterface`
-(default impl `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse):
-list-form and scalar `roles`, `allow_if` expressions,
-`methods`/`ips`/`requires_channel` constraints, `when@<env>` overrides, and
-firewall `security: false` / `stateless` flags all land in the map the attacker
-prompt renders.
+client for semantic mapping or fall back to heuristic classification. The
+entrypoint access map and perimeter rules come from
+`AccessControlConfigParserInterface` (default impl
+`SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse): list-form and
+scalar `roles`, `allow_if` expressions, `methods`/`ips`/`requires_channel`
+constraints, `when@<env>` overrides, and firewall `security: false` /
+`stateless` flags all land in the map the attacker prompt renders.
 
 **`DependencyExpansionStage`** — no-op unless `audit.since_closure: direct` and
 a `--since` diff-mode run is active (`AuditContext::diffSinceRef() !== null`).

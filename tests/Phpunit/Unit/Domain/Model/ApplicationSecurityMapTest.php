@@ -17,10 +17,10 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationSecurityMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ApplicationSecurityMapTest extends TestCase
@@ -76,7 +76,7 @@ final class ApplicationSecurityMapTest extends TestCase
 
     public function test_authorization_rules_can_be_looked_up_by_attribute_and_subject(): void
     {
-        $voterCapability = new VoterCapability(
+        $authorizationRuleCapability = new AuthorizationRuleCapability(
             filePath: 'src/Security/UserVoter.php',
             className: 'App\\Security\\UserVoter',
             supportedAttributes: ['EDIT'],
@@ -85,11 +85,11 @@ final class ApplicationSecurityMapTest extends TestCase
 
         $applicationSecurityMap = ApplicationSecurityMap::of(
             ProjectFileInventory::fromGroups([]),
-            new AccessControlMap(voterCapabilities: [$voterCapability]),
+            new AccessControlMap(authorizationRules: [$authorizationRuleCapability]),
         );
 
         self::assertSame(
-            [[$voterCapability], [$voterCapability], []],
+            [[$authorizationRuleCapability], [$authorizationRuleCapability], []],
             [$applicationSecurityMap->authorizationRules(), $applicationSecurityMap->authorizationRulesFor('EDIT', 'User'), $applicationSecurityMap->authorizationRulesFor('DELETE', 'User')],
         );
     }
@@ -133,28 +133,28 @@ final class ApplicationSecurityMapTest extends TestCase
 
     public function test_it_exposes_the_perimeter_rules_and_the_entrypoint_access_map(): void
     {
-        $routeAccessControl = new RouteAccessControl(
+        $entrypointAccessControl = new EntrypointAccessControl(
             filePath: 'src/Controller/UserController.php',
             methodName: 'edit',
             routePath: '/user/{id}/edit',
             routeMethods: ['GET'],
-            hasRouteAttribute: true,
-            methodLevelIsGranted: ['ROLE_ADMIN'],
-            methodHasDenyAccess: false,
-            classHasIsGranted: false,
+            isRouted: true,
+            handlerRequiredAttributes: ['ROLE_ADMIN'],
+            handlerChecksAccessInBody: false,
+            classHasAccessCheck: false,
         );
 
         $applicationSecurityMap = ApplicationSecurityMap::of(
             ProjectFileInventory::fromGroups([]),
             new AccessControlMap(
                 routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
-                firewallRules: ['^/admin: ROLE_ADMIN'],
-                routeAccessControls: [$routeAccessControl],
+                perimeterRules: ['^/admin: ROLE_ADMIN'],
+                routeAccessControls: [$entrypointAccessControl],
             ),
         );
 
         self::assertSame(
-            [['/admin' => ['ROLE_ADMIN']], ['^/admin: ROLE_ADMIN'], [$routeAccessControl]],
+            [['/admin' => ['ROLE_ADMIN']], ['^/admin: ROLE_ADMIN'], [$entrypointAccessControl]],
             [$applicationSecurityMap->entrypointAccessMap(), $applicationSecurityMap->perimeterRules(), $applicationSecurityMap->entrypointAccessControls()],
         );
     }
@@ -162,7 +162,7 @@ final class ApplicationSecurityMapTest extends TestCase
     public function test_field_bindings_can_be_looked_up_per_entrypoint(): void
     {
         $formBinding = new FormBinding(
-            controllerFilePath: 'src/Controller/UserController.php',
+            entrypointFilePath: 'src/Controller/UserController.php',
             controllerMethod: 'edit',
             formTypeClass: 'App\\Form\\UserType',
         );

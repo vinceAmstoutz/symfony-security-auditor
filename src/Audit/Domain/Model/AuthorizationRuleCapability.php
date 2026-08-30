@@ -13,11 +13,17 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-final readonly class VoterCapability
+/**
+ * What one authorization rule can decide: the permission names it answers for
+ * and the subjects it answers about. A profile's parser reads it from whatever
+ * its framework calls the rule — a Symfony voter's `supports()`, a Laravel
+ * policy's methods.
+ */
+final readonly class AuthorizationRuleCapability
 {
     /**
-     * @param list<string> $supportedAttributes attribute names the voter's `supports()` accepts (e.g. `EDIT`, `DELETE`)
-     * @param list<string> $supportedSubjects   fully-qualified or short class names of subjects the voter's `supports()` accepts (e.g. `App\Entity\User`)
+     * @param list<string> $supportedAttributes attribute names the rule accepts (e.g. `EDIT`, `DELETE`)
+     * @param list<string> $supportedSubjects   fully-qualified or short class names of subjects the rule accepts (e.g. `App\Entity\User`)
      */
     public function __construct(
         private string $filePath,

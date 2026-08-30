@@ -14,12 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Extracts the access-control map and firewall rules from a security
- * configuration file's raw content. Implementations must degrade gracefully:
- * content that is not parseable security configuration yields empty results,
- * never an exception — a broken config file must not abort the audit.
+ * Extracts the entrypoint access map and the perimeter rules from a security
+ * configuration file's raw content (Symfony: `security.yaml`'s `access_control`
+ * and `firewalls`). Implementations must degrade gracefully: content that is not
+ * parseable security configuration yields empty results, never an exception — a
+ * broken config file must not abort the audit.
  */
-interface SecurityConfigParserInterface
+interface AccessControlConfigParserInterface
 {
     /**
      * @return array<string, list<string>> route path pattern (or `route: <name>`)
@@ -28,12 +29,12 @@ interface SecurityConfigParserInterface
      *                                     `ips: …`, and `requires_channel: …`
      *                                     constraints when present
      */
-    public function parseAccessControl(string $configContent): array;
+    public function parseEntrypointAccessMap(string $configContent): array;
 
     /**
-     * @return list<string> one entry per firewall: its `pattern` (falling back
-     *                      to the firewall name), with `security: false` and
-     *                      `stateless` flags appended in parentheses
+     * @return list<string> one entry per perimeter rule: its path pattern
+     *                      (falling back to the rule's name), with `security:
+     *                      false` and `stateless` flags appended in parentheses
      */
-    public function parseFirewallRules(string $configContent): array;
+    public function parsePerimeterRules(string $configContent): array;
 }

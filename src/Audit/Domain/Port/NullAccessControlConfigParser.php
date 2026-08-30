@@ -16,16 +16,16 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use Override;
 
 /** @internal default when no security-config parser is wired — extracts nothing */
-final readonly class NullSecurityConfigParser implements SecurityConfigParserInterface
+final readonly class NullAccessControlConfigParser implements AccessControlConfigParserInterface
 {
     #[Override]
-    public function parseAccessControl(string $configContent): array
+    public function parseEntrypointAccessMap(string $configContent): array
     {
         return [];
     }
 
     #[Override]
-    public function parseFirewallRules(string $configContent): array
+    public function parsePerimeterRules(string $configContent): array
     {
         return [];
     }

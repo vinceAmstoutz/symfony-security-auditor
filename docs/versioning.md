@@ -263,8 +263,8 @@ Implementing one of these in your own application and overriding the alias in
   [`docs/extending.md`](extending.md).
 - `ReviewerFeedbackProviderInterface`
 - `TriageMemoryRecorderInterface`
-- `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
-  `FormBindingParserInterface`, `SecurityConfigParserInterface` — the
+- `EntrypointAccessControlParserInterface`, `AuthorizationRuleParserInterface`,
+  `FormBindingParserInterface`, `AccessControlConfigParserInterface` — the
   deterministic source extractions feeding the application security map.
 - `Tool\ToolInterface`, `Tool\ToolDefinition`, `Tool\ToolRegistry`,
   `Tool\ToolRegistryFactoryInterface`

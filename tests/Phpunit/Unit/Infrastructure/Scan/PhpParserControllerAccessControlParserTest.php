@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
@@ -61,9 +61,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertTrue($entries[0]->hasRouteAttribute());
+        self::assertTrue($entries[0]->isRouted());
         self::assertSame('/admin/dashboard', $entries[0]->routePath());
-        self::assertSame(['ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['ROLE_ADMIN'], $entries[0]->handlerRequiredAttributes());
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
@@ -89,7 +89,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('deleteUser', $entries[0]->methodName());
         self::assertSame('/admin/users/{id}', $entries[0]->routePath());
         self::assertSame(['DELETE'], $entries[0]->routeMethods());
-        self::assertTrue($entries[0]->hasRouteAttribute());
+        self::assertTrue($entries[0]->isRouted());
         self::assertTrue($entries[0]->lacksAccessCheck());
     }
 
@@ -116,7 +116,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         self::assertCount(1, $entries);
         self::assertSame('adminExport', $entries[0]->methodName());
-        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->handlerChecksAccessInBody());
     }
 
     /**
@@ -207,7 +207,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['ROLE_ADMIN'], $entries[0]->handlerRequiredAttributes());
         self::assertTrue($entries[0]->hasAccessCheck());
         self::assertFalse($entries[0]->lacksAccessCheck());
     }
@@ -232,7 +232,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->methodLevelIsGranted());
+        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->handlerRequiredAttributes());
         self::assertTrue($entries[0]->hasAccessCheck());
         self::assertFalse($entries[0]->lacksAccessCheck());
     }
@@ -257,7 +257,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->methodLevelIsGranted());
+        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->handlerRequiredAttributes());
         self::assertTrue($entries[0]->hasAccessCheck());
         self::assertFalse($entries[0]->lacksAccessCheck());
     }
@@ -282,7 +282,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertTrue($entries[0]->classHasIsGranted());
+        self::assertTrue($entries[0]->classHasAccessCheck());
         self::assertTrue($entries[0]->hasAccessCheck());
         self::assertSame(['ROLE_USER'], $entries[0]->guardAttributes());
     }
@@ -326,11 +326,11 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
             PHP;
         $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/DashboardController.php', $source));
 
-        $routeAccessControl = $this->invokeEntry($entries);
-        self::assertTrue($routeAccessControl->hasRouteAttribute());
-        self::assertSame('/admin/dashboard', $routeAccessControl->routePath());
-        self::assertSame('admin_dashboard', $routeAccessControl->routeName());
-        self::assertSame(['GET'], $routeAccessControl->routeMethods());
+        $entrypointAccessControl = $this->invokeEntry($entries);
+        self::assertTrue($entrypointAccessControl->isRouted());
+        self::assertSame('/admin/dashboard', $entrypointAccessControl->routePath());
+        self::assertSame('admin_dashboard', $entrypointAccessControl->routeName());
+        self::assertSame(['GET'], $entrypointAccessControl->routeMethods());
     }
 
     /**
@@ -351,7 +351,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
             PHP;
         $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/MixedController.php', $source));
 
-        self::assertFalse($this->invokeEntry($entries)->hasRouteAttribute());
+        self::assertFalse($this->invokeEntry($entries)->isRouted());
     }
 
     /**
@@ -368,7 +368,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
             PHP;
         $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/PlainController.php', $source));
 
-        self::assertFalse($this->invokeEntry($entries)->hasRouteAttribute());
+        self::assertFalse($this->invokeEntry($entries)->isRouted());
     }
 
     /**
@@ -500,7 +500,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->handlerChecksAccessInBody());
         self::assertTrue($entries[0]->hasAccessCheck());
         self::assertSame(['EDIT'], $entries[0]->guardAttributes());
     }
@@ -556,7 +556,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->handlerChecksAccessInBody());
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
@@ -580,7 +580,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->handlerChecksAccessInBody());
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
@@ -605,7 +605,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertFalse($entries[0]->handlerChecksAccessInBody());
         self::assertTrue($entries[0]->lacksAccessCheck());
     }
 
@@ -633,7 +633,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertFalse($entries[0]->handlerChecksAccessInBody());
         self::assertTrue($entries[0]->lacksAccessCheck());
     }
 
@@ -660,7 +660,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->handlerChecksAccessInBody());
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
@@ -690,7 +690,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertFalse($entries[0]->handlerChecksAccessInBody());
     }
 
     /**
@@ -948,7 +948,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -971,7 +971,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['PRIMARY_ROLE'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['PRIMARY_ROLE'], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -994,7 +994,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['EDIT'], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -1017,7 +1017,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['EDIT'], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -1040,7 +1040,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame([], $entries[0]->methodLevelIsGranted());
+        self::assertSame([], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -1062,7 +1062,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['ROLE_GROUPED'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['ROLE_GROUPED'], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -1086,7 +1086,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertSame('/cached', $entries[0]->routePath());
-        self::assertTrue($entries[0]->hasRouteAttribute());
+        self::assertTrue($entries[0]->isRouted());
     }
 
     /**
@@ -1109,7 +1109,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertSame('/grouped-route', $entries[0]->routePath());
-        self::assertTrue($entries[0]->hasRouteAttribute());
+        self::assertTrue($entries[0]->isRouted());
     }
 
     /**
@@ -1262,7 +1262,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertCount(1, $entries);
-        self::assertFalse($entries[0]->hasRouteAttribute());
+        self::assertFalse($entries[0]->isRouted());
         self::assertNull($entries[0]->routePath());
         self::assertSame([], $entries[0]->routeMethods());
     }
@@ -1288,7 +1288,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame([], $entries[0]->methodLevelIsGranted());
+        self::assertSame([], $entries[0]->handlerRequiredAttributes());
         self::assertFalse($entries[0]->lacksAccessCheck());
     }
 
@@ -1315,7 +1315,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame([], $entries[0]->methodLevelIsGranted());
+        self::assertSame([], $entries[0]->handlerRequiredAttributes());
         self::assertFalse($entries[0]->lacksAccessCheck());
     }
 
@@ -1338,7 +1338,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertCount(1, $entries);
-        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertFalse($entries[0]->handlerChecksAccessInBody());
     }
 
     /**
@@ -1370,7 +1370,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -1394,7 +1394,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
-        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+        self::assertSame(['EDIT'], $entries[0]->handlerRequiredAttributes());
     }
 
     /**
@@ -1503,9 +1503,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     }
 
     /**
-     * @param list<RouteAccessControl> $entries
+     * @param list<EntrypointAccessControl> $entries
      */
-    private function invokeEntry(array $entries): RouteAccessControl
+    private function invokeEntry(array $entries): EntrypointAccessControl
     {
         foreach ($entries as $entry) {
             if ('__invoke' === $entry->methodName()) {

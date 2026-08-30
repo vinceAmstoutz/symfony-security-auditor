@@ -15,14 +15,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class NullVoterCapabilityParser implements VoterCapabilityParserInterface
+final readonly class NullEntrypointAccessControlParser implements EntrypointAccessControlParserInterface
 {
     #[Override]
-    public function parse(ProjectFile $projectFile): ?VoterCapability
+    public function parse(ProjectFile $projectFile): array
     {
-        return null;
+        return [];
     }
 }

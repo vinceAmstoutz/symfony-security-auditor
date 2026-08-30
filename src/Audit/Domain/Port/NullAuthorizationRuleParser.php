@@ -13,15 +13,16 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
+use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 
-/**
- * Extracts the attribute and subject vocabulary from a single voter file by
- * scanning the body of its `supports()` method. Implementations must degrade
- * silently (return null or no entries) when the file cannot be parsed.
- */
-interface VoterCapabilityParserInterface
+/** @internal not part of the BC promise — see docs/versioning.md */
+final readonly class NullAuthorizationRuleParser implements AuthorizationRuleParserInterface
 {
-    public function parse(ProjectFile $projectFile): ?VoterCapability;
+    #[Override]
+    public function parse(ProjectFile $projectFile): ?AuthorizationRuleCapability
+    {
+        return null;
+    }
 }
