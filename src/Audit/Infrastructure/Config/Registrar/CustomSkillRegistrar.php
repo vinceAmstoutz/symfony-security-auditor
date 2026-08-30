@@ -17,7 +17,7 @@ use Override;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\ConfiguredAttackerSkill;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 

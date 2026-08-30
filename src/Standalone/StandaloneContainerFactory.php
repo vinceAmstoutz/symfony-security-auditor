@@ -30,7 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HostComposi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\SymfonyProfileRegistrars;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\SymfonyProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
@@ -57,7 +57,7 @@ final readonly class StandaloneContainerFactory
         ?HostCompositionRootLoader $hostCompositionRootLoader = null,
     ) {
         $this->hostCompositionRootLoader = $hostCompositionRootLoader ?? new HostCompositionRootLoader(
-            coreCompositionRoot: new CoreCompositionRoot(SymfonyProfileRegistrars::all()),
+            coreCompositionRoot: new CoreCompositionRoot(new SymfonyProfile()),
         );
     }
 

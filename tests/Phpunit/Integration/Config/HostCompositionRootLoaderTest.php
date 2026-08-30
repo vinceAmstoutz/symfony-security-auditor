@@ -28,7 +28,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CoreCompositionRoot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HostCompositionRootLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\SymfonyProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 
 final class HostCompositionRootLoaderTest extends TestCase
@@ -114,7 +116,7 @@ final class HostCompositionRootLoaderTest extends TestCase
         $containerBuilder->register('logger', NullLogger::class);
         $containerBuilder->register(ClockInterface::class, NativeClock::class);
 
-        (new HostCompositionRootLoader())->load($auditConfig, $containerBuilder, 'prod');
+        (new HostCompositionRootLoader(new CoreCompositionRoot(new SymfonyProfile())))->load($auditConfig, $containerBuilder, 'prod');
 
         return $containerBuilder;
     }

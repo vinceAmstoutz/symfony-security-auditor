@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 

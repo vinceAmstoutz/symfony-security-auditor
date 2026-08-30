@@ -96,7 +96,10 @@ src/
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Scan/          # SymfonyProjectFileTypeClassifier (Symfony file conventions), RegexStaticPreScanner, SarifImportingPreScanner (merges scan.import_sarif SARIF results as risk markers), RegexCodeSlicer, PhpParserControllerAccessControlParser, PhpParserVoterCapabilityParser, PhpParserFormBindingParser, SymfonyYamlSecurityConfigParser
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
-      Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer, Skill/{AttackerSkillInterface, AttackerSkillRegistry, one *AttackerSkill per attack surface, ConfiguredAttackerSkill for config-driven audit.custom_skills}), ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSectionsInterface, ReviewerPromptSections, ReviewerMessageRendererInterface, ReviewerMessageRenderer, ReviewerFeedbackHolder})
+      Prompt/        # Symfony prompt content — AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer, Skill/{one *AttackerSkill per attack surface, SymfonySkillSet enumerating them}), ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSectionsInterface, ReviewerPromptSections, ReviewerMessageRendererInterface, ReviewerMessageRenderer})
+      Skill/         # Framework-neutral skill machinery — AttackerSkillInterface, AttackerSkillRegistry, ConfiguredAttackerSkill (config-driven audit.custom_skills)
+      Feedback/      # ReviewerFeedbackHolder, CompositeReviewerFeedbackProvider
+      Config/        # Container wiring — CoreCompositionRoot (takes one FrameworkProfileInterface), HostCompositionRootLoader, ContainerParameterRegistrar, PromptVersions, SymfonyProfile, Registrar/{core registrars, Symfony/* profile registrars}
       Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default) + LockfileHashedAdvisoryCache (TTL-bounded lockfile-hash cache in front of it, wired when cache.enabled), DeferredAdvisoryDatabase (lazy wrapper), InMemoryAdvisoryDatabase (fallback), ComposerAuditRunnerInterface + SymfonyProcessComposerAuditRunner
       Pricing/       # ModelsDevPricingProvider (default), ModelPrice

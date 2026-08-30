@@ -52,8 +52,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
@@ -89,6 +87,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Feedback\CompositeReviewerFeedbackProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Feedback\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
@@ -110,16 +110,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailu
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRendererInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSections;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSectionsInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ExecutiveSummaryReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
@@ -131,16 +121,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownRep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolverInterface;
@@ -265,9 +249,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
         ]);
 
-    $defaultsConfigurator->set(SymfonyProjectFileTypeClassifier::class);
-    $defaultsConfigurator->alias(ProjectFileTypeClassifierInterface::class, SymfonyProjectFileTypeClassifier::class);
-
     $defaultsConfigurator->set(ProjectFileScanner::class)
         ->args([
             service(ProjectFileTypeClassifierInterface::class),
@@ -285,25 +266,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger')->ignoreOnInvalid(),
             inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
         ]);
-    $defaultsConfigurator->set(AttackerSkillRegistry::class)
-        ->args([tagged_iterator('symfony_security_auditor.attacker_skill')]);
-    $defaultsConfigurator->alias(AttackerSkillPromptRendererInterface::class, AttackerSkillRegistry::class);
-
-    $defaultsConfigurator->set(AttackerPromptBuilder::class)
-        ->args([
-            param('symfony_security_auditor.audit.structured_collection'),
-            param('symfony_security_auditor.audit.stable_system_prompt'),
-            service(AttackerSkillRegistry::class),
-        ]);
-    $defaultsConfigurator->alias(AttackerPromptBuilderInterface::class, AttackerPromptBuilder::class);
-
-    $defaultsConfigurator->set(ReviewerPromptSections::class);
-    $defaultsConfigurator->alias(ReviewerPromptSectionsInterface::class, ReviewerPromptSections::class);
-    $defaultsConfigurator->set(ReviewerMessageRenderer::class);
-    $defaultsConfigurator->alias(ReviewerMessageRendererInterface::class, ReviewerMessageRenderer::class);
-
-    $defaultsConfigurator->set(ReviewerFeedbackHolder::class);
-
     $defaultsConfigurator->set(NullTriageMemoryRecorder::class);
 
     $defaultsConfigurator->set(FilesystemTriageMemoryStore::class)
@@ -319,15 +281,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReviewerFeedbackHolder::class),
             service(FilesystemTriageMemoryStore::class),
         ]);
-
-    $defaultsConfigurator->set(ReviewerPromptBuilder::class)
-        ->args([
-            param('symfony_security_auditor.audit.reviewer_structured_collection'),
-            service(ReviewerPromptSectionsInterface::class),
-            service(ReviewerMessageRendererInterface::class),
-            service(ReviewerFeedbackProviderInterface::class),
-        ]);
-    $defaultsConfigurator->alias(ReviewerPromptBuilderInterface::class, ReviewerPromptBuilder::class);
 
     $defaultsConfigurator->set(ConsoleReportRenderer::class);
     $defaultsConfigurator->set(JsonReportRenderer::class);
@@ -412,19 +365,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
             service(GitChangedFilesResolverInterface::class),
         ]);
-
-    $defaultsConfigurator->set(PhpParserControllerAccessControlParser::class);
-    $defaultsConfigurator->alias(ControllerAccessControlParserInterface::class, PhpParserControllerAccessControlParser::class);
-
-    $defaultsConfigurator->set(PhpParserVoterCapabilityParser::class);
-    $defaultsConfigurator->alias(VoterCapabilityParserInterface::class, PhpParserVoterCapabilityParser::class);
-
-    $defaultsConfigurator->set(PhpParserFormBindingParser::class);
-    $defaultsConfigurator->alias(FormBindingParserInterface::class, PhpParserFormBindingParser::class);
-
-    $defaultsConfigurator->set(SymfonyYamlSecurityConfigParser::class)
-        ->args([service('logger')]);
-    $defaultsConfigurator->alias(SecurityConfigParserInterface::class, SymfonyYamlSecurityConfigParser::class);
 
     $defaultsConfigurator->set(MappingStage::class)
         ->args([
@@ -553,14 +493,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
         ]);
 
-    $defaultsConfigurator->set(SymfonyToolRegistryFactory::class)
-        ->args([service('logger'), service(AdvisoryDatabaseInterface::class), service(ProjectFileTypeClassifierInterface::class)]);
-    $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
-
     $defaultsConfigurator->set(NullStaticPreScanner::class);
-    $defaultsConfigurator->set(RegexStaticPreScanner::class)
-        ->args([param('symfony_security_auditor.scan.custom_risk_patterns'), service('logger')]);
-
     $defaultsConfigurator->set(NullCodeSlicer::class);
     $defaultsConfigurator->set(RegexCodeSlicer::class)
         ->args([param('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing')]);

@@ -55,10 +55,39 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   `config/services.php`, which every host imports through `CoreCompositionRoot`
   — so a Laravel host would have been prompted with Symfony's voter, Twig and
   Doctrine surfaces on top of its own. They move into `SymfonySkillRegistrar`,
-  listed by `SymfonyProfileRegistrars`, and `CoreCompositionRoot` now takes the
-  host's profile registrars alongside its core ones. Both Symfony hosts — the
-  bundle and the standalone binary — pass that profile, so the skill set is
-  byte-identical; a host auditing another framework passes its own instead.
+  listed by `SymfonyProfile`, and `CoreCompositionRoot` now takes the host's
+  profile alongside its core registrars. Both Symfony hosts — the bundle and the
+  standalone binary — pass that profile, so the skill set is byte-identical; a
+  host auditing another framework passes its own instead.
+
+- **A framework profile is one object, and deptrac now proves the boundary it
+  draws.** `SymfonyProfileRegistrars::all()` became
+  `SymfonyProfile implements FrameworkProfileInterface`, which a host hands to
+  `CoreCompositionRoot` as its single required constructor argument: it carries
+  both the six `Registrar\Symfony\` registrars and the profile's
+  `PromptVersions`. That second half closes a real hole —
+  `ContainerParameterRegistrar` read `AttackerPromptBuilder::PROMPT_VERSION` and
+  `ReviewerPromptBuilder::PROMPT_VERSION` directly, so a second profile's
+  prompts would have been served cached responses written against Symfony's
+  wording. The Symfony values are unchanged, so existing attacker and reviewer
+  cache keys are byte-identical.
+
+  Tightening the deptrac rule from `Config/Registrar/**` to
+  `Config/Registrar/Symfony/**` exposed nine violations, all of them
+  framework-neutral machinery sitting inside a layer that claims to be Symfony
+  knowledge. `AttackerSkillInterface`, `AttackerSkillRegistry` and
+  `ConfiguredAttackerSkill` move from `Prompt\Skill\` to a new
+  `Infrastructure\Skill\`; `ReviewerFeedbackHolder` and
+  `CompositeReviewerFeedbackProvider` move from `Prompt\Reviewer\` to a new
+  `Infrastructure\Feedback\`; and the composition roots, the DI definition
+  factories and `ContainerParameterRegistrar` leave the layer altogether,
+  because building a Symfony container is not knowledge of the framework being
+  audited. With the registry outside the layer, its `defaultSkills()` fallback —
+  which silently handed any caller the 25 Symfony skills — could no longer be
+  expressed without violating it; the list now lives once, in `SymfonySkillSet`,
+  which both the DI tag and the `AttackerPromptBuilder` fallback read, and the
+  registry takes its skills as a required argument. Deptrac reports 0 violations
+  against the tightened rule.
 
 - **File classification is a Domain port instead of a static call, so a
   non-Symfony profile can be plugged in.** `ProjectFile::create()` classified

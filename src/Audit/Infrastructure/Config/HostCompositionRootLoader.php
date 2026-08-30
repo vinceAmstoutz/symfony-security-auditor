@@ -37,8 +37,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimit
 final readonly class HostCompositionRootLoader
 {
     public function __construct(
+        private CoreCompositionRoot $coreCompositionRoot,
         private AuditConfigurationProcessor $auditConfigurationProcessor = new AuditConfigurationProcessor(),
-        private CoreCompositionRoot $coreCompositionRoot = new CoreCompositionRoot(),
     ) {}
 
     /**

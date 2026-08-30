@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Feedback;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;

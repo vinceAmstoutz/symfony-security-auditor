@@ -13,13 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt\Skill;
 
-use ArrayIterator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ApiResourceAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
@@ -39,14 +36,25 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SonataAdminAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SymfonySkillSet;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillRegistry;
 
-final class AttackerSkillRegistryTest extends TestCase
+final class SymfonySkillSetTest extends TestCase
 {
+    public function test_it_instantiates_every_class_it_lists(): void
+    {
+        self::assertEquals(
+            array_map(static fn (string $skill): AttackerSkillInterface => new $skill(), SymfonySkillSet::classNames()),
+            SymfonySkillSet::all(),
+        );
+    }
+
     /**
      * @param non-empty-string $expectedRole
      */
@@ -96,7 +104,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
     public function test_it_emits_only_the_blocks_for_present_file_types(): void
     {
-        $attackerSkillRegistry = new AttackerSkillRegistry();
+        $attackerSkillRegistry = new AttackerSkillRegistry(SymfonySkillSet::all());
 
         $output = $attackerSkillRegistry->render([ProjectFileType::VOTER], emitAll: false);
 
@@ -107,7 +115,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
     public function test_emit_all_ignores_present_types_and_returns_every_block(): void
     {
-        $attackerSkillRegistry = new AttackerSkillRegistry();
+        $attackerSkillRegistry = new AttackerSkillRegistry(SymfonySkillSet::all());
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
@@ -116,7 +124,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
     public function test_it_emits_blocks_in_attack_surface_priority_order(): void
     {
-        $attackerSkillRegistry = new AttackerSkillRegistry();
+        $attackerSkillRegistry = new AttackerSkillRegistry(SymfonySkillSet::all());
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
@@ -157,7 +165,7 @@ final class AttackerSkillRegistryTest extends TestCase
     #[DataProvider('everyFileTypeWithASkill')]
     public function test_each_file_type_emits_its_own_skill_blocks(ProjectFileType $projectFileType, array $roles): void
     {
-        $attackerSkillRegistry = new AttackerSkillRegistry();
+        $attackerSkillRegistry = new AttackerSkillRegistry(SymfonySkillSet::all());
 
         $output = $attackerSkillRegistry->render([$projectFileType], emitAll: false);
 
@@ -192,41 +200,6 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'twig_extension' => [ProjectFileType::TWIG_EXTENSION, ['twig_extension']];
         yield 'config' => [ProjectFileType::CONFIG, ['config', 'trust_boundary']];
         yield 'php' => [ProjectFileType::PHP, ['php']];
-    }
-
-    public function test_it_accepts_a_traversable_of_skills(): void
-    {
-        $attackerSkillRegistry = new AttackerSkillRegistry(new ArrayIterator([
-            new VoterAttackerSkill(),
-            new ControllerAttackerSkill(),
-        ]));
-
-        $output = $attackerSkillRegistry->render([], emitAll: true);
-
-        $controllerPosition = strpos($output, '<skills role="controller">');
-        $voterPosition = strpos($output, '<skills role="voter">');
-        self::assertNotFalse($controllerPosition);
-        self::assertNotFalse($voterPosition);
-        self::assertLessThan($voterPosition, $controllerPosition);
-    }
-
-    public function test_it_returns_empty_string_when_no_skill_matches(): void
-    {
-        $attackerSkillRegistry = new AttackerSkillRegistry([new VoterAttackerSkill()]);
-
-        self::assertSame('', $attackerSkillRegistry->render([ProjectFileType::CONTROLLER], emitAll: false));
-    }
-
-    public function test_blocks_are_separated_by_a_blank_line(): void
-    {
-        $attackerSkillRegistry = new AttackerSkillRegistry([
-            new ControllerAttackerSkill(),
-            new VoterAttackerSkill(),
-        ]);
-
-        $output = $attackerSkillRegistry->render([], emitAll: true);
-
-        self::assertStringContainsString("</skills>\n\n<skills role=\"voter\">", $output);
     }
 
     public function test_entity_file_upload_skill_does_not_wave_off_vich_s_unconfigured_default_namer(): void

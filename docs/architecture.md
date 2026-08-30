@@ -90,10 +90,13 @@ src/
 │       │                  PhpParser{ControllerAccessControl, VoterCapability, FormBinding}Parser
 │       ├── Diff/        # ProcessGitChangedFilesResolver (git diff for --since)
 │       ├── Prompt/      # AttackerPromptBuilder (+ SymfonyMappingContextRenderer,
-│       │                  NumberedFileContextRenderer, Skill/{AttackerSkillInterface,
-│       │                  AttackerSkillRegistry, one *AttackerSkill per surface}),
+│       │                  NumberedFileContextRenderer, Skill/{SymfonySkillSet,
+│       │                  one *AttackerSkill per surface}),
 │       │                  ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSections,
 │       │                  ReviewerMessageRenderer})
+│       ├── Skill/       # Framework-neutral skill machinery — AttackerSkillInterface,
+│       │                  AttackerSkillRegistry, ConfiguredAttackerSkill
+│       ├── Feedback/    # ReviewerFeedbackHolder, CompositeReviewerFeedbackProvider
 │       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache,
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
@@ -147,16 +150,24 @@ graph LR
 `deptrac.yaml` splits `Infrastructure` in two. A `SymfonyProfile` layer holds
 everything that only makes sense for a Symfony application:
 
-- `Infrastructure/Prompt/**` — the prompt builders and the `Skill/` blocks,
-  whose wording names controllers, voters, forms, Twig templates and Doctrine
-  repositories.
+- `Infrastructure/Prompt/**` — the prompt builders,
+  `SymfonyMappingContextRenderer` and the `Skill/` blocks, whose wording names
+  controllers, voters, forms, Twig templates and Doctrine repositories.
 - the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`,
   `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`,
-  `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and
-  `SymfonyYamlSecurityConfigParser`.
-- the container-building classes in `Infrastructure/Config/` —
-  `AuditConfigurationDefinition`, `CoreCompositionRoot`,
-  `AttackerAgentDefinitionFactory` and `ContainerParameterRegistrar`.
+  `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser`,
+  `SymfonyProjectFileTypeClassifier` and `SymfonyYamlSecurityConfigParser`.
+- `Infrastructure/Config/Registrar/Symfony/**` and the `SymfonyProfile` that
+  lists them — the wiring that puts all of the above into a container.
+
+The line is knowledge of the _audited_ framework, not use of Symfony components
+by the auditor itself. So the composition roots, the registrars in
+`Infrastructure/Config/Registrar/`, the DI definition factories and
+`ContainerParameterRegistrar` all stay outside the layer even though they build
+a Symfony container — as do the skill contract and registry
+(`Infrastructure/Skill/`) and the reviewer-feedback plumbing
+(`Infrastructure/Feedback/`), which carry no framework vocabulary. Whatever a
+Laravel profile would reuse verbatim belongs on the portable side.
 
 The `Infrastructure` layer is then everything under `Infrastructure/` that is
 _not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain`
@@ -699,10 +710,12 @@ Each builder is a thin composer delegating the bulk to collaborators:
   `AttackerSkillInterface` strategies under `Prompt/Skill/` (one class per
   attack surface: `ControllerAttackerSkill`, `ApiResourceAttackerSkill`,
   `VoterAttackerSkill`, …), each declaring its `ProjectFileType` and emission
-  `priority()`. `AttackerSkillRegistry` collects them (via the
-  `symfony_security_auditor.attacker_skill` DI tag) and emits, in priority
-  order, the blocks whose file type appears in the chunk. Adding an attack
-  surface is one new tagged class — no edit to the builder.
+  `priority()`, and all enumerated by `SymfonySkillSet`. `AttackerSkillRegistry`
+  — framework-neutral, in `Infrastructure/Skill/` — collects whatever a profile
+  contributes (via the `symfony_security_auditor.attacker_skill` DI tag) and
+  emits, in priority order, the blocks whose file type appears in the chunk.
+  Adding an attack surface is one new class listed in the set — no edit to the
+  builder or the registry.
 - **Reviewer** — the fixed system-prompt text lives in `ReviewerPromptSections`
   and the two line-numbered user-message templates in `ReviewerMessageRenderer`
   (both under `Prompt/Reviewer/`, behind interfaces); `ReviewerPromptBuilder`
@@ -779,13 +792,20 @@ carrying them: `configure()` hands the config tree to
 `CoreCompositionRoot`. There is still no separate Extension class — the bundle
 remains the entry point Symfony calls.
 
-`CoreCompositionRoot` is the single description of the graph, and it is not
-bundle-specific. It imports `config/services.php`, registers the container
-parameters, then runs six `ServiceRegistrarInterface` implementations
+`CoreCompositionRoot` is the single description of the graph, and it is neither
+bundle-specific nor framework-specific. It takes one `FrameworkProfileInterface`
+— the host says which framework it is auditing — then imports
+`config/services.php`, registers the container parameters (folding the profile's
+`PromptVersions` into the cache-key salts), and runs its six core
+`ServiceRegistrarInterface` implementations
 (`Audit\Infrastructure\Config\Registrar\`): `BudgetRegistrar`,
 `RateLimiterRegistrar`, `LlmClientRegistrar`, `ImplementationAliasRegistrar`,
-`CustomSkillRegistrar` and `EscalationRegistrar`. Adding a conditional wiring
-concern means adding a registrar and listing it, not adding a branch.
+`CustomSkillRegistrar` and `EscalationRegistrar`, followed by the profile's own.
+`SymfonyProfile` supplies the six under `Registrar\Symfony\`: the file-type
+classifier, the source parsers, the static pre-scanner, the 25 attacker skills,
+the prompt builders and the tool registry. Adding a conditional wiring concern
+means adding a registrar and listing it, not adding a branch; auditing another
+framework means passing another profile.
 
 The standalone binary reaches the same object, not a copy of it.
 `StandaloneContainerFactory` calls `HostCompositionRootLoader`, which runs the

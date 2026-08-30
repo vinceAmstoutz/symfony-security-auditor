@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfig
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\BudgetRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\CustomSkillRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\EscalationRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\FrameworkProfileInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\ImplementationAliasRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\LlmClientRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\RateLimiterRegistrar;
@@ -34,21 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\S
  */
 final readonly class CoreCompositionRoot
 {
-    /**
-     * @var list<ServiceRegistrarInterface>
-     */
-    private array $serviceRegistrars;
-
-    /**
-     * @param list<ServiceRegistrarInterface> $profileRegistrars the host's framework profile — the
-     *                                                           attacker skills and source parsers
-     *                                                           that only make sense for the
-     *                                                           framework being audited
-     */
-    public function __construct(array $profileRegistrars = [])
-    {
-        $this->serviceRegistrars = [...$this->coreRegistrars(), ...$profileRegistrars];
-    }
+    public function __construct(private FrameworkProfileInterface $frameworkProfile) {}
 
     /**
      * @throws JsonException
@@ -57,12 +44,20 @@ final readonly class CoreCompositionRoot
     {
         $containerConfigurator->import(\sprintf('%s/../../../../config/services.php', __DIR__));
 
-        (new ContainerParameterRegistrar())->register($bundleConfiguration, $containerBuilder);
+        (new ContainerParameterRegistrar($this->frameworkProfile->promptVersions()))->register($bundleConfiguration, $containerBuilder);
 
         $servicesConfigurator = $containerConfigurator->services();
-        foreach ($this->serviceRegistrars as $serviceRegistrar) {
+        foreach ($this->serviceRegistrars() as $serviceRegistrar) {
             $serviceRegistrar->register($servicesConfigurator, $bundleConfiguration);
         }
+    }
+
+    /**
+     * @return list<ServiceRegistrarInterface>
+     */
+    private function serviceRegistrars(): array
+    {
+        return [...$this->coreRegistrars(), ...$this->frameworkProfile->registrars()];
     }
 
     /**
