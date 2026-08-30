@@ -21,7 +21,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentIn
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizerInterface;
@@ -497,13 +496,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(NullCodeSlicer::class);
     $defaultsConfigurator->set(RegexCodeSlicer::class)
         ->args([param('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing')]);
-
-    $defaultsConfigurator->set(FileChunker::class)
-        ->args([
-            inline_service(ChunkingStrategy::class)
-                ->factory([ChunkingStrategy::class, 'from'])
-                ->args([param('symfony_security_auditor.audit.chunking.strategy')]),
-        ]);
 
     $defaultsConfigurator->set(RecordVulnerabilityToolFactory::class);
     $defaultsConfigurator->alias(RecordVulnerabilityToolFactoryInterface::class, RecordVulnerabilityToolFactory::class);

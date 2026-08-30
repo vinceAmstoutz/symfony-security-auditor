@@ -80,6 +80,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPro
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyChunkingVocabulary;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
@@ -616,7 +617,9 @@ final class AttackerAgentTest extends TestCase
     {
         $recordingLLMClient = new RecordingLLMClient();
 
-        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient);
+        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient, [
+            'fileChunker' => new FileChunker(chunkingVocabulary: SymfonyChunkingVocabulary::create()),
+        ]);
 
         $this->callAnalyze($attackerAgent,
             [$this->makeFile($lowerPriorityPath), $this->makeFile($higherPriorityPath)],
@@ -1299,7 +1302,7 @@ final class AttackerAgentTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create())]);
 
         $budgetExceeded = false;
         try {
@@ -1359,7 +1362,7 @@ final class AttackerAgentTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create())]);
 
         $budgetExceeded = false;
         try {
@@ -2415,7 +2418,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -2573,7 +2576,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $recordingProgressReporter,
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -2618,7 +2621,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $recordingProgressReporter,
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -2663,7 +2666,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $recordingProgressReporter,
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -3385,7 +3388,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -3497,7 +3500,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
                 toolRegistryFactory: $toolRegistryFactory,
             ),
             new AttackerAnalysisSettings(
@@ -3523,7 +3526,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: $attackerCache ?? new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $progressReporter ?? new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,

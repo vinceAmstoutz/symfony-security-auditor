@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking;
 
 use Symfony\Component\String\UnicodeString;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ChunkingVocabulary;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 use function Symfony\Component\String\u;
 
@@ -24,38 +24,13 @@ final readonly class FileChunker
 {
     private const int DEFAULT_CHUNK_SIZE = 10;
 
-    /**
-     * @var list<ProjectFileType>
-     */
-    private const array TYPE_PRIORITY = [
-        ProjectFileType::CONTROLLER,
-        ProjectFileType::API_RESOURCE,
-        ProjectFileType::LIVE_COMPONENT,
-        ProjectFileType::AUTHENTICATOR,
-        ProjectFileType::LDAP_SERVICE,
-        ProjectFileType::SONATA_ADMIN,
-        ProjectFileType::EASYADMIN_CRUD,
-        ProjectFileType::VOTER,
-        ProjectFileType::WEBHOOK_CONSUMER,
-        ProjectFileType::MESSENGER_HANDLER,
-        ProjectFileType::EVENT_SUBSCRIBER,
-        ProjectFileType::NORMALIZER,
-        ProjectFileType::ENTITY,
-        ProjectFileType::REPOSITORY,
-        ProjectFileType::FORM,
-        ProjectFileType::SCHEDULER,
-        ProjectFileType::TEMPLATE,
-        ProjectFileType::TWIG_EXTENSION,
-        ProjectFileType::CONFIG,
-        ProjectFileType::PHP,
-    ];
-
     /** @var int<1, max> */
     private int $chunkSize;
 
     public function __construct(
         private ChunkingStrategy $chunkingStrategy = ChunkingStrategy::Feature,
         int $chunkSize = self::DEFAULT_CHUNK_SIZE,
+        private ChunkingVocabulary $chunkingVocabulary = new ChunkingVocabulary(),
     ) {
         $this->chunkSize = max(1, $chunkSize);
     }
@@ -176,12 +151,10 @@ final readonly class FileChunker
 
     private function featureNameOf(ProjectFile $projectFile): ?string
     {
-        $baseName = basename($projectFile->relativePath(), '.php');
-        $featureName = match ($projectFile->fileType()) {
-            ProjectFileType::CONTROLLER => u($baseName)->beforeLast('Controller')->toString(),
-            ProjectFileType::EASYADMIN_CRUD => u($baseName)->beforeLast('CrudController')->toString(),
-            default => $baseName,
-        };
+        $featureName = $this->chunkingVocabulary->featureNameOf(
+            $projectFile->fileType(),
+            basename($projectFile->relativePath(), '.php'),
+        );
 
         return '' === $featureName ? null : $featureName;
     }
@@ -218,7 +191,7 @@ final readonly class FileChunker
      */
     private function findFeatureForFile(ProjectFile $projectFile, array $featureNames): ?string
     {
-        $baseName = basename(basename($projectFile->relativePath(), '.php'), '.twig');
+        $baseName = $this->chunkingVocabulary->stripTemplateExtension(basename($projectFile->relativePath(), '.php'));
         $relativePath = $projectFile->relativePath();
 
         $matchedFeature = null;
@@ -271,8 +244,6 @@ final readonly class FileChunker
 
     private function priority(ProjectFile $projectFile): int
     {
-        $index = array_search($projectFile->fileType(), self::TYPE_PRIORITY, true);
-
-        return false !== $index ? $index : \count(self::TYPE_PRIORITY);
+        return $this->chunkingVocabulary->priorityOf($projectFile->fileType());
     }
 }

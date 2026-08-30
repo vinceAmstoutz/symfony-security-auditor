@@ -60,6 +60,26 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   standalone binary — pass that profile, so the skill set is byte-identical; a
   host auditing another framework passes its own instead.
 
+- **The chunker no longer knows what a controller is called.** `FileChunker`
+  decides which surfaces the attacker sees first, which files belong to which
+  feature, and which extension a template hides behind — and it did all three
+  from hardcoded Symfony knowledge: a 20-entry `TYPE_PRIORITY` table of Symfony
+  `ProjectFileType` cases, a `match` stripping `Controller` / `CrudController`,
+  and a literal `.twig`. Every Laravel type therefore sorted behind every
+  Symfony one, a `UserController` in a Laravel app grouped by luck, and a
+  `.blade.php` view could never join its feature. Those three facts move into a
+  `ChunkingVocabulary` the profile supplies, wired by `SymfonyChunkingRegistrar`
+  from `SymfonyChunkingVocabulary`. The Symfony ordering, suffixes and extension
+  are carried over exactly — including `beforeLast()`'s two easily-missed edges,
+  that a name without the suffix keeps all of itself
+  (`src/Controller/Dashboard.php` still names feature `Dashboard`) while a name
+  that is only the suffix names nothing — so chunk composition, and therefore
+  every prompt, is unchanged; a new `FileChunkerTest` case pins the first of
+  those, which nothing had covered. A vocabulary with no conventions is
+  deliberately usable: it chunks by feature without renaming or reordering, so a
+  profile that supplies none is neutral rather than silently borrowing
+  Symfony's.
+
 - **A framework profile is one object, and deptrac now proves the boundary it
   draws.** `SymfonyProfileRegistrars::all()` became
   `SymfonyProfile implements FrameworkProfileInterface`, which a host hands to

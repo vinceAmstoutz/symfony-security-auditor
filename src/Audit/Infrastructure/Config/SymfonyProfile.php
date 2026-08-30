@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\FrameworkProfileInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\ServiceRegistrarInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\Symfony\SymfonyChunkingRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\Symfony\SymfonyClassifierRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\Symfony\SymfonyPromptRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\Symfony\SymfonySkillRegistrar;
@@ -43,6 +44,7 @@ final readonly class SymfonyProfile implements FrameworkProfileInterface
     {
         return [
             new SymfonyClassifierRegistrar(),
+            new SymfonyChunkingRegistrar(),
             new SymfonySourceParserRegistrar(),
             new SymfonyStaticPreScanRegistrar(),
             new SymfonySkillRegistrar(),

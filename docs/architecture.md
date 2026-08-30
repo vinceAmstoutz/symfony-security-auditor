@@ -329,8 +329,9 @@ relies on to extract security config from every config file in the project.
 These predicates and `SymfonyMapping` construction (`ProjectFileInventory`)
 drive metadata/reporting buckets; `AttackerAgent` chunking priority and skill
 selection key off `fileType()` directly. `ProjectFileType` is the single source
-of truth for the file-type vocabulary, referenced by the chunker, the static
-pre-scanner buckets, and the attacker skill-block ordering.
+of truth for the file-type vocabulary, referenced by the profile's
+`ChunkingVocabulary`, the static pre-scanner buckets, and the attacker
+skill-block ordering.
 
 `archetype()` returns the framework-neutral shape of the file — a
 `SurfaceArchetype` case (`HTTP_ENTRYPOINT`, `AUTHORIZATION_RULE`,
@@ -496,6 +497,15 @@ Sorts files by security priority before chunking:
 | 4        | Forms           |
 | 5        | Everything else |
 
+That order is not the chunker's own. `FileChunker` reads a `ChunkingVocabulary`
+— the surface priority, the class-name suffix an entrypoint drops to name its
+feature (`*Controller`, EasyAdmin's `*CrudController`), and the template
+extensions that sit in front of `.php` (`.twig`) — which
+`SymfonyChunkingVocabulary` supplies and `SymfonyChunkingRegistrar` wires. A
+vocabulary with no conventions is usable: it chunks by feature without renaming
+or reordering anything, so a profile that supplies none is neutral rather than
+silently borrowing Symfony's.
+
 `analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
 `bypassCache`, `previousFindings`, `rejectedFindings`) plus a
 `CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan,
@@ -514,8 +524,8 @@ content never changed; `AttackerChunkCache` adapts `AttackerCacheInterface`
 strategies, and both build their structured-collection round (a fresh collector
 wired into a single-tool `record_vulnerability` registry) through the shared
 `StructuredVulnerabilityCollectionSession::begin()`; `ChunkCoverageRecorder`
-records per-file coverage. The chunk-priority ordering above is defined once on
-`FileChunker` over `ProjectFileType` cases. Risk markers are indexed by
+records per-file coverage. The chunk-priority ordering above is defined once, on
+the profile's `ChunkingVocabulary`. Risk markers are indexed by
 `RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt
 preambles are rendered by `AttackerContextPromptRenderer`.
 

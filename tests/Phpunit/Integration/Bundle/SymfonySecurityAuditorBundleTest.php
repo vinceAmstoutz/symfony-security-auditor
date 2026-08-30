@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
@@ -46,7 +47,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Depend
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
@@ -92,6 +95,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\ConfiguredAt
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
 {
@@ -1090,6 +1094,30 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'requests_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['requests_per_minute' => 1]]]];
         yield 'input_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['input_tokens_per_minute' => 1]]]];
         yield 'output_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['output_tokens_per_minute' => 1]]]];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_bundle_gives_the_chunker_the_configured_strategy_and_symfony_surface_priority(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['chunking' => ['strategy' => 'type']]]);
+
+        $fileChunker = $this->getPrivateService($kernel, FileChunker::class);
+        self::assertInstanceOf(FileChunker::class, $fileChunker);
+
+        $chunks = $fileChunker->chunk([
+            SymfonyProjectFile::create('src/Entity/Invoice.php', '/app/src/Entity/Invoice.php', '<?php'),
+            SymfonyProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php'),
+        ]);
+
+        self::assertCount(1, $chunks);
+        self::assertSame(
+            ['src/Controller/UserController.php', 'src/Entity/Invoice.php'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $chunks[0]),
+        );
     }
 
     #[DataProvider('chunkingStrategyCases')]
