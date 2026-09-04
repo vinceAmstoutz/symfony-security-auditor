@@ -164,8 +164,9 @@ and provider switching.
 ### 3. Run
 
 ```bash
-# export the env var your config references, then audit any project
-export ANTHROPIC_API_KEY=sk-…
+# read the key your config references & keeps it out of your shell history
+printf 'Anthropic API key: '; read -rs ANTHROPIC_API_KEY; echo
+export ANTHROPIC_API_KEY
 symfony-security-auditor audit /path/to/your/symfony/project
 ```
 
