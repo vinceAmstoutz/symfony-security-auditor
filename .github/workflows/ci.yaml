@@ -200,6 +200,12 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: pcov
+          # pcov.directory is PHP_INI_PERDIR, so neither phpunit.dist.xml's
+          # <php><ini> nor ini_set() can change it — it has to be set here.
+          # Left to itself the action picks a single conventional source
+          # directory (src), which silently reports every line of
+          # packages/core/src as uncovered.
+          ini-values: pcov.directory=.
 
       - name: Cache Composer dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
