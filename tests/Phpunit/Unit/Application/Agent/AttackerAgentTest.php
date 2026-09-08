@@ -21,66 +21,68 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\ErrorHandler\BufferingLogger;
 use Symfony\Component\Validator\Validation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityDropReason;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityDropReason;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyChunkingVocabulary;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
@@ -321,7 +323,7 @@ final class AttackerAgentTest extends TestCase
     {
         $inertLines = str_repeat("        \$x = 1;\n", 40);
         $content = "<?php\n".$inertLines.'        $qb->where("u.username = $username");'."\n".$inertLines;
-        $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', $content);
+        $projectFile = SymfonyProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', $content);
 
         $captured = '';
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -363,7 +365,7 @@ final class AttackerAgentTest extends TestCase
     {
         $inertLines = str_repeat("        \$x = 1;\n", 40);
         $content = "<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        return null;\n    }\n}\n".$inertLines;
-        $projectFile = ProjectFile::create('src/Security/LoginAuthenticator.php', '/app/src/Security/LoginAuthenticator.php', $content);
+        $projectFile = SymfonyProjectFile::create('src/Security/LoginAuthenticator.php', '/app/src/Security/LoginAuthenticator.php', $content);
 
         $captured = '';
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -415,7 +417,7 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $symfonyMapping = SymfonyMapping::of(
-            ProjectFileInventory::fromGroups(['controllers' => $files]),
+            ProjectFileInventory::fromGroups(['entrypoints' => $files]),
             new AccessControlMap(),
         );
 
@@ -615,7 +617,9 @@ final class AttackerAgentTest extends TestCase
     {
         $recordingLLMClient = new RecordingLLMClient();
 
-        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient);
+        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient, [
+            'fileChunker' => new FileChunker(chunkingVocabulary: SymfonyChunkingVocabulary::create()),
+        ]);
 
         $this->callAnalyze($attackerAgent,
             [$this->makeFile($lowerPriorityPath), $this->makeFile($higherPriorityPath)],
@@ -1298,7 +1302,7 @@ final class AttackerAgentTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create())]);
 
         $budgetExceeded = false;
         try {
@@ -1358,7 +1362,7 @@ final class AttackerAgentTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create())]);
 
         $budgetExceeded = false;
         try {
@@ -1966,7 +1970,7 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner]);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
@@ -1991,7 +1995,7 @@ final class AttackerAgentTest extends TestCase
                 return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
-        $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
@@ -2007,7 +2011,7 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
+        $projectFile = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['leanMode' => true]);
 
         $result = $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
@@ -2048,8 +2052,8 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
-        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true]);
 
         $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
@@ -2086,8 +2090,8 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
-        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true]);
 
         $coverageRecorder = new class implements CoverageRecorderInterface {
@@ -2155,7 +2159,7 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache, 'staticPreScanner' => $scanner]);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
@@ -2175,7 +2179,7 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::of('', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
@@ -2185,7 +2189,7 @@ final class AttackerAgentTest extends TestCase
      */
     private function makeFile(string $path): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
+        return SymfonyProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
     }
 
     /**
@@ -2414,7 +2418,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -2572,7 +2576,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $recordingProgressReporter,
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -2617,7 +2621,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $recordingProgressReporter,
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -2662,7 +2666,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $recordingProgressReporter,
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -3384,7 +3388,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -3496,7 +3500,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
                 toolRegistryFactory: $toolRegistryFactory,
             ),
             new AttackerAnalysisSettings(
@@ -3522,7 +3526,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: $attackerCache ?? new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: $progressReporter ?? new NullProgressReporter(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1, SymfonyChunkingVocabulary::create()),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,

@@ -16,14 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InsufficientTrendReportsException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPoint;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\InsufficientTrendReportsException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\MalformedReportFileException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\ReportFileNotReadableException;
+use VinceAmstoutz\SecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SecurityAuditor\Command\ReportTrendAnalyzer;
+use VinceAmstoutz\SecurityAuditor\Command\TrendPoint;
 
 final class ReportTrendAnalyzerTest extends TestCase
 {

@@ -20,35 +20,36 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Validator\Validation;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\AttackerChunkCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ConcurrentChunkAnalyzer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\AttackerChunkCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\ConcurrentChunkAnalyzer;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
 final class ConcurrentChunkAnalyzerTest extends TestCase
@@ -380,7 +381,7 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
      */
     private function makeFile(string $path): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, '<?php');
+        return SymfonyProjectFile::create($path, '/app/'.$path, '<?php');
     }
 
     private static function registryOf(mixed $request): ToolRegistry

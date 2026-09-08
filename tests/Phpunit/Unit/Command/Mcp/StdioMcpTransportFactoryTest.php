@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Mcp;
 
 use Mcp\Server\Transport\StdioTransport;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\StdioMcpTransportFactory;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\StdioMcpTransportFactory;
 
 final class StdioMcpTransportFactoryTest extends TestCase
 {

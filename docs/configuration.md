@@ -309,7 +309,7 @@ first call and caches the result for the lifetime of the request.
 ```yaml
 # config/services.yaml
 services:
-    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
+    VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
         alias: App\Security\MyCustomAdvisoryDatabase
 ```
 

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 /**
  * Recording estimator — returns 0 but captures the length of the last input seen.

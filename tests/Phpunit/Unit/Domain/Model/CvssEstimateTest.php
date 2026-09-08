@@ -15,9 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CvssEstimate;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\CvssEstimate;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
 final class CvssEstimateTest extends TestCase
 {

@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskMarker;
 
 final class RiskMarkerTest extends TestCase
 {

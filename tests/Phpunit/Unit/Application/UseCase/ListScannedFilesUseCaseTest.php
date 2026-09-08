@@ -15,11 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
 
 use Override;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class ListScannedFilesUseCaseTest extends TestCase
 {
@@ -129,6 +130,6 @@ final class ListScannedFilesUseCaseTest extends TestCase
      */
     private function makeProjectFile(string $relativePath): ProjectFile
     {
-        return ProjectFile::create($relativePath, '/project/'.$relativePath, '<?php');
+        return SymfonyProjectFile::create($relativePath, '/project/'.$relativePath, '<?php');
     }
 }

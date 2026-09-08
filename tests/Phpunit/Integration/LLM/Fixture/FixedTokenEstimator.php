@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 final class FixedTokenEstimator implements TokenEstimatorInterface
 {

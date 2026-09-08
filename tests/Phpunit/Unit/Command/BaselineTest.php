@@ -16,11 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
+use VinceAmstoutz\SecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineEntry;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 final class BaselineTest extends TestCase
 {

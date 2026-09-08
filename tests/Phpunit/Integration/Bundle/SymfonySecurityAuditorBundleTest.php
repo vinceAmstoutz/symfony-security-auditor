@@ -33,62 +33,69 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AccessControlConfigParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Feedback\CompositeReviewerFeedbackProvider;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Feedback\ReviewerFeedbackHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SecurityAuditor\Command\AuditFailureExitCodeListener;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SymfonySkillSet;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
 {
@@ -135,7 +142,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $attackerSkillRegistry = $this->getPrivateService($kernel, AttackerSkillRegistry::class);
         self::assertInstanceOf(AttackerSkillRegistry::class, $attackerSkillRegistry);
 
-        self::assertSame((new AttackerSkillRegistry())->render([], true), $attackerSkillRegistry->render([], true));
+        self::assertSame((new AttackerSkillRegistry(SymfonySkillSet::all()))->render([], true), $attackerSkillRegistry->render([], true));
     }
 
     #[RunInSeparateProcess]
@@ -239,6 +246,19 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $pathArgument = $definition->getArgument(1);
         self::assertInstanceOf(Reference::class, $pathArgument);
         self::assertSame(AuditedProjectPathHolder::class, (string) $pathArgument);
+    }
+
+    public function test_bundle_gives_the_security_config_parser_the_application_logger(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertSame(
+            SymfonyYamlSecurityConfigParser::class,
+            (string) $containerBuilder->getAlias(AccessControlConfigParserInterface::class),
+        );
+        $loggerArgument = $containerBuilder->getDefinition(SymfonyYamlSecurityConfigParser::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $loggerArgument);
+        self::assertSame('logger', (string) $loggerArgument);
     }
 
     public function test_offline_only_replaces_the_advisory_feed_with_an_empty_local_one(): void
@@ -1074,6 +1094,30 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'requests_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['requests_per_minute' => 1]]]];
         yield 'input_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['input_tokens_per_minute' => 1]]]];
         yield 'output_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['output_tokens_per_minute' => 1]]]];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_bundle_gives_the_chunker_the_configured_strategy_and_symfony_surface_priority(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['chunking' => ['strategy' => 'type']]]);
+
+        $fileChunker = $this->getPrivateService($kernel, FileChunker::class);
+        self::assertInstanceOf(FileChunker::class, $fileChunker);
+
+        $chunks = $fileChunker->chunk([
+            SymfonyProjectFile::create('src/Entity/Invoice.php', '/app/src/Entity/Invoice.php', '<?php'),
+            SymfonyProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php'),
+        ]);
+
+        self::assertCount(1, $chunks);
+        self::assertSame(
+            ['src/Controller/UserController.php', 'src/Entity/Invoice.php'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $chunks[0]),
+        );
     }
 
     #[DataProvider('chunkingStrategyCases')]

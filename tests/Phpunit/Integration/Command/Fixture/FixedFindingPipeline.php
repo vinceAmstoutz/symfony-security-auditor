@@ -14,11 +14,11 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 /**
  * Test fake — bypasses the attacker/reviewer loop entirely and hands the
@@ -43,7 +43,7 @@ final readonly class FixedFindingPipeline implements PipelineInterface
     public function process(AuditContext $auditContext): void
     {
         $auditContext->setProjectFiles([
-            ProjectFile::create($this->vulnerability->filePath(), $this->vulnerability->filePath(), '<?php'),
+            SymfonyProjectFile::create($this->vulnerability->filePath(), $this->vulnerability->filePath(), '<?php'),
         ]);
         $auditContext->addVulnerability($this->vulnerability);
     }

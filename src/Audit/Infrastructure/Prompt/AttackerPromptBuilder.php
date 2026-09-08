@@ -14,11 +14,12 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SymfonySkillSet;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInterface
@@ -35,11 +36,15 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
     public const bool DEFAULT_EMIT_ALL_SKILLS = false;
 
+    private AttackerSkillRegistry $attackerSkillRegistry;
+
     public function __construct(
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
         private bool $emitAllSkills = self::DEFAULT_EMIT_ALL_SKILLS,
-        private AttackerSkillRegistry $attackerSkillRegistry = new AttackerSkillRegistry(),
-    ) {}
+        ?AttackerSkillRegistry $attackerSkillRegistry = null,
+    ) {
+        $this->attackerSkillRegistry = $attackerSkillRegistry ?? new AttackerSkillRegistry(SymfonySkillSet::all());
+    }
 
     /**
      * @param list<ProjectFile> $files

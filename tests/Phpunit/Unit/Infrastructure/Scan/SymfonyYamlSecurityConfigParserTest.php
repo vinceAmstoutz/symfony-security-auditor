@@ -30,7 +30,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_a_document_with_numeric_top_level_keys_is_ignored_instead_of_crashing(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             1:
                 question: Example question
 
@@ -43,7 +43,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_parses_scalar_roles(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/admin, roles: ROLE_ADMIN }
@@ -54,7 +54,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_parses_list_form_roles(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - path: ^/admin
@@ -66,7 +66,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_two_rules_for_the_same_path_keep_first_match_precedence_instead_of_last_wins(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/api/orders, methods: [GET], roles: PUBLIC_ACCESS }
@@ -81,7 +81,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_an_explicitly_empty_roles_rule_is_recorded_as_public_instead_of_dropped(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/status, roles: [] }
@@ -92,7 +92,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_a_later_rule_for_a_publicly_matched_path_does_not_override_first_match(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/status, roles: [] }
@@ -104,7 +104,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_a_public_rule_after_a_restricted_rule_for_the_same_path_is_appended_as_or(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/status, methods: [POST], roles: ROLE_ADMIN }
@@ -119,7 +119,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_a_fully_public_rule_after_a_restricted_rule_for_the_same_path_is_appended_as_or_public(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/reports, methods: [POST], roles: ROLE_ADMIN }
@@ -134,7 +134,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_a_path_after_a_merged_duplicate_is_still_processed(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/api/orders, methods: [GET], roles: PUBLIC_ACCESS }
@@ -148,7 +148,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_merging_a_later_duplicate_retains_earlier_recorded_paths(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/admin, roles: ROLE_ADMIN }
@@ -164,7 +164,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_surfaces_allow_if_expressions(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - path: ^/api
@@ -179,7 +179,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_surfaces_methods_ips_and_channel_constraints(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - path: ^/internal
@@ -205,7 +205,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
      */
     public function test_it_normalizes_lowercase_methods_to_uppercase(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - path: ^/admin
@@ -221,7 +221,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_surfaces_a_host_constraint_alongside_roles(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - path: ^/admin
@@ -237,7 +237,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_records_a_host_only_access_control_entry_instead_of_dropping_it(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - path: ^/internal-admin
@@ -252,7 +252,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_surfaces_a_port_constraint(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - path: ^/admin
@@ -268,7 +268,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_reads_access_control_inside_when_env_blocks(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             when@prod:
                 security:
                     access_control:
@@ -280,7 +280,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_keys_route_based_entries_by_route_name(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { route: api_admin_dashboard, roles: ROLE_ADMIN }
@@ -291,7 +291,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_reads_bare_root_access_control(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(
             "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n",
         );
 
@@ -300,7 +300,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_skips_entries_without_path_or_requirements(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { roles: ROLE_ADMIN }
@@ -312,7 +312,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_skips_an_entry_with_a_blank_path_instead_of_recording_a_universal_match_pattern(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: '', roles: ROLE_ADMIN }
@@ -323,7 +323,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_skips_an_entry_with_a_whitespace_only_path(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: '   ', roles: ROLE_ADMIN }
@@ -334,7 +334,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_merges_access_control_across_root_and_when_env_sections(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/admin, roles: ROLE_ADMIN }
@@ -352,7 +352,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_keeps_collecting_entries_after_one_without_a_path(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { roles: ROLE_ORPHAN }
@@ -364,7 +364,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_keeps_collecting_entries_after_one_without_requirements(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/bare }
@@ -378,20 +378,20 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
     {
         $yaml = "access_control:\n    - { path: ^/admin, roles: ROLE_ADMIN }\nfirewalls:\n    main:\n        pattern: ^/\n";
 
-        self::assertSame(['^/admin' => ['ROLE_ADMIN']], $this->symfonyYamlSecurityConfigParser->parseAccessControl($yaml));
-        self::assertSame(['^/'], $this->symfonyYamlSecurityConfigParser->parseFirewallRules($yaml));
+        self::assertSame(['^/admin' => ['ROLE_ADMIN']], $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap($yaml));
+        self::assertSame(['^/'], $this->symfonyYamlSecurityConfigParser->parsePerimeterRules($yaml));
     }
 
     public function test_a_bare_root_partial_with_only_firewalls_is_read(): void
     {
         $yaml = "firewalls:\n    api:\n        pattern: ^/api\n";
 
-        self::assertSame(['^/api'], $this->symfonyYamlSecurityConfigParser->parseFirewallRules($yaml));
+        self::assertSame(['^/api'], $this->symfonyYamlSecurityConfigParser->parsePerimeterRules($yaml));
     }
 
     public function test_a_security_block_nested_under_an_unrelated_key_is_ignored(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             some_bundle:
                 security:
                     access_control:
@@ -411,20 +411,20 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
                 self::callback(static fn (array $context): bool => \is_string($context['error'] ?? null) && '' !== $context['error']),
             );
 
-        (new SymfonyYamlSecurityConfigParser($logger))->parseAccessControl("\t{ not: yaml");
+        (new SymfonyYamlSecurityConfigParser($logger))->parseEntrypointAccessMap("\t{ not: yaml");
     }
 
     public function test_it_trims_quoted_padded_paths_and_patterns(): void
     {
         self::assertSame(
             ['^/admin' => ['ROLE_ADMIN']],
-            $this->symfonyYamlSecurityConfigParser->parseAccessControl(
+            $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(
                 "security:\n    access_control:\n        - { path: ' ^/admin ', roles: ROLE_ADMIN }\n",
             ),
         );
         self::assertSame(
             ['^/api'],
-            $this->symfonyYamlSecurityConfigParser->parseFirewallRules(
+            $this->symfonyYamlSecurityConfigParser->parsePerimeterRules(
                 "security:\n    firewalls:\n        api:\n            pattern: ' ^/api '\n",
             ),
         );
@@ -432,7 +432,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_plural_roles_win_over_the_legacy_singular_role_key(): void
     {
-        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap(<<<'YAML'
             security:
                 access_control:
                     - { path: ^/both, roles: ROLE_PLURAL, role: ROLE_SINGULAR }
@@ -443,21 +443,21 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_returns_empty_for_unparseable_yaml(): void
     {
-        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parseAccessControl("\t{ not: yaml"));
-        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parseFirewallRules("\t{ not: yaml"));
+        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap("\t{ not: yaml"));
+        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parsePerimeterRules("\t{ not: yaml"));
     }
 
     public function test_it_returns_empty_for_non_security_configuration(): void
     {
         $yaml = "framework:\n    secret: '%env(APP_SECRET)%'\n";
 
-        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parseAccessControl($yaml));
-        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parseFirewallRules($yaml));
+        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parseEntrypointAccessMap($yaml));
+        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parsePerimeterRules($yaml));
     }
 
     public function test_it_lists_firewall_patterns(): void
     {
-        $firewallRules = $this->symfonyYamlSecurityConfigParser->parseFirewallRules(<<<'YAML'
+        $firewallRules = $this->symfonyYamlSecurityConfigParser->parsePerimeterRules(<<<'YAML'
             security:
                 firewalls:
                     main:
@@ -469,7 +469,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_flags_disabled_security_and_stateless_firewalls(): void
     {
-        $firewallRules = $this->symfonyYamlSecurityConfigParser->parseFirewallRules(<<<'YAML'
+        $firewallRules = $this->symfonyYamlSecurityConfigParser->parsePerimeterRules(<<<'YAML'
             security:
                 firewalls:
                     dev:
@@ -488,7 +488,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
 
     public function test_it_falls_back_to_the_firewall_name_when_no_pattern_is_set(): void
     {
-        $firewallRules = $this->symfonyYamlSecurityConfigParser->parseFirewallRules(<<<'YAML'
+        $firewallRules = $this->symfonyYamlSecurityConfigParser->parsePerimeterRules(<<<'YAML'
             security:
                 firewalls:
                     main:

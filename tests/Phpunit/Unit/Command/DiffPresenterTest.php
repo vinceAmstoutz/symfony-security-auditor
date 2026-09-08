@@ -18,10 +18,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffOutputFormat;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiff;
+use VinceAmstoutz\SecurityAuditor\Command\DiffFinding;
+use VinceAmstoutz\SecurityAuditor\Command\DiffOutputFormat;
+use VinceAmstoutz\SecurityAuditor\Command\DiffPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\ReportDiff;
 
 final class DiffPresenterTest extends TestCase
 {

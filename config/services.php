@@ -16,195 +16,155 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigura
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\FixSynthesizer;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\FixSynthesizerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AccessControlConfigParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AuthorizationRuleParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\EntrypointAccessControlParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProjectFileTypeClassifierInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Feedback\CompositeReviewerFeedbackProvider;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Feedback\ReviewerFeedbackHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\AnthropicTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\CharacterRatioCounter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\DeepSeekTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\GeminiTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\LlamaTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MiniMaxTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MistralTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\OpenAiTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ExecutiveSummaryReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\GithubCommentReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
+use VinceAmstoutz\SecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SecurityAuditor\Command\AuditExitCodeResolver;
+use VinceAmstoutz\SecurityAuditor\Command\AuditExitCodeResolverInterface;
+use VinceAmstoutz\SecurityAuditor\Command\AuditFailureExitCodeListener;
+use VinceAmstoutz\SecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\AuditPresenterInterface;
+use VinceAmstoutz\SecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineCommand;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineInterface;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineMerger;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineMergerInterface;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineProcessorInterface;
+use VinceAmstoutz\SecurityAuditor\Command\ConsoleBanner;
+use VinceAmstoutz\SecurityAuditor\Command\ConsoleBannerInterface;
+use VinceAmstoutz\SecurityAuditor\Command\DiffCommand;
+use VinceAmstoutz\SecurityAuditor\Command\DiffPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\DiffPresenterInterface;
+use VinceAmstoutz\SecurityAuditor\Command\FindingTypeFilter;
+use VinceAmstoutz\SecurityAuditor\Command\FindingTypeFilterInterface;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\AuditTool;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\McpServeCommand;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\McpServerFactory;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\McpServerFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\StdioMcpTransportFactory;
+use VinceAmstoutz\SecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SecurityAuditor\Command\ReportDifferInterface;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoaderInterface;
+use VinceAmstoutz\SecurityAuditor\Command\ReportTrendAnalyzer;
+use VinceAmstoutz\SecurityAuditor\Command\ReportTrendAnalyzerInterface;
+use VinceAmstoutz\SecurityAuditor\Command\ReportWriter;
+use VinceAmstoutz\SecurityAuditor\Command\ReportWriterInterface;
+use VinceAmstoutz\SecurityAuditor\Command\TrendCommand;
+use VinceAmstoutz\SecurityAuditor\Command\TrendHtmlRenderer;
+use VinceAmstoutz\SecurityAuditor\Command\TrendHtmlRendererInterface;
+use VinceAmstoutz\SecurityAuditor\Command\TrendPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\TrendPresenterInterface;
+use VinceAmstoutz\SecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\AnthropicTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\CharacterRatioCounter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\DeepSeekTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\GeminiTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\LlamaTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MiniMaxTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MistralTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\OpenAiTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRendererInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSections;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSectionsInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ApiResourceAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerEasyAdminAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerTrustBoundaryAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityFileUploadAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LdapServiceAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LiveComponentAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\MessengerHandlerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\NormalizerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SonataAdminAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ExecutiveSummaryReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubCommentReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolverInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMergerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\StdioMcpTransportFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDifferInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoaderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRendererInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -290,6 +250,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(ProjectFileScanner::class)
         ->args([
+            service(ProjectFileTypeClassifierInterface::class),
             service('logger'),
             param('symfony_security_auditor.scan.included_paths'),
             param('symfony_security_auditor.scan.respect_gitignore'),
@@ -304,50 +265,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger')->ignoreOnInvalid(),
             inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
         ]);
-    $defaultsConfigurator->set(ApiResourceAttackerSkill::class);
-    $defaultsConfigurator->set(AuthenticatorAttackerSkill::class);
-    $defaultsConfigurator->set(ConfigAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerEasyAdminAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerFileUploadAttackerSkill::class);
-    $defaultsConfigurator->set(ControllerTrustBoundaryAttackerSkill::class);
-    $defaultsConfigurator->set(EntityAttackerSkill::class);
-    $defaultsConfigurator->set(EntityFileUploadAttackerSkill::class);
-    $defaultsConfigurator->set(EventSubscriberAttackerSkill::class);
-    $defaultsConfigurator->set(FileUploadAttackerSkill::class);
-    $defaultsConfigurator->set(FormAttackerSkill::class);
-    $defaultsConfigurator->set(LdapServiceAttackerSkill::class);
-    $defaultsConfigurator->set(LiveComponentAttackerSkill::class);
-    $defaultsConfigurator->set(MessengerHandlerAttackerSkill::class);
-    $defaultsConfigurator->set(NormalizerAttackerSkill::class);
-    $defaultsConfigurator->set(PhpAttackerSkill::class);
-    $defaultsConfigurator->set(RepositoryAttackerSkill::class);
-    $defaultsConfigurator->set(SchedulerAttackerSkill::class);
-    $defaultsConfigurator->set(SonataAdminAttackerSkill::class);
-    $defaultsConfigurator->set(TemplateAttackerSkill::class);
-    $defaultsConfigurator->set(TrustBoundaryAttackerSkill::class);
-    $defaultsConfigurator->set(TwigExtensionAttackerSkill::class);
-    $defaultsConfigurator->set(VoterAttackerSkill::class);
-    $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
-    $defaultsConfigurator->set(AttackerSkillRegistry::class)
-        ->args([tagged_iterator('symfony_security_auditor.attacker_skill')]);
-    $defaultsConfigurator->alias(AttackerSkillPromptRendererInterface::class, AttackerSkillRegistry::class);
-
-    $defaultsConfigurator->set(AttackerPromptBuilder::class)
-        ->args([
-            param('symfony_security_auditor.audit.structured_collection'),
-            param('symfony_security_auditor.audit.stable_system_prompt'),
-            service(AttackerSkillRegistry::class),
-        ]);
-    $defaultsConfigurator->alias(AttackerPromptBuilderInterface::class, AttackerPromptBuilder::class);
-
-    $defaultsConfigurator->set(ReviewerPromptSections::class);
-    $defaultsConfigurator->alias(ReviewerPromptSectionsInterface::class, ReviewerPromptSections::class);
-    $defaultsConfigurator->set(ReviewerMessageRenderer::class);
-    $defaultsConfigurator->alias(ReviewerMessageRendererInterface::class, ReviewerMessageRenderer::class);
-
-    $defaultsConfigurator->set(ReviewerFeedbackHolder::class);
-
     $defaultsConfigurator->set(NullTriageMemoryRecorder::class);
 
     $defaultsConfigurator->set(FilesystemTriageMemoryStore::class)
@@ -363,15 +280,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReviewerFeedbackHolder::class),
             service(FilesystemTriageMemoryStore::class),
         ]);
-
-    $defaultsConfigurator->set(ReviewerPromptBuilder::class)
-        ->args([
-            param('symfony_security_auditor.audit.reviewer_structured_collection'),
-            service(ReviewerPromptSectionsInterface::class),
-            service(ReviewerMessageRendererInterface::class),
-            service(ReviewerFeedbackProviderInterface::class),
-        ]);
-    $defaultsConfigurator->alias(ReviewerPromptBuilderInterface::class, ReviewerPromptBuilder::class);
 
     $defaultsConfigurator->set(ConsoleReportRenderer::class);
     $defaultsConfigurator->set(JsonReportRenderer::class);
@@ -457,26 +365,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(GitChangedFilesResolverInterface::class),
         ]);
 
-    $defaultsConfigurator->set(PhpParserControllerAccessControlParser::class);
-    $defaultsConfigurator->alias(ControllerAccessControlParserInterface::class, PhpParserControllerAccessControlParser::class);
-
-    $defaultsConfigurator->set(PhpParserVoterCapabilityParser::class);
-    $defaultsConfigurator->alias(VoterCapabilityParserInterface::class, PhpParserVoterCapabilityParser::class);
-
-    $defaultsConfigurator->set(PhpParserFormBindingParser::class);
-    $defaultsConfigurator->alias(FormBindingParserInterface::class, PhpParserFormBindingParser::class);
-
-    $defaultsConfigurator->set(SymfonyYamlSecurityConfigParser::class)
-        ->args([service('logger')]);
-    $defaultsConfigurator->alias(SecurityConfigParserInterface::class, SymfonyYamlSecurityConfigParser::class);
-
     $defaultsConfigurator->set(MappingStage::class)
         ->args([
             service('logger'),
-            service(ControllerAccessControlParserInterface::class),
-            service(VoterCapabilityParserInterface::class),
+            service(EntrypointAccessControlParserInterface::class),
+            service(AuthorizationRuleParserInterface::class),
             service(FormBindingParserInterface::class),
-            service(SecurityConfigParserInterface::class),
+            service(AccessControlConfigParserInterface::class),
         ]);
 
     $defaultsConfigurator->set(DependencyExpansionStage::class)
@@ -597,24 +492,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
         ]);
 
-    $defaultsConfigurator->set(SymfonyToolRegistryFactory::class)
-        ->args([service('logger'), service(AdvisoryDatabaseInterface::class)]);
-    $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
-
     $defaultsConfigurator->set(NullStaticPreScanner::class);
-    $defaultsConfigurator->set(RegexStaticPreScanner::class)
-        ->args([param('symfony_security_auditor.scan.custom_risk_patterns'), service('logger')]);
-
     $defaultsConfigurator->set(NullCodeSlicer::class);
     $defaultsConfigurator->set(RegexCodeSlicer::class)
         ->args([param('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing')]);
-
-    $defaultsConfigurator->set(FileChunker::class)
-        ->args([
-            inline_service(ChunkingStrategy::class)
-                ->factory([ChunkingStrategy::class, 'from'])
-                ->args([param('symfony_security_auditor.audit.chunking.strategy')]),
-        ]);
 
     $defaultsConfigurator->set(RecordVulnerabilityToolFactory::class);
     $defaultsConfigurator->alias(RecordVulnerabilityToolFactoryInterface::class, RecordVulnerabilityToolFactory::class);

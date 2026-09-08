@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use JsonException;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 
 /**
  * Runs {@see CoreCompositionRoot} against a plain `ContainerBuilder`, so a host
@@ -37,8 +37,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimit
 final readonly class HostCompositionRootLoader
 {
     public function __construct(
+        private CoreCompositionRoot $coreCompositionRoot,
         private AuditConfigurationProcessor $auditConfigurationProcessor = new AuditConfigurationProcessor(),
-        private CoreCompositionRoot $coreCompositionRoot = new CoreCompositionRoot(),
     ) {}
 
     /**

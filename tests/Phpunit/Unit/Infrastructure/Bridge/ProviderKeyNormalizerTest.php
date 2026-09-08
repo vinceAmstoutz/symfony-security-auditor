@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Bridge;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 
 final class ProviderKeyNormalizerTest extends TestCase
 {

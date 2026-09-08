@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
 
 final class NullPricingCatalogRefresherTest extends TestCase
 {

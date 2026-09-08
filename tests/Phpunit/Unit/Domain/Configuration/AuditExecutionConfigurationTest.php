@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 
 final class AuditExecutionConfigurationTest extends TestCase
 {

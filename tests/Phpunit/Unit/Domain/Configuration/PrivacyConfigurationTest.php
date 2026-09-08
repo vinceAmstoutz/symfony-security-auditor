@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\PrivacyConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\PrivacyConfiguration;
 
 final class PrivacyConfigurationTest extends TestCase
 {

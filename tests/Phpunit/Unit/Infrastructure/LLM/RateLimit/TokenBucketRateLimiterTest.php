@@ -19,12 +19,12 @@ use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use RuntimeException;
 use Symfony\Component\Clock\MockClock;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RateLimitRequestTooLargeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exception\InvalidRateLimiterConfigurationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Exception\RateLimitRequestTooLargeException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exception\InvalidRateLimiterConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 
 final class TokenBucketRateLimiterTest extends TestCase
 {

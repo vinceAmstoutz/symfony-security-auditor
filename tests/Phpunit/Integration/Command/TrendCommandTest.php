@@ -18,12 +18,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SecurityAuditor\Command\ReportTrendAnalyzer;
+use VinceAmstoutz\SecurityAuditor\Command\TrendCommand;
+use VinceAmstoutz\SecurityAuditor\Command\TrendPresenter;
 
 final class TrendCommandTest extends TestCase
 {

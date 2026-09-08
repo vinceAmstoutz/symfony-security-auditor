@@ -19,11 +19,11 @@ use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineCommand;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineMerger;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoader;
 
 final class BaselineCommandTest extends TestCase
 {

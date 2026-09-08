@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 
 final class LLMConfigurationTest extends TestCase
 {

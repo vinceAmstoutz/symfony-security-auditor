@@ -16,14 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use JsonException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use UnitEnum;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
 /**
  * @internal
@@ -31,6 +29,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPr
 final readonly class ContainerParameterRegistrar
 {
     private const string PREFIX = 'symfony_security_auditor.';
+
+    public function __construct(private PromptVersions $promptVersions) {}
 
     /**
      * @throws JsonException
@@ -139,7 +139,7 @@ final readonly class ContainerParameterRegistrar
             '%s|reviewer-v%d|prompt-v%d|collect-%s|tools-%s|batch-%d|max-output-%d',
             $llmConfiguration->reviewerModel(),
             FilesystemReviewerCache::CACHE_VERSION,
-            ReviewerPromptBuilder::PROMPT_VERSION,
+            $this->promptVersions->reviewer,
             $auditExecutionConfiguration->reviewerStructuredCollection ? 'tool' : 'json',
             $this->reviewerToolsSalt($auditExecutionConfiguration),
             $auditExecutionConfiguration->reviewerBatchSize,
@@ -164,7 +164,7 @@ final readonly class ContainerParameterRegistrar
         return \sprintf(
             '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s|max-output-%d%s',
             $model,
-            AttackerPromptBuilder::PROMPT_VERSION,
+            $this->promptVersions->attacker,
             RegexStaticPreScanner::CACHE_VERSION,
             $bundleConfiguration->audit->staticPreScanEnabled ? 'on' : 'off',
             $this->attackerToolsSalt($bundleConfiguration),

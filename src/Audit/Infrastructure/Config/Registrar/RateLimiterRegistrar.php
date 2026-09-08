@@ -16,12 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Regis
 use Override;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 

@@ -52,7 +52,7 @@ for GitHub Code Scanning / GitLab Security Dashboard.
 - **Cryptographic** — weak crypto, insecure random, hardcoded secret.
 
 Full enum:
-[`Audit/Domain/Model/VulnerabilityType.php`](../src/Audit/Domain/Model/VulnerabilityType.php).
+[`Audit/Domain/Model/VulnerabilityType.php`](../packages/core/src/Audit/Domain/Model/VulnerabilityType.php).
 
 ### Is it a SAST tool?
 

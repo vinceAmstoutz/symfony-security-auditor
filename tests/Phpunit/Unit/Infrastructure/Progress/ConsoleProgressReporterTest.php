@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progres
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 
 final class ConsoleProgressReporterTest extends TestCase
 {

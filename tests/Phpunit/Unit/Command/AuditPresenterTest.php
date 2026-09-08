@@ -21,25 +21,25 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditCost;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class AuditPresenterTest extends TestCase
 {
@@ -633,8 +633,8 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
-            ProjectFile::create('config/packages/security.yaml', '/p/config/packages/security.yaml', 'security:'),
+            SymfonyProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+            SymfonyProjectFile::create('config/packages/security.yaml', '/p/config/packages/security.yaml', 'security:'),
         ]);
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
@@ -655,7 +655,7 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
+            SymfonyProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
         ]);
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
@@ -671,7 +671,7 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('README.md', '/p/README.md', '# readme'),
+            SymfonyProjectFile::create('README.md', '/p/README.md', '# readme'),
         ]);
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
@@ -687,9 +687,9 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
-            ProjectFile::create('README.md', '/p/README.md', '# readme'),
-            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+            SymfonyProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
+            SymfonyProjectFile::create('README.md', '/p/README.md', '# readme'),
+            SymfonyProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
         ]);
 
         $flattened = $bufferedOutput->fetch();
@@ -713,7 +713,7 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('src/PwnController<fg=grey>.php', '/p/src/PwnController<fg=grey>.php', '<?php'),
+            SymfonyProjectFile::create('src/PwnController<fg=grey>.php', '/p/src/PwnController<fg=grey>.php', '<?php'),
         ]);
 
         self::assertStringContainsString('src/PwnController<fg=grey>.php', $bufferedOutput->fetch());
@@ -728,7 +728,7 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create("src/Evil.php\n * [CRITICAL] forged\x1b[31m\u{202E}x", '/p/src/Evil.php', '<?php'),
+            SymfonyProjectFile::create("src/Evil.php\n * [CRITICAL] forged\x1b[31m\u{202E}x", '/p/src/Evil.php', '<?php'),
         ]);
         $output = $bufferedOutput->fetch();
 
@@ -746,7 +746,7 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+            SymfonyProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
         ]);
 
         $display = $bufferedOutput->fetch();
@@ -763,7 +763,7 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+            SymfonyProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
         ]);
 
         $display = $bufferedOutput->fetch();
@@ -780,7 +780,7 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $this->auditPresenter->scannedFiles($symfonyStyle, [
-            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+            SymfonyProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
         ]);
 
         self::assertStringEndsWith("1 file(s) in scope.\n\n", $bufferedOutput->fetch());

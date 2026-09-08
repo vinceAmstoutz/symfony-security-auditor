@@ -15,9 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class PhpParserVoterCapabilityParserTest extends TestCase
 {
@@ -34,7 +34,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
      */
     public function test_it_returns_null_for_non_voter_file(): void
     {
-        $projectFile = ProjectFile::create('src/Service/Mailer.php', '/app/x', '<?php class Mailer {}');
+        $projectFile = SymfonyProjectFile::create('src/Service/Mailer.php', '/app/x', '<?php class Mailer {}');
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
@@ -53,7 +53,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Service/Helper.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Service/Helper.php', '/app/x', $source);
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
@@ -63,7 +63,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
      */
     public function test_it_returns_null_for_unparseable_voter(): void
     {
-        $projectFile = ProjectFile::create('src/Security/BrokenVoter.php', '/app/x', '<?php class BrokenVoter { public function');
+        $projectFile = SymfonyProjectFile::create('src/Security/BrokenVoter.php', '/app/x', '<?php class BrokenVoter { public function');
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
@@ -73,7 +73,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
      */
     public function test_it_returns_null_when_voter_file_declares_no_class(): void
     {
-        $projectFile = ProjectFile::create('src/Security/HelperVoter.php', '/app/x', '<?php function supports(): bool { return true; }');
+        $projectFile = SymfonyProjectFile::create('src/Security/HelperVoter.php', '/app/x', '<?php function supports(): bool { return true; }');
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
@@ -83,7 +83,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
      */
     public function test_it_returns_null_when_voter_has_no_supports_method(): void
     {
-        $projectFile = ProjectFile::create('src/Security/BareVoter.php', '/app/x', '<?php class BareVoter { public function hello(): void {} }');
+        $projectFile = SymfonyProjectFile::create('src/Security/BareVoter.php', '/app/x', '<?php class BareVoter { public function hello(): void {} }');
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
@@ -105,7 +105,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/DualVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/DualVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -125,7 +125,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 abstract public function supports(string $attribute, mixed $subject): bool;
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/AbstractVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/AbstractVoter.php', '/app/x', $source);
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
@@ -144,7 +144,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/EmptyAttrVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/EmptyAttrVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -168,7 +168,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/DynamicSubjectVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/DynamicSubjectVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -190,7 +190,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             };
             PHP;
-        $projectFile = ProjectFile::create('src/Security/AnonymousVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/AnonymousVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -214,7 +214,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/UserVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/UserVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -241,7 +241,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -280,7 +280,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -309,7 +309,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -335,7 +335,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -362,7 +362,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/CommentVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/CommentVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -392,7 +392,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/ApiScopeVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/ApiScopeVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -417,7 +417,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/CrossVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/CrossVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -443,7 +443,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/MixedVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/MixedVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -465,7 +465,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/RepeatAttrVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/RepeatAttrVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -490,7 +490,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -514,7 +514,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -538,7 +538,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/DynamicConstVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/DynamicConstVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -561,7 +561,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/VariableClassConstVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/VariableClassConstVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -585,7 +585,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/AliasedConstVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/AliasedConstVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -608,7 +608,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/MixedAttrVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/MixedAttrVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -631,7 +631,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/UnresolvedConstVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/UnresolvedConstVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
@@ -653,7 +653,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+        $projectFile = SymfonyProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 

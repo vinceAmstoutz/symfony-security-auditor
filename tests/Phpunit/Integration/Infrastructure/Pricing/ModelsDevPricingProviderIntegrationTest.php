@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 
 final class ModelsDevPricingProviderIntegrationTest extends TestCase
 {

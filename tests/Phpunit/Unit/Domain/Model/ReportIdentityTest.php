@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReportIdentity;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ReportIdentity;
 
 final class ReportIdentityTest extends TestCase
 {

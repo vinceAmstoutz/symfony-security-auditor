@@ -18,11 +18,11 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Command\DiffCommand;
+use VinceAmstoutz\SecurityAuditor\Command\DiffPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoader;
 
 final class DiffCommandTest extends TestCase
 {

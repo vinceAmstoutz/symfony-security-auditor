@@ -19,9 +19,9 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Event\ConsoleErrorEvent;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditFailureExitCodeListener;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SecurityAuditor\Command\AuditFailureExitCodeListener;
+use VinceAmstoutz\SecurityAuditor\Command\ExitCode;
 
 final class AuditFailureExitCodeListenerTest extends TestCase
 {

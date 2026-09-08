@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class NullStaticPreScannerTest extends TestCase
 {
@@ -25,7 +25,7 @@ final class NullStaticPreScannerTest extends TestCase
      */
     public function test_it_returns_empty_array_for_any_input(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Foo.php',
             '/app/src/Foo.php',
             "<?php\nunserialize(\$x); shell_exec(\$y); md5(\$z);",

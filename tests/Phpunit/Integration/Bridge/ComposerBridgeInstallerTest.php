@@ -19,8 +19,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 
 final class ComposerBridgeInstallerTest extends TestCase
 {

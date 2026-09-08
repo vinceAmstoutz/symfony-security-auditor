@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Override;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ChartBar;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\DistributionBarChart;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ChartBar;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\DistributionBarChart;
 
 final class DistributionBarChartTest extends TestCase
 {

@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\XdgConfigPathResolver;
 
 final class XdgConfigPathResolverTest extends TestCase
 {

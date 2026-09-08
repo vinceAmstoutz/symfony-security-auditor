@@ -10,17 +10,18 @@ Full detail for each item, including root cause and exact file paths, is in
 
 ## At a glance
 
-| What changed                               | Do you need to act?                            |
-| ------------------------------------------ | ---------------------------------------------- |
-| `audit.fail_on` defaults to `high`         | Only if a HIGH-risk audit must keep passing CI |
-| `model` defaults to `claude-opus-5`        | Only if you relied on the unconfigured default |
-| `max_output_tokens` defaults to `8192`     | No                                             |
-| `cache.prompt_caching` removed             | Yes, if the key is still in your configuration |
-| Exit code `3` for a failed audit           | Only if CI branches on `1`                     |
-| `*::create()` factories removed            | Only if you call them                          |
-| `PricingProviderInterface` widened         | Only if you implement it                       |
-| Eight Domain ports now `@internal`         | Only if you implement one                      |
-| Batch client signatures take value objects | Only if you implement a batch-capable client   |
+| What changed                                  | Do you need to act?                            |
+| --------------------------------------------- | ---------------------------------------------- |
+| `audit.fail_on` defaults to `high`            | Only if a HIGH-risk audit must keep passing CI |
+| `model` defaults to `claude-opus-5`           | Only if you relied on the unconfigured default |
+| `max_output_tokens` defaults to `8192`        | No                                             |
+| `cache.prompt_caching` removed                | Yes, if the key is still in your configuration |
+| Exit code `3` for a failed audit              | Only if CI branches on `1`                     |
+| `*::create()` factories removed               | Only if you call them                          |
+| `PricingProviderInterface` widened            | Only if you implement it                       |
+| Eight Domain ports now `@internal`            | Only if you implement one                      |
+| Batch client signatures take value objects    | Only if you implement a batch-capable client   |
+| Symfony-named Domain models and ports renamed | Only if you name one in your own code          |
 
 ## Configuration
 
@@ -122,6 +123,38 @@ Deprecated since 1.13. Pass the value objects to `of()` instead:
 | `SymfonyMapping::create()` | `SymfonyMapping::of()` — `ProjectFileInventory`, `AccessControlMap`                             |
 | `LLMResponse::create()`    | `LLMResponse::of()` — `TokenUsageSnapshot`                                                      |
 
+### Changed: `ProjectFile::create()` is now `ProjectFile::of()` and takes a type
+
+`ProjectFile` no longer classifies itself. The classification heuristics moved
+out of the Domain into `SymfonyProjectFileTypeClassifier`, behind the new
+`ProjectFileTypeClassifierInterface` port, so the audit engine can be pointed at
+a framework other than Symfony.
+
+```php
+// Before
+$projectFile = ProjectFile::create($relativePath, $absolutePath, $content);
+
+// After
+$projectFile = ProjectFile::of(
+    relativePath: $relativePath,
+    absolutePath: $absolutePath,
+    content: $content,
+    projectFileType: (new SymfonyProjectFileTypeClassifier())->classify($relativePath, $content),
+);
+```
+
+`ProjectFileScanner` takes the classifier as its **first** constructor argument,
+required rather than defaulted — a portable scanner must not silently assume
+Symfony. Only construct it directly if you are not using the bundle; the
+container wires `SymfonyProjectFileTypeClassifier` for you.
+
+```php
+new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger);
+```
+
+To audit a different framework, implement `ProjectFileTypeClassifierInterface`
+and alias it — see [`docs/extending.md`](docs/extending.md).
+
 ### Removed: `CacheAwarePricingProviderInterface`
 
 Its two methods moved onto `PricingProviderInterface`, which every
@@ -143,8 +176,8 @@ real rates (the bundled `ModelsDevPricingProvider` does) to keep the discount.
 
 `docs/versioning.md` now
 [enumerates the covered ports](docs/versioning.md#domain-ports-extension-points)
-instead of covering the whole `src/Audit/Domain/Port/` directory. These eight
-are now `@internal` and may change in a `MINOR`:
+instead of covering the whole `packages/core/src/Audit/Domain/Port/` directory.
+These eight are now `@internal` and may change in a `MINOR`:
 
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `AttackerCacheInterface`, `ContextAwareAttackerCacheInterface`,
@@ -173,3 +206,142 @@ public function completeBatch(array $requests, int $maxConcurrent): array;
 three fields (`system`, `user`, `tools`) as constructor arguments. The
 `LLMRequest::listFromArrays()` / `ToolLLMRequest::listFromArrays()` adapters are
 gone.
+
+### Renamed: the Domain models and ports that named Symfony
+
+Two Domain models and three ports described the audited application in Symfony's
+words, which a framework profile for anything else could not honestly fill in.
+They keep their behaviour; only the names changed:
+
+| 1.x                                      | 2.0                                      |
+| ---------------------------------------- | ---------------------------------------- |
+| `RouteAccessControl`                     | `EntrypointAccessControl`                |
+| `VoterCapability`                        | `AuthorizationRuleCapability`            |
+| `ControllerAccessControlParserInterface` | `EntrypointAccessControlParserInterface` |
+| `VoterCapabilityParserInterface`         | `AuthorizationRuleParserInterface`       |
+| `SecurityConfigParserInterface`          | `AccessControlConfigParserInterface`     |
+
+`EntrypointAccessControl`'s accessors moved with it, from the Symfony API each
+one reads to the check it represents:
+
+| 1.x                             | 2.0                                 |
+| ------------------------------- | ----------------------------------- |
+| `hasRouteAttribute()`           | `isRouted()`                        |
+| `methodLevelIsGranted()`        | `handlerRequiredAttributes()`       |
+| `classLevelIsGranted()`         | `classRequiredAttributes()`         |
+| `denyAccessAttributes()`        | `bodyRequiredAttributes()`          |
+| `methodHasDenyAccess()`         | `handlerChecksAccessInBody()`       |
+| `classHasIsGranted()`           | `classHasAccessCheck()`             |
+| `methodHasIsGrantedAttribute()` | `handlerHasUnresolvedAccessCheck()` |
+
+`AccessControlMap` and `AccessControlConfigParserInterface` followed the same
+rule, adopting the vocabulary `ApplicationSecurityMap` already used:
+
+| 1.x                                                        | 2.0                               |
+| ---------------------------------------------------------- | --------------------------------- |
+| `AccessControlMap::firewallRules()`                        | `perimeterRules()`                |
+| `AccessControlMap::voterCapabilities()`                    | `authorizationRules()`            |
+| `AccessControlMap::votersFor()`                            | `authorizationRulesFor()`         |
+| `AccessControlMap::controllersWithoutAccessCheck()`        | `entrypointsWithoutAccessCheck()` |
+| `AccessControlMap::formBindingsForController()`            | `fieldBindingsForEntrypoint()`    |
+| `FormBinding::controllerFilePath()`                        | `entrypointFilePath()`            |
+| `AccessControlConfigParserInterface::parseAccessControl()` | `parseEntrypointAccessMap()`      |
+| `AccessControlConfigParserInterface::parseFirewallRules()` | `parsePerimeterRules()`           |
+
+`SymfonyMapping` is untouched. It is the Symfony-flavoured facade over
+`ApplicationSecurityMap` by design, so its Symfony-named accessors — including
+the four deprecated since 1.19 — keep working exactly as before. The bundled
+Symfony parsers (`PhpParserControllerAccessControlParser`,
+`PhpParserVoterCapabilityParser`, `SymfonyYamlSecurityConfigParser`) keep their
+names too: they really do read Symfony, and they now implement the renamed
+ports.
+
+### Changed: `ProjectFileInventory` buckets by archetype, and its buckets are renamed
+
+The role grouping inside `SymfonyMapping` filtered on one exact
+`ProjectFileType` per bucket, so an API Platform resource, a Live Component and
+an EasyAdmin CRUD controller were counted as generic services rather than
+entrypoints, a Sonata admin was not an input binding, and a Twig extension was
+not a template surface. It now buckets on `ProjectFileType::archetype()`, which
+is what the rest of the engine already switches on, and the buckets are named
+after the archetype they hold:
+
+| 1.x                          | 2.0                                     |
+| ---------------------------- | --------------------------------------- |
+| `controllers()`              | `entrypoints()`                         |
+| `entities()`                 | `domainModels()`                        |
+| `voters()`                   | `authorizationRules()`                  |
+| `repositories()`             | `persistenceQueries()`                  |
+| `forms()`                    | `inputBindings()`                       |
+| `controllersWithoutVoters()` | `entrypointsWithoutAuthorizationRule()` |
+| `hasVoterForEntity()`        | `hasAuthorizationRuleForModel()`        |
+
+`services()`, `templates()` and `totalFiles()` keep their names.
+`ProjectFileInventory::fromGroups()` takes the same new keys (`entrypoints`,
+`domainModels`, `authorizationRules`, `persistenceQueries`, `inputBindings`,
+`services`, `templates`).
+
+**This changes what the attacker sees.** For a project using API Platform, Live
+Components, EasyAdmin, Sonata or Twig extensions, the mapping summary's per-role
+counts shift, more entrypoints are checked for a missing authorization rule, and
+every attacker cache key for the affected chunks changes. Nothing is dropped:
+`totalFiles()` is unchanged, because every file that moves out of `services()`
+moves into a bucket of its own.
+
+`SymfonyMapping`'s own accessors are untouched — it is the Symfony-flavoured
+facade, and it now delegates to the renamed inventory methods.
+
+### Moved: the framework-agnostic core is now `VinceAmstoutz\SecurityAuditor\`
+
+Roughly four fifths of the package never knew anything about Symfony, so it now
+lives in its own package, `vinceamstoutz/security-auditor-core`, inside
+`packages/core/` of this repository. Nothing about installation changes —
+`composer require vinceamstoutz/symfony-security-auditor` is untouched, and the
+bundle still ships the core inside its own distribution — but **every relocated
+class has a new namespace root**:
+
+```php
+// 1.x
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+
+// 2.0
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+```
+
+The rule is simple: **the path after the namespace root is unchanged**, so a
+one-line search and replace of `VinceAmstoutz\SymfonySecurityAuditor\` with
+`VinceAmstoutz\SecurityAuditor\` migrates almost everything. What stays on the
+old root is only what needs Symfony:
+
+| Still `VinceAmstoutz\SymfonySecurityAuditor\…`       | What it is                            |
+| ---------------------------------------------------- | ------------------------------------- |
+| `SymfonySecurityAuditorBundle`                       | the bundle class                      |
+| `Audit\Infrastructure\Config\**`                     | the Symfony DI wiring and profile     |
+| `Audit\Infrastructure\Prompt\**`                     | prompt content, attacker skills       |
+| `Audit\Infrastructure\Scan\**` (the Symfony parsers) | attribute and `security.yaml` parsers |
+| `Standalone\**`                                      | the standalone container              |
+
+Two relocations are not a pure root swap:
+
+| 1.x                                                                                                                                                                              | 2.0                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `…\Audit\Infrastructure\Config\{XdgConfigPathResolver, StandaloneConfig*, StandalonePlatformConfig*, YamlStandaloneConfigWriter, OfflineOnlyPlatformGuard}` and their exceptions | `VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\…` |
+| `…\Audit\Infrastructure\Scan\{RegexStaticPreScanner, RegexCodeSlicer, SarifImportingPreScanner, …}`                                                                              | `VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\…`     |
+
+`Infrastructure/Config/` split along the line it always had: the Symfony DI
+wiring kept the name and stayed in the bundle, while the standalone binary's own
+YAML settings file became `Infrastructure/Settings/` in the core. `Scan/` split
+the same way — the Symfony parsers stayed, the framework-neutral scanners moved.
+
+**What does not change:** every configuration key, the `audit:run` surface and
+its exit codes, the JSON and SARIF schemas, and the deprecation identities. The
+four `trigger_deprecation()` calls on `SymfonyMapping` still name
+`vinceamstoutz/symfony-security-auditor`, because that is the Composer package
+name a consumer filters on — not a repository path — and `ReportPackage::NAME`,
+the self-update URLs and the install scripts are likewise untouched.
+
+No compatibility aliases ship with this move; they are tracked separately.

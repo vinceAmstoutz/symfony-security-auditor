@@ -3,6 +3,17 @@
 All extension points are PHP interfaces. Wire your implementations via
 `config/services.yaml`; no bundle internals need to be modified.
 
+Almost every one of them lives in the framework-agnostic core package
+(`vinceamstoutz/security-auditor-core`, namespace root
+`VinceAmstoutz\SecurityAuditor\`), which is what makes them reusable from a tool
+for another framework. The exceptions are the interfaces a framework profile
+supplies — the prompt builders, the source parsers and the skill blocks — whose
+Symfony implementations live in the bundle package
+(`VinceAmstoutz\SymfonySecurityAuditor\`). If you are implementing an interface
+and the `use` statement starts with `VinceAmstoutz\SecurityAuditor\`, nothing
+about your implementation is Symfony-specific. See
+[the framework-specific boundary](architecture.md#the-framework-specific-boundary).
+
 ## Table of Contents
 
 - [1. Custom LLM Client](#1-custom-llm-client)
@@ -17,7 +28,7 @@ All extension points are PHP interfaces. Wire your implementations via
 ## 1. Custom LLM Client
 
 **Interface**:
-`VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface`
+`VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface`
 
 ```php
 interface LLMClientInterface
@@ -66,10 +77,10 @@ JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
 // src/Llm/AcmeLlmClient.php
 namespace App\Llm;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 final class AcmeLlmClient implements LLMClientInterface
 {
@@ -146,14 +157,14 @@ directly:
 ```yaml
 # config/services.yaml
 services:
-    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface:
+    VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface:
         alias: App\Llm\AcmeLlmClient
 ```
 
 ## 2. Custom Pipeline Stage
 
 **Interface**:
-`VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface`
+`VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\StageInterface`
 
 ```php
 interface StageInterface
@@ -186,8 +197,8 @@ interface StageInterface
 // src/Pipeline/Stage/DeduplicationStage.php
 namespace App\Pipeline\Stage;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
 final class DeduplicationStage implements StageInterface
 {
@@ -343,6 +354,20 @@ Beyond the seams above, these Domain ports can each be implemented and aliased
 in `config/services.yaml` to override the bundled behaviour (see
 [`docs/versioning.md`](versioning.md) for the full BC-protected list):
 
+- `ProjectFileTypeClassifierInterface` — decide what a discovered file _is_
+  (default: `SymfonyProjectFileTypeClassifier`). This is the seam for teaching
+  the auditor a framework other than Symfony: the chunker, the skill blocks and
+  the access-control and form-binding maps all switch on the `ProjectFileType`
+  it returns and on that type's framework-neutral
+  `ProjectFileType::archetype()`. Implementations must be pure — classification
+  is derived from the path and content alone, with no I/O — and must declare
+  `supportedTypes()`, the vocabulary it can produce, which is what the `grep`
+  and `list_files` tools offer the LLM as filter values. A framework profile
+  normally pairs one with its own `FrameworkVocabulary` so the PoC and fix
+  synthesizers speak the right idiom, and with its own attacker skills: a
+  profile is one `FrameworkProfileInterface` handed to `CoreCompositionRoot`
+  (see `SymfonyProfile`), so the model is never prompted with another
+  framework's surfaces.
 - `StaticPreScannerInterface` — supply your own deterministic risk-marker scan
   (default: `RegexStaticPreScanner`, or set
   `audit.static_prescan.enabled: false` for the null scanner). Project-specific
@@ -396,14 +421,14 @@ in `config/services.yaml` to override the bundled behaviour (see
   service implementing the Infrastructure-level
   `ProviderTokenEstimatorInterface` — it is auto-tagged and joins the resolver's
   candidate list.
-- `SecurityConfigParserInterface` — extracts the route access-control map and
-  firewall rules from raw security configuration content (default:
+- `AccessControlConfigParserInterface` — extracts the entrypoint access map and
+  the perimeter rules from raw security configuration content (default:
   `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse). Implement it
   when your project encodes access control outside standard YAML — e.g. PHP or
   XML security config, or a custom DSL.
-- `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
+- `EntrypointAccessControlParserInterface`, `AuthorizationRuleParserInterface`,
   `FormBindingParserInterface` — the deterministic AST extractions
-  (`#[IsGranted]`/`denyAccessUnlessGranted`, voter attributes, form
+  (`#[IsGranted]`/`denyAccessUnlessGranted`, authorization-rule attributes, form
   field-to-entity bindings) that feed the `SymfonyMapping` given to the attacker
   (defaults: the `PhpParser*` implementations in `Infrastructure/Scan/`).
   Implement one when your project encodes access control in a custom idiom the

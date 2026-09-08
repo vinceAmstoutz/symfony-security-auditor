@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 final class RiskLevelTest extends TestCase
 {

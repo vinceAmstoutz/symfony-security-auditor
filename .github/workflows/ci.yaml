@@ -127,14 +127,14 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: var/rector
-          key: rector-${{ hashFiles('src/**/*.php', 'tests/**/*.php', 'rector.php', 'composer.lock') }}
+          key: rector-${{ hashFiles('packages/core/src/**/*.php', 'src/**/*.php', 'tests/**/*.php', 'rector.php', 'composer.lock') }}
           restore-keys: rector-
 
       - name: Cache PHP CS Fixer result cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .php-cs-fixer.cache
-          key: php-cs-fixer-${{ hashFiles('src/**/*.php', 'tests/**/*.php', '.php-cs-fixer.dist.php', 'composer.lock') }}
+          key: php-cs-fixer-${{ hashFiles('packages/core/src/**/*.php', 'src/**/*.php', 'tests/**/*.php', '.php-cs-fixer.dist.php', 'composer.lock') }}
           restore-keys: php-cs-fixer-
 
       - name: Normalize composer.json
@@ -200,6 +200,12 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: pcov
+          # pcov.directory is PHP_INI_PERDIR, so neither phpunit.dist.xml's
+          # <php><ini> nor ini_set() can change it — it has to be set here.
+          # Left to itself the action picks a single conventional source
+          # directory (src), which silently reports every line of
+          # packages/core/src as uncovered.
+          ini-values: pcov.directory=.
 
       - name: Cache Composer dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -215,7 +221,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .phpunit.cache
-          key: phpunit-php${{ matrix.php }}-sf${{ matrix.symfony }}-${{ hashFiles('src/**/*.php', 'tests/**/*.php', 'phpunit.xml', 'composer.json') }}
+          key: phpunit-php${{ matrix.php }}-sf${{ matrix.symfony }}-${{ hashFiles('packages/core/src/**/*.php', 'src/**/*.php', 'tests/**/*.php', 'phpunit.xml', 'composer.json') }}
           restore-keys: phpunit-php${{ matrix.php }}-sf${{ matrix.symfony }}-
 
       - name: Run test suite with coverage (enforces 100% via MinimumLineCoverageExtension)

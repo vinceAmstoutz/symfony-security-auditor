@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditCost;
 
 final class AuditCostTest extends TestCase
 {

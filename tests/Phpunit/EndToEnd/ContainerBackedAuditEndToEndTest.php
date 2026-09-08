@@ -26,7 +26,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;

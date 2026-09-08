@@ -17,23 +17,23 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SecurityAuditor\Command\AuditExitCodeResolver;
+use VinceAmstoutz\SecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class AuditExitCodeResolverTest extends TestCase
 {
@@ -170,7 +170,7 @@ final class AuditExitCodeResolverTest extends TestCase
     public function test_it_passes_a_diff_run_whose_reference_left_no_changed_file_to_audit(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setMappingFiles([ProjectFile::create('src/Untouched.php', $this->tmpDir.'/src/Untouched.php', '<?php')]);
+        $auditContext->setMappingFiles([SymfonyProjectFile::create('src/Untouched.php', $this->tmpDir.'/src/Untouched.php', '<?php')]);
         $auditContext->setProjectFiles([]);
 
         $auditReport = AuditReport::fromContext($auditContext);
@@ -188,7 +188,7 @@ final class AuditExitCodeResolverTest extends TestCase
     private function reportWith(int $criticalFindings): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setProjectFiles([ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
+        $auditContext->setProjectFiles([SymfonyProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
         for ($i = 1; $i <= $criticalFindings; ++$i) {
             $auditContext->addVulnerability(
                 Vulnerability::of(

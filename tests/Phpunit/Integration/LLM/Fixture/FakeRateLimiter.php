@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
 
 use DateTimeImmutable;
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 final class FakeRateLimiter implements RateLimiterInterface
 {

@@ -36,11 +36,14 @@ responsibilities, data flow, key design decisions, and extension points.
 
 ## Layer Overview
 
-The bundle follows a strict Domain-Driven Design layering under `src/Audit/`.
-Infrastructure dependencies never leak into the Domain or Application layers.
+The repository is a monorepo with two packages. `packages/core` is
+framework-agnostic and knows nothing about Symfony; the root package is the
+Symfony bundle and holds only what a Symfony application needs. Inside the core,
+a strict Domain-Driven Design layering applies under `Audit/`: Infrastructure
+dependencies never leak into the Domain or Application layers.
 
 ```text
-src/
+packages/core/src/          # vinceamstoutz/security-auditor-core
 ├── Audit/
 │   ├── Domain/          # Pure PHP — no framework, no I/O
 │   │   ├── Model/       # Value objects and enums
@@ -56,13 +59,13 @@ src/
 │   │       │              TokenEstimatorInterface, RateLimiterInterface,
 │   │       │              PricingProviderInterface, ProgressReporterInterface,
 │   │       │              StaticPreScannerInterface, CodeSlicerInterface,
-│   │       │              ControllerAccessControlParserInterface,
-│   │       │              VoterCapabilityParserInterface,
+│   │       │              EntrypointAccessControlParserInterface,
+│   │       │              AuthorizationRuleParserInterface,
 │   │       │              FormBindingParserInterface,
 │   │       │              GitChangedFilesResolverInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
 │   │       │              (+ null-object port defaults: NullStaticPreScanner, NullCodeSlicer,
-│   │       │              NullControllerAccessControlParser, NullVoterCapabilityParser,
+│   │       │              NullEntrypointAccessControlParser, NullAuthorizationRuleParser,
 │   │       │              NullFormBindingParser, NullProgressReporter)
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
@@ -90,10 +93,13 @@ src/
 │       │                  PhpParser{ControllerAccessControl, VoterCapability, FormBinding}Parser
 │       ├── Diff/        # ProcessGitChangedFilesResolver (git diff for --since)
 │       ├── Prompt/      # AttackerPromptBuilder (+ SymfonyMappingContextRenderer,
-│       │                  NumberedFileContextRenderer, Skill/{AttackerSkillInterface,
-│       │                  AttackerSkillRegistry, one *AttackerSkill per surface}),
+│       │                  NumberedFileContextRenderer, Skill/{SymfonySkillSet,
+│       │                  one *AttackerSkill per surface}),
 │       │                  ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSections,
 │       │                  ReviewerMessageRenderer})
+│       ├── Skill/       # Framework-neutral skill machinery — AttackerSkillInterface,
+│       │                  AttackerSkillRegistry, ConfiguredAttackerSkill
+│       ├── Feedback/    # ReviewerFeedbackHolder, CompositeReviewerFeedbackProvider
 │       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache,
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
@@ -140,30 +146,57 @@ graph LR
     APP -->|via interface| INFRA
 ```
 
-**Namespace root**: `VinceAmstoutz\SymfonySecurityAuditor\`
+**Namespace roots**: `VinceAmstoutz\SecurityAuditor\` for the core package,
+`VinceAmstoutz\SymfonySecurityAuditor\` for the Symfony bundle.
+
+```text
+src/                        # vinceamstoutz/symfony-security-auditor (the bundle)
+├── Audit/Infrastructure/
+│   ├── Config/             # Symfony DI wiring — composition roots, definition
+│   │                         factories, ContainerParameterRegistrar,
+│   │                         SymfonyProfile, Registrar/**
+│   ├── Prompt/             # Symfony prompt content and attacker skills
+│   └── Scan/               # the Symfony source parsers and classifier
+├── Standalone/             # the standalone binary's container + application
+└── SymfonySecurityAuditorBundle.php
+```
 
 ### The framework-specific boundary
 
-`deptrac.yaml` splits `Infrastructure` in two. A `SymfonyProfile` layer holds
-everything that only makes sense for a Symfony application:
+The boundary is a **package** boundary, and `deptrac.yaml` enforces it: nothing
+in `packages/core` may depend on anything in `src/`. The core package is what a
+second framework's tool requires; the bundle is one consumer of it.
 
-- `Infrastructure/Prompt/**` — the prompt builders and the `Skill/` blocks,
-  whose wording names controllers, voters, forms, Twig templates and Doctrine
-  repositories.
+What stays in the bundle is knowledge of the _audited_ framework:
+
+- `Infrastructure/Prompt/**` — the prompt builders,
+  `SymfonyMappingContextRenderer` and the `Skill/` blocks, whose wording names
+  controllers, voters, forms, Twig templates and Doctrine repositories.
 - the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`,
   `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`,
-  `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and
+  `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser`,
+  `SymfonyChunkingVocabulary`, `SymfonyProjectFileTypeClassifier` and
   `SymfonyYamlSecurityConfigParser`.
-- the container-building classes in `Infrastructure/Config/` —
-  `AuditConfigurationDefinition`, `CoreCompositionRoot`,
-  `AttackerAgentDefinitionFactory` and `ContainerParameterRegistrar`.
+- `Infrastructure/Config/**` — the Symfony DI wiring: the composition roots, the
+  definition factories, `ContainerParameterRegistrar`, and the `SymfonyProfile`
+  with its `Registrar/Symfony/**`.
+- `Standalone/**` and the bundle class — the two hosts that wire a profile up.
 
-The `Infrastructure` layer is then everything under `Infrastructure/` that is
-_not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain`
-and `Application` already cannot reach `Infrastructure` at all. So the audit
-engine, the LLM client, the caches, the report renderers and the scanners stay
-reusable for a non-Symfony target, while `Command`, the bundle class and the
-standalone entry point are free to wire the Symfony profile up.
+Everything else is in the core, including the parts that read like Symfony but
+are not knowledge of the audited framework: `Command/**` (`symfony/console` is a
+standalone library), the settings loader in `Infrastructure/Settings/` (the
+binary's own YAML config file, formerly the standalone half of
+`Infrastructure/Config/`), the neutral scanners in `Infrastructure/Scan/`
+(`RegexStaticPreScanner`, `RegexCodeSlicer`, `SarifImportingPreScanner` and
+their line-retention machinery), the skill contract and registry
+(`Infrastructure/Skill/`) and the reviewer-feedback plumbing
+(`Infrastructure/Feedback/`). Whatever a Laravel profile would reuse verbatim
+belongs in the core.
+
+Inside the core, the DDD ruleset is unchanged —
+`Command → Application → Domain ← Infrastructure` — with one addition that the
+package split makes possible: `Command` may no longer reach the Symfony profile,
+because it now lives on the other side of the package line.
 
 Deptrac counts a dependency only when a class is actually used, not when it is
 merely imported, so an unused `use` statement is not a violation.
@@ -315,11 +348,17 @@ file whose `fileType()` is none of the above). `isConfiguration()` is
 deliberately independent of `fileType()` — it matches every
 `.yaml`/`.yml`/`.xml`/dotenv path regardless of directory, which `MappingStage`
 relies on to extract security config from every config file in the project.
-These predicates and `SymfonyMapping` construction (`ProjectFileInventory`)
-drive metadata/reporting buckets; `AttackerAgent` chunking priority and skill
-selection key off `fileType()` directly. `ProjectFileType` is the single source
-of truth for the file-type vocabulary, referenced by the chunker, the static
-pre-scanner buckets, and the attacker skill-block ordering.
+These predicates drive metadata/reporting; `AttackerAgent` chunking priority and
+skill selection key off `fileType()` directly. `ProjectFileInventory` — the role
+grouping inside `SymfonyMapping` — deliberately does **not** use them: it
+buckets by `archetype()`, so an API Platform resource, a Live Component and an
+EasyAdmin CRUD controller all land in `entrypoints()` beside a plain controller,
+a Sonata admin lands in `inputBindings()` beside a form type, and a Twig
+extension lands in `templates()`. Only the residual `services()` bucket and
+`totalFiles()` stay defined by exclusion. `ProjectFileType` is the single source
+of truth for the file-type vocabulary, referenced by the profile's
+`ChunkingVocabulary`, the static pre-scanner buckets, and the attacker
+skill-block ordering.
 
 `archetype()` returns the framework-neutral shape of the file — a
 `SurfaceArchetype` case (`HTTP_ENTRYPOINT`, `AUTHORIZATION_RULE`,
@@ -347,42 +386,45 @@ security surface rather than file contents alone. Notable helpers:
 
 - `controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
   `denyAccessUnlessGranted` calls (filename-heuristic).
-- `routeAccessControls()` returns the route → controller graph: one
-  `RouteAccessControl` per public action with its parsed `#[Route]`, class- and
-  method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call sites.
-- `controllersWithoutAccessCheck()` filters the graph to actions that carry a
+- `routeAccessControls()` returns the route → entrypoint graph: one
+  `EntrypointAccessControl` per public handler with its parsed `#[Route]`,
+  class- and method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call
+  sites.
+- `entrypointsWithoutAccessCheck()` filters the graph to actions that carry a
   route but no enforcement.
 
-### `RouteAccessControl` — immutable per-action access-control summary
+### `EntrypointAccessControl` — immutable per-handler access-control summary
 
-One entry per public controller action emitted by
-`ControllerAccessControlParserInterface` (default impl
+One entry per public entrypoint handler emitted by
+`EntrypointAccessControlParserInterface` (default impl
 `PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`).
-Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus four
-boolean / list signals — `methodLevelIsGranted`, `methodHasIsGrantedAttribute`
-(a method-level `#[IsGranted]`/`#[Security]` value present but not resolvable to
-a literal string, e.g. an enum case or `new Expression(...)`),
-`methodHasDenyAccess`, `classHasIsGranted` — combined by `hasAccessCheck()` and
-`lacksAccessCheck()`. The attacker prompt renders the full graph as a
-`Route Access-Control Map` block so the LLM can spot missing enforcement without
-re-deriving it from source.
+Named after what each signal _is_, not what Symfony spells it with: captures
+`filePath`, `methodName`, `routePath`, `routeMethods`, `isRouted`, plus four
+boolean / list signals — `handlerRequiredAttributes`,
+`handlerHasUnresolvedAccessCheck` (a declarative check on the handler whose
+attribute is present but not resolvable to a literal string, e.g. an enum case
+or `new Expression(...)`), `handlerChecksAccessInBody`, `classHasAccessCheck` —
+combined by `hasAccessCheck()` and `lacksAccessCheck()`. The attacker prompt
+renders the full graph as a `Route Access-Control Map` block so the LLM can spot
+missing enforcement without re-deriving it from source.
 
-### `VoterCapability` — immutable per-voter `supports()` summary
+### `AuthorizationRuleCapability` — immutable per-rule capability summary
 
-One entry per voter file emitted by `VoterCapabilityParserInterface` (default
-impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`,
-`supportedAttributes` (string literals seen inside `supports()`) and
-`supportedSubjects` (right-hand class names of `instanceof` checks). Helpers
-`coversAttribute(string)` and `coversSubject(string)` answer "is there a voter
-that handles this access decision?" so the prompt's `Voter Coverage` block lets
-the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually
-backs.
+One entry per authorization-rule file emitted by
+`AuthorizationRuleParserInterface` (default impl
+`PhpParserVoterCapabilityParser`, which reads a Symfony voter's `supports()`).
+Captures `filePath`, `className`, `supportedAttributes` (string literals seen
+inside `supports()`) and `supportedSubjects` (right-hand class names of
+`instanceof` checks). Helpers `coversAttribute(string)` and
+`coversSubject(string)` answer "is there a rule that handles this access
+decision?" so the prompt's `Voter Coverage` block lets the LLM flag
+`#[IsGranted('ATTR', $subject)]` calls that no voter actually backs.
 
 ### `FormBinding` — immutable controller → form-type binding
 
 One entry per `$this->createForm(SomeFormType::class)` call site emitted by
 `FormBindingParserInterface` (default impl `PhpParserFormBindingParser`).
-Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The
+Captures `entrypointFilePath`, `controllerMethod`, and `formTypeClass`. The
 attacker prompt renders the list as a `Form Bindings` block so the LLM can
 cross-reference call sites against the form types involved for mass-assignment /
 CSRF analysis without re-deriving the binding from source.
@@ -418,13 +460,13 @@ so `MappingStage` always sees the whole project.
 
 **`MappingStage`** — classifies `AuditContext::mappingFiles()` into roles,
 constructs `SymfonyMapping`, calls `AuditContext::setMapping()`. May use the LLM
-client for semantic mapping or fall back to heuristic classification. The route
-access-control map and firewall rules come from `SecurityConfigParserInterface`
-(default impl `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse):
-list-form and scalar `roles`, `allow_if` expressions,
-`methods`/`ips`/`requires_channel` constraints, `when@<env>` overrides, and
-firewall `security: false` / `stateless` flags all land in the map the attacker
-prompt renders.
+client for semantic mapping or fall back to heuristic classification. The
+entrypoint access map and perimeter rules come from
+`AccessControlConfigParserInterface` (default impl
+`SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse): list-form and
+scalar `roles`, `allow_if` expressions, `methods`/`ips`/`requires_channel`
+constraints, `when@<env>` overrides, and firewall `security: false` /
+`stateless` flags all land in the map the attacker prompt renders.
 
 **`DependencyExpansionStage`** — no-op unless `audit.since_closure: direct` and
 a `--since` diff-mode run is active (`AuditContext::diffSinceRef() !== null`).
@@ -485,6 +527,15 @@ Sorts files by security priority before chunking:
 | 4        | Forms           |
 | 5        | Everything else |
 
+That order is not the chunker's own. `FileChunker` reads a `ChunkingVocabulary`
+— the surface priority, the class-name suffix an entrypoint drops to name its
+feature (`*Controller`, EasyAdmin's `*CrudController`), and the template
+extensions that sit in front of `.php` (`.twig`) — which
+`SymfonyChunkingVocabulary` supplies and `SymfonyChunkingRegistrar` wires. A
+vocabulary with no conventions is usable: it chunks by feature without renaming
+or reordering anything, so a profile that supplies none is neutral rather than
+silently borrowing Symfony's.
+
 `analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
 `bypassCache`, `previousFindings`, `rejectedFindings`) plus a
 `CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan,
@@ -503,8 +554,8 @@ content never changed; `AttackerChunkCache` adapts `AttackerCacheInterface`
 strategies, and both build their structured-collection round (a fresh collector
 wired into a single-tool `record_vulnerability` registry) through the shared
 `StructuredVulnerabilityCollectionSession::begin()`; `ChunkCoverageRecorder`
-records per-file coverage. The chunk-priority ordering above is defined once on
-`FileChunker` over `ProjectFileType` cases. Risk markers are indexed by
+records per-file coverage. The chunk-priority ordering above is defined once, on
+the profile's `ChunkingVocabulary`. Risk markers are indexed by
 `RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt
 preambles are rendered by `AttackerContextPromptRenderer`.
 
@@ -699,10 +750,12 @@ Each builder is a thin composer delegating the bulk to collaborators:
   `AttackerSkillInterface` strategies under `Prompt/Skill/` (one class per
   attack surface: `ControllerAttackerSkill`, `ApiResourceAttackerSkill`,
   `VoterAttackerSkill`, …), each declaring its `ProjectFileType` and emission
-  `priority()`. `AttackerSkillRegistry` collects them (via the
-  `symfony_security_auditor.attacker_skill` DI tag) and emits, in priority
-  order, the blocks whose file type appears in the chunk. Adding an attack
-  surface is one new tagged class — no edit to the builder.
+  `priority()`, and all enumerated by `SymfonySkillSet`. `AttackerSkillRegistry`
+  — framework-neutral, in `Infrastructure/Skill/` — collects whatever a profile
+  contributes (via the `symfony_security_auditor.attacker_skill` DI tag) and
+  emits, in priority order, the blocks whose file type appears in the chunk.
+  Adding an attack surface is one new class listed in the set — no edit to the
+  builder or the registry.
 - **Reviewer** — the fixed system-prompt text lives in `ReviewerPromptSections`
   and the two line-numbered user-message templates in `ReviewerMessageRenderer`
   (both under `Prompt/Reviewer/`, behind interfaces); `ReviewerPromptBuilder`
@@ -779,13 +832,20 @@ carrying them: `configure()` hands the config tree to
 `CoreCompositionRoot`. There is still no separate Extension class — the bundle
 remains the entry point Symfony calls.
 
-`CoreCompositionRoot` is the single description of the graph, and it is not
-bundle-specific. It imports `config/services.php`, registers the container
-parameters, then runs six `ServiceRegistrarInterface` implementations
+`CoreCompositionRoot` is the single description of the graph, and it is neither
+bundle-specific nor framework-specific. It takes one `FrameworkProfileInterface`
+— the host says which framework it is auditing — then imports
+`config/services.php`, registers the container parameters (folding the profile's
+`PromptVersions` into the cache-key salts), and runs its six core
+`ServiceRegistrarInterface` implementations
 (`Audit\Infrastructure\Config\Registrar\`): `BudgetRegistrar`,
 `RateLimiterRegistrar`, `LlmClientRegistrar`, `ImplementationAliasRegistrar`,
-`CustomSkillRegistrar` and `EscalationRegistrar`. Adding a conditional wiring
-concern means adding a registrar and listing it, not adding a branch.
+`CustomSkillRegistrar` and `EscalationRegistrar`, followed by the profile's own.
+`SymfonyProfile` supplies the six under `Registrar\Symfony\`: the file-type
+classifier, the source parsers, the static pre-scanner, the 25 attacker skills,
+the prompt builders and the tool registry. Adding a conditional wiring concern
+means adding a registrar and listing it, not adding a branch; auditing another
+framework means passing another profile.
 
 The standalone binary reaches the same object, not a copy of it.
 `StandaloneContainerFactory` calls `HostCompositionRootLoader`, which runs the

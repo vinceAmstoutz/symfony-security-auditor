@@ -14,11 +14,11 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SecurityAuditor\Command\AuditCommandInput;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
+use VinceAmstoutz\SecurityAuditor\Command\OutputFormat;
 
 final class AuditCommandInputTest extends TestCase
 {

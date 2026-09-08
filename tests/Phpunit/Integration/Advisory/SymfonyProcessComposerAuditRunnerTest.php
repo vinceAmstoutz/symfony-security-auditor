@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 
 final class SymfonyProcessComposerAuditRunnerTest extends TestCase
 {

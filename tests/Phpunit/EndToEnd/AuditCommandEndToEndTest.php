@@ -21,66 +21,68 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullAccessControlConfigParser;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullAuthorizationRuleParser;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullEntrypointAccessControlParser;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Feedback\ReviewerFeedbackHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillRegistry;
+use VinceAmstoutz\SecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SecurityAuditor\Command\AuditExitCodeResolver;
+use VinceAmstoutz\SecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
+use VinceAmstoutz\SecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SecurityAuditor\Command\FindingTypeFilter;
+use VinceAmstoutz\SecurityAuditor\Command\ReportWriter;
+use VinceAmstoutz\SecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SymfonySkillSet;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 
 final class AuditCommandEndToEndTest extends TestCase
 {
@@ -1000,22 +1002,22 @@ final class AuditCommandEndToEndTest extends TestCase
         );
         $auditPipeline = new AuditPipeline(
             [
-                new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
-                new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
+                new IngestionStage(new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger()), new NullLogger()),
+                new MappingStage(new NullLogger(), new NullEntrypointAccessControlParser(), new NullAuthorizationRuleParser(), new NullFormBindingParser(), new NullAccessControlConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],
             new NullLogger(),
             $progressReporterHolder,
         );
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger());
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger());
         $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
             $projectFileScanner,
             new ResolvingTokenEstimator(),
             new CostCalculator(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json')),
             new NullLogger(),
             new FileChunker(),
-            new AttackerSkillRegistry(),
+            new AttackerSkillRegistry(SymfonySkillSet::all()),
             'stub',
             1,
         );

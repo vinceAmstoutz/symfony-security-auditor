@@ -17,7 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Formatter\OutputFormatterInterface;
 use Symfony\Component\Console\Output\BufferedOutput;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBanner;
+use VinceAmstoutz\SecurityAuditor\Command\ConsoleBanner;
 
 final class ConsoleBannerTest extends TestCase
 {

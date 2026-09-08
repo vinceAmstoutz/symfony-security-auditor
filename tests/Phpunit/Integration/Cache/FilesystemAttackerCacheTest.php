@@ -19,10 +19,10 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class FilesystemAttackerCacheTest extends TestCase
 {
@@ -35,7 +35,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_returns_null_when_no_entry_exists(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         self::assertNull($this->filesystemAttackerCache->get($chunk));
     }
@@ -46,7 +46,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_returns_null_and_skips_read_when_no_entry_exists(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         $filesystem = $this->createMock(Filesystem::class);
         $filesystem->method('exists')->willReturn(false);
@@ -62,7 +62,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_context_key_addresses_a_distinct_entry(): void
     {
-        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
+        $chunk = [SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
         $contextFree = [['title' => 'context-free']];
         $contextual = [['title' => 'contextual']];
 
@@ -78,7 +78,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_empty_context_key_addresses_the_legacy_entry(): void
     {
-        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
+        $chunk = [SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
         $payload = [['title' => 'legacy']];
 
         $this->filesystemAttackerCache->store($chunk, $payload);
@@ -91,7 +91,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_distinct_context_keys_address_distinct_entries(): void
     {
-        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
+        $chunk = [SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
 
         $this->filesystemAttackerCache->storeForContext($chunk, 'ctx-a', [['title' => 'a']]);
 
@@ -103,8 +103,8 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_a_different_chunk_under_the_same_context_is_a_distinct_entry(): void
     {
-        $chunkA = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php // a')];
-        $chunkB = [ProjectFile::create('src/B.php', '/app/src/B.php', '<?php // b')];
+        $chunkA = [SymfonyProjectFile::create('src/A.php', '/app/src/A.php', '<?php // a')];
+        $chunkB = [SymfonyProjectFile::create('src/B.php', '/app/src/B.php', '<?php // b')];
 
         $this->filesystemAttackerCache->storeForContext($chunkA, 'ctx', [['title' => 'a']]);
 
@@ -116,7 +116,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_context_entry_is_stored_at_path_derived_from_signature_and_context_key(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
         $expectedKey = hash('sha256', hash('sha256', 'src/A.php='.hash('sha256', 'X'))."\0context:ctx-42");
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -131,7 +131,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_round_trip_store_and_get_returns_same_payload(): void
     {
-        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
+        $chunk = [SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
         $payload = [['type' => 'sql_injection', 'severity' => 'high', 'title' => 't']];
 
         $this->filesystemAttackerCache->store($chunk, $payload);
@@ -144,7 +144,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_round_trip_preserves_all_entries_for_multi_finding_payload(): void
     {
-        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
+        $chunk = [SymfonyProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
         $payload = [
             ['type' => 'sql_injection', 'severity' => 'high', 'title' => 'one'],
             ['type' => 'broken_access_control', 'severity' => 'medium', 'title' => 'two'],
@@ -161,8 +161,8 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_returns_null_for_chunk_with_modified_content(): void
     {
-        $original = [ProjectFile::create('a.php', '/app/a.php', 'one')];
-        $modified = [ProjectFile::create('a.php', '/app/a.php', 'two')];
+        $original = [SymfonyProjectFile::create('a.php', '/app/a.php', 'one')];
+        $modified = [SymfonyProjectFile::create('a.php', '/app/a.php', 'two')];
 
         $this->filesystemAttackerCache->store($original, [['type' => 'sql_injection', 'severity' => 'high']]);
 
@@ -174,8 +174,8 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_key_is_independent_of_chunk_order(): void
     {
-        $projectFile = ProjectFile::create('a.php', '/app/a.php', 'A');
-        $b = ProjectFile::create('b.php', '/app/b.php', 'B');
+        $projectFile = SymfonyProjectFile::create('a.php', '/app/a.php', 'A');
+        $b = SymfonyProjectFile::create('b.php', '/app/b.php', 'B');
         $payload = [['type' => 'sql_injection', 'severity' => 'high']];
 
         $this->filesystemAttackerCache->store([$projectFile, $b], $payload);
@@ -188,7 +188,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_returns_null_when_cache_file_is_invalid_json(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
         $payload = [['type' => 'sql_injection']];
 
         $this->filesystemAttackerCache->store($chunk, $payload);
@@ -206,7 +206,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_returns_null_when_cache_file_contains_non_array_json(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
         $payload = [['type' => 'sql_injection']];
 
         $this->filesystemAttackerCache->store($chunk, $payload);
@@ -240,7 +240,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
         $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, $filesystem, new NullLogger());
 
-        self::assertNull($filesystemAttackerCache->get([ProjectFile::create('a.php', '/app/a.php', '<?php')]));
+        self::assertNull($filesystemAttackerCache->get([SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')]));
     }
 
     /**
@@ -264,7 +264,7 @@ final class FilesystemAttackerCacheTest extends TestCase
         $logger->method('debug');
 
         $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, $filesystem, $logger);
-        $filesystemAttackerCache->get([ProjectFile::create('a.php', '/app/a.php', '<?php')]);
+        $filesystemAttackerCache->get([SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')]);
 
         self::assertCount(1, $warnings);
         self::assertSame('Attacker cache entry was unreadable, ignoring', $warnings[0][0]);
@@ -279,7 +279,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_skips_non_array_entries_in_decoded_cache_payload(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
         $globResult = glob($this->cacheDir.'/*/*.json');
@@ -297,7 +297,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_logs_warning_when_cache_entry_is_unreadable_json(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
         $globResult = glob($this->cacheDir.'/*/*.json');
@@ -324,7 +324,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_store_refuses_to_write_through_a_symlinked_cache_file(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
         $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -348,7 +348,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_store_refuses_to_write_through_a_symlinked_shard_directory(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
         $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
         $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
@@ -380,7 +380,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_refuses_to_read_through_a_symlinked_cache_file(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
         $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -403,7 +403,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_logs_a_warning_with_the_path_when_refusing_a_symlinked_cache_file(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
         $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -436,7 +436,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_refuses_to_read_through_a_symlinked_shard_directory(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
         $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
         $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
@@ -460,7 +460,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_store_creates_nested_shard_directory_from_key_prefix(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
@@ -476,7 +476,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_store_writes_file_at_path_derived_from_sha256_of_relative_path_and_content_hash(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
         $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
@@ -492,8 +492,8 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_two_files_with_identical_content_but_different_paths_use_distinct_cache_entries(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'SAME');
-        $b = ProjectFile::create('src/B.php', '/app/src/B.php', 'SAME');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'SAME');
+        $b = SymfonyProjectFile::create('src/B.php', '/app/src/B.php', 'SAME');
 
         $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection', 'title' => 'a-finding']]);
         $this->filesystemAttackerCache->store([$b], [['type' => 'sql_injection', 'title' => 'b-finding']]);
@@ -507,12 +507,12 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_a_crafted_relative_path_cannot_collide_with_an_unrelated_multi_file_chunk(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'A-content');
-        $fileB = ProjectFile::create('src/B.php', '/app/src/B.php', 'B-content');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'A-content');
+        $fileB = SymfonyProjectFile::create('src/B.php', '/app/src/B.php', 'B-content');
         $this->filesystemAttackerCache->store([$projectFile, $fileB], [['type' => 'sql_injection', 'title' => 'real-two-file-chunk']]);
 
         $craftedRelativePath = 'src/A.php='.hash('sha256', 'A-content')."\nsrc/B.php";
-        $craftedFile = ProjectFile::create($craftedRelativePath, '/app/'.$craftedRelativePath, 'B-content');
+        $craftedFile = SymfonyProjectFile::create($craftedRelativePath, '/app/'.$craftedRelativePath, 'B-content');
 
         self::assertNull($this->filesystemAttackerCache->get([$craftedFile]));
     }
@@ -523,7 +523,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_distinct_key_salts_produce_distinct_cache_entries(): void
     {
-        $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
+        $chunk = [SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
         $payload = [['type' => 'sql_injection', 'title' => 'on-claude']];
 
         $claudeCache = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), new NullLogger(), 'claude-opus-4-7');
@@ -541,7 +541,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_same_key_salt_yields_same_cache_entry_across_instances(): void
     {
-        $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
+        $chunk = [SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
         $payload = [['type' => 'sql_injection']];
 
         $writer = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), new NullLogger(), 'claude-opus-4-7');
@@ -557,7 +557,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_empty_salt_keeps_legacy_unprefixed_key(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
         $expectedKey = hash('sha256', hash('sha256', 'src/A.php='.hash('sha256', 'X')));
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -573,7 +573,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_salted_key_concatenates_salt_null_byte_and_signatures_in_that_order(): void
     {
-        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $projectFile = SymfonyProjectFile::create('src/A.php', '/app/src/A.php', 'X');
         $signatures = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', "claude-opus-4-7\0".$signatures);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -599,7 +599,7 @@ final class FilesystemAttackerCacheTest extends TestCase
         );
 
         $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir.'/', $filesystem, new NullLogger());
-        $projectFile = ProjectFile::create('a.php', '/app/a.php', '<?php');
+        $projectFile = SymfonyProjectFile::create('a.php', '/app/a.php', '<?php');
 
         $filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
 
@@ -612,7 +612,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_logs_debug_cache_hit_with_path(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
@@ -651,7 +651,7 @@ final class FilesystemAttackerCacheTest extends TestCase
         );
 
         $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), $logger);
-        $filesystemAttackerCache->store([ProjectFile::create('a.php', '/app/a.php', '<?php')], [['type' => 'sql_injection']]);
+        $filesystemAttackerCache->store([SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')], [['type' => 'sql_injection']]);
 
         $storedLogs = array_values(array_filter(
             $debugLogs,
@@ -678,7 +678,7 @@ final class FilesystemAttackerCacheTest extends TestCase
         $logger->method('debug');
 
         $filesystemAttackerCache = new FilesystemAttackerCache('/proc/cannot-write', new Filesystem(), $logger);
-        $filesystemAttackerCache->store([ProjectFile::create('a.php', '/app/a.php', '<?php')], [['type' => 'sql_injection']]);
+        $filesystemAttackerCache->store([SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')], [['type' => 'sql_injection']]);
 
         $failureLogs = array_values(array_filter(
             $warnings,
@@ -697,7 +697,7 @@ final class FilesystemAttackerCacheTest extends TestCase
      */
     public function test_get_failure_warning_includes_path_and_error_keys(): void
     {
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
         $globResult = glob($this->cacheDir.'/*/*.json');
@@ -738,7 +738,7 @@ final class FilesystemAttackerCacheTest extends TestCase
         $filesystem->method('dumpFile');
 
         $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, $filesystem, new NullLogger());
-        $filesystemAttackerCache->store([ProjectFile::create('a.php', '/app/a.php', '<?php')], [['type' => 'sql_injection']]);
+        $filesystemAttackerCache->store([SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')], [['type' => 'sql_injection']]);
     }
 
     /**
@@ -757,7 +757,7 @@ final class FilesystemAttackerCacheTest extends TestCase
         $logger->method('debug');
 
         $filesystemAttackerCache = new FilesystemAttackerCache('/proc/cannot-write-here', new Filesystem(), $logger);
-        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $chunk = [SymfonyProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         $filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 

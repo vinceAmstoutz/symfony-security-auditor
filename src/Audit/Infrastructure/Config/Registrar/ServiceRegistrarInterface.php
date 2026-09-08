@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar;
 
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 
 /**
  * One slice of the audit object graph. A new conditional wiring concern is a

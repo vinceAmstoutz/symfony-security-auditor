@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progress;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\AuditOverviewLine;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress\AuditOverviewLine;
 
 final class AuditOverviewLineTest extends TestCase
 {

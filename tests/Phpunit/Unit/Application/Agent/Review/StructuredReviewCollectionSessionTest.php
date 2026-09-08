@@ -15,9 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Revi
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\StructuredReviewCollectionSession;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Review\StructuredReviewCollectionSession;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 
 final class StructuredReviewCollectionSessionTest extends TestCase
 {

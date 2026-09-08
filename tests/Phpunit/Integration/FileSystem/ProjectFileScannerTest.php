@@ -20,11 +20,12 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Process\Process;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyProjectFileTypeClassifier;
 
 final class ProjectFileScannerTest extends TestCase
 {
@@ -55,7 +56,7 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/src/Ignored.php', '<?php class Ignored {}');
         file_put_contents($this->tmpDir.'/src/Kept.php', '<?php class Kept {}');
 
-        $files = (new ProjectFileScanner(new NullLogger(), ['src']))->scan($this->tmpDir);
+        $files = (new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger(), ['src']))->scan($this->tmpDir);
         $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
 
         self::assertContains('src/Ignored.php', $paths);
@@ -114,7 +115,7 @@ final class ProjectFileScannerTest extends TestCase
     {
         file_put_contents($this->tmpDir.'/.env', "APP_ENV=prod\nAPP_SECRET=abcdef0123456789\n");
 
-        $files = (new ProjectFileScanner(new NullLogger(), ['.env']))->scan($this->tmpDir);
+        $files = (new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger(), ['.env']))->scan($this->tmpDir);
 
         self::assertCount(1, $files);
         self::assertSame('.env', $files[0]->relativePath());
@@ -194,7 +195,7 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/src/Should.php', '<?php // ignored');
         file_put_contents($this->tmpDir.'/app/MyClass.php', '<?php');
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), includedPaths: ['app']);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger(), includedPaths: ['app']);
 
         $files = $projectFileScanner->scan($this->tmpDir);
 
@@ -209,7 +210,7 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/public/index.php', '<?php // front controller');
         file_put_contents($this->tmpDir.'/bin/console.php', '<?php // console');
 
-        $projectFileScanner = new ProjectFileScanner(
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(),
             new NullLogger(),
             includedPaths: ['public/index.php', 'bin/console.php'],
         );
@@ -242,7 +243,7 @@ final class ProjectFileScannerTest extends TestCase
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
 
-        $projectFileScanner = new ProjectFileScanner($logger, includedPaths: ['nonexistent']);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger, includedPaths: ['nonexistent']);
 
         $files = $projectFileScanner->scan($this->tmpDir);
 
@@ -337,7 +338,7 @@ final class ProjectFileScannerTest extends TestCase
             },
         );
 
-        $projectFileScanner = new ProjectFileScanner($logger);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger);
         $projectFileScanner->scan($this->tmpDir);
 
         self::assertSame(['Scanning project', ['path' => $this->tmpDir]], $infoLogs[0]);
@@ -353,7 +354,7 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
         (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
 
-        $projectFileScanner = new ProjectFileScanner(
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(),
             new NullLogger(),
             includedPaths: ['src', 'derived'],
             respectGitignore: true,
@@ -373,7 +374,7 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
         file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
 
-        $projectFileScanner = new ProjectFileScanner(
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(),
             new NullLogger(),
             includedPaths: ['src', 'derived'],
             respectGitignore: false,
@@ -396,7 +397,7 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
         file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'derived']);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger(), includedPaths: ['src', 'derived']);
 
         $paths = array_map(
             static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
@@ -413,7 +414,7 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/src/Small.php', '<?php');
         file_put_contents($this->tmpDir.'/src/Big.php', '<?php /* '.str_repeat('x', 3 * 1024).' */');
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger(), maxFileSizeKb: 2);
 
         $files = $projectFileScanner->scan($this->tmpDir);
 
@@ -429,7 +430,7 @@ final class ProjectFileScannerTest extends TestCase
             '<?php /* '.str_repeat('x', 3 * 1024).' */',
         );
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger(), maxFileSizeKb: 2);
 
         $files = $projectFileScanner->scan($this->tmpDir);
 
@@ -442,7 +443,7 @@ final class ProjectFileScannerTest extends TestCase
         // 2 KB exactly — `str_repeat('a', 2 * 1024)` is 2048 bytes on disk.
         file_put_contents($this->tmpDir.'/public/index.php', str_repeat('a', 2 * 1024));
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger(), maxFileSizeKb: 2);
 
         $files = $projectFileScanner->scan($this->tmpDir);
 
@@ -468,7 +469,7 @@ final class ProjectFileScannerTest extends TestCase
         );
 
         // .env.dist is not in the scanner's tracked extensions, but secrets.yaml is.
-        $projectFileScanner = new ProjectFileScanner(
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(),
             new NullLogger(),
             secretScrubber: new RegexSecretScrubber(),
         );
@@ -488,7 +489,7 @@ final class ProjectFileScannerTest extends TestCase
         $original = "stripe:\n    key: ".$stripeShape."\n";
         file_put_contents($this->tmpDir.'/config/secrets.yaml', $original);
 
-        $projectFileScanner = new ProjectFileScanner(
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(),
             new NullLogger(),
             secretScrubber: new NullSecretScrubber(),
         );
@@ -523,7 +524,7 @@ final class ProjectFileScannerTest extends TestCase
             return $splFile->getContents();
         };
 
-        $projectFileScanner = new ProjectFileScanner($logger, fileReader: $reader);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger, fileReader: $reader);
         $files = $projectFileScanner->scan($this->tmpDir);
 
         $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
@@ -559,7 +560,7 @@ final class ProjectFileScannerTest extends TestCase
         );
         $logger->method('info');
 
-        $projectFileScanner = new ProjectFileScanner($logger);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger);
 
         try {
             $files = $projectFileScanner->scan($this->tmpDir);
@@ -597,7 +598,7 @@ final class ProjectFileScannerTest extends TestCase
         );
         $logger->method('info');
 
-        $projectFileScanner = new ProjectFileScanner($logger);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger);
 
         try {
             $files = $projectFileScanner->scan($this->tmpDir);
@@ -637,7 +638,7 @@ final class ProjectFileScannerTest extends TestCase
         $logger->method('info');
 
         $traversalPath = '../'.basename($outsideDir);
-        $projectFileScanner = new ProjectFileScanner($logger, ['src', $traversalPath, 'config']);
+        $projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), $logger, ['src', $traversalPath, 'config']);
 
         try {
             $files = $projectFileScanner->scan($this->tmpDir);
@@ -660,7 +661,7 @@ final class ProjectFileScannerTest extends TestCase
     {
         $this->tmpDir = sys_get_temp_dir().'/scanner_int_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
-        $this->projectFileScanner = new ProjectFileScanner(new NullLogger());
+        $this->projectFileScanner = new ProjectFileScanner(new SymfonyProjectFileTypeClassifier(), new NullLogger());
     }
 
     #[Override]

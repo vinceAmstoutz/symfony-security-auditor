@@ -17,8 +17,8 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
 
 final class ProcessGitChangedFilesResolverTest extends TestCase
 {

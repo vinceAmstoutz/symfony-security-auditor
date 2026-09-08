@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progres
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress\ProgressContext;
 
 final class ProgressContextTest extends TestCase
 {

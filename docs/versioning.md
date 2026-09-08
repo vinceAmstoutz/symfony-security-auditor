@@ -219,11 +219,11 @@ deprecated by the other.
 ### Domain ports (extension points)
 
 **An enumerated list, not a directory glob.** Before 2.0 the promise covered
-_every_ interface under `src/Audit/Domain/Port/`, which froze internal
-collaboration seams — prompt builders, cache plumbing, capability-detection
-interfaces — as public API. That cost was real, not theoretical: #235 exists
-only because `PricingProviderInterface` could not gain a cache-rate method
-without a `MAJOR`, so 1.x had to carry a parallel
+_every_ interface under `packages/core/src/Audit/Domain/Port/`, which froze
+internal collaboration seams — prompt builders, cache plumbing,
+capability-detection interfaces — as public API. That cost was real, not
+theoretical: #235 exists only because `PricingProviderInterface` could not gain
+a cache-rate method without a `MAJOR`, so 1.x had to carry a parallel
 `CacheAwarePricingProviderInterface` plus an `instanceof` branch. 2.0 narrowed
 the promise to the ports below. Everything else under `Port/` is tagged
 `@internal` and may change in a `MINOR`.
@@ -236,6 +236,10 @@ Implementing one of these in your own application and overriding the alias in
 - `LLMResponse` — the value object every `LLMClientInterface` implementation
   returns.
 - `ProjectFileScannerInterface`
+- `ProjectFileTypeClassifierInterface` — decides what a discovered file _is_.
+  Implement and alias it to teach the auditor a framework whose conventions
+  differ from Symfony's; everything downstream switches on the resulting
+  `ProjectFileType` and its framework-neutral `archetype()`.
 - `StaticPreScannerInterface` — host applications may implement this and alias
   it to supply their own deterministic risk-marker scan.
 - `CodeSlicerInterface` — implement and alias to control how files are trimmed
@@ -259,8 +263,8 @@ Implementing one of these in your own application and overriding the alias in
   [`docs/extending.md`](extending.md).
 - `ReviewerFeedbackProviderInterface`
 - `TriageMemoryRecorderInterface`
-- `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
-  `FormBindingParserInterface`, `SecurityConfigParserInterface` — the
+- `EntrypointAccessControlParserInterface`, `AuthorizationRuleParserInterface`,
+  `FormBindingParserInterface`, `AccessControlConfigParserInterface` — the
   deterministic source extractions feeding the application security map.
 - `Tool\ToolInterface`, `Tool\ToolDefinition`, `Tool\ToolRegistry`,
   `Tool\ToolRegistryFactoryInterface`
@@ -285,11 +289,24 @@ client can do, not how you implement one — and demoting them is what let
 value objects instead of raw array shapes. You may still implement them for the
 concurrency win; their signatures are simply no longer frozen.
 
+### Namespace roots
+
+The public API spans two packages, and the namespace root says which:
+
+| Root                                    | Package                                  |
+| --------------------------------------- | ---------------------------------------- |
+| `VinceAmstoutz\SecurityAuditor\`        | `vinceamstoutz/security-auditor-core`    |
+| `VinceAmstoutz\SymfonySecurityAuditor\` | `vinceamstoutz/symfony-security-auditor` |
+
+A root is itself public API: moving a BC-protected class between roots is a
+`MAJOR`. That is what 2.0 did once, wholesale, when the framework-agnostic core
+became its own package — see [`UPGRADE-2.0.md`](../UPGRADE-2.0.md).
+
 ### Domain models and exceptions
 
-- Value objects and enums under `src/Audit/Domain/Model/` — `Vulnerability`,
-  `AuditReport`, `AuditContext`, `VulnerabilitySeverity`, `VulnerabilityType`,
-  etc. Their public accessors are stable.
+- Value objects and enums under `packages/core/src/Audit/Domain/Model/` —
+  `Vulnerability`, `AuditReport`, `AuditContext`, `VulnerabilitySeverity`,
+  `VulnerabilityType`, etc. Their public accessors are stable.
 - Domain exception classes — callers may rely on the exception types thrown by
   public methods.
 
@@ -328,7 +345,7 @@ Anything tagged `@internal` may be refactored, renamed, or removed in any
 - Command-internal collaborators — `AuditCommandInput`, `AuditPresenter`,
   `ReportWriter`, `AuditExitCodeResolver`.
 - Prompt template files under `src/Audit/Infrastructure/Prompt/` and
-  `src/Audit/Infrastructure/Report/Template/`.
+  `packages/core/src/Audit/Infrastructure/Report/Template/`.
 - Private constants and methods on any class.
 
 If you find yourself depending on an internal class, please open an issue — we

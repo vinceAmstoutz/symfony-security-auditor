@@ -15,10 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chun
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyChunkingVocabulary;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class FileChunkerTest extends TestCase
 {
@@ -30,10 +32,10 @@ final class FileChunkerTest extends TestCase
     {
         $files = [
             $this->makeFile('README.md'),
-            ProjectFile::create($path, '/app/'.$path, $content),
+            SymfonyProjectFile::create($path, '/app/'.$path, $content),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Type, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Type, 10)->chunk($files);
 
         self::assertSame($path, $chunks[0][0]->relativePath());
     }
@@ -75,7 +77,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/Order.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -89,6 +91,26 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_controller_without_the_suffix_still_names_its_feature(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/Dashboard.php'),
+            $this->makeFile('src/Repository/DashboardRepository.php'),
+            $this->makeFile('src/Entity/Order.php'),
+        ];
+
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
+
+        $dashboardChunk = $this->findChunkContaining($chunks, 'src/Controller/Dashboard.php');
+        self::assertNotNull($dashboardChunk);
+        $dashboardChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $dashboardChunk);
+        self::assertContains('src/Repository/DashboardRepository.php', $dashboardChunkPaths);
+        self::assertNotContains('src/Entity/Order.php', $dashboardChunkPaths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_groups_an_api_resource_with_its_repository(): void
     {
         $files = [
@@ -97,7 +119,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/Order.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $offerChunk = $this->findChunkContaining($chunks, 'src/ApiResource/Offer.php');
         self::assertNotNull($offerChunk);
@@ -117,7 +139,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/Order.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $productChunk = $this->findChunkContaining($chunks, 'src/Controller/Admin/ProductCrudController.php');
         self::assertNotNull($productChunk);
@@ -138,7 +160,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('templates/user/edit.html.twig'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -158,7 +180,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('config/services.yaml'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $allChunkedPaths = $this->allPaths($chunks);
         self::assertContains('src/Service/SharedService.php', $allChunkedPaths);
@@ -177,7 +199,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Repository/UserRepository.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -186,7 +208,7 @@ final class FileChunkerTest extends TestCase
 
     public function test_feature_strategy_returns_empty_array_when_no_files(): void
     {
-        self::assertSame([], (new FileChunker(ChunkingStrategy::Feature))->chunk([]));
+        self::assertSame([], $this->symfonyChunker(ChunkingStrategy::Feature)->chunk([]));
     }
 
     /**
@@ -199,7 +221,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Service/Bar.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         self::assertCount(1, $chunks);
         self::assertCount(2, $chunks[0]);
@@ -215,7 +237,7 @@ final class FileChunkerTest extends TestCase
             $files[] = $this->makeFile('templates/user/page'.$i.'.html.twig');
         }
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunks = array_values(array_filter($chunks, static function (array $chunk): bool {
             foreach ($chunk as $file) {
@@ -241,7 +263,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/User.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Type, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Type, 10)->chunk($files);
 
         self::assertCount(1, $chunks);
         self::assertSame('src/Controller/UserController.php', $chunks[0][0]->relativePath());
@@ -257,7 +279,7 @@ final class FileChunkerTest extends TestCase
             $files[] = $this->makeFile('src/Service/Foo'.$i.'.php');
         }
 
-        $chunks = (new FileChunker(ChunkingStrategy::Type, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Type, 10)->chunk($files);
 
         self::assertCount(3, $chunks);
         self::assertCount(10, $chunks[0]);
@@ -275,7 +297,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/User.php'),
         ];
 
-        $chunks = (new FileChunker())->chunk($files);
+        $chunks = (new FileChunker(chunkingVocabulary: SymfonyChunkingVocabulary::create()))->chunk($files);
 
         self::assertCount(1, $chunks);
         self::assertCount(2, $chunks[0]);
@@ -292,7 +314,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/User.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -312,7 +334,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/User.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -331,7 +353,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/UserProfile.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -350,7 +372,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/username/Other.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -369,7 +391,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Entity/EleveÉcole.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $eleveChunk = $this->findChunkContaining($chunks, 'src/Controller/EleveController.php');
         self::assertNotNull($eleveChunk);
@@ -390,7 +412,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Service/Misc.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $orderChunk = $this->findChunkContaining($chunks, 'src/Controller/OrderController.php');
         self::assertNotNull($orderChunk);
@@ -409,7 +431,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Controller/UsersController.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         $usersChunk = $this->findChunkContaining($chunks, 'src/Controller/UsersController.php');
@@ -429,7 +451,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Controller/UserAddressController.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         $userAddressChunk = $this->findChunkContaining($chunks, 'src/Controller/UserAddressController.php');
@@ -450,7 +472,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Controller/UserSettingsController.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         self::assertCount(1, $chunks);
         $paths = $this->allPaths($chunks);
@@ -469,7 +491,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Controller/ProductController.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         self::assertCount(2, $chunks);
         $productChunk = $this->findChunkContaining($chunks, 'src/Controller/ProductController.php');
@@ -490,7 +512,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/Service/Misc.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $orderChunk = $this->findChunkContaining($chunks, 'src/Controller/OrderController.php');
         self::assertNotNull($orderChunk);
@@ -510,7 +532,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/User/Post/Shared.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -528,7 +550,7 @@ final class FileChunkerTest extends TestCase
             $this->makeFile('src/User2Repository.php'),
         ];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Feature, 10)->chunk($files);
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
@@ -543,7 +565,7 @@ final class FileChunkerTest extends TestCase
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
 
-        $chunks = (new FileChunker(ChunkingStrategy::Type, 0))->chunk($files);
+        $chunks = $this->symfonyChunker(ChunkingStrategy::Type, 0)->chunk($files);
 
         self::assertCount(2, $chunks);
         self::assertCount(1, $chunks[0]);
@@ -554,7 +576,7 @@ final class FileChunkerTest extends TestCase
      */
     private function makeFile(string $path): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, '<?php');
+        return SymfonyProjectFile::create($path, '/app/'.$path, '<?php');
     }
 
     /**
@@ -562,7 +584,7 @@ final class FileChunkerTest extends TestCase
      */
     private function makeFileWithContent(string $path, string $content): ProjectFile
     {
-        return ProjectFile::create($path, '/app/'.$path, $content);
+        return SymfonyProjectFile::create($path, '/app/'.$path, $content);
     }
 
     /**
@@ -598,5 +620,10 @@ final class FileChunkerTest extends TestCase
         }
 
         return $paths;
+    }
+
+    private function symfonyChunker(ChunkingStrategy $chunkingStrategy, int $chunkSize = 10): FileChunker
+    {
+        return new FileChunker($chunkingStrategy, $chunkSize, SymfonyChunkingVocabulary::create());
     }
 }

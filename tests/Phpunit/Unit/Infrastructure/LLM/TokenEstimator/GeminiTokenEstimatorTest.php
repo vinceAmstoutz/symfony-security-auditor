@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\TokenEstimator;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\GeminiTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\GeminiTokenEstimator;
 
 final class GeminiTokenEstimatorTest extends TestCase
 {

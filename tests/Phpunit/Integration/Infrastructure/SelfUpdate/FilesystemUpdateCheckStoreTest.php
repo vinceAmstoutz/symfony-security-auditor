@@ -21,9 +21,9 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\FilesystemUpdateCheckStore;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\FilesystemUpdateCheckStore;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture\RecordingLogger;
 
 final class FilesystemUpdateCheckStoreTest extends TestCase

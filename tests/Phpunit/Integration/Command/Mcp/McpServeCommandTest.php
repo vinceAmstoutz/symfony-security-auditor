@@ -19,14 +19,14 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\AuditTool;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\McpServeCommand;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\McpServerFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\PreloadedStdioTransportFactory;
 
 final class McpServeCommandTest extends TestCase

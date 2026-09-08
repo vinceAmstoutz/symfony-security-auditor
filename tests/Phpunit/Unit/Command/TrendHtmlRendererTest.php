@@ -15,10 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use Override;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrend;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPoint;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SecurityAuditor\Command\ReportTrend;
+use VinceAmstoutz\SecurityAuditor\Command\TrendHtmlRenderer;
+use VinceAmstoutz\SecurityAuditor\Command\TrendPoint;
 
 final class TrendHtmlRendererTest extends TestCase
 {

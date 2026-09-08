@@ -29,10 +29,11 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuthorizationRuleCapability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AuthorizationRuleParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -44,14 +45,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
  * attributes — but for the attacker prompt's "Voter Coverage" block it gives
  * the LLM a useful, deterministic summary of who handles what.
  */
-final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityParserInterface
+final readonly class PhpParserVoterCapabilityParser implements AuthorizationRuleParserInterface
 {
     public function __construct(
         private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
     ) {}
 
     #[Override]
-    public function parse(ProjectFile $projectFile): ?VoterCapability
+    public function parse(ProjectFile $projectFile): ?AuthorizationRuleCapability
     {
         if (ProjectFileType::VOTER !== $projectFile->fileType()) {
             return null;
@@ -91,7 +92,7 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         );
         $subjects = $this->collectInstanceofClassNames($body, $nodeFinder);
 
-        return new VoterCapability(
+        return new AuthorizationRuleCapability(
             filePath: $projectFile->relativePath(),
             className: $this->resolveClassName($class),
             supportedAttributes: $attributes,

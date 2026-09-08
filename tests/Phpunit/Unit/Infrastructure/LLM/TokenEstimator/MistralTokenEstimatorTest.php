@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Tok
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MistralTokenEstimator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MistralTokenEstimator;
 
 final class MistralTokenEstimatorTest extends TestCase
 {

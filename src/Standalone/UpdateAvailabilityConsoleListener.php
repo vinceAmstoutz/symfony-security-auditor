@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 use Symfony\Component\Console\Event\ConsoleTerminateEvent;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateAvailabilityNotifierInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateAvailabilityNotifierInterface;
+use VinceAmstoutz\SecurityAuditor\Command\SelfUpdateCommand;
 
 /**
  * Prints an "update available" notice to stderr once a command finishes, but

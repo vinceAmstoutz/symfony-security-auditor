@@ -14,10 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
 
 final class FakeSelfUpdater implements SelfUpdaterInterface
 {

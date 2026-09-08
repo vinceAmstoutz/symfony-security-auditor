@@ -19,11 +19,12 @@ use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CoreCompositionRoot;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\SymfonyProfile;
 
 /**
  * @phpstan-import-type BundleConfigArray from BundleConfiguration
@@ -50,6 +51,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         /** @var BundleConfigArray $config */
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        (new CoreCompositionRoot())->register($container, $builder, $bundleConfiguration);
+        (new CoreCompositionRoot(new SymfonyProfile()))->register($container, $builder, $bundleConfiguration);
     }
 }

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandaloneConfigFactory;
 
 final class StandaloneConfigFactoryTest extends TestCase
 {

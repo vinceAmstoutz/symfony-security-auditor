@@ -18,12 +18,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Command\DiffFinding;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\MalformedReportFileException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\ReportFileNotReadableException;
+use VinceAmstoutz\SecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoader;
 
 final class ReportDifferTest extends TestCase
 {

@@ -1,0 +1,69 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress;
+
+use Override;
+use Psr\Log\LoggerInterface;
+use Throwable;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+
+/**
+ * Mutable delegate wiring the `ProgressReporterInterface` seam between container
+ * construction and command invocation. The pipeline receives this holder;
+ * `AuditCommand` calls `setDelegate()` at the start of `__invoke()` to swap in a
+ * `ConsoleProgressReporter` built from the live `SymfonyStyle`, and until then
+ * the holder behaves as a `NullProgressReporter`.
+ *
+ * Reporter exceptions are swallowed so a misbehaving delegate cannot abort the
+ * audit, as the port's contract guarantees.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
+final class ProgressReporterHolder implements ProgressReporterInterface
+{
+    private ProgressReporterInterface $progressReporter;
+
+    public function __construct(private readonly LoggerInterface $logger)
+    {
+        $this->progressReporter = new NullProgressReporter();
+    }
+
+    public function setDelegate(ProgressReporterInterface $progressReporter): void
+    {
+        $this->progressReporter = $progressReporter;
+    }
+
+    #[Override]
+    public function report(string $event, array $context = []): void
+    {
+        try {
+            $this->progressReporter->report($event, $context);
+        } catch (Throwable $throwable) {
+            $this->logFailure($event, $throwable);
+        }
+    }
+
+    private function logFailure(string $event, Throwable $throwable): void
+    {
+        try {
+            $this->logger->debug('Progress reporter failed; audit continues.', [
+                'event' => $event,
+                'exception' => $throwable,
+            ]);
+        } catch (Throwable $loggerThrowable) {
+            error_log(\sprintf('ProgressReporterHolder could not log a failed progress event "%s": %s', $event, $loggerThrowable->getMessage()));
+        }
+    }
+}

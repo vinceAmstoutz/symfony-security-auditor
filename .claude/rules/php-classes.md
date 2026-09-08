@@ -44,11 +44,11 @@ See also: [[ddd-layers]], [[llm-seam]].
 
 Each file does exactly one thing. **No exceptions.**
 
-The canonical split lives under `src/Command/`: `AuditCommand` delegates only —
-input mapping/validation goes to `AuditCommandInput`, user-facing messaging to
-`AuditPresenter`, report persistence to `ReportWriter`, exit-code mapping to
-`AuditExitCodeResolver`. Replicate this pattern: thin orchestrator + dedicated
-collaborators, each behind an interface.
+The canonical split lives under `packages/core/src/Command/`: `AuditCommand`
+delegates only — input mapping/validation goes to `AuditCommandInput`,
+user-facing messaging to `AuditPresenter`, report persistence to `ReportWriter`,
+exit-code mapping to `AuditExitCodeResolver`. Replicate this pattern: thin
+orchestrator + dedicated collaborators, each behind an interface.
 
 When you touch a file that bundles responsibilities, extract them into new
 classes rather than adding more. One class/interface/trait per file is enforced
@@ -134,17 +134,18 @@ description.
 ### Domain-layer exception
 
 This rule applies to the **Application, Infrastructure, and Command** layers
-only. The **Domain layer** (`src/Audit/Domain/`) is pure PHP by mandate (see
-[[ddd-layers]]: _"No Symfony, no `symfony/ai`, no I/O"_) and therefore keeps
-native functions — `str_ends_with`, `str_contains`, `trim`, `is_dir`, … — even
-where a Symfony component would otherwise be preferred. Do **not** import
-`symfony/string`, `symfony/filesystem`, or any other Symfony component into a
-Domain class; the layer boundary wins over the components-first preference.
+only. The **Domain layer** (`packages/core/src/Audit/Domain/`) is pure PHP by
+mandate (see [[ddd-layers]]: _"No Symfony, no `symfony/ai`, no I/O"_) and
+therefore keeps native functions — `str_ends_with`, `str_contains`, `trim`,
+`is_dir`, … — even where a Symfony component would otherwise be preferred. Do
+**not** import `symfony/string`, `symfony/filesystem`, or any other Symfony
+component into a Domain class; the layer boundary wins over the components-first
+preference.
 
 Concretely:
 
 - `symfony/string` (`u()` / `b()`) is used freely in Application /
-  Infrastructure / Command, but never in `src/Audit/Domain/`.
+  Infrastructure / Command, but never in `packages/core/src/Audit/Domain/`.
 - A directory-vs-file predicate (`is_dir` / `is_file`) has no
   `symfony/filesystem` equivalent (`Filesystem::exists()` cannot distinguish the
   two), so those calls stay native at the scanning boundary; use

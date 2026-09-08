@@ -23,9 +23,9 @@ use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResultExtractor;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\PlatformResultExtractor;
 
 final class PlatformResultExtractorTest extends TestCase
 {

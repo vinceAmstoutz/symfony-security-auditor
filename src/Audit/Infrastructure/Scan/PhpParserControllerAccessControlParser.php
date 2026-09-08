@@ -27,14 +27,15 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\EntrypointAccessControl;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\EntrypointAccessControlParserInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Walks a controller-like file's AST for one RouteAccessControl per stacked
+ * Walks a controller-like file's AST for one EntrypointAccessControl per stacked
  * `#[Route]` on each public action, plus class- and method-level
  * `#[IsGranted]`/`#[Security]` and `denyAccessUnlessGranted()` calls in method
  * bodies (a first-class callable reference does not count — it is never
@@ -43,7 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessContr
  * covers `#[AsLiveComponent]`/`#[ApiResource]` classes. Returns [] for any other
  * file type or parse error — the mapping stage never aborts over one bad file.
  */
-final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
+final readonly class PhpParserControllerAccessControlParser implements EntrypointAccessControlParserInterface
 {
     public function __construct(
         private RouteAttributeParser $routeAttributeParser = new RouteAttributeParser(),
@@ -96,12 +97,12 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * @return list<RouteAccessControl>
+     * @return list<EntrypointAccessControl>
      */
     private function entriesForClass(string $filePath, Class_ $class): array
     {
-        $classHasIsGranted = $this->isGrantedAttributeParser->hasValueArg($class->attrGroups);
-        $classLevelIsGranted = $this->isGrantedAttributeParser->extractValues($class->attrGroups);
+        $classHasAccessCheck = $this->isGrantedAttributeParser->hasValueArg($class->attrGroups);
+        $classRequiredAttributes = $this->isGrantedAttributeParser->extractValues($class->attrGroups);
         $classConstants = $this->classConstantStrings($class);
         $classRouteData = $this->routeAttributeParser->extract($class->attrGroups, $classConstants)[0];
         $methodsByName = $this->methodsByName($class);
@@ -114,10 +115,10 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
             $denyAccessCalls = $this->denyAccessCalls($classMethod, $methodsByName);
             $accessFlags = [
-                'classHasIsGranted' => $classHasIsGranted,
-                'classLevelIsGranted' => $classLevelIsGranted,
-                'methodHasDenyAccess' => [] !== $denyAccessCalls,
-                'denyAccessAttributes' => $this->attributesFromCalls($denyAccessCalls),
+                'classHasAccessCheck' => $classHasAccessCheck,
+                'classRequiredAttributes' => $classRequiredAttributes,
+                'handlerChecksAccessInBody' => [] !== $denyAccessCalls,
+                'bodyRequiredAttributes' => $this->attributesFromCalls($denyAccessCalls),
             ];
 
             foreach ($this->buildEntries($filePath, $classMethod, $accessFlags, $classRouteData, $classConstants) as $entry) {
@@ -136,10 +137,10 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * never flagged. Mirror that: when the class has a route and nothing routed
      * a method, the `__invoke()` entry inherits the class route.
      *
-     * @param list<RouteAccessControl>                                                  $entries
+     * @param list<EntrypointAccessControl>                                             $entries
      * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
      *
-     * @return list<RouteAccessControl>
+     * @return list<EntrypointAccessControl>
      */
     private function withInvokableClassRoute(array $entries, array $classRouteData): array
     {
@@ -148,19 +149,19 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         }
 
         return array_map(
-            static fn (RouteAccessControl $routeAccessControl): RouteAccessControl => '__invoke' === $routeAccessControl->methodName()
-                ? $routeAccessControl->withRouteFromEnclosingClass($classRouteData['path'], $classRouteData['methods'], $classRouteData['name'])
-                : $routeAccessControl,
+            static fn (EntrypointAccessControl $entrypointAccessControl): EntrypointAccessControl => '__invoke' === $entrypointAccessControl->methodName()
+                ? $entrypointAccessControl->withRouteFromEnclosingClass($classRouteData['path'], $classRouteData['methods'], $classRouteData['name'])
+                : $entrypointAccessControl,
             $entries,
         );
     }
 
     /**
-     * @param list<RouteAccessControl> $entries
+     * @param list<EntrypointAccessControl> $entries
      */
     private function anyEntryRouted(array $entries): bool
     {
-        return [] !== array_filter($entries, static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->hasRouteAttribute());
+        return [] !== array_filter($entries, static fn (EntrypointAccessControl $entrypointAccessControl): bool => $entrypointAccessControl->isRouted());
     }
 
     /**
@@ -209,32 +210,32 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * route name must be matched against the same joined values, not the
      * method's own attribute in isolation.
      *
-     * @param array{classHasIsGranted: bool, classLevelIsGranted: list<string>, methodHasDenyAccess: bool, denyAccessAttributes: list<string>} $accessFlags
-     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string}                                                        $classRouteData
-     * @param array<string, string>                                                                                                            $classConstants
+     * @param array{classHasAccessCheck: bool, classRequiredAttributes: list<string>, handlerChecksAccessInBody: bool, bodyRequiredAttributes: list<string>} $accessFlags
+     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string}                                                                      $classRouteData
+     * @param array<string, string>                                                                                                                          $classConstants
      *
-     * @return list<RouteAccessControl>
+     * @return list<EntrypointAccessControl>
      */
     private function buildEntries(string $filePath, ClassMethod $classMethod, array $accessFlags, array $classRouteData, array $classConstants): array
     {
-        $methodLevelIsGranted = $this->isGrantedAttributeParser->extractValues($classMethod->attrGroups);
-        $methodHasIsGrantedAttribute = $this->isGrantedAttributeParser->hasValueArg($classMethod->attrGroups);
+        $handlerRequiredAttributes = $this->isGrantedAttributeParser->extractValues($classMethod->attrGroups);
+        $handlerHasUnresolvedAccessCheck = $this->isGrantedAttributeParser->hasValueArg($classMethod->attrGroups);
 
         $entries = [];
         foreach ($this->routeAttributeParser->extract($classMethod->attrGroups, $classConstants) as $routeData) {
-            $entries[] = new RouteAccessControl(
+            $entries[] = new EntrypointAccessControl(
                 filePath: $filePath,
                 methodName: $classMethod->name->toString(),
                 routePath: $this->prefixedRoutePath($classRouteData['path'], $routeData['path']),
                 routeMethods: $routeData['methods'],
-                hasRouteAttribute: $routeData['present'],
-                methodLevelIsGranted: $methodLevelIsGranted,
-                methodHasDenyAccess: $accessFlags['methodHasDenyAccess'],
-                classHasIsGranted: $accessFlags['classHasIsGranted'],
+                isRouted: $routeData['present'],
+                handlerRequiredAttributes: $handlerRequiredAttributes,
+                handlerChecksAccessInBody: $accessFlags['handlerChecksAccessInBody'],
+                classHasAccessCheck: $accessFlags['classHasAccessCheck'],
                 routeName: $this->prefixedRouteName($classRouteData['name'], $routeData['name']),
-                methodHasIsGrantedAttribute: $methodHasIsGrantedAttribute,
-                classLevelIsGranted: $accessFlags['classLevelIsGranted'],
-                denyAccessAttributes: $accessFlags['denyAccessAttributes'],
+                handlerHasUnresolvedAccessCheck: $handlerHasUnresolvedAccessCheck,
+                classRequiredAttributes: $accessFlags['classRequiredAttributes'],
+                bodyRequiredAttributes: $accessFlags['bodyRequiredAttributes'],
             );
         }
 
@@ -299,7 +300,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * literal. A non-literal attribute (enum case, variable, `new
      * Expression(...)`) is left out rather than guessed at, mirroring how route
      * paths are only resolved from literals. Duplicates are collapsed once,
-     * across every guard form, by {@see RouteAccessControl::guardAttributes()}.
+     * across every guard form, by {@see EntrypointAccessControl::guardAttributes()}.
      *
      * @param list<MethodCall|NullsafeMethodCall> $denyAccessCalls
      *

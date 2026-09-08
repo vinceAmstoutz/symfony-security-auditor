@@ -37,6 +37,181 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
 
 ### Changed
 
+- **A framework profile now owns its own vocabulary and its own attacker
+  skills.** Two things still tied the auditor to Symfony after classification
+  became a port. `ProjectFileType` had only Symfony nouns, so a Laravel Policy
+  would have had to masquerade as a `VOTER` and an Eloquent model as an
+  `ENTITY`; the enum gains `POLICY`, `ELOQUENT_MODEL`, `FORM_REQUEST`,
+  `BLADE_TEMPLATE`, `JOB`, `MIDDLEWARE` and `GUARD`, each mapped onto the
+  framework-neutral `SurfaceArchetype` that core logic already switches on, and
+  none of them widens `HTTP_ENTRYPOINT` — `isControllerLike()` stays exactly the
+  route-guarded set it was. The port gains `supportedTypes()` so a profile
+  declares which of those it can actually produce, and
+  `GrepTool`/`ListFilesTool` offer that list rather than every case, so no
+  project is invited to filter on a type its framework has no concept of (the
+  Symfony tool schema is unchanged: the same 21 types).
+
+  The 25 built-in attacker skills were registered in the shared
+  `config/services.php`, which every host imports through `CoreCompositionRoot`
+  — so a Laravel host would have been prompted with Symfony's voter, Twig and
+  Doctrine surfaces on top of its own. They move into `SymfonySkillRegistrar`,
+  listed by `SymfonyProfile`, and `CoreCompositionRoot` now takes the host's
+  profile alongside its core registrars. Both Symfony hosts — the bundle and the
+  standalone binary — pass that profile, so the skill set is byte-identical; a
+  host auditing another framework passes its own instead.
+
+- **The framework-agnostic core is its own package.** Around four fifths of
+  `src/` never knew anything about Symfony — `Domain` (zero framework imports),
+  `Application`, the LLM/cache/report/advisory/progress/tool/pricing/filesystem
+  adapters, and `Command`, since `symfony/console` is a standalone library and
+  not the framework. That code now lives in `packages/core/` as
+  `vinceamstoutz/security-auditor-core` under a new namespace root,
+  `VinceAmstoutz\SecurityAuditor\`, leaving the root package holding only what a
+  Symfony application needs: the prompt content and attacker skills, the Symfony
+  source parsers, the DI wiring and profile, the standalone container and the
+  bundle class.
+
+  Two directories split rather than moved whole, along a line they already had.
+  `Infrastructure/Config/` was two things: the Symfony DI wiring (stays) and the
+  standalone binary's own YAML settings file, which becomes the core's
+  `Infrastructure/Settings/`. `Infrastructure/Scan/` was the Symfony attribute
+  and `security.yaml` parsers (stay) plus framework-neutral scanners —
+  `RegexStaticPreScanner`, `RegexCodeSlicer`, `SarifImportingPreScanner` and the
+  line-retention machinery — which move, because a Laravel package would reuse
+  them verbatim.
+
+  `deptrac.yaml` now enforces the package line instead of an in-directory layer
+  list: nothing in `packages/core` may depend on anything in `src/`, which also
+  drops `Command`'s old permission to reach the Symfony profile. The elaborate
+  `classLike` include/exclude lists that used to carve `SymfonyProfile` out of
+  `Infrastructure` are gone — the directory split says it instead, with 0
+  violations and 0 double-layer warnings.
+
+  Installation is unchanged:
+  `composer require vinceamstoutz/symfony-security-auditor` still works, the
+  bundle ships the core inside its own distribution and `replace`s the split
+  package so the two can never be installed side by side. No configuration key,
+  CLI surface, report schema or deprecation identity moved — including the four
+  `trigger_deprecation()` calls that name the Composer package rather than the
+  repository path. Every PHP reference to a relocated class needs its namespace
+  root updated; [`UPGRADE-2.0.md`](UPGRADE-2.0.md) has the mapping, and
+  compatibility aliases are tracked separately.
+
+- **The project inventory counts an API resource as an entrypoint.**
+  `ProjectFileInventory` — the role grouping inside `SymfonyMapping` — filtered
+  each bucket on one exact `ProjectFileType`, while everything else in the
+  engine had already moved to `ProjectFileType::archetype()`. So an API Platform
+  resource, a Live Component and an EasyAdmin CRUD controller were counted as
+  generic services rather than entrypoints, a Sonata admin was not an input
+  binding, and a Twig extension was not a template surface — even though
+  `MappingStage` was already parsing all of them as entrypoints for
+  access-control extraction. Bucketing on the archetype closes that gap and
+  renames the buckets after what they hold: `entrypoints()`, `domainModels()`,
+  `authorizationRules()`, `persistenceQueries()`, `inputBindings()`, plus the
+  unchanged `services()` and `templates()`.
+
+  This is a visible change for projects using those components: the mapping
+  summary's per-role counts shift, more entrypoints are checked for a missing
+  authorization rule, and the affected chunks' attacker cache keys change.
+  Nothing is dropped — `totalFiles()` is unchanged, because every file leaving
+  `services()` lands in a bucket of its own. The committed end-to-end report
+  snapshots are byte-identical: the fixture project has none of the five file
+  types, which is also why a `ProjectFileInventoryTest` case now pins each one.
+  `SymfonyMapping`'s own accessors are untouched.
+
+- **The Domain models describing the audited application stopped naming
+  Symfony.** `RouteAccessControl` and `VoterCapability`, and the three ports
+  producing them, described what Symfony calls things rather than what they are
+  — so a Laravel profile would have had to fill a `VoterCapability` from a
+  policy and set `methodLevelIsGranted` from a middleware. They become
+  `EntrypointAccessControl`, `AuthorizationRuleCapability`,
+  `EntrypointAccessControlParserInterface`, `AuthorizationRuleParserInterface`
+  and `AccessControlConfigParserInterface`, and the rename goes all the way
+  down: `hasRouteAttribute()` is `isRouted()`, `methodLevelIsGranted()` is
+  `handlerRequiredAttributes()`, `methodHasDenyAccess()` is
+  `handlerChecksAccessInBody()`, and so on for every accessor that named a
+  Symfony attribute or helper. `AccessControlMap` and `FormBinding` adopt the
+  vocabulary `ApplicationSecurityMap` already used (`perimeterRules()`,
+  `authorizationRules()`, `entrypointsWithoutAccessCheck()`,
+  `fieldBindingsForEntrypoint()`, `entrypointFilePath()`), and `MappingStage`,
+  `DependencyExpansionStage` and `ChunkContextKeyDeriver` — all portable
+  Application code — lost their `$voterCapabilities` and `$firewallRules` locals
+  with them.
+
+  `SymfonyMapping` is deliberately untouched: it is the Symfony-flavoured facade
+  over `ApplicationSecurityMap`, so its Symfony-named accessors (including the
+  four deprecated since 1.19) keep working. So do the bundled Symfony parsers,
+  which really do read Symfony and now implement the renamed ports. No behaviour
+  changes — the full migration table is in [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
+
+- **The chunker no longer knows what a controller is called.** `FileChunker`
+  decides which surfaces the attacker sees first, which files belong to which
+  feature, and which extension a template hides behind — and it did all three
+  from hardcoded Symfony knowledge: a 20-entry `TYPE_PRIORITY` table of Symfony
+  `ProjectFileType` cases, a `match` stripping `Controller` / `CrudController`,
+  and a literal `.twig`. Every Laravel type therefore sorted behind every
+  Symfony one, a `UserController` in a Laravel app grouped by luck, and a
+  `.blade.php` view could never join its feature. Those three facts move into a
+  `ChunkingVocabulary` the profile supplies, wired by `SymfonyChunkingRegistrar`
+  from `SymfonyChunkingVocabulary`. The Symfony ordering, suffixes and extension
+  are carried over exactly — including `beforeLast()`'s two easily-missed edges,
+  that a name without the suffix keeps all of itself
+  (`src/Controller/Dashboard.php` still names feature `Dashboard`) while a name
+  that is only the suffix names nothing — so chunk composition, and therefore
+  every prompt, is unchanged; a new `FileChunkerTest` case pins the first of
+  those, which nothing had covered. A vocabulary with no conventions is
+  deliberately usable: it chunks by feature without renaming or reordering, so a
+  profile that supplies none is neutral rather than silently borrowing
+  Symfony's.
+
+- **A framework profile is one object, and deptrac now proves the boundary it
+  draws.** `SymfonyProfileRegistrars::all()` became
+  `SymfonyProfile implements FrameworkProfileInterface`, which a host hands to
+  `CoreCompositionRoot` as its single required constructor argument: it carries
+  both the six `Registrar\Symfony\` registrars and the profile's
+  `PromptVersions`. That second half closes a real hole —
+  `ContainerParameterRegistrar` read `AttackerPromptBuilder::PROMPT_VERSION` and
+  `ReviewerPromptBuilder::PROMPT_VERSION` directly, so a second profile's
+  prompts would have been served cached responses written against Symfony's
+  wording. The Symfony values are unchanged, so existing attacker and reviewer
+  cache keys are byte-identical.
+
+  Tightening the deptrac rule from `Config/Registrar/**` to
+  `Config/Registrar/Symfony/**` exposed nine violations, all of them
+  framework-neutral machinery sitting inside a layer that claims to be Symfony
+  knowledge. `AttackerSkillInterface`, `AttackerSkillRegistry` and
+  `ConfiguredAttackerSkill` move from `Prompt\Skill\` to a new
+  `Infrastructure\Skill\`; `ReviewerFeedbackHolder` and
+  `CompositeReviewerFeedbackProvider` move from `Prompt\Reviewer\` to a new
+  `Infrastructure\Feedback\`; and the composition roots, the DI definition
+  factories and `ContainerParameterRegistrar` leave the layer altogether,
+  because building a Symfony container is not knowledge of the framework being
+  audited. With the registry outside the layer, its `defaultSkills()` fallback —
+  which silently handed any caller the 25 Symfony skills — could no longer be
+  expressed without violating it; the list now lives once, in `SymfonySkillSet`,
+  which both the DI tag and the `AttackerPromptBuilder` fallback read, and the
+  registry takes its skills as a required argument. Deptrac reports 0 violations
+  against the tightened rule.
+
+- **File classification is a Domain port instead of a static call, so a
+  non-Symfony profile can be plugged in.** `ProjectFile::create()` classified
+  itself by calling `ProjectFileTypeClassifier::classify()` — a static method,
+  living in `Audit\Domain\Model\`, that hardcoded `extends AbstractController`,
+  `#[Route]`, `.twig`, EasyAdmin and Sonata. The audit engine therefore could
+  not be pointed at a Laravel or Laminas project even in principle: everything
+  downstream switches on `ProjectFileType`, and nothing could supply a different
+  one. The heuristics are unchanged but now live in
+  `SymfonyProjectFileTypeClassifier` (`Infrastructure/Scan/`, inside the
+  `SymfonyProfile` deptrac layer), reached through the new
+  `ProjectFileTypeClassifierInterface` — the 24th port on the BC list, joined
+  deliberately because it is exactly the framework extension point.
+  `ProjectFile` no longer classifies at all: `create()` becomes `of()` and takes
+  the `ProjectFileType` as data, and `ProjectFileScanner` — which is what
+  discovers files — takes the classifier as a required constructor argument
+  rather than defaulting to a Symfony one, so the portable half of
+  `Infrastructure` cannot reach `SymfonyProfile`. No detection behaviour
+  changes: every one of the 4,688 tests passes with its expectations untouched.
+
 - **The audit object graph is described in one named place, and every host
   reaches it the same way.** `SymfonySecurityAuditorBundle` carried the wiring
   itself — the `config/services.php` import, the container parameters and six

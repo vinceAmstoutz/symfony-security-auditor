@@ -17,12 +17,12 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 
 final class RegexStaticPreScannerTest extends TestCase
 {
@@ -51,7 +51,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_returns_empty_array_when_no_patterns_match(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Clean.php',
             '/app/src/Service/Clean.php',
             "<?php\nclass Clean { public function foo() { return 1; } }",
@@ -66,7 +66,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_unserialize_in_php_file(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Dangerous.php',
             '/app/src/Service/Dangerous.php',
             "<?php\nclass Dangerous { public function foo(\$data) { return unserialize(\$data); } }",
@@ -87,7 +87,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('typedComponentSinkCases')]
     public function test_it_flags_generic_php_sinks_in_a_typed_component(string $relativePath, string $source, string $expectedPattern): void
     {
-        $projectFile = ProjectFile::create($relativePath, '/app/'.$relativePath, $source);
+        $projectFile = SymfonyProjectFile::create($relativePath, '/app/'.$relativePath, $source);
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -111,7 +111,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('genericSinkCases')]
     public function test_it_flags_file_query_upload_xxe_and_input_sinks_in_a_plain_php_service(string $body, string $expectedPattern): void
     {
-        $projectFile = ProjectFile::create('src/Service/Danger.php', '/app/src/Service/Danger.php', "<?php\nclass Danger { public function run(\$in) { ".$body.' } }');
+        $projectFile = SymfonyProjectFile::create('src/Service/Danger.php', '/app/src/Service/Danger.php', "<?php\nclass Danger { public function run(\$in) { ".$body.' } }');
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -159,7 +159,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_static_require_without_a_dynamic_argument(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/bootstrap.php',
             '/app/src/bootstrap.php',
             "<?php\nrequire __DIR__.'/../vendor/autoload.php';\ninclude 'config/defaults.php';",
@@ -177,7 +177,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_non_constant_time_compare_regardless_of_operand_order(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Verifier.php',
             '/app/src/Service/Verifier.php',
             "<?php\nclass Verifier { public function foo(\$expectedSignature, \$input) { return \$expectedSignature === \$input; } }",
@@ -196,7 +196,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('nonConstantTimeCompareCases')]
     public function test_it_flags_non_constant_time_compare_on_canonical_variable_names(string $expression): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Verifier.php',
             '/app/src/Service/Verifier.php',
             \sprintf("<?php\nclass Verifier { public function foo(\$a, \$b) { return %s; } }", $expression),
@@ -224,7 +224,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_not_identical_signature_compare_in_webhook_consumer(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Webhook/PaymentWebhookConsumer.php',
             '/app/src/Webhook/PaymentWebhookConsumer.php',
             "<?php\nclass PaymentWebhookConsumer { public function consume(\$signature, \$computed) { if (\$signature !== \$computed) { throw new \RuntimeException('bad'); } } }",
@@ -242,7 +242,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_a_signature_compare_split_across_lines_with_a_leading_operator(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Webhook/PaymentWebhookConsumer.php',
             '/app/src/Webhook/PaymentWebhookConsumer.php',
             "<?php\nclass PaymentWebhookConsumer { public function consume(\$signature, \$computed) { if (\$signature\n !== \$computed) { throw new \RuntimeException('bad'); } } }",
@@ -260,7 +260,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_raw_filter_in_template(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'templates/index.html.twig',
             '/app/templates/index.html.twig',
             "<h1>Hello</h1>\n{{ user.bio|raw }}",
@@ -279,7 +279,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_groups_attribute_on_entity(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Entity/User.php',
             '/app/src/Entity/User.php',
             "<?php\nclass User {\n    #[Groups(['user:write', 'admin:write'])]\n    private string \$role;\n}",
@@ -297,7 +297,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_csrf_disabled_in_form(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Form/UserType.php',
             '/app/src/Form/UserType.php',
             "<?php\n\$builder->add('name', null, ['csrf_protection' => false]);",
@@ -315,7 +315,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_hardcoded_secret_in_yaml(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/db.yaml',
             '/app/config/packages/db.yaml',
             "database:\n    password: AKIAIOSFODNN7EXAMPLEXX",
@@ -333,7 +333,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_env_reference_as_hardcoded_secret(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/db.yaml',
             '/app/config/packages/db.yaml',
             "database:\n    password: '%env(DATABASE_PASSWORD)%'",
@@ -352,7 +352,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('wildcardCorsCases')]
     public function test_it_flags_a_wildcard_cors_origin(string $allowOriginLine): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_cors.yaml',
             '/app/config/packages/nelmio_cors.yaml',
             "nelmio_cors:\n    defaults:\n        allow_credentials: true\n        ".$allowOriginLine,
@@ -378,7 +378,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_specific_cors_origin(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_cors.yaml',
             '/app/config/packages/nelmio_cors.yaml',
             "nelmio_cors:\n    defaults:\n        allow_origin: ['https://app.example.com']",
@@ -396,7 +396,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_credential_assignment_in_dotenv_file(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             '.env',
             '/app/.env',
             "APP_ENV=prod\nAPP_SECRET=0123456789abcdef0123456789abcdef\n",
@@ -415,7 +415,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_empty_or_boilerplate_dotenv_values(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             '.env',
             '/app/.env',
             "APP_ENV=dev\nAPP_SECRET=\nAPP_DEBUG=0\n",
@@ -430,7 +430,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_scrubbed_secret_placeholder_in_config_file(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             '.env.prod',
             '/app/.env.prod',
             "MAILER_DSN=***REDACTED:connection-string***\n",
@@ -448,7 +448,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_disabled_pagination_on_api_resources(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Entity/Book.php',
             '/app/src/Entity/Book.php',
             "<?php\n#[ApiResource(paginationEnabled: false)]\nclass Book {}",
@@ -466,7 +466,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_api_filters_for_review(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Entity/Offer.php',
             '/app/src/Entity/Offer.php',
             "<?php\n#[ApiResource]\n#[ApiFilter(SearchFilter::class, properties: ['owner.email' => 'exact'])]\nclass Offer {}",
@@ -484,7 +484,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_a_sensitive_setter_on_an_api_resource_entity(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Entity/User.php',
             '/app/src/Entity/User.php',
             "<?php\n#[ApiResource]\n#[ORM\\Entity]\nclass User {\n    public function setRoles(array \$roles): self { \$this->roles = \$roles; return \$this; }\n}",
@@ -503,7 +503,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('controllerLikeRequestReadCases')]
     public function test_it_flags_controller_request_reads_on_controller_like_types(string $relativePath, string $source): void
     {
-        $projectFile = ProjectFile::create($relativePath, '/app/'.$relativePath, $source);
+        $projectFile = SymfonyProjectFile::create($relativePath, '/app/'.$relativePath, $source);
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -544,7 +544,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_controller_request_reads_on_a_non_controller_like_type(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/ReportService.php',
             '/app/src/Service/ReportService.php',
             "<?php\nclass ReportService {\n    public function build(Request \$request): void { \$this->render(\$request->query->get('q')); }\n}",
@@ -562,7 +562,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_writable_live_props(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Twig/Components/ProfileForm.php',
             '/app/src/Twig/Components/ProfileForm.php',
             "<?php\n#[AsLiveComponent]\nclass ProfileForm {\n    #[LiveProp(writable: true)]\n    public string \$email = '';\n}",
@@ -580,7 +580,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_live_actions_for_authorization_review(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Twig/Components/AdminPanel.php',
             '/app/src/Twig/Components/AdminPanel.php',
             "<?php\n#[AsLiveComponent]\nclass AdminPanel {\n    #[LiveAction]\n    public function deleteUser(): void {}\n}",
@@ -598,7 +598,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_shell_or_file_sinks_in_twig_extensions(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Twig/ReportExtension.php',
             '/app/src/Twig/ReportExtension.php',
             "<?php\nclass ReportExtension extends AbstractExtension {\n    public function readFile(string \$path): string { return file_get_contents(\$path); }\n}",
@@ -616,7 +616,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_bare_include_and_require_sinks_in_twig_extensions(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Twig/TemplateExtension.php',
             '/app/src/Twig/TemplateExtension.php',
             "<?php\nclass TemplateExtension extends AbstractExtension {\n    public function renderPartial(string \$page): void { include \$page; }\n}",
@@ -634,7 +634,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_include_once_as_a_function_call_requiring_parens(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Twig/BootstrapExtension.php',
             '/app/src/Twig/BootstrapExtension.php',
             "<?php\nclass BootstrapExtension extends AbstractExtension {\n    public function boot(string \$file): void { require_once \$file; }\n}",
@@ -652,7 +652,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_is_safe_html_declarations_in_twig_extensions(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Twig/MarkupExtension.php',
             '/app/src/Twig/MarkupExtension.php',
             "<?php\nclass MarkupExtension extends AbstractExtension {\n    public function getFilters(): array {\n        return [new TwigFilter('badge', [\$this, 'badge'], ['is_safe' => ['html']])];\n    }\n}",
@@ -670,7 +670,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_voter_default_return_true(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/AdminVoter.php',
             '/app/src/Security/AdminVoter.php',
             "<?php\nclass AdminVoter { protected function voteOnAttribute() { return true; } }",
@@ -688,7 +688,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_dynamic_order_by_in_repository(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Repository/UserRepository.php',
             '/app/src/Repository/UserRepository.php',
             "<?php\nclass UserRepository { public function find(\$order) { \$qb->orderBy(\$order); } }",
@@ -710,7 +710,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_dynamic_order_by_split_across_lines(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Repository/UserRepository.php',
             '/app/src/Repository/UserRepository.php',
             "<?php\nclass UserRepository {\n    public function find(\$sort) {\n        return \$this->createQueryBuilder('u')\n            ->orderBy(\n                \$sort\n            )\n            ->getQuery()\n            ->getResult();\n    }\n}",
@@ -729,7 +729,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('bareMailerHeaderSetterCases')]
     public function test_it_flags_bare_cc_and_bcc_mailer_header_setters(string $call): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/NotificationService.php',
             '/app/src/Service/NotificationService.php',
             "<?php\nclass NotificationService { public function send(\$email) { \$email{$call}(\$x); } }",
@@ -755,7 +755,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('redirectWithConcatenatedInputCases')]
     public function test_it_flags_redirect_targets_built_from_a_variable_beyond_the_first_argument_character(string $argument): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/RedirectController.php',
             '/app/src/Controller/RedirectController.php',
             "<?php\nclass RedirectController { public function go(\$request) { return \$this->redirect({$argument}); } }",
@@ -780,7 +780,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_redirect_with_input_split_across_lines(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/RedirectController.php',
             '/app/src/Controller/RedirectController.php',
             "<?php\nclass RedirectController {\n    public function go(\$request) {\n        return \$this->redirect(\n            \$request->query->get('url')\n        );\n    }\n}",
@@ -799,7 +799,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('forwardedHostUsageCases')]
     public function test_it_flags_forwarded_host_usage_in_a_controller(string $call): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/PasswordResetController.php',
             '/app/src/Controller/PasswordResetController.php',
             "<?php\nclass PasswordResetController { public function reset(\$request) { return \$request->{$call}(); } }",
@@ -825,7 +825,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_an_unrelated_getter_call(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/ImportController.php',
             '/app/src/Controller/ImportController.php',
             "<?php\nclass ImportController { public function import(\$uri) { return \$uri->getPath(); } }",
@@ -844,7 +844,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('trustedProxiesWildcardCases')]
     public function test_it_flags_a_wildcard_trusted_proxies_configuration(string $fileName, string $content): void
     {
-        $projectFile = ProjectFile::create($fileName, '/app/'.$fileName, $content);
+        $projectFile = SymfonyProjectFile::create($fileName, '/app/'.$fileName, $content);
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -869,7 +869,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_trusted_proxies_scoped_to_a_private_cidr(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/framework.yaml',
             '/app/config/packages/framework.yaml',
             "framework:\n    trusted_proxies: '10.0.0.0/8'",
@@ -888,7 +888,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('weakPasswordHasherAlgorithmCases')]
     public function test_it_flags_a_weak_password_hasher_algorithm(string $algorithm): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/security.yaml',
             '/app/config/packages/security.yaml',
             \sprintf("security:\n    password_hashers:\n        App\\Entity\\User:\n            algorithm: %s", $algorithm),
@@ -914,7 +914,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_the_default_password_hasher_algorithm(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/security.yaml',
             '/app/config/packages/security.yaml',
             "security:\n    password_hashers:\n        App\\Entity\\User:\n            algorithm: auto",
@@ -932,7 +932,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_a_remember_me_cookie_without_secure(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/security.yaml',
             '/app/config/packages/security.yaml',
             "security:\n    firewalls:\n        main:\n            remember_me:\n                secret: '%kernel.secret%'\n                secure: false",
@@ -950,7 +950,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_remember_me_cookie_marked_secure(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/security.yaml',
             '/app/config/packages/security.yaml',
             "security:\n    firewalls:\n        main:\n            remember_me:\n                secret: '%kernel.secret%'\n                secure: true",
@@ -968,7 +968,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_an_unanchored_cors_origin_regex(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_cors.yaml',
             '/app/config/packages/nelmio_cors.yaml',
             "nelmio_cors:\n    paths:\n        '^/api/':\n            allow_origin: ['^https://.*\\.example\\.com']\n            origin_regex: true",
@@ -986,7 +986,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_cors_config_without_a_regex_origin(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_cors.yaml',
             '/app/config/packages/nelmio_cors.yaml',
             "nelmio_cors:\n    paths:\n        '^/api/':\n            allow_origin: ['https://example.com']",
@@ -1005,7 +1005,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('cspUnsafeDirectiveCases')]
     public function test_it_flags_a_csp_directive_allowing_unsafe_inline_or_eval(string $directive): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_security.yaml',
             '/app/config/packages/nelmio_security.yaml',
             "nelmio_security:\n    csp:\n        default:\n            script-src:\n                - '{$directive}'",
@@ -1030,7 +1030,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_csp_directive_without_unsafe_keywords(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_security.yaml',
             '/app/config/packages/nelmio_security.yaml',
             "nelmio_security:\n    csp:\n        default:\n            script-src:\n                - 'self'",
@@ -1048,7 +1048,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_hsts_disabled_via_forced_ssl(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_security.yaml',
             '/app/config/packages/nelmio_security.yaml',
             "nelmio_security:\n    forced_ssl:\n        enabled: false",
@@ -1066,7 +1066,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_hsts_enabled_via_forced_ssl(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_security.yaml',
             '/app/config/packages/nelmio_security.yaml',
             "nelmio_security:\n    forced_ssl:\n        enabled: true",
@@ -1084,7 +1084,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_hsts_disabled_when_a_sibling_section_is_the_disabled_one(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_security.yaml',
             '/app/config/packages/nelmio_security.yaml',
             "nelmio_security:\n    forced_ssl:\n        enabled: true\n        hsts_max_age: 31536000\n    csp:\n        enabled: false",
@@ -1107,7 +1107,7 @@ final class RegexStaticPreScannerTest extends TestCase
             $allowlist .= "        - '10.0.{$i}.1'\n";
         }
 
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/nelmio_security.yaml',
             '/app/config/packages/nelmio_security.yaml',
             "firewall_a:\n    forced_ssl:\n        enabled: true\n{$allowlist}firewall_b:\n    forced_ssl:\n        enabled: false\n",
@@ -1126,7 +1126,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('appDebugEnabledCases')]
     public function test_it_flags_app_debug_enabled_in_a_dotenv_file(string $value): void
     {
-        $projectFile = ProjectFile::create('.env', '/app/.env', "APP_ENV=prod\n{$value}\n");
+        $projectFile = SymfonyProjectFile::create('.env', '/app/.env', "APP_ENV=prod\n{$value}\n");
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -1147,7 +1147,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_app_debug_disabled_in_a_dotenv_file(): void
     {
-        $projectFile = ProjectFile::create('.env', '/app/.env', "APP_ENV=prod\nAPP_DEBUG=0\n");
+        $projectFile = SymfonyProjectFile::create('.env', '/app/.env', "APP_ENV=prod\nAPP_DEBUG=0\n");
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -1161,7 +1161,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_the_mercure_default_jwt_secret_placeholder(): void
     {
-        $projectFile = ProjectFile::create('.env', '/app/.env', 'MERCURE_JWT_SECRET="!ChangeThisMercureHubJWTSecretKey!"');
+        $projectFile = SymfonyProjectFile::create('.env', '/app/.env', 'MERCURE_JWT_SECRET="!ChangeThisMercureHubJWTSecretKey!"');
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -1175,7 +1175,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_rotated_mercure_jwt_secret(): void
     {
-        $projectFile = ProjectFile::create('.env', '/app/.env', 'MERCURE_JWT_SECRET="a-real-rotated-secret-value"');
+        $projectFile = SymfonyProjectFile::create('.env', '/app/.env', 'MERCURE_JWT_SECRET="a-real-rotated-secret-value"');
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
@@ -1189,7 +1189,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_a_permissive_mercure_topic_claim(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/mercure.yaml',
             '/app/config/packages/mercure.yaml',
             "mercure:\n    hubs:\n        default:\n            jwt:\n                secret: '%env(MERCURE_JWT_SECRET)%'\n                publish: '*'",
@@ -1207,7 +1207,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_scoped_mercure_topic_claim(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/mercure.yaml',
             '/app/config/packages/mercure.yaml',
             "mercure:\n    hubs:\n        default:\n            jwt:\n                secret: '%env(MERCURE_JWT_SECRET)%'\n                publish: ['/books/1']",
@@ -1225,7 +1225,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_an_unescaped_ldap_filter_built_with_concatenation(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Ldap/DirectoryLookup.php',
             '/app/src/Ldap/DirectoryLookup.php',
             "<?php\nclass DirectoryLookup {\n    public function find(string \$username): void {\n        \$this->ldap->query('ou=users,dc=example,dc=com', '(uid=' . \$username . ')');\n    }\n}",
@@ -1243,7 +1243,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_static_ldap_filter(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Ldap/DirectoryLookup.php',
             '/app/src/Ldap/DirectoryLookup.php',
             "<?php\nclass DirectoryLookup {\n    public function find(): void {\n        \$this->ldap->query('ou=users,dc=example,dc=com', '(objectClass=person)');\n    }\n}",
@@ -1261,7 +1261,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_ldap_bind_with_a_variable_password(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Ldap/DirectoryLookup.php',
             '/app/src/Ldap/DirectoryLookup.php',
             "<?php\nclass DirectoryLookup {\n    public function bind(string \$dn, string \$password): void {\n        \$this->ldap->bind(\$dn, \$password);\n    }\n}",
@@ -1279,7 +1279,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_ldap_bind_with_a_literal_password(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Ldap/DirectoryLookup.php',
             '/app/src/Ldap/DirectoryLookup.php',
             "<?php\nclass DirectoryLookup {\n    public function bind(string \$dn): void {\n        \$this->ldap->bind(\$dn, 'service-account-password');\n    }\n}",
@@ -1297,7 +1297,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_a_sonata_admin_exposing_the_roles_field(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Admin/UserAdmin.php',
             '/app/src/Admin/UserAdmin.php',
             "<?php\nclass UserAdmin extends AbstractAdmin {\n    protected function configureFormFields(FormMapper \$form): void {\n        \$form->add('roles');\n    }\n}",
@@ -1315,7 +1315,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_sonata_admin_exposing_only_non_sensitive_fields(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Admin/UserAdmin.php',
             '/app/src/Admin/UserAdmin.php',
             "<?php\nclass UserAdmin extends AbstractAdmin {\n    protected function configureFormFields(FormMapper \$form): void {\n        \$form->add('email');\n    }\n}",
@@ -1333,7 +1333,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_a_custom_sonata_admin_batch_action(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Admin/UserAdmin.php',
             '/app/src/Admin/UserAdmin.php',
             "<?php\nclass UserAdmin extends AbstractAdmin {\n    public function getBatchActions(): array {\n        return [];\n    }\n}",
@@ -1351,7 +1351,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_a_sonata_admin_without_custom_batch_actions(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Admin/UserAdmin.php',
             '/app/src/Admin/UserAdmin.php',
             "<?php\nclass UserAdmin extends AbstractAdmin {\n    protected function configureListFields(ListMapper \$list): void {\n        \$list->add('email');\n    }\n}",
@@ -1369,7 +1369,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_an_easyadmin_field_exposing_the_roles_property(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/Admin/UserCrudController.php',
             '/app/src/Controller/Admin/UserCrudController.php',
             "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureFields(string \$pageName): iterable {\n        yield TextField::new('roles');\n    }\n}",
@@ -1387,7 +1387,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_an_easyadmin_field_exposing_only_non_sensitive_properties(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/Admin/UserCrudController.php',
             '/app/src/Controller/Admin/UserCrudController.php',
             "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureFields(string \$pageName): iterable {\n        yield TextField::new('email');\n    }\n}",
@@ -1405,7 +1405,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_an_easyadmin_destructive_action(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/Admin/UserCrudController.php',
             '/app/src/Controller/Admin/UserCrudController.php',
             "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureActions(Actions \$actions): Actions {\n        return \$actions->add(Crud::PAGE_INDEX, Action::DELETE);\n    }\n}",
@@ -1423,7 +1423,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_does_not_flag_an_easyadmin_controller_without_destructive_actions(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/Admin/UserCrudController.php',
             '/app/src/Controller/Admin/UserCrudController.php',
             "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureActions(Actions \$actions): Actions {\n        return \$actions->add(Crud::PAGE_INDEX, Action::DETAIL);\n    }\n}",
@@ -1441,7 +1441,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_form_submit_with_request_all_split_across_lines(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Controller/UserController.php',
             '/app/src/Controller/UserController.php',
             "<?php\nclass UserController {\n    public function edit(\$request, \$form) {\n        \$form->submit(\n            \$request->request->all()\n        );\n    }\n}",
@@ -1459,7 +1459,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_a_super_admin_setter_as_a_sensitive_setter(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Entity/User.php',
             '/app/src/Entity/User.php',
             "<?php\nclass User { public function setSuperAdmin(\$value) { \$this->superAdmin = \$value; } }",
@@ -1477,7 +1477,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_supports_returning_null_across_multiple_lines(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/LoginAuthenticator.php',
             '/app/src/Security/LoginAuthenticator.php',
             "\n<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        return null;\n    }\n}",
@@ -1496,7 +1496,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_supports_returning_null_after_an_earlier_guard_clause(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/LoginAuthenticator.php',
             '/app/src/Security/LoginAuthenticator.php',
             "\n<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        if (!\$request->hasSession()) {\n            return false;\n        }\n\n        if (!\$request->attributes->has('_login')) {\n            return null;\n        }\n\n        return true;\n    }\n}",
@@ -1514,7 +1514,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_http_client_request_split_across_lines(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Fetcher.php',
             '/app/src/Service/Fetcher.php',
             "\n<?php\nclass Fetcher {\n    public function __construct(private HttpClientInterface \$client) {}\n    public function fetch(string \$url) {\n        return \$this->client->request('GET', \$url);\n    }\n}",
@@ -1534,7 +1534,7 @@ final class RegexStaticPreScannerTest extends TestCase
     #[DataProvider('httpClientDiShapeCases')]
     public function test_it_flags_an_http_client_request_regardless_of_the_dependency_injection_shape(string $source): void
     {
-        $projectFile = ProjectFile::create('src/Service/UrlFetcher.php', '/app/src/Service/UrlFetcher.php', $source);
+        $projectFile = SymfonyProjectFile::create('src/Service/UrlFetcher.php', '/app/src/Service/UrlFetcher.php', $source);
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $this->regexStaticPreScanner->scan([$projectFile]));
         self::assertContains('http_client_request', $patterns);
@@ -1555,7 +1555,7 @@ final class RegexStaticPreScannerTest extends TestCase
     public function test_it_flags_request_mapping_attributes_on_a_controller(string $parameterAttribute): void
     {
         $source = "<?php\nnamespace App\\Controller;\nuse Symfony\\Component\\Routing\\Attribute\\Route;\nfinal class OrderController {\n    #[Route('/orders', methods: ['POST'])]\n    public function create(".$parameterAttribute." OrderDto \$dto): void {}\n}";
-        $projectFile = ProjectFile::create('src/Controller/OrderController.php', '/app/src/Controller/OrderController.php', $source);
+        $projectFile = SymfonyProjectFile::create('src/Controller/OrderController.php', '/app/src/Controller/OrderController.php', $source);
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $this->regexStaticPreScanner->scan([$projectFile]));
         self::assertContains('request_mapping_attribute', $patterns);
@@ -1576,7 +1576,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_self_validating_passport_in_authenticator(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Security/LoginAuthenticator.php',
             '/app/src/Security/LoginAuthenticator.php',
             "<?php\nclass LoginAuthenticator { public function authenticate() { return new SelfValidatingPassport(new UserBadge(\$id)); } }",
@@ -1594,7 +1594,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_php_serialize_in_messenger_config(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/messenger.yaml',
             '/app/config/packages/messenger.yaml',
             "framework:\n    messenger:\n        transports:\n            main:\n                serializer: php_serialize",
@@ -1612,7 +1612,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_flags_the_native_php_serializer_transport_service_in_messenger_config(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/messenger.yaml',
             '/app/config/packages/messenger.yaml',
             "framework:\n    messenger:\n        transports:\n            main:\n                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'\n                serializer: 'messenger.transport.native_php_serializer'",
@@ -1630,7 +1630,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_skips_buckets_without_patterns(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'unknown.bin',
             '/app/unknown.bin',
             'unserialize() and |raw and csrf_protection: false',
@@ -1645,7 +1645,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_emits_multiple_markers_when_multiple_patterns_match_same_file(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Bad.php',
             '/app/src/Service/Bad.php',
             "<?php\n\$x = unserialize(\$y);\n\$z = shell_exec(\$cmd);",
@@ -1664,7 +1664,7 @@ final class RegexStaticPreScannerTest extends TestCase
      */
     public function test_it_emits_one_marker_per_matching_line_for_the_same_pattern(): void
     {
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Repeated.php',
             '/app/src/Service/Repeated.php',
             "<?php\n\$a = unserialize(\$x);\n\$b = unserialize(\$y);\n\$c = unserialize(\$z);",
@@ -1698,7 +1698,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 ],
             ],
         ]);
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Privileged.php',
             '/app/src/Service/Privileged.php',
             "<?php\n\$this->doPrivilegedThing();",
@@ -1722,7 +1722,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'custom_one' => ['regex' => '/CUSTOM_TOKEN/', 'description' => 'custom'],
             ],
         ]);
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Mixed.php',
             '/app/src/Service/Mixed.php',
             "<?php\nCUSTOM_TOKEN;\nunserialize(\$x);",
@@ -1747,7 +1747,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'forbidden_host' => ['regex' => '/internal-admin\.example\.com/', 'description' => 'Internal host should be env-referenced'],
             ],
         ]);
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'config/packages/clients.yaml',
             '/app/config/packages/clients.yaml',
             "http_client:\n    base_uri: 'https://internal-admin.example.com'",
@@ -1771,7 +1771,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'literal_foos' => ['regex' => '/^foos/', 'description' => 'test'],
             ],
         ]);
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Foo.php',
             '/app/src/Service/Foo.php',
             "xfoos\nfoos",
@@ -1799,7 +1799,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'password_hash_call' => ['regex' => '~^password_hash\(.*\)~', 'description' => 'test'],
             ],
         ]);
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Hash.php',
             '/app/src/Service/Hash.php',
             "<?php\n\$x = 1;\npassword_hash(\$x);\n",
@@ -1823,7 +1823,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'spanning_block' => ['regex' => '~BEGIN_BLOCK.*?END_BLOCK~s', 'description' => 'test'],
             ],
         ]);
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Span.php',
             '/app/src/Service/Span.php',
             "<?php\nBEGIN_BLOCK\nmiddle content\nEND_BLOCK\n",
@@ -1848,7 +1848,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'spanning_block' => ['regex' => $regex, 'description' => 'test'],
             ],
         ]);
-        $projectFile = ProjectFile::create(
+        $projectFile = SymfonyProjectFile::create(
             'src/Service/Span.php',
             '/app/src/Service/Span.php',
             "<?php\nBEGIN_BLOCK\nmiddle content\nEND_BLOCK\n",
@@ -1937,7 +1937,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'catastrophic' => ['regex' => '/^(a+)+$/', 'description' => 'test'],
             ],
         ], $logger);
-        $projectFile = ProjectFile::create('src/Service/S.php', '/app/src/Service/S.php', "<?php\n".str_repeat('a', 30)."b\naaaa");
+        $projectFile = SymfonyProjectFile::create('src/Service/S.php', '/app/src/Service/S.php', "<?php\n".str_repeat('a', 30)."b\naaaa");
 
         $markers = $this->underATightBacktrackLimit(static fn (): array => $regexStaticPreScanner->scan([$projectFile]));
 
@@ -1964,7 +1964,7 @@ final class RegexStaticPreScannerTest extends TestCase
                 'catastrophic' => ['regex' => '/^(a+)+$/ms', 'description' => 'test'],
             ],
         ], $logger);
-        $projectFile = ProjectFile::create('src/Service/S.php', '/app/src/Service/S.php', "aaaa\n".str_repeat('a', 30).'b');
+        $projectFile = SymfonyProjectFile::create('src/Service/S.php', '/app/src/Service/S.php', "aaaa\n".str_repeat('a', 30).'b');
 
         $markers = $this->underATightBacktrackLimit(static fn (): array => $regexStaticPreScanner->scan([$projectFile]));
 

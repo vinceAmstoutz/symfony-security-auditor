@@ -18,9 +18,9 @@ use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandaloneConfigLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneAuditPreflight;
 
 final class StandaloneAuditPreflightTest extends TestCase

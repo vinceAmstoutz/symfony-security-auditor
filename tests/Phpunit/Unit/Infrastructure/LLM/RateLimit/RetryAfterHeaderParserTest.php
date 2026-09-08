@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Rat
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 
 final class RetryAfterHeaderParserTest extends TestCase
 {

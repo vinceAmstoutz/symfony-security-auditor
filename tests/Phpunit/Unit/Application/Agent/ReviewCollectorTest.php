@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Phpunit\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewCollector;
 
 final class ReviewCollectorTest extends TestCase
 {

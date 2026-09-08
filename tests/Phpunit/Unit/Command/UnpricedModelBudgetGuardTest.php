@@ -24,8 +24,8 @@ use Symfony\Component\Console\Output\ConsoleSectionOutput;
 use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SecurityAuditor\Command\UnpricedModelBudgetGuard;
 
 final class UnpricedModelBudgetGuardTest extends TestCase
 {

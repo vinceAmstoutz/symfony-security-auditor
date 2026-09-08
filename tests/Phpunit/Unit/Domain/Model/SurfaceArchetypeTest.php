@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SurfaceArchetype;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\SurfaceArchetype;
 
 final class SurfaceArchetypeTest extends TestCase
 {
@@ -37,25 +37,32 @@ final class SurfaceArchetypeTest extends TestCase
         yield 'an EasyAdmin CRUD controller is one too' => [ProjectFileType::EASYADMIN_CRUD, SurfaceArchetype::HTTP_ENTRYPOINT];
 
         yield 'a voter states an authorization rule' => [ProjectFileType::VOTER, SurfaceArchetype::AUTHORIZATION_RULE];
+        yield 'a Laravel policy states one too' => [ProjectFileType::POLICY, SurfaceArchetype::AUTHORIZATION_RULE];
 
         yield 'an authenticator establishes identity' => [ProjectFileType::AUTHENTICATOR, SurfaceArchetype::AUTHENTICATION];
         yield 'an LDAP service is an identity backend' => [ProjectFileType::LDAP_SERVICE, SurfaceArchetype::AUTHENTICATION];
+        yield 'a Laravel guard establishes identity too' => [ProjectFileType::GUARD, SurfaceArchetype::AUTHENTICATION];
 
         yield 'an entity is a domain model' => [ProjectFileType::ENTITY, SurfaceArchetype::DOMAIN_MODEL];
+        yield 'an Eloquent model is one too' => [ProjectFileType::ELOQUENT_MODEL, SurfaceArchetype::DOMAIN_MODEL];
         yield 'a repository queries persistence' => [ProjectFileType::REPOSITORY, SurfaceArchetype::PERSISTENCE_QUERY];
 
         yield 'a form binds request input' => [ProjectFileType::FORM, SurfaceArchetype::INPUT_BINDING];
         yield 'a Sonata admin binds request input too' => [ProjectFileType::SONATA_ADMIN, SurfaceArchetype::INPUT_BINDING];
+        yield 'a Laravel form request binds input too' => [ProjectFileType::FORM_REQUEST, SurfaceArchetype::INPUT_BINDING];
 
         yield 'a messenger handler consumes a message' => [ProjectFileType::MESSENGER_HANDLER, SurfaceArchetype::ASYNC_HANDLER];
         yield 'a webhook consumer consumes a remote event' => [ProjectFileType::WEBHOOK_CONSUMER, SurfaceArchetype::ASYNC_HANDLER];
         yield 'a scheduler runs work out of band' => [ProjectFileType::SCHEDULER, SurfaceArchetype::ASYNC_HANDLER];
+        yield 'a Laravel job is an async handler too' => [ProjectFileType::JOB, SurfaceArchetype::ASYNC_HANDLER];
 
         yield 'an event subscriber hooks the framework' => [ProjectFileType::EVENT_SUBSCRIBER, SurfaceArchetype::EVENT_HOOK];
+        yield 'Laravel middleware reacts to the request lifecycle' => [ProjectFileType::MIDDLEWARE, SurfaceArchetype::EVENT_HOOK];
         yield 'a normalizer shapes serialized output' => [ProjectFileType::NORMALIZER, SurfaceArchetype::SERIALIZATION];
 
         yield 'a template is a view' => [ProjectFileType::TEMPLATE, SurfaceArchetype::TEMPLATE];
         yield 'a Twig extension extends the view layer' => [ProjectFileType::TWIG_EXTENSION, SurfaceArchetype::TEMPLATE];
+        yield 'a Blade template renders output too' => [ProjectFileType::BLADE_TEMPLATE, SurfaceArchetype::TEMPLATE];
 
         yield 'config is config' => [ProjectFileType::CONFIG, SurfaceArchetype::CONFIG];
 

@@ -20,44 +20,44 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\ErrorHandler\BufferingLogger;
 use Symfony\Component\Validator\Validation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\SymfonyProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
@@ -166,7 +166,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $files = [];
         for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+            $files[] = SymfonyProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
         }
 
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -210,7 +210,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $files = [];
         for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+            $files[] = SymfonyProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
         }
 
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -261,7 +261,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $files = [];
         for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+            $files[] = SymfonyProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
         }
 
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -1814,22 +1814,22 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
-            ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
-            ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
-            ProjectFile::create('src/Entity/E.php', '/e', '<?php'),
-            ProjectFile::create('src/Form/F.php', '/f', '<?php'),
+            SymfonyProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+            SymfonyProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+            SymfonyProjectFile::create('src/Entity/E.php', '/e', '<?php'),
+            SymfonyProjectFile::create('src/Form/F.php', '/f', '<?php'),
         ]);
         $auditContext->setMapping(SymfonyMapping::of(
             ProjectFileInventory::fromGroups([
-                'controllers' => [
-                    ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
-                    ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+                'entrypoints' => [
+                    SymfonyProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+                    SymfonyProjectFile::create('src/Controller/B.php', '/b', '<?php'),
                 ],
-                'voters' => [ProjectFile::create('src/Security/V.php', '/v', '<?php')],
-                'forms' => [
-                    ProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
-                    ProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
-                    ProjectFile::create('src/Form/F3.php', '/f3', '<?php'),
+                'authorizationRules' => [SymfonyProjectFile::create('src/Security/V.php', '/v', '<?php')],
+                'inputBindings' => [
+                    SymfonyProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
+                    SymfonyProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
+                    SymfonyProjectFile::create('src/Form/F3.php', '/f3', '<?php'),
                 ],
             ]),
             new AccessControlMap(),
@@ -2289,7 +2289,7 @@ final class AuditOrchestratorTest extends TestCase
     {
         $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: $acceptedFingerprints);
         $auditContext->setProjectFiles([
-            ProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
+            SymfonyProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
         ]);
         $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 

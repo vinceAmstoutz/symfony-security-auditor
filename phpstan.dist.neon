@@ -24,10 +24,11 @@ parameters:
             tooWideThrowType: true
             tooWideImplicitThrowType: true
         checkedExceptionRegexes:
-            - '#^VinceAmstoutz\\SymfonySecurityAuditor\\.+\\Exception\\#'
+            - '#^VinceAmstoutz\\(SecurityAuditor|SymfonySecurityAuditor)\\.+\\Exception\\#'
     paths:
         - bin/
         - config/
+        - packages/core/src/
         - src/
         - tests/
         - tools/
