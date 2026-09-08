@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Budget;
 
 use Override;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
 final class CostCalculatorTest extends TestCase
 {

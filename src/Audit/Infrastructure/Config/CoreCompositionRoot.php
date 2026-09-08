@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use JsonException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\BudgetRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\CustomSkillRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Registrar\EscalationRegistrar;

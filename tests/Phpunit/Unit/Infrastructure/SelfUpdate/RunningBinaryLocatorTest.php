@@ -17,8 +17,8 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocator;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocator;
 
 final class RunningBinaryLocatorTest extends TestCase
 {

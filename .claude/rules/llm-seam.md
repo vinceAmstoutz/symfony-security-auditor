@@ -1,8 +1,8 @@
 ---
 paths:
-  - "src/Audit/Application/Agent/**"
-  - "src/Audit/Domain/Port/**"
-  - "src/Audit/Infrastructure/LLM/**"
+  - "packages/core/src/Audit/Application/Agent/**"
+  - "packages/core/src/Audit/Domain/Port/**"
+  - "packages/core/src/Audit/Infrastructure/LLM/**"
 ---
 
 # LLM Seam Rules

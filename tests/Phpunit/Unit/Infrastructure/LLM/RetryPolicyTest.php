@@ -16,10 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimitBackoff;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimitBackoff;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 
 final class RetryPolicyTest extends TestCase
 {

@@ -17,17 +17,17 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckStatus;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\MissingEnvironmentVariableException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandaloneConfigLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\XdgConfigPathResolver;
+use VinceAmstoutz\SecurityAuditor\Command\AuditPreflightInterface;
+use VinceAmstoutz\SecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SecurityAuditor\Command\DoctorCheckResult;
+use VinceAmstoutz\SecurityAuditor\Command\DoctorCheckStatus;
+use VinceAmstoutz\SecurityAuditor\Command\EnvironmentDoctor;
 
 final class EnvironmentDoctorTest extends TestCase
 {

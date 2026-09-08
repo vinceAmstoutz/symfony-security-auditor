@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
  * Test fake — records every progress event emitted by the pipeline.

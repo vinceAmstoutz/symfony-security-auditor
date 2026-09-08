@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillInterface;
 
 /**
  * The attack surfaces this profile knows about in a Symfony application. It is

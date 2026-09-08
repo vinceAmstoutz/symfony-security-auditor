@@ -15,9 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Regis
 
 use Override;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\ConfiguredAttackerSkill;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 

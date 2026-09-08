@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\MissingEnvironmentVariableException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\MissingPlatformException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandalonePlatformConfigResolver;
 
 final class StandalonePlatformConfigResolverTest extends TestCase
 {

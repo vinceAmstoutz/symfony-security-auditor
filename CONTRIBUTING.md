@@ -236,8 +236,8 @@ require a PR-description justification and a linked tracking issue.
 **TDD red/green/refactor.** Write the failing test first whenever practical. See
 [`.claude/rules/testing.md`](.claude/rules/testing.md) for the full convention.
 
-**Domain models** (`src/Audit/Domain/Model/`) are immutable. State changes
-return new instances. See
+**Domain models** (`packages/core/src/Audit/Domain/Model/`) are immutable. State
+changes return new instances. See
 [`.claude/rules/domain-models.md`](.claude/rules/domain-models.md).
 
 ## Which Branch to Target

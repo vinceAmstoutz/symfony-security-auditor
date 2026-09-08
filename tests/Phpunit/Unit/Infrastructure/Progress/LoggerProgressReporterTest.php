@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progres
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 
 final class LoggerProgressReporterTest extends TestCase
 {

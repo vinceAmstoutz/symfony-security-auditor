@@ -1,0 +1,246 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SecurityAuditor\Audit\Application\Agent;
+
+use Override;
+use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\AttackerChunkCache;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextFactory;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\ChunkCoverageRecorder;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\ConcurrentChunkAnalyzer;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunk\SequentialChunkAnalyzer;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
+
+/**
+ * Orchestrates the attacker pass: deterministic pre-scan, optional lean-mode
+ * filtering, feature/type chunking, then delegation to a per-chunk analyzer.
+ * The per-chunk prompt assembly, caching, and the sequential/concurrent
+ * analysis strategies live in dedicated `Chunk\` collaborators built here.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
+final readonly class AttackerAgent implements AttackerAgentInterface
+{
+    public const int DEFAULT_MAX_TOOL_ITERATIONS = 8;
+
+    public const bool DEFAULT_TOOLS_ENABLED = false;
+
+    public const bool DEFAULT_LEAN_MODE = false;
+
+    public const bool DEFAULT_STRUCTURED_COLLECTION = true;
+
+    public const int DEFAULT_MAX_CONCURRENT = 1;
+
+    private StaticPreScannerInterface $staticPreScanner;
+
+    private FileChunker $fileChunker;
+
+    private ProgressReporterInterface $progressReporter;
+
+    private SequentialChunkAnalyzer $sequentialChunkAnalyzer;
+
+    private ?ConcurrentChunkAnalyzer $concurrentChunkAnalyzer;
+
+    private LoggerInterface $logger;
+
+    private ?ToolRegistryFactoryInterface $toolRegistryFactory;
+
+    private bool $toolsEnabled;
+
+    private bool $leanMode;
+
+    private bool $useStructuredCollection;
+
+    private int $maxConcurrent;
+
+    public function __construct(
+        AttackerLlmCollaborators $attackerLlmCollaborators,
+        AttackerScanCollaborators $attackerScanCollaborators,
+        AttackerAnalysisSettings $attackerAnalysisSettings,
+        LoggerInterface $logger,
+    ) {
+        $this->logger = $logger;
+        $this->toolRegistryFactory = $attackerScanCollaborators->toolRegistryFactory;
+        $this->toolsEnabled = $attackerAnalysisSettings->toolsEnabled;
+        $this->leanMode = $attackerAnalysisSettings->leanMode;
+        $this->useStructuredCollection = $attackerAnalysisSettings->useStructuredCollection;
+        $this->maxConcurrent = $attackerAnalysisSettings->maxConcurrent;
+        $this->staticPreScanner = $attackerScanCollaborators->staticPreScanner;
+        $this->fileChunker = $attackerScanCollaborators->fileChunker ?? new FileChunker();
+        $this->progressReporter = $attackerScanCollaborators->progressReporter;
+
+        $chunkContextFactory = new ChunkContextFactory(
+            $attackerLlmCollaborators->attackerPromptBuilder,
+            $attackerLlmCollaborators->codeSlicer,
+            new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
+        );
+        $attackerChunkCache = new AttackerChunkCache($attackerScanCollaborators->attackerCache, $attackerLlmCollaborators->vulnerabilityFactory, $logger);
+
+        $this->sequentialChunkAnalyzer = new SequentialChunkAnalyzer(
+            $attackerLlmCollaborators->llmClient,
+            $chunkContextFactory,
+            $attackerChunkCache,
+            $attackerLlmCollaborators->vulnerabilityFactory,
+            $logger,
+            $this->progressReporter,
+            $attackerAnalysisSettings->maxToolIterations,
+            $this->useStructuredCollection,
+            $attackerLlmCollaborators->recordVulnerabilityToolFactory,
+        );
+
+        $this->concurrentChunkAnalyzer = $attackerLlmCollaborators->llmClient instanceof ToolBatchCapableLLMClientInterface && $attackerLlmCollaborators->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface
+            ? new ConcurrentChunkAnalyzer(
+                $attackerLlmCollaborators->llmClient,
+                $chunkContextFactory,
+                $attackerChunkCache,
+                $attackerLlmCollaborators->vulnerabilityFactory,
+                $logger,
+                $this->progressReporter,
+                $attackerAnalysisSettings->maxToolIterations,
+                $attackerLlmCollaborators->recordVulnerabilityToolFactory,
+                $this->maxConcurrent,
+            )
+            : null;
+    }
+
+    /**
+     * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    #[Override]
+    public function analyze(AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $files = $attackerAnalysisRequest->files;
+
+        if ([] === $files) {
+            return [];
+        }
+
+        $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
+
+        $markers = $this->staticPreScanner->scan($files);
+        $riskMarkerIndex = new RiskMarkerIndex($markers);
+        $effectiveFiles = $this->leanMode ? $riskMarkerIndex->filesWithMarkers($files) : $files;
+
+        if ([] === $effectiveFiles) {
+            return $this->skipLeanFilteredAnalysis($files, $coverageRecorder);
+        }
+
+        ChunkCoverageRecorder::record($this->droppedByLeanFilter($files, $effectiveFiles), 'skipped', $coverageRecorder);
+
+        $this->logStartingAnalysis($files, $effectiveFiles, $markers, $useTools, $attackerAnalysisRequest);
+
+        $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($effectiveFiles) : null;
+
+        $chunks = $this->fileChunker->chunk($effectiveFiles);
+
+        $concurrentChunkAnalyzer = $this->concurrentChunkAnalyzerForConcurrentAnalysis();
+
+        [$allVulnerabilities, $totalDropsByReason] = $concurrentChunkAnalyzer instanceof ConcurrentChunkAnalyzer
+            ? $concurrentChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $riskMarkerIndex, $toolRegistry)
+            : $this->sequentialChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+
+        $this->logger->info('Attacker agent complete', [
+            'total_vulnerabilities' => \count($allVulnerabilities),
+            'total_dropped_entries' => array_sum($totalDropsByReason),
+            'dropped_by_reason' => $totalDropsByReason,
+        ]);
+
+        return $allVulnerabilities;
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @return list<Vulnerability>
+     */
+    private function skipLeanFilteredAnalysis(array $files, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $this->logger->info('Attacker agent skipped — lean mode filtered all files', [
+            'files' => \count($files),
+            'markers' => 0,
+        ]);
+        ChunkCoverageRecorder::record($files, 'skipped', $coverageRecorder);
+
+        return [];
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     * @param list<ProjectFile> $effectiveFiles
+     *
+     * @return list<ProjectFile>
+     */
+    private function droppedByLeanFilter(array $files, array $effectiveFiles): array
+    {
+        $effectivePaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $effectiveFiles);
+
+        return array_values(array_filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => !\in_array($projectFile->relativePath(), $effectivePaths, true),
+        ));
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     * @param list<ProjectFile> $effectiveFiles
+     * @param list<RiskMarker>  $markers
+     */
+    private function logStartingAnalysis(
+        array $files,
+        array $effectiveFiles,
+        array $markers,
+        bool $useTools,
+        AttackerAnalysisRequest $attackerAnalysisRequest,
+    ): void {
+        $this->logger->info('Attacker agent starting analysis', [
+            'files' => \count($effectiveFiles),
+            'files_filtered_lean' => \count($files) - \count($effectiveFiles),
+            'markers' => \count($markers),
+            'tools_enabled' => $useTools,
+            'cache_bypassed' => $attackerAnalysisRequest->bypassCache,
+            'previous_findings' => \count($attackerAnalysisRequest->previousFindings),
+            'rejected_findings' => \count($attackerAnalysisRequest->rejectedFindings),
+        ]);
+    }
+
+    private function concurrentChunkAnalyzerForConcurrentAnalysis(): ?ConcurrentChunkAnalyzer
+    {
+        if ($this->maxConcurrent <= 1) {
+            return null;
+        }
+
+        if (!$this->useStructuredCollection) {
+            return null;
+        }
+
+        return $this->concurrentChunkAnalyzer;
+    }
+}

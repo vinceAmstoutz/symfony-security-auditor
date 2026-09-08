@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/Audit/Domain/**"
+  - "packages/core/src/Audit/Domain/**"
 ---
 
 # Domain Model Rules

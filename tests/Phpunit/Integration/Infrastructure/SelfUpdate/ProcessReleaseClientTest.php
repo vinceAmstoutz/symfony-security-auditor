@@ -17,8 +17,8 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ProcessReleaseClient;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\ProcessReleaseClient;
 
 final class ProcessReleaseClientTest extends TestCase
 {

@@ -22,7 +22,7 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
 
 final class ThisCallReachabilityTest extends TestCase
 {

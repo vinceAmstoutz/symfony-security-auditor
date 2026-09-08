@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Rat
 
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 
 final class NullRateLimiterTest extends TestCase
 {

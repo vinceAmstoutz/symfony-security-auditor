@@ -18,11 +18,11 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
+use VinceAmstoutz\SecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\InMemoryUpdateCheckStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingSelfUpdater;
 

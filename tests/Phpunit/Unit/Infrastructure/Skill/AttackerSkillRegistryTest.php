@@ -15,11 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Skill;
 
 use ArrayIterator;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\AttackerSkillRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Skill\ConfiguredAttackerSkill;
 
 final class AttackerSkillRegistryTest extends TestCase
 {

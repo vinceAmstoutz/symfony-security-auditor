@@ -42,6 +42,7 @@
             restrictWarnings="true"
     >
         <include>
+            <directory>packages/core/src</directory>
             <directory>src</directory>
         </include>
 

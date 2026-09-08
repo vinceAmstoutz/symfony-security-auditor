@@ -16,10 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckStatus;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctorInterface;
+use VinceAmstoutz\SecurityAuditor\Command\DoctorCheckResult;
+use VinceAmstoutz\SecurityAuditor\Command\DoctorCheckStatus;
+use VinceAmstoutz\SecurityAuditor\Command\DoctorCommand;
+use VinceAmstoutz\SecurityAuditor\Command\EnvironmentDoctorInterface;
 
 final class DoctorCommandTest extends TestCase
 {

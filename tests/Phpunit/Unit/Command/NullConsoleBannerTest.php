@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
+use VinceAmstoutz\SecurityAuditor\Command\NullConsoleBanner;
 
 final class NullConsoleBannerTest extends TestCase
 {

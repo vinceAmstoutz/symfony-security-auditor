@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandaloneConfig;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandalonePlatformConfig;
 
 final class StandaloneConfigTest extends TestCase
 {

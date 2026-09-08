@@ -17,9 +17,9 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\StandaloneConfigWriteException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\UnsafeStandaloneConfigWriteException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\YamlStandaloneConfigWriter;
 
 final class YamlStandaloneConfigWriterTest extends TestCase
 {

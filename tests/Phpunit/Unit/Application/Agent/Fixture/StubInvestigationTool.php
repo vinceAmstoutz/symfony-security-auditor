@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
 final readonly class StubInvestigationTool implements ToolInterface
 {

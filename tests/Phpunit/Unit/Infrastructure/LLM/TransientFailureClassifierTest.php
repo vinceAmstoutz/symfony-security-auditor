@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
 final class TransientFailureClassifierTest extends TestCase
 {

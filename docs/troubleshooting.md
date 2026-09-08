@@ -602,7 +602,7 @@ Implement `Audit/Domain/Port/AdvisoryDatabaseInterface`:
 ```yaml
 # config/services.yaml
 services:
-    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
+    VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
         alias: App\Security\MyCustomAdvisoryDatabase
 ```
 

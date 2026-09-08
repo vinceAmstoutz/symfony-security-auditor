@@ -1,0 +1,55 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SecurityAuditor\Command;
+
+use Symfony\Component\Console\Style\SymfonyStyle;
+use Throwable;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFile;
+
+/** @internal not part of the BC promise — see docs/versioning.md */
+interface AuditPresenterInterface
+{
+    public function header(SymfonyStyle $symfonyStyle, string $projectPath): void;
+
+    /**
+     * @param list<string> $configNotices
+     */
+    public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void;
+
+    public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
+
+    public function synthesisCostWarnings(SymfonyStyle $symfonyStyle, bool $pocSynthesisEnabled, bool $fixSynthesisEnabled): void;
+
+    public function runningSection(SymfonyStyle $symfonyStyle): void;
+
+    public function longRunNotice(SymfonyStyle $symfonyStyle): void;
+
+    public function estimatingSection(SymfonyStyle $symfonyStyle): void;
+
+    public function dryRunResult(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
+
+    /**
+     * @param list<ProjectFile> $projectFiles
+     */
+    public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void;
+
+    public function scannedFilesHint(SymfonyStyle $symfonyStyle, int $fileCount): void;
+
+    public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void;
+
+    public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void;
+
+    public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void;
+}

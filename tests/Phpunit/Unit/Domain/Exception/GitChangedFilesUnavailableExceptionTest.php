@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Exception;
 
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
 
 final class GitChangedFilesUnavailableExceptionTest extends TestCase
 {

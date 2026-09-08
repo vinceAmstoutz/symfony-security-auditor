@@ -21,8 +21,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
+use VinceAmstoutz\SecurityAuditor\Command\ConsoleBanner;
+use VinceAmstoutz\SecurityAuditor\Command\ConsoleBannerInterface;
 
 /**
  * Extends the bare Symfony `Application` to append the bundled

@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Tool;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 
 final class ToolDefinitionTest extends TestCase
 {

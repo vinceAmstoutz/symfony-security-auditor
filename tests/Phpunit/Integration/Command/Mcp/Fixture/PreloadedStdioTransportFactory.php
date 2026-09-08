@@ -17,7 +17,7 @@ use Mcp\Server\Transport\StdioTransport;
 use Mcp\Server\Transport\TransportInterface;
 use Override;
 use RuntimeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
+use VinceAmstoutz\SecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
 
 final class PreloadedStdioTransportFactory implements McpTransportFactoryInterface
 {

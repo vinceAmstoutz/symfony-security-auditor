@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AnthropicOptionDialect;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AnthropicOptionDialect;
 
 final class AnthropicOptionDialectTest extends TestCase
 {

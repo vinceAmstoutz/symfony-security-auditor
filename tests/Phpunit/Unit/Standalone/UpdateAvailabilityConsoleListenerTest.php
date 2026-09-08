@@ -20,8 +20,8 @@ use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateAvailabilityNotifierInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateAvailabilityNotifierInterface;
+use VinceAmstoutz\SecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\UpdateAvailabilityConsoleListener;
 
 final class UpdateAvailabilityConsoleListenerTest extends TestCase

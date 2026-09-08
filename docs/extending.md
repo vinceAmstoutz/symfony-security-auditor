@@ -3,6 +3,17 @@
 All extension points are PHP interfaces. Wire your implementations via
 `config/services.yaml`; no bundle internals need to be modified.
 
+Almost every one of them lives in the framework-agnostic core package
+(`vinceamstoutz/security-auditor-core`, namespace root
+`VinceAmstoutz\SecurityAuditor\`), which is what makes them reusable from a tool
+for another framework. The exceptions are the interfaces a framework profile
+supplies — the prompt builders, the source parsers and the skill blocks — whose
+Symfony implementations live in the bundle package
+(`VinceAmstoutz\SymfonySecurityAuditor\`). If you are implementing an interface
+and the `use` statement starts with `VinceAmstoutz\SecurityAuditor\`, nothing
+about your implementation is Symfony-specific. See
+[the framework-specific boundary](architecture.md#the-framework-specific-boundary).
+
 ## Table of Contents
 
 - [1. Custom LLM Client](#1-custom-llm-client)
@@ -17,7 +28,7 @@ All extension points are PHP interfaces. Wire your implementations via
 ## 1. Custom LLM Client
 
 **Interface**:
-`VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface`
+`VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface`
 
 ```php
 interface LLMClientInterface
@@ -66,10 +77,10 @@ JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
 // src/Llm/AcmeLlmClient.php
 namespace App\Llm;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 final class AcmeLlmClient implements LLMClientInterface
 {
@@ -146,14 +157,14 @@ directly:
 ```yaml
 # config/services.yaml
 services:
-    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface:
+    VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface:
         alias: App\Llm\AcmeLlmClient
 ```
 
 ## 2. Custom Pipeline Stage
 
 **Interface**:
-`VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface`
+`VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\StageInterface`
 
 ```php
 interface StageInterface
@@ -186,8 +197,8 @@ interface StageInterface
 // src/Pipeline/Stage/DeduplicationStage.php
 namespace App\Pipeline\Stage;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
 final class DeduplicationStage implements StageInterface
 {

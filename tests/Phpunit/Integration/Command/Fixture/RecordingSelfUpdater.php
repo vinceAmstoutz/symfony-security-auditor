@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
 
 final class RecordingSelfUpdater implements SelfUpdaterInterface
 {

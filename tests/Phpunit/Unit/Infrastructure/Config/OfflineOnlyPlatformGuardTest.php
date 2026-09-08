@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\NonLocalPlatformEndpointException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\OfflineOnlyPlatformGuard;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandalonePlatformConfig;
 
 final class OfflineOnlyPlatformGuardTest extends TestCase
 {

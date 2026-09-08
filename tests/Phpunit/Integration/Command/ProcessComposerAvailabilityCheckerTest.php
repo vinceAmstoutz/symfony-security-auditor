@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
+use VinceAmstoutz\SecurityAuditor\Command\ProcessComposerAvailabilityChecker;
 
 final class ProcessComposerAvailabilityCheckerTest extends TestCase
 {

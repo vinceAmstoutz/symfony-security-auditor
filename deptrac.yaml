@@ -1,38 +1,33 @@
 deptrac:
   paths:
+    - ./packages/core/src
     - ./src
   layers:
     - name: Domain
       collectors:
         - type: directory
-          value: src/Audit/Domain/.*
+          value: packages/core/src/Audit/Domain/.*
     - name: Application
       collectors:
         - type: directory
-          value: src/Audit/Application/.*
-    - name: SymfonyProfile
+          value: packages/core/src/Audit/Application/.*
+    - name: Infrastructure
       collectors:
         - type: directory
-          value: src/Audit/Infrastructure/Prompt/.*
-        - type: classLike
-          value: .*\\Infrastructure\\Scan\\(IsGrantedAttributeParser|PhpParserControllerAccessControlParser|PhpParserFormBindingParser|PhpParserVoterCapabilityParser|RouteAttributeParser|SymfonyChunkingVocabulary|SymfonyProjectFileTypeClassifier|SymfonyYamlSecurityConfigParser)$
-        - type: classLike
-          value: .*\\Infrastructure\\Config\\SymfonyProfile$
+          value: packages/core/src/Audit/Infrastructure/.*
+    - name: Command
+      collectors:
         - type: directory
-          value: src/Audit/Infrastructure/Config/Registrar/Symfony/.*
-    - name: Infrastructure
+          value: packages/core/src/Command/.*
+    - name: SymfonyProfile
       collectors:
         - type: bool
           must:
             - type: directory
               value: src/Audit/Infrastructure/.*
           must_not:
-            - type: layer
-              value: SymfonyProfile
-    - name: Command
-      collectors:
-        - type: directory
-          value: src/Command/.*
+            - type: directory
+              value: packages/core/src/.*
     - name: Bundle
       collectors:
         - type: classLike
@@ -48,15 +43,15 @@ deptrac:
     Infrastructure:
       - Domain
       - Application
-    SymfonyProfile:
-      - Domain
-      - Application
-      - Infrastructure
     Command:
       - Application
       - Domain
       - Infrastructure
-      - SymfonyProfile
+    SymfonyProfile:
+      - Domain
+      - Application
+      - Infrastructure
+      - Command
     Bundle:
       - Application
       - Domain

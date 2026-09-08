@@ -17,15 +17,15 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\MalformedProjectConfigException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\MissingEnvironmentVariableException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\MissingPlatformException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\ProjectConfigPlatformOverrideException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandaloneConfigLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\XdgConfigPathResolver;
 
 final class StandaloneConfigLoaderTest extends TestCase
 {

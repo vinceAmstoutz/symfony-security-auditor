@@ -15,9 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Tool\Tool;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformToolsMapper;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\PlatformToolsMapper;
 
 final class PlatformToolsMapperTest extends TestCase
 {

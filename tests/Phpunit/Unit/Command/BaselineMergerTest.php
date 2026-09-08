@@ -17,14 +17,14 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SecurityAuditor\Command\BaselineMerger;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\MalformedReportFileException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\ReportFileNotReadableException;
+use VinceAmstoutz\SecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
+use VinceAmstoutz\SecurityAuditor\Command\ReportFindingsLoader;
 
 final class BaselineMergerTest extends TestCase
 {

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PendingBinarySwap;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\PendingBinarySwap;
 
 final class PendingBinarySwapTest extends TestCase
 {

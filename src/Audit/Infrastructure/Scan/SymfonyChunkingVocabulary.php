@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ChunkingVocabulary;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ChunkingVocabulary;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 /**
  * How a Symfony application groups into features: a `*Controller` names one

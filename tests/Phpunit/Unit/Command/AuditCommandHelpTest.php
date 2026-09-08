@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandHelp;
+use VinceAmstoutz\SecurityAuditor\Command\AuditCommandHelp;
 
 final class AuditCommandHelpTest extends TestCase
 {

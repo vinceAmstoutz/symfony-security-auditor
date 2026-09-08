@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Del
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 
 final class UsleepSleeperTest extends TestCase
 {

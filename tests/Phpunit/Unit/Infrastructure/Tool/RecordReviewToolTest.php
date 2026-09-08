@@ -15,10 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Phpunit\Unit\Infrastructure
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewTool;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\ReviewCollector;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Tool\RecordReviewTool;
 
 final class RecordReviewToolTest extends TestCase
 {

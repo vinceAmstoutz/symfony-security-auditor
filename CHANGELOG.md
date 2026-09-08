@@ -60,6 +60,43 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   standalone binary — pass that profile, so the skill set is byte-identical; a
   host auditing another framework passes its own instead.
 
+- **The framework-agnostic core is its own package.** Around four fifths of
+  `src/` never knew anything about Symfony — `Domain` (zero framework imports),
+  `Application`, the LLM/cache/report/advisory/progress/tool/pricing/filesystem
+  adapters, and `Command`, since `symfony/console` is a standalone library and
+  not the framework. That code now lives in `packages/core/` as
+  `vinceamstoutz/security-auditor-core` under a new namespace root,
+  `VinceAmstoutz\SecurityAuditor\`, leaving the root package holding only what a
+  Symfony application needs: the prompt content and attacker skills, the Symfony
+  source parsers, the DI wiring and profile, the standalone container and the
+  bundle class.
+
+  Two directories split rather than moved whole, along a line they already had.
+  `Infrastructure/Config/` was two things: the Symfony DI wiring (stays) and the
+  standalone binary's own YAML settings file, which becomes the core's
+  `Infrastructure/Settings/`. `Infrastructure/Scan/` was the Symfony attribute
+  and `security.yaml` parsers (stay) plus framework-neutral scanners —
+  `RegexStaticPreScanner`, `RegexCodeSlicer`, `SarifImportingPreScanner` and the
+  line-retention machinery — which move, because a Laravel package would reuse
+  them verbatim.
+
+  `deptrac.yaml` now enforces the package line instead of an in-directory layer
+  list: nothing in `packages/core` may depend on anything in `src/`, which also
+  drops `Command`'s old permission to reach the Symfony profile. The elaborate
+  `classLike` include/exclude lists that used to carve `SymfonyProfile` out of
+  `Infrastructure` are gone — the directory split says it instead, with 0
+  violations and 0 double-layer warnings.
+
+  Installation is unchanged:
+  `composer require vinceamstoutz/symfony-security-auditor` still works, the
+  bundle ships the core inside its own distribution and `replace`s the split
+  package so the two can never be installed side by side. No configuration key,
+  CLI surface, report schema or deprecation identity moved — including the four
+  `trigger_deprecation()` calls that name the Composer package rather than the
+  repository path. Every PHP reference to a relocated class needs its namespace
+  root updated; [`UPGRADE-2.0.md`](UPGRADE-2.0.md) has the mapping, and
+  compatibility aliases are tracked separately.
+
 - **The project inventory counts an API resource as an entrypoint.**
   `ProjectFileInventory` — the role grouping inside `SymfonyMapping` — filtered
   each bucket on one exact `ProjectFileType`, while everything else in the

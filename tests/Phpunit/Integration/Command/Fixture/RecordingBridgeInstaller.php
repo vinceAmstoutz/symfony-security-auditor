@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 
 /**
  * Test fake — records the bridge installations requested by the command.

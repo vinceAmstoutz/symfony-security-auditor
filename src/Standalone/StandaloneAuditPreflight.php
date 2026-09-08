@@ -15,9 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
 use Override;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\StandaloneConfigLoader;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\XdgConfigPathResolver;
+use VinceAmstoutz\SecurityAuditor\Command\AuditPreflightInterface;
 
 /**
  * Boots the audit command through the exact same factories `audit` uses at

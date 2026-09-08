@@ -18,10 +18,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrend;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendOutputFormat;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPoint;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
+use VinceAmstoutz\SecurityAuditor\Command\ReportTrend;
+use VinceAmstoutz\SecurityAuditor\Command\TrendOutputFormat;
+use VinceAmstoutz\SecurityAuditor\Command\TrendPoint;
+use VinceAmstoutz\SecurityAuditor\Command\TrendPresenter;
 
 final class TrendPresenterTest extends TestCase
 {

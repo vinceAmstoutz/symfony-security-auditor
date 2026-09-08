@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
+use VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
 
 final class FakeReleaseClient implements ReleaseClientInterface
 {

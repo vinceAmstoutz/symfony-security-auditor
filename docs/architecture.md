@@ -36,11 +36,14 @@ responsibilities, data flow, key design decisions, and extension points.
 
 ## Layer Overview
 
-The bundle follows a strict Domain-Driven Design layering under `src/Audit/`.
-Infrastructure dependencies never leak into the Domain or Application layers.
+The repository is a monorepo with two packages. `packages/core` is
+framework-agnostic and knows nothing about Symfony; the root package is the
+Symfony bundle and holds only what a Symfony application needs. Inside the core,
+a strict Domain-Driven Design layering applies under `Audit/`: Infrastructure
+dependencies never leak into the Domain or Application layers.
 
 ```text
-src/
+packages/core/src/          # vinceamstoutz/security-auditor-core
 ├── Audit/
 │   ├── Domain/          # Pure PHP — no framework, no I/O
 │   │   ├── Model/       # Value objects and enums
@@ -143,12 +146,28 @@ graph LR
     APP -->|via interface| INFRA
 ```
 
-**Namespace root**: `VinceAmstoutz\SymfonySecurityAuditor\`
+**Namespace roots**: `VinceAmstoutz\SecurityAuditor\` for the core package,
+`VinceAmstoutz\SymfonySecurityAuditor\` for the Symfony bundle.
+
+```text
+src/                        # vinceamstoutz/symfony-security-auditor (the bundle)
+├── Audit/Infrastructure/
+│   ├── Config/             # Symfony DI wiring — composition roots, definition
+│   │                         factories, ContainerParameterRegistrar,
+│   │                         SymfonyProfile, Registrar/**
+│   ├── Prompt/             # Symfony prompt content and attacker skills
+│   └── Scan/               # the Symfony source parsers and classifier
+├── Standalone/             # the standalone binary's container + application
+└── SymfonySecurityAuditorBundle.php
+```
 
 ### The framework-specific boundary
 
-`deptrac.yaml` splits `Infrastructure` in two. A `SymfonyProfile` layer holds
-everything that only makes sense for a Symfony application:
+The boundary is a **package** boundary, and `deptrac.yaml` enforces it: nothing
+in `packages/core` may depend on anything in `src/`. The core package is what a
+second framework's tool requires; the bundle is one consumer of it.
+
+What stays in the bundle is knowledge of the _audited_ framework:
 
 - `Infrastructure/Prompt/**` — the prompt builders,
   `SymfonyMappingContextRenderer` and the `Skill/` blocks, whose wording names
@@ -156,25 +175,28 @@ everything that only makes sense for a Symfony application:
 - the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`,
   `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`,
   `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser`,
-  `SymfonyProjectFileTypeClassifier` and `SymfonyYamlSecurityConfigParser`.
-- `Infrastructure/Config/Registrar/Symfony/**` and the `SymfonyProfile` that
-  lists them — the wiring that puts all of the above into a container.
+  `SymfonyChunkingVocabulary`, `SymfonyProjectFileTypeClassifier` and
+  `SymfonyYamlSecurityConfigParser`.
+- `Infrastructure/Config/**` — the Symfony DI wiring: the composition roots, the
+  definition factories, `ContainerParameterRegistrar`, and the `SymfonyProfile`
+  with its `Registrar/Symfony/**`.
+- `Standalone/**` and the bundle class — the two hosts that wire a profile up.
 
-The line is knowledge of the _audited_ framework, not use of Symfony components
-by the auditor itself. So the composition roots, the registrars in
-`Infrastructure/Config/Registrar/`, the DI definition factories and
-`ContainerParameterRegistrar` all stay outside the layer even though they build
-a Symfony container — as do the skill contract and registry
+Everything else is in the core, including the parts that read like Symfony but
+are not knowledge of the audited framework: `Command/**` (`symfony/console` is a
+standalone library), the settings loader in `Infrastructure/Settings/` (the
+binary's own YAML config file, formerly the standalone half of
+`Infrastructure/Config/`), the neutral scanners in `Infrastructure/Scan/`
+(`RegexStaticPreScanner`, `RegexCodeSlicer`, `SarifImportingPreScanner` and
+their line-retention machinery), the skill contract and registry
 (`Infrastructure/Skill/`) and the reviewer-feedback plumbing
-(`Infrastructure/Feedback/`), which carry no framework vocabulary. Whatever a
-Laravel profile would reuse verbatim belongs on the portable side.
+(`Infrastructure/Feedback/`). Whatever a Laravel profile would reuse verbatim
+belongs in the core.
 
-The `Infrastructure` layer is then everything under `Infrastructure/` that is
-_not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain`
-and `Application` already cannot reach `Infrastructure` at all. So the audit
-engine, the LLM client, the caches, the report renderers and the scanners stay
-reusable for a non-Symfony target, while `Command`, the bundle class and the
-standalone entry point are free to wire the Symfony profile up.
+Inside the core, the DDD ruleset is unchanged —
+`Command → Application → Domain ← Infrastructure` — with one addition that the
+package split makes possible: `Command` may no longer reach the Symfony profile,
+because it now lives on the other side of the package line.
 
 Deptrac counts a dependency only when a class is actually used, not when it is
 merely imported, so an unused `use` statement is not a violation.

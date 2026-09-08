@@ -1,0 +1,65 @@
+{
+    "name": "vinceamstoutz/security-auditor-core",
+    "description": "Framework-agnostic core of the AI-powered multi-agent security auditor — domain, audit pipeline, LLM seam, reporting and CLI",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "ai",
+        "audit",
+        "llm",
+        "multi-agent",
+        "owasp",
+        "penetration-testing",
+        "php",
+        "sast",
+        "security",
+        "static-analysis",
+        "vulnerability"
+    ],
+    "authors": [
+        {
+            "name": "Vincent Amstoutz",
+            "email": "vincent.amstoutz.dev@gmail.com",
+            "homepage": "https://vince-amstoutz.tech/",
+            "role": "Creator"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/vinceamstoutz/symfony-security-auditor/issues",
+        "source": "https://github.com/vinceamstoutz/symfony-security-auditor",
+        "security": "https://github.com/vinceamstoutz/symfony-security-auditor/security/policy"
+    },
+    "require": {
+        "php": ">=8.3",
+        "ext-uri": "*",
+        "composer-runtime-api": "^2.0",
+        "league/uri-polyfill": "^7.8",
+        "mcp/sdk": "^0.7.0",
+        "psr/clock": "^1.0",
+        "psr/log": "^3.0",
+        "symfony/ai-platform": "^0.12",
+        "symfony/clock": "^7.4 || ^8.0",
+        "symfony/console": "^7.4 || ^8.0",
+        "symfony/deprecation-contracts": "^2.5 || ^3",
+        "symfony/filesystem": "^7.4 || ^8.0",
+        "symfony/finder": "^7.4 || ^8.0",
+        "symfony/models-dev": ">=87.0",
+        "symfony/process": "^7.4 || ^8.0",
+        "symfony/string": "^7.4 || ^8.0",
+        "symfony/validator": "^7.4 || ^8.0",
+        "symfony/yaml": "^7.4 || ^8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "VinceAmstoutz\\SecurityAuditor\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-2.x": "2.0.x-dev"
+        }
+    }
+}

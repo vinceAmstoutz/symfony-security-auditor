@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentReviewBatch;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\Agent\Review\ConcurrentReviewBatch;
 
 final class ConcurrentReviewBatchTest extends TestCase
 {

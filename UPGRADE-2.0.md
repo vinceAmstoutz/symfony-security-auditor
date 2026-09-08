@@ -176,8 +176,8 @@ real rates (the bundled `ModelsDevPricingProvider` does) to keep the discount.
 
 `docs/versioning.md` now
 [enumerates the covered ports](docs/versioning.md#domain-ports-extension-points)
-instead of covering the whole `src/Audit/Domain/Port/` directory. These eight
-are now `@internal` and may change in a `MINOR`:
+instead of covering the whole `packages/core/src/Audit/Domain/Port/` directory.
+These eight are now `@internal` and may change in a `MINOR`:
 
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `AttackerCacheInterface`, `ContextAwareAttackerCacheInterface`,
@@ -290,3 +290,58 @@ moves into a bucket of its own.
 
 `SymfonyMapping`'s own accessors are untouched — it is the Symfony-flavoured
 facade, and it now delegates to the renamed inventory methods.
+
+### Moved: the framework-agnostic core is now `VinceAmstoutz\SecurityAuditor\`
+
+Roughly four fifths of the package never knew anything about Symfony, so it now
+lives in its own package, `vinceamstoutz/security-auditor-core`, inside
+`packages/core/` of this repository. Nothing about installation changes —
+`composer require vinceamstoutz/symfony-security-auditor` is untouched, and the
+bundle still ships the core inside its own distribution — but **every relocated
+class has a new namespace root**:
+
+```php
+// 1.x
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+
+// 2.0
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+```
+
+The rule is simple: **the path after the namespace root is unchanged**, so a
+one-line search and replace of `VinceAmstoutz\SymfonySecurityAuditor\` with
+`VinceAmstoutz\SecurityAuditor\` migrates almost everything. What stays on the
+old root is only what needs Symfony:
+
+| Still `VinceAmstoutz\SymfonySecurityAuditor\…`       | What it is                            |
+| ---------------------------------------------------- | ------------------------------------- |
+| `SymfonySecurityAuditorBundle`                       | the bundle class                      |
+| `Audit\Infrastructure\Config\**`                     | the Symfony DI wiring and profile     |
+| `Audit\Infrastructure\Prompt\**`                     | prompt content, attacker skills       |
+| `Audit\Infrastructure\Scan\**` (the Symfony parsers) | attribute and `security.yaml` parsers |
+| `Standalone\**`                                      | the standalone container              |
+
+Two relocations are not a pure root swap:
+
+| 1.x                                                                                                                                                                              | 2.0                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `…\Audit\Infrastructure\Config\{XdgConfigPathResolver, StandaloneConfig*, StandalonePlatformConfig*, YamlStandaloneConfigWriter, OfflineOnlyPlatformGuard}` and their exceptions | `VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Settings\…` |
+| `…\Audit\Infrastructure\Scan\{RegexStaticPreScanner, RegexCodeSlicer, SarifImportingPreScanner, …}`                                                                              | `VinceAmstoutz\SecurityAuditor\Audit\Infrastructure\Scan\…`     |
+
+`Infrastructure/Config/` split along the line it always had: the Symfony DI
+wiring kept the name and stayed in the bundle, while the standalone binary's own
+YAML settings file became `Infrastructure/Settings/` in the core. `Scan/` split
+the same way — the Symfony parsers stayed, the framework-neutral scanners moved.
+
+**What does not change:** every configuration key, the `audit:run` surface and
+its exit codes, the JSON and SARIF schemas, and the deprecation identities. The
+four `trigger_deprecation()` calls on `SymfonyMapping` still name
+`vinceamstoutz/symfony-security-auditor`, because that is the Composer package
+name a consumer filters on — not a repository path — and `ReportPackage::NAME`,
+the self-update URLs and the install scripts are likewise untouched.
+
+No compatibility aliases ship with this move; they are tracked separately.
