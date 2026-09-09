@@ -1,6 +1,6 @@
 {
     "name": "vinceamstoutz/security-auditor-core",
-    "description": "Framework-agnostic core of the AI-powered multi-agent security auditor — domain, audit pipeline, LLM seam, reporting and CLI",
+    "description": "Framework-agnostic core of the AI-powered multi-agent security auditor \u2014 domain, audit pipeline, LLM seam, reporting and CLI",
     "license": "MIT",
     "type": "library",
     "keywords": [
@@ -31,10 +31,12 @@
     },
     "require": {
         "php": ">=8.3",
+        "ext-dom": "*",
         "ext-uri": "*",
         "composer-runtime-api": "^2.0",
         "league/uri-polyfill": "^7.8",
         "mcp/sdk": "^0.7.0",
+        "nikic/php-parser": "^5.3",
         "psr/clock": "^1.0",
         "psr/log": "^3.0",
         "symfony/ai-platform": "^0.12",
@@ -48,6 +50,20 @@
         "symfony/string": "^7.4 || ^8.0",
         "symfony/validator": "^7.4 || ^8.0",
         "symfony/yaml": "^7.4 || ^8.0"
+    },
+    "suggest": {
+        "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge \u2014 claude-opus-5, claude-sonnet-5, claude-haiku-4-5-20251001",
+        "symfony/ai-azure-platform": "Azure OpenAI platform bridge \u2014 enterprise GPT-5.6, o4-mini",
+        "symfony/ai-bedrock-platform": "AWS Bedrock platform bridge \u2014 Claude, Nova, Llama on AWS",
+        "symfony/ai-deep-seek-platform": "DeepSeek platform bridge \u2014 deepseek-chat, deepseek-reasoner",
+        "symfony/ai-gemini-platform": "Google Gemini platform bridge \u2014 gemini-3.1-pro-preview, gemini-3.6-flash",
+        "symfony/ai-meta-platform": "Meta (Llama) platform bridge \u2014 llama-4-scout-17b-16e-instruct-fp8, llama-3.3-70b-instruct",
+        "symfony/ai-mini-max-platform": "MiniMax platform bridge \u2014 MiniMax-M3, MiniMax-M2.7",
+        "symfony/ai-mistral-platform": "Mistral platform bridge \u2014 mistral-large-latest, codestral-latest",
+        "symfony/ai-ollama-platform": "Ollama local inference bridge \u2014 llama3.3, deepseek-r1, qwen3, phi4 (no API key)",
+        "symfony/ai-open-ai-platform": "OpenAI platform bridge \u2014 gpt-5.6, gpt-4.1, o4-mini",
+        "symfony/ai-open-responses-platform": "OpenAI Responses API platform bridge",
+        "symfony/ai-vertex-ai-platform": "Google Vertex AI platform bridge \u2014 Gemini + Claude on GCP"
     },
     "autoload": {
         "psr-4": {

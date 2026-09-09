@@ -407,6 +407,30 @@ Migration guide: [`UPGRADE-2.0.md`](UPGRADE-2.0.md).
   `symfony_security_auditor.cache.prompt_caching` container parameter are
   removed with it.
 
+### Fixed
+
+- **Three dependencies the shipped code imports are now actually required.** The
+  bundle `replace`s `vinceamstoutz/security-auditor-core` and ships its code
+  through a second `autoload.psr-4` root, so Composer never reads the replaced
+  package's manifest — the root `composer.json` alone decides what gets
+  installed. Declaring a dependency only in `packages/core/composer.json` is
+  therefore inert for everyone installing the bundle, which is what had happened
+  to three of them: `symfony/ai-platform`, imported directly by
+  `SymfonyAiLLMClient` and everything around it, was absent from the root
+  manifest entirely and reached installations only as a transitive of
+  `symfony/ai-bundle`; `symfony/clock`, used by `Command\BaselineProcessor`,
+  `Command\BaselineMerger` and the bundle's own `Standalone\*` factories, sat
+  under `require-dev`; and `ext-dom`, which `JunitReportRenderer` needs for
+  `DOMDocument`, was declared nowhere. All three are now direct requirements of
+  the root manifest, and `packages/core/composer.json` additionally declares
+  `nikic/php-parser` (for `Infrastructure\Scan\ThisCallReachability`) and
+  `ext-dom`, which it needs once it is published on its own. The resolved
+  dependency set is unchanged — every one of them was already being installed
+  transitively — so nothing about an existing installation moves; what changes
+  is that dropping the transitive now fails resolution instead of failing at
+  runtime. `PackageManifestTest` pins the invariant that the root manifest
+  requires everything the core requires, at identical constraints.
+
 ## [1.20.1] — 2026-08-23 — Herald
 
 A release about the binary saying who it is and what it just did. The identity
