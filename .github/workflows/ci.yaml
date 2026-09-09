@@ -137,8 +137,10 @@ jobs:
           key: php-cs-fixer-${{ hashFiles('packages/core/src/**/*.php', 'src/**/*.php', 'tests/**/*.php', '.php-cs-fixer.dist.php', 'composer.lock') }}
           restore-keys: php-cs-fixer-
 
-      - name: Normalize composer.json
-        run: composer normalize --dry-run
+      - name: Normalize the composer manifests
+        run: |
+          composer normalize --dry-run
+          composer normalize --dry-run packages/core/composer.json
 
       - name: PHP CS Fixer
         run: vendor/bin/php-cs-fixer fix --config .php-cs-fixer.dist.php --dry-run --diff
@@ -154,8 +156,8 @@ jobs:
 
       - name: Swiss Knife
         run: |
-          vendor/bin/swiss-knife check-commented-code src tests tools
-          vendor/bin/swiss-knife check-conflicts src tests tools
+          vendor/bin/swiss-knife check-commented-code packages/core/src src tests tools
+          vendor/bin/swiss-knife check-conflicts packages/core/src src tests tools
 
       - name: Composer audit
         run: composer audit

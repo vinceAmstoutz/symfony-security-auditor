@@ -233,6 +233,7 @@ function runCodeQualityTools(bool $fixMode = false): void
 
     io()->section('Composer Normalize');
     run('docker compose exec php composer normalize'.($fixMode ? '' : ' --dry-run'));
+    run('docker compose exec php composer normalize'.($fixMode ? '' : ' --dry-run').' packages/core/composer.json');
 
     io()->section('PHP CS Fixer');
     run('docker compose exec php vendor/bin/php-cs-fixer fix'.($fixMode ? '' : ' --dry-run --diff'));
