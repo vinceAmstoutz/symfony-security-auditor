@@ -74,7 +74,7 @@ single green run is still not proof of CI parity: Infection rewrites
 result caching, so test order is effectively random per invocation — see #275.
 
 Commit messages are validated separately in CI via
-[commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
+[commitlint](https://commitlint.js.org/) (`commitlint.config.mjs`) — see
 [Commit Messages](#commit-messages).
 
 ## Project Structure
