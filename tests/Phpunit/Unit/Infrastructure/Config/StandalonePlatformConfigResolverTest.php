@@ -13,13 +13,35 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
+use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 
 final class StandalonePlatformConfigResolverTest extends TestCase
 {
+    private Filesystem $filesystem;
+
+    private string $tmpDir;
+
+    #[Override]
+    protected function setUp(): void
+    {
+        $this->filesystem = new Filesystem();
+        $this->tmpDir = sys_get_temp_dir().'/standalone_platform_config_resolver_test_'.uniqid('', true);
+        $this->filesystem->mkdir($this->tmpDir);
+    }
+
+    #[Override]
+    protected function tearDown(): void
+    {
+        $this->filesystem->remove($this->tmpDir);
+    }
+
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
@@ -170,5 +192,134 @@ final class StandalonePlatformConfigResolverTest extends TestCase
 
         (new StandalonePlatformConfigResolver())
             ->resolve(['platform' => ['openai' => ['api_key' => '%env(openaiApiKey)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    #[DataProvider('credentialFileContents')]
+    public function test_it_reads_the_credential_from_the_file_its_variable_points_at(string $contents): void
+    {
+        $credentialFile = $this->writeCredentialFile($contents);
+
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $credentialFile]))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
+
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-from-file']]], $standalonePlatformConfig->toAiConfig());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function credentialFileContents(): iterable
+    {
+        yield 'bare value' => ['sk-from-file'];
+        yield 'trailing newline' => ["sk-from-file\n"];
+        yield 'windows line ending' => ["sk-from-file\r\n"];
+        yield 'surrounding whitespace' => ["  sk-from-file \n"];
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_it_rejects_a_file_placeholder_whose_variable_is_unset(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage('"ANTHROPIC_API_KEY_FILE"');
+
+        (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_it_rejects_a_credential_file_that_cannot_be_read(): void
+    {
+        $missingFile = \sprintf('%s/absent-api-key', $this->tmpDir);
+
+        $this->expectException(UnreadableCredentialFileException::class);
+        $this->expectExceptionMessage(\sprintf('The credential file "%s", referenced by your config, could not be read.', $missingFile));
+
+        (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $missingFile]))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_it_rejects_a_credential_file_holding_only_whitespace(): void
+    {
+        $blankFile = $this->writeCredentialFile(" \n");
+
+        $this->expectException(UnreadableCredentialFileException::class);
+        $this->expectExceptionMessage(\sprintf('The credential file "%s", referenced by your config, is empty.', $blankFile));
+
+        (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $blankFile]))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_a_run_that_needs_no_credential_tolerates_an_unset_file_variable(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]], false);
+
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_a_run_that_needs_no_credential_tolerates_an_unreadable_credential_file(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => \sprintf('%s/absent-api-key', $this->tmpDir)]))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]], false);
+
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_a_run_that_needs_no_credential_tolerates_a_blank_credential_file(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $this->writeCredentialFile('')]))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]], false);
+
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    private function writeCredentialFile(string $contents): string
+    {
+        $path = \sprintf('%s/api-key', $this->tmpDir);
+        $this->filesystem->dumpFile($path, $contents);
+
+        return $path;
     }
 }

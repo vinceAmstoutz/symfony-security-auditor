@@ -252,6 +252,18 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_its_success_message_points_at_the_docs_instead_of_a_paste_ready_export_line(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->execute([]);
+
+        $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringContainsString('docs/configuration.md#providing-the-api-key', (string) $display);
+        self::assertStringNotContainsString('export', (string) $display);
+    }
+
     public function test_it_reports_success(): void
     {
         $commandTester = $this->commandTester();
@@ -369,14 +381,16 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Configuration written to', $commandTester->getDisplay());
     }
 
-    public function test_it_prints_a_copy_pasteable_export_command_for_the_api_key_variable(): void
+    public function test_it_names_the_api_key_variable_the_user_chose(): void
     {
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai', 'gpt-5.4', 'MY_CUSTOM_KEY']);
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('export MY_CUSTOM_KEY=', $commandTester->getDisplay());
+        $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringContainsString('Set MY_CUSTOM_KEY in your environment', (string) $display);
     }
 
     public function test_it_treats_an_empty_answer_as_declining_the_overwrite(): void
