@@ -45,6 +45,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_passes_the_platform_block_through_untouched(): void
     {
@@ -57,6 +58,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_resolves_env_placeholders_anywhere_in_the_platform_block(): void
     {
@@ -69,6 +71,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_resolves_placeholders_in_a_nested_generic_platform(): void
     {
@@ -84,6 +87,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_a_run_that_needs_no_credential_substitutes_an_unusable_stand_in(): void
     {
@@ -99,6 +103,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_a_run_that_needs_no_credential_still_prefers_the_real_one_when_it_is_set(): void
     {
@@ -111,6 +116,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_carries_the_active_provider_selector(): void
     {
@@ -125,6 +131,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_has_no_active_provider_when_the_selector_is_absent(): void
     {
@@ -137,6 +144,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_ignores_an_empty_active_provider_selector(): void
     {
@@ -149,6 +157,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_rejects_a_config_without_a_platform_block(): void
     {
@@ -160,6 +169,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_rejects_an_empty_platform_block(): void
     {
@@ -171,6 +181,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_rejects_an_env_placeholder_whose_variable_is_unset(): void
     {
@@ -184,6 +195,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     /**
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function test_it_rejects_a_mixed_case_env_placeholder_instead_of_passing_it_through_as_a_literal(): void
     {

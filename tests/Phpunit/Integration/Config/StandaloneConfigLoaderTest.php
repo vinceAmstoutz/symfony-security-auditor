@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -48,6 +49,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -63,6 +65,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -81,6 +84,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -96,6 +100,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -113,6 +118,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -130,6 +136,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -150,6 +157,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -167,6 +175,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -197,6 +206,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -217,6 +227,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -237,6 +248,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -256,6 +268,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -275,6 +288,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -290,6 +304,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -305,6 +320,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
@@ -322,6 +338,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
