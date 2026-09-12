@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 
 /**
@@ -41,6 +42,7 @@ final readonly class StandaloneConfigLoader
      * @throws UnresolvableConfigPathException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException

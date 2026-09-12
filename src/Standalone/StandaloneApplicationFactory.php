@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
@@ -346,6 +347,7 @@ final readonly class StandaloneApplicationFactory
      * @throws UnresolvableConfigPathException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
@@ -364,6 +366,7 @@ final readonly class StandaloneApplicationFactory
      * @throws UnresolvableConfigPathException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
