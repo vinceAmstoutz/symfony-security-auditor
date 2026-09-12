@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -74,8 +75,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             $this->standaloneConfigLoader->load();
         } catch (MissingPlatformException) {
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, 'No provider is configured — run "init".');
-        } catch (MissingEnvironmentVariableException $missingEnvironmentVariableException) {
-            return new DoctorCheckResult('API key', DoctorCheckStatus::Failure, $missingEnvironmentVariableException->getMessage());
+        } catch (MissingEnvironmentVariableException|UnreadableCredentialFileException $credentialResolutionFailure) {
+            return new DoctorCheckResult('API key', DoctorCheckStatus::Failure, $credentialResolutionFailure->getMessage());
         } catch (MalformedProjectConfigException $malformedProjectConfigException) {
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $malformedProjectConfigException->getMessage());
         } catch (ProjectConfigPlatformOverrideException $projectConfigPlatformOverrideException) {

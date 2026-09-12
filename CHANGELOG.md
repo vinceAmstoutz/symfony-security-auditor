@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **The standalone configuration can now take the provider credential from a
+  file.** `StandalonePlatformConfigResolver`
+  (`src/Audit/Infrastructure/Config/StandalonePlatformConfigResolver.php`)
+  matched `%env(VAR)%` and nothing else, so an environment variable holding the
+  key itself was the only way into a standalone run, and `%env(file:VAR)%` — the
+  Symfony processor syntax bundle users already know — resolved to a lookup for
+  a variable literally named `file:VAR`, failing with:
+
+  ```text
+  The environment variable "file:ANTHROPIC_API_KEY_FILE", referenced by your config, is not set.
+  ```
+
+  It now reads the file whose path `VAR` holds and strips surrounding
+  whitespace, so Docker and Kubernetes secrets, `systemd` `LoadCredential=` and
+  a plain `0600` file all work without a shell being involved. An unset
+  variable, an unreadable file, or a file holding only whitespace stops the run
+  before the provider is contacted (`UnreadableCredentialFileException`);
+  `doctor` reports it under its `API key` check, and `--dry-run` tolerates all
+  three because it never reaches the provider. See
+  [Providing the API key](docs/configuration.md#providing-the-api-key).
+
 ## [1.20.1] — 2026-08-23 — Herald
 
 A release about the binary saying who it is and what it just did. The identity

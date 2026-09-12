@@ -173,6 +173,12 @@ symfony-security-auditor audit /path/to/your/symfony/project
 [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
 `--dry-run`, `--since`, `--fail-on`, …) works identically.
 
+> [!TIP] `export ANTHROPIC_API_KEY=…` typed interactively is appended verbatim
+> to your shell history.
+> [Providing the API key](docs/configuration.md#providing-the-api-key) covers
+> reading it from a file (`%env(file:…)%`), from a secret manager, or from a CI
+> secret store.
+
 ### 4. Keep it up to date
 
 ```bash

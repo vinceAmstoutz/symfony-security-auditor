@@ -22,6 +22,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Model Options](#model-options)
 - [Split-Model Setup](#split-model-setup)
 - [Standalone Configuration](#standalone-configuration)
+- [Providing the API key](#providing-the-api-key)
 - [CLI Reference](#cli-reference)
   - [Output Formats Reference](#output-formats-reference)
   - [`audit:diff`](#auditdiff--comparing-two-reports)
@@ -554,6 +555,92 @@ platform:
     openai: { api_key: '%env(OPENAI_API_KEY)%' }
 model: gpt-5.6
 ```
+
+## Providing the API key
+
+The `platform:` block holds a `%env(...)%` placeholder, never the key itself.
+Where that value comes from is yours to choose:
+
+| Source               | Config value                           | Typical setup                                                     |
+| -------------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| Environment variable | `'%env(ANTHROPIC_API_KEY)%'`           | CI secret store, `systemd` unit, a per-command assignment         |
+| File on disk         | `'%env(file:ANTHROPIC_API_KEY_FILE)%'` | Docker/Kubernetes secrets, `systemd` `LoadCredential=`, 0600 file |
+| Secret manager       | either of the above                    | `pass`, 1Password, Vault — read at launch, see below              |
+
+### Reading the key from a file
+
+`%env(file:VAR)%` reads the file whose **path** `VAR` holds, rather than the
+variable's own value:
+
+```yaml
+platform:
+    anthropic: { api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%' }
+```
+
+```bash
+ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic symfony-security-auditor audit .
+```
+
+Surrounding whitespace is stripped, so a file written with `echo` or saved with
+Windows line endings works as is. The run stops before contacting the provider
+when `VAR` is unset, when the file cannot be read, or when it holds only
+whitespace; `doctor` reports the same failure under its `API key` check, and
+`--dry-run` tolerates all three because it never reaches the provider.
+
+This is the portable option. No shell is involved, so it behaves identically on
+every shell and operating system, and it is how container runtimes and service
+managers already hand a secret to a process.
+
+### Keeping the key out of your shell history
+
+`export ANTHROPIC_API_KEY=sk-…` typed interactively is appended verbatim to
+`~/.bash_history` or `~/.zsh_history`. Read the key from your secret manager
+instead, scoped to the single command that needs it:
+
+```bash
+# bash, zsh
+ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .
+```
+
+```fish
+# fish
+env ANTHROPIC_API_KEY=(pass show anthropic/api-key) symfony-security-auditor audit .
+```
+
+```powershell
+# PowerShell
+$env:ANTHROPIC_API_KEY = (op read 'op://Private/Anthropic/credential')
+symfony-security-auditor audit .
+```
+
+Only the command reaches the history file; the key itself never appears on the
+line. With no secret manager to read from, prompt for it instead:
+
+```bash
+printf 'Anthropic API key: '; read -rs ANTHROPIC_API_KEY; echo
+export ANTHROPIC_API_KEY
+```
+
+### In CI
+
+Keep the key in the runner's secret store and expose it to the step as an
+environment variable, never in the workflow file itself. See
+[CI](ci.md#github-actions) for GitHub Actions and [GitLab](ci.md#gitlab-ci)
+examples.
+
+### In a Symfony application
+
+The bundle resolves `ai.yaml` through Symfony's own environment handling, so
+`.env.local` (gitignored), the
+[secrets vault](https://symfony.com/doc/current/configuration/secrets.html)
+(`bin/console secrets:set ANTHROPIC_API_KEY`) and `%env(file:VAR)%` for a
+mounted secret all work unchanged.
+
+### No key at all
+
+Running against [Ollama](#supported-platforms) needs no credential. Pair it with
+[`privacy.offline_only: true`](#privacy--data-egress) to have that enforced
+rather than assumed.
 
 ## CLI Reference
 

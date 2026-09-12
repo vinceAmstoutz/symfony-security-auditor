@@ -13,8 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
+use Symfony\Component\Filesystem\Exception\IOException;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -22,6 +25,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 final readonly class StandalonePlatformConfigResolver
 {
     private const string ENV_PLACEHOLDER = '/^%env\(([^)]+)\)%$/';
+
+    private const string FILE_PROCESSOR = 'file:';
 
     /**
      * Stands in for a credential a run has been told it will not need — a
@@ -37,6 +42,7 @@ final readonly class StandalonePlatformConfigResolver
      */
     public function __construct(
         private array $environment = [],
+        private Filesystem $filesystem = new Filesystem(),
     ) {}
 
     /**
@@ -44,6 +50,7 @@ final readonly class StandalonePlatformConfigResolver
      *
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     public function resolve(array $rawConfig, bool $credentialsRequired = true): StandalonePlatformConfig
     {
@@ -66,6 +73,7 @@ final readonly class StandalonePlatformConfigResolver
      * @return array<array-key, mixed>
      *
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     private function resolveEnvPlaceholders(array $config, bool $credentialsRequired): array
     {
@@ -83,6 +91,7 @@ final readonly class StandalonePlatformConfigResolver
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      */
     private function resolveValue(string $value, bool $credentialsRequired): string
     {
@@ -90,13 +99,57 @@ final readonly class StandalonePlatformConfigResolver
             return $value;
         }
 
-        $resolved = $this->environment[$matches[1]] ?? '';
+        $expression = $matches[1];
+
+        return str_starts_with($expression, self::FILE_PROCESSOR)
+            ? $this->resolveCredentialFile(substr($expression, \strlen(self::FILE_PROCESSOR)), $credentialsRequired)
+            : $this->resolveEnvironmentVariable($expression, $credentialsRequired);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     */
+    private function resolveEnvironmentVariable(string $name, bool $credentialsRequired): string
+    {
+        $resolved = $this->environment[$name] ?? '';
         if ('' !== $resolved) {
             return $resolved;
         }
 
         if ($credentialsRequired) {
-            throw MissingEnvironmentVariableException::forName($matches[1]);
+            throw MissingEnvironmentVariableException::forName($name);
+        }
+
+        return self::UNNEEDED_CREDENTIAL;
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    private function resolveCredentialFile(string $name, bool $credentialsRequired): string
+    {
+        $path = $this->environment[$name] ?? '';
+        if ('' === $path) {
+            return $this->resolveEnvironmentVariable($name, $credentialsRequired);
+        }
+
+        try {
+            $credential = trim($this->filesystem->readFile($path));
+        } catch (IOException) {
+            if ($credentialsRequired) {
+                throw UnreadableCredentialFileException::forPath($path);
+            }
+
+            return self::UNNEEDED_CREDENTIAL;
+        }
+
+        if ('' !== $credential) {
+            return $credential;
+        }
+
+        if ($credentialsRequired) {
+            throw UnreadableCredentialFileException::forBlankFile($path);
         }
 
         return self::UNNEEDED_CREDENTIAL;

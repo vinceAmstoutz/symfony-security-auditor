@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -207,6 +208,19 @@ final class EnvironmentDoctorTest extends TestCase
 
         self::assertEquals(
             new DoctorCheckResult('API key', DoctorCheckStatus::Failure, MissingEnvironmentVariableException::forName('OPENAI_API_KEY')->getMessage()),
+            $results[0],
+        );
+    }
+
+    public function test_it_fails_the_api_key_check_when_the_referenced_credential_file_cannot_be_read(): void
+    {
+        $missingCredentialFile = \sprintf('%s/absent-api-key', $this->configHome);
+        $this->writeConfig("platform:\n    openai:\n        api_key: '%env(file:OPENAI_API_KEY_FILE)%'\n");
+
+        $results = $this->doctorWith($this->resolver(), ['OPENAI_API_KEY_FILE' => $missingCredentialFile], true)->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('API key', DoctorCheckStatus::Failure, UnreadableCredentialFileException::forPath($missingCredentialFile)->getMessage()),
             $results[0],
         );
     }
