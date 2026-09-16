@@ -72,7 +72,6 @@
         "rector/swiss-knife": "^2.4",
         "spaze/phpstan-disallowed-calls": "^4.12",
         "staabm/phpstan-todo-by": "^0.3",
-        "symfony/ai-generic-platform": "^0.13",
         "symfony/clock": "^7.4 || ^8.0",
         "symfony/dotenv": "^7.4 || ^8.0",
         "symfony/error-handler": "^7.4 || ^8.0",
