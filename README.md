@@ -203,6 +203,16 @@ CI, or a per-run secret-manager prefix:
 ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .
 ```
 
+Rather not store the key at all, and no secret manager to read it from? Prompt
+for it per shell — `read -rs` keeps it off the screen, and a bare `export` keeps
+it out of `~/.bash_history`:
+
+```bash
+# read the key your config references & keep it out of your shell history
+printf 'Anthropic API key: '; read -rs ANTHROPIC_API_KEY; echo
+export ANTHROPIC_API_KEY
+```
+
 > [!TIP]
 >
 > Storing nothing is a perfectly good choice.
