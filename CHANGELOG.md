@@ -78,8 +78,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 ### Added
 
 - **`audit init --base-url`** supplies the platform endpoint without the prompt,
-  for instance-keyed platforms that expose one. Public API per
-  `docs/versioning.md`.
+  for instance-keyed platforms that expose one. `base_url` exists only on
+  `generic`, `openresponses` and `azure`, all of them instance keyed, so passing
+  it with a flat platform is rejected with exit code `2` rather than writing a
+  key that platform has no node for. Public API per `docs/versioning.md`.
 - **`symfony/ai-generic-platform` in `composer.json` `suggest`** and a new
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms)
   section documenting the nested `platform:` block and the compound

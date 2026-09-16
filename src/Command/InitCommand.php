@@ -77,6 +77,12 @@ final readonly class InitCommand
 
         $provider = $this->providerKeyNormalizer->normalize($provider);
         $providerKey = ProviderKey::of($provider);
+
+        if (null !== $initCommandInput->baseUrl && null === $providerKey->instance) {
+            $symfonyStyle->error(\sprintf('--base-url applies to platforms configured per instance, such as generic.my_gateway; "%s" exposes no base_url key.', $provider));
+
+            return Command::INVALID;
+        }
         $envVar = b($initCommandInput->envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey)))->trim()->toString();
 
         if (1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)) {
@@ -132,7 +138,7 @@ final readonly class InitCommand
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
-        if (null === $initCommandInput->baseUrl && null === $providerKey->instance) {
+        if (null === $providerKey->instance) {
             return null;
         }
 

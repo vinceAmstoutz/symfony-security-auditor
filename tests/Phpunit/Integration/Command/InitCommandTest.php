@@ -439,6 +439,30 @@ final class InitCommandTest extends TestCase
         ];
     }
 
+    public function test_it_rejects_a_base_url_for_a_platform_that_exposes_none(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'anthropic', '--model' => 'claude-opus-5', '--base-url' => 'https://nope.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_explains_that_a_base_url_needs_a_platform_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'anthropic', '--model' => 'claude-opus-5', '--base-url' => 'https://nope.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString('--base-url applies to platforms configured per instance', $commandTester->getDisplay());
+    }
+
     public function test_it_installs_the_platform_bridge_rather_than_one_named_after_the_instance(): void
     {
         $commandTester = $this->commandTester();
