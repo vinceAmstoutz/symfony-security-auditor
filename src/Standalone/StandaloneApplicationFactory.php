@@ -26,6 +26,8 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -33,7 +35,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\NullCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
@@ -53,6 +58,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Running
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ThrottledUpdateAvailabilityNotifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthRemoveCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
@@ -74,6 +82,9 @@ final readonly class StandaloneApplicationFactory
 
     private const string UPDATE_CHECK_OPT_OUT_VARIABLE = 'SSA_NO_UPDATE_CHECK';
 
+    /**
+     * @param array<string, string> $environment
+     */
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -84,6 +95,8 @@ final readonly class StandaloneApplicationFactory
         private string $pathEnvironment = '',
         private ?UpdateAvailabilityConsoleListener $updateAvailabilityConsoleListener = null,
         private PendingBinarySwap $pendingBinarySwap = new PendingBinarySwap(),
+        private CredentialStoreInterface $credentialStore = new NullCredentialStore(),
+        private array $environment = [],
     ) {}
 
     /**
@@ -104,11 +117,12 @@ final readonly class StandaloneApplicationFactory
         $resolvedBinaryPath = $runningBinaryPath ?? '';
         $pathEnvironment = $environment['PATH'] ?? '';
         $pendingBinarySwap = new PendingBinarySwap();
+        $credentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
 
         return new self(
             new StandaloneConfigLoader(
                 $xdgConfigPathResolver,
-                new StandalonePlatformConfigResolver($environment),
+                new StandalonePlatformConfigResolver($environment, credentialStore: $credentialStore),
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
@@ -123,6 +137,8 @@ final readonly class StandaloneApplicationFactory
                 $pendingBinarySwap,
             ),
             pendingBinarySwap: $pendingBinarySwap,
+            credentialStore: $credentialStore,
+            environment: $environment,
         );
     }
 
@@ -164,6 +180,9 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->initCommand());
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
+        $standaloneApplication->addCommand(new AuthSetCommand($this->credentialStore, $this->configuredCredentialVariable()));
+        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
+        $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
         $this->registerUpdateAvailabilityNotice($standaloneApplication);
 
@@ -192,7 +211,13 @@ final readonly class StandaloneApplicationFactory
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->bridgeInstaller,
+            $this->credentialStore,
         );
+    }
+
+    private function configuredCredentialVariable(): ConfiguredCredentialVariable
+    {
+        return new ConfiguredCredentialVariable($this->xdgConfigPathResolver);
     }
 
     private function selfUpdateCommand(): SelfUpdateCommand
@@ -348,6 +373,7 @@ final readonly class StandaloneApplicationFactory
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
@@ -367,6 +393,7 @@ final readonly class StandaloneApplicationFactory
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
