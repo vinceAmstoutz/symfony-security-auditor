@@ -439,6 +439,26 @@ final class InitCommandTest extends TestCase
         ];
     }
 
+    public function test_it_does_not_ask_for_a_base_url_when_the_platform_takes_no_instance(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('Which base URL', $commandTester->getDisplay());
+    }
+
+    public function test_it_asks_for_a_base_url_when_the_platform_takes_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which base URL', $commandTester->getDisplay());
+    }
+
     public function test_it_rejects_a_base_url_for_a_platform_that_exposes_none(): void
     {
         $commandTester = $this->commandTester();
