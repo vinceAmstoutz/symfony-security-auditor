@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInsta
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
@@ -78,8 +79,8 @@ final readonly class InitCommand
         $provider = $this->providerKeyNormalizer->normalize($provider);
         $providerKey = ProviderKey::of($provider);
 
-        if (null !== $initCommandInput->baseUrl && null === $providerKey->instance) {
-            $symfonyStyle->error(\sprintf('--base-url applies to platforms configured per instance, such as generic.my_gateway; "%s" exposes no base_url key.', $provider));
+        if (null !== $initCommandInput->baseUrl && !BaseUrlPlatforms::accept($providerKey)) {
+            $symfonyStyle->error(\sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::NAMES), $provider));
 
             return Command::INVALID;
         }
@@ -139,11 +140,11 @@ final readonly class InitCommand
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
-        if (null === $providerKey->instance) {
+        if (!BaseUrlPlatforms::accept($providerKey)) {
             return null;
         }
 
-        $baseUrl = b($initCommandInput->baseUrl ?? $this->ask($symfonyStyle, 'Which base URL does this platform expose? (leave empty if it needs none)', ''))->trim()->toString();
+        $baseUrl = b($initCommandInput->baseUrl ?? $this->ask($symfonyStyle, 'Which base URL does this platform expose? (required by this platform)', ''))->trim()->toString();
 
         return '' !== $baseUrl ? $baseUrl : null;
     }

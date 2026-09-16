@@ -439,7 +439,7 @@ final class InitCommandTest extends TestCase
         ];
     }
 
-    public function test_it_does_not_ask_for_a_base_url_when_the_platform_takes_no_instance(): void
+    public function test_it_does_not_ask_for_a_base_url_when_the_platform_has_no_such_key(): void
     {
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
@@ -449,14 +449,33 @@ final class InitCommandTest extends TestCase
         self::assertStringNotContainsString('Which base URL', $commandTester->getDisplay());
     }
 
-    public function test_it_asks_for_a_base_url_when_the_platform_takes_an_instance(): void
+    public function test_it_asks_for_a_base_url_when_a_flat_platform_requires_one(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example']);
+        $commandTester->setInputs(['albert', 'our-model', 'ALBERT_API_KEY', 'https://albert.example']);
 
         $commandTester->execute([]);
 
         self::assertStringContainsString('Which base URL', $commandTester->getDisplay());
+    }
+
+    public function test_it_writes_the_base_url_of_a_flat_platform_beside_its_api_key(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'albert', '--model' => 'our-model', '--env-var' => 'ALBERT_API_KEY', '--base-url' => 'https://albert.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'albert',
+                'platform' => ['albert' => ['base_url' => 'https://albert.example', 'api_key' => '%env(ALBERT_API_KEY)%']],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
     }
 
     public function test_it_rejects_a_base_url_for_a_platform_that_exposes_none(): void
@@ -471,7 +490,7 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::INVALID, $exitCode);
     }
 
-    public function test_it_explains_that_a_base_url_needs_a_platform_instance(): void
+    public function test_it_names_the_platforms_that_take_a_base_url_when_rejecting_one(): void
     {
         $commandTester = $this->commandTester();
 
@@ -480,7 +499,19 @@ final class InitCommandTest extends TestCase
             ['interactive' => false],
         );
 
-        self::assertStringContainsString('--base-url applies to platforms configured per instance', $commandTester->getDisplay());
+        self::assertStringContainsString('albert, amazeeai, azure, generic, openresponses', $commandTester->getDisplay());
+    }
+
+    public function test_it_rejects_a_base_url_for_an_instance_keyed_platform_that_has_no_such_key(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'bedrock.default', '--model' => 'our-model', '--base-url' => 'https://nope.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
     }
 
     public function test_it_installs_the_platform_bridge_rather_than_one_named_after_the_instance(): void

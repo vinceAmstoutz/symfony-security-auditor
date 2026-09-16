@@ -63,6 +63,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `deployment`, and `bedrock`, `cache` and `failover` have no `api_key` node at
   all) and still have to be written by hand.
 
+- **`init` wrote an unbootable config for `albert` and `amazeeai`.** Both
+  platforms declare `base_url` as a required child, but neither is instance
+  keyed, and `audit init --provider=albert` wrote only an `api_key`, so the next
+  run aborted with:
+
+  ```text
+  The child config "base_url" under "ai.platform.albert" must be configured.
+  ```
+
+  Taking a `base_url` and being instance keyed are independent axes that
+  `InitCommand` had conflated: it prompted for a base URL only when the provider
+  named an instance, and refused `--base-url` otherwise. Both now key off
+  `BaseUrlPlatforms` (`src/Audit/Infrastructure/Config/`), so the two flat
+  platforms that need a `base_url` are asked for one and have it written beside
+  their `api_key`, while `bedrock`, `cache` and `failover` still refuse it
+  despite being instance keyed.
+
 - **Five provider bridges installed a package that does not exist.**
   `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`
   (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) had no entry
@@ -84,10 +101,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms) now
   says so and points at `completions_path` for gateways serving another route.
 - **`audit init --base-url`** supplies the platform endpoint without the prompt,
-  for instance-keyed platforms that expose one. `base_url` exists only on
-  `generic`, `openresponses` and `azure`, all of them instance keyed, so passing
-  it with a flat platform is rejected with exit code `2` rather than writing a
-  key that platform has no node for. Public API per `docs/versioning.md`.
+  for the platforms that declare one: `albert`, `amazeeai`, `azure`, `generic`
+  and `openresponses` (`BaseUrlPlatforms::NAMES` in
+  `src/Audit/Infrastructure/Config/`). Passing it with any other platform is
+  rejected with exit code `2` rather than writing a key that platform has no
+  node for. Listed in `docs/versioning.md` as part of the `init` surface.
 - **`symfony/ai-generic-platform` in `composer.json` `suggest`** and a new
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms)
   section documenting the nested `platform:` block and the compound

@@ -442,6 +442,19 @@ fields it does not ask for (`azure` also requires `deployment`; `bedrock`,
 `cache` and `failover` have no `api_key` node at all), so write those blocks by
 hand and point `provider:` at the matching `<platform>.<instance>`.
 
+Being instance keyed and taking a `base_url` are independent. `albert` and
+`amazeeai` require a `base_url` on a flat block, so `init` asks them for one too
+and writes it without an instance level:
+
+```yaml
+provider: albert
+platform:
+    albert:
+        base_url: 'https://your-albert.example'
+        api_key: '%env(ALBERT_API_KEY)%'
+model: 'your-model'
+```
+
 ## Model Options
 
 The bundle exposes `max_output_tokens` directly at the top level (see
@@ -559,21 +572,22 @@ model: claude-opus-4-8
 `--base-url` to skip the matching prompt. Any option left out falls back to its
 interactive prompt (or, under `--no-interaction`, to its default — `anthropic`,
 `claude-opus-4-8`, and `<PLATFORM>_API_KEY` respectively). `--base-url` is only
-prompted for when `--provider` selects a platform instance (see
-[Instance-keyed platforms](#instance-keyed-platforms)), and is left out of the
-written config when the answer is empty. No flat platform has a `base_url` key
-(`ollama` uses `endpoint`, `lmstudio` uses `host_url`), so passing `--base-url`
-with one is rejected with exit code `2` before anything is written. A blank
-provider or model, or an `--env-var` that is not a valid environment variable
-name, is rejected with exit code `2` before anything is written. The provider
-bridge is downloaded **before** the configuration file is replaced, so a failed
-download (offline, `composer` missing) leaves the previous, working
-configuration untouched. When a configuration already exists, `init` asks before
-overwriting it — and declines by default under `--no-interaction` — so scripted
-reconfiguration needs `--force` to replace the existing file without asking. The
-`SSA_INIT` installer flag's no-terminal fallback and the GitHub Action run plain
-`init --no-interaction`, which keeps those Anthropic defaults — pass the options
-yourself to script any other provider:
+prompted for when the platform declares one, namely `albert`, `amazeeai`,
+`azure`, `generic` and `openresponses`, and is left out of the written config
+when the answer is empty. Every other platform either names its endpoint
+differently (`ollama` uses `endpoint`, `lmstudio` uses `host_url`) or hosts
+none, so passing `--base-url` with one is rejected with exit code `2` before
+anything is written. A blank provider or model, or an `--env-var` that is not a
+valid environment variable name, is rejected with exit code `2` before anything
+is written. The provider bridge is downloaded **before** the configuration file
+is replaced, so a failed download (offline, `composer` missing) leaves the
+previous, working configuration untouched. When a configuration already exists,
+`init` asks before overwriting it — and declines by default under
+`--no-interaction` — so scripted reconfiguration needs `--force` to replace the
+existing file without asking. The `SSA_INIT` installer flag's no-terminal
+fallback and the GitHub Action run plain `init --no-interaction`, which keeps
+those Anthropic defaults — pass the options yourself to script any other
+provider:
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
