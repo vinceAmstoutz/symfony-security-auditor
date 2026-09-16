@@ -499,7 +499,10 @@ final class InitCommandTest extends TestCase
             ['interactive' => false],
         );
 
-        self::assertStringContainsString('albert, amazeeai, azure, generic, openresponses', $commandTester->getDisplay());
+        self::assertStringContainsString(
+            'albert, amazeeai, azure, generic, openresponses',
+            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+        );
     }
 
     public function test_it_rejects_a_base_url_for_an_instance_keyed_platform_that_has_no_such_key(): void

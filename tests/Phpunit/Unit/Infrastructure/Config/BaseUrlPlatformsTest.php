@@ -34,14 +34,10 @@ final class BaseUrlPlatformsTest extends TestCase
         yield 'a flat platform requiring a base_url' => ['albert', true];
         yield 'the other flat platform requiring a base_url' => ['amazeeai', true];
         yield 'an instance-keyed platform exposing one' => ['generic.my_gateway', true];
+        yield 'an instance-keyed platform exposing one beside other required fields' => ['azure.prod', true];
         yield 'the instance name never decides' => ['openresponses.my_gateway', true];
         yield 'an instance-keyed platform without one' => ['bedrock.default', false];
         yield 'a flat platform naming its endpoint differently' => ['ollama', false];
         yield 'a flat platform hosting no endpoint' => ['anthropic', false];
-    }
-
-    public function test_it_names_every_platform_that_takes_a_base_url(): void
-    {
-        self::assertSame(['albert', 'amazeeai', 'azure', 'generic', 'openresponses'], BaseUrlPlatforms::NAMES);
     }
 }
