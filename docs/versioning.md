@@ -132,10 +132,10 @@ following surface is BC-protected:
   `SSA_INIT` environment variables.
 - The `init` command name and its `--provider`, `--model`, `--env-var`,
   `--base-url` and `--force` options (`--base-url` since 1.21 — accepted by the
-  platforms that declare one: `albert`, `amazeeai`, `azure`, `generic`,
-  `openresponses`). The standalone exposes the **identical** `audit:run` command
-  (and its `audit` alias), arguments, options, and exit-code surface listed
-  above.
+  platforms `init` can write a block for that declare one: `albert`, `amazeeai`,
+  `generic` and `openresponses`). The standalone exposes the **identical**
+  `audit:run` command (and its `audit` alias), arguments, options, and exit-code
+  surface listed above.
 - The `self-update` command name and its `--check` option (see
   [CLI Reference → `self-update`](configuration.md#self-update--updating-the-standalone-binary)).
 - The `doctor` command name and its exit-code contract (`0` when every check

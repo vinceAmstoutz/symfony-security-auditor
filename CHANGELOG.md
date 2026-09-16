@@ -45,9 +45,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms) now
   says so and points at `completions_path` for gateways serving another route.
 - **`audit init --base-url`** supplies the platform endpoint without the prompt,
-  for the platforms that declare one: `albert`, `amazeeai`, `azure`, `generic`
-  and `openresponses` (`BaseUrlPlatforms::NAMES` in
-  `src/Audit/Infrastructure/Config/`). Passing it with any other platform is
+  for the platforms `init` can write a block for that declare one: `albert`,
+  `amazeeai`, `generic` and `openresponses` (`BaseUrlPlatforms::writableNames()`
+  in `src/Audit/Infrastructure/Config/`). `azure` declares a `base_url` too but
+  is refused for needing a `deployment`, so naming it would only send a reader
+  into a second refusal. Passing `--base-url` with any other platform is
   rejected with exit code `2` rather than writing a key that platform has no
   node for. Listed in `docs/versioning.md` as part of the `init` surface.
 - **`symfony/ai-generic-platform`, `symfony/ai-albert-platform` and
