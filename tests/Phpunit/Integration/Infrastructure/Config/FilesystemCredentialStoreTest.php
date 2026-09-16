@@ -165,9 +165,6 @@ final class FilesystemCredentialStoreTest extends TestCase
     /**
      * @throws UnreadableCredentialStoreException
      */
-    /**
-     * @throws UnreadableCredentialStoreException
-     */
     public function test_it_treats_a_credential_file_of_only_whitespace_as_empty(): void
     {
         $this->givenStoredCredentials("  \n\t ");
@@ -175,6 +172,9 @@ final class FilesystemCredentialStoreTest extends TestCase
         self::assertNull($this->store()->read('ANTHROPIC_API_KEY'));
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     #[DataProvider('unparsableCredentialFiles')]
     public function test_it_refuses_to_guess_at_a_credential_file_it_cannot_parse(string $contents): void
     {

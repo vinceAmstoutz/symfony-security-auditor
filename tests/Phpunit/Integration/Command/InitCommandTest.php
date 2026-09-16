@@ -470,9 +470,6 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Export OPENAI_API_KEY before auditing instead.', $display);
     }
 
-    /**
-     * @throws UnreadableCredentialStoreException
-     */
     public function test_it_does_not_claim_to_have_stored_a_key_it_could_not_store(): void
     {
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
@@ -486,6 +483,9 @@ final class InitCommandTest extends TestCase
         self::assertStringNotContainsString('You can run "audit', $display);
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     private function storedCredential(string $variableName): ?string
     {
         return (new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome)))->read($variableName);
