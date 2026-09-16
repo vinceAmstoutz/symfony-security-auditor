@@ -397,6 +397,9 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Export MY_CUSTOM_KEY before auditing', (string) $display);
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_stores_the_api_key_the_user_pastes(): void
     {
         $commandTester = $this->commandTester();
@@ -420,6 +423,9 @@ final class InitCommandTest extends TestCase
         self::assertStringNotContainsString('openai-test-key-pasted-at-init', $display);
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_stores_nothing_when_the_user_skips_the_key(): void
     {
         $commandTester = $this->commandTester();
