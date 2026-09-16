@@ -19,6 +19,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
@@ -54,6 +56,10 @@ final class AuthStatusCommandTest extends TestCase
         self::assertStringContainsString('Source the environment', $this->flattened($commandTester));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_reports_a_key_coming_from_the_store(): void
     {
         $this->writeConfig();
@@ -65,6 +71,10 @@ final class AuthStatusCommandTest extends TestCase
         self::assertStringContainsString('Source stored on this machine', $this->flattened($commandTester));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_names_the_key_without_printing_it(): void
     {
         $this->writeConfig();
@@ -79,6 +89,10 @@ final class AuthStatusCommandTest extends TestCase
         self::assertStringNotContainsString(self::KEY, $display);
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_warns_that_an_exported_variable_shadows_the_stored_key(): void
     {
         $this->writeConfig();

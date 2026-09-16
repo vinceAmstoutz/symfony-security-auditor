@@ -19,6 +19,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
@@ -42,6 +44,9 @@ final class AuthSetCommandTest extends TestCase
         $this->filesystem->remove($this->configHome);
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_stores_the_key_under_the_variable_the_configuration_reads(): void
     {
         $this->writeConfig();
@@ -53,6 +58,9 @@ final class AuthSetCommandTest extends TestCase
         self::assertSame('anthropic-test-key-typed-by-hand', $this->store()->read('ANTHROPIC_API_KEY'));
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_stores_the_key_under_a_variable_named_on_the_command_line(): void
     {
         $commandTester = $this->commandTester();
@@ -63,6 +71,9 @@ final class AuthSetCommandTest extends TestCase
         self::assertSame('openai-test-key-typed-by-hand', $this->store()->read('OPENAI_API_KEY'));
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_drops_the_whitespace_a_paste_brings_with_it(): void
     {
         $this->writeConfig();
@@ -74,6 +85,10 @@ final class AuthSetCommandTest extends TestCase
         self::assertSame('anthropic-test-key-pasted', $this->store()->read('ANTHROPIC_API_KEY'));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_replaces_a_key_stored_earlier(): void
     {
         $this->writeConfig();

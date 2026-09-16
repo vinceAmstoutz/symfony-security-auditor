@@ -162,6 +162,9 @@ final class FilesystemCredentialStoreTest extends TestCase
         self::assertNull($this->store()->read('ANTHROPIC_API_KEY'));
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     #[DataProvider('unparsableCredentialFiles')]
     public function test_it_refuses_to_guess_at_a_credential_file_it_cannot_parse(string $contents): void
     {
@@ -256,6 +259,10 @@ final class FilesystemCredentialStoreTest extends TestCase
         self::assertSame('anthropic-test-key-kept', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     #[DataProvider('unstorableCredentials')]
     public function test_it_refuses_to_store_a_credential_it_could_not_read_back(string $credential, string $expectedMessage): void
     {
@@ -301,6 +308,10 @@ final class FilesystemCredentialStoreTest extends TestCase
         self::assertNull($this->homelessStore()->read('ANTHROPIC_API_KEY'));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_refuses_to_store_a_credential_with_nowhere_to_put_it(): void
     {
         $this->expectException(CredentialStoreWriteException::class);
@@ -323,6 +334,10 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->store()->read('ANTHROPIC_API_KEY');
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_reports_a_credential_file_it_cannot_write(): void
     {
         $this->filesystem->dumpFile(\dirname($this->credentialsFile()), 'a file where the configuration directory belongs');

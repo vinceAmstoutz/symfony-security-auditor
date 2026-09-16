@@ -21,6 +21,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -452,6 +453,9 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Export OPENAI_API_KEY before auditing instead.', $display);
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
     private function storedCredential(string $variableName): ?string
     {
         return (new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome)))->read($variableName);

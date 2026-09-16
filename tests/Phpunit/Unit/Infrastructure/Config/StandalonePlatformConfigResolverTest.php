@@ -20,6 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config\Fixture\InMemoryCredentialStore;
 
@@ -47,6 +48,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_passes_the_platform_block_through_untouched(): void
     {
@@ -60,6 +62,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_resolves_env_placeholders_anywhere_in_the_platform_block(): void
     {
@@ -73,6 +76,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_resolves_placeholders_in_a_nested_generic_platform(): void
     {
@@ -89,6 +93,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_run_that_needs_no_credential_substitutes_an_unusable_stand_in(): void
     {
@@ -105,6 +110,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_run_that_needs_no_credential_still_prefers_the_real_one_when_it_is_set(): void
     {
@@ -118,6 +124,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_carries_the_active_provider_selector(): void
     {
@@ -133,6 +140,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_has_no_active_provider_when_the_selector_is_absent(): void
     {
@@ -146,6 +154,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_ignores_an_empty_active_provider_selector(): void
     {
@@ -159,6 +168,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_a_config_without_a_platform_block(): void
     {
@@ -171,6 +181,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_an_empty_platform_block(): void
     {
@@ -183,6 +194,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_an_env_placeholder_whose_variable_is_unset(): void
     {
@@ -197,6 +209,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_a_mixed_case_env_placeholder_instead_of_passing_it_through_as_a_literal(): void
     {
@@ -211,6 +224,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     #[DataProvider('credentialFileContents')]
     public function test_it_reads_the_credential_from_the_file_its_variable_points_at(string $contents): void
@@ -238,6 +252,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_a_file_placeholder_whose_variable_is_unset(): void
     {
@@ -252,6 +267,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_a_credential_file_that_cannot_be_read(): void
     {
@@ -268,6 +284,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_a_credential_file_holding_only_whitespace(): void
     {
@@ -284,6 +301,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_run_that_needs_no_credential_tolerates_an_unset_file_variable(): void
     {
@@ -300,6 +318,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_run_that_needs_no_credential_tolerates_an_unreadable_credential_file(): void
     {
@@ -316,6 +335,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_run_that_needs_no_credential_tolerates_a_blank_credential_file(): void
     {
@@ -340,6 +360,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_falls_back_to_the_stored_credential_when_the_variable_is_unset(): void
     {
@@ -353,6 +374,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_lets_an_exported_variable_override_the_stored_credential(): void
     {
@@ -366,6 +388,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_falls_back_to_the_stored_credential_when_a_credential_file_is_not_configured(): void
     {
@@ -375,6 +398,12 @@ final class StandalonePlatformConfigResolverTest extends TestCase
         self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-from-the-store']]], $standalonePlatformConfig->toAiConfig());
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_reports_a_credential_that_is_neither_exported_nor_stored(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);

@@ -34,6 +34,9 @@ final class NullCredentialStoreTest extends TestCase
         self::assertNull((new NullCredentialStore())->location());
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     */
     public function test_it_refuses_to_pretend_it_stored_a_credential(): void
     {
         $this->expectException(CredentialStoreWriteException::class);

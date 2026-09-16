@@ -19,6 +19,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthRemoveCommand;
@@ -42,6 +44,10 @@ final class AuthRemoveCommandTest extends TestCase
         $this->filesystem->remove($this->configHome);
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_forgets_the_stored_key(): void
     {
         $this->writeConfig();
@@ -52,6 +58,10 @@ final class AuthRemoveCommandTest extends TestCase
         self::assertNull($this->store()->read('ANTHROPIC_API_KEY'));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_reminds_the_user_to_revoke_the_key_with_the_provider(): void
     {
         $this->writeConfig();
@@ -63,6 +73,10 @@ final class AuthRemoveCommandTest extends TestCase
         self::assertStringContainsString('revoke it there too', $this->flattened($commandTester));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
     public function test_it_forgets_a_key_stored_under_a_variable_named_on_the_command_line(): void
     {
         $this->store()->write('OPENAI_API_KEY', 'openai-test-key-to-forget');
