@@ -132,14 +132,12 @@ final readonly class InitCommand
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
-        if (null !== $initCommandInput->baseUrl) {
-            return $initCommandInput->baseUrl;
-        }
-
-        if (!$providerKey->isInstanceScoped()) {
+        if (null === $initCommandInput->baseUrl && null === $providerKey->instance) {
             return null;
         }
 
-        return b($this->ask($symfonyStyle, 'Which base URL does this platform expose? (leave empty if it needs none)', ''))->trim()->toString();
+        $baseUrl = b($initCommandInput->baseUrl ?? $this->ask($symfonyStyle, 'Which base URL does this platform expose? (leave empty if it needs none)', ''))->trim()->toString();
+
+        return '' !== $baseUrl ? $baseUrl : null;
     }
 }

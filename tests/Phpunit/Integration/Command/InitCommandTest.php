@@ -403,28 +403,40 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Aborted', $commandTester->getDisplay());
     }
 
-    public function test_it_writes_an_instance_keyed_platform_nested_under_its_instance(): void
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('instanceKeyedOptionCases')]
+    public function test_it_writes_an_instance_keyed_platform_nested_under_its_instance(array $options, string $expectedApiKey): void
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(
-            [
-                '--provider' => 'generic.my_gateway',
-                '--model' => 'our-model',
-                '--env-var' => 'GATEWAY_TOKEN',
-                '--base-url' => 'https://gw.example',
-            ],
-            ['interactive' => false],
-        );
+        $commandTester->execute($options, ['interactive' => false]);
 
         self::assertSame(
             [
                 'provider' => 'generic.my_gateway',
-                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => $expectedApiKey]]],
                 'model' => 'our-model',
             ],
             Yaml::parseFile($this->configFile()),
         );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function instanceKeyedOptionCases(): iterable
+    {
+        yield 'an explicit env var is used verbatim' => [
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            '%env(GATEWAY_TOKEN)%',
+        ];
+
+        yield 'an omitted env var is derived from the platform, not the instance' => [
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--base-url' => 'https://gw.example'],
+            '%env(GENERIC_API_KEY)%',
+        ];
     }
 
     public function test_it_installs_the_platform_bridge_rather_than_one_named_after_the_instance(): void
@@ -437,25 +449,6 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame([['generic.my_gateway', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
-    }
-
-    public function test_it_derives_the_api_key_variable_from_the_platform_not_the_instance(): void
-    {
-        $commandTester = $this->commandTester();
-
-        $commandTester->execute(
-            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--base-url' => 'https://gw.example'],
-            ['interactive' => false],
-        );
-
-        self::assertSame(
-            [
-                'provider' => 'generic.my_gateway',
-                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GENERIC_API_KEY)%']]],
-                'model' => 'our-model',
-            ],
-            Yaml::parseFile($this->configFile()),
-        );
     }
 
     public function test_it_asks_for_a_base_url_when_the_provider_selects_a_platform_instance(): void
@@ -475,18 +468,18 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_does_not_ask_for_a_base_url_for_a_flat_platform(): void
+    public function test_it_omits_the_base_url_when_the_prompt_is_answered_empty(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['anthropic', 'claude-opus-5', 'ANTHROPIC_API_KEY']);
+        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', '']);
 
         $commandTester->execute([]);
 
         self::assertSame(
             [
-                'provider' => 'anthropic',
-                'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']],
-                'model' => 'claude-opus-5',
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
             ],
             Yaml::parseFile($this->configFile()),
         );

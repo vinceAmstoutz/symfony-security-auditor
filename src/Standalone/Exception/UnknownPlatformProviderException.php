@@ -29,9 +29,7 @@ final class UnknownPlatformProviderException extends RuntimeException
     public static function forInstanceKeyedProvider(string $provider, array $instances): self
     {
         return new self(\sprintf(
-            'The "%s" platform is configured per instance, so "provider: %s" does not select one. Use "%s.<instance>" instead. Configured instances: %s.',
-            $provider,
-            $provider,
+            'The "%1$s" platform is configured per instance, so "provider: %1$s" does not select one. Use "%1$s.<instance>" instead. Configured instances: %2$s.',
             $provider,
             implode(', ', $instances),
         ));

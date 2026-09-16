@@ -55,9 +55,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now nests the connection under its instance and accepts a `base_url`,
   `audit init` gained `--base-url` and prompts for it when the provider selects
   an instance, and a bare `provider: generic` now reports that the platform is
-  configured per instance and lists the instances it found. The same fix covers
-  `openresponses`, `azure`, `bedrock`, `cache` and `failover`, three of which
-  were already advertised as supported.
+  configured per instance and lists the instances it found. The nesting covers
+  all six instance-keyed platforms (`generic`, `openresponses`, `azure`,
+  `bedrock`, `cache`, `failover`); `init` writes a bootable block for the two
+  whose prototype is `base_url` plus `api_key`, namely `generic` and
+  `openresponses`. The other four take different fields (`azure` also requires
+  `deployment`, and `bedrock`, `cache` and `failover` have no `api_key` node at
+  all) and still have to be written by hand.
 
 - **Five provider bridges installed a package that does not exist.**
   `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`

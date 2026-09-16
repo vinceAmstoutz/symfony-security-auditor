@@ -23,6 +23,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBa
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
@@ -120,12 +121,12 @@ final readonly class StandaloneContainerFactory
      */
     private function configuredInstancesOf(ContainerBuilder $containerBuilder, string $provider): array
     {
-        $prefix = \sprintf('%s%s.', self::PLATFORM_SERVICE_PREFIX, $provider);
         $instances = [];
 
         foreach (array_keys($containerBuilder->findTaggedServiceIds(self::PLATFORM_TAG)) as $serviceId) {
-            if (str_starts_with($serviceId, $prefix)) {
-                $instances[] = substr($serviceId, \strlen($prefix));
+            $providerKey = ProviderKey::of(substr($serviceId, \strlen(self::PLATFORM_SERVICE_PREFIX)));
+            if ($provider === $providerKey->platform && null !== $providerKey->instance) {
+                $instances[] = $providerKey->instance;
             }
         }
 

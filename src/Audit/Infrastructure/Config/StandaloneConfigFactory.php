@@ -38,7 +38,7 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
     {
         $connection = $this->connection($apiKeyEnvironmentVariable, $baseUrl);
 
-        if (!$providerKey->isInstanceScoped()) {
+        if (null === $providerKey->instance) {
             return [$providerKey->platform => $connection];
         }
 
@@ -50,7 +50,7 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
      */
     private function connection(string $apiKeyEnvironmentVariable, ?string $baseUrl): array
     {
-        $connection = null !== $baseUrl && '' !== $baseUrl ? ['base_url' => $baseUrl] : [];
+        $connection = null !== $baseUrl ? ['base_url' => $baseUrl] : [];
         $connection['api_key'] = \sprintf('%%env(%s)%%', $apiKeyEnvironmentVariable);
 
         return $connection;

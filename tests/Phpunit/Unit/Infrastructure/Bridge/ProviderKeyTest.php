@@ -40,20 +40,4 @@ final class ProviderKeyTest extends TestCase
         yield 'only the first dot separates, the rest belongs to the instance' => ['generic.eu.gateway', 'generic', 'eu.gateway'];
         yield 'a trailing dot names no instance' => ['generic.', 'generic', null];
     }
-
-    #[DataProvider('instanceScopeCases')]
-    public function test_it_reports_whether_the_provider_selects_a_platform_instance(string $provider, bool $expected): void
-    {
-        self::assertSame($expected, ProviderKey::of($provider)->isInstanceScoped());
-    }
-
-    /**
-     * @return iterable<string, array{string, bool}>
-     */
-    public static function instanceScopeCases(): iterable
-    {
-        yield 'a flat platform is not instance scoped' => ['anthropic', false];
-        yield 'an instance-keyed platform is instance scoped' => ['generic.my_gateway', true];
-        yield 'a trailing dot is not instance scoped' => ['generic.', false];
-    }
 }

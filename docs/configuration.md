@@ -419,6 +419,12 @@ writes exactly that and installs `symfony/ai-generic-platform` for you. A bare
 `provider: generic` names no instance, and the run aborts saying so and listing
 the instances you configured.
 
+`init` asks for a `base_url` and an API key, which is the whole prototype of
+`generic` and `openresponses`. The other four instance-keyed platforms need
+fields it does not ask for (`azure` also requires `deployment`; `bedrock`,
+`cache` and `failover` have no `api_key` node at all), so write those blocks by
+hand and point `provider:` at the matching `<platform>.<instance>`.
+
 ## Model Options
 
 The bundle exposes `max_output_tokens` directly at the top level (see

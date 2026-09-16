@@ -19,69 +19,52 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 
 final class StandaloneConfigFactoryTest extends TestCase
 {
-    public function test_it_builds_the_rootless_config_with_an_env_referenced_api_key(): void
+    /**
+     * @param array<string, mixed> $expected
+     */
+    #[DataProvider('configCases')]
+    public function test_it_builds_the_rootless_config(string $provider, ?string $baseUrl, array $expected): void
     {
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
-            (new StandaloneConfigFactory())->create('openai', 'gpt-5.4', 'OPENAI_API_KEY'),
-        );
-    }
-
-    public function test_it_nests_the_connection_under_its_instance_for_an_instance_keyed_platform(): void
-    {
-        self::assertSame(
-            [
-                'provider' => 'generic.my_gateway',
-                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
-                'model' => 'our-model',
-            ],
-            (new StandaloneConfigFactory())->create('generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example'),
-        );
-    }
-
-    public function test_it_keeps_an_instance_keyed_platform_nested_even_when_it_exposes_no_base_url(): void
-    {
-        self::assertSame(
-            [
-                'provider' => 'bedrock.default',
-                'platform' => ['bedrock' => ['default' => ['api_key' => '%env(AWS_TOKEN)%']]],
-                'model' => 'our-model',
-            ],
-            (new StandaloneConfigFactory())->create('bedrock.default', 'our-model', 'AWS_TOKEN'),
-        );
-    }
-
-    public function test_it_accepts_a_base_url_for_a_flat_platform_too(): void
-    {
-        self::assertSame(
-            [
-                'provider' => 'ollama',
-                'platform' => ['ollama' => ['base_url' => 'http://localhost:11434', 'api_key' => '%env(OLLAMA_TOKEN)%']],
-                'model' => 'llama3.3',
-            ],
-            (new StandaloneConfigFactory())->create('ollama', 'llama3.3', 'OLLAMA_TOKEN', 'http://localhost:11434'),
-        );
-    }
-
-    #[DataProvider('omittedBaseUrlCases')]
-    public function test_it_omits_the_base_url_when_none_was_supplied(?string $baseUrl): void
-    {
-        self::assertSame(
-            [
-                'provider' => 'generic.gw',
-                'platform' => ['generic' => ['gw' => ['api_key' => '%env(TOKEN)%']]],
-                'model' => 'our-model',
-            ],
-            (new StandaloneConfigFactory())->create('generic.gw', 'our-model', 'TOKEN', $baseUrl),
+            $expected,
+            (new StandaloneConfigFactory())->create($provider, 'gpt-5.4', 'API_TOKEN', $baseUrl),
         );
     }
 
     /**
-     * @return iterable<string, array{string|null}>
+     * @return iterable<string, array{string, string|null, array<string, mixed>}>
      */
-    public static function omittedBaseUrlCases(): iterable
+    public static function configCases(): iterable
     {
-        yield 'no base url given' => [null];
-        yield 'an empty answer at the base url prompt' => [''];
+        yield 'a flat platform holds the connection directly' => [
+            'openai',
+            null,
+            [
+                'provider' => 'openai',
+                'platform' => ['openai' => ['api_key' => '%env(API_TOKEN)%']],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'an instance-keyed platform nests it under the instance' => [
+            'openresponses.my_gateway',
+            'https://gw.example',
+            [
+                'provider' => 'openresponses.my_gateway',
+                'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+
+        yield 'an instance-keyed platform keeps the nesting without a base url' => [
+            'generic.my_gateway',
+            null,
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
     }
 }
