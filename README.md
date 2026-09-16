@@ -117,8 +117,9 @@ irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/mai
 >
 > **One command, installed _and_ configured.** Set `SSA_INIT=1` and the
 > installer runs the guided [`init`](#2-configure--the-guided-init) for you
-> right after downloading — so you skip step 2. It prompts for your provider
-> when a terminal is attached, and falls back to the Anthropic defaults
+> right after downloading — so you skip step 2, and `init` asks for your API key
+> at the end, leaving you ready to audit. It prompts for your provider when a
+> terminal is attached, and falls back to the Anthropic defaults
 > non-interactively in a pipe or CI. `init` fetches the provider bridge with
 > `composer`, so composer must be available for this combined step.
 >
@@ -152,27 +153,72 @@ symfony-security-auditor init
 ```
 
 Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on
-Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows) and
-downloads the provider bridge you pick. `init` fetches that bridge with
-`composer`, so composer must be available for this one-time setup step; running
-audits afterward needs only the binary. The file is rootless (the same keys as
-the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:`
-block handed verbatim to `symfony/ai`. See
+Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows),
+downloads the provider bridge you pick, and finally asks for your API key —
+pasted invisibly, never echoed, never in your shell history. `init` fetches that
+bridge with `composer`, so composer must be available for this one-time setup
+step; running audits afterward needs only the binary. The file is rootless (the
+same keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a
+`platform:` block handed verbatim to `symfony/ai`. See
 [configuration](docs/configuration.md#standalone-configuration) for the format
 and provider switching.
+
+Press Enter at the key prompt to skip it — you can store the key any time with
+`auth:set`, or keep using an environment variable and store nothing at all.
 
 ### 3. Run
 
 ```bash
-# read the key your config references & keeps it out of your shell history
-printf 'Anthropic API key: '; read -rs ANTHROPIC_API_KEY; echo
-export ANTHROPIC_API_KEY
 symfony-security-auditor audit /path/to/your/symfony/project
 ```
 
 `audit` is an alias for `audit:run`; every option documented in the
 [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
 `--dry-run`, `--since`, `--fail-on`, …) works identically.
+
+Every run names the key it is about to spend, masked:
+
+```text
+API key: sk-ant…qF4A
+Project: /path/to/your/symfony/project
+```
+
+#### Managing the stored key
+
+| Command       | What it does                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| `auth:set`    | Store or replace the key — prompts invisibly, writes an owner-only file                            |
+| `auth:status` | Show which key an audit would use, where it came from, and its SHA-256 fingerprint — never the key |
+| `auth:remove` | Forget the stored key on this machine                                                              |
+
+The key is kept in `credentials.json` next to your config, created `0600` on
+Linux/macOS (and inside the `%APPDATA%` profile directory, protected by its
+inherited ACL, on Windows). An audit **refuses to read it** if other users on
+the machine can, and tells you to rotate the key and `chmod 600` the file.
+
+**An exported variable always wins**, so nothing changes for Docker, Kubernetes,
+CI, or a per-run secret-manager prefix:
+
+```bash
+ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .
+```
+
+Rather not store the key at all, and no secret manager to read it from? Prompt
+for it per shell — `read -rs` keeps it off the screen, and a bare `export` keeps
+it out of `~/.bash_history`:
+
+```bash
+# read the key your config references & keep it out of your shell history
+printf 'Anthropic API key: '; read -rs ANTHROPIC_API_KEY; echo
+export ANTHROPIC_API_KEY
+```
+
+> [!TIP]
+>
+> Storing nothing is a perfectly good choice.
+> [Providing the API key](docs/configuration.md#providing-the-api-key) covers
+> the environment variable, a mounted secret file (`%env(file:…)%`), a password
+> manager, and a CI secret store — and how they rank against the stored key.
 
 ### 4. Keep it up to date
 

@@ -106,6 +106,27 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertTrue($standaloneApplication->has('init'));
     }
 
+    #[DataProvider('credentialCommandNames')]
+    public function test_it_registers_the_credential_commands(string $commandName): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertTrue($standaloneApplication->has($commandName));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function credentialCommandNames(): iterable
+    {
+        yield 'set' => ['auth:set'];
+        yield 'status' => ['auth:status'];
+        yield 'remove' => ['auth:remove'];
+    }
+
     public function test_it_registers_the_self_update_command(): void
     {
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([

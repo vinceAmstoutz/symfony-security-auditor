@@ -33,4 +33,19 @@ final readonly class StandalonePlatformConfig
     {
         return ['platform' => $this->platform];
     }
+
+    /**
+     * Names the credential the run will authenticate with, so output can say
+     * which key was spent without ever printing it. A run told it needs no
+     * credential carries the sentinel instead of a key, and has no identity
+     * worth showing.
+     */
+    public function credentialIdentity(): ?CredentialIdentity
+    {
+        $apiKey = PlatformApiKey::valueIn($this->platform);
+
+        return null === $apiKey || StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL === $apiKey
+            ? null
+            : CredentialIdentity::of($apiKey);
+    }
 }
