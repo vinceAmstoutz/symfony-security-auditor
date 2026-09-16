@@ -85,15 +85,9 @@ final readonly class InitCommand
         $provider = $this->providerKeyNormalizer->normalize($provider);
         $providerKey = ProviderKey::of($provider);
 
-        $handWritten = HandWrittenPlatforms::requirementOf($providerKey);
-        if (null !== $handWritten) {
-            $symfonyStyle->error(\sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile));
-
-            return Command::INVALID;
-        }
-
-        if (null !== $initCommandInput->baseUrl && !BaseUrlPlatforms::accept($providerKey)) {
-            $symfonyStyle->error(\sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::NAMES), $provider));
+        $violation = $this->platformViolation($providerKey, $provider, $initCommandInput->baseUrl, $configFile);
+        if (null !== $violation) {
+            $symfonyStyle->error($violation);
 
             return Command::INVALID;
         }
@@ -107,6 +101,12 @@ final readonly class InitCommand
         }
 
         $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
+
+        if (null === $baseUrl && BaseUrlPlatforms::accept($providerKey)) {
+            $symfonyStyle->error(\sprintf('"%s" requires a base URL, so nothing was written. Re-run with --base-url=<origin>.', $provider));
+
+            return Command::INVALID;
+        }
 
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl));
@@ -182,6 +182,20 @@ final readonly class InitCommand
     private function defaultApiKeyVariable(ProviderKey $providerKey): string
     {
         return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+    }
+
+    private function platformViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl, string $configFile): ?string
+    {
+        $handWritten = HandWrittenPlatforms::requirementOf($providerKey);
+        if (null !== $handWritten) {
+            return \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile);
+        }
+
+        if (null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)) {
+            return \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::NAMES), $provider);
+        }
+
+        return null;
     }
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string

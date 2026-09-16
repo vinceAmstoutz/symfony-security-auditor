@@ -697,20 +697,40 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_omits_the_base_url_when_the_prompt_is_answered_empty(): void
+    public function test_it_writes_nothing_when_a_required_base_url_is_answered_empty(): void
     {
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', '']);
 
         $commandTester->execute([]);
 
-        self::assertSame(
-            [
-                'provider' => 'generic.my_gateway',
-                'platform' => ['generic' => ['my_gateway' => ['api_key' => '%env(GATEWAY_TOKEN)%']]],
-                'model' => 'our-model',
-            ],
-            Yaml::parseFile($this->configFile()),
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_it_refuses_an_empty_base_url_rather_than_writing_a_config_that_cannot_boot(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => ''],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_says_a_base_url_is_required_when_none_is_given(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'albert', '--model' => 'our-model', '--env-var' => 'ALBERT_API_KEY', '--base-url' => '  '],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'requires a base URL, so nothing was written',
+            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
         );
     }
 

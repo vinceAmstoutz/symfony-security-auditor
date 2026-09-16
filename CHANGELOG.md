@@ -156,6 +156,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   their `api_key`, while `bedrock`, `cache` and `failover` still refuse it
   despite being instance keyed.
 
+- **An empty base URL no longer writes a config that cannot boot.** `base_url`
+  is a required child on all five platforms that declare it, yet answering the
+  `init` prompt with Enter, or passing `--base-url=` or a whitespace-only value,
+  dropped the key and still reported success. The next run then failed with:
+
+  ```text
+  The child config "base_url" under "ai.platform.generic.my_gateway" must be configured.
+  ```
+
+  `init` now reports that the platform requires a base URL and exits `2` without
+  writing anything.
+
 - **`init` wrote a config the container refuses for eight platforms.** It only
   ever writes an `api_key` plus an optional `base_url`, so a platform that
   rejects `api_key` or requires a field it never asks for ended up with a block
