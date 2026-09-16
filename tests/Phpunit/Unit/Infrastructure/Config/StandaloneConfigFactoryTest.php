@@ -56,7 +56,6 @@ final class StandaloneConfigFactoryTest extends TestCase
             ],
         ];
 
-
         yield 'an instance-keyed platform keeps the nesting without a base url' => [
             'generic.my_gateway',
             null,
