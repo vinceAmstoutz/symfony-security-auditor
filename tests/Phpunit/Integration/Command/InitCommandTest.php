@@ -399,24 +399,24 @@ final class InitCommandTest extends TestCase
     public function test_it_stores_the_api_key_the_user_pastes(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'sk-proj-pasted-at-init-time']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
 
         $commandTester->execute([]);
 
-        self::assertSame('sk-proj-pasted-at-init-time', $this->storedCredential('OPENAI_API_KEY'));
+        self::assertSame('openai-test-key-pasted-at-init', $this->storedCredential('OPENAI_API_KEY'));
     }
 
     public function test_it_names_the_stored_key_without_printing_it(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'sk-proj-pasted-at-init-time']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
 
         $commandTester->execute([]);
 
         $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
 
-        self::assertStringContainsString('Stored OPENAI_API_KEY (sk-pro…time)', $display);
-        self::assertStringNotContainsString('sk-proj-pasted-at-init-time', $display);
+        self::assertStringContainsString('Stored OPENAI_API_KEY (openai…init)', $display);
+        self::assertStringNotContainsString('openai-test-key-pasted-at-init', $display);
     }
 
     public function test_it_stores_nothing_when_the_user_skips_the_key(): void
@@ -434,7 +434,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'sk-proj-pasted-at-init-time']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
     }
@@ -444,7 +444,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'sk-proj-pasted-at-init-time']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
         $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());

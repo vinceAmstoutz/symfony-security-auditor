@@ -21,7 +21,7 @@ final class CredentialIdentityTest extends TestCase
 {
     public function test_it_reveals_only_the_leading_and_trailing_characters(): void
     {
-        self::assertSame('sk-ant…qF4A', CredentialIdentity::of('sk-ant-api03-Zk1mNopQrStUvWxYz0123456789qF4A')->maskedPreview);
+        self::assertSame('anthro…iews', CredentialIdentity::of('anthropic-test-key-for-previews')->maskedPreview);
     }
 
     #[DataProvider('unpreviewableCredentials')]
@@ -35,33 +35,33 @@ final class CredentialIdentityTest extends TestCase
      */
     public static function unpreviewableCredentials(): iterable
     {
-        yield 'shorter than the preview reveals' => ['sk-ant-tooshort'];
-        yield 'exactly one character below the threshold' => ['sk-ant-0123456789012345'];
+        yield 'shorter than the preview reveals' => ['anthropic-short'];
+        yield 'exactly one character below the threshold' => ['anthropic-test-key-2345'];
         yield 'empty' => [''];
-        yield 'non-ascii bytes' => ["sk-ant-\xc3\x28-0123456789abcdefghij"];
-        yield 'an accidental multi-line paste' => ["sk-ant-0123456789abcdefghijkl\nsk-ant-trailing"];
-        yield 'a surrounding-whitespace paste' => ['sk-ant-0123456789abcdefghijkl '];
+        yield 'non-ascii bytes' => ["anthropic-test-key-\xc3\x28-padding"];
+        yield 'an accidental multi-line paste' => ["anthropic-test-key-one\nanthropic-test-key-two"];
+        yield 'a surrounding-whitespace paste' => ['anthropic-test-key-trailing '];
     }
 
     public function test_it_previews_a_credential_of_exactly_the_minimum_length(): void
     {
-        self::assertSame('sk-ant…3456', CredentialIdentity::of('sk-ant-01234567890123456')->maskedPreview);
+        self::assertSame('anthro…3456', CredentialIdentity::of('anthropic-test-key-23456')->maskedPreview);
     }
 
     public function test_it_fingerprints_a_credential_without_disclosing_it(): void
     {
-        self::assertSame('SHA256:ed9ff73cc4b2cd57', CredentialIdentity::of('sk-ant-api03-Zk1mNopQrStUvWxYz0123456789qF4A')->fingerprint);
+        self::assertSame('SHA256:66ff24e605fe0e69', CredentialIdentity::of('anthropic-test-key-for-previews')->fingerprint);
     }
 
     public function test_it_fingerprints_two_credentials_sharing_a_preview_differently(): void
     {
-        $shared = CredentialIdentity::of('sk-ant-0000000000000000000qF4A')->fingerprint;
+        $shared = CredentialIdentity::of('anthropic-test-key-one-same')->fingerprint;
 
-        self::assertNotSame($shared, CredentialIdentity::of('sk-ant-1111111111111111111qF4A')->fingerprint);
+        self::assertNotSame($shared, CredentialIdentity::of('anthropic-test-key-two-same')->fingerprint);
     }
 
     public function test_it_fingerprints_a_credential_it_refuses_to_preview(): void
     {
-        self::assertSame('SHA256:eec67dee620cb996', CredentialIdentity::of('sk-ant-tooshort')->fingerprint);
+        self::assertSame('SHA256:1e2fb7da193109ef', CredentialIdentity::of('anthropic-short')->fingerprint);
     }
 }

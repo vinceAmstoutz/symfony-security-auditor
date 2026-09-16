@@ -48,9 +48,9 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_round_trips_a_credential(): void
     {
         $filesystemCredentialStore = $this->store();
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-round-trip');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-round-trip');
 
-        self::assertSame('sk-ant-api03-round-trip', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-round-trip', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
     }
 
     /**
@@ -59,7 +59,7 @@ final class FilesystemCredentialStoreTest extends TestCase
      */
     public function test_it_creates_the_credential_file_owner_only(): void
     {
-        $this->store()->write('ANTHROPIC_API_KEY', 'sk-ant-api03-owner-only');
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-owner-only');
 
         self::assertSame('0600', $this->permissionsOf($this->credentialsFile()));
     }
@@ -70,7 +70,7 @@ final class FilesystemCredentialStoreTest extends TestCase
      */
     public function test_it_creates_the_configuration_directory_owner_only(): void
     {
-        $this->store()->write('ANTHROPIC_API_KEY', 'sk-ant-api03-owner-only');
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-owner-only');
 
         self::assertSame('0700', $this->permissionsOf(\dirname($this->credentialsFile())));
     }
@@ -82,10 +82,11 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_tightens_permissions_a_previous_write_left_open(): void
     {
         $filesystemCredentialStore = $this->store();
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-first');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-first');
+
         $this->filesystem->chmod($this->credentialsFile(), 0644);
 
-        $filesystemCredentialStore->write('OPENAI_API_KEY', 'sk-proj-second');
+        $filesystemCredentialStore->write('OPENAI_API_KEY', 'openai-test-key-second');
 
         self::assertSame('0600', $this->permissionsOf($this->credentialsFile()));
     }
@@ -95,7 +96,7 @@ final class FilesystemCredentialStoreTest extends TestCase
      */
     public function test_it_refuses_to_read_a_credential_file_other_users_can_open(): void
     {
-        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"sk-ant-api03-exposed"}', 0644);
+        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"anthropic-test-key-exposed"}', 0644);
 
         $this->expectException(UnreadableCredentialStoreException::class);
         $this->expectExceptionMessage('readable by other users on this machine (permissions 0644)');
@@ -108,9 +109,9 @@ final class FilesystemCredentialStoreTest extends TestCase
      */
     public function test_it_reads_a_credential_file_windows_cannot_express_permissions_for(): void
     {
-        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"sk-ant-api03-windows"}', 0644);
+        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"anthropic-test-key-windows"}', 0644);
 
-        self::assertSame('sk-ant-api03-windows', $this->store('Windows')->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-windows', $this->store('Windows')->read('ANTHROPIC_API_KEY'));
     }
 
     /**
@@ -126,7 +127,7 @@ final class FilesystemCredentialStoreTest extends TestCase
      */
     public function test_it_reports_no_credential_for_an_unstored_variable(): void
     {
-        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"sk-ant-api03-stored"}');
+        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"anthropic-test-key-stored"}');
 
         self::assertNull($this->store()->read('OPENAI_API_KEY'));
     }
@@ -178,7 +179,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public static function unparsableCredentialFiles(): iterable
     {
         yield 'truncated json' => ['{"ANTHROPIC_API_KEY":'];
-        yield 'a bare scalar' => ['"sk-ant-api03-bare"'];
+        yield 'a bare scalar' => ['"anthropic-test-key-bare"'];
     }
 
     /**
@@ -188,10 +189,10 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_keeps_credentials_for_other_variables_when_one_is_written(): void
     {
         $filesystemCredentialStore = $this->store();
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-kept');
-        $filesystemCredentialStore->write('OPENAI_API_KEY', 'sk-proj-added');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-kept');
+        $filesystemCredentialStore->write('OPENAI_API_KEY', 'openai-test-key-added');
 
-        self::assertSame('sk-ant-api03-kept', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-kept', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
     }
 
     /**
@@ -201,10 +202,10 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_replaces_a_credential_stored_under_the_same_variable(): void
     {
         $filesystemCredentialStore = $this->store();
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-old');
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-new');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-old');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-new');
 
-        self::assertSame('sk-ant-api03-new', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-new', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
     }
 
     /**
@@ -214,7 +215,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_removes_a_stored_credential(): void
     {
         $filesystemCredentialStore = $this->store();
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-removed');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-removed');
         $filesystemCredentialStore->remove('ANTHROPIC_API_KEY');
 
         self::assertNull($filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
@@ -227,7 +228,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_reports_that_a_credential_was_removed(): void
     {
         $filesystemCredentialStore = $this->store();
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-removed');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-removed');
 
         self::assertTrue($filesystemCredentialStore->remove('ANTHROPIC_API_KEY'));
     }
@@ -248,11 +249,11 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_keeps_other_credentials_when_one_is_removed(): void
     {
         $filesystemCredentialStore = $this->store();
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-kept');
-        $filesystemCredentialStore->write('OPENAI_API_KEY', 'sk-proj-dropped');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-kept');
+        $filesystemCredentialStore->write('OPENAI_API_KEY', 'openai-test-key-dropped');
         $filesystemCredentialStore->remove('OPENAI_API_KEY');
 
-        self::assertSame('sk-ant-api03-kept', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-kept', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
     }
 
     #[DataProvider('unstorableCredentials')]
@@ -270,7 +271,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public static function unstorableCredentials(): iterable
     {
         yield 'empty' => ['', 'An empty API key cannot be stored.'];
-        yield 'invalid utf-8' => ["sk-ant-\xc3\x28", 'must be valid UTF-8 text'];
+        yield 'invalid utf-8' => ["anthropic-test-key-\xc3\x28", 'must be valid UTF-8 text'];
     }
 
     /**
@@ -305,7 +306,7 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->expectException(CredentialStoreWriteException::class);
         $this->expectExceptionMessage('No per-user configuration directory could be resolved');
 
-        $this->homelessStore()->write('ANTHROPIC_API_KEY', 'sk-ant-api03-homeless');
+        $this->homelessStore()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-homeless');
     }
 
     /**
@@ -329,7 +330,7 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->expectException(CredentialStoreWriteException::class);
         $this->expectExceptionMessage('could not be written');
 
-        $this->store()->write('ANTHROPIC_API_KEY', 'sk-ant-api03-blocked');
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-blocked');
     }
 
     private function givenStoredCredentials(string $contents, int $mode = 0600): void

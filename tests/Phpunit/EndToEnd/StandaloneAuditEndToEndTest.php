@@ -109,7 +109,7 @@ final class StandaloneAuditEndToEndTest extends TestCase
     {
         $this->filesystem->dumpFile(
             $this->configHome.'/symfony-security-auditor/config.yaml',
-            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\n      api_key: 'sk-proj-0123456789abcdefghij'\nmodel: 'gpt-4'\n",
+            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\n      api_key: 'openai-test-key-for-the-header'\nmodel: 'gpt-4'\n",
         );
 
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
@@ -119,10 +119,11 @@ final class StandaloneAuditEndToEndTest extends TestCase
         $commandTester = new CommandTester($standaloneApplication->find(AuditCommand::NAME));
 
         $commandTester->execute(['project-path' => $this->projectDir, '--dry-run' => true]);
+
         $display = $commandTester->getDisplay();
 
-        self::assertStringContainsString('API key: sk-pro…ghij', $display);
-        self::assertStringNotContainsString('sk-proj-0123456789abcdefghij', $display);
+        self::assertStringContainsString('API key: openai…ader', $display);
+        self::assertStringNotContainsString('openai-test-key-for-the-header', $display);
     }
 
     /**

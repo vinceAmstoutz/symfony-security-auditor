@@ -50,7 +50,7 @@ final class EnvPlaceholderTest extends TestCase
      */
     public static function valuesThatAreNotPlaceholders(): iterable
     {
-        yield 'a literal key' => ['sk-ant-api03-literal'];
+        yield 'a literal key' => ['anthropic-test-key-literal'];
         yield 'an unterminated placeholder' => ['%env(ANTHROPIC_API_KEY'];
         yield 'a placeholder with text around it' => ['prefix %env(ANTHROPIC_API_KEY)%'];
         yield 'an empty value' => [''];

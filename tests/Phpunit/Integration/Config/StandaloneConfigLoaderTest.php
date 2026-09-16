@@ -368,7 +368,7 @@ final class StandaloneConfigLoaderTest extends TestCase
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
         $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
-        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-only-in-the-store');
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-only-stored');
         $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
 
         $standaloneConfig = (new StandaloneConfigLoader(
@@ -377,7 +377,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         ))->load();
 
         self::assertSame(
-            ['platform' => ['anthropic' => ['api_key' => 'sk-ant-api03-only-in-the-store']]],
+            ['platform' => ['anthropic' => ['api_key' => 'anthropic-test-key-only-stored']]],
             $standaloneConfig->platform->toAiConfig(),
         );
     }

@@ -45,7 +45,7 @@ final class AuthRemoveCommandTest extends TestCase
     public function test_it_forgets_the_stored_key(): void
     {
         $this->writeConfig();
-        $this->store()->write('ANTHROPIC_API_KEY', 'sk-ant-api03-to-forget');
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-to-forget');
 
         $this->commandTester()->execute([]);
 
@@ -55,7 +55,7 @@ final class AuthRemoveCommandTest extends TestCase
     public function test_it_reminds_the_user_to_revoke_the_key_with_the_provider(): void
     {
         $this->writeConfig();
-        $this->store()->write('ANTHROPIC_API_KEY', 'sk-ant-api03-to-forget');
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-to-forget');
         $commandTester = $this->commandTester();
 
         $commandTester->execute([]);
@@ -65,7 +65,7 @@ final class AuthRemoveCommandTest extends TestCase
 
     public function test_it_forgets_a_key_stored_under_a_variable_named_on_the_command_line(): void
     {
-        $this->store()->write('OPENAI_API_KEY', 'sk-proj-to-forget');
+        $this->store()->write('OPENAI_API_KEY', 'openai-test-key-to-forget');
 
         $this->commandTester()->execute(['--env-var' => 'OPENAI_API_KEY']);
 

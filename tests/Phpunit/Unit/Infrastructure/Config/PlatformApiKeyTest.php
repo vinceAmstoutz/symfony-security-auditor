@@ -21,12 +21,12 @@ final class PlatformApiKeyTest extends TestCase
 {
     public function test_it_finds_the_key_a_provider_block_nests(): void
     {
-        self::assertSame('sk-ant-nested', PlatformApiKey::valueIn(['anthropic' => ['api_key' => 'sk-ant-nested']]));
+        self::assertSame('anthropic-test-key-nested', PlatformApiKey::valueIn(['anthropic' => ['api_key' => 'anthropic-test-key-nested']]));
     }
 
     public function test_it_finds_the_key_whichever_provider_holds_it(): void
     {
-        self::assertSame('sk-proj-openai', PlatformApiKey::valueIn(['ollama' => ['host_url' => 'http://localhost:11434'], 'openai' => ['api_key' => 'sk-proj-openai']]));
+        self::assertSame('openai-test-key-value', PlatformApiKey::valueIn(['ollama' => ['host_url' => 'http://localhost:11434'], 'openai' => ['api_key' => 'openai-test-key-value']]));
     }
 
     /**

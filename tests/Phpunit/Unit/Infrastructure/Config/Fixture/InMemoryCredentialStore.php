@@ -23,18 +23,27 @@ final class InMemoryCredentialStore implements CredentialStoreInterface
      */
     public function __construct(private array $credentials = []) {}
 
+    /**
+     * @throws void
+     */
     #[Override]
     public function read(string $variableName): ?string
     {
         return $this->credentials[$variableName] ?? null;
     }
 
+    /**
+     * @throws void
+     */
     #[Override]
     public function write(string $variableName, string $credential): void
     {
         $this->credentials[$variableName] = $credential;
     }
 
+    /**
+     * @throws void
+     */
     #[Override]
     public function remove(string $variableName): bool
     {
@@ -48,7 +57,7 @@ final class InMemoryCredentialStore implements CredentialStoreInterface
     }
 
     #[Override]
-    public function location(): ?string
+    public function location(): string
     {
         return '/tmp/in-memory/credentials.json';
     }

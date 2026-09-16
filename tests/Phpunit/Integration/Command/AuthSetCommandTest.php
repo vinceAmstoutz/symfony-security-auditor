@@ -46,64 +46,65 @@ final class AuthSetCommandTest extends TestCase
     {
         $this->writeConfig();
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['sk-ant-api03-typed-by-hand']);
+        $commandTester->setInputs(['anthropic-test-key-typed-by-hand']);
 
         $commandTester->execute([]);
 
-        self::assertSame('sk-ant-api03-typed-by-hand', $this->store()->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-typed-by-hand', $this->store()->read('ANTHROPIC_API_KEY'));
     }
 
     public function test_it_stores_the_key_under_a_variable_named_on_the_command_line(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['sk-proj-typed-by-hand']);
+        $commandTester->setInputs(['openai-test-key-typed-by-hand']);
 
         $commandTester->execute(['--env-var' => 'OPENAI_API_KEY']);
 
-        self::assertSame('sk-proj-typed-by-hand', $this->store()->read('OPENAI_API_KEY'));
+        self::assertSame('openai-test-key-typed-by-hand', $this->store()->read('OPENAI_API_KEY'));
     }
 
     public function test_it_drops_the_whitespace_a_paste_brings_with_it(): void
     {
         $this->writeConfig();
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['  sk-ant-api03-pasted  ']);
+        $commandTester->setInputs(['  anthropic-test-key-pasted  ']);
 
         $commandTester->execute([]);
 
-        self::assertSame('sk-ant-api03-pasted', $this->store()->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-pasted', $this->store()->read('ANTHROPIC_API_KEY'));
     }
 
     public function test_it_replaces_a_key_stored_earlier(): void
     {
         $this->writeConfig();
-        $this->store()->write('ANTHROPIC_API_KEY', 'sk-ant-api03-the-old-one');
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-the-old-one');
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['sk-ant-api03-the-new-one']);
+        $commandTester->setInputs(['anthropic-test-key-the-new-one']);
 
         $commandTester->execute([]);
 
-        self::assertSame('sk-ant-api03-the-new-one', $this->store()->read('ANTHROPIC_API_KEY'));
+        self::assertSame('anthropic-test-key-the-new-one', $this->store()->read('ANTHROPIC_API_KEY'));
     }
 
     public function test_it_names_the_stored_key_without_printing_it(): void
     {
         $this->writeConfig();
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['sk-ant-api03-Zk1mNopQrStUvWxYz0123456789qF4A']);
+        $commandTester->setInputs(['anthropic-test-key-for-previews']);
 
         $commandTester->execute([]);
+
         $display = $this->flattened($commandTester);
 
-        self::assertStringContainsString('Stored ANTHROPIC_API_KEY (sk-ant…qF4A, SHA256:ed9ff73cc4b2cd57)', $display);
-        self::assertStringNotContainsString('sk-ant-api03-Zk1mNopQrStUvWxYz0123456789qF4A', $display);
+        self::assertStringContainsString('Stored ANTHROPIC_API_KEY (anthro…iews, SHA256:66ff24e605fe0e69)', $display);
+        self::assertStringNotContainsString('anthropic-test-key-for-previews', $display);
     }
 
     public function test_it_says_where_the_key_landed(): void
     {
         $this->writeConfig();
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['sk-ant-api03-typed-by-hand']);
+        $commandTester->setInputs(['anthropic-test-key-typed-by-hand']);
 
         $commandTester->execute([]);
 

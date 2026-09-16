@@ -21,9 +21,9 @@ final class StandalonePlatformConfigTest extends TestCase
 {
     public function test_it_names_the_credential_the_run_authenticates_with(): void
     {
-        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => ['api_key' => 'sk-ant-api03-Zk1mNopQrStUvWxYz0123456789qF4A']]);
+        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => ['api_key' => 'anthropic-test-key-for-previews']]);
 
-        self::assertSame('sk-ant…qF4A', $standalonePlatformConfig->credentialIdentity()?->maskedPreview);
+        self::assertSame('anthro…iews', $standalonePlatformConfig->credentialIdentity()?->maskedPreview);
     }
 
     public function test_it_names_no_credential_for_a_provider_that_needs_none(): void

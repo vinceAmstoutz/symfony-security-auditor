@@ -39,6 +39,6 @@ final class NullCredentialStoreTest extends TestCase
         $this->expectException(CredentialStoreWriteException::class);
         $this->expectExceptionMessage('No per-user configuration directory could be resolved');
 
-        (new NullCredentialStore())->write('ANTHROPIC_API_KEY', 'sk-ant-api03-nowhere');
+        (new NullCredentialStore())->write('ANTHROPIC_API_KEY', 'anthropic-test-key-nowhere');
     }
 }

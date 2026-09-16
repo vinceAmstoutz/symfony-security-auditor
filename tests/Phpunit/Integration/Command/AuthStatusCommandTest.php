@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
 
 final class AuthStatusCommandTest extends TestCase
 {
-    private const string KEY = 'sk-ant-api03-Zk1mNopQrStUvWxYz0123456789qF4A';
+    private const string KEY = 'anthropic-test-key-for-previews';
 
     private Filesystem $filesystem;
 
@@ -72,9 +72,10 @@ final class AuthStatusCommandTest extends TestCase
         $commandTester = $this->commandTester();
 
         $commandTester->execute([]);
+
         $display = $this->flattened($commandTester);
 
-        self::assertStringContainsString('Key sk-ant…qF4A Fingerprint SHA256:ed9ff73cc4b2cd57', $display);
+        self::assertStringContainsString('Key anthro…iews Fingerprint SHA256:66ff24e605fe0e69', $display);
         self::assertStringNotContainsString(self::KEY, $display);
     }
 
@@ -82,7 +83,7 @@ final class AuthStatusCommandTest extends TestCase
     {
         $this->writeConfig();
         $this->store()->write('ANTHROPIC_API_KEY', self::KEY);
-        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY' => 'sk-ant-api03-exported-instead']);
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY' => 'anthropic-test-key-exported']);
 
         $commandTester->execute([]);
 
@@ -121,6 +122,7 @@ final class AuthStatusCommandTest extends TestCase
         $commandTester = $this->commandTester();
 
         $commandTester->execute([]);
+
         $display = $this->flattened($commandTester);
 
         self::assertStringContainsString('auth:set', $display);

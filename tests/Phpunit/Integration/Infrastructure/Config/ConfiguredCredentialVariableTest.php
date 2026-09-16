@@ -66,7 +66,7 @@ final class ConfiguredCredentialVariableTest extends TestCase
      */
     public static function configurationsNamingNoVariable(): iterable
     {
-        yield 'a literal key' => ["platform:\n    anthropic:\n        api_key: 'sk-ant-literal'\n"];
+        yield 'a literal key' => ["platform:\n    anthropic:\n        api_key: 'anthropic-test-key-literal'\n"];
         yield 'a provider needing no key' => ["platform:\n    ollama:\n        host_url: 'http://localhost:11434'\n"];
         yield 'no platform block' => ["model: 'claude-opus-5'\n"];
         yield 'a platform block that is not a map' => ["platform: 'anthropic'\n"];
