@@ -612,7 +612,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'albert, amazeeai, azure, generic, openresponses',
+            'albert, amazeeai, generic, openresponses',
             (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
         );
     }

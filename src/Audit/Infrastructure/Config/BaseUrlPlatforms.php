@@ -38,4 +38,17 @@ final readonly class BaseUrlPlatforms
     {
         return \in_array($providerKey->platform, self::NAMES, true);
     }
+
+    /**
+     * The subset `init` can actually write, for the messages that tell a user
+     * where `--base-url` belongs: `azure` declares a `base_url` but is refused
+     * earlier for needing a `deployment`, so naming it only sends them into a
+     * second refusal.
+     *
+     * @return list<string>
+     */
+    public static function writableNames(): array
+    {
+        return array_values(array_diff(self::NAMES, array_keys(HandWrittenPlatforms::REQUIREMENTS)));
+    }
 }

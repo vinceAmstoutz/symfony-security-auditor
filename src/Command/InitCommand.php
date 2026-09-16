@@ -192,7 +192,7 @@ final readonly class InitCommand
         }
 
         if (null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)) {
-            return \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::NAMES), $provider);
+            return \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::writableNames()), $provider);
         }
 
         return null;

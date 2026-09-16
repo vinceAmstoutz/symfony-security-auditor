@@ -26,6 +26,11 @@ final class BaseUrlPlatformsTest extends TestCase
         self::assertSame($expected, BaseUrlPlatforms::accept(ProviderKey::of($provider)));
     }
 
+    public function test_it_leaves_out_the_platforms_init_cannot_write(): void
+    {
+        self::assertSame(['albert', 'amazeeai', 'generic', 'openresponses'], BaseUrlPlatforms::writableNames());
+    }
+
     /**
      * @return iterable<string, array{string, bool}>
      */
