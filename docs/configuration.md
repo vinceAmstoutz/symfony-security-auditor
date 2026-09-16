@@ -438,10 +438,13 @@ ai:
 ```
 
 `init` asks for a `base_url` and an API key, which is the whole prototype of
-`generic` and `openresponses`. The other four instance-keyed platforms need
-fields it does not ask for (`azure` also requires `deployment`; `bedrock`,
-`cache` and `failover` have no `api_key` node at all), so write those blocks by
-hand and point `provider:` at the matching `<platform>.<instance>`.
+`generic` and `openresponses`. Eight platforms need something it never asks for
+and are refused with exit code `2` rather than written half-configured: `azure`
+(a `deployment`) and `cartesia` (a `version`) want an extra field beside the
+key, while `bedrock`, `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
+`transformersphp` have no `api_key` node at all. Write those blocks by hand,
+pointing `provider:` at the matching `<platform>.<instance>` when the platform
+is instance keyed.
 
 Being instance keyed and taking a `base_url` are independent. `albert` and
 `amazeeai` require a `base_url` on a flat block, so `init` asks them for one too

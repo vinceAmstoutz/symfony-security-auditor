@@ -156,6 +156,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   their `api_key`, while `bedrock`, `cache` and `failover` still refuse it
   despite being instance keyed.
 
+- **`init` wrote a config the container refuses for eight platforms.** It only
+  ever writes an `api_key` plus an optional `base_url`, so a platform that
+  rejects `api_key` or requires a field it never asks for ended up with a block
+  that failed on the next run, for example:
+
+  ```text
+  Unrecognized option "api_key" under "ai.platform.lmstudio". Available options are "host_url", "http_client".
+  ```
+
+  `audit init --provider=lmstudio` was newly reachable because this release also
+  fixed that bridge's package slug, so the bridge now installed cleanly and only
+  then produced an unusable config. `HandWrittenPlatforms`
+  (`src/Audit/Infrastructure/Config/`) names the eight and what each needs
+  instead: `azure` (a `deployment`), `cartesia` (a `version`), and `bedrock`,
+  `cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` (no
+  `api_key` node at all). `init` now names the missing piece and exits `2`
+  without writing anything, rather than reporting success.
+
 - **Five provider bridges installed a package that does not exist.**
   `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`
   (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) had no entry

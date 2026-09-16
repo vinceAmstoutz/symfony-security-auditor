@@ -617,6 +617,45 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_refuses_a_platform_whose_block_it_cannot_write(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'lmstudio', '--model' => 'our-model', '--env-var' => 'LMSTUDIO_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_says_what_a_hand_written_platform_needs_instead(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'needs a "deployment" name beside the api_key, which "init" does not write',
+            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_writes_nothing_for_a_platform_it_cannot_configure(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'transformersphp', '--model' => 'our-model', '--env-var' => 'TRANSFORMERS_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
     public function test_it_rejects_a_base_url_for_an_instance_keyed_platform_that_has_no_such_key(): void
     {
         $commandTester = $this->commandTester();
