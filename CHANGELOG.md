@@ -77,6 +77,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **Documented that `base_url` is the origin only.** The `generic` bridge
+  appends its own `completions_path` (default `/v1/chat/completions`), so a
+  `base_url` ending in `/v1` produced `/v1/v1/chat/completions` and a malformed
+  URL error.
+  [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms) now
+  says so and points at `completions_path` for gateways serving another route.
 - **`audit init --base-url`** supplies the platform endpoint without the prompt,
   for instance-keyed platforms that expose one. `base_url` exists only on
   `generic`, `openresponses` and `azure`, all of them instance keyed, so passing

@@ -419,6 +419,23 @@ writes exactly that and installs `symfony/ai-generic-platform` for you. A bare
 `provider: generic` names no instance, and the run aborts saying so and listing
 the instances you configured.
 
+`base_url` is the origin only. The `generic` bridge appends its own
+`completions_path`, which defaults to `/v1/chat/completions`, so a `base_url`
+already ending in `/v1` produces `/v1/v1/chat/completions` and the run fails on
+a malformed URL. Give it `https://your-gateway.example` and, if your gateway
+serves a different route, set `completions_path` rather than folding the prefix
+into `base_url`:
+
+```yaml
+ai:
+    platform:
+        generic:
+            my_gateway:
+                base_url: '%env(GATEWAY_URL)%'
+                api_key: '%env(GATEWAY_TOKEN)%'
+                completions_path: '/chat/completions'
+```
+
 `init` asks for a `base_url` and an API key, which is the whole prototype of
 `generic` and `openresponses`. The other four instance-keyed platforms need
 fields it does not ask for (`azure` also requires `deployment`; `bedrock`,
