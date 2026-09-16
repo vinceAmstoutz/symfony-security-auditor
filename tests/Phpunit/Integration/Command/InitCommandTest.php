@@ -448,7 +448,14 @@ final class InitCommandTest extends TestCase
             ['interactive' => false],
         );
 
-        self::assertStringContainsString('GENERIC_API_KEY', (string) file_get_contents($this->configFile()));
+        self::assertSame(
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GENERIC_API_KEY)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
     }
 
     public function test_it_asks_for_a_base_url_when_the_provider_selects_a_platform_instance(): void

@@ -99,9 +99,7 @@ final readonly class StandaloneContainerFactory
             if (!$containerBuilder->hasDefinition($platformServiceId)) {
                 $instances = $this->configuredInstancesOf($containerBuilder, $activeProvider);
 
-                throw [] === $instances
-                    ? UnknownPlatformProviderException::forProvider($activeProvider)
-                    : UnknownPlatformProviderException::forInstanceKeyedProvider($activeProvider, $instances);
+                throw [] === $instances ? UnknownPlatformProviderException::forProvider($activeProvider) : UnknownPlatformProviderException::forInstanceKeyedProvider($activeProvider, $instances);
             }
 
             $containerBuilder->setAlias(PlatformInterface::class, $platformServiceId)->setPublic(true);

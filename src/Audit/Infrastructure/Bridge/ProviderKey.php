@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
+use function Symfony\Component\String\u;
+
 /**
  * Splits a configured `provider` into the `symfony/ai` platform it names and
  * the optional instance within it. Platforms declared with
@@ -26,6 +28,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
  */
 final readonly class ProviderKey
 {
+    private const string INSTANCE_SEPARATOR = '.';
+
     private function __construct(
         public string $platform,
         public ?string $instance,
@@ -33,11 +37,22 @@ final readonly class ProviderKey
 
     public static function of(string $provider): self
     {
-        [$platform, $instance] = array_pad(explode('.', $provider, 2), 2, null);
+        $unicodeString = u($provider);
+        if (!$unicodeString->containsAny(self::INSTANCE_SEPARATOR)) {
+            return new self($provider, null);
+        }
 
-        return new self($platform, null !== $instance && '' !== $instance ? $instance : null);
+        $instance = $unicodeString->after(self::INSTANCE_SEPARATOR)->toString();
+
+        return new self(
+            $unicodeString->before(self::INSTANCE_SEPARATOR)->toString(),
+            '' !== $instance ? $instance : null,
+        );
     }
 
+    /**
+     * @phpstan-assert-if-true non-empty-string $this->instance
+     */
     public function isInstanceScoped(): bool
     {
         return null !== $this->instance;

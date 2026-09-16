@@ -397,8 +397,8 @@ ai:
                 api_key: '%env(GATEWAY_TOKEN)%'
 ```
 
-In **bundle** mode that is all you need: `symfony/ai-bundle` selects the platform
-by itself when exactly one is configured.
+In **bundle** mode that is all you need: `symfony/ai-bundle` selects the
+platform by itself when exactly one is configured.
 
 In **standalone** mode the top-level `provider:` key selects which platform the
 audit runs against, and for these six it must carry the instance name too:

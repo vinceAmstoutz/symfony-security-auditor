@@ -18,22 +18,30 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   gateway, yet it appeared nowhere in the project: absent from both platform
   tables, from `composer.json` `suggest` and from every example. Finding it was
   not enough either, because it is declared with `useAttributeAsKey` and so
-  registers as `ai.platform.generic.<instance>`, while
-  `StandaloneConfigFactory` wrote a flat
-  `platform: {<provider>: {api_key: …}}` and
+  registers as `ai.platform.generic.<instance>`, while `StandaloneConfigFactory`
+  wrote a flat `platform: {<provider>: {api_key: …}}` and
   `StandaloneContainerFactory::selectActivePlatform()` looked up
-  `ai.platform.<provider>`. `audit init --provider=generic` therefore produced
-  a config the container rejected with
-  `Invalid type for path "ai.platform.generic.api_key". Expected "array", but got "string"`,
-  and repairing it by hand produced
-  `The selected provider "generic" is not present in the "platform:" block of your config.`
-  — which named the one key that was plainly present. `StandaloneConfigFactory`
+  `ai.platform.<provider>`. `audit init --provider=generic` therefore produced a
+  config the container rejected with:
+
+  ```text
+  Invalid type for path "ai.platform.generic.api_key". Expected "array", but got "string"
+  ```
+
+  and repairing it by hand produced:
+
+  ```text
+  The selected provider "generic" is not present in the "platform:" block of your config.
+  ```
+
+  which named the one key that was plainly present. `StandaloneConfigFactory`
   now nests the connection under its instance and accepts a `base_url`,
   `audit init` gained `--base-url` and prompts for it when the provider selects
   an instance, and a bare `provider: generic` now reports that the platform is
   configured per instance and lists the instances it found. The same fix covers
   `openresponses`, `azure`, `bedrock`, `cache` and `failover`, three of which
   were already advertised as supported.
+
 - **Five provider bridges installed a package that does not exist.**
   `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`
   (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) had no entry
@@ -48,8 +56,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
-- **`audit init --base-url`** — supplies the platform endpoint without the
-  prompt, for instance-keyed platforms that expose one. Public API per
+- **`audit init --base-url`** supplies the platform endpoint without the prompt,
+  for instance-keyed platforms that expose one. Public API per
   `docs/versioning.md`.
 - **`symfony/ai-generic-platform` in `composer.json` `suggest`** and a new
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms)

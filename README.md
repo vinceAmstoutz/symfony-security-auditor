@@ -430,7 +430,8 @@ ai:
                 api_key: '%env(GATEWAY_TOKEN)%'
 ```
 
-See [Configuration → Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms).
+See
+[Configuration → Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms).
 
 ## Documentation
 
