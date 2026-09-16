@@ -156,6 +156,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   their `api_key`, while `bedrock`, `cache` and `failover` still refuse it
   despite being instance keyed.
 
+- **A mistyped platform instance now names the real ones.**
+  `provider: generic.typo` against a configured `generic.eu` reported:
+
+  ```text
+  The selected provider "generic.typo" is not present in the "platform:" block of your config.
+  ```
+
+  which is the same misdirection this release fixed for a bare
+  `provider: generic`: the `generic` block is plainly there, only the instance
+  is wrong. `StandaloneContainerFactory` now looks the instances up by the
+  platform part of the provider, so the error reads
+  `The "generic" platform has no "typo" instance. Configured instances: eu.`
+
 - **An empty base URL no longer writes a config that cannot boot.** `base_url`
   is a required child on all five platforms that declare it, yet answering the
   `init` prompt with Enter, or passing `--base-url=` or a whitespace-only value,

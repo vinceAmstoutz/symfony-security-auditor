@@ -122,9 +122,7 @@ final readonly class StandaloneContainerFactory
         if (null !== $activeProvider) {
             $platformServiceId = \sprintf('%s%s', self::PLATFORM_SERVICE_PREFIX, $activeProvider);
             if (!$containerBuilder->hasDefinition($platformServiceId)) {
-                $instances = $this->configuredInstancesOf($containerBuilder, $activeProvider);
-
-                throw [] === $instances ? UnknownPlatformProviderException::forProvider($activeProvider) : UnknownPlatformProviderException::forInstanceKeyedProvider($activeProvider, $instances);
+                throw $this->unknownProvider($containerBuilder, $activeProvider);
             }
 
             $containerBuilder->setAlias(PlatformInterface::class, $platformServiceId)->setPublic(true);
@@ -135,6 +133,20 @@ final readonly class StandaloneContainerFactory
         if (\count($containerBuilder->findTaggedServiceIds(self::PLATFORM_TAG)) > 1) {
             throw AmbiguousPlatformException::create();
         }
+    }
+
+    private function unknownProvider(ContainerBuilder $containerBuilder, string $activeProvider): UnknownPlatformProviderException
+    {
+        $providerKey = ProviderKey::of($activeProvider);
+        $instances = $this->configuredInstancesOf($containerBuilder, $providerKey->platform);
+
+        if ([] === $instances) {
+            return UnknownPlatformProviderException::forProvider($activeProvider);
+        }
+
+        return null === $providerKey->instance
+            ? UnknownPlatformProviderException::forInstanceKeyedProvider($providerKey->platform, $instances)
+            : UnknownPlatformProviderException::forUnknownInstance($providerKey->platform, $providerKey->instance, $instances);
     }
 
     /**

@@ -180,9 +180,31 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_it_rejects_a_selector_absent_from_the_platform_block(): void
     {
         $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The selected provider "mistral" is not present in the "platform:" block of your config.');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://a']]], 'mistral')),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    public function test_it_names_the_configured_instances_when_the_selected_one_does_not_exist(): void
+    {
+        $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The "generic" platform has no "typo" instance. Configured instances: primary.');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(
+                ['generic' => ['primary' => ['base_url' => 'http://a']]],
+                'generic.typo',
+            )),
             $this->cacheDir,
         );
     }

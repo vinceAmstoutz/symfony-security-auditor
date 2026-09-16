@@ -26,6 +26,19 @@ final class UnknownPlatformProviderException extends RuntimeException
     /**
      * @param list<string> $instances
      */
+    public static function forUnknownInstance(string $platform, string $instance, array $instances): self
+    {
+        return new self(\sprintf(
+            'The "%1$s" platform has no "%2$s" instance. Configured instances: %3$s.',
+            $platform,
+            $instance,
+            implode(', ', $instances),
+        ));
+    }
+
+    /**
+     * @param list<string> $instances
+     */
     public static function forInstanceKeyedProvider(string $provider, array $instances): self
     {
         return new self(\sprintf(
