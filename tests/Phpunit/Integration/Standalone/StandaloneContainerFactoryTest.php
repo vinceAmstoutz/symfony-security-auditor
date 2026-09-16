@@ -17,6 +17,7 @@ use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
@@ -122,6 +123,27 @@ final class StandaloneContainerFactoryTest extends TestCase
         self::assertSame(getcwd(), $containerBuilder->getParameter('kernel.project_dir'));
         self::assertFalse($containerBuilder->getParameter('kernel.debug'));
         self::assertInstanceOf(EventDispatcher::class, $containerBuilder->get('event_dispatcher'));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_provides_every_service_the_ollama_platform_demands_outright(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434']], 'ollama')),
+            $this->cacheDir,
+        );
+
+        $platform = $containerBuilder->get(PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+
+        self::assertSame(OllamaFactory::STUB_RESPONSE, $platform->invoke('llama3.3', 'ping')->asText());
     }
 
     /**

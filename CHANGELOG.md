@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **The standalone binary now boots against Ollama.** `doctor` reported the
+  bridge as installed but unusable and `audit` never scanned a file:
+
+  ```text
+  Installed, but the audit cannot start with it: The service
+  "Symfony\AI\Platform\PlatformInterface" has a dependency on a non-existent
+  service "http_client".
+  ```
+
+  `StandaloneContainerFactory` (`src/Standalone/`) registers the services
+  `symfony/ai-bundle` expects an application to provide, and `http_client` —
+  supplied by `FrameworkBundle` in a real app — was missing. Only `ollama`
+  references it strictly; every other bridge falls back to a client it builds
+  itself, which is why this provider alone failed. The container now registers
+  `http_client` as `FrameworkBundle` does, and `symfony/http-client` becomes a
+  direct dependency.
+
 ## [1.20.1] — 2026-08-23 — Herald
 
 A release about the binary saying who it is and what it just did. The identity

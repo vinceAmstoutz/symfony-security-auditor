@@ -65,6 +65,22 @@ Two distinct "Provider bridge" failures:
   happens to be installed. Re-run `init` for the current provider (`--force`
   skips the overwrite prompt) to install the matching bridge.
 
+On `1.20.1` and earlier, one reason string came from the binary rather than from
+the bridge:
+
+```text
+Installed, but the audit cannot start with it: The service
+"Symfony\AI\Platform\PlatformInterface" has a dependency on a non-existent
+service "http_client".
+```
+
+The container the binary builds registers the services `symfony/ai-bundle`
+expects an application to provide, and `http_client` was missing from that list.
+Only `ollama` requires it outright — every other provider's bridge falls back to
+a client it builds itself — so this surfaced as an Ollama-only failure. Upgrade
+the binary (`symfony-security-auditor self-update`); re-running `init` does not
+help, since the bridge was never the problem.
+
 ### `.symfony-security-auditor.yaml` cannot override `platform`, `provider`, or `scan.import_sarif`
 
 Fixed as a security issue in `1.19.0`. A per-project
