@@ -50,10 +50,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `src/Audit/Infrastructure/Config/`). Passing it with any other platform is
   rejected with exit code `2` rather than writing a key that platform has no
   node for. Listed in `docs/versioning.md` as part of the `init` surface.
-- **`symfony/ai-generic-platform` in `composer.json` `suggest`** and a new
+- **`symfony/ai-generic-platform`, `symfony/ai-albert-platform` and
+  `symfony/ai-amazee-ai-platform` in the README platform table and in
+  `composer.json` `suggest`**, plus a new
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms)
   section documenting the nested `platform:` block and the compound
-  `provider: generic.my_gateway` selector.
+  `provider: generic.my_gateway` selector. All three are absent from the table
+  today, so a reader looking for the bridge that takes a `base_url` found
+  nothing.
 
 ### Changed
 
