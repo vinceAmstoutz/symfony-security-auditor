@@ -21,17 +21,17 @@ final class UncoveredLinesTest extends TestCase
 {
     public function test_it_names_every_statement_that_never_executed(): void
     {
-        self::assertSame(['src/A.php:19', 'src/B.php:7'], UncoveredLines::in(self::report()));
+        self::assertSame(['src/A.php:19', 'src/B.php:7'], UncoveredLines::in($this->report()));
     }
 
     public function test_it_ignores_statements_that_did_execute(): void
     {
-        self::assertNotContains('src/A.php:12', UncoveredLines::in(self::report()));
+        self::assertNotContains('src/A.php:12', UncoveredLines::in($this->report()));
     }
 
     public function test_it_ignores_coverage_entries_that_are_not_statements(): void
     {
-        self::assertNotContains('src/B.php:3', UncoveredLines::in(self::report()));
+        self::assertNotContains('src/B.php:3', UncoveredLines::in($this->report()));
     }
 
     #[DataProvider('unusableReports')]
@@ -51,7 +51,7 @@ final class UncoveredLinesTest extends TestCase
         yield 'fully covered' => ['<coverage><project><file name="src/A.php"><line num="1" type="stmt" count="3"/></file></project></coverage>'];
     }
 
-    private static function report(): string
+    private function report(): string
     {
         return <<<'XML'
             <?xml version="1.0" encoding="UTF-8"?>
