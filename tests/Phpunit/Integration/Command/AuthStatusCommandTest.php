@@ -114,8 +114,24 @@ final class AuthStatusCommandTest extends TestCase
         self::assertStringNotContainsString('is also stored on this machine', $this->flattened($commandTester));
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_stays_quiet_about_shadowing_when_the_stored_key_is_the_one_in_use(): void
+    {
+        $this->writeConfig();
+        $this->store()->write('ANTHROPIC_API_KEY', self::KEY);
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('is also stored on this machine', $this->flattened($commandTester));
+    }
+
     public function test_it_reports_a_variable_named_on_the_command_line(): void
     {
+        $this->writeConfig();
         $commandTester = $this->commandTester(['OPENAI_API_KEY' => self::KEY]);
 
         $commandTester->execute(['--env-var' => 'OPENAI_API_KEY']);
@@ -142,6 +158,26 @@ final class AuthStatusCommandTest extends TestCase
         self::assertStringContainsString('auth:set', $display);
         self::assertStringContainsString('export ANTHROPIC_API_KEY=', $display);
         self::assertStringContainsString('ANTHROPIC_API_KEY=$(pass show …) audit .', $display);
+    }
+
+    public function test_it_names_the_variable_that_resolved_to_nothing(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('No API key resolves for ANTHROPIC_API_KEY', $this->flattened($commandTester));
+    }
+
+    public function test_it_introduces_the_options_it_offers(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Pick whichever fits how you work', $this->flattened($commandTester));
     }
 
     public function test_it_refuses_when_no_variable_is_configured_yet(): void

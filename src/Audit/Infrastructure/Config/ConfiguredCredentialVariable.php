@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
@@ -30,7 +29,6 @@ final readonly class ConfiguredCredentialVariable
 {
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
-        private Filesystem $filesystem = new Filesystem(),
     ) {}
 
     public function name(): ?string
@@ -63,10 +61,6 @@ final readonly class ConfiguredCredentialVariable
         try {
             $configFile = $this->xdgConfigPathResolver->configFile();
         } catch (UnresolvableConfigPathException) {
-            return [];
-        }
-
-        if (!$this->filesystem->exists($configFile)) {
             return [];
         }
 

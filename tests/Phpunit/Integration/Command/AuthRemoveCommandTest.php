@@ -79,6 +79,7 @@ final class AuthRemoveCommandTest extends TestCase
      */
     public function test_it_forgets_a_key_stored_under_a_variable_named_on_the_command_line(): void
     {
+        $this->writeConfig();
         $this->store()->write('OPENAI_API_KEY', 'openai-test-key-to-forget');
 
         $this->commandTester()->execute(['--env-var' => 'OPENAI_API_KEY']);
@@ -94,6 +95,16 @@ final class AuthRemoveCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringContainsString('Nothing was stored for ANTHROPIC_API_KEY', $this->flattened($commandTester));
+    }
+
+    public function test_it_does_not_claim_to_have_forgotten_a_key_that_was_never_stored(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('Forgot the stored key', $this->flattened($commandTester));
     }
 
     public function test_it_succeeds_when_there_was_nothing_stored(): void

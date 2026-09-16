@@ -436,6 +436,17 @@ final class InitCommandTest extends TestCase
         self::assertNull($this->storedCredential('OPENAI_API_KEY'));
     }
 
+    public function test_it_does_not_try_to_store_a_key_the_user_skipped(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->execute([]);
+
+        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringNotContainsString('could not be stored', $display);
+    }
+
     public function test_it_still_reports_success_when_the_key_cannot_be_stored(): void
     {
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
@@ -462,6 +473,19 @@ final class InitCommandTest extends TestCase
     /**
      * @throws UnreadableCredentialStoreException
      */
+    public function test_it_does_not_claim_to_have_stored_a_key_it_could_not_store(): void
+    {
+        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->execute([]);
+
+        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringNotContainsString('You can run "audit', $display);
+    }
+
     private function storedCredential(string $variableName): ?string
     {
         return (new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome)))->read($variableName);

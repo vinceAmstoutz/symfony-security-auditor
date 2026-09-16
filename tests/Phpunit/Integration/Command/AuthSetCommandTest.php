@@ -63,6 +63,7 @@ final class AuthSetCommandTest extends TestCase
      */
     public function test_it_stores_the_key_under_a_variable_named_on_the_command_line(): void
     {
+        $this->writeConfig();
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai-test-key-typed-by-hand']);
 

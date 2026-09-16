@@ -165,6 +165,16 @@ final class FilesystemCredentialStoreTest extends TestCase
     /**
      * @throws UnreadableCredentialStoreException
      */
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_treats_a_credential_file_of_only_whitespace_as_empty(): void
+    {
+        $this->givenStoredCredentials("  \n\t ");
+
+        self::assertNull($this->store()->read('ANTHROPIC_API_KEY'));
+    }
+
     #[DataProvider('unparsableCredentialFiles')]
     public function test_it_refuses_to_guess_at_a_credential_file_it_cannot_parse(string $contents): void
     {
@@ -196,6 +206,19 @@ final class FilesystemCredentialStoreTest extends TestCase
         $filesystemCredentialStore->write('OPENAI_API_KEY', 'openai-test-key-added');
 
         self::assertSame('anthropic-test-key-kept', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_reads_back_a_credential_stored_after_an_earlier_one(): void
+    {
+        $filesystemCredentialStore = $this->store();
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-first');
+        $filesystemCredentialStore->write('OPENAI_API_KEY', 'openai-test-key-second');
+
+        self::assertSame('openai-test-key-second', $filesystemCredentialStore->read('OPENAI_API_KEY'));
     }
 
     /**

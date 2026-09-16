@@ -159,10 +159,12 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
             return;
         }
 
-        $permissions = ((int) fileperms($path)) & self::PERMISSION_BITS;
-        if (0 !== ($permissions & self::GROUP_AND_OTHER_BITS)) {
-            throw UnreadableCredentialStoreException::forInsecurePermissions($path, $permissions);
+        $permissions = fileperms($path);
+        if (false === $permissions || 0 === ($permissions & self::GROUP_AND_OTHER_BITS)) {
+            return;
         }
+
+        throw UnreadableCredentialStoreException::forInsecurePermissions($path, $permissions & self::PERMISSION_BITS);
     }
 
     /**
