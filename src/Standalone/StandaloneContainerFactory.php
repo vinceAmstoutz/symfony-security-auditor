@@ -21,6 +21,8 @@ use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
@@ -74,6 +76,7 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->register('event_dispatcher', EventDispatcher::class)->setPublic(true);
         $containerBuilder->register('logger', NullLogger::class);
         $containerBuilder->register(ClockInterface::class, NativeClock::class);
+        $containerBuilder->register('http_client', HttpClientInterface::class)->setFactory([HttpClient::class, 'create']);
 
         $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), $standaloneConfig->auditConfig, $containerBuilder);
