@@ -12,6 +12,61 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **The standalone binary can now hold your API key for you, so a machine is set
+  up once instead of every shell.** `init` (`src/Command/InitCommand.php`) only
+  ever asked _which environment variable_ holds the key and wrote
+  `%env(ANTHROPIC_API_KEY)%` into the config — it never asked for the key
+  itself, so the guided `curl … | SSA_INIT=1 sh` install ended pointing at a
+  variable nobody had set, and the first audit failed with:
+
+  ```text
+  The environment variable "ANTHROPIC_API_KEY", referenced by your config, is not set.
+  ```
+
+  `init` now finishes by asking for the key (hidden input, skippable with
+  Enter), and three commands manage it afterwards: **`auth:set`** stores or
+  replaces it, **`auth:status`** reports which key an audit would use and where
+  it came from, and **`auth:remove`** forgets it. `FilesystemCredentialStore`
+  (`src/Audit/Infrastructure/Config/`) keeps it in `credentials.json` beside the
+  config file, keyed by the variable the config names — so switching provider
+  cannot make a run pick up the previous provider's key.
+
+  **An exported variable still wins**, ahead of anything stored, so Docker,
+  Kubernetes, CI and a `ANTHROPIC_API_KEY=$(pass show …) audit .` prefix are
+  unaffected; `auth:status` warns when an export is shadowing a stored key. A
+  container with no resolvable home directory simply has nothing stored and
+  falls back to the environment exactly as before. See
+  [Providing the API key](docs/configuration.md#providing-the-api-key).
+
+### Security
+
+- **A stored credential is written owner-only, and an exposed one is refused
+  rather than used.** `FilesystemCredentialStore`
+  (`src/Audit/Infrastructure/Config/FilesystemCredentialStore.php`) creates
+  `credentials.json` empty, tightens it to `0600` and its directory to `0700`,
+  and only then writes the key into it — so the secret never occupies a path the
+  process umask has left group- or world-readable. On a read, a file others can
+  open stops the run:
+
+  ```text
+  The stored credentials at "…/credentials.json" are readable by other users on this machine (permissions 0644). Anyone who could read them may already have your API key, so rotate it with your provider, then run "chmod 600 …".
+  ```
+
+  `auth:set` and `auth:remove` tighten the file before reading it, so an exposed
+  key can always be replaced or deleted from the tool itself. Windows has no
+  POSIX permission bits, so the check is skipped there and the file is protected
+  by the user-profile ACL it inherits from `%APPDATA%` — documented as the
+  weaker guarantee it is, rather than claimed as parity.
+
+- **The API key is named in output, never printed.** `CredentialIdentity`
+  (`src/Audit/Infrastructure/Config/CredentialIdentity.php`) renders a
+  credential as a masked preview (`sk-ant…qF4A` — first six and last four
+  characters, matching what a provider console shows) plus a truncated SHA-256
+  fingerprint (`SHA256:ed9ff73cc4b2cd57`) that identifies it exactly while
+  revealing nothing. Anything shorter than 24 characters, or carrying bytes
+  outside printable ASCII, is masked entirely. Every audit run prints the
+  preview in its header; `auth:status` and `doctor` print both.
+
 - **The standalone configuration can now take the provider credential from a
   file.** `StandalonePlatformConfigResolver`
   (`src/Audit/Infrastructure/Config/StandalonePlatformConfigResolver.php`)
@@ -39,13 +94,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `InitCommand::__invoke()` (`src/Command/InitCommand.php`) ended with
   `Run: export ANTHROPIC_API_KEY=, then "audit <path>".` — a line whose whole
   purpose was to be pasted, which appends the key verbatim to `~/.bash_history`
-  or `~/.zsh_history` the moment it is. It now prints:
+  or `~/.zsh_history` the moment it is. It now confirms where the configuration
+  landed and offers to store the key instead, naming the variable without ever
+  teaching the leak — and when the key prompt is skipped, points at
+  [Providing the API key](docs/configuration.md#providing-the-api-key) rather
+  than handing over a line to paste.
+
+- **A run with no API key now says how to get one.**
+  `MissingEnvironmentVariableException::forName()`
+  (`src/Audit/Infrastructure/Config/Exception/`) reported only:
 
   ```text
-  Set ANTHROPIC_API_KEY in your environment, then run "audit <path>". Keeping the key out of your shell history: docs/configuration.md#providing-the-api-key
+  The environment variable "ANTHROPIC_API_KEY", referenced by your config, is not set.
   ```
 
-  naming the same variable without teaching the leak.
+  which names the problem and leaves the reader to find the fix. It now names
+  every way out — `auth:set`, an `export`, or a password-manager prefix — and
+  points at `auth:status`. `doctor` surfaces the same message under its
+  `API key` check, and its green result now names the key that resolved
+  (`Config resolves and an API key is available: sk-ant…qF4A (SHA256:…)`)
+  instead of only asserting that one was found.
 
 ## [1.20.1] — 2026-08-23 — Herald
 
