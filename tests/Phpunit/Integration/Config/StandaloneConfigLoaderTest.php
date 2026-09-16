@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\P
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -352,6 +353,33 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->expectException(MalformedProjectConfigException::class);
 
         $this->loader()->load();
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     */
+    public function test_it_loads_a_configuration_whose_key_is_only_in_the_credential_store(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+        $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'sk-ant-api03-only-in-the-store');
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+
+        $standaloneConfig = (new StandaloneConfigLoader(
+            $xdgConfigPathResolver,
+            new StandalonePlatformConfigResolver(credentialStore: $filesystemCredentialStore),
+        ))->load();
+
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => 'sk-ant-api03-only-in-the-store']]],
+            $standaloneConfig->platform->toAiConfig(),
+        );
     }
 
     private function loader(?string $projectConfigFile = null): StandaloneConfigLoader

@@ -18,16 +18,13 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class StandalonePlatformConfigResolver
 {
-    private const string ENV_PLACEHOLDER = '/^%env\(([^)]+)\)%$/';
-
-    private const string FILE_PROCESSOR = 'file:';
-
     /**
      * Stands in for a credential a run has been told it will not need — a
      * `--dry-run`, which estimates cost from the scanned files and never
@@ -43,6 +40,7 @@ final readonly class StandalonePlatformConfigResolver
     public function __construct(
         private array $environment = [],
         private Filesystem $filesystem = new Filesystem(),
+        private CredentialStoreInterface $credentialStore = new NullCredentialStore(),
     ) {}
 
     /**
@@ -51,6 +49,7 @@ final readonly class StandalonePlatformConfigResolver
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     public function resolve(array $rawConfig, bool $credentialsRequired = true): StandalonePlatformConfig
     {
@@ -74,6 +73,7 @@ final readonly class StandalonePlatformConfigResolver
      *
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     private function resolveEnvPlaceholders(array $config, bool $credentialsRequired): array
     {
@@ -92,28 +92,38 @@ final readonly class StandalonePlatformConfigResolver
     /**
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     private function resolveValue(string $value, bool $credentialsRequired): string
     {
-        if (1 !== preg_match(self::ENV_PLACEHOLDER, $value, $matches)) {
+        $envPlaceholder = EnvPlaceholder::in($value);
+        if (!$envPlaceholder instanceof EnvPlaceholder) {
             return $value;
         }
 
-        $expression = $matches[1];
-
-        return str_starts_with($expression, self::FILE_PROCESSOR)
-            ? $this->resolveCredentialFile(substr($expression, \strlen(self::FILE_PROCESSOR)), $credentialsRequired)
-            : $this->resolveEnvironmentVariable($expression, $credentialsRequired);
+        return $envPlaceholder->readsFile
+            ? $this->resolveCredentialFile($envPlaceholder->variableName, $credentialsRequired)
+            : $this->resolveEnvironmentVariable($envPlaceholder->variableName, $credentialsRequired);
     }
 
     /**
+     * An exported variable outranks the stored credential, so a container, a
+     * CI job or a `VAR=$(pass show …)` prefix keeps deciding what a run
+     * authenticates with on a machine that also has one stored.
+     *
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialStoreException
      */
     private function resolveEnvironmentVariable(string $name, bool $credentialsRequired): string
     {
         $resolved = $this->environment[$name] ?? '';
         if ('' !== $resolved) {
             return $resolved;
+        }
+
+        $stored = $this->credentialStore->read($name);
+        if (null !== $stored) {
+            return $stored;
         }
 
         if ($credentialsRequired) {
@@ -126,6 +136,7 @@ final readonly class StandalonePlatformConfigResolver
     /**
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      */
     private function resolveCredentialFile(string $name, bool $credentialsRequired): string
     {

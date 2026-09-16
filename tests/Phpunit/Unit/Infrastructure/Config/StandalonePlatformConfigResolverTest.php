@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config\Fixture\InMemoryCredentialStore;
 
 final class StandalonePlatformConfigResolverTest extends TestCase
 {
@@ -333,5 +334,53 @@ final class StandalonePlatformConfigResolverTest extends TestCase
         $this->filesystem->dumpFile($path, $contents);
 
         return $path;
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_it_falls_back_to_the_stored_credential_when_the_variable_is_unset(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore(['ANTHROPIC_API_KEY' => 'sk-from-the-store'])))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
+
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-from-the-store']]], $standalonePlatformConfig->toAiConfig());
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_it_lets_an_exported_variable_override_the_stored_credential(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => 'sk-from-env'], credentialStore: new InMemoryCredentialStore(['ANTHROPIC_API_KEY' => 'sk-from-the-store'])))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
+
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-from-env']]], $standalonePlatformConfig->toAiConfig());
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     */
+    public function test_it_falls_back_to_the_stored_credential_when_a_credential_file_is_not_configured(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore(['ANTHROPIC_API_KEY_FILE' => 'sk-from-the-store'])))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
+
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-from-the-store']]], $standalonePlatformConfig->toAiConfig());
+    }
+
+    public function test_it_reports_a_credential_that_is_neither_exported_nor_stored(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage('run "auth:set" to store the key on this machine');
+
+        (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore()))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
     }
 }

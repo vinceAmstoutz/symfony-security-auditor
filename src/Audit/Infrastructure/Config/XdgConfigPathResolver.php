@@ -24,6 +24,8 @@ final readonly class XdgConfigPathResolver
 
     private const string CONFIG_FILENAME = 'config.yaml';
 
+    private const string CREDENTIALS_FILENAME = 'credentials.json';
+
     public const string HOME_OVERRIDE_VARIABLE = 'SYMFONY_SECURITY_AUDITOR_HOME';
 
     public function __construct(
@@ -65,6 +67,14 @@ final readonly class XdgConfigPathResolver
     public function configFile(): string
     {
         return \sprintf('%s/%s/%s', $this->baseDirectory($this->xdgConfigHome, '.config'), self::APP_DIRECTORY, self::CONFIG_FILENAME);
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function credentialsFile(): string
+    {
+        return \sprintf('%s/%s/%s', $this->baseDirectory($this->xdgConfigHome, '.config'), self::APP_DIRECTORY, self::CREDENTIALS_FILENAME);
     }
 
     /**
