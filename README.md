@@ -410,9 +410,27 @@ then override individual keys as needed.
 | Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                 |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                              |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | _(none)_                                       |
+| Generic (AI gateway) | `symfony/ai-generic-platform`        | depends on the gateway                         |
 
 Swapping providers requires only a `config/packages/ai.yaml` change — no PHP
 edits.
+
+Any OpenAI-compatible endpoint behind a custom URL and token (an in-house AI
+gateway, LiteLLM, vLLM, LocalAI) goes through the **generic** platform. It is
+configured per instance, so the instance name is part of the platform block and,
+in standalone mode, part of `provider:` as well:
+
+```yaml
+# config/packages/ai.yaml
+ai:
+    platform:
+        generic:
+            my_gateway:
+                base_url: '%env(GATEWAY_URL)%'
+                api_key: '%env(GATEWAY_TOKEN)%'
+```
+
+See [Configuration → Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms).
 
 ## Documentation
 

@@ -10,6 +10,52 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **An AI gateway behind a custom URL and token can now be configured.**
+  `symfony/ai-generic-platform` is the only `symfony/ai` bridge that takes a
+  `base_url` plus an `api_key`, which is the shape of every corporate AI
+  gateway, yet it appeared nowhere in the project: absent from both platform
+  tables, from `composer.json` `suggest` and from every example. Finding it was
+  not enough either, because it is declared with `useAttributeAsKey` and so
+  registers as `ai.platform.generic.<instance>`, while
+  `StandaloneConfigFactory` wrote a flat
+  `platform: {<provider>: {api_key: …}}` and
+  `StandaloneContainerFactory::selectActivePlatform()` looked up
+  `ai.platform.<provider>`. `audit init --provider=generic` therefore produced
+  a config the container rejected with
+  `Invalid type for path "ai.platform.generic.api_key". Expected "array", but got "string"`,
+  and repairing it by hand produced
+  `The selected provider "generic" is not present in the "platform:" block of your config.`
+  — which named the one key that was plainly present. `StandaloneConfigFactory`
+  now nests the connection under its instance and accepts a `base_url`,
+  `audit init` gained `--base-url` and prompts for it when the provider selects
+  an instance, and a bare `provider: generic` now reports that the platform is
+  configured per instance and lists the instances it found. The same fix covers
+  `openresponses`, `azure`, `bedrock`, `cache` and `failover`, three of which
+  were already advertised as supported.
+- **Five provider bridges installed a package that does not exist.**
+  `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`
+  (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) had no entry
+  for `minimax`, `lmstudio`, `openrouter`, `dockermodelrunner` or
+  `transformersphp`, so `audit init` asked Composer for
+  `symfony/ai-minimax-platform` instead of `symfony/ai-mini-max-platform`, and
+  likewise for `lm-studio`, `open-router`, `docker-model-runner` and
+  `transformers-php`. `minimax` was already spelled correctly in this package's
+  own `suggest` block. An instance-scoped provider (`generic.my_gateway`) also
+  had its instance folded into the package name; only the platform part now
+  selects the bridge.
+
+### Added
+
+- **`audit init --base-url`** — supplies the platform endpoint without the
+  prompt, for instance-keyed platforms that expose one. Public API per
+  `docs/versioning.md`.
+- **`symfony/ai-generic-platform` in `composer.json` `suggest`** and a new
+  [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms)
+  section documenting the nested `platform:` block and the compound
+  `provider: generic.my_gateway` selector.
+
 ## [1.20.1] — 2026-08-23 — Herald
 
 A release about the binary saying who it is and what it just did. The identity

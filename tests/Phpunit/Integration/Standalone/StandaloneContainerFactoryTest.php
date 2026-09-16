@@ -172,6 +172,27 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
+    public function test_it_names_the_configured_instances_when_an_instance_keyed_platform_is_selected_without_one(): void
+    {
+        $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The "generic" platform is configured per instance, so "provider: generic" does not select one. Use "generic.<instance>" instead. Configured instances: primary, secondary.');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(
+                ['generic' => ['primary' => ['base_url' => 'http://a'], 'secondary' => ['base_url' => 'http://b']]],
+                'generic',
+            )),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_it_resolves_environment_variable_placeholders_in_the_audit_configuration(): void
     {

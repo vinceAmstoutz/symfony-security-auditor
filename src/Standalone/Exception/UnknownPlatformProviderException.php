@@ -22,4 +22,18 @@ final class UnknownPlatformProviderException extends RuntimeException
     {
         return new self(\sprintf('The selected provider "%s" is not present in the "platform:" block of your config.', $provider));
     }
+
+    /**
+     * @param list<string> $instances
+     */
+    public static function forInstanceKeyedProvider(string $provider, array $instances): self
+    {
+        return new self(\sprintf(
+            'The "%s" platform is configured per instance, so "provider: %s" does not select one. Use "%s.<instance>" instead. Configured instances: %s.',
+            $provider,
+            $provider,
+            $provider,
+            implode(', ', $instances),
+        ));
+    }
 }

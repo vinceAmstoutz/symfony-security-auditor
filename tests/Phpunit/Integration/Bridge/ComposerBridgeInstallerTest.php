@@ -123,6 +123,27 @@ final class ComposerBridgeInstallerTest extends TestCase
         yield 'openai maps to the hyphenated open-ai package' => ['openai', 'symfony/ai-open-ai-platform'];
         yield 'deepseek maps to the hyphenated deep-seek package' => ['deepseek', 'symfony/ai-deep-seek-platform'];
         yield 'vertexai maps to the hyphenated vertex-ai package' => ['vertexai', 'symfony/ai-vertex-ai-platform'];
+        yield 'openresponses maps to the hyphenated open-responses package' => ['openresponses', 'symfony/ai-open-responses-platform'];
+        yield 'huggingface maps to the hyphenated hugging-face package' => ['huggingface', 'symfony/ai-hugging-face-platform'];
+        yield 'elevenlabs maps to the hyphenated eleven-labs package' => ['elevenlabs', 'symfony/ai-eleven-labs-platform'];
+        yield 'amazeeai maps to the hyphenated amazee-ai package' => ['amazeeai', 'symfony/ai-amazee-ai-platform'];
+        yield 'minimax maps to the hyphenated mini-max package' => ['minimax', 'symfony/ai-mini-max-platform'];
+        yield 'lmstudio maps to the hyphenated lm-studio package' => ['lmstudio', 'symfony/ai-lm-studio-platform'];
+        yield 'openrouter maps to the hyphenated open-router package' => ['openrouter', 'symfony/ai-open-router-platform'];
+        yield 'dockermodelrunner maps to the hyphenated docker-model-runner package' => ['dockermodelrunner', 'symfony/ai-docker-model-runner-platform'];
+        yield 'transformersphp maps to the hyphenated transformers-php package' => ['transformersphp', 'symfony/ai-transformers-php-platform'];
+        yield 'an instance-keyed provider installs the bridge of its platform' => ['generic.my_gateway', 'symfony/ai-generic-platform'];
+        yield 'an instance-keyed provider still honours the slug overrides' => ['openresponses.my_gateway', 'symfony/ai-open-responses-platform'];
+    }
+
+    public function test_every_slug_override_is_its_config_key_with_hyphens_inserted(): void
+    {
+        $slugs = ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES;
+
+        self::assertSame(
+            array_keys($slugs),
+            array_map(static fn (string $slug): string => str_replace('-', '', $slug), array_values($slugs)),
+        );
     }
 
     /**

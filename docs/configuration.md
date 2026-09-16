@@ -336,6 +336,7 @@ Install the Composer package for your chosen provider, then configure it under
 | Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                  |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                               |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | none                                            |
+| Generic (AI gateway) | `symfony/ai-generic-platform`        | depends on the gateway                          |
 
 ### Full `ai.yaml` example
 
@@ -374,7 +375,49 @@ ai:
     #   api_key: '%env(MINIMAX_API_KEY)%'
     # ollama:
     #   endpoint: 'http://localhost:11434'
+    # generic:
+    #   my_gateway:
+    #     base_url: '%env(GATEWAY_URL)%'
+    #     api_key: '%env(GATEWAY_TOKEN)%'
 ```
+
+### Instance-keyed platforms
+
+Most platforms take their settings directly (`anthropic: {api_key: …}`). Six of
+them are keyed by an instance name instead, because you may configure several of
+each: `generic`, `openresponses`, `azure`, `bedrock`, `cache` and `failover`.
+Their settings live one level deeper, under a name you choose:
+
+```yaml
+ai:
+    platform:
+        generic:
+            my_gateway:
+                base_url: '%env(GATEWAY_URL)%'
+                api_key: '%env(GATEWAY_TOKEN)%'
+```
+
+In **bundle** mode that is all you need: `symfony/ai-bundle` selects the platform
+by itself when exactly one is configured.
+
+In **standalone** mode the top-level `provider:` key selects which platform the
+audit runs against, and for these six it must carry the instance name too:
+
+```yaml
+# ~/.config/symfony-security-auditor/config.yaml
+provider: generic.my_gateway
+platform:
+    generic:
+        my_gateway:
+            base_url: 'https://your-gateway.example'
+            api_key: '%env(GATEWAY_TOKEN)%'
+model: 'your-model'
+```
+
+`audit init --provider=generic.my_gateway --base-url=https://your-gateway.example`
+writes exactly that and installs `symfony/ai-generic-platform` for you. A bare
+`provider: generic` names no instance, and the run aborts saying so and listing
+the instances you configured.
 
 ## Model Options
 
@@ -489,10 +532,13 @@ model: claude-opus-4-8
 # scan:, audit:, cache: are all accepted here too, unwrapped.
 ```
 
-`init` is also scriptable: pass `--provider`, `--model`, and `--env-var` to skip
-the matching prompt. Any option left out falls back to its interactive prompt
-(or, under `--no-interaction`, to its default — `anthropic`, `claude-opus-4-8`,
-and `<PROVIDER>_API_KEY` respectively). A blank provider or model, or an
+`init` is also scriptable: pass `--provider`, `--model`, `--env-var` and
+`--base-url` to skip the matching prompt. Any option left out falls back to its
+interactive prompt (or, under `--no-interaction`, to its default — `anthropic`,
+`claude-opus-4-8`, and `<PLATFORM>_API_KEY` respectively). `--base-url` is only
+prompted for when `--provider` selects a platform instance (see
+[Instance-keyed platforms](#instance-keyed-platforms)), and is left out of the
+written config when the answer is empty. A blank provider or model, or an
 `--env-var` that is not a valid environment variable name, is rejected with exit
 code `2` before anything is written. The provider bridge is downloaded
 **before** the configuration file is replaced, so a failed download (offline,
@@ -507,6 +553,16 @@ yourself to script any other provider:
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
 # --env-var omitted → derived as OPENAI_API_KEY
+```
+
+```bash
+# an AI gateway: the instance name belongs to both --provider and the config
+symfony-security-auditor init \
+    --provider=generic.my_gateway \
+    --model=your-model \
+    --base-url=https://your-gateway.example \
+    --env-var=GATEWAY_TOKEN \
+    --no-interaction
 ```
 
 ### Per-project overrides

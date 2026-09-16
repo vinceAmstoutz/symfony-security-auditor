@@ -14,12 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Attribute\Option;
+use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
@@ -54,25 +55,18 @@ final readonly class InitCommand
      */
     public function __invoke(
         SymfonyStyle $symfonyStyle,
-        #[Option(description: 'AI provider to configure (any symfony/ai platform — e.g. anthropic, openai, gemini); skips the prompt when set')]
-        ?string $provider = null,
-        #[Option(description: 'Model the auditor should use; skips the prompt when set')]
-        ?string $model = null,
-        #[Option(description: 'Environment variable holding the API key; defaults to <PROVIDER>_API_KEY')]
-        ?string $envVar = null,
-        #[Option(description: 'Overwrite an existing configuration without asking')]
-        bool $force = false,
+        #[MapInput] InitCommandInput $initCommandInput,
     ): int {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        if (!$force && $this->isOverwriteDeclined($symfonyStyle, $configFile)) {
+        if (!$initCommandInput->force && $this->isOverwriteDeclined($symfonyStyle, $configFile)) {
             $symfonyStyle->warning('Aborted; the existing configuration was left untouched (use --force to overwrite).');
 
             return Command::SUCCESS;
         }
 
-        $provider = b($provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic'))->trim()->toString();
-        $model = b($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
+        $provider = b($initCommandInput->provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama, or generic.my_gateway for an AI gateway)', 'anthropic'))->trim()->toString();
+        $model = b($initCommandInput->model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
 
         $violation = $this->identityViolation($provider, $model);
         if (null !== $violation) {
@@ -82,7 +76,8 @@ final readonly class InitCommand
         }
 
         $provider = $this->providerKeyNormalizer->normalize($provider);
-        $envVar = b($envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider)))->trim()->toString();
+        $providerKey = ProviderKey::of($provider);
+        $envVar = b($initCommandInput->envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey)))->trim()->toString();
 
         if (1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)) {
             $symfonyStyle->error(\sprintf('"%s" is not a valid environment variable name (letters, digits, and underscores only; must not start with a digit).', $envVar));
@@ -90,8 +85,10 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
+        $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
+
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl));
 
         $symfonyStyle->success(\sprintf('Configuration written to %s. Run: export %s=, then "audit <path>".', $configFile, $envVar));
 
@@ -128,8 +125,21 @@ final readonly class InitCommand
         return $answer;
     }
 
-    private function defaultApiKeyVariable(string $provider): string
+    private function defaultApiKeyVariable(ProviderKey $providerKey): string
     {
-        return \sprintf('%s_API_KEY', u($provider)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+        return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+    }
+
+    private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    {
+        if (null !== $initCommandInput->baseUrl) {
+            return $initCommandInput->baseUrl;
+        }
+
+        if (!$providerKey->isInstanceScoped()) {
+            return null;
+        }
+
+        return b($this->ask($symfonyStyle, 'Which base URL does this platform expose? (leave empty if it needs none)', ''))->trim()->toString();
     }
 }
