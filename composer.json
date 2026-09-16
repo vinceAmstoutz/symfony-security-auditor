@@ -69,7 +69,7 @@
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-symfony": "^2.0",
         "phpunit/phpunit": "^12.5",
-        "rector/rector": "*",
+        "rector/rector": "^2.4",
         "rector/swiss-knife": "^2.4",
         "spaze/phpstan-disallowed-calls": "^4.12",
         "staabm/phpstan-todo-by": "^0.3",
