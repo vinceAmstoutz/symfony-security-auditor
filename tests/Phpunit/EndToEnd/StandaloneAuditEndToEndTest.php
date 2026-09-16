@@ -105,6 +105,37 @@ final class StandaloneAuditEndToEndTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_a_run_names_the_api_key_it_uses_without_printing_it(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->configHome.'/symfony-security-auditor/config.yaml',
+            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\n      api_key: 'sk-proj-0123456789abcdefghij'\nmodel: 'gpt-4'\n",
+        );
+
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+        $commandTester = new CommandTester($standaloneApplication->find(AuditCommand::NAME));
+
+        $commandTester->execute(['project-path' => $this->projectDir, '--dry-run' => true]);
+        $display = $commandTester->getDisplay();
+
+        self::assertStringContainsString('API key: sk-pro…ghij', $display);
+        self::assertStringNotContainsString('sk-proj-0123456789abcdefghij', $display);
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     * @throws UnresolvableAuditCommandException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_dry_run_estimates_cost_without_a_provider_credential(): void
     {
         self::assertSame(

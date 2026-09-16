@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -76,7 +77,7 @@ final readonly class StandaloneContainerFactory
         $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), $standaloneConfig->auditConfig, $containerBuilder);
 
-        $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
+        $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
 
@@ -84,6 +85,25 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    /**
+     * The product banner is already on screen by the time a command runs, so
+     * the audit header carries the credential the run will spend instead of
+     * repeating it — named by its masked preview, never printed.
+     */
+    private function registerAuditHeaderBanner(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void
+    {
+        $credentialIdentity = $standalonePlatformConfig->credentialIdentity();
+
+        if (null === $credentialIdentity) {
+            $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
+
+            return;
+        }
+
+        $containerBuilder->register(ConsoleBannerInterface::class, CredentialConsoleBanner::class)
+            ->setArguments([$credentialIdentity->maskedPreview]);
     }
 
     /**

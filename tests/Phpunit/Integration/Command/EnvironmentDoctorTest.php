@@ -55,16 +55,26 @@ final class EnvironmentDoctorTest extends TestCase
 
     public function test_it_reports_every_check_green_when_the_environment_is_ready(): void
     {
-        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\nmodel: 'gpt-4'\n");
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test-0123456789abcdefghij'\nmodel: 'gpt-4'\n");
         $this->installBridge();
 
         $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
 
         self::assertEquals([
-            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.'),
+            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a).'),
             new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
         ], \array_slice($results, 0, 3));
+    }
+
+    public function test_it_reports_a_platform_that_needs_no_api_key(): void
+    {
+        $this->writeConfig("platform:\n    ollama:\n        host_url: 'http://localhost:11434'\nmodel: 'llama3'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
+
+        self::assertSame('Config resolves; the configured platform needs no API key.', $results[0]->detail);
     }
 
     public function test_it_reports_the_bundled_pricing_catalog_version(): void

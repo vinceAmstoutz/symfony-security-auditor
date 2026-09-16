@@ -20,7 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
@@ -72,10 +74,10 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     private function configurationCheck(): DoctorCheckResult
     {
         try {
-            $this->standaloneConfigLoader->load();
+            $standaloneConfig = $this->standaloneConfigLoader->load();
         } catch (MissingPlatformException) {
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, 'No provider is configured — run "init".');
-        } catch (MissingEnvironmentVariableException|UnreadableCredentialFileException $credentialResolutionFailure) {
+        } catch (MissingEnvironmentVariableException|UnreadableCredentialFileException|UnreadableCredentialStoreException $credentialResolutionFailure) {
             return new DoctorCheckResult('API key', DoctorCheckStatus::Failure, $credentialResolutionFailure->getMessage());
         } catch (MalformedProjectConfigException $malformedProjectConfigException) {
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $malformedProjectConfigException->getMessage());
@@ -87,7 +89,21 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
         }
 
-        return new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.');
+        return new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, $this->resolvedConfigurationDetail($standaloneConfig));
+    }
+
+    /**
+     * Naming the key that resolved is what turns "it works" into an answer:
+     * a machine with a stale export and a freshly stored key looks identical
+     * otherwise, right up to the provider rejecting the run.
+     */
+    private function resolvedConfigurationDetail(StandaloneConfig $standaloneConfig): string
+    {
+        $credentialIdentity = $standaloneConfig->platform->credentialIdentity();
+
+        return null === $credentialIdentity
+            ? 'Config resolves; the configured platform needs no API key.'
+            : \sprintf('Config resolves and an API key is available: %s (%s).', $credentialIdentity->maskedPreview, $credentialIdentity->fingerprint);
     }
 
     private function bridgeCheck(bool $configurationResolves): DoctorCheckResult
