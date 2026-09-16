@@ -83,6 +83,7 @@ final readonly class InitCommand
 
             return Command::INVALID;
         }
+
         $envVar = b($initCommandInput->envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey)))->trim()->toString();
 
         if (1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)) {
