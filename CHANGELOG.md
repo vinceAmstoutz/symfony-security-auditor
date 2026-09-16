@@ -52,11 +52,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   The stored credentials at "…/credentials.json" are readable by other users on this machine (permissions 0644). Anyone who could read them may already have your API key, so rotate it with your provider, then run "chmod 600 …".
   ```
 
-  `auth:set` and `auth:remove` tighten the file before reading it, so an exposed
-  key can always be replaced or deleted from the tool itself. Windows has no
-  POSIX permission bits, so the check is skipped there and the file is protected
-  by the user-profile ACL it inherits from `%APPDATA%` — documented as the
-  weaker guarantee it is, rather than claimed as parity.
+  Only reading refuses: `auth:set` and `auth:remove` rewrite the file and
+  restore `0600` as they go, so an exposed key is always replaceable or
+  deletable from the tool itself rather than only by hand. Windows has no POSIX
+  permission bits, so the check is skipped there and the file is protected by
+  the user-profile ACL it inherits from `%APPDATA%` — documented as the weaker
+  guarantee it is, rather than claimed as parity.
 
 - **The API key is named in output, never printed.** `CredentialIdentity`
   (`src/Audit/Infrastructure/Config/CredentialIdentity.php`) renders a

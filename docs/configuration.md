@@ -615,8 +615,9 @@ this machine (permissions 0644). Anyone who could read them may already have
 your API key, so rotate it with your provider, then run "chmod 600 …".
 ```
 
-`auth:set` and `auth:remove` tighten the file first, so you can always replace
-or delete an exposed key from the tool itself.
+Only reading refuses. `auth:set` and `auth:remove` rewrite the file and restore
+`0600` as they go, so an exposed key is always replaceable or deletable from the
+tool itself rather than only by hand.
 
 Windows has no POSIX permission bits — `fileperms()` reports the same mode for
 every file on an NTFS volume — so the permission check is skipped there and the

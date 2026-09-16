@@ -50,6 +50,8 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     #[Override]
     public function read(string $variableName): ?string
     {
+        $this->guardAgainstInsecurePermissions();
+
         $credential = $this->credentials()[$variableName] ?? '';
 
         return '' !== $credential ? $credential : null;
@@ -60,24 +62,22 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     {
         $this->guardAgainstUnstorableCredential($credential);
 
-        $path = $this->securedPath();
         $credentials = $this->credentials();
         $credentials[$variableName] = $credential;
 
-        $this->persist($path, $credentials);
+        $this->persist($credentials);
     }
 
     #[Override]
     public function remove(string $variableName): bool
     {
-        $path = $this->securedPath();
         $credentials = $this->credentials();
         if (!\array_key_exists($variableName, $credentials)) {
             return false;
         }
 
         unset($credentials[$variableName]);
-        $this->persist($path, $credentials);
+        $this->persist($credentials);
 
         return true;
     }
@@ -103,8 +103,6 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
         if (null === $path || !$this->filesystem->exists($path)) {
             return [];
         }
-
-        $this->guardAgainstInsecurePermissions($path);
 
         try {
             $raw = trim($this->filesystem->readFile($path));
@@ -143,24 +141,28 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     }
 
     /**
+     * Only reading refuses a file other users on the machine can open: a
+     * credential exposed once is one to rotate rather than keep using, but
+     * refusing to *write* would leave the key that most needs replacing
+     * replaceable only by hand. A write restores the mode instead.
+     *
      * Windows has no POSIX permission bits — `fileperms()` reports the same
      * mode for every file on an NTFS volume — so the file there is protected
      * by the user-profile ACL it inherits from `%APPDATA%` instead.
      *
      * @throws UnreadableCredentialStoreException
      */
-    private function guardAgainstInsecurePermissions(string $path): void
+    private function guardAgainstInsecurePermissions(): void
     {
-        if (self::WINDOWS_OS_FAMILY === $this->osFamily) {
+        $path = $this->location();
+        if (null === $path || !$this->filesystem->exists($path) || self::WINDOWS_OS_FAMILY === $this->osFamily) {
             return;
         }
 
         $permissions = ((int) fileperms($path)) & self::PERMISSION_BITS;
-        if (0 === ($permissions & self::GROUP_AND_OTHER_BITS)) {
-            return;
+        if (0 !== ($permissions & self::GROUP_AND_OTHER_BITS)) {
+            throw UnreadableCredentialStoreException::forInsecurePermissions($path, $permissions);
         }
-
-        throw UnreadableCredentialStoreException::forInsecurePermissions($path, $permissions);
     }
 
     /**
@@ -178,40 +180,22 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     }
 
     /**
-     * Both mutating paths tighten the file before they read it, so a file
-     * something else left world-readable can still be rewritten or emptied
-     * from here — refusing would put the only recovery outside the tool, on
-     * the one credential a user most needs to replace.
+     * @param array<string, string> $credentials
      *
      * @throws CredentialStoreWriteException
      */
-    private function securedPath(): string
+    private function persist(array $credentials): void
     {
         $path = $this->location();
         if (null === $path) {
             throw CredentialStoreWriteException::forUnresolvableLocation();
         }
 
-        try {
-            $this->createOwnerOnly($path);
-        } catch (IOException $ioException) {
-            throw CredentialStoreWriteException::forPath($path, $ioException);
-        }
-
-        return $path;
-    }
-
-    /**
-     * @param array<string, string> $credentials
-     *
-     * @throws CredentialStoreWriteException
-     */
-    private function persist(string $path, array $credentials): void
-    {
         $payload = json_encode($credentials);
         \assert(false !== $payload, 'A map of UTF-8 validated strings is always JSON-encodable');
 
         try {
+            $this->createOwnerOnly($path);
             $this->filesystem->dumpFile($path, $payload);
         } catch (IOException $ioException) {
             throw CredentialStoreWriteException::forPath($path, $ioException);
