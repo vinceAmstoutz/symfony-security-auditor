@@ -66,9 +66,6 @@ final readonly class AuthStatusCommand
             : $this->reportStoredOrMissing($symfonyStyle, $variableName, $stored);
     }
 
-    /**
-     * @throws UnreadableCredentialStoreException
-     */
     private function reportStoredOrMissing(SymfonyStyle $symfonyStyle, string $variableName, ?string $stored): int
     {
         return null !== $stored

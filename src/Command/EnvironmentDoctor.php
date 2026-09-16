@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -101,9 +102,9 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     {
         $credentialIdentity = $standaloneConfig->platform->credentialIdentity();
 
-        return null === $credentialIdentity
-            ? 'Config resolves; the configured platform needs no API key.'
-            : \sprintf('Config resolves and an API key is available: %s (%s).', $credentialIdentity->maskedPreview, $credentialIdentity->fingerprint);
+        return $credentialIdentity instanceof CredentialIdentity
+            ? \sprintf('Config resolves and an API key is available: %s (%s).', $credentialIdentity->maskedPreview, $credentialIdentity->fingerprint)
+            : 'Config resolves; the configured platform needs no API key.';
     }
 
     private function bridgeCheck(bool $configurationResolves): DoctorCheckResult

@@ -21,6 +21,7 @@ use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
@@ -96,7 +97,7 @@ final readonly class StandaloneContainerFactory
     {
         $credentialIdentity = $standalonePlatformConfig->credentialIdentity();
 
-        if (null === $credentialIdentity) {
+        if (!$credentialIdentity instanceof CredentialIdentity) {
             $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
 
             return;

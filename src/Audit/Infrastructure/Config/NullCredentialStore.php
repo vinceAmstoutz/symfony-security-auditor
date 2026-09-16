@@ -25,18 +25,27 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\C
  */
 final readonly class NullCredentialStore implements CredentialStoreInterface
 {
+    /**
+     * @throws void
+     */
     #[Override]
     public function read(string $variableName): ?string
     {
         return null;
     }
 
+    /**
+     * @throws CredentialStoreWriteException
+     */
     #[Override]
     public function write(string $variableName, string $credential): void
     {
         throw CredentialStoreWriteException::forUnresolvableLocation();
     }
 
+    /**
+     * @throws void
+     */
     #[Override]
     public function remove(string $variableName): bool
     {

@@ -117,12 +117,12 @@ final readonly class StandaloneApplicationFactory
         $resolvedBinaryPath = $runningBinaryPath ?? '';
         $pathEnvironment = $environment['PATH'] ?? '';
         $pendingBinarySwap = new PendingBinarySwap();
-        $credentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
+        $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
 
         return new self(
             new StandaloneConfigLoader(
                 $xdgConfigPathResolver,
-                new StandalonePlatformConfigResolver($environment, credentialStore: $credentialStore),
+                new StandalonePlatformConfigResolver($environment, credentialStore: $filesystemCredentialStore),
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
@@ -137,7 +137,7 @@ final readonly class StandaloneApplicationFactory
                 $pendingBinarySwap,
             ),
             pendingBinarySwap: $pendingBinarySwap,
-            credentialStore: $credentialStore,
+            credentialStore: $filesystemCredentialStore,
             environment: $environment,
         );
     }

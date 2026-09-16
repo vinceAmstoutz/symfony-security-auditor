@@ -19,9 +19,9 @@ use Throwable;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final class CredentialStoreWriteException extends RuntimeException
 {
-    public static function forPath(string $path, Throwable $previous): self
+    public static function forPath(string $path, Throwable $throwable): self
     {
-        return new self(\sprintf('The credentials at "%s" could not be written.', $path), previous: $previous);
+        return new self(\sprintf('The credentials at "%s" could not be written.', $path), previous: $throwable);
     }
 
     public static function forBlankCredential(): self

@@ -29,15 +29,21 @@ final readonly class PlatformApiKey
     public static function valueIn(array $platform): ?string
     {
         foreach ($platform as $key => $value) {
-            $found = self::KEY === $key && \is_string($value) && '' !== $value
-                ? $value
-                : (\is_array($value) ? self::valueIn($value) : null);
-
+            $found = self::valueAt($key, $value);
             if (null !== $found) {
                 return $found;
             }
         }
 
         return null;
+    }
+
+    private static function valueAt(mixed $key, mixed $value): ?string
+    {
+        if (self::KEY === $key && \is_string($value) && '' !== $value) {
+            return $value;
+        }
+
+        return \is_array($value) ? self::valueIn($value) : null;
     }
 }
