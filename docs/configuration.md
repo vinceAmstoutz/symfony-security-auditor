@@ -22,6 +22,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Model Options](#model-options)
 - [Split-Model Setup](#split-model-setup)
 - [Standalone Configuration](#standalone-configuration)
+- [Providing the API key](#providing-the-api-key)
 - [CLI Reference](#cli-reference)
   - [Output Formats Reference](#output-formats-reference)
   - [`audit:diff`](#auditdiff--comparing-two-reports)
@@ -649,6 +650,165 @@ platform:
     openai: { api_key: '%env(OPENAI_API_KEY)%' }
 model: gpt-5.6
 ```
+
+## Providing the API key
+
+The `platform:` block holds a `%env(...)%` placeholder, never the key itself.
+Where that value comes from is yours to choose:
+
+| Source                 | Config value                           | Typical setup                                                     |
+| ---------------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| Environment variable   | `'%env(ANTHROPIC_API_KEY)%'`           | CI secret store, `systemd` unit, a per-command assignment         |
+| Stored on this machine | `'%env(ANTHROPIC_API_KEY)%'`           | `auth:set` — a developer laptop, set up once                      |
+| File on disk           | `'%env(file:ANTHROPIC_API_KEY_FILE)%'` | Docker/Kubernetes secrets, `systemd` `LoadCredential=`, 0600 file |
+| Secret manager         | either of the above                    | `pass`, 1Password, Vault — read at launch, see below              |
+
+### Which one wins
+
+Resolution order is fixed, and the first hit wins:
+
+1. **The environment variable**, when it is set and non-empty.
+2. **The credential stored by `auth:set`**, under that same variable name.
+3. Otherwise the run stops before contacting the provider, naming all three ways
+   to fix it.
+
+The environment coming first is what keeps containers, CI and per-run
+secret-manager prefixes behaving exactly as they did before a key was ever
+stored. `auth:status` says which one is in play, and warns when an exported
+variable is shadowing a stored key.
+
+### Storing the key on this machine
+
+Standalone only. `init` offers it at the end of setup, and `auth:set` does it at
+any time:
+
+```bash
+symfony-security-auditor auth:set
+# Paste the API key for ANTHROPIC_API_KEY (input stays hidden): ****
+# [OK] Stored ANTHROPIC_API_KEY (sk-ant…qF4A, SHA256:ed9ff73cc4b2cd57) in
+#      /home/you/.config/symfony-security-auditor/credentials.json.
+```
+
+The prompt never echoes, so the key reaches neither the terminal nor the shell
+history. It is written to `credentials.json` beside your config file, keyed by
+the variable your `platform:` block names — so switching provider with `init`
+cannot make a run pick up the previous provider's key.
+
+| Command       | What it does                                                                           |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `auth:set`    | Store or replace the key; `--env-var` targets a variable other than the configured one |
+| `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path     |
+| `auth:remove` | Forget the stored key (the key stays valid with your provider — revoke it there too)   |
+
+**File permissions.** The file is created `0600` and its directory `0700`, and
+those are re-applied on every write. On a read, a file that group or others can
+open is **refused**, not used:
+
+```text
+The stored credentials at "…/credentials.json" are readable by other users on
+this machine (permissions 0644). Anyone who could read them may already have
+your API key, so rotate it with your provider, then run "chmod 600 …".
+```
+
+Only reading refuses. `auth:set` and `auth:remove` rewrite the file and restore
+`0600` as they go, so an exposed key is always replaceable or deletable from the
+tool itself rather than only by hand.
+
+Windows has no POSIX permission bits — `fileperms()` reports the same mode for
+every file on an NTFS volume — so the permission check is skipped there and the
+file is protected by the user-profile ACL it inherits from `%APPDATA%`, the same
+protection `~/.aws/credentials` and `gh`'s `hosts.yml` rely on. If you want
+stronger guarantees on Windows, keep using `%env(file:…)%` with a file your own
+tooling protects, or a secret manager.
+
+**Naming the key in output.** A stored or exported key is never printed. It is
+identified two ways instead: a masked preview (`sk-ant…qF4A`, the first six and
+last four characters, matching what your provider console shows) and a truncated
+SHA-256 fingerprint (`SHA256:ed9ff73cc4b2cd57`) that identifies it exactly while
+revealing nothing. A key shorter than 24 characters is masked entirely. Every
+audit run prints the preview in its header; `auth:status` and `doctor` print
+both.
+
+**Nothing is required.** The store is a convenience for a machine you set up by
+hand. A container with no resolvable home directory simply has nothing stored,
+and falls back to the environment variable exactly as before.
+
+### Reading the key from a file
+
+`%env(file:VAR)%` reads the file whose **path** `VAR` holds, rather than the
+variable's own value:
+
+```yaml
+platform:
+    anthropic: { api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%' }
+```
+
+```bash
+ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic symfony-security-auditor audit .
+```
+
+Surrounding whitespace is stripped, so a file written with `echo` or saved with
+Windows line endings works as is. The run stops before contacting the provider
+when `VAR` is unset, when the file cannot be read, or when it holds only
+whitespace; `doctor` reports the same failure under its `API key` check, and
+`--dry-run` tolerates all three because it never reaches the provider.
+
+This is the portable option. No shell is involved, so it behaves identically on
+every shell and operating system, and it is how container runtimes and service
+managers already hand a secret to a process.
+
+### Keeping the key out of your shell history
+
+`export ANTHROPIC_API_KEY=sk-…` typed interactively is appended verbatim to
+`~/.bash_history` or `~/.zsh_history`. Read the key from your secret manager
+instead, scoped to the single command that needs it:
+
+```bash
+# bash, zsh
+ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .
+```
+
+```fish
+# fish
+env ANTHROPIC_API_KEY=(pass show anthropic/api-key) symfony-security-auditor audit .
+```
+
+```powershell
+# PowerShell
+$env:ANTHROPIC_API_KEY = (op read 'op://Private/Anthropic/credential')
+symfony-security-auditor audit .
+```
+
+Only the command reaches the history file; the key itself never appears on the
+line. With no secret manager to read from, either store the key once with
+`auth:set` (above), or prompt for it per shell:
+
+```bash
+printf 'Anthropic API key: '; read -rs ANTHROPIC_API_KEY; echo
+export ANTHROPIC_API_KEY
+```
+
+### In CI
+
+Keep the key in the runner's secret store and expose it to the step as an
+environment variable, never in the workflow file itself. The environment
+outranks any stored credential, so a runner is unaffected by what a developer
+machine keeps. See [CI](ci.md#github-actions) for GitHub Actions and
+[GitLab](ci.md#gitlab-ci) examples.
+
+### In a Symfony application
+
+The bundle resolves `ai.yaml` through Symfony's own environment handling, so
+`.env.local` (gitignored), the
+[secrets vault](https://symfony.com/doc/current/configuration/secrets.html)
+(`bin/console secrets:set ANTHROPIC_API_KEY`) and `%env(file:VAR)%` for a
+mounted secret all work unchanged.
+
+### No key at all
+
+Running against [Ollama](#supported-platforms) needs no credential. Pair it with
+[`privacy.offline_only: true`](#privacy--data-egress) to have that enforced
+rather than assumed.
 
 ## CLI Reference
 

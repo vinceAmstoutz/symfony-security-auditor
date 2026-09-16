@@ -23,6 +23,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
@@ -46,6 +50,7 @@ final readonly class InitCommand
         private StandaloneConfigFactoryInterface $standaloneConfigFactory,
         private StandaloneConfigWriterInterface $standaloneConfigWriter,
         private BridgeInstallerInterface $bridgeInstaller,
+        private CredentialStoreInterface $credentialStore,
         private Filesystem $filesystem = new Filesystem(),
         private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
     ) {}
@@ -98,9 +103,42 @@ final readonly class InitCommand
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl));
 
-        $symfonyStyle->success(\sprintf('Configuration written to %s. Run: export %s=, then "audit <path>".', $configFile, $envVar));
+        $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
+        $this->offerToStoreCredential($symfonyStyle, $envVar);
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Asking here is what makes a guided install end with a working setup:
+     * the configuration alone only names a variable, and a user who has to go
+     * and export it separately is a user whose first audit fails.
+     */
+    private function offerToStoreCredential(SymfonyStyle $symfonyStyle, string $envVar): void
+    {
+        $answer = $symfonyStyle->askHidden(\sprintf('Paste the API key for %s to store it on this machine, or press Enter to skip (input stays hidden)', $envVar));
+        $credential = b(\is_string($answer) ? $answer : '')->trim()->toString();
+
+        if ('' === $credential) {
+            $symfonyStyle->note(\sprintf('No key stored. Export %1$s before auditing, or run "auth:set" at any time to store it. Keeping the key out of your shell history: docs/configuration.md#providing-the-api-key', $envVar));
+
+            return;
+        }
+
+        $this->storeCredential($symfonyStyle, $envVar, $credential);
+    }
+
+    private function storeCredential(SymfonyStyle $symfonyStyle, string $envVar, string $credential): void
+    {
+        try {
+            $this->credentialStore->write($envVar, $credential);
+        } catch (CredentialStoreWriteException|UnreadableCredentialStoreException $credentialStoreFailure) {
+            $symfonyStyle->warning(\sprintf('The configuration is ready, but the key could not be stored: %s Export %s before auditing instead.', $credentialStoreFailure->getMessage(), $envVar));
+
+            return;
+        }
+
+        $symfonyStyle->success(\sprintf('Stored %s (%s). You can run "audit <path>" now — no environment variable needed.', $envVar, CredentialIdentity::of($credential)->maskedPreview));
     }
 
     /**

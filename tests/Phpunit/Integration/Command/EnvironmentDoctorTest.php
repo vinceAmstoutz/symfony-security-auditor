@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -54,16 +55,26 @@ final class EnvironmentDoctorTest extends TestCase
 
     public function test_it_reports_every_check_green_when_the_environment_is_ready(): void
     {
-        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\nmodel: 'gpt-4'\n");
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test-0123456789abcdefghij'\nmodel: 'gpt-4'\n");
         $this->installBridge();
 
         $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
 
         self::assertEquals([
-            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.'),
+            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a).'),
             new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
         ], \array_slice($results, 0, 3));
+    }
+
+    public function test_it_reports_a_platform_that_needs_no_api_key(): void
+    {
+        $this->writeConfig("platform:\n    ollama:\n        host_url: 'http://localhost:11434'\nmodel: 'llama3'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
+
+        self::assertSame('Config resolves; the configured platform needs no API key.', $results[0]->detail);
     }
 
     public function test_it_reports_the_bundled_pricing_catalog_version(): void
@@ -207,6 +218,19 @@ final class EnvironmentDoctorTest extends TestCase
 
         self::assertEquals(
             new DoctorCheckResult('API key', DoctorCheckStatus::Failure, MissingEnvironmentVariableException::forName('OPENAI_API_KEY')->getMessage()),
+            $results[0],
+        );
+    }
+
+    public function test_it_fails_the_api_key_check_when_the_referenced_credential_file_cannot_be_read(): void
+    {
+        $missingCredentialFile = \sprintf('%s/absent-api-key', $this->configHome);
+        $this->writeConfig("platform:\n    openai:\n        api_key: '%env(file:OPENAI_API_KEY_FILE)%'\n");
+
+        $results = $this->doctorWith($this->resolver(), ['OPENAI_API_KEY_FILE' => $missingCredentialFile], true)->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('API key', DoctorCheckStatus::Failure, UnreadableCredentialFileException::forPath($missingCredentialFile)->getMessage()),
             $results[0],
         );
     }

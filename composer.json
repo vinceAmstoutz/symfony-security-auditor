@@ -81,6 +81,8 @@
         "tomasvotruba/cognitive-complexity": "^1.0"
     },
     "suggest": {
+        "symfony/ai-albert-platform": "To run the audit against the Albert platform (needs a base_url)",
+        "symfony/ai-amazee-ai-platform": "To run the audit against amazee.ai (needs a base_url)",
         "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge — claude-opus-5, claude-sonnet-5, claude-haiku-4-5-20251001",
         "symfony/ai-azure-platform": "Azure OpenAI platform bridge — enterprise GPT-5.6, o4-mini",
         "symfony/ai-bedrock-platform": "AWS Bedrock platform bridge — Claude, Nova, Llama on AWS",

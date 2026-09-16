@@ -21,6 +21,8 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
@@ -54,7 +56,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_the_configuration_for_the_chosen_provider(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
 
         $commandTester->execute([]);
 
@@ -67,7 +69,7 @@ final class InitCommandTest extends TestCase
     public function test_it_installs_the_bridge_for_the_chosen_provider_in_the_data_directory(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
 
         $commandTester->execute([]);
 
@@ -77,7 +79,7 @@ final class InitCommandTest extends TestCase
     public function test_it_derives_the_api_key_variable_from_the_provider_name_by_default(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['gemini', 'gemini-2.5-pro', '']);
+        $commandTester->setInputs(['gemini', 'gemini-2.5-pro', '', '']);
 
         $commandTester->execute([]);
 
@@ -90,7 +92,7 @@ final class InitCommandTest extends TestCase
     public function test_it_strips_invalid_characters_when_deriving_the_api_key_variable_from_the_provider(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['my-ai', 'my-model', '']);
+        $commandTester->setInputs(['my-ai', 'my-model', '', '']);
 
         $commandTester->execute([]);
 
@@ -215,7 +217,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
 
         $commandTester->execute(['--force' => true]);
 
@@ -242,7 +244,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['yes', 'openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['yes', 'openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
 
         $commandTester->execute([]);
 
@@ -252,10 +254,22 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_its_success_message_points_at_the_docs_instead_of_a_paste_ready_export_line(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->execute([]);
+
+        $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringContainsString('docs/configuration.md#providing-the-api-key', (string) $display);
+        self::assertStringNotContainsString('export', (string) $display);
+    }
+
     public function test_it_reports_success(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
     }
@@ -342,11 +356,13 @@ final class InitCommandTest extends TestCase
 
     public function test_it_leaves_the_configuration_unwritten_when_the_bridge_install_fails(): void
     {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
         $initCommand = new InitCommand(
-            new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome),
+            $xdgConfigPathResolver,
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             new FailingBridgeInstaller(),
+            new FilesystemCredentialStore($xdgConfigPathResolver),
         );
         $commandTester = new CommandTester($initCommand);
 
@@ -362,21 +378,117 @@ final class InitCommandTest extends TestCase
     public function test_it_confirms_where_the_configuration_was_written(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
 
         $commandTester->execute([]);
 
         self::assertStringContainsString('Configuration written to', $commandTester->getDisplay());
     }
 
-    public function test_it_prints_a_copy_pasteable_export_command_for_the_api_key_variable(): void
+    public function test_it_names_the_api_key_variable_the_user_chose(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'MY_CUSTOM_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'MY_CUSTOM_KEY', '']);
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('export MY_CUSTOM_KEY=', $commandTester->getDisplay());
+        $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringContainsString('Export MY_CUSTOM_KEY before auditing', (string) $display);
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_stores_the_api_key_the_user_pastes(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('openai-test-key-pasted-at-init', $this->storedCredential('OPENAI_API_KEY'));
+    }
+
+    public function test_it_names_the_stored_key_without_printing_it(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+
+        $commandTester->execute([]);
+
+        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringContainsString('Stored OPENAI_API_KEY (openai…init)', $display);
+        self::assertStringNotContainsString('openai-test-key-pasted-at-init', $display);
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_stores_nothing_when_the_user_skips_the_key(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+
+        $commandTester->execute([]);
+
+        self::assertNull($this->storedCredential('OPENAI_API_KEY'));
+    }
+
+    public function test_it_does_not_try_to_store_a_key_the_user_skipped(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->execute([]);
+
+        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringNotContainsString('could not be stored', $display);
+    }
+
+    public function test_it_still_reports_success_when_the_key_cannot_be_stored(): void
+    {
+        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+
+        self::assertSame(Command::SUCCESS, $commandTester->execute([]));
+    }
+
+    public function test_it_tells_the_user_to_export_the_variable_when_the_key_cannot_be_stored(): void
+    {
+        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->execute([]);
+
+        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringContainsString('Export OPENAI_API_KEY before auditing instead.', $display);
+    }
+
+    public function test_it_does_not_claim_to_have_stored_a_key_it_could_not_store(): void
+    {
+        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->execute([]);
+
+        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+
+        self::assertStringNotContainsString('You can run "audit', $display);
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    private function storedCredential(string $variableName): ?string
+    {
+        return (new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome)))->read($variableName);
     }
 
     public function test_it_treats_an_empty_answer_as_declining_the_overwrite(): void
@@ -565,11 +677,13 @@ final class InitCommandTest extends TestCase
 
     private function commandTester(): CommandTester
     {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
         $initCommand = new InitCommand(
-            new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome),
+            $xdgConfigPathResolver,
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->recordingBridgeInstaller,
+            new FilesystemCredentialStore($xdgConfigPathResolver),
         );
 
         return new CommandTester($initCommand);
