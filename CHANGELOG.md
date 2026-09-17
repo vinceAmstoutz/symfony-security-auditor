@@ -108,13 +108,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   direct dependency.
 
 - **An AI gateway behind a custom URL and token can now be configured.**
-  `symfony/ai-generic-platform` is the only `symfony/ai` bridge that takes a
-  `base_url` plus an `api_key`, which is the shape of every corporate AI
-  gateway, yet it appeared nowhere in the project: absent from both platform
-  tables, from `composer.json` `suggest` and from every example. Finding it was
-  not enough either, because it is declared with `useAttributeAsKey` and so
-  registers as `ai.platform.generic.<instance>`, while `StandaloneConfigFactory`
-  wrote a flat `platform: {<provider>: {api_key: …}}` and
+  `symfony/ai-generic-platform` is the `symfony/ai` bridge for an arbitrary
+  OpenAI-compatible endpoint behind a `base_url` plus an `api_key`, which is the
+  shape of every corporate AI gateway, yet it was absent from both platform
+  tables, from `composer.json` `suggest` and from every documented example, even
+  though the standalone end-to-end suite already used it as its platform.
+  Finding it was not enough either, because it is declared with
+  `useAttributeAsKey` and so registers as `ai.platform.generic.<instance>`,
+  while `StandaloneConfigFactory` wrote a flat
+  `platform: {<provider>: {api_key: …}}` and
   `StandaloneContainerFactory::selectActivePlatform()` looked up
   `ai.platform.<provider>`. `audit init --provider=generic` therefore produced a
   config the container rejected with:
@@ -155,8 +157,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   named an instance, and refused `--base-url` otherwise. Both now key off
   `BaseUrlPlatforms` (`src/Audit/Infrastructure/Config/`), so the two flat
   platforms that need a `base_url` are asked for one and have it written beside
-  their `api_key`, while `bedrock`, `cache` and `failover` still refuse it
-  despite being instance keyed.
+  their `api_key`, while `bedrock`, `cache` and `failover` are refused earlier
+  still, as platforms `init` cannot write at all.
 
 - **A mistyped platform instance now names the real ones.**
   `provider: generic.typo` against a configured `generic.eu` reported:
@@ -193,10 +195,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
   The mirror case was unguarded too: `--provider=anthropic.prod` nested a flat
   platform under an instance it has no prototype for, giving
-  `Unrecognized option "prod" under "ai.platform.anthropic"`.
+  `Unrecognized option "prod" under "ai.platform.anthropic". Available options are "api_key", "cache_retention", "http_client", "version".`.
   `InstanceKeyedPlatforms` (`src/Audit/Infrastructure/Config/`) now names the
   six platforms declared with `useAttributeAsKey`, and `init` refuses both
   directions with the shape to use instead, rather than reporting success.
+
+- **A hyphenated instance name wrote a config that could not boot.**
+  `symfony/config` rewrites a key holding a hyphen and no underscore, and an
+  instance is a prototyped key like any other, so `generic.my-gateway`
+  registered the service as `ai.platform.generic.my_gateway` while `provider:`
+  kept the hyphen. `init` reported success and the next run aborted with:
+
+  ```text
+  The "generic" platform has no "my-gateway" instance. Configured instances: my_gateway.
+  ```
+
+  `ConfigKeyInstanceName` (`src/Audit/Infrastructure/Config/`) folds the name
+  the same way the framework will, so `--provider=generic.my-gateway` now writes
+  `my_gateway` in both places. `generic.0` is refused outright: a purely numeric
+  name becomes an integer array key, turning the instance level into a YAML
+  sequence the prototype cannot take a name from. A provider naming no platform
+  before the dot (`.anthropic`) is refused too, instead of advising the empty
+  string.
 
 - **An instance written with stray whitespace kept it.** `generic. my_gateway`
   parsed to the instance `" my_gateway"` and was written as the YAML key,

@@ -39,5 +39,8 @@ final class ProviderKeyTest extends TestCase
         yield 'an instance-keyed platform splits on the first dot' => ['generic.my_gateway', 'generic', 'my_gateway'];
         yield 'only the first dot separates, the rest belongs to the instance' => ['generic.eu.gateway', 'generic', 'eu.gateway'];
         yield 'a trailing dot names no instance' => ['generic.', 'generic', null];
+        yield 'whitespace after the dot is not part of the instance' => ['generic. my_gateway', 'generic', 'my_gateway'];
+        yield 'whitespace before the dot is not part of the platform' => ['generic .my_gateway', 'generic', 'my_gateway'];
+        yield 'an all-whitespace instance names none' => ['generic.   ', 'generic', null];
     }
 }

@@ -695,6 +695,67 @@ final class InitCommandTest extends TestCase
         self::assertFileDoesNotExist($this->configFile());
     }
 
+    public function test_it_says_a_platform_is_unwritable_before_asking_for_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'azure', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'needs a "deployment" name beside the api_key',
+            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_refuses_a_purely_numeric_instance_name(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.0', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_refuses_a_provider_naming_no_platform_before_the_dot(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => '.anthropic', '--model' => 'claude-opus-5', '--env-var' => 'TOKEN'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'names no platform before the dot',
+            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_writes_a_hyphenated_instance_under_the_key_symfony_will_use(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my-gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
     public function test_it_refuses_a_flat_platform_given_an_instance(): void
     {
         $commandTester = $this->commandTester();

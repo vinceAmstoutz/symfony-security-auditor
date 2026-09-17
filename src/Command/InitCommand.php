@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyInstanceName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
@@ -187,9 +188,14 @@ final readonly class InitCommand
 
     private function platformViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl, string $configFile): ?string
     {
-        $handWritten = HandWrittenPlatforms::requirementOf($providerKey);
-        if (null !== $handWritten) {
-            return \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile);
+        return $this->writabilityViolation($providerKey, $provider, $baseUrl, $configFile)
+            ?? $this->providerNameViolation($providerKey, $provider);
+    }
+
+    private function providerNameViolation(ProviderKey $providerKey, string $provider): ?string
+    {
+        if ('' === $providerKey->platform) {
+            return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
         }
 
         if (InstanceKeyedPlatforms::needsAnInstance($providerKey)) {
@@ -198,6 +204,20 @@ final readonly class InitCommand
 
         if (InstanceKeyedPlatforms::rejectsAnInstance($providerKey)) {
             return \sprintf('"%s" takes a single connection block and names no instance, so drop the instance and use "%s".', $provider, $providerKey->platform);
+        }
+
+        if (null !== $providerKey->instance && !ConfigKeyInstanceName::isUsable($providerKey->instance)) {
+            return \sprintf('"%s" uses a purely numeric instance name, which YAML cannot key a platform by. Give it a name, for example "%s.my_gateway".', $provider, $providerKey->platform);
+        }
+
+        return null;
+    }
+
+    private function writabilityViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl, string $configFile): ?string
+    {
+        $handWritten = HandWrittenPlatforms::requirementOf($providerKey);
+        if (null !== $handWritten) {
+            return \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile);
         }
 
         if (null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)) {

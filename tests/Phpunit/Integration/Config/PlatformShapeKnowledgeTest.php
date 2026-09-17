@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWritten
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
 
 /**
- * `BaseUrlPlatforms` and `HandWrittenPlatforms` restate what `symfony/ai-bundle`
+ * `BaseUrlPlatforms`, `HandWrittenPlatforms` and `InstanceKeyedPlatforms` restate what `symfony/ai-bundle`
  * declares about each platform's connection block. A bundle upgrade that adds a
  * platform, or gives an existing one a `base_url`, would otherwise leave them
  * quietly wrong: `init` would stop asking for a key it now needs, or keep
@@ -119,6 +119,16 @@ final class PlatformShapeKnowledgeTest extends TestCase
         return $names;
     }
 
+    public function test_no_platform_is_refused_for_a_requirement_it_no_longer_has(): void
+    {
+        $refusedForAnExtraField = array_keys(array_filter(
+            HandWrittenPlatforms::REQUIREMENTS,
+            static fn (string $requirement): bool => !str_contains($requirement, 'rather than an api_key') && 'no connection options at all' !== $requirement,
+        ));
+
+        self::assertSame([], array_diff($refusedForAnExtraField, $this->platformsRequiringMoreThanACredential()));
+    }
+
     /**
      * Platforms with a required child beyond the `api_key` and `base_url` that
      * `init` writes. Each node owns the chain from its own declaration up to
@@ -132,7 +142,7 @@ final class PlatformShapeKnowledgeTest extends TestCase
         $names = [];
 
         foreach ($this->configFiles() as $finder) {
-            preg_match_all('/(?:string|scalar|integer|boolean|array)Node\(\x27([a-z_]+)\x27\)(.*?)->end\(\)/s', $finder->getContents(), $matches, \PREG_SET_ORDER);
+            preg_match_all('/(?:string|scalar|integer|float|boolean|enum|variable|array)Node\(\x27([a-z_]+)\x27\)(.*?)->end\(\)/s', $finder->getContents(), $matches, \PREG_SET_ORDER);
 
             foreach ($matches as $match) {
                 if (str_contains($match[2], '->isRequired()') && !\in_array($match[1], ['api_key', 'base_url'], true)) {

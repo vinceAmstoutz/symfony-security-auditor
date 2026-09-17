@@ -446,14 +446,13 @@ then override individual keys as needed.
 | -------------------- | ------------------------------------ | ---------------------------------------------- |
 | Anthropic (Claude)   | `symfony/ai-anthropic-platform`      | `ANTHROPIC_API_KEY`                            |
 | OpenAI               | `symfony/ai-open-ai-platform`        | `OPENAI_API_KEY`                               |
-| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY`                               |
+| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY` plus a `base_url`             |
 | Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL` |
 | Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`                               |
 | Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | GCP credentials                                |
 | AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials                                |
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                             |
 | Mistral              | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                              |
-| Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                 |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                              |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | _(none)_                                       |
 | Albert (French gov)  | `symfony/ai-albert-platform`         | `ALBERT_API_KEY` plus a `base_url`             |

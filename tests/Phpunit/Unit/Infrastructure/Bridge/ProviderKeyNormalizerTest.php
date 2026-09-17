@@ -46,5 +46,8 @@ final class ProviderKeyNormalizerTest extends TestCase
         yield 'instance left untouched on an unknown platform' => ['generic.my_gateway', 'generic.my_gateway'];
         yield 'instance keeps the case the user typed' => ['generic.myGateway', 'generic.myGateway'];
         yield 'platform folded while a mixed-case instance survives' => ['GENERIC.EU_West', 'generic.EU_West'];
+        yield 'a hyphenated instance folds the way symfony/config will' => ['generic.my-gateway', 'generic.my_gateway'];
+        yield 'an instance already holding an underscore keeps its hyphens' => ['generic.my-gate_way', 'generic.my-gate_way'];
+        yield 'the hyphen fold leaves case alone' => ['generic.MY-GATEWAY', 'generic.MY_GATEWAY'];
     }
 }

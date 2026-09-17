@@ -327,14 +327,13 @@ Install the Composer package for your chosen provider, then configure it under
 | -------------------- | ------------------------------------ | ----------------------------------------------- |
 | Anthropic (Claude)   | `symfony/ai-anthropic-platform`      | `ANTHROPIC_API_KEY`                             |
 | OpenAI               | `symfony/ai-open-ai-platform`        | `OPENAI_API_KEY`                                |
-| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY`                                |
+| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY` plus a `base_url`              |
 | Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL`  |
 | Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`                                |
 | Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` |
 | AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials (env or instance role)          |
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                              |
 | Mistral AI           | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                               |
-| Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                  |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                               |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | none                                            |
 | Albert (French gov)  | `symfony/ai-albert-platform`         | `ALBERT_API_KEY` plus a `base_url`              |
@@ -442,14 +441,15 @@ ai:
                 completions_path: '/chat/completions'
 ```
 
-`init` asks for a `base_url` and an API key, which is the whole prototype of
-`generic` and `openresponses`. Eight platforms need something it never asks for
-and are refused with exit code `2` rather than written half-configured: `azure`
-(a `deployment`) and `cartesia` (a `version`) want an extra field beside the
-key, while `bedrock`, `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
-`transformersphp` have no `api_key` node at all. Write those blocks by hand,
-pointing `provider:` at the matching `<platform>.<instance>` when the platform
-is instance keyed.
+`init` asks for a `base_url` and an API key, which is all `generic` and
+`openresponses` require; the rest of their prototype (`http_client`,
+`model_catalog`, `completions_path` and friends) has defaults you can override
+by hand. Eight platforms need something it never asks for and are refused with
+exit code `2` rather than written half-configured: `azure` (a `deployment`) and
+`cartesia` (a `version`) want an extra field beside the key, while `bedrock`,
+`cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` have
+no `api_key` node at all. Write those blocks by hand, pointing `provider:` at
+the matching `<platform>.<instance>` when the platform is instance keyed.
 
 Being instance keyed and taking a `base_url` are independent. `albert` and
 `amazeeai` require a `base_url` on a flat block, so `init` asks them for one too

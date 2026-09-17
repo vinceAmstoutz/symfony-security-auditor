@@ -33,7 +33,7 @@ final class HandWrittenPlatformsTest extends TestCase
     {
         yield 'an instance-keyed platform needing a deployment' => ['azure.prod', 'a "deployment" name beside the api_key'];
         yield 'an instance-keyed platform taking a runtime client' => ['bedrock.prod', 'a "bedrock_runtime_client" service rather than an api_key'];
-        yield 'an instance-keyed platform wrapping another' => ['cache.prod', 'the "platform" it wraps and a cache "service" rather than an api_key'];
+        yield 'an instance-keyed platform wrapping another' => ['cache.prod', 'the "platform" it wraps rather than an api_key'];
         yield 'an instance-keyed platform listing its fallbacks' => ['failover.prod', 'the list of "platforms" it falls back through rather than an api_key'];
         yield 'a flat platform needing a version' => ['cartesia', 'a "version" beside the api_key'];
         yield 'a flat platform addressed by host url' => ['lmstudio', 'a "host_url" rather than an api_key'];

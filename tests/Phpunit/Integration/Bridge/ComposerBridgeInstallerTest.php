@@ -24,6 +24,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 
 final class ComposerBridgeInstallerTest extends TestCase
 {
+    private const string UNTOUCHED_SYMLINK_TARGET = 'not the manifest
+';
+
     private string $targetDirectory;
 
     private Filesystem $filesystem;
@@ -73,6 +76,7 @@ final class ComposerBridgeInstallerTest extends TestCase
     {
         $this->filesystem->mkdir($this->targetDirectory);
         $outsideTarget = sys_get_temp_dir().'/ssa-bridge-symlink-target-'.bin2hex(random_bytes(6));
+        $this->filesystem->dumpFile($outsideTarget, self::UNTOUCHED_SYMLINK_TARGET);
         symlink($outsideTarget, $this->targetDirectory.'/composer.json');
 
         try {
@@ -80,7 +84,7 @@ final class ComposerBridgeInstallerTest extends TestCase
 
             (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
         } finally {
-            self::assertFileDoesNotExist($outsideTarget);
+            self::assertStringEqualsFile($outsideTarget, self::UNTOUCHED_SYMLINK_TARGET);
         }
     }
 
@@ -119,6 +123,11 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     public static function providerPackageCases(): iterable
     {
+        yield 'minimax hyphenates as mini-max' => ['minimax', 'symfony/ai-mini-max-platform'];
+        yield 'lmstudio hyphenates as lm-studio' => ['lmstudio', 'symfony/ai-lm-studio-platform'];
+        yield 'openrouter hyphenates as open-router' => ['openrouter', 'symfony/ai-open-router-platform'];
+        yield 'dockermodelrunner hyphenates as docker-model-runner' => ['dockermodelrunner', 'symfony/ai-docker-model-runner-platform'];
+        yield 'transformersphp hyphenates as transformers-php' => ['transformersphp', 'symfony/ai-transformers-php-platform'];
         yield 'verbatim slug' => ['gemini', 'symfony/ai-gemini-platform'];
         yield 'openai maps to the hyphenated open-ai package' => ['openai', 'symfony/ai-open-ai-platform'];
         yield 'deepseek maps to the hyphenated deep-seek package' => ['deepseek', 'symfony/ai-deep-seek-platform'];
