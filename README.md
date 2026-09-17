@@ -117,11 +117,12 @@ irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/mai
 >
 > **One command, installed _and_ configured.** Set `SSA_INIT=1` and the
 > installer runs the guided [`init`](#2-configure--the-guided-init) for you
-> right after downloading — so you skip step 2, and `init` asks for your API key
-> at the end, leaving you ready to audit. It prompts for your provider when a
-> terminal is attached, and falls back to the Anthropic defaults
-> non-interactively in a pipe or CI. `init` fetches the provider bridge with
-> `composer`, so composer must be available for this combined step.
+> right after downloading, so you skip step 2. With a terminal attached it
+> prompts for your provider and offers to store your API key at the end, leaving
+> you ready to audit; in a pipe or CI it takes the Anthropic defaults and stores
+> no key, so export one or run `auth:set` before auditing. `init` fetches the
+> provider bridge with `composer`, so composer must be available for this
+> combined step.
 >
 > ```bash
 > curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh

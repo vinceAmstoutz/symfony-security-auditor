@@ -352,8 +352,10 @@ ai:
       api_key: '%env(ANTHROPIC_API_KEY)%'
     # openai:
     #   api_key: '%env(OPENAI_API_KEY)%'
-    # open_responses:
-    #   api_key: '%env(OPENAI_API_KEY)%'
+    # openresponses:
+    #   my_instance:
+    #     base_url: '%env(OPENAI_BASEURL)%'
+    #     api_key: '%env(OPENAI_API_KEY)%'
     # azure:
     #   my_deployment:
     #     base_url: '%env(AZURE_OPENAI_BASEURL)%'
@@ -371,8 +373,6 @@ ai:
     #   api_key: '%env(DEEPSEEK_API_KEY)%'
     # mistral:
     #   api_key: '%env(MISTRAL_API_KEY)%'
-    # meta:
-    #   api_key: '%env(META_API_KEY)%'
     # minimax:
     #   api_key: '%env(MINIMAX_API_KEY)%'
     # ollama:
@@ -416,12 +416,24 @@ platform:
 model: 'your-model'
 ```
 
-`audit init --provider=generic.my_gateway --base-url=https://your-gateway.example`
-writes exactly that and installs `symfony/ai-generic-platform` for you. The
-instance name is required and kept exactly as you type it: `init` refuses a bare
-`--provider=generic` and tells you to use `generic.<instance>`, just as it
-refuses an instance on a platform that takes a single block
-(`--provider=anthropic.prod`). A bare `provider: generic` in a hand-written
+`audit init` writes exactly that block, and installs
+`symfony/ai-generic-platform` for you, given `--provider=generic.my_gateway`,
+`--base-url=https://your-gateway.example`, `--model=your-model` and
+`--env-var=GATEWAY_TOKEN`. Leave the last two out and `init` prompts for them,
+or under `--no-interaction` falls back to `claude-opus-4-8` and
+`GENERIC_API_KEY`.
+
+The instance name is required: `init` refuses a bare `--provider=generic` and
+tells you to use `generic.<instance>`, just as it refuses an instance on a
+platform that takes a single block (`--provider=anthropic.prod`). Its case is
+preserved, but surrounding whitespace is trimmed, and a hyphen is folded to an
+underscore the way `symfony/config` will, in both `provider:` and the
+`platform:` block at once so the two always agree (`generic.my-gateway` is
+written as `generic.my_gateway`). A name the config file could not be read back
+with is refused outright: `0`, because YAML writes that block as a sequence
+entry rather than as a key, and `.inf` or `.nan`, because YAML writes those
+unquoted and then refuses them on the way back in. Every other number keys the
+block by name and is accepted. A bare `provider: generic` in a hand-written
 config aborts the run saying so and listing the instances you configured.
 
 `base_url` is the origin only. The `generic` bridge appends its own
@@ -441,15 +453,16 @@ ai:
                 completions_path: '/chat/completions'
 ```
 
-`init` asks for a `base_url` and an API key, which is all `generic` and
-`openresponses` require; the rest of their prototype (`http_client`,
-`model_catalog`, `completions_path` and friends) has defaults you can override
-by hand. Eight platforms need something it never asks for and are refused with
-exit code `2` rather than written half-configured: `azure` (a `deployment`) and
-`cartesia` (a `version`) want an extra field beside the key, while `bedrock`,
-`cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` have
-no `api_key` node at all. Write those blocks by hand, pointing `provider:` at
-the matching `<platform>.<instance>` when the platform is instance keyed.
+`init` asks for a `base_url`, the only child either platform requires, plus an
+API key; the rest of their prototype (`http_client`, `model_catalog` and the
+route key, which is `completions_path` on `generic` and `responses_path` on
+`openresponses`) has defaults you can override by hand. Eight platforms need
+something it never asks for and are refused with exit code `2` rather than
+written half-configured: `azure` (a `deployment`) and `cartesia` (a `version`)
+want an extra field beside the key, while `bedrock`, `cache`, `failover`,
+`dockermodelrunner`, `lmstudio` and `transformersphp` have no `api_key` node at
+all. Write those blocks by hand, pointing `provider:` at the matching
+`<platform>.<instance>` when the platform is instance keyed.
 
 Being instance keyed and taking a `base_url` are independent. `albert` and
 `amazeeai` require a `base_url` on a flat block, so `init` asks them for one too
