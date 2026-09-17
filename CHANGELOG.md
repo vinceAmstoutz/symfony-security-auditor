@@ -88,6 +88,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`Config resolves and an API key is available: sk-ant…qF4A (SHA256:…)`)
   instead of only asserting that one was found.
 
+### Removed
+
+- **Meta (Llama) is no longer listed as a supported platform.**
+  `symfony/ai-bundle` no longer declares a `meta` platform, so the block the
+  docs told readers to uncomment now fails configuration outright:
+
+  ```text
+  Unrecognized option "meta" under "ai.platform". Available options are "albert", "amazeeai", "anthropic", "azure", "bedrock", "cache", "cartesia", "cerebras", "cohere", "decart", "deepgram", "deepseek", "dockermodelrunner", "elevenlabs", "failover", "gemini", "generic", "huggingface", "lmstudio", "minimax", "mistral", "ollama", "openai", "openresponses", "openrouter", "ovh", "perplexity", "scaleway", "transformersphp", "vertexai", "voyage".
+  ```
+
+  The row is dropped from the `README.md` and `docs/configuration.md` platform
+  tables, `symfony/ai-meta-platform` is dropped from `composer.json` `suggest`,
+  and the commented `# meta:` block is dropped from the `ai.yaml` example. Llama
+  models remain reachable through any OpenAI-compatible gateway via the
+  `generic` platform this release adds.
+
 ### Fixed
 
 - **The standalone binary now boots against Ollama.** `doctor` reported the
@@ -101,11 +117,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
   `StandaloneContainerFactory` (`src/Standalone/`) registers the services
   `symfony/ai-bundle` expects an application to provide, and `http_client` —
-  supplied by `FrameworkBundle` in a real app — was missing. Only `ollama`
-  references it strictly; every other bridge falls back to a client it builds
-  itself, which is why this provider alone failed. The container now registers
-  `http_client` as `FrameworkBundle` does, and `symfony/http-client` becomes a
-  direct dependency.
+  supplied by `FrameworkBundle` in a real app — was missing. Three bridges
+  reference it strictly (`ollama`, `elevenlabs` and `deepgram`), and `ollama` is
+  the only one of them an audit runs against; every other bridge passes
+  `NULL_ON_INVALID_REFERENCE` and falls back to a client it builds itself, which
+  is why this provider alone failed. The container now registers `http_client`
+  as `FrameworkBundle` does, and `symfony/http-client` becomes a direct
+  dependency.
 
 - **An AI gateway behind a custom URL and token can now be configured.**
   `symfony/ai-generic-platform` is the `symfony/ai` bridge for an arbitrary
@@ -216,11 +234,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
   `ConfigKeyInstanceName` (`src/Audit/Infrastructure/Config/`) folds the name
   the same way the framework will, so `--provider=generic.my-gateway` now writes
-  `my_gateway` in both places. `generic.0` is refused outright: a purely numeric
-  name becomes an integer array key, turning the instance level into a YAML
-  sequence the prototype cannot take a name from. A provider naming no platform
-  before the dot (`.anthropic`) is refused too, instead of advising the empty
-  string.
+  `my_gateway` in both places. An instance name the config file could not be
+  read back with is refused outright, `init` asking the same dumper and parser
+  that will handle the file rather than guessing: `generic.0` is dumped as a
+  YAML sequence entry, so the container answers
+  `The attribute "name" must be set for path "ai.platform.generic".`, while
+  `generic..inf` and `generic..nan` are dumped unquoted and the next run cannot
+  parse its own config
+  (`Numeric keys are not supported. Quote your evaluable mapping keys instead`),
+  which `--force` would have turned into the loss of a working configuration.
+  Every other number keys the block by name and is accepted. A provider naming
+  no platform before the dot (`.anthropic`) is refused too, instead of advising
+  the empty string.
 
 - **An instance written with stray whitespace kept it.** `generic. my_gateway`
   parsed to the instance `" my_gateway"` and was written as the YAML key,
@@ -310,11 +335,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
   It now reads the file whose path `VAR` holds and strips surrounding
   whitespace, so Docker and Kubernetes secrets, `systemd` `LoadCredential=` and
-  a plain `0600` file all work without a shell being involved. An unset
-  variable, an unreadable file, or a file holding only whitespace stops the run
-  before the provider is contacted (`UnreadableCredentialFileException`);
-  `doctor` reports it under its `API key` check, and `--dry-run` tolerates all
-  three because it never reaches the provider. See
+  a plain `0600` file all work without a shell being involved. An unreadable
+  file or a file holding only whitespace stops the run before the provider is
+  contacted (`UnreadableCredentialFileException`), and an unset variable falls
+  through to the ordinary `MissingEnvironmentVariableException`; `doctor`
+  reports it under its `API key` check, and `--dry-run` tolerates all three
+  because it never reaches the provider. See
   [Providing the API key](docs/configuration.md#providing-the-api-key).
 
 ## [1.20.1] — 2026-08-23 — Herald

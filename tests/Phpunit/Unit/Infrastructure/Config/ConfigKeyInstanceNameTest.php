@@ -49,10 +49,16 @@ final class ConfigKeyInstanceNameTest extends TestCase
     public static function usabilityCases(): iterable
     {
         yield 'zero turns the block into a sequence' => ['0', false];
-        yield 'any digits key by position rather than by name' => ['42', false];
-        yield 'a negative number keys by position too' => ['-1', false];
+        yield 'another number keys the block by name' => ['42', true];
+        yield 'a single digit other than zero keys by name' => ['1', true];
+        yield 'leading zeroes keep the name a string' => ['007', true];
+        yield 'a negative number folds to an underscore and keys by name' => ['-1', true];
         yield 'digits with a letter name the instance' => ['eu1', true];
         yield 'a leading digit still names the instance' => ['1eu', true];
         yield 'an ordinary name is usable' => ['my_gateway', true];
+        yield 'infinity is written unquoted and cannot be read back' => ['.inf', false];
+        yield 'not-a-number is written unquoted too' => ['.nan', false];
+        yield 'the casing of infinity does not save it' => ['.INF', false];
+        yield 'a word that merely looks evaluable is quoted for us' => ['true', true];
     }
 }

@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
+
 /**
  * An instance name as `symfony/config` will store it. `ArrayNode::preNormalize()`
  * rewrites a key holding a hyphen and no underscore, and an instance is a
@@ -35,12 +38,20 @@ final readonly class ConfigKeyInstanceName
     }
 
     /**
-     * A purely numeric name becomes an integer array key, which turns the
-     * instance level into a list and makes the dumped YAML a sequence the
-     * prototype cannot take a name from.
+     * A name only works if the config file can be read back after `init` writes
+     * it, so it is asked of the same dumper and parser that will handle the
+     * file: `0` is dumped as a sequence entry the prototype cannot take a name
+     * from, and `.inf`, `.nan` and their casings are dumped unquoted and then
+     * refused on the way back in.
      */
     public static function isUsable(string $instance): bool
     {
-        return 1 !== preg_match('/^-?\d+$/', $instance);
+        try {
+            $parsed = Yaml::parse(Yaml::dump([self::of($instance) => null]));
+        } catch (ParseException) {
+            return false;
+        }
+
+        return \is_array($parsed) && !array_is_list($parsed);
     }
 }

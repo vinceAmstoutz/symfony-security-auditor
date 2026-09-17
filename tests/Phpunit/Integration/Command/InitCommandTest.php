@@ -710,7 +710,53 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_refuses_a_purely_numeric_instance_name(): void
+    public function test_it_writes_a_numbered_instance_other_than_zero(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.42', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.42',
+                'platform' => ['generic' => [42 => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_names_the_missing_platform_even_when_a_base_url_is_given(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => '.gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'names no platform before the dot',
+            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_refuses_an_instance_name_the_config_cannot_be_read_back_with(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic..inf', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_refuses_zero_as_an_instance_name(): void
     {
         $commandTester = $this->commandTester();
 

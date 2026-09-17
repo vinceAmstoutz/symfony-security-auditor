@@ -188,16 +188,16 @@ final readonly class InitCommand
 
     private function platformViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl, string $configFile): ?string
     {
+        if ('' === $providerKey->platform) {
+            return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
+        }
+
         return $this->writabilityViolation($providerKey, $provider, $baseUrl, $configFile)
             ?? $this->providerNameViolation($providerKey, $provider);
     }
 
     private function providerNameViolation(ProviderKey $providerKey, string $provider): ?string
     {
-        if ('' === $providerKey->platform) {
-            return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
-        }
-
         if (InstanceKeyedPlatforms::needsAnInstance($providerKey)) {
             return \sprintf('"%1$s" is configured per instance, so it needs an instance name: use "%1$s.<instance>", for example "%1$s.my_gateway".', $provider);
         }
@@ -207,7 +207,7 @@ final readonly class InitCommand
         }
 
         if (null !== $providerKey->instance && !ConfigKeyInstanceName::isUsable($providerKey->instance)) {
-            return \sprintf('"%s" uses a purely numeric instance name, which YAML cannot key a platform by. Give it a name, for example "%s.my_gateway".', $provider, $providerKey->platform);
+            return \sprintf('"%s" uses an instance name the config file cannot be read back with. Give it a name, for example "%s.my_gateway".', $provider, $providerKey->platform);
         }
 
         return null;
