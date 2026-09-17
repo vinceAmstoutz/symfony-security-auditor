@@ -215,7 +215,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the bare form that #365 actually reported kept producing:
 
   ```text
-  Invalid type for path "ai.platform.generic.base_url". Expected "array", but got "string"
+  Invalid type for path "ai.platform.generic.api_key". Expected "array", but got "string"
   ```
 
   The mirror case was unguarded too: `--provider=anthropic.prod` nested a flat
@@ -250,20 +250,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   parse its own config:
 
   ```text
-  Implicit casting of incompatible mapping keys to strings is not supported. Quote your evaluable mapping keys instead
+  Config file "~/.config/symfony-security-auditor/config.yaml" is not valid YAML: Implicit casting of incompatible mapping keys to strings is not supported. Quote your evaluable mapping keys instead at line 3 (near "generic: { .inf: { base_url: 'https://gw.example', api_key: '%env(GATEWAY_TOKEN)%' } }").
   ```
 
   Under `--force` that would have cost a working configuration. A name the
   parser reads as a YAML tag or as the merge key, such as `generic.!php/const`
   or `generic.<<`, is refused for a third reason: the block comes back under a
-  different name than `provider:` points at. A name holding a quote, a NUL, a
-  carriage return or a newline, or ending in a backslash, is refused by
+  different name than `provider:` points at. A name holding a single quote, a
+  NUL, a carriage return or a newline, or ending in a backslash, is refused by
   `PlatformServiceId` (`src/Audit/Infrastructure/Config/`) for a fourth: it
   survives YAML untouched, but `ai.platform.generic.o'brien` is not an id the
-  container accepts, so the run died on `Invalid service id`. Every other number
-  is accepted, subject to the hyphen fold above, so `generic.-1` is written as
-  `generic._1`. A provider naming no platform before the dot (`.anthropic`) is
-  refused too, instead of advising the empty string.
+  container accepts, so the run died on `Invalid service id`. A name holding a
+  `%...%` pair is refused for a fifth (`ContainerParameterSyntax`): it is valid
+  YAML and a valid service id, but `generic.%gw%` reached the container as a
+  parameter reference and aborted the run with:
+
+  ```text
+  The service ".abstract.instanceof.VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage" has a dependency on a non-existent parameter "gw".
+  ```
+
+  Every other number is accepted, subject to the hyphen fold above, so
+  `generic.-1` is written as `generic._1`. A provider naming no platform before
+  the dot (`.anthropic`) is refused too, instead of advising the empty string.
 
 - **An instance written with stray whitespace kept it.** `generic. my_gateway`
   parsed to the instance `" my_gateway"` and was written as the YAML key,

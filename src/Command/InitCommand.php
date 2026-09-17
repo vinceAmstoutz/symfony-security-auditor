@@ -210,12 +210,23 @@ final readonly class InitCommand
             return \sprintf('"%s" takes a single connection block and names no instance, so drop the instance and use "%s".', $provider, $providerKey->platform);
         }
 
-        if (null !== $providerKey->instance && !ConfigKeyInstanceName::isUsable($providerKey->instance)) {
-            return \sprintf('"%s" uses an instance name the config file cannot be read back with. Give it a name, for example "%s.my_gateway".', $provider, $providerKey->platform);
+        return null !== $providerKey->instance
+            ? $this->instanceNameViolation($providerKey->instance, $provider, $providerKey->platform)
+            : null;
+    }
+
+    private function instanceNameViolation(string $instance, string $provider, string $platform): ?string
+    {
+        if (!ConfigKeyInstanceName::isUsable($instance)) {
+            return \sprintf('"%s" uses an instance name the config file cannot be read back with. Give it a name, for example "%s.my_gateway".', $provider, $platform);
         }
 
-        if (null !== $providerKey->instance && !PlatformServiceId::accepts($providerKey->instance)) {
-            return \sprintf('"%s" uses an instance name the container cannot name a service by. Give it a name, for example "%s.my_gateway".', $provider, $providerKey->platform);
+        if (!PlatformServiceId::accepts($instance)) {
+            return \sprintf('"%s" uses an instance name the container cannot name a service by. Give it a name, for example "%s.my_gateway".', $provider, $platform);
+        }
+
+        if (!ContainerParameterSyntax::accepts($instance)) {
+            return \sprintf('"%s" uses an instance name that would be read as a container parameter rather than as a name. Give it a name, for example "%s.my_gateway".', $provider, $platform);
         }
 
         return null;

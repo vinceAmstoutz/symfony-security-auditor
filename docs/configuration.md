@@ -434,7 +434,12 @@ with is refused outright: `0`, because YAML writes that block as a sequence
 entry rather than as a key; `.inf` or `.nan`, because YAML writes those unquoted
 and then refuses them on the way back in; and a name read as a YAML tag or as
 the merge key, such as `!php/const` or `<<`, because the block comes back under
-a different name than `provider:` points at. Every other number is accepted,
+a different name than `provider:` points at. Two more are refused for what
+happens after the file is read: a name holding a single quote, a NUL, a carriage
+return or a newline, or ending in a backslash, because
+`ai.platform.<platform>.<instance>` would not be a service id the container
+accepts; and a name holding a `%...%` pair, because the container would read it
+as a parameter reference rather than as a name. Every other number is accepted,
 subject to the same hyphen fold, so `generic.-1` is written as `generic._1`. A
 bare `provider: generic` in a hand-written config aborts the run saying so and
 listing the instances you configured.
