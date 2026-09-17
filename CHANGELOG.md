@@ -194,8 +194,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   ```
 
   The mirror case was unguarded too: `--provider=anthropic.prod` nested a flat
-  platform under an instance it has no prototype for, giving
-  `Unrecognized option "prod" under "ai.platform.anthropic". Available options are "api_key", "cache_retention", "http_client", "version".`.
+  platform under an instance it has no prototype for, giving:
+
+  ```text
+  Unrecognized option "prod" under "ai.platform.anthropic". Available options are "api_key", "cache_retention", "http_client", "version".
+  ```
+
   `InstanceKeyedPlatforms` (`src/Audit/Infrastructure/Config/`) now names the
   six platforms declared with `useAttributeAsKey`, and `init` refuses both
   directions with the shape to use instead, rather than reporting success.
