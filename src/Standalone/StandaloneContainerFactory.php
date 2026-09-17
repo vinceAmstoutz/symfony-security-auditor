@@ -152,13 +152,13 @@ final readonly class StandaloneContainerFactory
     /**
      * @return list<string>
      */
-    private function configuredInstancesOf(ContainerBuilder $containerBuilder, string $provider): array
+    private function configuredInstancesOf(ContainerBuilder $containerBuilder, string $platform): array
     {
         $instances = [];
 
         foreach (array_keys($containerBuilder->findTaggedServiceIds(self::PLATFORM_TAG)) as $serviceId) {
             $providerKey = ProviderKey::of(substr($serviceId, \strlen(self::PLATFORM_SERVICE_PREFIX)));
-            if ($provider === $providerKey->platform && null !== $providerKey->instance) {
+            if ($platform === $providerKey->platform && null !== $providerKey->instance) {
                 $instances[] = $providerKey->instance;
             }
         }

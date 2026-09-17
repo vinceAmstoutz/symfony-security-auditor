@@ -90,8 +90,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     {
         $this->ensureComposerProject($targetDirectory);
 
-        $platform = ProviderKey::of($provider)->platform;
-        $package = \sprintf(self::PACKAGE_TEMPLATE, self::PACKAGE_SLUG_OVERRIDES[$platform] ?? $platform);
+        $package = self::packageFor($provider);
         $process = ($this->processBuilder)($package, $targetDirectory);
 
         try {
@@ -103,6 +102,17 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         if (!$process->isSuccessful()) {
             throw BridgeInstallationFailedException::forFailedProcess($package, $process->getErrorOutput());
         }
+    }
+
+    /**
+     * The bridge package a provider selects. Only the platform half names a
+     * bridge: an instance is a connection of that platform, not a package.
+     */
+    public static function packageFor(string $provider): string
+    {
+        $platform = ProviderKey::of($provider)->platform;
+
+        return \sprintf(self::PACKAGE_TEMPLATE, self::PACKAGE_SLUG_OVERRIDES[$platform] ?? $platform);
     }
 
     /**

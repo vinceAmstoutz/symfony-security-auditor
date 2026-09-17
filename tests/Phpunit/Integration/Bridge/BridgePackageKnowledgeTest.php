@@ -14,69 +14,63 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
-use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\RecordingBridgeProcessBuilder;
 
 /**
  * `ComposerBridgeInstaller` derives a bridge package name from the platform key,
  * hyphenating the ones `symfony/ai-bundle` spells differently. A wrong slug
- * fails only at `composer require`, on the user's machine, so the names it would
- * ask for are read back here against the ones the bundle itself names.
+ * fails only at `composer require`, on the user's machine, so every name `init`
+ * could ask for is checked against the packages the bundle itself declares.
  */
 final class BridgePackageKnowledgeTest extends TestCase
 {
-    private const string BUNDLE_SOURCE = __DIR__.'/../../../../vendor/symfony/ai-bundle/src/AiBundle.php';
+    private const string PLATFORM_CONFIG_DIRECTORY = __DIR__.'/../../../../vendor/symfony/ai-bundle/config/platform';
 
-    /**
-     * @throws BridgeInstallationFailedException
-     */
-    public function test_every_platform_asks_for_the_package_the_bundle_names(): void
+    private const string BUNDLE_MANIFEST = __DIR__.'/../../../../vendor/symfony/ai-bundle/composer.json';
+
+    public function test_every_platform_asks_for_a_package_the_bundle_declares(): void
     {
-        $expected = $this->packagesTheBundleNames();
+        $declared = $this->packagesTheBundleDeclares();
 
-        $asked = [];
-        $filesystem = new Filesystem();
+        $unknown = array_values(array_filter(
+            $this->platformNames(),
+            static fn (string $platform): bool => !\in_array(ComposerBridgeInstaller::packageFor($platform), $declared, true),
+        ));
 
-        foreach (array_keys($expected) as $platform) {
-            $targetDirectory = sys_get_temp_dir().'/ssa-slug-'.bin2hex(random_bytes(6));
-            $recorder = new RecordingBridgeProcessBuilder();
-
-            (new ComposerBridgeInstaller(processBuilder: $recorder(...)))->install($platform, $targetDirectory);
-            $filesystem->remove($targetDirectory);
-
-            $asked[$platform] = $recorder->package();
-        }
-
-        self::assertSame($expected, $asked);
+        self::assertSame([], $unknown);
     }
 
     /**
-     * @return array<string, string>
+     * @return list<string>
      */
-    private function packagesTheBundleNames(): array
+    private function platformNames(): array
     {
-        $source = file_get_contents(self::BUNDLE_SOURCE);
-        self::assertNotFalse($source);
+        $names = [];
 
-        preg_match_all('/if \(\x27([a-z]+)\x27 === \$type[^)]*\) \{/', $source, $branches, \PREG_OFFSET_CAPTURE);
-
-        $packages = [];
-        $count = \count($branches[0]);
-
-        for ($index = 0; $index < $count; ++$index) {
-            $platform = $branches[1][$index][0];
-            $start = $branches[0][$index][1];
-            $end = $index + 1 < $count ? $branches[0][$index + 1][1] : \strlen($source);
-
-            if (!\array_key_exists($platform, $packages) && 1 === preg_match('/willBeAvailable\(\x27(symfony\/ai-[a-z-]+-platform)\x27/', substr($source, $start, $end - $start), $named)) {
-                $packages[$platform] = $named[1];
-            }
+        foreach ((new Finder())->files()->in(self::PLATFORM_CONFIG_DIRECTORY)->name('*.php')->depth(0) as $finder) {
+            $names[] = $finder->getBasename('.php');
         }
 
-        self::assertNotSame([], $packages, 'The bundle names a bridge package for at least one platform');
-        ksort($packages);
+        sort($names);
+
+        self::assertNotSame([], $names, 'The bundle declares at least one platform');
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function packagesTheBundleDeclares(): array
+    {
+        $manifest = file_get_contents(self::BUNDLE_MANIFEST);
+        self::assertNotFalse($manifest);
+
+        preg_match_all('#"(symfony/ai-[a-z-]+-platform)"#', $manifest, $matches);
+        $packages = array_values(array_unique($matches[1]));
+
+        self::assertNotSame([], $packages, 'The bundle declares at least one bridge package');
 
         return $packages;
     }

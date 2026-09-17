@@ -417,7 +417,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringContainsString('Stored OPENAI_API_KEY (openai…init)', $display);
         self::assertStringNotContainsString('openai-test-key-pasted-at-init', $display);
@@ -442,7 +442,7 @@ final class InitCommandTest extends TestCase
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringNotContainsString('could not be stored', $display);
     }
@@ -465,7 +465,7 @@ final class InitCommandTest extends TestCase
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringContainsString('Export OPENAI_API_KEY before auditing instead.', $display);
     }
@@ -478,7 +478,7 @@ final class InitCommandTest extends TestCase
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringNotContainsString('You can run "audit', $display);
     }
@@ -613,7 +613,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'albert, amazeeai, generic, openresponses',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -640,7 +640,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'needs a "deployment" name beside the api_key, which "init" does not write',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -679,7 +679,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'use "openresponses.<instance>", for example "openresponses.my_gateway"',
-            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -706,7 +706,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'needs a "deployment" name beside the api_key',
-            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -740,7 +740,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'names no platform before the dot',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -756,7 +756,7 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::INVALID, $exitCode);
         self::assertStringContainsString(
             'cannot be read back with',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -771,7 +771,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'takes a single connection block',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -787,8 +787,30 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::INVALID, $exitCode);
         self::assertStringContainsString(
             'would be read as a container parameter',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
+    }
+
+    public function test_it_installs_no_bridge_for_a_provider_it_refuses(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'lmstudio', '--model' => 'our-model', '--env-var' => 'TOKEN'],
+            ['interactive' => false],
+        );
+
+        self::assertSame([], $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_it_refuses_the_provider_before_asking_anything_else(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['generic']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('Which model should the auditor use?', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_refuses_a_base_url_the_container_would_read_as_a_parameter(): void
@@ -803,7 +825,7 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::INVALID, $exitCode);
         self::assertStringContainsString(
             'would be read as a container parameter',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -838,7 +860,7 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::INVALID, $exitCode);
         self::assertStringContainsString(
             'a service name cannot contain',
-            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -865,7 +887,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'names no platform before the dot',
-            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -911,7 +933,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'drop the instance and use "anthropic"',
-            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -996,7 +1018,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString(
             'requires a base URL, so nothing was written',
-            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+            $this->unwrappedDisplay($commandTester),
         );
     }
 
@@ -1012,6 +1034,11 @@ final class InitCommandTest extends TestCase
         );
 
         return new CommandTester($initCommand);
+    }
+
+    private function unwrappedDisplay(CommandTester $commandTester): string
+    {
+        return (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
     }
 
     private function configFile(): string

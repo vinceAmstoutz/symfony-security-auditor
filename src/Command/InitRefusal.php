@@ -35,6 +35,37 @@ final readonly class InitRefusal
 {
     private const string PICK_A_NAME = 'Pick a plain name such as "%s.my_gateway".';
 
+    private const string ENV_VAR_NAME_PATTERN = '/^[A-Za-z_]\w*$/';
+
+    /**
+     * Checked on the raw bytes, before `ProviderKeyNormalizer` — its `u()` call
+     * throws on non-UTF-8 input, which must refuse rather than crash.
+     */
+    public static function forProviderText(string $provider): ?string
+    {
+        return match (true) {
+            1 !== preg_match('//u', $provider) => 'The provider must be valid UTF-8 text.',
+            '' === $provider => 'The provider must not be empty.',
+            default => null,
+        };
+    }
+
+    public static function forModel(string $model): ?string
+    {
+        return match (true) {
+            1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
+            '' === $model => 'The model must not be empty.',
+            default => null,
+        };
+    }
+
+    public static function forEnvironmentVariable(string $envVar): ?string
+    {
+        return 1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)
+            ? \sprintf('"%s" is not a valid environment variable name (letters, digits, and underscores only; must not start with a digit).', $envVar)
+            : null;
+    }
+
     public static function forProvider(ProviderKey $providerKey, string $provider, ?string $baseUrl, string $configFile): ?string
     {
         if ('' === $providerKey->platform) {
@@ -42,7 +73,7 @@ final readonly class InitRefusal
         }
 
         return self::forUnwritablePlatform($providerKey, $provider, $configFile)
-            ?? self::forProviderShape($providerKey, $provider)
+            ?? self::forInstanceShape($providerKey, $provider)
             ?? self::forInapplicableBaseUrl($providerKey, $provider, $baseUrl);
     }
 
@@ -54,7 +85,7 @@ final readonly class InitRefusal
                 : null;
         }
 
-        return ContainerParameterSyntax::accepts($baseUrl)
+        return ContainerParameterSyntax::isAbsentFrom($baseUrl)
             ? null
             : \sprintf('The base URL for "%s" holds "%%...%%", which would be read as a container parameter rather than as part of the URL. Give the URL itself, or "%%env(VAR)%%" to read it from the environment.', $provider);
     }
@@ -68,7 +99,7 @@ final readonly class InitRefusal
             : null;
     }
 
-    private static function forProviderShape(ProviderKey $providerKey, string $provider): ?string
+    private static function forInstanceShape(ProviderKey $providerKey, string $provider): ?string
     {
         if (InstanceKeyedPlatforms::needsAnInstance($providerKey)) {
             return \sprintf('"%1$s" is configured per instance, so it needs an instance name: use "%1$s.<instance>", for example "%1$s.my_gateway".', $provider);
@@ -93,7 +124,7 @@ final readonly class InitRefusal
             return self::sentence('"%s" uses an instance name holding a character a service name cannot contain: an apostrophe, a line break, a null byte, or a trailing backslash.', $provider, $platform);
         }
 
-        if (!ContainerParameterSyntax::accepts($instance)) {
+        if (!ContainerParameterSyntax::isAbsentFrom($instance)) {
             return self::sentence('"%s" uses an instance name holding "%%...%%", which would be read as a container parameter rather than as part of the name.', $provider, $platform);
         }
 

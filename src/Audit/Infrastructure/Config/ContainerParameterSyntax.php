@@ -28,7 +28,7 @@ final readonly class ContainerParameterSyntax
 {
     private const string REFERENCE_PATTERN = '/%%|%[^%\s]++%/';
 
-    public static function accepts(string $value): bool
+    public static function isAbsentFrom(string $value): bool
     {
         return EnvPlaceholder::in($value) instanceof EnvPlaceholder
             || 1 !== preg_match(self::REFERENCE_PATTERN, $value);

@@ -20,9 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerPa
 final class ContainerParameterSyntaxTest extends TestCase
 {
     #[DataProvider('valueCases')]
-    public function test_it_rejects_a_value_the_container_would_read_as_a_parameter(string $value, bool $expected): void
+    public function test_it_reports_whether_a_value_is_free_of_parameter_references(string $value, bool $expected): void
     {
-        self::assertSame($expected, ContainerParameterSyntax::accepts($value));
+        self::assertSame($expected, ContainerParameterSyntax::isAbsentFrom($value));
     }
 
     /**

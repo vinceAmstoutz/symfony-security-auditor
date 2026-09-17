@@ -43,8 +43,6 @@ final readonly class InitCommand
 
     public const string DESCRIPTION = 'Create the standalone configuration and download the selected provider bridge';
 
-    private const string ENV_VAR_NAME_PATTERN = '/^[A-Za-z_]\w*$/';
-
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandaloneConfigFactoryInterface $standaloneConfigFactory,
@@ -72,39 +70,33 @@ final readonly class InitCommand
         }
 
         $provider = b($initCommandInput->provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama, or generic.my_gateway for an AI gateway)', 'anthropic'))->trim()->toString();
-        $model = b($initCommandInput->model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
 
-        $violation = $this->identityViolation($provider, $model);
-        if (null !== $violation) {
-            $symfonyStyle->error($violation);
-
+        if ($this->refused($symfonyStyle, InitRefusal::forProviderText($provider))) {
             return Command::INVALID;
         }
 
         $provider = $this->providerKeyNormalizer->normalize($provider);
         $providerKey = ProviderKey::of($provider);
 
-        $violation = InitRefusal::forProvider($providerKey, $provider, $initCommandInput->baseUrl, $configFile);
-        if (null !== $violation) {
-            $symfonyStyle->error($violation);
+        if ($this->refused($symfonyStyle, InitRefusal::forProvider($providerKey, $provider, $initCommandInput->baseUrl, $configFile))) {
+            return Command::INVALID;
+        }
 
+        $model = b($initCommandInput->model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
+
+        if ($this->refused($symfonyStyle, InitRefusal::forModel($model))) {
             return Command::INVALID;
         }
 
         $envVar = b($initCommandInput->envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey)))->trim()->toString();
 
-        if (1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)) {
-            $symfonyStyle->error(\sprintf('"%s" is not a valid environment variable name (letters, digits, and underscores only; must not start with a digit).', $envVar));
-
+        if ($this->refused($symfonyStyle, InitRefusal::forEnvironmentVariable($envVar))) {
             return Command::INVALID;
         }
 
         $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
 
-        $baseUrlViolation = InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl);
-        if (null !== $baseUrlViolation) {
-            $symfonyStyle->error($baseUrlViolation);
-
+        if ($this->refused($symfonyStyle, InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl))) {
             return Command::INVALID;
         }
 
@@ -149,20 +141,15 @@ final readonly class InitCommand
         $symfonyStyle->success(\sprintf('Stored %s (%s). You can run "audit <path>" now — no environment variable needed.', $envVar, CredentialIdentity::of($credential)->maskedPreview));
     }
 
-    /**
-     * Checked on the raw bytes, before `ProviderKeyNormalizer` — its `u()`
-     * call throws on non-UTF-8 input, which must reject with exit code 2
-     * instead of crashing.
-     */
-    private function identityViolation(string $provider, string $model): ?string
+    private function refused(SymfonyStyle $symfonyStyle, ?string $violation): bool
     {
-        return match (true) {
-            1 !== preg_match('//u', $provider) => 'The provider must be valid UTF-8 text.',
-            '' === $provider => 'The provider must not be empty.',
-            1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
-            '' === $model => 'The model must not be empty.',
-            default => null,
-        };
+        if (null === $violation) {
+            return false;
+        }
+
+        $symfonyStyle->error($violation);
+
+        return true;
     }
 
     private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile): bool
