@@ -36,7 +36,7 @@ use function Symfony\Component\String\b;
 use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — the command *name* (`init`) is public, but the PHP class itself is for internal use only. */
-#[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
+#[AsCommand(name: self::NAME, description: self::DESCRIPTION, help: InitCommandHelp::HELP)]
 final readonly class InitCommand
 {
     public const string NAME = 'init';
@@ -100,10 +100,12 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
+        $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', $providerKey->platform));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl));
 
         $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
+        $symfonyStyle->definitionList(['Provider' => $provider], ['Model' => $model], ['API key variable' => $envVar]);
         $this->offerToStoreCredential($symfonyStyle, $envVar);
 
         return Command::SUCCESS;
@@ -171,13 +173,20 @@ final readonly class InitCommand
         return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
     }
 
+    private function askRequired(SymfonyStyle $symfonyStyle, string $question): string
+    {
+        $answer = $symfonyStyle->ask($question);
+
+        return \is_string($answer) ? $answer : '';
+    }
+
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
         if (!BaseUrlPlatforms::accept($providerKey)) {
             return null;
         }
 
-        $baseUrl = b($initCommandInput->baseUrl ?? $this->ask($symfonyStyle, 'Which base URL does this platform expose? (required by this platform)', ''))->trim()->toString();
+        $baseUrl = b($initCommandInput->baseUrl ?? $this->askRequired($symfonyStyle, \sprintf('Base URL of the endpoint you want %s to reach (required, e.g. https://your-gateway.example)', $providerKey->platform)))->trim()->toString();
 
         return '' !== $baseUrl ? $baseUrl : null;
     }

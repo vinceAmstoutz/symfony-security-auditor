@@ -95,7 +95,7 @@ final readonly class InitRefusal
         $requirement = HandWrittenPlatforms::requirementOf($providerKey);
 
         return null !== $requirement
-            ? \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $requirement, $configFile)
+            ? \sprintf('"%s" needs %s, which "init" does not write, so nothing was created. Write the block by hand in %s — docs/configuration.md#instance-keyed-platforms shows the shape and how to install its bridge.', $provider, $requirement, $configFile)
             : null;
     }
 
@@ -134,7 +134,7 @@ final readonly class InitRefusal
     private static function forInapplicableBaseUrl(ProviderKey $providerKey, string $provider, ?string $baseUrl): ?string
     {
         return null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)
-            ? \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::writableNames()), $provider)
+            ? \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::writableShapes()), $provider)
             : null;
     }
 

@@ -38,7 +38,7 @@ final readonly class HandWrittenPlatforms
         'dockermodelrunner' => 'a "host_url" rather than an api_key',
         'failover' => 'the list of "platforms" it falls back through rather than an api_key',
         'lmstudio' => 'a "host_url" rather than an api_key',
-        'transformersphp' => 'no connection options at all',
+        'transformersphp' => 'an empty connection block rather than an api_key',
     ];
 
     public static function requirementOf(ProviderKey $providerKey): ?string

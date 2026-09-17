@@ -44,8 +44,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   gateway does not serve.
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms) now
   says so and points at `completions_path` for gateways serving another route.
-- **`audit init --base-url`** supplies the platform endpoint without the prompt,
-  for the platforms `init` can write a block for that declare one: `albert`,
+- **`init` says what it is doing and what it wrote.** It named the file and
+  nothing else, while the run sat silent for however long `composer require`
+  took, right after the last question. It now says the bridge is downloading
+  before it starts, and lists the provider, model and API-key variable it
+  resolved — the three values it picks silently, including a model that defaults
+  to `claude-opus-4-8` for every provider rather than being derived from the one
+  you chose. `init --help` documents those defaults and shows an instance-keyed
+  invocation; `docs/configuration.md` gains an
+  [`init` CLI reference](docs/configuration.md#init--generating-the-standalone-configuration)
+  with the option table and the `composer require --working-dir=…` line for the
+  eight platforms it refuses to write.
+- **A refusal now leaves somewhere to go.** The base-URL prompt offered an empty
+  default, so pressing Enter looked legal and instead threw away every answer
+  already given; it no longer offers one and names the platform it is asking
+  about. A provider is checked the moment it is typed rather than after the
+  model and API-key questions, so a mistyped one costs one answer instead of
+  three. `--base-url applies to the platforms that expose one` now spells the
+  two instance-keyed ones as `generic.<instance>` and
+  `openresponses.<instance>`, rather than naming a form that would be refused
+  again. The eight platforms `init` cannot write are told that nothing was
+  created and where the shape and the bridge command are documented, and
+  `transformersphp` no longer reads as needing "no connection options at all,
+  which init does not write".
+- **`init --base-url`** supplies the platform endpoint without the prompt, for
+  the platforms `init` can write a block for that declare one: `albert`,
   `amazeeai`, `generic` and `openresponses` (`BaseUrlPlatforms::writableNames()`
   in `src/Audit/Infrastructure/Config/`). `azure` declares a `base_url` too but
   is refused for needing a `deployment`, so naming it would only send a reader
@@ -143,7 +166,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   while `StandaloneConfigFactory` wrote a flat
   `platform: {<provider>: {api_key: …}}` and
   `StandaloneContainerFactory::selectActivePlatform()` looked up
-  `ai.platform.<provider>`. `audit init --provider=generic` therefore produced a
+  `ai.platform.<provider>`. `init --provider=generic` therefore produced a
   config the container rejected with:
 
   ```text
@@ -157,21 +180,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   ```
 
   which named the one key that was plainly present. `StandaloneConfigFactory`
-  now nests the connection under its instance and accepts a `base_url`,
-  `audit init` gained `--base-url` and prompts for it on every platform whose
-  block it can write and that declares one, and a bare `provider: generic` now
-  reports that the platform is configured per instance and lists the instances
-  it found. The nesting covers all six instance-keyed platforms (`generic`,
-  `openresponses`, `azure`, `bedrock`, `cache`, `failover`); `init` writes a
-  bootable block for the two whose prototype is `base_url` plus `api_key`,
-  namely `generic` and `openresponses`. The other four take different fields
-  (`azure` also requires `deployment`, and `bedrock`, `cache` and `failover`
-  have no `api_key` node at all) and still have to be written by hand.
+  now nests the connection under its instance and accepts a `base_url`, `init`
+  gained `--base-url` and prompts for it on every platform whose block it can
+  write and that declares one, and a bare `provider: generic` now reports that
+  the platform is configured per instance and lists the instances it found. The
+  nesting covers all six instance-keyed platforms (`generic`, `openresponses`,
+  `azure`, `bedrock`, `cache`, `failover`); `init` writes a bootable block for
+  the two whose prototype is `base_url` plus `api_key`, namely `generic` and
+  `openresponses`. The other four take different fields (`azure` also requires
+  `deployment`, and `bedrock`, `cache` and `failover` have no `api_key` node at
+  all) and still have to be written by hand.
 
 - **`init` wrote an unbootable config for `albert` and `amazeeai`.** Both
   platforms declare `base_url` as a required child, but neither is instance
-  keyed, and `audit init --provider=albert` wrote only an `api_key`, so the next
-  run aborted with:
+  keyed, and `init --provider=albert` wrote only an `api_key`, so the next run
+  aborted with:
 
   ```text
   The child config "base_url" under "ai.platform.albert" must be configured.
@@ -210,9 +233,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `init` now reports that the platform requires a base URL and exits `2` without
   writing anything.
 
-- **`audit init --provider=generic` still wrote the flat block this release set
-  out to fix.** Nesting only happened once the provider named an instance, so
-  the bare form that #365 actually reported kept producing:
+- **`init --provider=generic` still wrote the flat block this release set out to
+  fix.** Nesting only happened once the provider named an instance, so the bare
+  form that #365 actually reported kept producing:
 
   ```text
   Invalid type for path "ai.platform.generic.api_key". Expected "array", but got "string"
@@ -299,9 +322,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   Unrecognized option "api_key" under "ai.platform.lmstudio". Available options are "host_url", "http_client".
   ```
 
-  `audit init --provider=lmstudio` was newly reachable because this release also
-  fixed that bridge's package slug, so the bridge now installed cleanly and only
-  then produced an unusable config. `HandWrittenPlatforms`
+  `init --provider=lmstudio` was newly reachable because this release also fixed
+  that bridge's package slug, so the bridge now installed cleanly and only then
+  produced an unusable config. `HandWrittenPlatforms`
   (`src/Audit/Infrastructure/Config/`) names the eight and what each needs
   instead: `azure` (a `deployment`), `cartesia` (a `version`), and `bedrock`,
   `cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` (no
@@ -312,16 +335,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`
   (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) had no entry
   for `minimax`, `lmstudio`, `openrouter`, `dockermodelrunner` or
-  `transformersphp`, so `audit init` asked Composer for
-  `symfony/ai-minimax-platform` instead of `symfony/ai-mini-max-platform`, and
-  likewise for `lm-studio`, `open-router`, `docker-model-runner` and
-  `transformers-php`. `minimax` was already spelled correctly in this package's
-  own `suggest` block. An instance-scoped provider (`generic.my_gateway`) also
-  had its instance folded into the package name; only the platform part now
-  selects the bridge. `BridgePackageKnowledgeTest` reads the package names
-  `symfony/ai-bundle` itself asks for back out of `AiBundle.php` and compares
-  them with the ones `init` would request, so the next renamed bridge fails the
-  build rather than a user's `composer require`.
+  `transformersphp`, so `init` asked Composer for `symfony/ai-minimax-platform`
+  instead of `symfony/ai-mini-max-platform`, and likewise for `lm-studio`,
+  `open-router`, `docker-model-runner` and `transformers-php`. `minimax` was
+  already spelled correctly in this package's own `suggest` block. An
+  instance-scoped provider (`generic.my_gateway`) also had its instance folded
+  into the package name; only the platform part now selects the bridge.
+  `BridgePackageKnowledgeTest` reads the package names `symfony/ai-bundle`
+  itself asks for back out of `AiBundle.php` and compares them with the ones
+  `init` would request, so the next renamed bridge fails the build rather than a
+  user's `composer require`.
 
 ### Security
 

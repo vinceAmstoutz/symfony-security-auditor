@@ -51,4 +51,22 @@ final readonly class BaseUrlPlatforms
     {
         return array_values(array_diff(self::NAMES, array_keys(HandWrittenPlatforms::REQUIREMENTS)));
     }
+
+    /**
+     * The same platforms, spelled the way a provider that works spells them, so
+     * a reader told `--base-url` does not apply to theirs is not handed a name
+     * that would be refused again for naming no instance.
+     *
+     * @return list<string>
+     */
+    public static function writableShapes(): array
+    {
+        $shapes = [];
+
+        foreach (self::writableNames() as $platform) {
+            $shapes[] = \in_array($platform, InstanceKeyedPlatforms::NAMES, true) ? \sprintf('%s.<instance>', $platform) : $platform;
+        }
+
+        return $shapes;
+    }
 }

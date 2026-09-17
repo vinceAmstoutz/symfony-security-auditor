@@ -123,7 +123,7 @@ final class PlatformShapeKnowledgeTest extends TestCase
     {
         $refusedForAnExtraField = array_keys(array_filter(
             HandWrittenPlatforms::REQUIREMENTS,
-            static fn (string $requirement): bool => !str_contains($requirement, 'rather than an api_key') && 'no connection options at all' !== $requirement,
+            static fn (string $requirement): bool => !str_contains($requirement, 'rather than an api_key'),
         ));
 
         self::assertSame([], array_diff($refusedForAnExtraField, $this->platformsRequiringMoreThanACredential()));

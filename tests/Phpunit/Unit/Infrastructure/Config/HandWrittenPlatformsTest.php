@@ -38,7 +38,7 @@ final class HandWrittenPlatformsTest extends TestCase
         yield 'a flat platform needing a version' => ['cartesia', 'a "version" beside the api_key'];
         yield 'a flat platform addressed by host url' => ['lmstudio', 'a "host_url" rather than an api_key'];
         yield 'the other flat platform addressed by host url' => ['dockermodelrunner', 'a "host_url" rather than an api_key'];
-        yield 'a flat platform taking no options' => ['transformersphp', 'no connection options at all'];
+        yield 'a flat platform taking no options' => ['transformersphp', 'an empty connection block rather than an api_key'];
         yield 'a platform init writes in full' => ['anthropic', null];
         yield 'an instance-keyed platform init writes in full' => ['generic.my_gateway', null];
     }

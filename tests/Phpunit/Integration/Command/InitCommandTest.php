@@ -559,7 +559,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringNotContainsString('Which base URL', $commandTester->getDisplay());
+        self::assertStringNotContainsString('Base URL of the endpoint', $commandTester->getDisplay());
     }
 
     public function test_it_asks_for_a_base_url_when_a_flat_platform_requires_one(): void
@@ -569,7 +569,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which base URL', $commandTester->getDisplay());
+        self::assertStringContainsString('Base URL of the endpoint', $commandTester->getDisplay());
     }
 
     public function test_it_writes_the_base_url_of_a_flat_platform_beside_its_api_key(): void
@@ -613,7 +613,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'albert, amazeeai, generic, openresponses',
+            'albert, amazeeai, generic.<instance>, openresponses.<instance>',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -790,6 +790,47 @@ final class InitCommandTest extends TestCase
             'would be read as a container parameter',
             $this->unwrappedDisplay($commandTester),
         );
+    }
+
+    public function test_it_says_the_bridge_is_downloading_before_the_wait(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'Downloading the generic provider bridge with composer',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    #[DataProvider('resolvedValueCases')]
+    public function test_it_lists_the_values_it_resolved(string $label, string $value): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            \sprintf('%s %s', $label, $value),
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function resolvedValueCases(): iterable
+    {
+        yield 'the provider it configured' => ['Provider', 'generic.my_gateway'];
+        yield 'the model it wrote' => ['Model', 'our-model'];
+        yield 'the variable the key is read from' => ['API key variable', 'GATEWAY_TOKEN'];
     }
 
     /**

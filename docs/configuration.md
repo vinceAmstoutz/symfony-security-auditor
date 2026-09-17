@@ -29,6 +29,7 @@ bundle registration, bundle-level configuration, platform wiring via
   - [`audit:trend`](#audittrend--tracking-findings-across-reports)
   - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
   - [`mcp:serve`](#mcpserve--model-context-protocol-server)
+  - [`init`](#init--generating-the-standalone-configuration)
   - [`self-update`](#self-update--updating-the-standalone-binary)
   - [`doctor`](#doctor--preflight-environment-check)
   - [Update notifications](#update-notifications)
@@ -416,8 +417,8 @@ platform:
 model: 'your-model'
 ```
 
-`audit init` writes that configuration, and installs
-`symfony/ai-generic-platform` for you, given `--provider=generic.my_gateway`,
+`init` writes that configuration, and installs `symfony/ai-generic-platform` for
+you, given `--provider=generic.my_gateway`,
 `--base-url=https://your-gateway.example`, `--model=your-model` and
 `--env-var=GATEWAY_TOKEN`. Leave the last two out and `init` prompts for them,
 or under `--no-interaction` falls back to `claude-opus-4-8` and
@@ -1192,6 +1193,43 @@ Exposed tools:
 > `mcp:serve` is a transport in front of the same pipeline `audit:run` uses, so
 > an audit triggered over MCP bills the configured LLM provider exactly as a CLI
 > run would.
+
+### `init` — generating the standalone configuration
+
+Standalone only. Writes `config.yaml` and downloads the provider bridge it
+needs. Every option it is not given is prompted for; under `--no-interaction`
+each falls back to its default instead.
+
+| Option       | Default                | Description                                                                                                                          |
+| ------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `--provider` | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                               |
+| `--model`    | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                            |
+| `--env-var`  | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from.                                                                   |
+| `--base-url` | prompted when required | The endpoint origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
+| `--force`    | off                    | Overwrite an existing configuration without asking.                                                                                  |
+
+```bash
+symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
+
+# an AI gateway: base_url is the origin only, with no trailing /v1 —
+# the bridge appends its own completions_path
+symfony-security-auditor init \
+    --provider=generic.my_gateway \
+    --base-url=https://your-gateway.example \
+    --env-var=GATEWAY_TOKEN \
+    --model=your-model \
+    --no-interaction
+```
+
+Eight platforms need a field `init` never writes and are refused with exit code
+`2` rather than written half-configured. Write those blocks by hand in
+`config.yaml` and install the bridge yourself, pointing `composer` at the
+standalone data directory:
+
+```bash
+composer require symfony/ai-lm-studio-platform \
+    --working-dir="${XDG_DATA_HOME:-$HOME/.local/share}/symfony-security-auditor"
+```
 
 ### `self-update` — updating the standalone binary
 
