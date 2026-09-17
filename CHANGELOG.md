@@ -53,8 +53,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   you chose. `init --help` documents those defaults and shows an instance-keyed
   invocation; `docs/configuration.md` gains an
   [`init` CLI reference](docs/configuration.md#init--generating-the-standalone-configuration)
-  with the option table and the `composer require --working-dir=…` line for the
-  eight platforms it refuses to write.
+  with the option table and what the eight platforms it refuses still need.
 - **A refusal now leaves somewhere to go.** The base-URL prompt offered an empty
   default, so pressing Enter looked legal while it in fact threw away every
   answer already given. The marker is gone and the prompt names the platform it

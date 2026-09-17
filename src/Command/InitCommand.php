@@ -110,7 +110,7 @@ final readonly class InitCommand
         $symfonyStyle->definitionList(
             ['Provider' => OutputFormatter::escape($provider)],
             ['Model' => OutputFormatter::escape($model)],
-            ['API key variable' => OutputFormatter::escape($envVar)],
+            ['API key variable' => $envVar],
         );
         $this->offerToStoreCredential($symfonyStyle, $envVar);
 

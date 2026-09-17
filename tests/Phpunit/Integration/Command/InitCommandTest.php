@@ -805,17 +805,28 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('requires a base URL', $this->unwrappedDisplay($commandTester));
     }
 
-    public function test_it_reports_a_value_holding_console_markup_as_written(): void
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('consoleMarkupCases')]
+    public function test_it_reports_a_value_holding_console_markup_as_written(array $options, string $expected): void
     {
         $commandTester = $this->commandTester();
 
-        $exitCode = $commandTester->execute(
-            ['--provider' => 'openai', '--model' => 'a<fg=nope>model', '--env-var' => 'TOKEN'],
-            ['interactive' => false],
-        );
+        $exitCode = $commandTester->execute($options, ['interactive' => false]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
-        self::assertStringContainsString('a<fg=nope>model', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString($expected, $this->unwrappedDisplay($commandTester));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function consoleMarkupCases(): iterable
+    {
+        yield 'a model naming an unknown colour' => [['--provider' => 'openai', '--model' => 'a<fg=nope>model', '--env-var' => 'TOKEN'], 'a<fg=nope>model'];
+        yield 'a provider naming an unknown colour' => [['--provider' => 'x<fg=nope>y', '--model' => 'our-model', '--env-var' => 'TOKEN'], 'x<fg=nope>y'];
+        yield 'a provider holding a known tag is not swallowed' => [['--provider' => 'x<info>y', '--model' => 'our-model', '--env-var' => 'TOKEN'], 'x<info>y'];
     }
 
     public function test_it_says_the_bridge_is_downloading_before_the_wait(): void

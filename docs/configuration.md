@@ -1197,8 +1197,9 @@ Exposed tools:
 ### `init` — generating the standalone configuration
 
 Standalone only. Writes `config.yaml` and downloads the provider bridge it
-needs. Every option it is not given is prompted for; under `--no-interaction`
-each falls back to its default instead.
+needs. Every option it is not given is prompted for. Under `--no-interaction`
+the three with defaults fall back to them, and a platform that requires a
+`--base-url` is refused rather than written half-configured.
 
 | Option       | Default                | Description                                                                                                                          |
 | ------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1225,9 +1226,13 @@ Eight platforms are refused with exit code `2` rather than written
 half-configured, because `init` only ever writes an `api_key` and an optional
 `base_url`: `azure` and `cartesia` need an extra field beside the key, and
 `bedrock`, `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
-`transformersphp` take no `api_key` at all. Write those blocks by hand in
-`config.yaml`, using the shapes under
-[Instance-keyed platforms](#instance-keyed-platforms).
+`transformersphp` take no `api_key` at all. The refusal names the field the
+platform wants; its connection block goes under `platform:` in `config.yaml`,
+with the same children `symfony/ai-bundle` documents for it. Four of the eight
+(`azure`, `bedrock`, `cache`, `failover`) nest one level deeper under an
+instance name — see [Instance-keyed platforms](#instance-keyed-platforms);
+`cartesia`, `dockermodelrunner`, `lmstudio` and `transformersphp` take a flat
+block.
 
 Their bridge package still has to reach the standalone data directory, and
 `init` is the only thing that puts one there — it also pins the binary's own PHP
