@@ -37,6 +37,7 @@ final class ContainerParameterSyntaxTest extends TestCase
         yield 'a parameter reference inside a url is refused' => ['https://gw.example/%v%', false];
         yield 'a bare parameter reference is refused' => ['%v%', false];
         yield 'an escaped percent would be rewritten, so it is refused' => ['https://gw.example/a%%b', false];
+        yield 'a percent pair spanning whitespace is not a reference' => ['https://gw.example/?d=50% off 20%', true];
         yield 'an env placeholder with a suffix is not the whole value' => ['%env(GATEWAY_URL)%/v1', false];
     }
 }

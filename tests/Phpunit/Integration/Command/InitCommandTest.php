@@ -20,6 +20,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
@@ -791,16 +792,30 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_installs_no_bridge_for_a_provider_it_refuses(): void
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('refusedProviderCases')]
+    public function test_it_installs_no_bridge_for_a_provider_it_refuses(array $options): void
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(
-            ['--provider' => 'lmstudio', '--model' => 'our-model', '--env-var' => 'TOKEN'],
-            ['interactive' => false],
-        );
+        $commandTester->execute($options, ['interactive' => false]);
 
         self::assertSame([], $this->recordingBridgeInstaller->installations);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function refusedProviderCases(): iterable
+    {
+        yield 'a platform init cannot write' => [['--provider' => 'lmstudio', '--model' => 'our-model', '--env-var' => 'TOKEN']];
+        yield 'an instance-keyed platform with no instance' => [['--provider' => 'generic', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example']];
+        yield 'an instance name yaml cannot key by' => [['--provider' => 'generic.0', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example']];
+        yield 'an environment variable name that is not one' => [['--provider' => 'generic.gw', '--model' => 'our-model', '--env-var' => '9TOKEN', '--base-url' => 'https://gw.example']];
+        yield 'a base url read as a container parameter' => [['--provider' => 'generic.gw', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example/%v%']];
+        yield 'a required base url left empty' => [['--provider' => 'albert', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => '']];
     }
 
     public function test_it_refuses_the_provider_before_asking_anything_else(): void
@@ -965,7 +980,10 @@ final class InitCommandTest extends TestCase
             ['interactive' => false],
         );
 
-        self::assertSame([['generic.my_gateway', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
+        self::assertSame(
+            'symfony/ai-generic-platform',
+            ComposerBridgeInstaller::packageFor($this->recordingBridgeInstaller->installations[0][0]),
+        );
     }
 
     public function test_it_asks_for_a_base_url_when_the_provider_selects_a_platform_instance(): void

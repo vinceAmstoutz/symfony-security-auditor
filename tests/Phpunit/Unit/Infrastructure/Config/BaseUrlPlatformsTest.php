@@ -40,8 +40,8 @@ final class BaseUrlPlatformsTest extends TestCase
         $description = $option->description;
 
         self::assertSame(
-            [],
-            array_values(array_filter(BaseUrlPlatforms::writableNames(), static fn (string $platform): bool => !str_contains($description, $platform))),
+            BaseUrlPlatforms::writableNames(),
+            array_values(array_filter(BaseUrlPlatforms::NAMES, static fn (string $platform): bool => str_contains($description, $platform))),
         );
     }
 
@@ -54,7 +54,7 @@ final class BaseUrlPlatformsTest extends TestCase
         yield 'the other flat platform requiring a base_url' => ['amazeeai', true];
         yield 'an instance-keyed platform exposing one' => ['generic.my_gateway', true];
         yield 'an instance-keyed platform exposing one beside other required fields' => ['azure.prod', true];
-        yield 'the instance name never decides' => ['openresponses.my_gateway', true];
+        yield 'the instance name never decides' => ['ollama.generic', false];
         yield 'an instance-keyed platform without one' => ['bedrock.default', false];
         yield 'a flat platform naming its endpoint differently' => ['ollama', false];
         yield 'a flat platform hosting no endpoint' => ['anthropic', false];
