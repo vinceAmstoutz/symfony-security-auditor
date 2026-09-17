@@ -56,12 +56,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   with the option table and the `composer require --working-dir=…` line for the
   eight platforms it refuses to write.
 - **A refusal now leaves somewhere to go.** The base-URL prompt offered an empty
-  default, so pressing Enter looked legal and instead threw away every answer
-  already given; it no longer offers one and names the platform it is asking
-  about. A provider is checked the moment it is typed rather than after the
-  model and API-key questions, so a mistyped one costs one answer instead of
-  three. `--base-url applies to the platforms that expose one` now spells the
-  two instance-keyed ones as `generic.<instance>` and
+  default, so pressing Enter looked legal while it in fact threw away every
+  answer already given. The marker is gone and the prompt names the platform it
+  is asking about; answering it empty is still refused, and a prompt that
+  reaches end of input — a `RUN` line or a CI step that forgot
+  `--no-interaction` — reports that refusal with exit code `2` rather than
+  aborting with exit `1`. A provider is checked the moment it is typed rather
+  than after the model and API-key questions, so a mistyped one costs one answer
+  instead of three. `--base-url applies to the platforms that expose one` now
+  spells the two instance-keyed ones as `generic.<instance>` and
   `openresponses.<instance>`, rather than naming a form that would be refused
   again. The eight platforms `init` cannot write are told that nothing was
   created and where the shape is documented, and `transformersphp` no longer

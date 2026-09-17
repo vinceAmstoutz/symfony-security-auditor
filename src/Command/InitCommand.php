@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\MissingInputException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
@@ -100,12 +102,16 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', $providerKey->platform));
+        $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', OutputFormatter::escape($providerKey->platform)));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl));
 
         $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
-        $symfonyStyle->definitionList(['Provider' => $provider], ['Model' => $model], ['API key variable' => $envVar]);
+        $symfonyStyle->definitionList(
+            ['Provider' => OutputFormatter::escape($provider)],
+            ['Model' => OutputFormatter::escape($model)],
+            ['API key variable' => OutputFormatter::escape($envVar)],
+        );
         $this->offerToStoreCredential($symfonyStyle, $envVar);
 
         return Command::SUCCESS;
@@ -173,9 +179,18 @@ final readonly class InitCommand
         return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
     }
 
+    /**
+     * Asked without a default, so no misleading `[]` is offered for a value that
+     * is required. `QuestionHelper` rethrows at end of input when the default is
+     * null, which would abort with exit 1 instead of the refusal this returns to.
+     */
     private function askRequired(SymfonyStyle $symfonyStyle, string $question): string
     {
-        $answer = $symfonyStyle->ask($question);
+        try {
+            $answer = $symfonyStyle->ask($question);
+        } catch (MissingInputException) {
+            return '';
+        }
 
         return \is_string($answer) ? $answer : '';
     }

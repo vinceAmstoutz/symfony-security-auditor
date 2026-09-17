@@ -792,6 +792,32 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_refuses_a_missing_base_url_when_the_prompt_reaches_end_of_input(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([]);
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN'],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString('requires a base URL', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_reports_a_value_holding_console_markup_as_written(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'openai', '--model' => 'a<fg=nope>model', '--env-var' => 'TOKEN'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString('a<fg=nope>model', $this->unwrappedDisplay($commandTester));
+    }
+
     public function test_it_says_the_bridge_is_downloading_before_the_wait(): void
     {
         $commandTester = $this->commandTester();

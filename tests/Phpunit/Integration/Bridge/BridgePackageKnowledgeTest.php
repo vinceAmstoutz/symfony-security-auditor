@@ -29,16 +29,19 @@ final class BridgePackageKnowledgeTest extends TestCase
 
     private const string BUNDLE_MANIFEST = __DIR__.'/../../../../vendor/symfony/ai-bundle/composer.json';
 
-    public function test_every_platform_asks_for_a_package_the_bundle_declares(): void
+    public function test_every_platform_asks_for_the_package_the_bundle_declares_for_it(): void
     {
-        $declared = $this->packagesTheBundleDeclares();
+        $declared = $this->packagesTheBundleDeclaresByPlatform();
 
-        $unknown = array_values(array_filter(
-            $this->platformNames(),
-            static fn (string $platform): bool => !\in_array(ComposerBridgeInstaller::packageFor($platform), $declared, true),
-        ));
+        $asked = [];
+        $expected = [];
 
-        self::assertSame([], $unknown);
+        foreach ($this->platformNames() as $platform) {
+            $asked[$platform] = ComposerBridgeInstaller::packageFor($platform);
+            $expected[$platform] = $declared[$platform] ?? null;
+        }
+
+        self::assertSame($expected, $asked);
     }
 
     /**
@@ -60,18 +63,29 @@ final class BridgePackageKnowledgeTest extends TestCase
     }
 
     /**
-     * @return list<string>
+     * The bundle names each bridge with the platform key hyphenated, so
+     * `symfony/ai-open-ai-platform` belongs to `openai`. Keying the declared
+     * packages that way pairs each platform with its own package, rather than
+     * only asking whether the requested name exists somewhere in the list — a
+     * slug pointing at another platform's real bridge would pass that.
+     *
+     * @return array<string, string>
      */
-    private function packagesTheBundleDeclares(): array
+    private function packagesTheBundleDeclaresByPlatform(): array
     {
         $manifest = file_get_contents(self::BUNDLE_MANIFEST);
         self::assertNotFalse($manifest);
 
-        preg_match_all('#"(symfony/ai-[a-z-]+-platform)"#', $manifest, $matches);
-        $packages = array_values(array_unique($matches[1]));
+        preg_match_all('#"symfony/ai-([a-z-]+)-platform"#', $manifest, $matches);
 
-        self::assertNotSame([], $packages, 'The bundle declares at least one bridge package');
+        $byPlatform = [];
 
-        return $packages;
+        foreach (array_unique($matches[1]) as $slug) {
+            $byPlatform[str_replace('-', '', $slug)] = \sprintf('symfony/ai-%s-platform', $slug);
+        }
+
+        self::assertNotSame([], $byPlatform, 'The bundle declares at least one bridge package');
+
+        return $byPlatform;
     }
 }

@@ -115,5 +115,6 @@ final class WrittenConfigurationBootsEndToEndTest extends TestCase
         yield 'an instance that folds a hyphen' => ['generic.my-gateway', 'http://localhost'];
         yield 'a numbered instance' => ['generic.42', 'http://localhost'];
         yield 'an instance whose case is preserved' => ['generic.myGateway', 'http://localhost'];
+        yield 'a platform that takes a single connection block' => ['ollama', null];
     }
 }
