@@ -416,7 +416,7 @@ platform:
 model: 'your-model'
 ```
 
-`audit init` writes exactly that block, and installs
+`audit init` writes that configuration, and installs
 `symfony/ai-generic-platform` for you, given `--provider=generic.my_gateway`,
 `--base-url=https://your-gateway.example`, `--model=your-model` and
 `--env-var=GATEWAY_TOKEN`. Leave the last two out and `init` prompts for them,
@@ -432,14 +432,15 @@ underscore the way `symfony/config` will, in both `provider:` and the
 written as `generic.my_gateway`). A name the config file could not be read back
 with is refused outright: `0`, because YAML writes that block as a sequence
 entry rather than as a key, and `.inf` or `.nan`, because YAML writes those
-unquoted and then refuses them on the way back in. Every other number keys the
-block by name and is accepted. A bare `provider: generic` in a hand-written
-config aborts the run saying so and listing the instances you configured.
+unquoted and then refuses them on the way back in. Every other number is
+accepted, subject to the same hyphen fold, so `generic.-1` is written as
+`generic._1`. A bare `provider: generic` in a hand-written config aborts the run
+saying so and listing the instances you configured.
 
 `base_url` is the origin only. The `generic` bridge appends its own
 `completions_path`, which defaults to `/v1/chat/completions`, so a `base_url`
-already ending in `/v1` produces `/v1/v1/chat/completions` and the run fails on
-a malformed URL. Give it `https://your-gateway.example` and, if your gateway
+already ending in `/v1` produces `/v1/v1/chat/completions`, a path your gateway
+does not serve. Give it `https://your-gateway.example` and, if your gateway
 serves a different route, set `completions_path` rather than folding the prefix
 into `base_url`:
 
@@ -454,15 +455,16 @@ ai:
 ```
 
 `init` asks for a `base_url`, the only child either platform requires, plus an
-API key; the rest of their prototype (`http_client`, `model_catalog` and the
-route key, which is `completions_path` on `generic` and `responses_path` on
-`openresponses`) has defaults you can override by hand. Eight platforms need
-something it never asks for and are refused with exit code `2` rather than
-written half-configured: `azure` (a `deployment`) and `cartesia` (a `version`)
-want an extra field beside the key, while `bedrock`, `cache`, `failover`,
-`dockermodelrunner`, `lmstudio` and `transformersphp` have no `api_key` node at
-all. Write those blocks by hand, pointing `provider:` at the matching
-`<platform>.<instance>` when the platform is instance keyed.
+API key. Everything else in their prototype is optional: `http_client` and the
+route key (`completions_path` on `generic`, `responses_path` on `openresponses`)
+carry defaults, `generic` adds `supports_completions`, `supports_embeddings` and
+`embeddings_path`, and `model_catalog` has no default at all. Set any of them by
+hand. Eight platforms need something it never asks for and are refused with exit
+code `2` rather than written half-configured: `azure` (a `deployment`) and
+`cartesia` (a `version`) want an extra field beside the key, while `bedrock`,
+`cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` have
+no `api_key` node at all. Write those blocks by hand, pointing `provider:` at
+the matching `<platform>.<instance>` when the platform is instance keyed.
 
 Being instance keyed and taking a `base_url` are independent. `albert` and
 `amazeeai` require a `base_url` on a flat block, so `init` asks them for one too

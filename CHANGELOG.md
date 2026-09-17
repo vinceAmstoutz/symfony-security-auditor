@@ -40,8 +40,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 - **Documented that `base_url` is the origin only.** The `generic` bridge
   appends its own `completions_path` (default `/v1/chat/completions`), so a
-  `base_url` ending in `/v1` produced `/v1/v1/chat/completions` and a malformed
-  URL error.
+  `base_url` ending in `/v1` produced `/v1/v1/chat/completions`, a path the
+  gateway does not serve.
   [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms) now
   says so and points at `completions_path` for gateways serving another route.
 - **`audit init --base-url`** supplies the platform endpoint without the prompt,
@@ -119,11 +119,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `symfony/ai-bundle` expects an application to provide, and `http_client` —
   supplied by `FrameworkBundle` in a real app — was missing. Three bridges
   reference it strictly (`ollama`, `elevenlabs` and `deepgram`), and `ollama` is
-  the only one of them an audit runs against; every other bridge passes
-  `NULL_ON_INVALID_REFERENCE` and falls back to a client it builds itself, which
-  is why this provider alone failed. The container now registers `http_client`
-  as `FrameworkBundle` does, and `symfony/http-client` becomes a direct
-  dependency.
+  the only one of them an audit runs against; every other bridge that takes an
+  `http_client` passes `NULL_ON_INVALID_REFERENCE` and falls back to a client it
+  builds itself, which is why this provider alone failed. The container now
+  registers `http_client` as `FrameworkBundle` does, and `symfony/http-client`
+  becomes a direct dependency.
 
 - **An AI gateway behind a custom URL and token can now be configured.**
   `symfony/ai-generic-platform` is the `symfony/ai` bridge for an arbitrary
@@ -151,15 +151,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
   which named the one key that was plainly present. `StandaloneConfigFactory`
   now nests the connection under its instance and accepts a `base_url`,
-  `audit init` gained `--base-url` and prompts for it when the provider selects
-  an instance, and a bare `provider: generic` now reports that the platform is
-  configured per instance and lists the instances it found. The nesting covers
-  all six instance-keyed platforms (`generic`, `openresponses`, `azure`,
-  `bedrock`, `cache`, `failover`); `init` writes a bootable block for the two
-  whose prototype is `base_url` plus `api_key`, namely `generic` and
-  `openresponses`. The other four take different fields (`azure` also requires
-  `deployment`, and `bedrock`, `cache` and `failover` have no `api_key` node at
-  all) and still have to be written by hand.
+  `audit init` gained `--base-url` and prompts for it on every platform whose
+  block it can write and that declares one, and a bare `provider: generic` now
+  reports that the platform is configured per instance and lists the instances
+  it found. The nesting covers all six instance-keyed platforms (`generic`,
+  `openresponses`, `azure`, `bedrock`, `cache`, `failover`); `init` writes a
+  bootable block for the two whose prototype is `base_url` plus `api_key`,
+  namely `generic` and `openresponses`. The other four take different fields
+  (`azure` also requires `deployment`, and `bedrock`, `cache` and `failover`
+  have no `api_key` node at all) and still have to be written by hand.
 
 - **`init` wrote an unbootable config for `albert` and `amazeeai`.** Both
   platforms declare `base_url` as a required child, but neither is instance
@@ -243,9 +243,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   parse its own config
   (`Numeric keys are not supported. Quote your evaluable mapping keys instead`),
   which `--force` would have turned into the loss of a working configuration.
-  Every other number keys the block by name and is accepted. A provider naming
-  no platform before the dot (`.anthropic`) is refused too, instead of advising
-  the empty string.
+  Every other number is accepted, subject to the hyphen fold above, so
+  `generic.-1` is written as `generic._1`. A provider naming no platform before
+  the dot (`.anthropic`) is refused too, instead of advising the empty string.
 
 - **An instance written with stray whitespace kept it.** `generic. my_gateway`
   parsed to the instance `" my_gateway"` and was written as the YAML key,
