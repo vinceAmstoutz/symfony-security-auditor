@@ -195,8 +195,9 @@ final readonly class InitCommand
             return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
         }
 
-        return $this->writabilityViolation($providerKey, $provider, $baseUrl, $configFile)
-            ?? $this->providerNameViolation($providerKey, $provider);
+        return $this->handWrittenViolation($providerKey, $provider, $configFile)
+            ?? $this->providerNameViolation($providerKey, $provider)
+            ?? $this->baseUrlApplicabilityViolation($providerKey, $provider, $baseUrl);
     }
 
     private function providerNameViolation(ProviderKey $providerKey, string $provider): ?string
@@ -220,18 +221,24 @@ final readonly class InitCommand
         return null;
     }
 
-    private function writabilityViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl, string $configFile): ?string
+    private function handWrittenViolation(ProviderKey $providerKey, string $provider, string $configFile): ?string
     {
         $handWritten = HandWrittenPlatforms::requirementOf($providerKey);
-        if (null !== $handWritten) {
-            return \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile);
-        }
 
-        if (null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)) {
-            return \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::writableNames()), $provider);
-        }
+        return null !== $handWritten
+            ? \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile)
+            : null;
+    }
 
-        return null;
+    /**
+     * Last of the refusals, so a provider that names a platform wrongly hears
+     * why before it hears that `--base-url` does not apply to what it named.
+     */
+    private function baseUrlApplicabilityViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl): ?string
+    {
+        return null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)
+            ? \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::writableNames()), $provider)
+            : null;
     }
 
     private function baseUrlViolation(?string $baseUrl, string $provider, ProviderKey $providerKey): ?string

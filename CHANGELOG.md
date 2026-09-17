@@ -307,7 +307,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `transformers-php`. `minimax` was already spelled correctly in this package's
   own `suggest` block. An instance-scoped provider (`generic.my_gateway`) also
   had its instance folded into the package name; only the platform part now
-  selects the bridge.
+  selects the bridge. `BridgePackageKnowledgeTest` reads the package names
+  `symfony/ai-bundle` itself asks for back out of `AiBundle.php` and compares
+  them with the ones `init` would request, so the next renamed bridge fails the
+  build rather than a user's `composer require`.
 
 ### Security
 

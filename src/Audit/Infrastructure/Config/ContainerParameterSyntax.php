@@ -30,7 +30,7 @@ final readonly class ContainerParameterSyntax
 
     public static function accepts(string $value): bool
     {
-        return null !== EnvPlaceholder::in($value)
+        return EnvPlaceholder::in($value) instanceof EnvPlaceholder
             || 1 !== preg_match(self::REFERENCE_PATTERN, $value);
     }
 }

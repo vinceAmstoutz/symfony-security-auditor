@@ -713,7 +713,9 @@ any time:
 symfony-security-auditor auth:set
 # Paste the API key for ANTHROPIC_API_KEY (input stays hidden): ****
 # [OK] Stored ANTHROPIC_API_KEY (sk-ant…qF4A, SHA256:ed9ff73cc4b2cd57) in
-#      /home/you/.config/symfony-security-auditor/credentials.json.
+#      /home/you/.config/symfony-security-auditor/credentials.json. Audits pick
+#      it up on their own from now on — an exported ANTHROPIC_API_KEY still
+#      takes precedence when you want to override it for one run.
 ```
 
 The prompt never echoes, so the key reaches neither the terminal nor the shell
