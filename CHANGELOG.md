@@ -64,9 +64,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   two instance-keyed ones as `generic.<instance>` and
   `openresponses.<instance>`, rather than naming a form that would be refused
   again. The eight platforms `init` cannot write are told that nothing was
-  created and where the shape and the bridge command are documented, and
-  `transformersphp` no longer reads as needing "no connection options at all,
-  which init does not write".
+  created and where the shape is documented, and `transformersphp` no longer
+  reads as needing "no connection options at all, which init does not write".
 - **`init --base-url`** supplies the platform endpoint without the prompt, for
   the platforms `init` can write a block for that declare one: `albert`,
   `amazeeai`, `generic` and `openresponses` (`BaseUrlPlatforms::writableNames()`
@@ -341,8 +340,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   already spelled correctly in this package's own `suggest` block. An
   instance-scoped provider (`generic.my_gateway`) also had its instance folded
   into the package name; only the platform part now selects the bridge.
-  `BridgePackageKnowledgeTest` reads the package names `symfony/ai-bundle`
-  itself asks for back out of `AiBundle.php` and compares them with the ones
+  `BridgePackageKnowledgeTest` reads the bridge package names out of
+  `symfony/ai-bundle`'s own `composer.json` and compares them with the ones
   `init` would request, so the next renamed bridge fails the build rather than a
   user's `composer require`.
 

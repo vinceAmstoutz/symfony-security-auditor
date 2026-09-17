@@ -95,7 +95,7 @@ final readonly class InitRefusal
         $requirement = HandWrittenPlatforms::requirementOf($providerKey);
 
         return null !== $requirement
-            ? \sprintf('"%s" needs %s, which "init" does not write, so nothing was created. Write the block by hand in %s — docs/configuration.md#instance-keyed-platforms shows the shape and how to install its bridge.', $provider, $requirement, $configFile)
+            ? \sprintf('"%s" needs %s, which "init" does not write, so nothing was created. Write the block by hand in %s; docs/configuration.md#init--generating-the-standalone-configuration says how, and what is still missing for its bridge.', $provider, $requirement, $configFile)
             : null;
     }
 

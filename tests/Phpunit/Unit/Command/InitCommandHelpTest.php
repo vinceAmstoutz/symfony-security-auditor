@@ -23,6 +23,12 @@ final class InitCommandHelpTest extends TestCase
         self::assertStringContainsString('claude-opus-4-8 — set it for any other provider, it is not derived from one', InitCommandHelp::HELP);
     }
 
+    public function test_it_names_the_env_var_default_as_the_console_will_print_it(): void
+    {
+        self::assertStringContainsString('<PLATFORM>_API_KEY', InitCommandHelp::HELP);
+        self::assertStringNotContainsString('&lt;', InitCommandHelp::HELP);
+    }
+
     public function test_it_warns_that_a_base_url_is_the_origin_only(): void
     {
         self::assertStringContainsString('do not include a trailing <info>/v1</info>', InitCommandHelp::HELP);

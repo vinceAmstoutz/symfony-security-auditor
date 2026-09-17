@@ -1221,15 +1221,20 @@ symfony-security-auditor init \
     --no-interaction
 ```
 
-Eight platforms need a field `init` never writes and are refused with exit code
-`2` rather than written half-configured. Write those blocks by hand in
-`config.yaml` and install the bridge yourself, pointing `composer` at the
-standalone data directory:
+Eight platforms are refused with exit code `2` rather than written
+half-configured, because `init` only ever writes an `api_key` and an optional
+`base_url`: `azure` and `cartesia` need an extra field beside the key, and
+`bedrock`, `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
+`transformersphp` take no `api_key` at all. Write those blocks by hand in
+`config.yaml`, using the shapes under
+[Instance-keyed platforms](#instance-keyed-platforms).
 
-```bash
-composer require symfony/ai-lm-studio-platform \
-    --working-dir="${XDG_DATA_HOME:-$HOME/.local/share}/symfony-security-auditor"
-```
+Their bridge package still has to reach the standalone data directory, and
+`init` is the only thing that puts one there — it also pins the binary's own PHP
+version in that directory, without which the bridge resolves against your system
+PHP and the binary aborts on the next run. Installing a bridge for a platform
+`init` refuses is therefore not supported yet; it is tracked in
+[#370](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/370).
 
 ### `self-update` — updating the standalone binary
 

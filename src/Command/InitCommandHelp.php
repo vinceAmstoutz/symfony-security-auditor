@@ -22,12 +22,12 @@ final class InitCommandHelp
 {
     public const string HELP = <<<'HELP'
         The <info>%command.name%</info> command writes the standalone configuration and downloads the provider bridge it needs.
-        Every option it does not receive is asked for; under <info>--no-interaction</info> each falls back to its default instead.
+        Every option it does not receive is asked for. Under <info>--no-interaction</info> the three with defaults fall back to them, and a platform that requires a <info>--base-url</info> is refused rather than written half-configured.
 
         Defaults:
           <info>--provider</info>  anthropic
           <info>--model</info>     claude-opus-4-8 — set it for any other provider, it is not derived from one
-          <info>--env-var</info>   &lt;PLATFORM&gt;_API_KEY
+          <info>--env-var</info>   <PLATFORM>_API_KEY
 
         A platform configured per instance needs the instance in <info>--provider</info>, and the endpoint it reaches in <info>--base-url</info>:
 
