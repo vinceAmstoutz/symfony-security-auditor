@@ -51,7 +51,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   is refused for needing a `deployment`, so naming it would only send a reader
   into a second refusal. Passing `--base-url` with any other platform is
   rejected with exit code `2` rather than writing a key that platform has no
-  node for. Listed in `docs/versioning.md` as part of the `init` surface.
+  node for. A URL holding a `%...%` pair is rejected too
+  (`ContainerParameterSyntax`, `src/Audit/Infrastructure/Config/`): the value
+  reaches the container verbatim, where `%v%` is a parameter reference that
+  aborts the run with `You have requested a non-existent parameter "v".` and
+  `%%` is silently rewritten to a single `%`. A whole-value `%env(VAR)%` is
+  still accepted, because `StandalonePlatformConfigResolver` resolves it before
+  the container is built. Listed in `docs/versioning.md` as part of the `init`
+  surface.
 - **`symfony/ai-generic-platform`, `symfony/ai-albert-platform` and
   `symfony/ai-amazee-ai-platform` in the README platform table and in
   `composer.json` `suggest`**, plus a new

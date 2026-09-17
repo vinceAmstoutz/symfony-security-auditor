@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyInstanceName;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
@@ -105,8 +106,9 @@ final readonly class InitCommand
 
         $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
 
-        if (null === $baseUrl && BaseUrlPlatforms::accept($providerKey)) {
-            $symfonyStyle->error(\sprintf('"%s" requires a base URL, so nothing was written. Re-run with --base-url=<origin>.', $provider));
+        $baseUrlViolation = $this->baseUrlViolation($baseUrl, $provider, $providerKey);
+        if (null !== $baseUrlViolation) {
+            $symfonyStyle->error($baseUrlViolation);
 
             return Command::INVALID;
         }
@@ -230,6 +232,19 @@ final readonly class InitCommand
         }
 
         return null;
+    }
+
+    private function baseUrlViolation(?string $baseUrl, string $provider, ProviderKey $providerKey): ?string
+    {
+        if (null === $baseUrl) {
+            return BaseUrlPlatforms::accept($providerKey)
+                ? \sprintf('"%s" requires a base URL, so nothing was written. Re-run with --base-url=<origin>.', $provider)
+                : null;
+        }
+
+        return ContainerParameterSyntax::accepts($baseUrl)
+            ? null
+            : \sprintf('The base URL for "%s" holds "%%...%%", which would be read as a container parameter rather than as part of the URL. Give the URL itself, or "%%env(VAR)%%" to read it from the environment.', $provider);
     }
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string

@@ -28,7 +28,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 final readonly class ConfigKeyInstanceName
 {
-    private const string PLATFORM_NODE = 'platform';
+    private const string PLATFORM_NODE = 'zzz';
 
     private const string PLATFORM_PLACEHOLDER = 'a_platform';
 

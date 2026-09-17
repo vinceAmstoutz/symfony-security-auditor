@@ -760,6 +760,41 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_refuses_a_base_url_the_container_would_read_as_a_parameter(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example/%v%'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'would be read as a container parameter',
+            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_accepts_a_base_url_that_is_an_env_placeholder(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => '%env(GATEWAY_URL)%'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => '%env(GATEWAY_URL)%', 'api_key' => '%env(TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
     public function test_it_refuses_an_instance_the_container_cannot_name_a_service_by(): void
     {
         $commandTester = $this->commandTester();
