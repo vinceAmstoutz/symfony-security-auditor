@@ -23,16 +23,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyInstanceName;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformServiceId;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -89,7 +84,7 @@ final readonly class InitCommand
         $provider = $this->providerKeyNormalizer->normalize($provider);
         $providerKey = ProviderKey::of($provider);
 
-        $violation = $this->platformViolation($providerKey, $provider, $initCommandInput->baseUrl, $configFile);
+        $violation = InitRefusal::forProvider($providerKey, $provider, $initCommandInput->baseUrl, $configFile);
         if (null !== $violation) {
             $symfonyStyle->error($violation);
 
@@ -106,7 +101,7 @@ final readonly class InitCommand
 
         $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
 
-        $baseUrlViolation = $this->baseUrlViolation($baseUrl, $provider, $providerKey);
+        $baseUrlViolation = InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl);
         if (null !== $baseUrlViolation) {
             $symfonyStyle->error($baseUrlViolation);
 
@@ -187,82 +182,6 @@ final readonly class InitCommand
     private function defaultApiKeyVariable(ProviderKey $providerKey): string
     {
         return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
-    }
-
-    private function platformViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl, string $configFile): ?string
-    {
-        if ('' === $providerKey->platform) {
-            return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
-        }
-
-        return $this->handWrittenViolation($providerKey, $provider, $configFile)
-            ?? $this->providerNameViolation($providerKey, $provider)
-            ?? $this->baseUrlApplicabilityViolation($providerKey, $provider, $baseUrl);
-    }
-
-    private function providerNameViolation(ProviderKey $providerKey, string $provider): ?string
-    {
-        if (InstanceKeyedPlatforms::needsAnInstance($providerKey)) {
-            return \sprintf('"%1$s" is configured per instance, so it needs an instance name: use "%1$s.<instance>", for example "%1$s.my_gateway".', $provider);
-        }
-
-        if (InstanceKeyedPlatforms::rejectsAnInstance($providerKey)) {
-            return \sprintf('"%s" takes a single connection block and names no instance, so drop the instance and use "%s".', $provider, $providerKey->platform);
-        }
-
-        return null !== $providerKey->instance
-            ? $this->instanceNameViolation($providerKey->instance, $provider, $providerKey->platform)
-            : null;
-    }
-
-    private function instanceNameViolation(string $instance, string $provider, string $platform): ?string
-    {
-        if (!ConfigKeyInstanceName::isUsable($instance)) {
-            return \sprintf('"%s" uses an instance name the config file cannot be read back with. Give it a name, for example "%s.my_gateway".', $provider, $platform);
-        }
-
-        if (!PlatformServiceId::accepts($instance)) {
-            return \sprintf('"%s" uses an instance name the container cannot name a service by. Give it a name, for example "%s.my_gateway".', $provider, $platform);
-        }
-
-        if (!ContainerParameterSyntax::accepts($instance)) {
-            return \sprintf('"%s" uses an instance name that would be read as a container parameter rather than as a name. Give it a name, for example "%s.my_gateway".', $provider, $platform);
-        }
-
-        return null;
-    }
-
-    private function handWrittenViolation(ProviderKey $providerKey, string $provider, string $configFile): ?string
-    {
-        $handWritten = HandWrittenPlatforms::requirementOf($providerKey);
-
-        return null !== $handWritten
-            ? \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile)
-            : null;
-    }
-
-    /**
-     * Last of the refusals, so a provider that names a platform wrongly hears
-     * why before it hears that `--base-url` does not apply to what it named.
-     */
-    private function baseUrlApplicabilityViolation(ProviderKey $providerKey, string $provider, ?string $baseUrl): ?string
-    {
-        return null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)
-            ? \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::writableNames()), $provider)
-            : null;
-    }
-
-    private function baseUrlViolation(?string $baseUrl, string $provider, ProviderKey $providerKey): ?string
-    {
-        if (null === $baseUrl) {
-            return BaseUrlPlatforms::accept($providerKey)
-                ? \sprintf('"%s" requires a base URL, so nothing was written. Re-run with --base-url=<origin>.', $provider)
-                : null;
-        }
-
-        return ContainerParameterSyntax::accepts($baseUrl)
-            ? null
-            : \sprintf('The base URL for "%s" holds "%%...%%", which would be read as a container parameter rather than as part of the URL. Give the URL itself, or "%%env(VAR)%%" to read it from the environment.', $provider);
     }
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string

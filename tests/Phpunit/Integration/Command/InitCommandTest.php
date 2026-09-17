@@ -837,7 +837,7 @@ final class InitCommandTest extends TestCase
 
         self::assertSame(Command::INVALID, $exitCode);
         self::assertStringContainsString(
-            'cannot name a service by',
+            'a service name cannot contain',
             (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
         );
     }
