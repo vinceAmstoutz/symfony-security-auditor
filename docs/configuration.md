@@ -431,11 +431,13 @@ underscore the way `symfony/config` will, in both `provider:` and the
 `platform:` block at once so the two always agree (`generic.my-gateway` is
 written as `generic.my_gateway`). A name the config file could not be read back
 with is refused outright: `0`, because YAML writes that block as a sequence
-entry rather than as a key, and `.inf` or `.nan`, because YAML writes those
-unquoted and then refuses them on the way back in. Every other number is
-accepted, subject to the same hyphen fold, so `generic.-1` is written as
-`generic._1`. A bare `provider: generic` in a hand-written config aborts the run
-saying so and listing the instances you configured.
+entry rather than as a key; `.inf` or `.nan`, because YAML writes those unquoted
+and then refuses them on the way back in; and a name read as a YAML tag or as
+the merge key, such as `!php/const` or `<<`, because the block comes back under
+a different name than `provider:` points at. Every other number is accepted,
+subject to the same hyphen fold, so `generic.-1` is written as `generic._1`. A
+bare `provider: generic` in a hand-written config aborts the run saying so and
+listing the instances you configured.
 
 `base_url` is the origin only. The `generic` bridge appends its own
 `completions_path`, which defaults to `/v1/chat/completions`, so a `base_url`

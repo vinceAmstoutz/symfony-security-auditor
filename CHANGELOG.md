@@ -242,10 +242,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `generic..inf` and `generic..nan` are dumped unquoted and the next run cannot
   parse its own config
   (`Numeric keys are not supported. Quote your evaluable mapping keys instead`),
-  which `--force` would have turned into the loss of a working configuration.
-  Every other number is accepted, subject to the hyphen fold above, so
-  `generic.-1` is written as `generic._1`. A provider naming no platform before
-  the dot (`.anthropic`) is refused too, instead of advising the empty string.
+  which `--force` would have turned into the loss of a working configuration. A
+  name the parser reads as a YAML tag or as the merge key, such as
+  `generic.!php/const` or `generic.<<`, is refused for a third reason: the block
+  comes back under a different name than `provider:` points at. Every other
+  number is accepted, subject to the hyphen fold above, so `generic.-1` is
+  written as `generic._1`. A provider naming no platform before the dot
+  (`.anthropic`) is refused too, instead of advising the empty string.
 
 - **An instance written with stray whitespace kept it.** `generic. my_gateway`
   parsed to the instance `" my_gateway"` and was written as the YAML key,

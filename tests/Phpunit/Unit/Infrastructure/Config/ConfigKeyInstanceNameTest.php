@@ -60,5 +60,7 @@ final class ConfigKeyInstanceNameTest extends TestCase
         yield 'not-a-number is written unquoted too' => ['.nan', false];
         yield 'the casing of infinity does not save it' => ['.INF', false];
         yield 'a word that merely looks evaluable is quoted for us' => ['true', true];
+        yield 'a yaml tag is resolved away where the writer nests it' => ['!php/const', false];
+        yield 'the merge key is not a name the block keeps' => ['<<', false];
     }
 }
