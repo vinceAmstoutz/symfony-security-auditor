@@ -260,10 +260,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   NUL, a carriage return or a newline, or ending in a backslash, is refused by
   `PlatformServiceId` (`src/Audit/Infrastructure/Config/`) for a fourth: it
   survives YAML untouched, but `ai.platform.generic.o'brien` is not an id the
-  container accepts, so the run died on `Invalid service id`. A name holding a
-  `%...%` pair is refused for a fifth (`ContainerParameterSyntax`): it is valid
-  YAML and a valid service id, but `generic.%gw%` reached the container as a
-  parameter reference and aborted the run with:
+  container accepts, so the run died on `Invalid service id`.
+  `PlatformServiceIdKnowledgeTest` asks a real `ContainerBuilder` which names it
+  takes, rather than re-asserting the rule, so a tightening upstream fails the
+  build instead of quietly letting `init` write that config again. A name
+  holding a `%...%` pair is refused for a fifth (`ContainerParameterSyntax`): it
+  is valid YAML and a valid service id, but `generic.%gw%` reached the container
+  as a parameter reference and aborted the run with:
 
   ```text
   The service ".abstract.instanceof.VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage" has a dependency on a non-existent parameter "gw".
