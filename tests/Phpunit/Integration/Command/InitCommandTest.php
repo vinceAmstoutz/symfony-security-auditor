@@ -754,6 +754,26 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'cannot be read back with',
+            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_refuses_an_instance_the_container_cannot_name_a_service_by(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => "generic.o'brien", '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'cannot name a service by',
+            (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()),
+        );
     }
 
     public function test_it_refuses_zero_as_an_instance_name(): void

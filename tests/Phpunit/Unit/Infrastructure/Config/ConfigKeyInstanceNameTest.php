@@ -52,7 +52,7 @@ final class ConfigKeyInstanceNameTest extends TestCase
         yield 'another number keys the block by name' => ['42', true];
         yield 'a single digit other than zero keys by name' => ['1', true];
         yield 'leading zeroes keep the name a string' => ['007', true];
-        yield 'a negative number folds to an underscore and keys by name' => ['-1', true];
+        yield 'a negative number is usable' => ['-1', true];
         yield 'digits with a letter name the instance' => ['eu1', true];
         yield 'a leading digit still names the instance' => ['1eu', true];
         yield 'an ordinary name is usable' => ['my_gateway', true];

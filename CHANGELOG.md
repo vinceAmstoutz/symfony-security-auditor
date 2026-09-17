@@ -240,15 +240,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   YAML sequence entry, so the container answers
   `The attribute "name" must be set for path "ai.platform.generic".`, while
   `generic..inf` and `generic..nan` are dumped unquoted and the next run cannot
-  parse its own config
-  (`Numeric keys are not supported. Quote your evaluable mapping keys instead`),
-  which `--force` would have turned into the loss of a working configuration. A
-  name the parser reads as a YAML tag or as the merge key, such as
-  `generic.!php/const` or `generic.<<`, is refused for a third reason: the block
-  comes back under a different name than `provider:` points at. Every other
-  number is accepted, subject to the hyphen fold above, so `generic.-1` is
-  written as `generic._1`. A provider naming no platform before the dot
-  (`.anthropic`) is refused too, instead of advising the empty string.
+  parse its own config:
+
+  ```text
+  Implicit casting of incompatible mapping keys to strings is not supported. Quote your evaluable mapping keys instead
+  ```
+
+  Under `--force` that would have cost a working configuration. A name the
+  parser reads as a YAML tag or as the merge key, such as `generic.!php/const`
+  or `generic.<<`, is refused for a third reason: the block comes back under a
+  different name than `provider:` points at. A name holding a quote, a NUL, a
+  carriage return or a newline, or ending in a backslash, is refused by
+  `PlatformServiceId` (`src/Audit/Infrastructure/Config/`) for a fourth: it
+  survives YAML untouched, but `ai.platform.generic.o'brien` is not an id the
+  container accepts, so the run died on `Invalid service id`. Every other number
+  is accepted, subject to the hyphen fold above, so `generic.-1` is written as
+  `generic._1`. A provider naming no platform before the dot (`.anthropic`) is
+  refused too, instead of advising the empty string.
 
 - **An instance written with stray whitespace kept it.** `generic. my_gateway`
   parsed to the instance `" my_gateway"` and was written as the YAML key,

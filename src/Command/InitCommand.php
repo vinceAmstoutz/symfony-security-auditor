@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformServiceId;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -208,6 +209,10 @@ final readonly class InitCommand
 
         if (null !== $providerKey->instance && !ConfigKeyInstanceName::isUsable($providerKey->instance)) {
             return \sprintf('"%s" uses an instance name the config file cannot be read back with. Give it a name, for example "%s.my_gateway".', $provider, $providerKey->platform);
+        }
+
+        if (null !== $providerKey->instance && !PlatformServiceId::accepts($providerKey->instance)) {
+            return \sprintf('"%s" uses an instance name the container cannot name a service by. Give it a name, for example "%s.my_gateway".', $provider, $providerKey->platform);
         }
 
         return null;
