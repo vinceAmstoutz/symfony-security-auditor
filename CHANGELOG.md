@@ -183,6 +183,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `init` now reports that the platform requires a base URL and exits `2` without
   writing anything.
 
+- **`audit init --provider=generic` still wrote the flat block this release set
+  out to fix.** Nesting only happened once the provider named an instance, so
+  the bare form that #365 actually reported kept producing:
+
+  ```text
+  Invalid type for path "ai.platform.generic.base_url". Expected "array", but got "string"
+  ```
+
+  The mirror case was unguarded too: `--provider=anthropic.prod` nested a flat
+  platform under an instance it has no prototype for, giving
+  `Unrecognized option "prod" under "ai.platform.anthropic"`.
+  `InstanceKeyedPlatforms` (`src/Audit/Infrastructure/Config/`) now names the
+  six platforms declared with `useAttributeAsKey`, and `init` refuses both
+  directions with the shape to use instead, rather than reporting success.
+
+- **`init --provider=generic.myGateway` silently renamed the instance.**
+  `ProviderKeyNormalizer` lowercased the whole provider string to fold package
+  slugs onto config keys, which was harmless until this release made instance
+  names possible. The written config stayed self-consistent, so it booted, but
+  the instance the user named was gone and a hand-written `platform:` block
+  using the original casing no longer matched `provider:`. Only the platform
+  half is folded now.
+
 - **`init` wrote a config the container refuses for eight platforms.** It only
   ever writes an `api_key` plus an optional `base_url`, so a platform that
   rejects `api_key` or requires a field it never asks for ended up with a block

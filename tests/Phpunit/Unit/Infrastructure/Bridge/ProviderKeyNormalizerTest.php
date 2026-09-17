@@ -44,5 +44,7 @@ final class ProviderKeyNormalizerTest extends TestCase
         yield 'uppercase package slug' => ['Open-AI', 'openai'];
         yield 'package slug folded while its instance is preserved' => ['open-responses.my_gateway', 'openresponses.my_gateway'];
         yield 'instance left untouched on an unknown platform' => ['generic.my_gateway', 'generic.my_gateway'];
+        yield 'instance keeps the case the user typed' => ['generic.myGateway', 'generic.myGateway'];
+        yield 'platform folded while a mixed-case instance survives' => ['GENERIC.EU_West', 'generic.EU_West'];
     }
 }

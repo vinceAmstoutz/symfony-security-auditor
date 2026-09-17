@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
 
 /**
  * `BaseUrlPlatforms` and `HandWrittenPlatforms` restate what `symfony/ai-bundle`
@@ -35,12 +36,17 @@ final class PlatformShapeKnowledgeTest extends TestCase
         self::assertSame(BaseUrlPlatforms::NAMES, $this->platformsDeclaring('base_url'));
     }
 
-    public function test_no_platform_is_named_twice_as_writable_and_hand_written(): void
+    public function test_azure_is_the_only_platform_both_declaring_a_base_url_and_hand_written(): void
     {
         self::assertSame(
             ['azure'],
             array_values(array_intersect(BaseUrlPlatforms::NAMES, array_keys(HandWrittenPlatforms::REQUIREMENTS))),
         );
+    }
+
+    public function test_every_platform_declared_per_instance_is_named(): void
+    {
+        self::assertSame(InstanceKeyedPlatforms::NAMES, $this->platformsDeclaring_useAttributeAsKey());
     }
 
     public function test_every_hand_written_platform_still_exists_in_the_bundle(): void
@@ -81,6 +87,24 @@ final class PlatformShapeKnowledgeTest extends TestCase
 
         foreach ($this->configFiles() as $finder) {
             if (1 === preg_match($pattern, $finder->getContents())) {
+                $names[] = $finder->getBasename('.php');
+            }
+        }
+
+        sort($names);
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function platformsDeclaring_useAttributeAsKey(): array
+    {
+        $names = [];
+
+        foreach ($this->configFiles() as $finder) {
+            if (str_contains($finder->getContents(), 'useAttributeAsKey')) {
                 $names[] = $finder->getBasename('.php');
             }
         }

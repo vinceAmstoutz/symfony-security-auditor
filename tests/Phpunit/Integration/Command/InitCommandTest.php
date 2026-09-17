@@ -656,16 +656,89 @@ final class InitCommandTest extends TestCase
         self::assertFileDoesNotExist($this->configFile());
     }
 
-    public function test_it_rejects_a_base_url_for_an_instance_keyed_platform_that_has_no_such_key(): void
+    public function test_it_refuses_an_instance_keyed_platform_named_without_an_instance(): void
     {
         $commandTester = $this->commandTester();
 
         $exitCode = $commandTester->execute(
-            ['--provider' => 'bedrock.default', '--model' => 'our-model', '--base-url' => 'https://nope.example'],
+            ['--provider' => 'generic', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
             ['interactive' => false],
         );
 
         self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_shows_the_instance_syntax_when_the_instance_is_missing(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'openresponses', '--model' => 'our-model', '--env-var' => 'TOKEN'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'use "openresponses.<instance>", for example "openresponses.my_gateway"',
+            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_writes_nothing_for_an_instance_keyed_platform_named_without_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_it_refuses_a_flat_platform_given_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'anthropic.prod', '--model' => 'claude-opus-5', '--env-var' => 'ANTHROPIC_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_says_to_drop_the_instance_from_a_flat_platform(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'anthropic.prod', '--model' => 'claude-opus-5', '--env-var' => 'ANTHROPIC_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'drop the instance and use "anthropic"',
+            (string) preg_replace('/\\s+/', ' ', $commandTester->getDisplay()),
+        );
+    }
+
+    public function test_it_keeps_the_instance_name_as_the_user_typed_it(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.myGateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.myGateway',
+                'platform' => ['generic' => ['myGateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
     }
 
     public function test_it_installs_the_platform_bridge_rather_than_one_named_after_the_instance(): void

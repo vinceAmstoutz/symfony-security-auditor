@@ -29,8 +29,9 @@ final readonly class ProviderKeyNormalizer
 {
     public function normalize(string $provider): string
     {
-        $providerKey = ProviderKey::of(u($provider)->trim()->lower()->toString());
-        $platform = array_flip(ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES)[$providerKey->platform] ?? $providerKey->platform;
+        $providerKey = ProviderKey::of(u($provider)->trim()->toString());
+        $platformKey = u($providerKey->platform)->lower()->toString();
+        $platform = array_flip(ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES)[$platformKey] ?? $platformKey;
 
         if (null === $providerKey->instance) {
             return $platform;

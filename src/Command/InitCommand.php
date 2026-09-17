@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\C
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -189,6 +190,14 @@ final readonly class InitCommand
         $handWritten = HandWrittenPlatforms::requirementOf($providerKey);
         if (null !== $handWritten) {
             return \sprintf('"%s" needs %s, which "init" does not write. Configure it by hand in %s.', $provider, $handWritten, $configFile);
+        }
+
+        if (InstanceKeyedPlatforms::needsAnInstance($providerKey)) {
+            return \sprintf('"%1$s" is configured per instance, so it needs an instance name: use "%1$s.<instance>", for example "%1$s.my_gateway".', $provider);
+        }
+
+        if (InstanceKeyedPlatforms::rejectsAnInstance($providerKey)) {
+            return \sprintf('"%s" takes a single connection block and names no instance, so drop the instance and use "%s".', $provider, $providerKey->platform);
         }
 
         if (null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)) {

@@ -416,9 +416,12 @@ model: 'your-model'
 ```
 
 `audit init --provider=generic.my_gateway --base-url=https://your-gateway.example`
-writes exactly that and installs `symfony/ai-generic-platform` for you. A bare
-`provider: generic` names no instance, and the run aborts saying so and listing
-the instances you configured.
+writes exactly that and installs `symfony/ai-generic-platform` for you. The
+instance name is required and kept exactly as you type it: `init` refuses a bare
+`--provider=generic` and tells you to use `generic.<instance>`, just as it
+refuses an instance on a platform that takes a single block
+(`--provider=anthropic.prod`). A bare `provider: generic` in a hand-written
+config aborts the run saying so and listing the instances you configured.
 
 `base_url` is the origin only. The `generic` bridge appends its own
 `completions_path`, which defaults to `/v1/chat/completions`, so a `base_url`
