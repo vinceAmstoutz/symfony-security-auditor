@@ -33,7 +33,7 @@ final class InitCommandInput
     #[Option(description: 'Environment variable holding the API key; defaults to <PLATFORM>_API_KEY')]
     public ?string $envVar = null;
 
-    #[Option(description: 'Base URL of the platform endpoint, required by the platforms that declare one (albert, amazeeai, generic, openresponses); passing it with any other platform is rejected. Skips the prompt when set.', name: 'base-url')]
+    #[Option(description: 'Base URL of the platform endpoint, required by the platforms that declare one (albert, amazeeai, generic, openresponses); passing it with any other platform is rejected. Skips the prompt when set.')]
     public ?string $baseUrl = null;
 
     #[Option(description: 'Overwrite an existing configuration without asking')]

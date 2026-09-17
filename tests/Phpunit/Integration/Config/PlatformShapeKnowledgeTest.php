@@ -54,6 +54,11 @@ final class PlatformShapeKnowledgeTest extends TestCase
         self::assertSame([], array_diff(array_keys(HandWrittenPlatforms::REQUIREMENTS), $this->platformNames()));
     }
 
+    public function test_no_platform_requiring_an_extra_field_is_left_writable(): void
+    {
+        self::assertSame([], array_diff($this->platformsRequiringMoreThanACredential(), array_keys(HandWrittenPlatforms::REQUIREMENTS)));
+    }
+
     public function test_no_platform_without_an_api_key_node_is_left_writable(): void
     {
         $withoutApiKey = array_values(array_diff($this->platformNames(), $this->platformsDeclaring('api_key')));
@@ -106,6 +111,34 @@ final class PlatformShapeKnowledgeTest extends TestCase
         foreach ($this->configFiles() as $finder) {
             if (str_contains($finder->getContents(), 'useAttributeAsKey')) {
                 $names[] = $finder->getBasename('.php');
+            }
+        }
+
+        sort($names);
+
+        return $names;
+    }
+
+    /**
+     * Platforms with a required child beyond the `api_key` and `base_url` that
+     * `init` writes. Each node owns the chain from its own declaration up to
+     * its `->end()`, so a later sibling's `->isRequired()` is not attributed to
+     * a node that merely carries a default.
+     *
+     * @return list<string>
+     */
+    private function platformsRequiringMoreThanACredential(): array
+    {
+        $names = [];
+
+        foreach ($this->configFiles() as $finder) {
+            preg_match_all('/(?:string|scalar|integer|boolean|array)Node\(\x27([a-z_]+)\x27\)(.*?)->end\(\)/s', $finder->getContents(), $matches, \PREG_SET_ORDER);
+
+            foreach ($matches as $match) {
+                if (str_contains($match[2], '->isRequired()') && !\in_array($match[1], ['api_key', 'base_url'], true)) {
+                    $names[] = $finder->getBasename('.php');
+                    break;
+                }
             }
         }
 

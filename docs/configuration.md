@@ -337,6 +337,8 @@ Install the Composer package for your chosen provider, then configure it under
 | Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                  |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                               |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | none                                            |
+| Albert (French gov)  | `symfony/ai-albert-platform`         | `ALBERT_API_KEY` plus a `base_url`              |
+| amazee.ai            | `symfony/ai-amazee-ai-platform`      | `AMAZEEAI_API_KEY` plus a `base_url`            |
 | Generic (AI gateway) | `symfony/ai-generic-platform`        | depends on the gateway                          |
 
 ### Full `ai.yaml` example

@@ -15,8 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
+use Symfony\Component\Console\Attribute\Option;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommandInput;
 
 final class BaseUrlPlatformsTest extends TestCase
 {
@@ -29,6 +32,17 @@ final class BaseUrlPlatformsTest extends TestCase
     public function test_it_leaves_out_the_platforms_init_cannot_write(): void
     {
         self::assertSame(['albert', 'amazeeai', 'generic', 'openresponses'], BaseUrlPlatforms::writableNames());
+    }
+
+    public function test_the_base_url_option_help_names_every_platform_it_accepts(): void
+    {
+        $option = (new ReflectionProperty(InitCommandInput::class, 'baseUrl'))->getAttributes(Option::class)[0]->newInstance();
+        $description = $option->description;
+
+        self::assertSame(
+            [],
+            array_values(array_filter(BaseUrlPlatforms::writableNames(), static fn (string $platform): bool => !str_contains($description, $platform))),
+        );
     }
 
     /**

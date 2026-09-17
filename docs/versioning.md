@@ -131,11 +131,11 @@ following surface is BC-protected:
   (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR` /
   `SSA_INIT` environment variables.
 - The `init` command name and its `--provider`, `--model`, `--env-var`,
-  `--base-url` and `--force` options (`--base-url` since 1.21 — accepted by the
-  platforms `init` can write a block for that declare one: `albert`, `amazeeai`,
-  `generic` and `openresponses`). The standalone exposes the **identical**
-  `audit:run` command (and its `audit` alias), arguments, options, and exit-code
-  surface listed above.
+  `--base-url` and `--force` options (`--base-url` accepted by the platforms
+  `init` can write a block for that declare one: `albert`, `amazeeai`, `generic`
+  and `openresponses`). The standalone exposes the **identical** `audit:run`
+  command (and its `audit` alias), arguments, options, and exit-code surface
+  listed above.
 - The `self-update` command name and its `--check` option (see
   [CLI Reference → `self-update`](configuration.md#self-update--updating-the-standalone-binary)).
 - The `doctor` command name and its exit-code contract (`0` when every check

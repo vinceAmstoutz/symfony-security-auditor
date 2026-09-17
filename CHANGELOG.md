@@ -198,6 +198,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   six platforms declared with `useAttributeAsKey`, and `init` refuses both
   directions with the shape to use instead, rather than reporting success.
 
+- **An instance written with stray whitespace kept it.** `generic. my_gateway`
+  parsed to the instance `" my_gateway"` and was written as the YAML key,
+  because only the provider string as a whole was trimmed and never the half
+  after the dot. `ProviderKey::of()` trims both halves now, the same
+  silent-rename class as the case-folding entry below.
+
 - **`init --provider=generic.myGateway` silently renamed the instance.**
   `ProviderKeyNormalizer` lowercased the whole provider string to fold package
   slugs onto config keys, which was harmless until this release made instance

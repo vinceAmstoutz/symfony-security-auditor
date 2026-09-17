@@ -36,8 +36,8 @@ final readonly class ProviderKey
     public static function of(string $provider): self
     {
         $parts = explode(self::INSTANCE_SEPARATOR, $provider, 2);
-        $instance = $parts[1] ?? '';
+        $instance = trim($parts[1] ?? '');
 
-        return new self($parts[0], '' !== $instance ? $instance : null);
+        return new self(trim($parts[0]), '' !== $instance ? $instance : null);
     }
 }
