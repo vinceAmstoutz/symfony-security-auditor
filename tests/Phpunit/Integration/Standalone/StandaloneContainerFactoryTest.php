@@ -195,6 +195,27 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
+    public function test_it_does_not_offer_instances_for_a_platform_configured_without_one(): void
+    {
+        $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The selected provider "ollama.typo" is not present in the "platform:" block of your config.');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(
+                ['ollama' => ['endpoint' => 'http://127.0.0.1:11434']],
+                'ollama.typo',
+            )),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
     public function test_it_names_the_configured_instances_when_the_selected_one_does_not_exist(): void
     {
         $this->expectException(UnknownPlatformProviderException::class);
