@@ -85,14 +85,14 @@ final class WrittenConfigurationBootsEndToEndTest extends TestCase
      */
     #[DataProvider('providersInitCanWrite')]
     #[RunInSeparateProcess]
-    public function test_the_configuration_init_writes_boots_a_platform(string $typed, ?string $baseUrl): void
+    public function test_the_configuration_init_writes_boots_a_platform(string $typed, ?string $baseUrl, ?string $endpoint, ?string $apiKeyVariable): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->home.'/config', $this->cacheDir, $this->home);
         $provider = (new ProviderKeyNormalizer())->normalize($typed);
 
         (new YamlStandaloneConfigWriter())->write(
             $xdgConfigPathResolver->configFile(),
-            (new StandaloneConfigFactory())->create($provider, 'our-model', 'GATEWAY_TOKEN', $baseUrl),
+            (new StandaloneConfigFactory())->create($provider, 'our-model', $apiKeyVariable, $baseUrl, $endpoint),
         );
 
         $standaloneConfig = (new StandaloneConfigLoader(
@@ -107,14 +107,16 @@ final class WrittenConfigurationBootsEndToEndTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string, string|null}>
+     * @return iterable<string, array{string, string|null, string|null, string|null}>
      */
     public static function providersInitCanWrite(): iterable
     {
-        yield 'an instance-keyed platform' => ['generic.my_gateway', 'http://localhost'];
-        yield 'an instance that folds a hyphen' => ['generic.my-gateway', 'http://localhost'];
-        yield 'a numbered instance' => ['generic.42', 'http://localhost'];
-        yield 'an instance whose case is preserved' => ['generic.myGateway', 'http://localhost'];
-        yield 'a platform that takes a single connection block' => ['ollama', null];
+        yield 'an instance-keyed platform' => ['generic.my_gateway', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'an instance that folds a hyphen' => ['generic.my-gateway', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'a numbered instance' => ['generic.42', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'an instance whose case is preserved' => ['generic.myGateway', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'a platform that takes a single connection block' => ['ollama', null, null, 'GATEWAY_TOKEN'];
+        yield 'a local install, reached at its endpoint and authenticating nobody' => ['ollama', null, 'http://localhost:11434', null];
+        yield 'a local install that still carries a cloud token' => ['ollama', null, 'https://ollama.com', 'GATEWAY_TOKEN'];
     }
 }

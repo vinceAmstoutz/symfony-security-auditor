@@ -16,11 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 
 /**
- * `BaseUrlPlatforms`, `HandWrittenPlatforms` and `InstanceKeyedPlatforms` restate what `symfony/ai-bundle`
+ * `BaseUrlPlatforms`, `EndpointPlatforms`, `HandWrittenPlatforms`, `InstanceKeyedPlatforms` and
+ * `OptionalApiKeyPlatforms` restate what `symfony/ai-bundle`
  * declares about each platform's connection block. A bundle upgrade that adds a
  * platform, or gives an existing one a `base_url`, would otherwise leave them
  * quietly wrong: `init` would stop asking for a key it now needs, or keep
@@ -42,6 +45,44 @@ final class PlatformShapeKnowledgeTest extends TestCase
             ['azure'],
             array_values(array_intersect(BaseUrlPlatforms::NAMES, array_keys(HandWrittenPlatforms::REQUIREMENTS))),
         );
+    }
+
+    public function test_every_platform_declaring_an_endpoint_is_named(): void
+    {
+        self::assertSame(EndpointPlatforms::NAMES, $this->platformsDeclaring('endpoint'));
+    }
+
+    public function test_every_endpoint_platform_leaving_it_without_a_default_is_named(): void
+    {
+        self::assertSame(EndpointPlatforms::WITHOUT_A_DEFAULT, $this->platformsDeclaringANodeWithoutADefault('endpoint'));
+    }
+
+    /**
+     * A platform names its connection URL `base_url` or `endpoint`, never both,
+     * which is what lets `--base-url` and `--endpoint` stay separate options
+     * that each refuse what the other accepts.
+     */
+    public function test_no_platform_declares_both_an_endpoint_and_a_base_url(): void
+    {
+        self::assertSame([], array_values(array_intersect(EndpointPlatforms::NAMES, BaseUrlPlatforms::NAMES)));
+    }
+
+    /**
+     * The `--endpoint` refusal names `EndpointPlatforms::NAMES` verbatim, so a
+     * platform that became hand-written or instance-keyed would be advertised
+     * as an answer and then refused for a second reason.
+     */
+    public function test_every_endpoint_platform_is_flat_and_writable(): void
+    {
+        self::assertSame(
+            [],
+            array_values(array_intersect(EndpointPlatforms::NAMES, [...array_keys(HandWrittenPlatforms::REQUIREMENTS), ...InstanceKeyedPlatforms::NAMES])),
+        );
+    }
+
+    public function test_every_platform_leaving_its_api_key_optional_is_named(): void
+    {
+        self::assertSame(OptionalApiKeyPlatforms::NAMES, $this->platformsDeclaringAnOptionalApiKey());
     }
 
     public function test_every_platform_declared_per_instance_is_named(): void
@@ -155,6 +196,58 @@ final class PlatformShapeKnowledgeTest extends TestCase
         sort($names);
 
         return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function platformsDeclaringANodeWithoutADefault(string $node): array
+    {
+        $names = [];
+
+        foreach ($this->configFiles() as $finder) {
+            $declaration = $this->nodeDeclaration($finder->getContents(), $node);
+
+            if (null !== $declaration && !str_contains($declaration, '->defaultValue(')) {
+                $names[] = $finder->getBasename('.php');
+            }
+        }
+
+        sort($names);
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function platformsDeclaringAnOptionalApiKey(): array
+    {
+        $names = [];
+
+        foreach ($this->configFiles() as $finder) {
+            $declaration = $this->nodeDeclaration($finder->getContents(), 'api_key');
+
+            if (null !== $declaration && !str_contains($declaration, '->isRequired()')) {
+                $names[] = $finder->getBasename('.php');
+            }
+        }
+
+        sort($names);
+
+        return $names;
+    }
+
+    /**
+     * The chain a node owns, from its own declaration up to its `->end()`, so a
+     * later sibling's `->defaultValue()` or `->isRequired()` is never read as
+     * belonging to it.
+     */
+    private function nodeDeclaration(string $contents, string $node): ?string
+    {
+        $pattern = \sprintf('/(?:string|scalar)Node\(\x27%s\x27\)(.*?)->end\(\)/s', preg_quote($node, '/'));
+
+        return 1 === preg_match($pattern, $contents, $matches) ? $matches[1] : null;
     }
 
     private function configFiles(): Finder

@@ -1118,6 +1118,131 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_writes_a_local_platform_with_its_endpoint_and_no_credential(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(
+            ['provider' => 'ollama', 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']], 'model' => 'llama3.2'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_never_asks_for_a_key_to_store_when_it_wrote_no_credential(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('Paste the API key', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_writes_the_endpoint_and_the_credential_when_both_are_given(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'ollama', '--model' => 'llama3.2', '--endpoint' => 'https://ollama.com', '--env-var' => 'OLLAMA_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            ['provider' => 'ollama', 'platform' => ['ollama' => ['endpoint' => 'https://ollama.com', 'api_key' => '%env(OLLAMA_API_KEY)%']], 'model' => 'llama3.2'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_refuses_a_platform_that_declares_no_default_endpoint_when_none_is_given(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'ollama', '--model' => 'llama3.2'], ['interactive' => false]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_writes_nothing_when_it_refuses_the_missing_endpoint(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'ollama', '--model' => 'llama3.2'], ['interactive' => false]);
+
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_it_drops_the_credential_when_asked_to_write_none(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--base-url' => 'https://gw.example', '--no-api-key' => true],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            ['provider' => 'generic.my_gateway', 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example']]], 'model' => 'our-model'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_says_the_configuration_carries_no_credential(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'ollama', '--model' => 'llama3.2', '--endpoint' => 'http://localhost:11434'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString('none — this platform is configured without a credential', $this->unwrappedDisplay($commandTester));
+    }
+
+    #[DataProvider('inapplicableOptionCases')]
+    public function test_it_refuses_an_option_the_platform_does_not_take(string $option, string $value): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'anthropic', '--model' => 'claude-opus-5', $option => $value],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function inapplicableOptionCases(): iterable
+    {
+        yield 'an endpoint for a platform declaring none' => ['--endpoint', 'http://localhost:11434'];
+        yield 'an omitted key for a platform requiring one' => ['--no-api-key', '1'];
+    }
+
+    public function test_it_offers_to_keep_the_default_endpoint_when_the_platform_carries_one(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['deepgram', 'nova-3', 'DEEPGRAM_API_KEY', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('or leave it empty to keep the default', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_offers_no_such_default_for_the_platform_that_declares_none(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('or leave it empty to keep the default', $this->unwrappedDisplay($commandTester));
+    }
+
     private function commandTester(): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
