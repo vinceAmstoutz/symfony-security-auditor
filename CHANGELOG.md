@@ -12,6 +12,45 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`init` can now configure a local Ollama end to end, and writes no credential
+  for a platform that authenticates nobody.** `init --provider=ollama` exited
+  `0` and reported success on a configuration the next run could not use: it
+  wrote `api_key: '%env(OLLAMA_API_KEY)%'` for the one platform
+  `docs/configuration.md` lists as needing no credential, and omitted the
+  `endpoint` the bridge has no default for, so the request went out against no
+  base URI at all. The next command stopped at:
+
+  ```text
+  No API key available. Your config reads it from "OLLAMA_API_KEY", which is not set in the environment and has nothing stored for it.
+  ```
+
+  Two options close it. **`--endpoint`** writes the connection URL for the
+  platforms that name it that way — `deepgram`, `elevenlabs`, `minimax` and
+  `ollama` — mirroring what `--base-url` already does for the platforms naming
+  it `base_url`; a platform declares one spelling or the other, never both, so
+  each option rejects what the other accepts. **`--no-api-key`** writes no
+  `api_key` at all, for the platforms whose key `symfony/ai-bundle` leaves
+  optional (`deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`,
+  `vertexai`); it is refused for every other platform, whose container
+  validation fails without one.
+
+  `ollama` needs neither flag to come out right: it is the only platform whose
+  `endpoint` node declares no default, so `init` now treats it as one you host
+  yourself — the endpoint is required, and no credential is invented unless
+  `--env-var` names one, which is what Ollama Cloud wants. Asked for no
+  endpoint, `init` refuses with exit code `2` and writes nothing, rather than
+  reporting success on a file that cannot run. The keyless shape is also what
+  `privacy.offline_only: true` has always expected, so the pairing the docs
+  recommend is reachable through `init` for the first time.
+
+  `EndpointPlatforms` and `OptionalApiKeyPlatforms`
+  (`src/Audit/Infrastructure/Config/`) restate what the bundle declares, and
+  `PlatformShapeKnowledgeTest` reads its `config/platform/*.php` back so an
+  upstream change fails the build instead of leaving the lists quietly wrong.
+  `WrittenConfigurationBootsEndToEndTest` now boots the keyless local-Ollama
+  block through the real loader and compiled container. Closes
+  [#369](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/369).
+
 - **The standalone binary can now hold your API key for you, so a machine is set
   up once instead of every shell.** `init` (`src/Command/InitCommand.php`) only
   ever asked _which environment variable_ holds the key and wrote
