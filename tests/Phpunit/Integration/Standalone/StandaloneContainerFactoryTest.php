@@ -180,9 +180,73 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_it_rejects_a_selector_absent_from_the_platform_block(): void
     {
         $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The selected provider "mistral" is not present in the "platform:" block of your config.');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://a']]], 'mistral')),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    public function test_it_does_not_offer_instances_for_a_platform_configured_without_one(): void
+    {
+        $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The selected provider "ollama.typo" is not present in the "platform:" block of your config.');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(
+                ['ollama' => ['endpoint' => 'http://127.0.0.1:11434']],
+                'ollama.typo',
+            )),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    public function test_it_names_the_configured_instances_when_the_selected_one_does_not_exist(): void
+    {
+        $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The "generic" platform has no "typo" instance. Configured instances: primary.');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(
+                ['generic' => ['primary' => ['base_url' => 'http://a']]],
+                'generic.typo',
+            )),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    public function test_it_names_the_configured_instances_when_an_instance_keyed_platform_is_selected_without_one(): void
+    {
+        $this->expectException(UnknownPlatformProviderException::class);
+        $this->expectExceptionMessage('The "generic" platform is configured per instance, so "provider: generic" does not select one. Use "generic.<instance>" instead. Configured instances: primary, secondary.');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(
+                ['generic' => ['primary' => ['base_url' => 'http://a'], 'secondary' => ['base_url' => 'http://b']]],
+                'generic',
+            )),
             $this->cacheDir,
         );
     }

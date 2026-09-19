@@ -14,13 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Attribute\Option;
+use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\MissingInputException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
@@ -34,14 +38,12 @@ use function Symfony\Component\String\b;
 use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — the command *name* (`init`) is public, but the PHP class itself is for internal use only. */
-#[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
+#[AsCommand(name: self::NAME, description: self::DESCRIPTION, help: InitCommandHelp::HELP)]
 final readonly class InitCommand
 {
     public const string NAME = 'init';
 
     public const string DESCRIPTION = 'Create the standalone configuration and download the selected provider bridge';
-
-    private const string ENV_VAR_NAME_PATTERN = '/^[A-Za-z_]\w*$/';
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -59,46 +61,57 @@ final readonly class InitCommand
      */
     public function __invoke(
         SymfonyStyle $symfonyStyle,
-        #[Option(description: 'AI provider to configure (any symfony/ai platform — e.g. anthropic, openai, gemini); skips the prompt when set')]
-        ?string $provider = null,
-        #[Option(description: 'Model the auditor should use; skips the prompt when set')]
-        ?string $model = null,
-        #[Option(description: 'Environment variable holding the API key; defaults to <PROVIDER>_API_KEY')]
-        ?string $envVar = null,
-        #[Option(description: 'Overwrite an existing configuration without asking')]
-        bool $force = false,
+        #[MapInput] InitCommandInput $initCommandInput,
     ): int {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        if (!$force && $this->isOverwriteDeclined($symfonyStyle, $configFile)) {
+        if (!$initCommandInput->force && $this->isOverwriteDeclined($symfonyStyle, $configFile)) {
             $symfonyStyle->warning('Aborted; the existing configuration was left untouched (use --force to overwrite).');
 
             return Command::SUCCESS;
         }
 
-        $provider = b($provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic'))->trim()->toString();
-        $model = b($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
+        $provider = b($initCommandInput->provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama, or generic.my_gateway for an AI gateway)', 'anthropic'))->trim()->toString();
 
-        $violation = $this->identityViolation($provider, $model);
-        if (null !== $violation) {
-            $symfonyStyle->error($violation);
-
+        if ($this->refused($symfonyStyle, InitRefusal::forProviderText($provider))) {
             return Command::INVALID;
         }
 
         $provider = $this->providerKeyNormalizer->normalize($provider);
-        $envVar = b($envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider)))->trim()->toString();
+        $providerKey = ProviderKey::of($provider);
 
-        if (1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)) {
-            $symfonyStyle->error(\sprintf('"%s" is not a valid environment variable name (letters, digits, and underscores only; must not start with a digit).', $envVar));
-
+        if ($this->refused($symfonyStyle, InitRefusal::forProvider($providerKey, $provider, $initCommandInput->baseUrl, $configFile))) {
             return Command::INVALID;
         }
 
+        $model = b($initCommandInput->model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
+
+        if ($this->refused($symfonyStyle, InitRefusal::forModel($model))) {
+            return Command::INVALID;
+        }
+
+        $envVar = b($initCommandInput->envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey)))->trim()->toString();
+
+        if ($this->refused($symfonyStyle, InitRefusal::forEnvironmentVariable($envVar))) {
+            return Command::INVALID;
+        }
+
+        $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
+
+        if ($this->refused($symfonyStyle, InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl))) {
+            return Command::INVALID;
+        }
+
+        $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', OutputFormatter::escape($providerKey->platform)));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl));
 
         $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
+        $symfonyStyle->definitionList(
+            ['Provider' => OutputFormatter::escape($provider)],
+            ['Model' => OutputFormatter::escape($model)],
+            ['API key variable' => $envVar],
+        );
         $this->offerToStoreCredential($symfonyStyle, $envVar);
 
         return Command::SUCCESS;
@@ -136,20 +149,15 @@ final readonly class InitCommand
         $symfonyStyle->success(\sprintf('Stored %s (%s). You can run "audit <path>" now — no environment variable needed.', $envVar, CredentialIdentity::of($credential)->maskedPreview));
     }
 
-    /**
-     * Checked on the raw bytes, before `ProviderKeyNormalizer` — its `u()`
-     * call throws on non-UTF-8 input, which must reject with exit code 2
-     * instead of crashing.
-     */
-    private function identityViolation(string $provider, string $model): ?string
+    private function refused(SymfonyStyle $symfonyStyle, ?string $violation): bool
     {
-        return match (true) {
-            1 !== preg_match('//u', $provider) => 'The provider must be valid UTF-8 text.',
-            '' === $provider => 'The provider must not be empty.',
-            1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
-            '' === $model => 'The model must not be empty.',
-            default => null,
-        };
+        if (null === $violation) {
+            return false;
+        }
+
+        $symfonyStyle->error($violation);
+
+        return true;
     }
 
     private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile): bool
@@ -166,8 +174,35 @@ final readonly class InitCommand
         return $answer;
     }
 
-    private function defaultApiKeyVariable(string $provider): string
+    private function defaultApiKeyVariable(ProviderKey $providerKey): string
     {
-        return \sprintf('%s_API_KEY', u($provider)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+        return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+    }
+
+    /**
+     * Asked without a default, so no misleading `[]` is offered for a value that
+     * is required. `QuestionHelper` rethrows at end of input when the default is
+     * null, which would abort with exit 1 instead of the refusal this returns to.
+     */
+    private function askRequired(SymfonyStyle $symfonyStyle, string $question): string
+    {
+        try {
+            $answer = $symfonyStyle->ask($question);
+        } catch (MissingInputException) {
+            return '';
+        }
+
+        return \is_string($answer) ? $answer : '';
+    }
+
+    private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    {
+        if (!BaseUrlPlatforms::accept($providerKey)) {
+            return null;
+        }
+
+        $baseUrl = b($initCommandInput->baseUrl ?? $this->askRequired($symfonyStyle, \sprintf('Base URL of the endpoint you want %s to reach (required, e.g. https://your-gateway.example)', $providerKey->platform)))->trim()->toString();
+
+        return '' !== $baseUrl ? $baseUrl : null;
     }
 }

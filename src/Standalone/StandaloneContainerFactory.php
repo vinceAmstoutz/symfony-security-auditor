@@ -23,6 +23,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBa
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
@@ -121,7 +122,7 @@ final readonly class StandaloneContainerFactory
         if (null !== $activeProvider) {
             $platformServiceId = \sprintf('%s%s', self::PLATFORM_SERVICE_PREFIX, $activeProvider);
             if (!$containerBuilder->hasDefinition($platformServiceId)) {
-                throw UnknownPlatformProviderException::forProvider($activeProvider);
+                throw $this->unknownProvider($containerBuilder, $activeProvider);
             }
 
             $containerBuilder->setAlias(PlatformInterface::class, $platformServiceId)->setPublic(true);
@@ -132,5 +133,36 @@ final readonly class StandaloneContainerFactory
         if (\count($containerBuilder->findTaggedServiceIds(self::PLATFORM_TAG)) > 1) {
             throw AmbiguousPlatformException::create();
         }
+    }
+
+    private function unknownProvider(ContainerBuilder $containerBuilder, string $activeProvider): UnknownPlatformProviderException
+    {
+        $providerKey = ProviderKey::of($activeProvider);
+        $instances = $this->configuredInstancesOf($containerBuilder, $providerKey->platform);
+
+        if ([] === $instances) {
+            return UnknownPlatformProviderException::forProvider($activeProvider);
+        }
+
+        return null === $providerKey->instance
+            ? UnknownPlatformProviderException::forInstanceKeyedProvider($providerKey->platform, $instances)
+            : UnknownPlatformProviderException::forUnknownInstance($providerKey->platform, $providerKey->instance, $instances);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function configuredInstancesOf(ContainerBuilder $containerBuilder, string $platform): array
+    {
+        $instances = [];
+
+        foreach (array_keys($containerBuilder->findTaggedServiceIds(self::PLATFORM_TAG)) as $serviceId) {
+            $providerKey = ProviderKey::of(substr($serviceId, \strlen(self::PLATFORM_SERVICE_PREFIX)));
+            if ($platform === $providerKey->platform && null !== $providerKey->instance) {
+                $instances[] = $providerKey->instance;
+            }
+        }
+
+        return $instances;
     }
 }

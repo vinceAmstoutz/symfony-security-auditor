@@ -20,6 +20,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
@@ -417,7 +418,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringContainsString('Stored OPENAI_API_KEY (openai…init)', $display);
         self::assertStringNotContainsString('openai-test-key-pasted-at-init', $display);
@@ -442,7 +443,7 @@ final class InitCommandTest extends TestCase
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringNotContainsString('could not be stored', $display);
     }
@@ -465,7 +466,7 @@ final class InitCommandTest extends TestCase
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringContainsString('Export OPENAI_API_KEY before auditing instead.', $display);
     }
@@ -478,7 +479,7 @@ final class InitCommandTest extends TestCase
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
-        $display = (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        $display = $this->unwrappedDisplay($commandTester);
 
         self::assertStringNotContainsString('You can run "audit', $display);
     }
@@ -515,6 +516,608 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Aborted', $commandTester->getDisplay());
     }
 
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('instanceKeyedOptionCases')]
+    public function test_it_writes_an_instance_keyed_platform_nested_under_its_instance(array $options, string $expectedApiKey): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute($options, ['interactive' => false]);
+
+        self::assertSame(
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => $expectedApiKey]]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function instanceKeyedOptionCases(): iterable
+    {
+        yield 'an explicit env var is used verbatim' => [
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            '%env(GATEWAY_TOKEN)%',
+        ];
+
+        yield 'an omitted env var is derived from the platform, not the instance' => [
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--base-url' => 'https://gw.example'],
+            '%env(GENERIC_API_KEY)%',
+        ];
+    }
+
+    public function test_it_does_not_ask_for_a_base_url_when_the_platform_has_no_such_key(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('Base URL of the endpoint', $commandTester->getDisplay());
+    }
+
+    public function test_it_asks_for_a_base_url_when_a_flat_platform_requires_one(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['albert', 'our-model', 'ALBERT_API_KEY', 'https://albert.example']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Base URL of the endpoint', $commandTester->getDisplay());
+    }
+
+    public function test_it_writes_the_base_url_of_a_flat_platform_beside_its_api_key(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'albert', '--model' => 'our-model', '--env-var' => 'ALBERT_API_KEY', '--base-url' => 'https://albert.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'albert',
+                'platform' => ['albert' => ['base_url' => 'https://albert.example', 'api_key' => '%env(ALBERT_API_KEY)%']],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_rejects_a_base_url_for_a_platform_that_exposes_none(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'anthropic', '--model' => 'claude-opus-5', '--base-url' => 'https://nope.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_names_the_platforms_that_take_a_base_url_when_rejecting_one(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'anthropic', '--model' => 'claude-opus-5', '--base-url' => 'https://nope.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'albert, amazeeai, generic.<instance>, openresponses.<instance>',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_refuses_a_platform_whose_block_it_cannot_write(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'lmstudio', '--model' => 'our-model', '--env-var' => 'LMSTUDIO_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_says_what_a_hand_written_platform_needs_instead(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'needs a "deployment" name beside the api_key, which "init" does not write',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_writes_nothing_for_a_platform_it_cannot_configure(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'transformersphp', '--model' => 'our-model', '--env-var' => 'TRANSFORMERS_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_it_refuses_an_instance_keyed_platform_named_without_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_shows_the_instance_syntax_when_the_instance_is_missing(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'openresponses', '--model' => 'our-model', '--env-var' => 'TOKEN'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'use "openresponses.<instance>", for example "openresponses.my_gateway"',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_writes_nothing_for_an_instance_keyed_platform_named_without_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_it_says_a_platform_is_unwritable_before_asking_for_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'azure', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'needs a "deployment" name beside the api_key',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_writes_a_numbered_instance_other_than_zero(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.42', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.42',
+                'platform' => ['generic' => [42 => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_names_the_missing_platform_even_when_a_base_url_is_given(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => '.gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'names no platform before the dot',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_refuses_an_instance_name_the_config_cannot_be_read_back_with(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic..inf', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'cannot be read back with',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_names_the_stray_instance_before_the_base_url_rule(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'ollama.x', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'takes a single connection block',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_refuses_an_instance_the_container_would_read_as_a_parameter(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.%gw%', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'would be read as a container parameter',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_refuses_a_missing_base_url_when_the_prompt_reaches_end_of_input(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([]);
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN'],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString('requires a base URL', $this->unwrappedDisplay($commandTester));
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('consoleMarkupCases')]
+    public function test_it_reports_a_value_holding_console_markup_as_written(array $options, string $expected): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute($options, ['interactive' => false]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString($expected, $this->unwrappedDisplay($commandTester));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function consoleMarkupCases(): iterable
+    {
+        yield 'a model naming an unknown colour' => [['--provider' => 'openai', '--model' => 'a<fg=nope>model', '--env-var' => 'TOKEN'], 'a<fg=nope>model'];
+        yield 'a provider naming an unknown colour' => [['--provider' => 'x<fg=nope>y', '--model' => 'our-model', '--env-var' => 'TOKEN'], 'x<fg=nope>y'];
+        yield 'a provider holding a known tag is not swallowed' => [['--provider' => 'x<info>y', '--model' => 'our-model', '--env-var' => 'TOKEN'], 'x<info>y'];
+    }
+
+    public function test_it_says_the_bridge_is_downloading_before_the_wait(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'Downloading the generic provider bridge with composer',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    #[DataProvider('resolvedValueCases')]
+    public function test_it_lists_the_values_it_resolved(string $label, string $value): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            \sprintf('%s %s', $label, $value),
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function resolvedValueCases(): iterable
+    {
+        yield 'the provider it configured' => ['Provider', 'generic.my_gateway'];
+        yield 'the model it wrote' => ['Model', 'our-model'];
+        yield 'the variable the key is read from' => ['API key variable', 'GATEWAY_TOKEN'];
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('refusedProviderCases')]
+    public function test_it_installs_no_bridge_for_a_provider_it_refuses(array $options): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute($options, ['interactive' => false]);
+
+        self::assertSame([], $this->recordingBridgeInstaller->installations);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function refusedProviderCases(): iterable
+    {
+        yield 'a platform init cannot write' => [['--provider' => 'lmstudio', '--model' => 'our-model', '--env-var' => 'TOKEN']];
+        yield 'an instance-keyed platform with no instance' => [['--provider' => 'generic', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example']];
+        yield 'an instance name yaml cannot key by' => [['--provider' => 'generic.0', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example']];
+        yield 'an environment variable name that is not one' => [['--provider' => 'generic.gw', '--model' => 'our-model', '--env-var' => '9TOKEN', '--base-url' => 'https://gw.example']];
+        yield 'a base url read as a container parameter' => [['--provider' => 'generic.gw', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example/%v%']];
+        yield 'a required base url left empty' => [['--provider' => 'albert', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => '']];
+    }
+
+    public function test_it_refuses_the_provider_before_asking_anything_else(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['generic']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('Which model should the auditor use?', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_refuses_a_base_url_the_container_would_read_as_a_parameter(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example/%v%'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'would be read as a container parameter',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_accepts_a_base_url_that_is_an_env_placeholder(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => '%env(GATEWAY_URL)%'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => '%env(GATEWAY_URL)%', 'api_key' => '%env(TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_refuses_an_instance_the_container_cannot_name_a_service_by(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => "generic.o'brien", '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'a service name cannot contain',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_refuses_zero_as_an_instance_name(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.0', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_refuses_a_provider_naming_no_platform_before_the_dot(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => '.anthropic', '--model' => 'claude-opus-5', '--env-var' => 'TOKEN'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'names no platform before the dot',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_writes_a_hyphenated_instance_under_the_key_symfony_will_use(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my-gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_refuses_a_flat_platform_given_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'anthropic.prod', '--model' => 'claude-opus-5', '--env-var' => 'ANTHROPIC_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_says_to_drop_the_instance_from_a_flat_platform(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'anthropic.prod', '--model' => 'claude-opus-5', '--env-var' => 'ANTHROPIC_API_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'drop the instance and use "anthropic"',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_keeps_the_instance_name_as_the_user_typed_it(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.myGateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'generic.myGateway',
+                'platform' => ['generic' => ['myGateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_installs_the_platform_bridge_rather_than_one_named_after_the_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            'symfony/ai-generic-platform',
+            ComposerBridgeInstaller::packageFor($this->recordingBridgeInstaller->installations[0][0]),
+        );
+    }
+
+    public function test_it_asks_for_a_base_url_when_the_provider_selects_a_platform_instance(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
+                'model' => 'our-model',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_writes_nothing_when_a_required_base_url_is_answered_empty(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', '']);
+
+        $commandTester->execute([]);
+
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_it_refuses_an_empty_base_url_rather_than_writing_a_config_that_cannot_boot(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN', '--base-url' => ''],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function test_it_says_a_base_url_is_required_when_none_is_given(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'albert', '--model' => 'our-model', '--env-var' => 'ALBERT_API_KEY', '--base-url' => '  '],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'requires a base URL, so nothing was written',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
     private function commandTester(): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
@@ -527,6 +1130,11 @@ final class InitCommandTest extends TestCase
         );
 
         return new CommandTester($initCommand);
+    }
+
+    private function unwrappedDisplay(CommandTester $commandTester): string
+    {
+        return (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
     }
 
     private function configFile(): string

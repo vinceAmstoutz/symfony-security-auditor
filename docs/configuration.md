@@ -29,6 +29,7 @@ bundle registration, bundle-level configuration, platform wiring via
   - [`audit:trend`](#audittrend--tracking-findings-across-reports)
   - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
   - [`mcp:serve`](#mcpserve--model-context-protocol-server)
+  - [`init`](#init--generating-the-standalone-configuration)
   - [`self-update`](#self-update--updating-the-standalone-binary)
   - [`doctor`](#doctor--preflight-environment-check)
   - [Update notifications](#update-notifications)
@@ -327,16 +328,18 @@ Install the Composer package for your chosen provider, then configure it under
 | -------------------- | ------------------------------------ | ----------------------------------------------- |
 | Anthropic (Claude)   | `symfony/ai-anthropic-platform`      | `ANTHROPIC_API_KEY`                             |
 | OpenAI               | `symfony/ai-open-ai-platform`        | `OPENAI_API_KEY`                                |
-| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY`                                |
+| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY` plus a `base_url`              |
 | Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL`  |
 | Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`                                |
 | Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` |
 | AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials (env or instance role)          |
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                              |
 | Mistral AI           | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                               |
-| Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                  |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                               |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | none                                            |
+| Albert (French gov)  | `symfony/ai-albert-platform`         | `ALBERT_API_KEY` plus a `base_url`              |
+| amazee.ai            | `symfony/ai-amazee-ai-platform`      | `AMAZEEAI_API_KEY` plus a `base_url`            |
+| Generic (AI gateway) | `symfony/ai-generic-platform`        | depends on the gateway                          |
 
 ### Full `ai.yaml` example
 
@@ -350,8 +353,10 @@ ai:
       api_key: '%env(ANTHROPIC_API_KEY)%'
     # openai:
     #   api_key: '%env(OPENAI_API_KEY)%'
-    # open_responses:
-    #   api_key: '%env(OPENAI_API_KEY)%'
+    # openresponses:
+    #   my_instance:
+    #     base_url: '%env(OPENAI_BASEURL)%'
+    #     api_key: '%env(OPENAI_API_KEY)%'
     # azure:
     #   my_deployment:
     #     base_url: '%env(AZURE_OPENAI_BASEURL)%'
@@ -369,12 +374,117 @@ ai:
     #   api_key: '%env(DEEPSEEK_API_KEY)%'
     # mistral:
     #   api_key: '%env(MISTRAL_API_KEY)%'
-    # meta:
-    #   api_key: '%env(META_API_KEY)%'
     # minimax:
     #   api_key: '%env(MINIMAX_API_KEY)%'
     # ollama:
     #   endpoint: 'http://localhost:11434'
+    # generic:
+    #   my_gateway:
+    #     base_url: '%env(GATEWAY_URL)%'
+    #     api_key: '%env(GATEWAY_TOKEN)%'
+```
+
+### Instance-keyed platforms
+
+Most platforms take their settings directly (`anthropic: {api_key: …}`). Six of
+them are keyed by an instance name instead, because you may configure several of
+each: `generic`, `openresponses`, `azure`, `bedrock`, `cache` and `failover`.
+Their settings live one level deeper, under a name you choose:
+
+```yaml
+ai:
+    platform:
+        generic:
+            my_gateway:
+                base_url: '%env(GATEWAY_URL)%'
+                api_key: '%env(GATEWAY_TOKEN)%'
+```
+
+In **bundle** mode that is all you need: `symfony/ai-bundle` selects the
+platform by itself when exactly one is configured.
+
+In **standalone** mode the top-level `provider:` key selects which platform the
+audit runs against, and for these six it must carry the instance name too:
+
+```yaml
+# ~/.config/symfony-security-auditor/config.yaml
+provider: generic.my_gateway
+platform:
+    generic:
+        my_gateway:
+            base_url: 'https://your-gateway.example'
+            api_key: '%env(GATEWAY_TOKEN)%'
+model: 'your-model'
+```
+
+`init` writes that configuration, and installs `symfony/ai-generic-platform` for
+you, given `--provider=generic.my_gateway`,
+`--base-url=https://your-gateway.example`, `--model=your-model` and
+`--env-var=GATEWAY_TOKEN`. Leave the last two out and `init` prompts for them,
+or under `--no-interaction` falls back to `claude-opus-4-8` and
+`GENERIC_API_KEY`.
+
+The instance name is required: `init` refuses a bare `--provider=generic` and
+tells you to use `generic.<instance>`, just as it refuses an instance on a
+platform that takes a single block (`--provider=anthropic.prod`). Its case is
+preserved, but surrounding whitespace is trimmed, and a hyphen is folded to an
+underscore the way `symfony/config` will, in both `provider:` and the
+`platform:` block at once so the two always agree (`generic.my-gateway` is
+written as `generic.my_gateway`). A name the config file could not be read back
+with is refused outright: `0`, because YAML writes that block as a sequence
+entry rather than as a key; `.inf` or `.nan`, because YAML writes those unquoted
+and then refuses them on the way back in; and a name read as a YAML tag or as
+the merge key, such as `!php/const` or `<<`, because the block comes back under
+a different name than `provider:` points at. Two more are refused for what
+happens after the file is read: a name holding a single quote, a NUL, a carriage
+return or a newline, or ending in a backslash, because
+`ai.platform.<platform>.<instance>` would not be a service id the container
+accepts; and a name holding a `%...%` pair, because the container would read it
+as a parameter reference rather than as a name. Every other number is accepted,
+subject to the same hyphen fold, so `generic.-1` is written as `generic._1`. A
+bare `provider: generic` in a hand-written config aborts the run saying so and
+listing the instances you configured.
+
+`base_url` is the origin only. The `generic` bridge appends its own
+`completions_path`, which defaults to `/v1/chat/completions`, so a `base_url`
+already ending in `/v1` produces `/v1/v1/chat/completions`, a path your gateway
+does not serve. Give it `https://your-gateway.example` and, if your gateway
+serves a different route, set `completions_path` rather than folding the prefix
+into `base_url`:
+
+```yaml
+ai:
+    platform:
+        generic:
+            my_gateway:
+                base_url: '%env(GATEWAY_URL)%'
+                api_key: '%env(GATEWAY_TOKEN)%'
+                completions_path: '/chat/completions'
+```
+
+`init` asks for a `base_url`, the only child either platform requires, plus an
+API key. Everything else in their prototype is optional: `http_client` and the
+route key (`completions_path` on `generic`, `responses_path` on `openresponses`)
+carry defaults, `generic` adds `supports_completions`, `supports_embeddings` and
+`embeddings_path`, and `model_catalog` has no default at all. Set any of them by
+hand. Eight platforms need something it never asks for and are refused with exit
+code `2` rather than written half-configured: `azure` (a `deployment`) and
+`cartesia` (a `version`) want an extra field beside the key, while `bedrock`,
+`cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` have
+no `api_key` node at all. Write those blocks by hand, pointing `provider:` at
+the matching `<platform>.<instance>` when the platform is instance keyed.
+
+Being instance keyed and taking a `base_url` are independent. `albert` and
+`amazeeai` require a `base_url` on a flat block, so `init` asks them for one too
+and writes it without an instance level:
+
+```yaml
+provider: albert
+platform:
+    albert:
+        base_url: 'https://your-albert.example'
+        api_key: '%env(ALBERT_API_KEY)%'
+model: 'your-model'
 ```
 
 ## Model Options
@@ -490,24 +600,42 @@ model: claude-opus-4-8
 # scan:, audit:, cache: are all accepted here too, unwrapped.
 ```
 
-`init` is also scriptable: pass `--provider`, `--model`, and `--env-var` to skip
-the matching prompt. Any option left out falls back to its interactive prompt
-(or, under `--no-interaction`, to its default — `anthropic`, `claude-opus-4-8`,
-and `<PROVIDER>_API_KEY` respectively). A blank provider or model, or an
-`--env-var` that is not a valid environment variable name, is rejected with exit
-code `2` before anything is written. The provider bridge is downloaded
-**before** the configuration file is replaced, so a failed download (offline,
-`composer` missing) leaves the previous, working configuration untouched. When a
-configuration already exists, `init` asks before overwriting it — and declines
-by default under `--no-interaction` — so scripted reconfiguration needs
-`--force` to replace the existing file without asking. The `SSA_INIT` installer
-flag's no-terminal fallback and the GitHub Action run plain
-`init --no-interaction`, which keeps those Anthropic defaults — pass the options
-yourself to script any other provider:
+`init` is also scriptable: pass `--provider`, `--model`, `--env-var` and
+`--base-url` to skip the matching prompt. Any option left out falls back to its
+interactive prompt (or, under `--no-interaction`, to its default — `anthropic`,
+`claude-opus-4-8`, and `<PLATFORM>_API_KEY` respectively). `--base-url` is only
+prompted for when `init` can write the platform's block and that block declares
+one, namely `albert`, `amazeeai`, `generic` and `openresponses`, and all four
+require it, so an empty answer is rejected with exit code `2` rather than
+written without it. `azure` declares a `base_url` too but is refused earlier for
+needing a `deployment`. Every other platform either names its endpoint
+differently (`ollama` uses `endpoint`, `lmstudio` uses `host_url`) or hosts
+none, so passing `--base-url` with one is rejected with exit code `2` before
+anything is written. A blank provider or model, or an `--env-var` that is not a
+valid environment variable name, is rejected with exit code `2` before anything
+is written. The provider bridge is downloaded **before** the configuration file
+is replaced, so a failed download (offline, `composer` missing) leaves the
+previous, working configuration untouched. When a configuration already exists,
+`init` asks before overwriting it — and declines by default under
+`--no-interaction` — so scripted reconfiguration needs `--force` to replace the
+existing file without asking. The `SSA_INIT` installer flag's no-terminal
+fallback and the GitHub Action run plain `init --no-interaction`, which keeps
+those Anthropic defaults — pass the options yourself to script any other
+provider:
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
 # --env-var omitted → derived as OPENAI_API_KEY
+```
+
+```bash
+# an AI gateway: the instance name belongs to both --provider and the config
+symfony-security-auditor init \
+    --provider=generic.my_gateway \
+    --model=your-model \
+    --base-url=https://your-gateway.example \
+    --env-var=GATEWAY_TOKEN \
+    --no-interaction
 ```
 
 ### Per-project overrides
@@ -591,7 +719,9 @@ any time:
 symfony-security-auditor auth:set
 # Paste the API key for ANTHROPIC_API_KEY (input stays hidden): ****
 # [OK] Stored ANTHROPIC_API_KEY (sk-ant…qF4A, SHA256:ed9ff73cc4b2cd57) in
-#      /home/you/.config/symfony-security-auditor/credentials.json.
+#      /home/you/.config/symfony-security-auditor/credentials.json. Audits pick
+#      it up on their own from now on — an exported ANTHROPIC_API_KEY still
+#      takes precedence when you want to override it for one run.
 ```
 
 The prompt never echoes, so the key reaches neither the terminal nor the shell
@@ -1063,6 +1193,53 @@ Exposed tools:
 > `mcp:serve` is a transport in front of the same pipeline `audit:run` uses, so
 > an audit triggered over MCP bills the configured LLM provider exactly as a CLI
 > run would.
+
+### `init` — generating the standalone configuration
+
+Standalone only. Writes `config.yaml` and downloads the provider bridge it
+needs. Every option it is not given is prompted for. Under `--no-interaction`
+the three with defaults fall back to them, and a platform that requires a
+`--base-url` is refused rather than written half-configured.
+
+| Option       | Default                | Description                                                                                                                          |
+| ------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `--provider` | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                               |
+| `--model`    | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                            |
+| `--env-var`  | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from.                                                                   |
+| `--base-url` | prompted when required | The endpoint origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
+| `--force`    | off                    | Overwrite an existing configuration without asking.                                                                                  |
+
+```bash
+symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
+
+# an AI gateway: base_url is the origin only, with no trailing /v1 —
+# the bridge appends its own completions_path
+symfony-security-auditor init \
+    --provider=generic.my_gateway \
+    --base-url=https://your-gateway.example \
+    --env-var=GATEWAY_TOKEN \
+    --model=your-model \
+    --no-interaction
+```
+
+Eight platforms are refused with exit code `2` rather than written
+half-configured, because `init` only ever writes an `api_key` and an optional
+`base_url`: `azure` and `cartesia` need an extra field beside the key, and
+`bedrock`, `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
+`transformersphp` take no `api_key` at all. The refusal names the field the
+platform wants; its connection block goes under `platform:` in `config.yaml`,
+with the same children `symfony/ai-bundle` documents for it. Four of the eight
+(`azure`, `bedrock`, `cache`, `failover`) nest one level deeper under an
+instance name — see [Instance-keyed platforms](#instance-keyed-platforms);
+`cartesia`, `dockermodelrunner`, `lmstudio` and `transformersphp` take a flat
+block.
+
+Their bridge package still has to reach the standalone data directory, and
+`init` is the only thing that puts one there — it also pins the binary's own PHP
+version in that directory, without which the bridge resolves against your system
+PHP and the binary aborts on the next run. Installing a bridge for a platform
+`init` refuses is therefore not supported yet; it is tracked in
+[#370](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/370).
 
 ### `self-update` — updating the standalone binary
 

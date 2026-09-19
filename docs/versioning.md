@@ -130,7 +130,10 @@ following surface is BC-protected:
   `.sha256` checksum, plus the `install.sh` (Linux/macOS) and `install.ps1`
   (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR` /
   `SSA_INIT` environment variables.
-- The `init` command name. The standalone exposes the **identical** `audit:run`
+- The `init` command name and its `--provider`, `--model`, `--env-var`,
+  `--base-url` and `--force` options (`--base-url` accepted by the platforms
+  `init` can write a block for that declare one: `albert`, `amazeeai`, `generic`
+  and `openresponses`). The standalone exposes the **identical** `audit:run`
   command (and its `audit` alias), arguments, options, and exit-code surface
   listed above.
 - The `self-update` command name and its `--check` option (see
@@ -138,12 +141,20 @@ following surface is BC-protected:
 - The `doctor` command name and its exit-code contract (`0` when every check
   passes or only warns, `1` when any check fails — see
   [CLI Reference → `doctor`](configuration.md#doctor--preflight-environment-check)).
+- The `auth:set`, `auth:status` and `auth:remove` command names and their
+  `--env-var` option, which names the variable to store, report on or forget and
+  otherwise defaults to the one the configuration reads. `auth:status` carries
+  an exit-code contract: `0` when a key resolves for that variable, `1` when
+  none does, `2` when the name given is not a valid environment variable name
+  (see
+  [CLI Reference → Storing the key on this machine](configuration.md#storing-the-key-on-this-machine)).
 - The `SSA_NO_UPDATE_CHECK` environment variable, which disables the interactive
   "update available" notice (see
   [CLI Reference → Update notifications](configuration.md#update-notifications)).
 - The configuration path contract. On Linux/macOS the XDG Base Directory spec:
   the config file `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`
-  (falling back to `~/.config/…`), the cache directory
+  (falling back to `~/.config/…`), the credential store `credentials.json`
+  beside it in that same directory, the cache directory
   `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`), and the bridge
   data directory `$XDG_DATA_HOME/symfony-security-auditor` (→
   `~/.local/share/…`). On Windows the native app-data directories: `%APPDATA%`

@@ -11,9 +11,9 @@ Every class **must** be declared `final readonly`. The only permitted opt-outs
 are documented **context carriers**:
 
 - `Audit\Domain\Model\AuditContext` — pipeline state accumulated across stages.
-- `Command\AuditCommandInput` — Symfony Console MapInput requires public mutable
-  properties with property-level defaults; promoted readonly constructor params
-  are invisible to its reflection.
+- `Command\AuditCommandInput` and `Command\InitCommandInput` — Symfony Console
+  MapInput requires public mutable properties with property-level defaults;
+  promoted readonly constructor params are invisible to its reflection.
 
 Each opt-out site declares the reason in a leading code comment and cites this
 rule. Anything outside that list must be `final readonly`. If inheritance feels

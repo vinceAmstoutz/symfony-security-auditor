@@ -24,7 +24,21 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 
 final class ComposerBridgeInstallerTest extends TestCase
 {
+    private const string UNTOUCHED_SYMLINK_TARGET = 'not the manifest
+';
+
+    private const string PINNED_MANIFEST = '{
+    "config": {
+        "platform": {
+            "php": "8.3.99"
+        }
+    }
+}
+';
+
     private string $targetDirectory;
+
+    private string $outsideTarget;
 
     private Filesystem $filesystem;
 
@@ -33,12 +47,13 @@ final class ComposerBridgeInstallerTest extends TestCase
     {
         $this->filesystem = new Filesystem();
         $this->targetDirectory = sys_get_temp_dir().'/ssa-bridge-'.bin2hex(random_bytes(6));
+        $this->outsideTarget = sys_get_temp_dir().'/ssa-bridge-symlink-target-'.bin2hex(random_bytes(6));
     }
 
     #[Override]
     protected function tearDown(): void
     {
-        $this->filesystem->remove($this->targetDirectory);
+        $this->filesystem->remove([$this->targetDirectory, $this->outsideTarget]);
     }
 
     /**
@@ -48,9 +63,7 @@ final class ComposerBridgeInstallerTest extends TestCase
     {
         (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess(), platformPhpVersion: '8.3.99'))->install('anthropic', $this->targetDirectory);
 
-        $manifest = file_get_contents($this->targetDirectory.'/composer.json');
-        self::assertNotFalse($manifest);
-        self::assertSame(['config' => ['platform' => ['php' => '8.3.99']]], json_decode($manifest, true, flags: \JSON_THROW_ON_ERROR));
+        self::assertStringEqualsFile($this->targetDirectory.'/composer.json', self::PINNED_MANIFEST);
     }
 
     /**
@@ -69,18 +82,18 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_refuses_to_write_through_a_dangling_symlinked_manifest_path(): void
+    public function test_it_refuses_to_write_through_a_symlinked_manifest_path(): void
     {
         $this->filesystem->mkdir($this->targetDirectory);
-        $outsideTarget = sys_get_temp_dir().'/ssa-bridge-symlink-target-'.bin2hex(random_bytes(6));
-        symlink($outsideTarget, $this->targetDirectory.'/composer.json');
+        $this->filesystem->dumpFile($this->outsideTarget, self::UNTOUCHED_SYMLINK_TARGET);
+        symlink($this->outsideTarget, $this->targetDirectory.'/composer.json');
 
         try {
             $this->expectException(BridgeInstallationFailedException::class);
 
             (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
         } finally {
-            self::assertFileDoesNotExist($outsideTarget);
+            self::assertStringEqualsFile($this->outsideTarget, self::UNTOUCHED_SYMLINK_TARGET);
         }
     }
 
@@ -119,10 +132,27 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     public static function providerPackageCases(): iterable
     {
+        yield 'minimax hyphenates as mini-max' => ['minimax', 'symfony/ai-mini-max-platform'];
+        yield 'lmstudio hyphenates as lm-studio' => ['lmstudio', 'symfony/ai-lm-studio-platform'];
+        yield 'openrouter hyphenates as open-router' => ['openrouter', 'symfony/ai-open-router-platform'];
+        yield 'dockermodelrunner hyphenates as docker-model-runner' => ['dockermodelrunner', 'symfony/ai-docker-model-runner-platform'];
+        yield 'transformersphp hyphenates as transformers-php' => ['transformersphp', 'symfony/ai-transformers-php-platform'];
         yield 'verbatim slug' => ['gemini', 'symfony/ai-gemini-platform'];
         yield 'openai maps to the hyphenated open-ai package' => ['openai', 'symfony/ai-open-ai-platform'];
         yield 'deepseek maps to the hyphenated deep-seek package' => ['deepseek', 'symfony/ai-deep-seek-platform'];
         yield 'vertexai maps to the hyphenated vertex-ai package' => ['vertexai', 'symfony/ai-vertex-ai-platform'];
+        yield 'an instance-keyed provider installs the bridge of its platform' => ['generic.my_gateway', 'symfony/ai-generic-platform'];
+        yield 'an instance-keyed provider still honours the slug overrides' => ['openresponses.my_gateway', 'symfony/ai-open-responses-platform'];
+    }
+
+    public function test_every_slug_override_is_its_config_key_with_hyphens_inserted(): void
+    {
+        $slugs = ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES;
+
+        self::assertSame(
+            array_keys($slugs),
+            array_map(static fn (string $slug): string => str_replace('-', '', $slug), array_values($slugs)),
+        );
     }
 
     /**

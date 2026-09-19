@@ -38,6 +38,103 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   falls back to the environment exactly as before. See
   [Providing the API key](docs/configuration.md#providing-the-api-key).
 
+- **Documented that `base_url` is the origin only.** The `generic` bridge
+  appends its own `completions_path` (default `/v1/chat/completions`), so a
+  `base_url` ending in `/v1` produced `/v1/v1/chat/completions`, a path the
+  gateway does not serve.
+  [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms) now
+  says so and points at `completions_path` for gateways serving another route.
+- **`init` says what it is doing and what it wrote.** It named the file and
+  nothing else, while the run sat silent for however long `composer require`
+  took, right after the last question. It now says the bridge is downloading
+  before it starts, and lists the provider, model and API-key variable it
+  resolved — the three values it picks silently, including a model that defaults
+  to `claude-opus-4-8` for every provider rather than being derived from the one
+  you chose. `init --help` documents those defaults and shows an instance-keyed
+  invocation; `docs/configuration.md` gains an
+  [`init` CLI reference](docs/configuration.md#init--generating-the-standalone-configuration)
+  with the option table and what the eight platforms it refuses still need.
+- **A refusal now leaves somewhere to go.** The base-URL prompt offered an empty
+  default, so pressing Enter looked legal while it in fact threw away every
+  answer already given. The marker is gone and the prompt names the platform it
+  is asking about; answering it empty is still refused, and a prompt that
+  reaches end of input — a `RUN` line or a CI step that forgot
+  `--no-interaction` — reports that refusal with exit code `2` rather than
+  aborting with exit `1`. A provider is checked the moment it is typed rather
+  than after the model and API-key questions, so a mistyped one costs one answer
+  instead of three. `--base-url applies to the platforms that expose one` now
+  spells the two instance-keyed ones as `generic.<instance>` and
+  `openresponses.<instance>`, rather than naming a form that would be refused
+  again. The eight platforms `init` cannot write are told that nothing was
+  created and where the shape is documented, and `transformersphp` no longer
+  reads as needing "no connection options at all, which init does not write".
+- **`init --base-url`** supplies the platform endpoint without the prompt, for
+  the platforms `init` can write a block for that declare one: `albert`,
+  `amazeeai`, `generic` and `openresponses` (`BaseUrlPlatforms::writableNames()`
+  in `src/Audit/Infrastructure/Config/`). `azure` declares a `base_url` too but
+  is refused for needing a `deployment`, so naming it would only send a reader
+  into a second refusal. Passing `--base-url` with any other platform is
+  rejected with exit code `2` rather than writing a key that platform has no
+  node for. A URL holding a `%...%` pair is rejected too
+  (`ContainerParameterSyntax`, `src/Audit/Infrastructure/Config/`): the value
+  reaches the container verbatim, where `%v%` is a parameter reference that
+  aborts the run with `You have requested a non-existent parameter "v".` and
+  `%%` is silently rewritten to a single `%`. A whole-value `%env(VAR)%` is
+  still accepted, because `StandalonePlatformConfigResolver` resolves it before
+  the container is built. Listed in `docs/versioning.md` as part of the `init`
+  surface.
+- **`symfony/ai-generic-platform`, `symfony/ai-albert-platform` and
+  `symfony/ai-amazee-ai-platform` in the README platform table and in
+  `composer.json` `suggest`**, plus a new
+  [Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms)
+  section documenting the nested `platform:` block and the compound
+  `provider: generic.my_gateway` selector. All three are absent from the table
+  today, so a reader looking for the bridge that takes a `base_url` found
+  nothing.
+
+### Changed
+
+- **`init` no longer prints a paste-ready `export` line.**
+  `InitCommand::__invoke()` (`src/Command/InitCommand.php`) ended with
+  `Run: export ANTHROPIC_API_KEY=, then "audit <path>".` — a line whose whole
+  purpose was to be pasted, which appends the key verbatim to `~/.bash_history`
+  or `~/.zsh_history` the moment it is. It now confirms where the configuration
+  landed and offers to store the key instead, naming the variable without ever
+  teaching the leak — and when the key prompt is skipped, points at
+  [Providing the API key](docs/configuration.md#providing-the-api-key) rather
+  than handing over a line to paste.
+
+- **A run with no API key now says how to get one.**
+  `MissingEnvironmentVariableException::forName()`
+  (`src/Audit/Infrastructure/Config/Exception/`) reported only:
+
+  ```text
+  The environment variable "ANTHROPIC_API_KEY", referenced by your config, is not set.
+  ```
+
+  which names the problem and leaves the reader to find the fix. It now names
+  every way out — `auth:set`, an `export`, or a password-manager prefix — and
+  points at `auth:status`. `doctor` surfaces the same message under its
+  `API key` check, and its green result now names the key that resolved
+  (`Config resolves and an API key is available: sk-ant…qF4A (SHA256:…)`)
+  instead of only asserting that one was found.
+
+### Removed
+
+- **Meta (Llama) is no longer listed as a supported platform.**
+  `symfony/ai-bundle` no longer declares a `meta` platform, so the block the
+  docs told readers to uncomment now fails configuration outright:
+
+  ```text
+  Unrecognized option "meta" under "ai.platform". Available options are "albert", "amazeeai", "anthropic", "azure", "bedrock", "cache", "cartesia", "cerebras", "cohere", "decart", "deepgram", "deepseek", "dockermodelrunner", "elevenlabs", "failover", "gemini", "generic", "huggingface", "lmstudio", "minimax", "mistral", "ollama", "openai", "openresponses", "openrouter", "ovh", "perplexity", "scaleway", "transformersphp", "vertexai", "voyage".
+  ```
+
+  The row is dropped from the `README.md` and `docs/configuration.md` platform
+  tables, `symfony/ai-meta-platform` is dropped from `composer.json` `suggest`,
+  and the commented `# meta:` block is dropped from the `ai.yaml` example. Llama
+  models remain reachable through any OpenAI-compatible gateway via the
+  `generic` platform this release adds.
+
 ### Fixed
 
 - **The standalone binary now boots against Ollama.** `doctor` reported the
@@ -51,11 +148,204 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
   `StandaloneContainerFactory` (`src/Standalone/`) registers the services
   `symfony/ai-bundle` expects an application to provide, and `http_client` —
-  supplied by `FrameworkBundle` in a real app — was missing. Only `ollama`
-  references it strictly; every other bridge falls back to a client it builds
-  itself, which is why this provider alone failed. The container now registers
-  `http_client` as `FrameworkBundle` does, and `symfony/http-client` becomes a
-  direct dependency.
+  supplied by `FrameworkBundle` in a real app — was missing. Three bridges
+  reference it strictly (`ollama`, `elevenlabs` and `deepgram`), and `ollama` is
+  the only one of them an audit runs against; every other bridge that takes an
+  `http_client` passes `NULL_ON_INVALID_REFERENCE` and falls back to a client it
+  builds itself, which is why this provider alone failed. The container now
+  registers `http_client` as `FrameworkBundle` does, and `symfony/http-client`
+  becomes a direct dependency.
+
+- **An AI gateway behind a custom URL and token can now be configured.**
+  `symfony/ai-generic-platform` is the `symfony/ai` bridge for an arbitrary
+  OpenAI-compatible endpoint behind a `base_url` plus an `api_key`, which is the
+  shape of every corporate AI gateway, yet it was absent from both platform
+  tables, from `composer.json` `suggest` and from every documented example, even
+  though the standalone end-to-end suite already used it as its platform.
+  Finding it was not enough either, because it is declared with
+  `useAttributeAsKey` and so registers as `ai.platform.generic.<instance>`,
+  while `StandaloneConfigFactory` wrote a flat
+  `platform: {<provider>: {api_key: …}}` and
+  `StandaloneContainerFactory::selectActivePlatform()` looked up
+  `ai.platform.<provider>`. `init --provider=generic` therefore produced a
+  config the container rejected with:
+
+  ```text
+  Invalid type for path "ai.platform.generic.api_key". Expected "array", but got "string"
+  ```
+
+  and repairing it by hand produced:
+
+  ```text
+  The selected provider "generic" is not present in the "platform:" block of your config.
+  ```
+
+  which named the one key that was plainly present. `StandaloneConfigFactory`
+  now nests the connection under its instance and accepts a `base_url`, `init`
+  gained `--base-url` and prompts for it on every platform whose block it can
+  write and that declares one, and a bare `provider: generic` now reports that
+  the platform is configured per instance and lists the instances it found. The
+  nesting covers all six instance-keyed platforms (`generic`, `openresponses`,
+  `azure`, `bedrock`, `cache`, `failover`); `init` writes a bootable block for
+  the two whose prototype is `base_url` plus `api_key`, namely `generic` and
+  `openresponses`. The other four take different fields (`azure` also requires
+  `deployment`, and `bedrock`, `cache` and `failover` have no `api_key` node at
+  all) and still have to be written by hand.
+
+- **`init` wrote an unbootable config for `albert` and `amazeeai`.** Both
+  platforms declare `base_url` as a required child, but neither is instance
+  keyed, and `init --provider=albert` wrote only an `api_key`, so the next run
+  aborted with:
+
+  ```text
+  The child config "base_url" under "ai.platform.albert" must be configured.
+  ```
+
+  Taking a `base_url` and being instance keyed are independent axes that
+  `InitCommand` had conflated: it prompted for a base URL only when the provider
+  named an instance, and refused `--base-url` otherwise. Both now key off
+  `BaseUrlPlatforms` (`src/Audit/Infrastructure/Config/`), so the two flat
+  platforms that need a `base_url` are asked for one and have it written beside
+  their `api_key`, while `bedrock`, `cache` and `failover` are refused earlier
+  still, as platforms `init` cannot write at all.
+
+- **A mistyped platform instance now names the real ones.**
+  `provider: generic.typo` against a configured `generic.eu` reported:
+
+  ```text
+  The selected provider "generic.typo" is not present in the "platform:" block of your config.
+  ```
+
+  which is the same misdirection this release fixed for a bare
+  `provider: generic`: the `generic` block is plainly there, only the instance
+  is wrong. `StandaloneContainerFactory` now looks the instances up by the
+  platform part of the provider, so the error reads
+  `The "generic" platform has no "typo" instance. Configured instances: eu.`
+
+- **An empty base URL no longer writes a config that cannot boot.** `base_url`
+  is a required child on all five platforms that declare it, yet answering the
+  `init` prompt with Enter, or passing `--base-url=` or a whitespace-only value,
+  dropped the key and still reported success. The next run then failed with:
+
+  ```text
+  The child config "base_url" under "ai.platform.generic.my_gateway" must be configured.
+  ```
+
+  `init` now reports that the platform requires a base URL and exits `2` without
+  writing anything.
+
+- **`init --provider=generic` still wrote the flat block this release set out to
+  fix.** Nesting only happened once the provider named an instance, so the bare
+  form that #365 actually reported kept producing:
+
+  ```text
+  Invalid type for path "ai.platform.generic.api_key". Expected "array", but got "string"
+  ```
+
+  The mirror case was unguarded too: `--provider=anthropic.prod` nested a flat
+  platform under an instance it has no prototype for, giving:
+
+  ```text
+  Unrecognized option "prod" under "ai.platform.anthropic". Available options are "api_key", "cache_retention", "http_client", "version".
+  ```
+
+  `InstanceKeyedPlatforms` (`src/Audit/Infrastructure/Config/`) now names the
+  six platforms declared with `useAttributeAsKey`, and `init` refuses both
+  directions with the shape to use instead, rather than reporting success.
+
+- **A hyphenated instance name wrote a config that could not boot.**
+  `symfony/config` rewrites a key holding a hyphen and no underscore, and an
+  instance is a prototyped key like any other, so `generic.my-gateway`
+  registered the service as `ai.platform.generic.my_gateway` while `provider:`
+  kept the hyphen. `init` reported success and the next run aborted with:
+
+  ```text
+  The "generic" platform has no "my-gateway" instance. Configured instances: my_gateway.
+  ```
+
+  `ConfigKeyInstanceName` (`src/Audit/Infrastructure/Config/`) folds the name
+  the same way the framework will, so `--provider=generic.my-gateway` now writes
+  `my_gateway` in both places. An instance name the config file could not be
+  read back with is refused outright, `init` asking the same dumper and parser
+  that will handle the file rather than guessing: `generic.0` is dumped as a
+  YAML sequence entry, so the container answers
+  `The attribute "name" must be set for path "ai.platform.generic".`, while
+  `generic..inf` and `generic..nan` are dumped unquoted and the next run cannot
+  parse its own config:
+
+  ```text
+  Config file "~/.config/symfony-security-auditor/config.yaml" is not valid YAML: Implicit casting of incompatible mapping keys to strings is not supported. Quote your evaluable mapping keys instead at line 3 (near "generic: { .inf: { base_url: 'https://gw.example', api_key: '%env(GATEWAY_TOKEN)%' } }").
+  ```
+
+  Under `--force` that would have cost a working configuration. A name the
+  parser reads as a YAML tag or as the merge key, such as `generic.!php/const`
+  or `generic.<<`, is refused for a third reason: the block comes back under a
+  different name than `provider:` points at. A name holding a single quote, a
+  NUL, a carriage return or a newline, or ending in a backslash, is refused by
+  `PlatformServiceId` (`src/Audit/Infrastructure/Config/`) for a fourth: it
+  survives YAML untouched, but `ai.platform.generic.o'brien` is not an id the
+  container accepts, so the run died on `Invalid service id`.
+  `PlatformServiceIdKnowledgeTest` asks a real `ContainerBuilder` which names it
+  takes, rather than re-asserting the rule, so a tightening upstream fails the
+  build instead of quietly letting `init` write that config again. A name
+  holding a `%...%` pair is refused for a fifth (`ContainerParameterSyntax`): it
+  is valid YAML and a valid service id, but `generic.%gw%` reached the container
+  as a parameter reference and aborted the run with:
+
+  ```text
+  The service ".abstract.instanceof.VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage" has a dependency on a non-existent parameter "gw".
+  ```
+
+  Every other number is accepted, subject to the hyphen fold above, so
+  `generic.-1` is written as `generic._1`. A provider naming no platform before
+  the dot (`.anthropic`) is refused too, instead of advising the empty string.
+
+- **An instance written with stray whitespace kept it.** `generic. my_gateway`
+  parsed to the instance `" my_gateway"` and was written as the YAML key,
+  because only the provider string as a whole was trimmed and never the half
+  after the dot. `ProviderKey::of()` trims both halves now, the same
+  silent-rename class as the case-folding entry below.
+
+- **`init --provider=generic.myGateway` silently renamed the instance.**
+  `ProviderKeyNormalizer` lowercased the whole provider string to fold package
+  slugs onto config keys, which was harmless until this release made instance
+  names possible. The written config stayed self-consistent, so it booted, but
+  the instance the user named was gone and a hand-written `platform:` block
+  using the original casing no longer matched `provider:`. Only the platform
+  half is folded now.
+
+- **`init` wrote a config the container refuses for eight platforms.** It only
+  ever writes an `api_key` plus an optional `base_url`, so a platform that
+  rejects `api_key` or requires a field it never asks for ended up with a block
+  that failed on the next run, for example:
+
+  ```text
+  Unrecognized option "api_key" under "ai.platform.lmstudio". Available options are "host_url", "http_client".
+  ```
+
+  `init --provider=lmstudio` was newly reachable because this release also fixed
+  that bridge's package slug, so the bridge now installed cleanly and only then
+  produced an unusable config. `HandWrittenPlatforms`
+  (`src/Audit/Infrastructure/Config/`) names the eight and what each needs
+  instead: `azure` (a `deployment`), `cartesia` (a `version`), and `bedrock`,
+  `cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` (no
+  `api_key` node at all). `init` now names the missing piece and exits `2`
+  without writing anything, rather than reporting success.
+
+- **Five provider bridges installed a package that does not exist.**
+  `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`
+  (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) had no entry
+  for `minimax`, `lmstudio`, `openrouter`, `dockermodelrunner` or
+  `transformersphp`, so `init` asked Composer for `symfony/ai-minimax-platform`
+  instead of `symfony/ai-mini-max-platform`, and likewise for `lm-studio`,
+  `open-router`, `docker-model-runner` and `transformers-php`. `minimax` was
+  already spelled correctly in this package's own `suggest` block. An
+  instance-scoped provider (`generic.my_gateway`) also had its instance folded
+  into the package name; only the platform part now selects the bridge.
+  `BridgePackageKnowledgeTest` reads the bridge package names out of
+  `symfony/ai-bundle`'s own `composer.json` and compares them with the ones
+  `init` would request, so the next renamed bridge fails the build rather than a
+  user's `composer require`.
 
 ### Security
 
@@ -101,39 +391,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
   It now reads the file whose path `VAR` holds and strips surrounding
   whitespace, so Docker and Kubernetes secrets, `systemd` `LoadCredential=` and
-  a plain `0600` file all work without a shell being involved. An unset
-  variable, an unreadable file, or a file holding only whitespace stops the run
-  before the provider is contacted (`UnreadableCredentialFileException`);
-  `doctor` reports it under its `API key` check, and `--dry-run` tolerates all
-  three because it never reaches the provider. See
+  a plain `0600` file all work without a shell being involved. An unreadable
+  file or a file holding only whitespace stops the run before the provider is
+  contacted (`UnreadableCredentialFileException`), and an unset variable falls
+  through to the ordinary `MissingEnvironmentVariableException`; `doctor`
+  reports it under its `API key` check, and `--dry-run` tolerates all three
+  because it never reaches the provider. See
   [Providing the API key](docs/configuration.md#providing-the-api-key).
-
-### Changed
-
-- **`init` no longer prints a paste-ready `export` line.**
-  `InitCommand::__invoke()` (`src/Command/InitCommand.php`) ended with
-  `Run: export ANTHROPIC_API_KEY=, then "audit <path>".` — a line whose whole
-  purpose was to be pasted, which appends the key verbatim to `~/.bash_history`
-  or `~/.zsh_history` the moment it is. It now confirms where the configuration
-  landed and offers to store the key instead, naming the variable without ever
-  teaching the leak — and when the key prompt is skipped, points at
-  [Providing the API key](docs/configuration.md#providing-the-api-key) rather
-  than handing over a line to paste.
-
-- **A run with no API key now says how to get one.**
-  `MissingEnvironmentVariableException::forName()`
-  (`src/Audit/Infrastructure/Config/Exception/`) reported only:
-
-  ```text
-  The environment variable "ANTHROPIC_API_KEY", referenced by your config, is not set.
-  ```
-
-  which names the problem and leaves the reader to find the fix. It now names
-  every way out — `auth:set`, an `export`, or a password-manager prefix — and
-  points at `auth:status`. `doctor` surfaces the same message under its
-  `API key` check, and its green result now names the key that resolved
-  (`Config resolves and an API key is available: sk-ant…qF4A (SHA256:…)`)
-  instead of only asserting that one was found.
 
 ## [1.20.1] — 2026-08-23 — Herald
 

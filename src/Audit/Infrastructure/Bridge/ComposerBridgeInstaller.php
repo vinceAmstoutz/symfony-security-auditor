@@ -26,7 +26,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
  * `composer require`. The provider name is the `symfony/ai` platform *config*
  * key (`openai`, `deepseek`, …); a handful of packages spell that key with
  * hyphens (`symfony/ai-open-ai-platform` for the `openai` platform), so those
- * are mapped to their package slug before the package name is built.
+ * are mapped to their package slug before the package name is built. An
+ * instance-scoped provider (`generic.my_gateway`) names one instance of a
+ * platform, not a package of its own, so only the platform part selects the
+ * bridge.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -42,11 +45,16 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     public const array PACKAGE_SLUG_OVERRIDES = [
         'openai' => 'open-ai',
         'openresponses' => 'open-responses',
+        'openrouter' => 'open-router',
         'deepseek' => 'deep-seek',
         'vertexai' => 'vertex-ai',
         'huggingface' => 'hugging-face',
         'elevenlabs' => 'eleven-labs',
         'amazeeai' => 'amazee-ai',
+        'minimax' => 'mini-max',
+        'lmstudio' => 'lm-studio',
+        'dockermodelrunner' => 'docker-model-runner',
+        'transformersphp' => 'transformers-php',
     ];
 
     private const string MANIFEST_FILENAME = 'composer.json';
@@ -82,7 +90,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     {
         $this->ensureComposerProject($targetDirectory);
 
-        $package = \sprintf(self::PACKAGE_TEMPLATE, self::PACKAGE_SLUG_OVERRIDES[$provider] ?? $provider);
+        $package = self::packageFor($provider);
         $process = ($this->processBuilder)($package, $targetDirectory);
 
         try {
@@ -94,6 +102,17 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         if (!$process->isSuccessful()) {
             throw BridgeInstallationFailedException::forFailedProcess($package, $process->getErrorOutput());
         }
+    }
+
+    /**
+     * The bridge package a provider selects. Only the platform half names a
+     * bridge: an instance is a connection of that platform, not a package.
+     */
+    public static function packageFor(string $provider): string
+    {
+        $platform = ProviderKey::of($provider)->platform;
+
+        return \sprintf(self::PACKAGE_TEMPLATE, self::PACKAGE_SLUG_OVERRIDES[$platform] ?? $platform);
     }
 
     /**

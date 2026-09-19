@@ -76,10 +76,11 @@ service "http_client".
 
 The container the binary builds registers the services `symfony/ai-bundle`
 expects an application to provide, and `http_client` was missing from that list.
-Only `ollama` requires it outright — every other provider's bridge falls back to
-a client it builds itself — so this surfaced as an Ollama-only failure. Upgrade
-the binary (`symfony-security-auditor self-update`); re-running `init` does not
-help, since the bridge was never the problem.
+Three bridges require it outright (`ollama`, `elevenlabs` and `deepgram`), and
+`ollama` is the only one an audit runs against, so this surfaced as an
+Ollama-only failure. Upgrade the binary
+(`symfony-security-auditor self-update`); re-running `init` does not help, since
+the bridge was never the problem.
 
 ### `.symfony-security-auditor.yaml` cannot override `platform`, `provider`, or `scan.import_sarif`
 

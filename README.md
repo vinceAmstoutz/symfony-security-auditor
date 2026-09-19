@@ -117,11 +117,12 @@ irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/mai
 >
 > **One command, installed _and_ configured.** Set `SSA_INIT=1` and the
 > installer runs the guided [`init`](#2-configure--the-guided-init) for you
-> right after downloading — so you skip step 2, and `init` asks for your API key
-> at the end, leaving you ready to audit. It prompts for your provider when a
-> terminal is attached, and falls back to the Anthropic defaults
-> non-interactively in a pipe or CI. `init` fetches the provider bridge with
-> `composer`, so composer must be available for this combined step.
+> right after downloading, so you skip step 2. With a terminal attached it
+> prompts for your provider and offers to store your API key at the end, leaving
+> you ready to audit; in a pipe or CI it takes the Anthropic defaults and stores
+> no key, so export one or run `auth:set` before auditing. `init` fetches the
+> provider bridge with `composer`, so composer must be available for this
+> combined step.
 >
 > ```bash
 > curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
@@ -446,19 +447,39 @@ then override individual keys as needed.
 | -------------------- | ------------------------------------ | ---------------------------------------------- |
 | Anthropic (Claude)   | `symfony/ai-anthropic-platform`      | `ANTHROPIC_API_KEY`                            |
 | OpenAI               | `symfony/ai-open-ai-platform`        | `OPENAI_API_KEY`                               |
-| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY`                               |
+| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY` plus a `base_url`             |
 | Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL` |
 | Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`                               |
 | Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | GCP credentials                                |
 | AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials                                |
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                             |
 | Mistral              | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                              |
-| Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                 |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                              |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | _(none)_                                       |
+| Albert (French gov)  | `symfony/ai-albert-platform`         | `ALBERT_API_KEY` plus a `base_url`             |
+| amazee.ai            | `symfony/ai-amazee-ai-platform`      | `AMAZEEAI_API_KEY` plus a `base_url`           |
+| Generic (AI gateway) | `symfony/ai-generic-platform`        | depends on the gateway                         |
 
 Swapping providers requires only a `config/packages/ai.yaml` change — no PHP
 edits.
+
+Any OpenAI-compatible endpoint behind a custom URL and token (an in-house AI
+gateway, LiteLLM, vLLM, LocalAI) goes through the **generic** platform. It is
+configured per instance, so the instance name is part of the platform block and,
+in standalone mode, part of `provider:` as well:
+
+```yaml
+# config/packages/ai.yaml
+ai:
+    platform:
+        generic:
+            my_gateway:
+                base_url: '%env(GATEWAY_URL)%'
+                api_key: '%env(GATEWAY_TOKEN)%'
+```
+
+See
+[Configuration → Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms).
 
 ## Documentation
 
