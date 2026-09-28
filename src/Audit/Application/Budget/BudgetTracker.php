@@ -47,7 +47,7 @@ final class BudgetTracker
         $costUsd = $this->costCalculator->costForCall(
             $llmResponse->inputTokens(),
             $llmResponse->outputTokens(),
-            $llmResponse->model(),
+            $this->costCalculator->billedModel($llmResponse->model(), $llmResponse->reportedModel()),
             $llmResponse->cacheReadTokens(),
             $llmResponse->cacheCreationTokens(),
         );

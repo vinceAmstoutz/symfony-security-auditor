@@ -113,7 +113,7 @@ final readonly class BatchWindowResolver
                 $this->model,
                 $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
                 TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
-            );
+            )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult));
             $this->budgetTracker?->recordCall($llmResponse);
             $this->budgetTracker?->assertWithinBudget();
 

@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **A call is billed as the model the provider says answered it.** A gateway
+  routing on its own (`openrouter/auto`), a failover platform or an alias the
+  provider resolves (`claude-opus-4-8` answered as a dated release) used to be
+  billed at the configured model's rate whatever actually ran. `symfony/ai` 0.14
+  reports the serving model in `TokenUsage::getModel()`;
+  `PlatformResultExtractor::extractReportedModel()` reads it, every per-call
+  `LLMResponse` carries it through the new `LLMResponse::withReportedModel()` /
+  `LLMResponse::reportedModel()`, and `BudgetTracker` prices the call through
+  `CostCalculator::billedModel()`, which takes the reported model whenever the
+  pricing source lists it and keeps the configured one otherwise, so a gateway
+  answering under an id no catalog knows never drops the cost to `$0`. The
+  budget guard and `estimated_cost_usd` follow; `usage_by_model` stays keyed by
+  the configured model, so the report schema does not change.
+
 - **`init` configures AWS Bedrock.** `init --provider=bedrock.<instance>` used
   to install the bridge and print a block to finish by hand, because Bedrock's
   default InvokeModel route needs an AWS SDK client service. `symfony/ai` 0.14

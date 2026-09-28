@@ -64,6 +64,18 @@ final readonly class PlatformResultExtractor
     }
 
     /**
+     * The model the provider says served the call, which a gateway routing
+     * on its own, or a failover platform, can differ from the one requested.
+     */
+    public function extractReportedModel(DeferredResult $deferredResult): ?string
+    {
+        $tokenUsage = $deferredResult->getMetadata()->all()['token_usage'] ?? null;
+        $reportedModel = $tokenUsage instanceof TokenUsageInterface ? $tokenUsage->getModel() : null;
+
+        return '' === $reportedModel ? null : $reportedModel;
+    }
+
+    /**
      * A negative count here is a compromised or malfunctioning provider
      * response — every caller relies on rejecting it before it ever reaches
      * `RateLimiterInterface::record()`, whose mutable window counters have no
