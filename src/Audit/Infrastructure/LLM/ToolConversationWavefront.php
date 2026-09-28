@@ -240,7 +240,7 @@ final readonly class ToolConversationWavefront
                 $this->model,
                 'tool_iteration',
                 TokenUsageSnapshot::of($callInput, $callOutput, $callCacheRead, $callCacheCreation),
-            ));
+            )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult)));
             $this->budgetTracker->assertWithinBudget();
         }
 

@@ -41,6 +41,29 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_a_response_carries_no_reported_model_unless_given_one(): void
+    {
+        self::assertNull(LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50))->reportedModel());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_the_reported_model_rides_beside_the_configured_one_without_touching_the_rest(): void
+    {
+        $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50, 7, 3))
+            ->withReportedModel('claude-opus-20260101');
+
+        self::assertSame('claude-opus-20260101', $llmResponse->reportedModel());
+        self::assertSame('claude-opus', $llmResponse->model());
+        self::assertSame('Hello world', $llmResponse->content());
+        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame([100, 50, 7, 3], [$llmResponse->inputTokens(), $llmResponse->outputTokens(), $llmResponse->cacheReadTokens(), $llmResponse->cacheCreationTokens()]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_tokens_default_to_zero_when_not_supplied(): void
     {
         $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50));

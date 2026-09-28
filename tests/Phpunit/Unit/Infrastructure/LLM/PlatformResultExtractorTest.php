@@ -82,6 +82,23 @@ final class PlatformResultExtractorTest extends TestCase
         return $deferredResult;
     }
 
+    #[DataProvider('reportedModelCases')]
+    public function test_it_extracts_the_model_the_provider_reports(?TokenUsage $tokenUsage, ?string $expectedModel): void
+    {
+        $deferredResult = null === $tokenUsage ? $this->deferredResult() : $this->deferredResultWithTokenUsage($tokenUsage);
+
+        self::assertSame($expectedModel, (new PlatformResultExtractor(null))->extractReportedModel($deferredResult));
+    }
+
+    /** @return iterable<string, array{?TokenUsage, ?string}> */
+    public static function reportedModelCases(): iterable
+    {
+        yield 'a reported model' => [new TokenUsage(promptTokens: 1, completionTokens: 1, model: 'claude-opus-4-8-20260101'), 'claude-opus-4-8-20260101'];
+        yield 'token usage naming no model' => [new TokenUsage(promptTokens: 1, completionTokens: 1), null];
+        yield 'token usage naming an empty model' => [new TokenUsage(promptTokens: 1, completionTokens: 1, model: ''), null];
+        yield 'no token usage at all' => [null, null];
+    }
+
     public function test_it_extracts_the_raw_provider_stop_reason(): void
     {
         $platformResultExtractor = new PlatformResultExtractor(null);

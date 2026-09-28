@@ -199,7 +199,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $this->model,
             $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
             TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
-        );
+        )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult));
         $this->budgetTracker?->recordCall($llmResponse);
         $this->budgetTracker?->assertWithinBudget();
 
