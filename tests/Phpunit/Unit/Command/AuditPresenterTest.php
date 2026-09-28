@@ -212,6 +212,22 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_result_for_an_incomplete_audit_never_claims_it_completed(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext($auditContext), Command::SUCCESS);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('[WARNING] Audit incomplete: 1 file(s) were never analyzed', $flattened);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_result_for_success_exit_emits_success_message(): void
     {
         $bufferedOutput = new BufferedOutput();

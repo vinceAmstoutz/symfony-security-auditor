@@ -137,6 +137,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A report never calls an aborted or partly failed audit clean.** When an LLM
+  call failed for good — the run in #372 died on
+  `OpenSSL SSL_read: … unexpected eof while reading` — the audit exited `1`, but
+  the partial report it still wrote printed "✅ No validated vulnerabilities
+  found." with grade A, because no renderer read the `errored`/`aborted` entries
+  in its coverage. The same held for a run that finished with a chunk whose
+  response could not be parsed, which also printed `[OK] Audit complete`.
+  `AuditReport::unanalyzedFiles()` and `AuditReport::isComplete()`
+  (`src/Audit/Domain/Model/`) now expose that gap. The console, executive,
+  Markdown, HTML and GitHub-comment reports replace the clean line with
+  `Audit incomplete: N file(s) were never analyzed …` (and print it above the
+  findings when there are some). The GitHub comment headlines the run as
+  `incomplete`, `--format=github` emits a `::warning`, and the success banner
+  becomes a warning. Machine-readable formats gain additive fields: the JSON
+  report carries `complete`, and SARIF runs carry
+  `invocations[0].executionSuccessful` with the reason as an `error`
+  notification. Exit codes are unchanged. Reported by
+  [@shochdoerfer](https://github.com/shochdoerfer) in
+  [#372](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/372).
+
 - **The standalone binary now boots against Ollama.** `doctor` reported the
   bridge as installed but unusable and `audit` never scanned a file:
 

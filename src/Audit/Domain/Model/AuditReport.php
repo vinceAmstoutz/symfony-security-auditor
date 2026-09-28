@@ -18,6 +18,9 @@ use DateTimeInterface;
 
 final readonly class AuditReport
 {
+    /** @var list<string> */
+    private const array UNANALYZED_STATUSES = ['errored', 'aborted'];
+
     /** @var list<Vulnerability> */
     private array $vulnerabilities;
 
@@ -129,6 +132,30 @@ final readonly class AuditReport
     public function coverage(): array
     {
         return $this->coverage;
+    }
+
+    /**
+     * Files some stage set out to analyze and never finished: its call failed
+     * (`errored`) or an abort stopped the run before reaching it (`aborted`).
+     * A finding can hide in any of them, so a report listing one cannot vouch
+     * for the absence of vulnerabilities. Files the lean pre-scan left out on
+     * purpose (`skipped`) are not among them.
+     *
+     * @return list<string>
+     */
+    public function unanalyzedFiles(): array
+    {
+        $unanalyzed = array_filter(
+            $this->coverage,
+            static fn (array $entry): bool => \in_array($entry['status'], self::UNANALYZED_STATUSES, true),
+        );
+
+        return array_values(array_unique(array_column($unanalyzed, 'file')));
+    }
+
+    public function isComplete(): bool
+    {
+        return [] === $this->unanalyzedFiles();
     }
 
     /** @return list<Vulnerability> */
@@ -299,6 +326,7 @@ final readonly class AuditReport
             'completed_at' => $this->reportIdentity->completedAt->format(DateTimeInterface::ATOM),
             'duration_seconds' => $this->durationSeconds(),
             'files_scanned' => $this->reportIdentity->filesScanned,
+            'complete' => $this->isComplete(),
             'risk_score' => $this->riskScore(),
             'risk_level' => $this->riskLevel(),
             'score' => $this->normalizedScore(),
