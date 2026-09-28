@@ -137,6 +137,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **An API key or URL holding `%` now reaches the provider exactly as stored,
+  and `init` refuses a model the container would misread.** The standalone
+  binary substitutes `%env(VAR)%`, `%env(file:VAR)%` and `auth:set` values
+  itself, then hands the result to the container, which reads `%name%` inside it
+  as a parameter reference and `%%` as an escaped percent. A key containing
+  `%kernel.secret%` stopped the run with
+  `You have requested a non-existent parameter "kernel.secret".`, and one
+  containing `%%` was silently shortened to `%` and rejected by the provider; a
+  percent-encoded URL read from the environment broke the same way.
+  `StandalonePlatformConfigResolver` (`src/Audit/Infrastructure/Config/`) now
+  escapes every value it substitutes, and
+  `StandalonePlatformConfig::credentialIdentity()` unescapes it again, so the
+  masked preview and fingerprint still describe the key the provider receives.
+  `init --model` rejects a `%…%` pair with exit code `2`, as `--base-url`
+  already did. Reported alongside
+  [#369](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/369).
+
 - **The standalone binary now boots against Ollama.** `doctor` reported the
   bridge as installed but unusable and `audit` never scanned a file:
 
