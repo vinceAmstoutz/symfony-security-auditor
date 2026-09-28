@@ -128,12 +128,6 @@ final class StandaloneAuditEndToEndTest extends TestCase
 
     /**
      * @throws UnresolvableConfigPathException
-     * @throws MissingPlatformException
-     * @throws MissingEnvironmentVariableException
-     * @throws MissingBundleExtensionException
-     * @throws UnknownPlatformProviderException
-     * @throws AmbiguousPlatformException
-     * @throws UnresolvableAuditCommandException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
