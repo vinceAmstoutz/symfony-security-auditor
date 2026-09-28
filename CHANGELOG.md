@@ -203,6 +203,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Cost is priced at the rate of the platform that serves the model.**
+  `ModelsDevPricingProvider` looked a model up by its id alone: a bare id was
+  priced only from first-party providers, and a qualified one from whichever
+  provider sorted first alphabetically. A model on a gateway or cloud was
+  therefore priced at another provider's rate, or not at all. Against the
+  `symfony/models-dev` catalog of the day, Venice priced none of its 111 models,
+  OVH none of its 12, Scaleway 1 of 15. Together priced 14 of 39 and Hugging
+  Face 36 of 77 at another provider's rate, and Bedrock, Azure and Vertex AI
+  left dozens unpriced; a `nova-micro` or `llama-3.3-70b-instruct` on Bedrock
+  showed `$0.00`. The new `PricingPlatformPass` reads the `ai.platform.<name>`
+  service `PlatformInterface` is aliased to, in the bundle and in the standalone
+  binary alike, and `PlatformCatalogProviders` maps the 20 `symfony/ai`
+  platforms with a listing of their own (`together` to `togetherai`, `ovh` to
+  `ovhcloud`, `bedrock` to `amazon-bedrock`, …) to it. The pricing provider
+  reads that listing first, including the ids the Bedrock bridge sends
+  (`amazon.<name>-v1:0`, `anthropic.<name>`, `meta.llama3-…`), and falls back to
+  the previous lookup for a model the platform does not list or a platform with
+  no listing (`generic`, `ollama`, …). Every priced model on those 20 platforms
+  now resolves to its own platform's rate; the budget guard, the dry-run
+  estimate and `estimated_cost_usd` follow. `symfony/models-dev` now requires
+  `>=130.0`, the first catalog listing every provider the mapping reads.
+
 - **A report never calls an aborted or partly failed audit clean.** When an LLM
   call failed for good — the run in #372 died on
   `OpenSSL SSL_read: … unexpected eof while reading` — the audit exited `1`, but

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
@@ -22,6 +23,7 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -144,6 +146,38 @@ final class StandaloneContainerFactoryTest extends TestCase
         self::assertInstanceOf(PlatformInterface::class, $platform);
 
         self::assertSame(OllamaFactory::STUB_RESPONSE, $platform->invoke('llama3.3', 'ping')->asText());
+    }
+
+    /**
+     * @param array<string, mixed> $platform
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[DataProvider('servingPlatformCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_publishes_the_platform_the_audit_runs_against_for_pricing(array $platform, ?string $provider, string $expectedPlatform): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig($platform, $provider)),
+            $this->cacheDir,
+        );
+
+        self::assertSame($expectedPlatform, $containerBuilder->getParameter(PricingPlatformPass::PARAMETER));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, ?string, string}> */
+    public static function servingPlatformCases(): iterable
+    {
+        yield 'the only platform configured' => [['ollama' => ['endpoint' => 'http://localhost:11434']], null, 'ollama'];
+        yield 'the instance the provider selects' => [
+            ['generic' => ['primary' => ['base_url' => 'http://a'], 'secondary' => ['base_url' => 'http://b']]],
+            'generic.secondary',
+            'generic',
+        ];
     }
 
     /**

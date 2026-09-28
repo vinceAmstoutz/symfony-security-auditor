@@ -63,6 +63,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewer
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
@@ -92,6 +93,12 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
  */
 final class SymfonySecurityAuditorBundle extends AbstractBundle
 {
+    #[Override]
+    public function build(ContainerBuilder $container): void
+    {
+        $container->addCompilerPass(new PricingPlatformPass());
+    }
+
     #[Override]
     public function configure(DefinitionConfigurator $definition): void
     {

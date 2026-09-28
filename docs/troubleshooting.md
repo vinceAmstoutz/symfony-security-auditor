@@ -507,10 +507,11 @@ most:
 
 The cost estimate multiplies token counts by per-model prices from the
 configured `PricingProviderInterface` (the bundled `ModelsDevPricingProvider`
-reads prices from the `symfony/models-dev` catalog shipped in `vendor/`). When a
-configured model (`model`, `attacker_model`, or `reviewer_model`) is absent from
-that catalog — a typo, or a model `symfony/ai` supports but the catalog does not
-list — its price resolves to `0.0` and the dry run now prints a stderr warning:
+reads prices from the `symfony/models-dev` catalog shipped in `vendor/`, the
+listing of the platform the audit runs against first). When a configured model
+(`model`, `attacker_model`, or `reviewer_model`) is absent from that catalog — a
+typo, or a model `symfony/ai` supports but the catalog does not list — its price
+resolves to `0.0` and the dry run now prints a stderr warning:
 
 ```text
 No published pricing for the configured model(s): <model>. The dry-run cost

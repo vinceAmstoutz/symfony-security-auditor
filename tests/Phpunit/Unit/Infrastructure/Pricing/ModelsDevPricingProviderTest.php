@@ -339,6 +339,53 @@ final class ModelsDevPricingProviderTest extends TestCase
         }
     }
 
+    #[DataProvider('servingPlatformCases')]
+    public function test_it_prices_a_model_at_the_rate_of_the_platform_serving_it(string $platform, string $model, float $expectedInputPrice, float $expectedOutputPrice): void
+    {
+        $modelsDevPricingProvider = $this->providerServedBy($platform);
+
+        self::assertTrue($modelsDevPricingProvider->hasModel($model));
+        self::assertSame($expectedInputPrice, $modelsDevPricingProvider->pricePerMillionInputTokens($model));
+        self::assertSame($expectedOutputPrice, $modelsDevPricingProvider->pricePerMillionOutputTokens($model));
+    }
+
+    /** @return iterable<string, array{string, string, float, float}> */
+    public static function servingPlatformCases(): iterable
+    {
+        yield 'together over an aggregator listing the same id' => ['together', 'vendor/relisted-model', 2.0, 2.0];
+        yield 'venice from its own listing' => ['venice', 'venice-uncensored', 0.5, 2.0];
+        yield 'bedrock under the id as configured' => ['bedrock', 'nova-verbatim', 0.01, 0.02];
+        yield 'bedrock nova under its versioned id' => ['bedrock', 'nova-micro', 0.035, 0.14];
+        yield 'bedrock claude under its versioned id' => ['bedrock', 'claude-haiku-4-5-20251001', 1.0, 5.0];
+        yield 'bedrock claude over the first-party rate' => ['bedrock', 'claude-opus-4-8', 7.0, 28.0];
+        yield 'bedrock llama under its dashed, versioned id' => ['bedrock', 'llama-3.3-70b-instruct', 0.72, 0.72];
+        yield 'a platform not listing the model falls back to first party' => ['azure', 'claude-opus-4-8', 5.0, 25.0];
+        yield 'a platform with no listing of its own falls back to first party' => ['generic', 'claude-opus-4-8', 5.0, 25.0];
+    }
+
+    public function test_without_a_serving_platform_a_relisted_id_keeps_the_catalog_wide_rate(): void
+    {
+        self::assertSame(0.2, $this->providerForCatalog('platform-listings.json')->pricePerMillionInputTokens('vendor/relisted-model'));
+    }
+
+    public function test_without_a_serving_platform_a_model_only_that_platform_lists_is_unpriced(): void
+    {
+        self::assertFalse($this->providerForCatalog('platform-listings.json')->hasModel('venice-uncensored'));
+    }
+
+    public function test_the_serving_platform_free_listing_is_not_replaced_by_another_provider_paid_one(): void
+    {
+        $modelsDevPricingProvider = $this->providerServedBy('anthropic');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-promo'));
+        self::assertSame(0.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-promo'));
+    }
+
+    private function providerServedBy(string $platform): ModelsDevPricingProvider
+    {
+        return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/platform-listings.json', 'vinceamstoutz/not-a-real-package', $platform);
+    }
+
     private function providerForCatalog(string $fixture): ModelsDevPricingProvider
     {
         return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/'.$fixture, 'vinceamstoutz/not-a-real-package');

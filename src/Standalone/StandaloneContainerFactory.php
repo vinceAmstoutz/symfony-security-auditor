@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerPa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -88,6 +89,7 @@ final readonly class StandaloneContainerFactory
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
+        $containerBuilder->addCompilerPass(new PricingPlatformPass());
         $containerBuilder->compile(true);
 
         return $containerBuilder;
