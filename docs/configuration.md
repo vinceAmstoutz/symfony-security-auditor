@@ -482,13 +482,13 @@ API key. Everything else in their prototype is optional: `http_client` and the
 route key (`completions_path` on `generic`, `responses_path` on `openresponses`)
 carry defaults, `generic` adds `supports_completions`, `supports_embeddings` and
 `embeddings_path`, and `model_catalog` has no default at all. Set any of them by
-hand. Nine platforms need something it never asks for and are refused with exit
+hand. Eight platforms need something it never asks for and are refused with exit
 code `2` rather than written half-configured: `azure` (a `deployment`),
 `cartesia` (a `version`) and `higgsfield` (an `api_secret`) want an extra field
-beside the key, `bedrock` needs an inference `api` route, and `cache`,
-`failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` have no
-`api_key` node at all. Write those blocks by hand, pointing `provider:` at the
-matching `<platform>.<instance>` when the platform is instance keyed.
+beside the key, and `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
+`transformersphp` have no `api_key` node at all. Write those blocks by hand,
+pointing `provider:` at the matching `<platform>.<instance>` when the platform
+is instance keyed.
 
 Being instance keyed and taking a `base_url` are independent. `albert` and
 `amazeeai` require a `base_url` on a flat block, so `init` asks them for one too
@@ -1274,15 +1274,15 @@ needs. Every option it is not given is prompted for. Under `--no-interaction`
 the ones with defaults fall back to them, and a platform that requires a
 `--base-url` or an `--endpoint` is refused rather than written half-configured.
 
-| Option         | Default                | Description                                                                                                                                                     |
-| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--provider`   | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                                                          |
-| `--model`      | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                                                       |
-| `--env-var`    | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead.                            |
-| `--base-url`   | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform.                          |
-| `--endpoint`   | prompted when required | The same thing under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. Rejected for any other platform. |
-| `--no-api-key` | off                    | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`, `vertexai`). |
-| `--force`      | off                    | Overwrite an existing configuration without asking.                                                                                                             |
+| Option         | Default                | Description                                                                                                                                                                |
+| -------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--provider`   | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                                                                     |
+| `--model`      | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                                                                  |
+| `--env-var`    | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead.                                       |
+| `--base-url`   | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform.                                     |
+| `--endpoint`   | prompted when required | The same thing under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. Rejected for any other platform.            |
+| `--no-api-key` | off                    | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`bedrock`, `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`, `vertexai`). |
+| `--force`      | off                    | Overwrite an existing configuration without asking.                                                                                                                        |
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
@@ -1315,14 +1315,25 @@ only produce a run that stops at `No API key available`. Pass `--env-var` to add
 a key anyway, which is what Ollama Cloud needs. That keyless shape is what
 `privacy.offline_only: true` expects — see [privacy.\*](#privacy--data-egress).
 
-Nine platforms are not written, because `init` only ever writes an `api_key` and
-an optional `base_url` or `endpoint`: `azure`, `cartesia` and `higgsfield` need
-an extra field beside the key, `bedrock` needs an inference `api` route, and
-`cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` take
-no `api_key` at all. The refusal names the field the platform wants; its
-connection block goes under `platform:` in `config.yaml`, with the same children
-`symfony/ai-bundle` documents for it. Four of the nine (`azure`, `bedrock`,
-`cache`, `failover`) nest one level deeper under an instance name — see
+`bedrock` is written on a Bedrock Mantle route, the one that takes an API key
+where the default InvokeModel route needs an AWS SDK client service. Name the
+model after its vendor, as Bedrock does: `anthropic.claude-opus-4-8` is written
+with `api: messages`, `google.gemma-…` with `api: responses`, and every other
+model (`openai.gpt-oss-120b`, `qwen.…`) with `api: completions`; `init` also
+installs the `generic` or `openresponses` bridge those last two routes borrow
+their protocol from. A bare `claude-opus-4-8` is refused, since it names no
+route. The key comes from `BEDROCK_API_KEY` by default; `--no-api-key` writes
+none, so requests are signed with AWS SigV4 from your usual AWS credentials.
+Mantle defaults to `us-west-2`: add `region:` to the block for another one.
+
+Eight platforms are not written, because `init` only ever writes an `api_key`
+and an optional `base_url` or `endpoint`: `azure`, `cartesia` and `higgsfield`
+need an extra field beside the key, and `cache`, `failover`,
+`dockermodelrunner`, `lmstudio` and `transformersphp` take no `api_key` at all.
+The refusal names the field the platform wants; its connection block goes under
+`platform:` in `config.yaml`, with the same children `symfony/ai-bundle`
+documents for it. Three of the eight (`azure`, `cache`, `failover`) nest one
+level deeper under an instance name — see
 [Instance-keyed platforms](#instance-keyed-platforms); `cartesia`,
 `dockermodelrunner`, `higgsfield`, `lmstudio` and `transformersphp` take a flat
 block.

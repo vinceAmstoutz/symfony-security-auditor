@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BedrockMantleRoute;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
@@ -92,7 +93,7 @@ final readonly class InitCommand
 
         $model = b($initCommandInput->model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
 
-        if ($this->refused($symfonyStyle, InitRefusal::forModel($model))) {
+        if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
             return Command::INVALID;
         }
 
@@ -114,7 +115,7 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $this->installBridge($symfonyStyle, $provider, $providerKey);
+        $this->installBridges($symfonyStyle, $provider, $providerKey, $model);
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
 
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
@@ -174,6 +175,20 @@ final readonly class InitCommand
         $symfonyStyle->writeln(OutputFormatter::escape(Yaml::dump(HandWrittenPlatformBlock::for($providerKey, $initCommandInput->model ?? self::MODEL_PLACEHOLDER), 4, 4)));
 
         return true;
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws BridgeInstallationFailedException
+     */
+    private function installBridges(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey, string $model): void
+    {
+        $this->installBridge($symfonyStyle, $provider, $providerKey);
+
+        $companionPlatform = BedrockMantleRoute::applies($providerKey) ? BedrockMantleRoute::companionPlatform($model) : null;
+        if (null !== $companionPlatform) {
+            $this->installBridge($symfonyStyle, $companionPlatform, ProviderKey::of($companionPlatform));
+        }
     }
 
     /**

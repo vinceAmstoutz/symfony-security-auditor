@@ -32,7 +32,6 @@ final readonly class HandWrittenPlatforms
      */
     public const array REQUIREMENTS = [
         'azure' => 'a "deployment" name beside the api_key',
-        'bedrock' => 'an inference "api" route and, on the default route, a "bedrock_runtime_client" service rather than an api_key alone',
         'cache' => 'the "platform" it wraps rather than an api_key',
         'cartesia' => 'a "version" beside the api_key',
         'dockermodelrunner' => 'a "host_url" rather than an api_key',

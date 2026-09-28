@@ -29,7 +29,6 @@ final readonly class HandWrittenPlatformBlock
      */
     public const array CONNECTIONS = [
         'azure' => ['base_url' => 'https://<resource>.openai.azure.com', 'deployment' => '<deployment>', 'api_version' => '<api version>', 'api_key' => '%env(AZURE_API_KEY)%'],
-        'bedrock' => ['api' => 'messages', 'api_key' => '%env(BEDROCK_API_KEY)%', 'region' => 'us-west-2'],
         'cache' => ['platform' => 'ai.platform.<platform to cache>'],
         'cartesia' => ['api_key' => '%env(CARTESIA_API_KEY)%', 'version' => '<api version>'],
         'dockermodelrunner' => ['host_url' => 'http://127.0.0.1:12434'],

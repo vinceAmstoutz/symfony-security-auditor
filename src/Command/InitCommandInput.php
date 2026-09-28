@@ -39,7 +39,7 @@ final class InitCommandInput
     #[Option(description: 'Endpoint the platform should reach, for the platforms that declare one (deepgram, elevenlabs, minimax, ollama, together, venice); passing it with any other platform is rejected. Required for ollama, which declares no default. Skips the prompt when set.')]
     public ?string $endpoint = null;
 
-    #[Option(description: 'Write no api_key at all, for the platforms whose key is optional (deepgram, elevenlabs, generic, ollama, openresponses, vertexai); use it for a local server that authenticates nobody')]
+    #[Option(description: 'Write no api_key at all, for the platforms whose key is optional (bedrock, deepgram, elevenlabs, generic, ollama, openresponses, vertexai); use it for a local server that authenticates nobody')]
     public bool $noApiKey = false;
 
     #[Option(description: 'Overwrite an existing configuration without asking')]

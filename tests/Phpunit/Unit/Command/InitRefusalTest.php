@@ -57,6 +57,26 @@ final class InitRefusalTest extends TestCase
         yield 'a stray endpoint is named before the contradiction it sits beside' => ['anthropic', self::input(endpoint: 'http://localhost:11434', noApiKey: true, envVar: 'ANTHROPIC_API_KEY'), '--endpoint applies'];
     }
 
+    #[DataProvider('bedrockModelCases')]
+    public function test_it_refuses_a_bedrock_model_that_names_no_vendor(string $provider, string $model, bool $refused): void
+    {
+        $refusal = InitRefusal::forModel($model, ProviderKey::of($provider));
+
+        $refused
+            ? self::assertStringContainsString(\sprintf('"%s" names none, so init cannot tell which Bedrock route serves it', $model), (string) $refusal)
+            : self::assertNull($refusal);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, bool}>
+     */
+    public static function bedrockModelCases(): iterable
+    {
+        yield 'a bedrock model without its vendor' => ['bedrock.prod', 'claude-opus-4-8', true];
+        yield 'a bedrock model named after its vendor' => ['bedrock.prod', 'anthropic.claude-opus-4-8', false];
+        yield 'the same bare model on another platform' => ['anthropic', 'claude-opus-4-8', false];
+    }
+
     #[DataProvider('handWrittenCases')]
     public function test_it_says_what_a_hand_written_platform_needs_and_where_its_block_goes(string $provider, ?string $expected): void
     {
@@ -73,7 +93,7 @@ final class InitRefusalTest extends TestCase
     public static function handWrittenCases(): iterable
     {
         yield 'the field the platform wants' => ['azure', '"azure" needs a "deployment" name beside the api_key, which "init" does not ask for'];
-        yield 'the file the block goes into' => ['bedrock.prod', \sprintf('so %s was not written', self::CONFIG_FILE)];
+        yield 'the file the block goes into' => ['cache.prod', \sprintf('so %s was not written', self::CONFIG_FILE)];
         yield 'a platform init can write' => ['anthropic', null];
     }
 

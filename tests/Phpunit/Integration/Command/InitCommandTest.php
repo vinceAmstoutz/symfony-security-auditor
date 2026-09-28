@@ -632,6 +632,58 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::INVALID, $exitCode);
     }
 
+    public function test_it_writes_bedrock_on_the_mantle_route_serving_the_model(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'bedrock.prod', '--model' => 'anthropic.claude-opus-4-8'], ['interactive' => false]);
+
+        self::assertSame(
+            [
+                'provider' => 'bedrock.prod',
+                'platform' => ['bedrock' => ['prod' => ['api' => 'messages', 'api_key' => '%env(BEDROCK_API_KEY)%']]],
+                'model' => 'anthropic.claude-opus-4-8',
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    /**
+     * @param list<string> $expectedPlatforms
+     */
+    #[DataProvider('bridgeInstallCases')]
+    public function test_it_installs_the_bridge_each_route_borrows_its_protocol_from(string $provider, string $model, array $expectedPlatforms): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => $provider, '--model' => $model], ['interactive' => false]);
+
+        self::assertSame(
+            array_map(fn (string $platform): array => [$platform, $this->dataHome.'/symfony-security-auditor'], $expectedPlatforms),
+            $this->recordingBridgeInstaller->installations,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string, list<string>}>
+     */
+    public static function bridgeInstallCases(): iterable
+    {
+        yield 'bedrock on chat completions borrows the generic bridge' => ['bedrock.prod', 'openai.gpt-oss-120b', ['bedrock.prod', 'generic']];
+        yield 'bedrock on messages needs nothing more' => ['bedrock.prod', 'anthropic.claude-opus-4-8', ['bedrock.prod']];
+        yield 'any other platform installs its own bridge alone' => ['openai', 'openai.gpt-oss-120b', ['openai']];
+    }
+
+    public function test_it_writes_nothing_for_a_bedrock_model_that_names_no_vendor(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'bedrock.prod', '--model' => 'claude-opus-4-8'], ['interactive' => false]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
     public function test_it_says_what_a_hand_written_platform_needs_instead(): void
     {
         $commandTester = $this->commandTester();
