@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **The standalone binary serves the auditor over MCP too.**
+  `symfony-security-auditor mcp:serve` starts the same Model Context Protocol
+  server `bin/console mcp:serve` already offered in bundle mode, so Claude Code,
+  Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI or any other
+  MCP client can run an audit without a Symfony application around it.
+  `StandaloneApplicationFactory` registers it lazily beside `audit:run`, built
+  from the user-level `config.yaml` by
+  `StandaloneConsoleCommandFactory::createMcpServer()`; like a real audit it
+  refuses to start without the provider credential the configuration names. The
+  `mcp:serve` docs and the README now show how to register it with each client,
+  and say plainly that the audit runs on the configured provider rather than on
+  the assistant's model, so an API key is still needed unless the platform is a
+  local one such as Ollama.
+
 - **`init` installs the bridge for a platform it cannot configure, and prints
   the block to finish by hand.** For the nine platforms whose connection block
   `init` does not write (`azure`, `bedrock`, `cache`, `cartesia`,
