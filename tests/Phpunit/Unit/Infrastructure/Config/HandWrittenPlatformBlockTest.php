@@ -49,10 +49,10 @@ final class HandWrittenPlatformBlockTest extends TestCase
         ];
 
         yield 'an instance-keyed platform named without one gets a default instance' => [
-            'bedrock',
+            'cache',
             [
-                'provider' => 'bedrock.default',
-                'platform' => ['bedrock' => ['default' => ['api' => 'messages', 'api_key' => '%env(BEDROCK_API_KEY)%', 'region' => 'us-west-2']]],
+                'provider' => 'cache.default',
+                'platform' => ['cache' => ['default' => ['platform' => 'ai.platform.<platform to cache>']]],
                 'model' => 'our-model',
             ],
         ];

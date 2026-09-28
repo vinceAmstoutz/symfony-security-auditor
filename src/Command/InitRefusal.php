@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BedrockMantleRoute;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyInstanceName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
@@ -53,12 +54,13 @@ final readonly class InitRefusal
         };
     }
 
-    public static function forModel(string $model): ?string
+    public static function forModel(string $model, ?ProviderKey $providerKey = null): ?string
     {
         return match (true) {
             1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
             '' === $model => 'The model must not be empty.',
             !ContainerParameterSyntax::isAbsentFrom($model) => 'The model holds "%...%", which would be read as a container parameter rather than as part of its name. Give the name itself.',
+            $providerKey instanceof ProviderKey && BedrockMantleRoute::applies($providerKey) && !BedrockMantleRoute::namesAVendor($model) => \sprintf('Bedrock names a model after its vendor, for example "anthropic.claude-opus-4-8" or "openai.gpt-oss-120b"; "%s" names none, so init cannot tell which Bedrock route serves it. Give the full model id.', $model),
             default => null,
         };
     }

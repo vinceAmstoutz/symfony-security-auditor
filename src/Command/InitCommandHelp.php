@@ -37,6 +37,6 @@ final class InitCommandHelp
 
         A platform spells its connection URL one way or the other, never both: <info>--base-url</info> for albert, amazeeai, generic and openresponses, <info>--endpoint</info> for deepgram, elevenlabs, minimax, ollama, together and venice. Either is the origin only; the bridge appends its own path, so do not include a trailing <info>/v1</info>.
         <info>--no-api-key</info> writes no credential at all, for the platforms whose key the bundle leaves optional. Ollama takes that route by default, since a local install authenticates nobody.
-        A platform whose block it cannot write (azure, bedrock, lmstudio, …) still gets its bridge installed, and the block to complete by hand is printed instead.
+        A platform whose block it cannot write (azure, cache, lmstudio, …) still gets its bridge installed, and the block to complete by hand is printed instead.
         HELP;
 }

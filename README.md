@@ -493,7 +493,7 @@ then override individual keys as needed.
 | Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL` |
 | Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`                               |
 | Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | GCP credentials                                |
-| AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials                                |
+| AWS Bedrock          | `symfony/ai-bedrock-platform`        | `BEDROCK_API_KEY`, or AWS credentials          |
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                             |
 | Mistral              | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                              |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                              |

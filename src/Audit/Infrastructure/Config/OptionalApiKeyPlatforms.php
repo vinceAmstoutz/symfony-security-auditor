@@ -33,7 +33,7 @@ final readonly class OptionalApiKeyPlatforms
     /**
      * @var list<string>
      */
-    public const array NAMES = ['deepgram', 'elevenlabs', 'generic', 'ollama', 'openresponses', 'vertexai'];
+    public const array NAMES = ['bedrock', 'deepgram', 'elevenlabs', 'generic', 'ollama', 'openresponses', 'vertexai'];
 
     public static function accept(ProviderKey $providerKey): bool
     {
