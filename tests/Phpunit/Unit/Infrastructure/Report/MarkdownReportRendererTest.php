@@ -135,6 +135,36 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_never_calls_an_incomplete_audit_clean(): void
+    {
+        self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_says_an_audit_without_findings_did_not_finish(): void
+    {
+        self::assertStringContainsString('> ⚠️ **Audit incomplete: 2 file(s)', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_warns_above_the_findings_of_an_audit_that_did_not_finish(): void
+    {
+        self::assertStringContainsString(
+            "free of vulnerabilities.**\n\n## Summary by severity",
+            $this->renderer->render($this->makeIncompleteReport($this->makeValidatedVuln())),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_safe_message_when_no_vulnerabilities(): void
     {
         $output = $this->renderer->render($this->makeReport());
