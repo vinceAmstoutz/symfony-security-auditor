@@ -228,6 +228,21 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_result_for_an_incomplete_audit_emits_no_success_message(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext($auditContext), Command::SUCCESS);
+
+        self::assertStringNotContainsString('Audit complete. Risk:', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_result_for_success_exit_emits_success_message(): void
     {
         $bufferedOutput = new BufferedOutput();
