@@ -24,6 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 
 final class ComposerBridgeInstallerTest extends TestCase
 {
+    private const string AI_BUNDLE_CLASS = __DIR__.'/../../../../vendor/symfony/ai-bundle/src/AiBundle.php';
+
     private const string UNTOUCHED_SYMLINK_TARGET = 'not the manifest
 ';
 
@@ -143,6 +145,26 @@ final class ComposerBridgeInstallerTest extends TestCase
         yield 'vertexai maps to the hyphenated vertex-ai package' => ['vertexai', 'symfony/ai-vertex-ai-platform'];
         yield 'an instance-keyed provider installs the bridge of its platform' => ['generic.my_gateway', 'symfony/ai-generic-platform'];
         yield 'an instance-keyed provider still honours the slug overrides' => ['openresponses.my_gateway', 'symfony/ai-open-responses-platform'];
+    }
+
+    public function test_every_platform_resolves_to_the_bridge_package_the_bundle_requires(): void
+    {
+        preg_match_all(
+            '/if \(\x27([a-z]+)\x27 === \$type\) \{\s+if \(!ContainerBuilder::willBeAvailable\(\x27(symfony\/ai-[a-z-]+-platform)\x27/',
+            (string) file_get_contents(self::AI_BUNDLE_CLASS),
+            $matches,
+            \PREG_SET_ORDER,
+        );
+
+        $required = [];
+        $resolved = [];
+        foreach ($matches as [, $platform, $package]) {
+            $required[$platform] = $package;
+            $resolved[$platform] = ComposerBridgeInstaller::packageFor($platform);
+        }
+
+        self::assertArrayHasKey('anthropic', $required);
+        self::assertSame($required, $resolved);
     }
 
     public function test_every_slug_override_is_its_config_key_with_hyphens_inserted(): void

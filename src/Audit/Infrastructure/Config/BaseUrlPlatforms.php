@@ -32,7 +32,7 @@ final readonly class BaseUrlPlatforms
     /**
      * @var list<string>
      */
-    public const array NAMES = ['albert', 'amazeeai', 'azure', 'generic', 'openresponses'];
+    public const array NAMES = ['albert', 'amazeeai', 'azure', 'generic', 'higgsfield', 'openresponses'];
 
     public static function accept(ProviderKey $providerKey): bool
     {

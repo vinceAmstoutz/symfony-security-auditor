@@ -46,7 +46,7 @@ final class InitCommandHelpTest extends TestCase
 
     public function test_it_says_which_option_carries_the_connection_url_for_which_platform(): void
     {
-        self::assertStringContainsString('<info>--base-url</info> for albert, amazeeai, generic and openresponses, <info>--endpoint</info> for deepgram, elevenlabs, minimax and ollama', InitCommandHelp::HELP);
+        self::assertStringContainsString('<info>--base-url</info> for albert, amazeeai, generic and openresponses, <info>--endpoint</info> for deepgram, elevenlabs, minimax, ollama, together and venice', InitCommandHelp::HELP);
     }
 
     public function test_it_says_a_local_install_is_written_without_a_credential(): void

@@ -47,6 +47,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         'openresponses' => 'open-responses',
         'openrouter' => 'open-router',
         'deepseek' => 'deep-seek',
+        'edenai' => 'eden-ai',
+        'typesafe' => 'type-safe',
         'vertexai' => 'vertex-ai',
         'huggingface' => 'hugging-face',
         'elevenlabs' => 'eleven-labs',

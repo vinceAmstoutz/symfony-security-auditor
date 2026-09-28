@@ -134,12 +134,12 @@ following surface is BC-protected:
   `--base-url`, `--endpoint`, `--no-api-key` and `--force` options (`--base-url`
   accepted by the platforms `init` can write a block for that declare one:
   `albert`, `amazeeai`, `generic` and `openresponses`; `--endpoint` by the
-  platforms naming the same field that way: `deepgram`, `elevenlabs`, `minimax`
-  and `ollama`; `--no-api-key` by the platforms whose `api_key` the bundle
-  leaves optional: `deepgram`, `elevenlabs`, `generic`, `ollama`,
-  `openresponses` and `vertexai`). The standalone exposes the **identical**
-  `audit:run` command (and its `audit` alias), arguments, options, and exit-code
-  surface listed above.
+  platforms naming the same field that way: `deepgram`, `elevenlabs`, `minimax`,
+  `ollama`, `together` and `venice`; `--no-api-key` by the platforms whose
+  `api_key` the bundle leaves optional: `deepgram`, `elevenlabs`, `generic`,
+  `ollama`, `openresponses` and `vertexai`). The standalone exposes the
+  **identical** `audit:run` command (and its `audit` alias), arguments, options,
+  and exit-code surface listed above.
 - The `self-update` command name and its `--check` option (see
   [CLI Reference → `self-update`](configuration.md#self-update--updating-the-standalone-binary)).
 - The `doctor` command name and its exit-code contract (`0` when every check
