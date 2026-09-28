@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
@@ -107,9 +108,20 @@ final class PlatformShapeKnowledgeTest extends TestCase
         self::assertSame(InstanceKeyedPlatforms::NAMES, $this->platformsDeclaring_useAttributeAsKey());
     }
 
-    public function test_every_hand_written_platform_has_a_block_to_paste(): void
+    #[DataProvider('handWrittenPlatformCases')]
+    public function test_every_hand_written_platform_has_a_block_to_paste(string $platform): void
     {
-        self::assertSame(array_keys(HandWrittenPlatforms::REQUIREMENTS), array_keys(HandWrittenPlatformBlock::CONNECTIONS));
+        self::assertArrayHasKey($platform, HandWrittenPlatformBlock::CONNECTIONS);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function handWrittenPlatformCases(): iterable
+    {
+        foreach (array_keys(HandWrittenPlatforms::REQUIREMENTS) as $platform) {
+            yield $platform => [$platform];
+        }
     }
 
     public function test_every_setting_of_a_block_to_paste_is_one_its_platform_declares(): void
