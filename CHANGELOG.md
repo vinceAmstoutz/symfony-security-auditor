@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`init` installs the bridge for a platform it cannot configure, and prints
+  the block to finish by hand.** For the nine platforms whose connection block
+  `init` does not write (`azure`, `bedrock`, `cache`, `cartesia`,
+  `dockermodelrunner`, `failover`, `higgsfield`, `lmstudio`, `transformersphp`),
+  it used to exit `2` with nothing installed, and a hand-run `composer require`
+  missed the PHP version pin the binary needs. `init` now installs the bridge
+  the same way it does for every other platform, then prints a ready-to-edit
+  `config.yaml` block (`HandWrittenPlatformBlock`,
+  `src/Audit/Infrastructure/Config/`) with a `<placeholder>` for every value
+  only you know. It still exits `2` and writes no configuration. `doctor` now
+  points at `init --provider=<platform>` for a missing bridge. Closes
+  [#370](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/370).
+
 - **`init` can now configure a local Ollama end to end, and writes no credential
   for a platform that authenticates nobody.** `init --provider=ollama` exited
   `0` and reported success on a configuration the next run could not use: it

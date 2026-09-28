@@ -642,7 +642,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'needs a "deployment" name beside the api_key, which "init" does not write',
+            'needs a "deployment" name beside the api_key, which "init" does not ask for',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -657,6 +657,70 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_it_still_installs_the_bridge_of_a_platform_whose_block_it_cannot_write(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'lmstudio', '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertSame([['lmstudio', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_it_prints_the_block_to_complete_for_a_platform_whose_block_it_cannot_write(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertStringContainsString("deployment: '<deployment>'", $commandTester->getDisplay());
+    }
+
+    public function test_it_prints_the_block_as_yaml_ready_to_paste(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'failover'], ['interactive' => false]);
+
+        self::assertStringContainsString(
+            <<<'YAML'
+                provider: failover.default
+                platform:
+                    failover:
+                        default:
+                            platforms: ['ai.platform.<first choice>', ai.platform.<fallback>]
+                model: '<model id>'
+                YAML,
+            $commandTester->getDisplay(),
+        );
+    }
+
+    public function test_it_names_the_instance_the_block_is_written_for(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'azure', '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertStringContainsString('provider: azure.default', $commandTester->getDisplay());
+    }
+
+    public function test_it_puts_the_model_it_was_given_into_the_block(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'lmstudio', '--model' => 'qwen3-coder'], ['interactive' => false]);
+
+        self::assertStringContainsString('model: qwen3-coder', $commandTester->getDisplay());
+    }
+
+    public function test_it_leaves_a_placeholder_for_the_model_it_was_not_given(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'lmstudio'], ['interactive' => false]);
+
+        self::assertStringContainsString("model: '<model id>'", $commandTester->getDisplay());
     }
 
     public function test_it_refuses_an_instance_keyed_platform_named_without_an_instance(): void
@@ -890,7 +954,6 @@ final class InitCommandTest extends TestCase
      */
     public static function refusedProviderCases(): iterable
     {
-        yield 'a platform init cannot write' => [['--provider' => 'lmstudio', '--model' => 'our-model', '--env-var' => 'TOKEN']];
         yield 'an instance-keyed platform with no instance' => [['--provider' => 'generic', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example']];
         yield 'an instance name yaml cannot key by' => [['--provider' => 'generic.0', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example']];
         yield 'an environment variable name that is not one' => [['--provider' => 'generic.gw', '--model' => 'our-model', '--env-var' => '9TOKEN', '--base-url' => 'https://gw.example']];
