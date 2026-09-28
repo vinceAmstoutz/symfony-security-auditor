@@ -84,7 +84,8 @@ The auditor ships two maintained ways to run it — pick the one that fits:
 > [!TIP]
 >
 > Both expose the same `audit` command, options, and output formats — see the
-> [CLI reference](docs/configuration.md#cli-reference).
+> [CLI reference](docs/configuration.md#cli-reference) — and both can serve the
+> auditor to your AI assistant over [MCP](#use-it-from-your-ai-assistant-mcp).
 
 ## Standalone tool (binary)
 
@@ -336,6 +337,43 @@ bin/console audit:run --dry-run
 > or [Renovate](https://docs.renovatebot.com/) — this auditor targets the
 > application-level logic flaws those scanners cannot see.
 
+## Use it from your AI assistant (MCP)
+
+`mcp:serve` starts a [Model Context Protocol](https://modelcontextprotocol.io)
+server, so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code,
+Windsurf, Gemini CLI, Codex CLI, … — can audit a project on request and read
+back the JSON report. It works from the standalone binary and from the bundle
+alike:
+
+```bash
+# Claude Code, with the standalone binary
+claude mcp add --transport stdio symfony-security-auditor -- symfony-security-auditor mcp:serve
+```
+
+```json
+{
+    "mcpServers": {
+        "symfony-security-auditor": {
+            "command": "symfony-security-auditor",
+            "args": ["mcp:serve"]
+        }
+    }
+}
+```
+
+The second snippet is the shape Claude Desktop, Cursor, Windsurf and Gemini CLI
+read; with the bundle, use `"command": "php"` and
+`"args": ["/absolute/path/to/bin/console", "mcp:serve"]`.
+
+> [!NOTE]
+>
+> The audit still runs on **your configured provider and model**, not on the
+> assistant's, so it needs the same API key as a CLI run — with the binary,
+> store it once with `auth:set` so a desktop client finds it. Point the auditor
+> at a local Ollama and it needs no key at all. Setup for every client,
+> including VS Code and Codex CLI:
+> [`mcp:serve`](docs/configuration.md#mcpserve--model-context-protocol-server).
+
 ## Features
 
 - **Multi-agent loop** — adversarial Attacker + skeptical Reviewer cut false
@@ -390,6 +428,10 @@ bin/console audit:run --dry-run
   known findings, `--baseline` drops them from the report and exit code so only
   new findings fail CI; `--min-score` gates on the normalized score
   independently of `--fail-on`.
+- **Callable from your AI assistant** — `mcp:serve` exposes the audit as an MCP
+  tool to Claude Code, Claude Desktop, Cursor, VS Code and any other MCP client,
+  from the binary or the bundle (see
+  [Use it from your AI assistant](#use-it-from-your-ai-assistant-mcp)).
 - **Findings over time** — `audit:diff` compares two JSON reports by finding
   fingerprint, `audit:trend` tracks counts across a series of them.
 - **CI-ready** — a reusable

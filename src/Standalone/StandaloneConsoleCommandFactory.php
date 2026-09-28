@@ -16,7 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -34,5 +36,18 @@ final readonly class StandaloneConsoleCommandFactory
         }
 
         return new Command(null, $auditCommand);
+    }
+
+    /**
+     * @throws UnresolvableMcpServeCommandException
+     */
+    public function createMcpServer(ContainerBuilder $containerBuilder): Command
+    {
+        $mcpServeCommand = $containerBuilder->get(McpServeCommand::class);
+        if (!$mcpServeCommand instanceof McpServeCommand) {
+            throw UnresolvableMcpServeCommandException::fromContainer(McpServeCommand::class);
+        }
+
+        return new Command(null, $mcpServeCommand);
     }
 }
