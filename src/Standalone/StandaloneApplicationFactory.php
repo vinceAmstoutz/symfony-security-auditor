@@ -64,12 +64,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -184,6 +186,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
         $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
+        $standaloneApplication->addCommand($this->lazyMcpServeCommand());
         $this->registerUpdateAvailabilityNotice($standaloneApplication);
 
         return $standaloneApplication;
@@ -386,6 +389,37 @@ final readonly class StandaloneApplicationFactory
     private function loadAuditCommand(bool $credentialsRequired): Command
     {
         return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired));
+    }
+
+    private function lazyMcpServeCommand(): LazyCommand
+    {
+        return new LazyCommand(
+            McpServeCommand::NAME,
+            [],
+            McpServeCommand::DESCRIPTION,
+            false,
+            fn (): Command => $this->loadMcpServeCommand(),
+        );
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     * @throws UnresolvableMcpServeCommandException
+     * @throws MalformedProjectConfigException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     */
+    private function loadMcpServeCommand(): Command
+    {
+        return $this->standaloneConsoleCommandFactory->createMcpServer($this->buildContainer(true));
     }
 
     /**

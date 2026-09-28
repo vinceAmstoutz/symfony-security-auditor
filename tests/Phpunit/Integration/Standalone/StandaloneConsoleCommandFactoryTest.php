@@ -25,10 +25,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneConsoleCommandFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
 
@@ -92,6 +94,39 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
         $display = $commandTester->getDisplay();
         self::assertStringContainsString('Project:', $display);
         self::assertStringNotContainsString('SECURITY AUDITOR', $display);
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws UnresolvableMcpServeCommandException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_wraps_the_invokable_mcp_server_command_under_its_name(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+
+        self::assertSame('mcp:serve', (new StandaloneConsoleCommandFactory())->createMcpServer($containerBuilder)->getName());
+    }
+
+    /**
+     * @throws UnresolvableMcpServeCommandException
+     */
+    public function test_it_rejects_a_container_whose_mcp_server_service_is_not_the_mcp_server_command(): void
+    {
+        $this->expectException(UnresolvableMcpServeCommandException::class);
+
+        $containerBuilder = new ContainerBuilder();
+        $containerBuilder->register(McpServeCommand::class, stdClass::class)->setPublic(true);
+        $containerBuilder->compile(true);
+
+        (new StandaloneConsoleCommandFactory())->createMcpServer($containerBuilder);
     }
 
     /**

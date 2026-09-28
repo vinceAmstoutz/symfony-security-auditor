@@ -1176,39 +1176,94 @@ as every other writer in this tool refuses symlinked destinations).
 ### `mcp:serve` — Model Context Protocol server
 
 Starts a [Model Context Protocol](https://modelcontextprotocol.io) server over
-stdio, exposing the auditor as MCP **tools** so an MCP client (Claude Desktop,
-an IDE agent, …) can run an audit on demand. The server is built on the official
+stdio, exposing the auditor as MCP **tools** so any MCP client — Claude Code,
+Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can run an
+audit on demand. The server is built on the official
 [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC
-on stdin/stdout — so the command prints nothing else to stdout.
+on stdin/stdout, so the command prints nothing else to stdout.
+
+It is available both ways the auditor ships:
 
 ```bash
-bin/console mcp:serve
+symfony-security-auditor mcp:serve   # standalone binary, reads your user-level config.yaml
+bin/console mcp:serve                # Symfony bundle, reads the application's configuration
 ```
 
-Register it with your MCP client by pointing the client at the command. For
-Claude Desktop (`claude_desktop_config.json`):
+Exposed tools:
+
+| Tool    | Arguments             | Description                                                                                                                 |
+| ------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `audit` | `path` (string, req.) | Runs the multi-agent audit on the project directory at `path` (an absolute path) and returns the JSON vulnerability report. |
+
+#### Registering it with an MCP client
+
+Every client launches the server as a subprocess from a command and its
+arguments. With the standalone binary that is `symfony-security-auditor` and
+`mcp:serve`; with the bundle, `php` and the **absolute** path to your
+application's `bin/console` followed by `mcp:serve`, since a client does not
+start it from your project directory.
+
+Claude Code:
+
+```bash
+claude mcp add --transport stdio symfony-security-auditor -- symfony-security-auditor mcp:serve
+```
+
+Claude Desktop (`claude_desktop_config.json`), Cursor (`.cursor/mcp.json`),
+Windsurf (`~/.codeium/windsurf/mcp_config.json`) and Gemini CLI
+(`~/.gemini/settings.json`) share one shape:
 
 ```json
 {
     "mcpServers": {
         "symfony-security-auditor": {
-            "command": "php",
-            "args": ["bin/console", "mcp:serve"]
+            "command": "symfony-security-auditor",
+            "args": ["mcp:serve"]
         }
     }
 }
 ```
 
-Exposed tools:
+VS Code (`.vscode/mcp.json`):
 
-| Tool    | Arguments             | Description                                                                                              |
-| ------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
-| `audit` | `path` (string, req.) | Runs the multi-agent audit on the project directory at `path` and returns the JSON vulnerability report. |
+```json
+{
+    "servers": {
+        "symfony-security-auditor": {
+            "type": "stdio",
+            "command": "symfony-security-auditor",
+            "args": ["mcp:serve"]
+        }
+    }
+}
+```
 
-> The audit runs with the bundle's configured platform, models, and profile —
-> `mcp:serve` is a transport in front of the same pipeline `audit:run` uses, so
-> an audit triggered over MCP bills the configured LLM provider exactly as a CLI
-> run would.
+Codex CLI (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.symfony-security-auditor]
+command = "symfony-security-auditor"
+args = ["mcp:serve"]
+```
+
+#### Which model runs the audit — and the API key
+
+The audit runs with the auditor's own configured platform, models and profile:
+`mcp:serve` is a transport in front of the same pipeline `audit:run` uses, so an
+audit triggered over MCP bills the configured LLM provider exactly as a CLI run
+would. **The MCP client's own model is not used**, and your provider credential
+is still required. Letting the client's model do the work would need MCP
+_sampling_, which the major clients do not offer.
+
+- An audit needs **no API key** only when the configured platform takes none,
+  such as a local [Ollama](#supported-platforms) — nothing then leaves your
+  machine either.
+- A client started from a desktop app does not inherit your shell's environment
+  variables. With the standalone binary, store the key once with
+  [`auth:set`](#providing-the-api-key) so the server finds it however it is
+  launched; otherwise pass the variable through the client's `env` setting.
+- A full report can be large. Claude Code caps a tool's output at 25,000 tokens
+  by default; raise `MAX_MCP_OUTPUT_TOKENS` if a report is cut off.
 
 ### `init` — generating the standalone configuration
 
