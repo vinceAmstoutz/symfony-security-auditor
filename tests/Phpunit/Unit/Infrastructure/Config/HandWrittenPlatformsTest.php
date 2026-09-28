@@ -32,7 +32,7 @@ final class HandWrittenPlatformsTest extends TestCase
     public static function platformCases(): iterable
     {
         yield 'an instance-keyed platform needing a deployment' => ['azure.prod', 'a "deployment" name beside the api_key'];
-        yield 'an instance-keyed platform taking a runtime client' => ['bedrock.prod', 'a "bedrock_runtime_client" service rather than an api_key'];
+        yield 'an instance-keyed platform taking a runtime client' => ['bedrock.prod', 'an inference "api" route and, on the default route, a "bedrock_runtime_client" service rather than an api_key alone'];
         yield 'an instance-keyed platform wrapping another' => ['cache.prod', 'the "platform" it wraps rather than an api_key'];
         yield 'an instance-keyed platform listing its fallbacks' => ['failover.prod', 'the list of "platforms" it falls back through rather than an api_key'];
         yield 'a flat platform needing a version' => ['cartesia', 'a "version" beside the api_key'];
