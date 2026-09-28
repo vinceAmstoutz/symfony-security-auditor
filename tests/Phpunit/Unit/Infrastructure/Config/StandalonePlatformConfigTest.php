@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 
@@ -24,6 +25,13 @@ final class StandalonePlatformConfigTest extends TestCase
         $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => ['api_key' => 'anthropic-test-key-for-previews']]);
 
         self::assertSame('anthro…iews', $standalonePlatformConfig->credentialIdentity()?->maskedPreview);
+    }
+
+    public function test_it_names_the_credential_the_container_reads_rather_than_its_escaped_spelling(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => ['api_key' => 'anthropic-test-key-50%%%%']]);
+
+        self::assertSame(CredentialIdentity::of('anthropic-test-key-50%%')->fingerprint, $standalonePlatformConfig->credentialIdentity()?->fingerprint);
     }
 
     public function test_it_names_no_credential_for_a_provider_that_needs_none(): void

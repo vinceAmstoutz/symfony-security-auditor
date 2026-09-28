@@ -348,6 +348,52 @@ final class StandalonePlatformConfigResolverTest extends TestCase
         );
     }
 
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     */
+    #[DataProvider('credentialSources')]
+    public function test_it_escapes_a_resolved_credential_so_the_container_reads_it_literally(string $placeholder, bool $fromFile, bool $fromStore): void
+    {
+        $credential = 'sk-%kernel.secret%-50%%';
+        $environment = match (true) {
+            $fromFile => ['ANTHROPIC_API_KEY_FILE' => $this->writeCredentialFile($credential)],
+            $fromStore => [],
+            default => ['ANTHROPIC_API_KEY' => $credential],
+        };
+
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver($environment, credentialStore: new InMemoryCredentialStore($fromStore ? ['ANTHROPIC_API_KEY' => $credential] : [])))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => $placeholder]]]);
+
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-%%kernel.secret%%-50%%%%']]], $standalonePlatformConfig->toAiConfig());
+    }
+
+    /**
+     * @return iterable<string, array{string, bool, bool}>
+     */
+    public static function credentialSources(): iterable
+    {
+        yield 'an exported variable' => ['%env(ANTHROPIC_API_KEY)%', false, false];
+        yield 'a credential file' => ['%env(file:ANTHROPIC_API_KEY_FILE)%', true, false];
+        yield 'the credential store' => ['%env(ANTHROPIC_API_KEY)%', false, true];
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_leaves_a_literal_written_in_the_configuration_as_written(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['anthropic' => ['api_key' => 'sk-50%%']]]);
+
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-50%%']]], $standalonePlatformConfig->toAiConfig());
+    }
+
     private function writeCredentialFile(string $contents): string
     {
         $path = \sprintf('%s/api-key', $this->tmpDir);

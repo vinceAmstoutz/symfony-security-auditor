@@ -20,13 +20,23 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * the run with "You have requested a non-existent parameter", the second
  * silently rewrites the value. A whole-value `%env(VAR)%` is the exception,
  * because `StandalonePlatformConfigResolver` resolves it before the container
- * is built.
+ * is built, escaping what it substitutes so a secret is never read as syntax.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ContainerParameterSyntax
 {
     private const string REFERENCE_PATTERN = '/%%|%[^%\s]++%/';
+
+    public static function escape(string $literal): string
+    {
+        return str_replace('%', '%%', $literal);
+    }
+
+    public static function unescape(string $value): string
+    {
+        return str_replace('%%', '%', $value);
+    }
 
     public static function isAbsentFrom(string $value): bool
     {

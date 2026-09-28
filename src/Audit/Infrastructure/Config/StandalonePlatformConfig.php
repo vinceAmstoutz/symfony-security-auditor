@@ -46,6 +46,6 @@ final readonly class StandalonePlatformConfig
 
         return null === $apiKey || StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL === $apiKey
             ? null
-            : CredentialIdentity::of($apiKey);
+            : CredentialIdentity::of(ContainerParameterSyntax::unescape($apiKey));
     }
 }

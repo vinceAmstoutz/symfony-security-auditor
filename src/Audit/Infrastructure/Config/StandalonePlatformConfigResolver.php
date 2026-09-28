@@ -101,9 +101,11 @@ final readonly class StandalonePlatformConfigResolver
             return $value;
         }
 
-        return $envPlaceholder->readsFile
+        $resolved = $envPlaceholder->readsFile
             ? $this->resolveCredentialFile($envPlaceholder->variableName, $credentialsRequired)
             : $this->resolveEnvironmentVariable($envPlaceholder->variableName, $credentialsRequired);
+
+        return ContainerParameterSyntax::escape($resolved);
     }
 
     /**
