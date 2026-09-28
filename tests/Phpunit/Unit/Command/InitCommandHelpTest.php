@@ -53,4 +53,9 @@ final class InitCommandHelpTest extends TestCase
     {
         self::assertStringContainsString('Ollama takes that route by default, since a local install authenticates nobody', InitCommandHelp::HELP);
     }
+
+    public function test_it_says_a_platform_it_cannot_write_still_gets_its_bridge(): void
+    {
+        self::assertStringContainsString('still gets its bridge installed, and the block to complete by hand is printed instead', InitCommandHelp::HELP);
+    }
 }

@@ -33,7 +33,7 @@ final class InitRefusalTest extends TestCase
     {
         self::assertStringContainsString(
             $expected,
-            (string) InitRefusal::forProvider(ProviderKey::of($provider), $provider, $initCommandInput, self::CONFIG_FILE),
+            (string) InitRefusal::forProvider(ProviderKey::of($provider), $provider, $initCommandInput),
         );
     }
 
@@ -42,8 +42,6 @@ final class InitRefusalTest extends TestCase
      */
     public static function competingRefusalCases(): iterable
     {
-        yield 'a platform init cannot write is named before its missing instance' => ['azure', self::input(), 'needs a "deployment" name'];
-        yield 'a platform init cannot write is named before a stray base url' => ['bedrock', self::input(baseUrl: 'https://gw.example'), 'bedrock_runtime_client'];
         yield 'a missing platform is named before a stray base url' => ['.gateway', self::input(baseUrl: 'https://gw.example'), 'names no platform before the dot'];
         yield 'a stray instance is named before a stray base url' => ['ollama.x', self::input(baseUrl: 'https://gw.example'), 'takes a single connection block'];
         yield 'a missing instance is named before a stray base url' => ['generic', self::input(baseUrl: 'https://gw.example'), 'is configured per instance'];
@@ -59,10 +57,30 @@ final class InitRefusalTest extends TestCase
         yield 'a stray endpoint is named before the contradiction it sits beside' => ['anthropic', self::input(endpoint: 'http://localhost:11434', noApiKey: true, envVar: 'ANTHROPIC_API_KEY'), '--endpoint applies'];
     }
 
+    #[DataProvider('handWrittenCases')]
+    public function test_it_says_what_a_hand_written_platform_needs_and_where_its_block_goes(string $provider, ?string $expected): void
+    {
+        $refusal = InitRefusal::forHandWrittenPlatform(ProviderKey::of($provider), $provider, self::CONFIG_FILE);
+
+        null === $expected
+            ? self::assertNull($refusal)
+            : self::assertStringContainsString($expected, (string) $refusal);
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null}>
+     */
+    public static function handWrittenCases(): iterable
+    {
+        yield 'the field the platform wants' => ['azure', '"azure" needs a "deployment" name beside the api_key, which "init" does not ask for'];
+        yield 'the file the block goes into' => ['bedrock.prod', \sprintf('so %s was not written', self::CONFIG_FILE)];
+        yield 'a platform init can write' => ['anthropic', null];
+    }
+
     #[DataProvider('writableCases')]
     public function test_it_finds_nothing_wrong_with_a_provider_init_can_write(string $provider, InitCommandInput $initCommandInput): void
     {
-        self::assertNull(InitRefusal::forProvider(ProviderKey::of($provider), $provider, $initCommandInput, self::CONFIG_FILE));
+        self::assertNull(InitRefusal::forProvider(ProviderKey::of($provider), $provider, $initCommandInput));
     }
 
     /**

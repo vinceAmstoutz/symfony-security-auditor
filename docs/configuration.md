@@ -1258,25 +1258,34 @@ only produce a run that stops at `No API key available`. Pass `--env-var` to add
 a key anyway, which is what Ollama Cloud needs. That keyless shape is what
 `privacy.offline_only: true` expects — see [privacy.\*](#privacy--data-egress).
 
-Nine platforms are refused with exit code `2` rather than written
-half-configured, because `init` only ever writes an `api_key` and an optional
-`base_url` or `endpoint`: `azure`, `cartesia` and `higgsfield` need an extra
-field beside the key, `bedrock` needs an inference `api` route, and `cache`,
-`failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` take no
-`api_key` at all. The refusal names the field the platform wants; its connection
-block goes under `platform:` in `config.yaml`, with the same children
+Nine platforms are not written, because `init` only ever writes an `api_key` and
+an optional `base_url` or `endpoint`: `azure`, `cartesia` and `higgsfield` need
+an extra field beside the key, `bedrock` needs an inference `api` route, and
+`cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` take
+no `api_key` at all. The refusal names the field the platform wants; its
+connection block goes under `platform:` in `config.yaml`, with the same children
 `symfony/ai-bundle` documents for it. Four of the nine (`azure`, `bedrock`,
 `cache`, `failover`) nest one level deeper under an instance name — see
 [Instance-keyed platforms](#instance-keyed-platforms); `cartesia`,
 `dockermodelrunner`, `higgsfield`, `lmstudio` and `transformersphp` take a flat
 block.
 
-Their bridge package still has to reach the standalone data directory, and
-`init` is the only thing that puts one there — it also pins the binary's own PHP
-version in that directory, without which the bridge resolves against your system
-PHP and the binary aborts on the next run. Installing a bridge for a platform
-`init` refuses is therefore not supported yet; it is tracked in
-[#370](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/370).
+For these, `init` still installs the bridge into the standalone data directory,
+pinned to the binary's own PHP version, then prints the block to paste into
+`config.yaml` instead of writing it, and exits with code `2`. Replace every
+`<placeholder>` before running an audit:
+
+```bash
+symfony-security-auditor init --provider=lmstudio --model=qwen3-coder --no-interaction
+```
+
+```yaml
+provider: lmstudio
+platform:
+    lmstudio:
+        host_url: 'http://127.0.0.1:1234'
+model: qwen3-coder
+```
 
 ### `self-update` — updating the standalone binary
 

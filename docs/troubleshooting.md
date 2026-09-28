@@ -55,7 +55,7 @@ failures.
 
 Two distinct "Provider bridge" failures:
 
-- **`Not installed — run "init" to download it.`** —
+- **`Not installed — run "init --provider=<platform>" to download it.`** —
   `<data-dir>/vendor/autoload.php` does not exist yet.
 - **`Installed, but the audit cannot start with it: <reason>`** — the autoloader
   exists, but `doctor` also builds the container to confirm it actually boots,
