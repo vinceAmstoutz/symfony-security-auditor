@@ -24,9 +24,16 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
     #[Override]
     public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, ?string $baseUrl = null, ?string $endpoint = null): array
     {
+        $providerKey = ProviderKey::of($provider);
+        $connection = $this->connection($apiKeyEnvironmentVariable, $baseUrl, $endpoint);
+
+        if (BedrockMantleRoute::applies($providerKey)) {
+            $connection = ['api' => BedrockMantleRoute::of($model), ...$connection];
+        }
+
         return [
             'provider' => $provider,
-            'platform' => $this->platformBlock(ProviderKey::of($provider), $this->connection($apiKeyEnvironmentVariable, $baseUrl, $endpoint)),
+            'platform' => $this->platformBlock($providerKey, $connection),
             'model' => $model,
         ];
     }

@@ -32,6 +32,28 @@ final class StandaloneConfigFactoryTest extends TestCase
     }
 
     /**
+     * @param array<string, string> $expectedConnection
+     */
+    #[DataProvider('bedrockCases')]
+    public function test_it_writes_bedrock_on_the_mantle_route_serving_the_model(string $model, ?string $apiKeyVariable, array $expectedConnection): void
+    {
+        self::assertSame(
+            ['bedrock' => ['prod' => $expectedConnection]],
+            (new StandaloneConfigFactory())->create('bedrock.prod', $model, $apiKeyVariable)['platform'],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null, array<string, string>}>
+     */
+    public static function bedrockCases(): iterable
+    {
+        yield 'an anthropic model on messages' => ['anthropic.claude-opus-4-8', 'BEDROCK_API_KEY', ['api' => 'messages', 'api_key' => '%env(BEDROCK_API_KEY)%']];
+        yield 'an open-weight model on completions' => ['openai.gpt-oss-120b', 'BEDROCK_API_KEY', ['api' => 'completions', 'api_key' => '%env(BEDROCK_API_KEY)%']];
+        yield 'signed with aws credentials rather than a key' => ['anthropic.claude-opus-4-8', null, ['api' => 'messages']];
+    }
+
+    /**
      * @return iterable<string, array{string, string|null, string|null, string|null, array<string, mixed>}>
      */
     public static function configCases(): iterable
