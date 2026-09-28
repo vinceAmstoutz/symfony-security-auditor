@@ -158,7 +158,7 @@ final readonly class InitRefusal
     private static function forInapplicableBaseUrl(ProviderKey $providerKey, string $provider, ?string $baseUrl): ?string
     {
         return null !== $baseUrl && !BaseUrlPlatforms::accept($providerKey)
-            ? \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key.', implode(', ', BaseUrlPlatforms::writableShapes()), $provider)
+            ? \sprintf('--base-url applies to the platforms that expose one (%s); "%s" has no base_url key%s.', implode(', ', BaseUrlPlatforms::writableShapes()), $provider, EndpointPlatforms::accept($providerKey) ? ' — it names the same thing endpoint, so use --endpoint' : '')
             : null;
     }
 

@@ -28,7 +28,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   platforms that name it that way — `deepgram`, `elevenlabs`, `minimax` and
   `ollama` — mirroring what `--base-url` already does for the platforms naming
   it `base_url`; a platform declares one spelling or the other, never both, so
-  each option rejects what the other accepts. **`--no-api-key`** writes no
+  each option rejects what the other accepts and names the one that platform
+  takes instead — `--base-url` on `ollama`, the first thing a reader of the old
+  error tries, now answers `use --endpoint`. **`--no-api-key`** writes no
   `api_key` at all, for the platforms whose key `symfony/ai-bundle` leaves
   optional (`deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`,
   `vertexai`); it is refused for every other platform, whose container

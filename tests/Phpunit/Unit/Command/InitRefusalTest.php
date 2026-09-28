@@ -50,6 +50,7 @@ final class InitRefusalTest extends TestCase
         yield 'a stray base url is named when nothing else is wrong' => ['anthropic', self::input(baseUrl: 'https://gw.example'), '--base-url applies to the platforms that expose one'];
         yield 'a stray endpoint is named when nothing else is wrong' => ['anthropic', self::input(endpoint: 'http://localhost:11434'), '--endpoint applies to the platforms that declare one'];
         yield 'a platform naming its endpoint base_url is pointed at the option it does take' => ['albert', self::input(endpoint: 'http://localhost:11434'), 'use --base-url'];
+        yield 'a platform naming its base url endpoint is pointed at the option it does take' => ['ollama', self::input(baseUrl: 'http://localhost:11434'), 'use --endpoint'];
         yield 'a stray base url is named before a stray endpoint' => ['anthropic', self::input(baseUrl: 'https://gw.example', endpoint: 'http://localhost:11434'), '--base-url applies'];
         yield 'an omitted key the platform requires is named when nothing else is wrong' => ['anthropic', self::input(noApiKey: true), '--no-api-key applies to the platforms whose key is optional'];
         yield 'a stray endpoint is named before an omitted key' => ['anthropic', self::input(endpoint: 'http://localhost:11434', noApiKey: true), '--endpoint applies'];
