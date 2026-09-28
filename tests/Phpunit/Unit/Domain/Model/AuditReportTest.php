@@ -500,6 +500,58 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_it_names_each_file_a_stage_never_finished_analyzing_once(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/Errored.php', 'errored');
+        $auditContext->recordCoverage('attacker', 'src/Aborted.php', 'aborted');
+        $auditContext->recordCoverage('reviewer', 'src/Errored.php', 'errored');
+        $auditContext->recordCoverage('attacker', 'src/Skipped.php', 'skipped');
+        $auditContext->recordCoverage('attacker', 'src/Cached.php', 'cached');
+        $auditContext->recordCoverage('reviewer', 'src/Rejected.php', 'rejected');
+        $auditContext->recordCoverage('reviewer', 'src/Analyzed.php', 'validated');
+
+        self::assertSame(['src/Errored.php', 'src/Aborted.php'], AuditReport::fromContext($auditContext)->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    #[DataProvider('completenessCases')]
+    public function test_it_is_complete_only_when_every_file_was_analyzed(string $status, bool $expected): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', $status);
+
+        self::assertSame($expected, AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function completenessCases(): iterable
+    {
+        yield 'an analyzed file' => ['analyzed', true];
+        yield 'a file the lean filter skipped on purpose' => ['skipped', true];
+        yield 'a file whose call failed' => ['errored', false];
+        yield 'a file an abort never reached' => ['aborted', false];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_report_array_says_whether_the_audit_is_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        self::assertFalse(AuditReport::fromContext($auditContext)->toArray()['complete']);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_report_coverage_is_empty_when_context_recorded_nothing(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

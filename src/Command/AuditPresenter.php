@@ -326,6 +326,17 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
+        if (!$auditReport->isComplete()) {
+            $symfonyStyle->warning(\sprintf(
+                'Audit incomplete: %d file(s) were never analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d',
+                \count($auditReport->unanalyzedFiles()),
+                $auditReport->riskLevel(),
+                $auditReport->totalVulnerabilities(),
+            ));
+
+            return;
+        }
+
         $symfonyStyle->success(\sprintf(
             'Audit complete. Risk: %s | Vulnerabilities: %d',
             $auditReport->riskLevel(),

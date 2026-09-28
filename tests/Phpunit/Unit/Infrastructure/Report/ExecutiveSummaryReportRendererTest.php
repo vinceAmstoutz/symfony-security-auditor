@@ -54,6 +54,44 @@ final class ExecutiveSummaryReportRendererTest extends AbstractReportRendererTes
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_an_incomplete_report_never_states_that_nothing_was_found(): void
+    {
+        self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_an_incomplete_report_never_claims_there_is_no_business_exposure(): void
+    {
+        self::assertStringContainsString('Unknown business exposure: the audit did not finish', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_an_incomplete_report_says_how_many_files_it_never_analyzed(): void
+    {
+        self::assertStringContainsString('⚠️  Audit incomplete: 2 file(s)', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_incomplete_report_warns_above_the_findings_it_did_validate(): void
+    {
+        self::assertStringContainsString(
+            "vulnerabilities.\n\n  1 validated finding(s) across 1 file(s).",
+            $this->renderer->render($this->makeIncompleteReport($this->makeValidatedVuln())),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_a_clean_report_states_that_nothing_was_found(): void
     {
         $output = $this->renderer->render($this->makeReport());

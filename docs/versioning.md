@@ -221,14 +221,19 @@ deprecated by the other.
   finding's type and severity (another additive `MINOR` change). The report root
   also carries `score` (a normalized 0-100 health score, since 1.19) and `grade`
   (its `A`-`F` letter, since 1.19) beside the unchanged `risk_score` and
-  `risk_level` — both additive.
+  `risk_level` — both additive. Since 1.21 it also carries `complete`, `false`
+  whenever some file was never analyzed (an LLM call failed or the run was
+  aborted; the `coverage` array holds the detail) — additive as well.
 - The **SARIF 2.1.0 output** produced by `--format=sarif`. The
   `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
   The `version` is sourced dynamically from installed Composer metadata, so it
   tracks the package version automatically. Each rule's `properties.tags` array
   additionally carries a `external/cwe/cwe-<n>` tag, and each result's
   `properties` carries the CVSS estimate as `security-severity` (the numeric
-  score GitHub Code Scanning ranks by) plus a `cvssV4_0Vector`.
+  score GitHub Code Scanning ranks by) plus a `cvssV4_0Vector`. Since 1.21 each
+  run also carries `invocations[0].executionSuccessful`, `false` for an
+  incomplete audit, with the reason as an `error`-level
+  `toolExecutionNotifications` entry.
 
 ### Domain ports (extension points)
 

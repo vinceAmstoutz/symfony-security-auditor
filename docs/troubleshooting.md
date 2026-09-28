@@ -373,6 +373,20 @@ Then verify with `ollama list`. The model name in
 
 ## Empty / Surprising Reports
 
+### `Audit incomplete: N file(s) were never analyzed`
+
+Some file never got an answer from the model: its LLM call failed even after the
+retries in `audit.retry.*`, or an abort (a provider error, a budget cap) stopped
+the run before reaching it. Every report format says so instead of printing "No
+validated vulnerabilities found", because a file nobody analyzed can still hold
+a vulnerability. The JSON report sets `complete: false`, SARIF sets
+`invocations[0].executionSuccessful: false`, and the `coverage` array in the
+JSON report lists each file with its `errored` or `aborted` status.
+
+Read the `LLM call failed` warnings in the log for the cause, fix it (see
+[LLM & Provider Errors](#llm--provider-errors)), and run again. With
+`cache.enabled`, the files that were analyzed are served from the cache.
+
 ### Report has zero vulnerabilities but I know there are some
 
 Diagnostic order:
