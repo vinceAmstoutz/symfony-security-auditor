@@ -39,10 +39,20 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
     #[Override]
     public function render(AuditReport $auditReport): string
     {
-        return implode("\n", array_map(
-            $this->annotation(...),
-            $auditReport->vulnerabilities(),
-        ));
+        return implode("\n", [
+            ...$this->incompleteWarning($auditReport),
+            ...array_map($this->annotation(...), $auditReport->vulnerabilities()),
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function incompleteWarning(AuditReport $auditReport): array
+    {
+        $notice = IncompleteAuditNotice::for($auditReport);
+
+        return null === $notice ? [] : [\sprintf('::warning title=Audit incomplete::%s', $this->escapeData($notice))];
     }
 
     private function annotation(Vulnerability $vulnerability): string

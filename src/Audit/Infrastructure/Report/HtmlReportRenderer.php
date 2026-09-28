@@ -106,6 +106,12 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
 
     private function summary(AuditReport $auditReport): string
     {
+        $notice = IncompleteAuditNotice::for($auditReport);
+
+        if (null !== $notice) {
+            return \sprintf('<p class="incomplete">⚠️ %s</p>', $this->escape($notice));
+        }
+
         return 0 === $auditReport->totalVulnerabilities()
             ? '<p class="safe">No validated vulnerabilities found.</p>'
             : '';

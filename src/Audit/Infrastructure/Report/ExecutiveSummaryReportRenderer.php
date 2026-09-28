@@ -50,6 +50,7 @@ final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInt
     public function render(AuditReport $auditReport): string
     {
         $executiveSummary = ExecutiveSummary::of($auditReport);
+        $notice = IncompleteAuditNotice::for($auditReport);
 
         return strtr($this->templateLoader->load('executive.txt'), [
             '{{projectPath}}' => $this->sanitize($auditReport->projectPath()),
@@ -59,26 +60,28 @@ final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInt
             '{{auditId}}' => $auditReport->auditId(),
             '{{riskLevel}}' => $auditReport->riskLevel(),
             '{{riskScore}}' => $executiveSummary->riskScore,
-            '{{businessImpact}}' => $this->wrapped($this->businessImpact($executiveSummary)),
-            '{{body}}' => $this->body($executiveSummary),
+            '{{businessImpact}}' => $this->wrapped($this->businessImpact($executiveSummary, null === $notice)),
+            '{{body}}' => $this->body($executiveSummary, $notice),
         ]);
     }
 
-    private function businessImpact(ExecutiveSummary $executiveSummary): string
+    private function businessImpact(ExecutiveSummary $executiveSummary, bool $complete): string
     {
         return match ($executiveSummary->riskLevel) {
             RiskLevel::Critical => 'Immediate action required: findings at this level let an attacker read or alter data they should never reach, or take over a privileged account.',
             RiskLevel::High => 'Action required this sprint: findings at this level are exploitable by a motivated attacker and put user data or business logic at risk.',
             RiskLevel::Medium => 'Plan remediation: no single finding is decisive, but together they weaken defence in depth and shorten the path to a breach.',
             RiskLevel::Low => 'Low business exposure: fold the fixes into routine maintenance.',
-            RiskLevel::Safe => $this->safeBusinessImpact($executiveSummary->totalFindings),
+            RiskLevel::Safe => $this->safeBusinessImpact($executiveSummary->totalFindings, $complete),
         };
     }
 
-    private function safeBusinessImpact(int $totalFindings): string
+    private function safeBusinessImpact(int $totalFindings, bool $complete): string
     {
         if (0 === $totalFindings) {
-            return 'No validated findings: this audit identified no business exposure in the scanned surface.';
+            return $complete
+                ? 'No validated findings: this audit identified no business exposure in the scanned surface.'
+                : 'Unknown business exposure: the audit did not finish, so finding nothing says nothing about the files it never analyzed.';
         }
 
         return 'Negligible business exposure: the validated findings are low-impact — fold the fixes into routine maintenance.';
@@ -89,13 +92,16 @@ final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInt
         return u($prose)->wordwrap(self::PROSE_WIDTH, "\n  ")->toString();
     }
 
-    private function body(ExecutiveSummary $executiveSummary): string
+    private function body(ExecutiveSummary $executiveSummary, ?string $notice): string
     {
+        $warning = null === $notice ? [] : [\sprintf('  ⚠️  %s', $this->wrapped($notice)), ''];
+
         if (0 === $executiveSummary->totalFindings) {
-            return "  No validated vulnerabilities found.\n";
+            return [] === $warning ? "  No validated vulnerabilities found.\n" : \sprintf("%s\n", $warning[0]);
         }
 
         return implode("\n", [
+            ...$warning,
             \sprintf('  %d validated finding(s) across %d file(s).', $executiveSummary->totalFindings, $executiveSummary->affectedFileCount()),
             '',
             '  BY SEVERITY',

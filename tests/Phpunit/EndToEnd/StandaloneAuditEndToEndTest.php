@@ -131,6 +131,30 @@ final class StandaloneAuditEndToEndTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_a_credential_holding_percent_signs_reaches_the_run_unaltered(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->configHome.'/symfony-security-auditor/config.yaml',
+            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\n      api_key: '%env(PROVIDER_API_KEY)%'\nmodel: 'gpt-4'\n",
+        );
+
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'PROVIDER_API_KEY' => 'sk-live-%kernel.secret%-0123456789-a%%b',
+        ])->create();
+        $commandTester = new CommandTester($standaloneApplication->find(AuditCommand::NAME));
+
+        $commandTester->execute(['project-path' => $this->projectDir, '--dry-run' => true]);
+
+        self::assertStringContainsString('API key: sk-liv…a%%b', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_dry_run_estimates_cost_without_a_provider_credential(): void
     {
         self::assertSame(

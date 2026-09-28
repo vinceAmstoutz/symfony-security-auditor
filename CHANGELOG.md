@@ -178,6 +178,45 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A report never calls an aborted or partly failed audit clean.** When an LLM
+  call failed for good — the run in #372 died on
+  `OpenSSL SSL_read: … unexpected eof while reading` — the audit exited `1`, but
+  the partial report it still wrote printed "✅ No validated vulnerabilities
+  found." with grade A, because no renderer read the `errored`/`aborted` entries
+  in its coverage. The same held for a run that finished with a chunk whose
+  response could not be parsed, which also printed `[OK] Audit complete`.
+  `AuditReport::unanalyzedFiles()` and `AuditReport::isComplete()`
+  (`src/Audit/Domain/Model/`) now expose that gap. The console, executive,
+  Markdown, HTML and GitHub-comment reports replace the clean line with
+  `Audit incomplete: N file(s) were never analyzed …` (and print it above the
+  findings when there are some). The GitHub comment headlines the run as
+  `incomplete`, `--format=github` emits a `::warning`, and the success banner
+  becomes a warning. Machine-readable formats gain additive fields: the JSON
+  report carries `complete`, and SARIF runs carry
+  `invocations[0].executionSuccessful` with the reason as an `error`
+  notification. Exit codes are unchanged. Reported by
+  [@shochdoerfer](https://github.com/shochdoerfer) in
+  [#372](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/372).
+
+- **An API key or URL holding `%` now reaches the provider exactly as stored,
+  and `init` refuses a model the container would misread.** The standalone
+  binary substitutes `%env(VAR)%`, `%env(file:VAR)%` and `auth:set` values
+  itself, then hands the result to the container, which reads `%name%` inside it
+  as a parameter reference and `%%` as an escaped percent. A key containing
+  `%kernel.secret%` stopped the run with
+  `You have requested a non-existent parameter "kernel.secret".`, and one
+  containing `%%` was silently shortened to `%` and rejected by the provider; a
+  percent-encoded URL read from the environment broke the same way.
+  `StandalonePlatformConfigResolver` (`src/Audit/Infrastructure/Config/`) now
+  escapes every value it substitutes, and
+  `StandalonePlatformConfig::credentialIdentity()` unescapes it again, so the
+  masked preview and fingerprint still describe the key the provider receives;
+  the preview shown in the audit header is escaped on its way into the container
+  too, where a `%%` in the key's first or last characters used to be halved.
+  `init --model` rejects a `%…%` pair with exit code `2`, as `--base-url`
+  already did. Reported alongside
+  [#369](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/369).
+
 - **The standalone binary now boots against Ollama.** `doctor` reported the
   bridge as installed but unusable and `audit` never scanned a file:
 

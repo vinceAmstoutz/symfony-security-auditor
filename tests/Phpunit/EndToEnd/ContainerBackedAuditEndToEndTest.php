@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAuditPlatform;
 
 /**
  * Boots the real bundle through a Symfony kernel and drives `audit:run` from
@@ -168,6 +169,15 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $report = $this->decode($this->runAudit(['model' => 'gpt-4o', ...$config], 'json', MalformedResponseAuditPlatform::class));
 
         self::assertSame(0, $report['total_vulnerabilities']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_report_written_after_the_provider_rejected_the_run_declares_itself_incomplete(): void
+    {
+        $report = $this->decode($this->runAudit(['model' => 'gpt-4o'], 'json', UnauthorizedAuditPlatform::class));
+
+        self::assertFalse($report['complete']);
     }
 
     /** @return iterable<string, array{array<string, mixed>}> */

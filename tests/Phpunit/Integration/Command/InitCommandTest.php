@@ -303,6 +303,7 @@ final class InitCommandTest extends TestCase
         yield 'empty env var' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => '']];
         yield 'provider with invalid utf-8 bytes' => [['--provider' => "caf\xE9", '--model' => 'gpt-5.4']];
         yield 'model with invalid utf-8 bytes' => [['--provider' => 'openai', '--model' => "caf\xE9"]];
+        yield 'model read as a container parameter' => [['--provider' => 'openai', '--model' => 'gpt-%v%']];
         yield 'env var with invalid utf-8 bytes' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => "\xE9KEY"]];
     }
 
@@ -337,6 +338,7 @@ final class InitCommandTest extends TestCase
         yield 'invalid utf-8 provider' => [['--provider' => "caf\xE9", '--model' => 'gpt-5.4'], 'The provider must be valid UTF-8 text.'];
         yield 'blank model' => [['--provider' => 'openai', '--model' => ' '], 'The model must not be empty.'];
         yield 'invalid utf-8 model' => [['--provider' => 'openai', '--model' => "caf\xE9"], 'The model must be valid UTF-8 text.'];
+        yield 'model read as a container parameter' => [['--provider' => 'openai', '--model' => 'gpt-%v%'], 'would be read as a container parameter'];
         yield 'invalid env var name' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'MY KEY'], 'not a valid environment variable name'];
     }
 

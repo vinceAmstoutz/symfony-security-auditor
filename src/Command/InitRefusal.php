@@ -59,6 +59,7 @@ final readonly class InitRefusal
         return match (true) {
             1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
             '' === $model => 'The model must not be empty.',
+            !ContainerParameterSyntax::isAbsentFrom($model) => 'The model holds "%...%", which would be read as a container parameter rather than as part of its name. Give the name itself.',
             default => null,
         };
     }
