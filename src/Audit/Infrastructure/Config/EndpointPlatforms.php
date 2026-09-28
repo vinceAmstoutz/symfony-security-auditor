@@ -20,9 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * listed by `symfony/ai-bundle`'s `config/platform/*.php`. They are the ones
  * `--endpoint` applies to, and they are distinct from the platforms naming the
  * same thing `base_url`: a platform declares one spelling or the other, never
- * both. `deepgram`, `elevenlabs` and `minimax` carry a default endpoint and
- * only need one to reach somewhere else; `ollama` declares none, so a
- * configuration without it sends the request against no base URI at all.
+ * both. The others fall back to a default endpoint and only need one to reach
+ * somewhere else; `ollama` has none, so a configuration without it sends the
+ * request against no base URI at all.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -31,7 +31,7 @@ final readonly class EndpointPlatforms
     /**
      * @var list<string>
      */
-    public const array NAMES = ['deepgram', 'elevenlabs', 'minimax', 'ollama'];
+    public const array NAMES = ['deepgram', 'elevenlabs', 'minimax', 'ollama', 'together', 'venice'];
 
     /**
      * The subset whose `endpoint` node declares no default, so the bundle

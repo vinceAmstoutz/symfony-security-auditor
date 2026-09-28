@@ -34,15 +34,20 @@ final class PlatformShapeKnowledgeTest extends TestCase
 {
     private const string PLATFORM_CONFIG_GLOB = __DIR__.'/../../../../vendor/symfony/ai-bundle/config/platform';
 
+    /**
+     * @var list<string>
+     */
+    private const array ENDPOINTS_DEFAULTED_BY_THE_BRIDGE = ['together'];
+
     public function test_every_platform_declaring_a_base_url_is_named(): void
     {
         self::assertSame(BaseUrlPlatforms::NAMES, $this->platformsDeclaring('base_url'));
     }
 
-    public function test_azure_is_the_only_platform_both_declaring_a_base_url_and_hand_written(): void
+    public function test_azure_and_higgsfield_are_the_only_platforms_both_declaring_a_base_url_and_hand_written(): void
     {
         self::assertSame(
-            ['azure'],
+            ['azure', 'higgsfield'],
             array_values(array_intersect(BaseUrlPlatforms::NAMES, array_keys(HandWrittenPlatforms::REQUIREMENTS))),
         );
     }
@@ -54,7 +59,15 @@ final class PlatformShapeKnowledgeTest extends TestCase
 
     public function test_every_endpoint_platform_leaving_it_without_a_default_is_named(): void
     {
-        self::assertSame(EndpointPlatforms::WITHOUT_A_DEFAULT, $this->platformsDeclaringANodeWithoutADefault('endpoint'));
+        self::assertSame(
+            EndpointPlatforms::WITHOUT_A_DEFAULT,
+            array_values(array_diff($this->platformsDeclaringANodeWithoutADefault('endpoint'), self::ENDPOINTS_DEFAULTED_BY_THE_BRIDGE)),
+        );
+    }
+
+    public function test_every_endpoint_the_bridge_defaults_is_still_left_without_one_by_the_bundle(): void
+    {
+        self::assertSame([], array_values(array_diff(self::ENDPOINTS_DEFAULTED_BY_THE_BRIDGE, $this->platformsDeclaringANodeWithoutADefault('endpoint'))));
     }
 
     /**
@@ -80,9 +93,12 @@ final class PlatformShapeKnowledgeTest extends TestCase
         );
     }
 
-    public function test_every_platform_leaving_its_api_key_optional_is_named(): void
+    public function test_every_writable_platform_leaving_its_api_key_optional_is_named(): void
     {
-        self::assertSame(OptionalApiKeyPlatforms::NAMES, $this->platformsDeclaringAnOptionalApiKey());
+        self::assertSame(
+            OptionalApiKeyPlatforms::NAMES,
+            array_values(array_diff($this->platformsDeclaringAnOptionalApiKey(), array_keys(HandWrittenPlatforms::REQUIREMENTS))),
+        );
     }
 
     public function test_every_platform_declared_per_instance_is_named(): void

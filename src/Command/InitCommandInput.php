@@ -36,7 +36,7 @@ final class InitCommandInput
     #[Option(description: 'Base URL of the platform endpoint, required by the platforms that declare one (albert, amazeeai, generic.<instance>, openresponses.<instance>); passing it with any other platform is rejected. Skips the prompt when set.')]
     public ?string $baseUrl = null;
 
-    #[Option(description: 'Endpoint the platform should reach, for the platforms that declare one (deepgram, elevenlabs, minimax, ollama); passing it with any other platform is rejected. Required for ollama, which declares no default. Skips the prompt when set.')]
+    #[Option(description: 'Endpoint the platform should reach, for the platforms that declare one (deepgram, elevenlabs, minimax, ollama, together, venice); passing it with any other platform is rejected. Required for ollama, which declares no default. Skips the prompt when set.')]
     public ?string $endpoint = null;
 
     #[Option(description: 'Write no api_key at all, for the platforms whose key is optional (deepgram, elevenlabs, generic, ollama, openresponses, vertexai); use it for a local server that authenticates nobody')]

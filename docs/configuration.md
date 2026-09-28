@@ -332,13 +332,17 @@ Install the Composer package for your chosen provider, then configure it under
 | Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL`  |
 | Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`                                |
 | Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` |
-| AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials (env or instance role)          |
+| AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials, or an API key on Mantle routes |
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                              |
 | Mistral AI           | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                               |
 | MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                               |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | none                                            |
 | Albert (French gov)  | `symfony/ai-albert-platform`         | `ALBERT_API_KEY` plus a `base_url`              |
 | amazee.ai            | `symfony/ai-amazee-ai-platform`      | `AMAZEEAI_API_KEY` plus a `base_url`            |
+| Fireworks AI         | `symfony/ai-fireworks-platform`      | `FIREWORKS_API_KEY`                             |
+| Together AI          | `symfony/ai-together-platform`       | `TOGETHER_API_KEY`                              |
+| Venice AI            | `symfony/ai-venice-platform`         | `VENICE_API_KEY`                                |
+| Eden AI              | `symfony/ai-eden-ai-platform`        | `EDENAI_API_KEY`                                |
 | Generic (AI gateway) | `symfony/ai-generic-platform`        | depends on the gateway                          |
 
 ### Full `ai.yaml` example
@@ -467,12 +471,13 @@ API key. Everything else in their prototype is optional: `http_client` and the
 route key (`completions_path` on `generic`, `responses_path` on `openresponses`)
 carry defaults, `generic` adds `supports_completions`, `supports_embeddings` and
 `embeddings_path`, and `model_catalog` has no default at all. Set any of them by
-hand. Eight platforms need something it never asks for and are refused with exit
-code `2` rather than written half-configured: `azure` (a `deployment`) and
-`cartesia` (a `version`) want an extra field beside the key, while `bedrock`,
-`cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` have
-no `api_key` node at all. Write those blocks by hand, pointing `provider:` at
-the matching `<platform>.<instance>` when the platform is instance keyed.
+hand. Nine platforms need something it never asks for and are refused with exit
+code `2` rather than written half-configured: `azure` (a `deployment`),
+`cartesia` (a `version`) and `higgsfield` (an `api_secret`) want an extra field
+beside the key, `bedrock` needs an inference `api` route, and `cache`,
+`failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` have no
+`api_key` node at all. Write those blocks by hand, pointing `provider:` at the
+matching `<platform>.<instance>` when the platform is instance keyed.
 
 Being instance keyed and taking a `base_url` are independent. `albert` and
 `amazeeai` require a `base_url` on a flat block, so `init` asks them for one too
@@ -610,20 +615,20 @@ option left out falls back to its interactive prompt (or, under
 an empty answer is rejected with exit code `2` rather than written without it.
 `azure` declares a `base_url` too but is refused earlier for needing a
 `deployment`. A platform naming the same field `endpoint` takes `--endpoint`
-instead (`deepgram`, `elevenlabs`, `minimax`, `ollama`); every other platform
-either names it differently again (`lmstudio` uses `host_url`) or hosts none, so
-passing either option with one is rejected with exit code `2` before anything is
-written. A blank provider or model, or an `--env-var` that is not a valid
-environment variable name, is rejected with exit code `2` before anything is
-written. The provider bridge is downloaded **before** the configuration file is
-replaced, so a failed download (offline, `composer` missing) leaves the
-previous, working configuration untouched. When a configuration already exists,
-`init` asks before overwriting it — and declines by default under
-`--no-interaction` — so scripted reconfiguration needs `--force` to replace the
-existing file without asking. The `SSA_INIT` installer flag's no-terminal
-fallback and the GitHub Action run plain `init --no-interaction`, which keeps
-those Anthropic defaults — pass the options yourself to script any other
-provider:
+instead (`deepgram`, `elevenlabs`, `minimax`, `ollama`, `together`, `venice`);
+every other platform either names it differently again (`lmstudio` uses
+`host_url`) or hosts none, so passing either option with one is rejected with
+exit code `2` before anything is written. A blank provider or model, or an
+`--env-var` that is not a valid environment variable name, is rejected with exit
+code `2` before anything is written. The provider bridge is downloaded
+**before** the configuration file is replaced, so a failed download (offline,
+`composer` missing) leaves the previous, working configuration untouched. When a
+configuration already exists, `init` asks before overwriting it — and declines
+by default under `--no-interaction` — so scripted reconfiguration needs
+`--force` to replace the existing file without asking. The `SSA_INIT` installer
+flag's no-terminal fallback and the GitHub Action run plain
+`init --no-interaction`, which keeps those Anthropic defaults — pass the options
+yourself to script any other provider:
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
@@ -1209,7 +1214,7 @@ the ones with defaults fall back to them, and a platform that requires a
 | `--model`      | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                                                       |
 | `--env-var`    | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead.                            |
 | `--base-url`   | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform.                          |
-| `--endpoint`   | prompted when required | The same thing under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax` and `ollama`. Rejected for any other platform.                       |
+| `--endpoint`   | prompted when required | The same thing under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. Rejected for any other platform. |
 | `--no-api-key` | off                    | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`, `vertexai`). |
 | `--force`      | off                    | Overwrite an existing configuration without asking.                                                                                                             |
 
@@ -1244,16 +1249,17 @@ only produce a run that stops at `No API key available`. Pass `--env-var` to add
 a key anyway, which is what Ollama Cloud needs. That keyless shape is what
 `privacy.offline_only: true` expects — see [privacy.\*](#privacy--data-egress).
 
-Eight platforms are refused with exit code `2` rather than written
+Nine platforms are refused with exit code `2` rather than written
 half-configured, because `init` only ever writes an `api_key` and an optional
-`base_url`: `azure` and `cartesia` need an extra field beside the key, and
-`bedrock`, `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
-`transformersphp` take no `api_key` at all. The refusal names the field the
-platform wants; its connection block goes under `platform:` in `config.yaml`,
-with the same children `symfony/ai-bundle` documents for it. Four of the eight
-(`azure`, `bedrock`, `cache`, `failover`) nest one level deeper under an
-instance name — see [Instance-keyed platforms](#instance-keyed-platforms);
-`cartesia`, `dockermodelrunner`, `lmstudio` and `transformersphp` take a flat
+`base_url` or `endpoint`: `azure`, `cartesia` and `higgsfield` need an extra
+field beside the key, `bedrock` needs an inference `api` route, and `cache`,
+`failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` take no
+`api_key` at all. The refusal names the field the platform wants; its connection
+block goes under `platform:` in `config.yaml`, with the same children
+`symfony/ai-bundle` documents for it. Four of the nine (`azure`, `bedrock`,
+`cache`, `failover`) nest one level deeper under an instance name — see
+[Instance-keyed platforms](#instance-keyed-platforms); `cartesia`,
+`dockermodelrunner`, `higgsfield`, `lmstudio` and `transformersphp` take a flat
 block.
 
 Their bridge package still has to reach the standalone data directory, and

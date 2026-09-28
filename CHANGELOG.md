@@ -135,6 +135,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **Runs on `symfony/ai` 0.14.** `symfony/ai-bundle` moves from `^0.13` to
+  `^0.14`, which brings the Fireworks, Together, Venice, Eden AI, TypeSafe and
+  Higgsfield platforms. `init` writes the ones it can: `together` and `venice`
+  take `--endpoint` (both keep a default), while `higgsfield`, which needs an
+  `api_secret`, joins the platforms `init` refuses. `bedrock` stays refused: its
+  new Mantle routes accept an `api_key` but need an `api` choice `init` does not
+  ask for. `ComposerBridgeInstaller` (`src/Audit/Infrastructure/Bridge/`)
+  resolves `edenai` and `typesafe` to their real packages
+  (`symfony/ai-eden-ai-platform`, `symfony/ai-type-safe-platform`), and a new
+  test reads the bundle's own package checks so a future bridge cannot be
+  installed under the wrong name.
+
 - **`init` no longer prints a paste-ready `export` line.**
   `InitCommand::__invoke()` (`src/Command/InitCommand.php`) ended with
   `Run: export ANTHROPIC_API_KEY=, then "audit <path>".` — a line whose whole
