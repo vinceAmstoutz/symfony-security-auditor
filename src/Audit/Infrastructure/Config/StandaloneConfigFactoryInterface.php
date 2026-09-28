@@ -21,5 +21,5 @@ interface StandaloneConfigFactoryInterface
     /**
      * @return array<string, mixed>
      */
-    public function create(string $provider, string $model, string $apiKeyEnvironmentVariable, ?string $baseUrl = null): array;
+    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, ?string $baseUrl = null, ?string $endpoint = null): array;
 }

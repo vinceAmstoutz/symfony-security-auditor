@@ -600,21 +600,23 @@ model: claude-opus-4-8
 # scan:, audit:, cache: are all accepted here too, unwrapped.
 ```
 
-`init` is also scriptable: pass `--provider`, `--model`, `--env-var` and
-`--base-url` to skip the matching prompt. Any option left out falls back to its
-interactive prompt (or, under `--no-interaction`, to its default — `anthropic`,
-`claude-opus-4-8`, and `<PLATFORM>_API_KEY` respectively). `--base-url` is only
-prompted for when `init` can write the platform's block and that block declares
-one, namely `albert`, `amazeeai`, `generic` and `openresponses`, and all four
-require it, so an empty answer is rejected with exit code `2` rather than
-written without it. `azure` declares a `base_url` too but is refused earlier for
-needing a `deployment`. Every other platform either names its endpoint
-differently (`ollama` uses `endpoint`, `lmstudio` uses `host_url`) or hosts
-none, so passing `--base-url` with one is rejected with exit code `2` before
-anything is written. A blank provider or model, or an `--env-var` that is not a
-valid environment variable name, is rejected with exit code `2` before anything
-is written. The provider bridge is downloaded **before** the configuration file
-is replaced, so a failed download (offline, `composer` missing) leaves the
+`init` is also scriptable: pass `--provider`, `--model`, `--env-var`,
+`--base-url`, `--endpoint` and `--no-api-key` to skip the matching prompt. Any
+option left out falls back to its interactive prompt (or, under
+`--no-interaction`, to its default — `anthropic`, `claude-opus-4-8`, and
+`<PLATFORM>_API_KEY` respectively). `--base-url` is only prompted for when
+`init` can write the platform's block and that block declares one, namely
+`albert`, `amazeeai`, `generic` and `openresponses`, and all four require it, so
+an empty answer is rejected with exit code `2` rather than written without it.
+`azure` declares a `base_url` too but is refused earlier for needing a
+`deployment`. A platform naming the same field `endpoint` takes `--endpoint`
+instead (`deepgram`, `elevenlabs`, `minimax`, `ollama`); every other platform
+either names it differently again (`lmstudio` uses `host_url`) or hosts none, so
+passing either option with one is rejected with exit code `2` before anything is
+written. A blank provider or model, or an `--env-var` that is not a valid
+environment variable name, is rejected with exit code `2` before anything is
+written. The provider bridge is downloaded **before** the configuration file is
+replaced, so a failed download (offline, `composer` missing) leaves the
 previous, working configuration untouched. When a configuration already exists,
 `init` asks before overwriting it — and declines by default under
 `--no-interaction` — so scripted reconfiguration needs `--force` to replace the
@@ -1198,16 +1200,18 @@ Exposed tools:
 
 Standalone only. Writes `config.yaml` and downloads the provider bridge it
 needs. Every option it is not given is prompted for. Under `--no-interaction`
-the three with defaults fall back to them, and a platform that requires a
-`--base-url` is refused rather than written half-configured.
+the ones with defaults fall back to them, and a platform that requires a
+`--base-url` or an `--endpoint` is refused rather than written half-configured.
 
-| Option       | Default                | Description                                                                                                                          |
-| ------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `--provider` | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                               |
-| `--model`    | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                            |
-| `--env-var`  | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from.                                                                   |
-| `--base-url` | prompted when required | The endpoint origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
-| `--force`    | off                    | Overwrite an existing configuration without asking.                                                                                  |
+| Option         | Default                | Description                                                                                                                                                     |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--provider`   | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                                                          |
+| `--model`      | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                                                       |
+| `--env-var`    | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead.                            |
+| `--base-url`   | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform.                          |
+| `--endpoint`   | prompted when required | The same thing under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax` and `ollama`. Rejected for any other platform.                       |
+| `--no-api-key` | off                    | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`, `vertexai`). |
+| `--force`      | off                    | Overwrite an existing configuration without asking.                                                                                                             |
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
@@ -1220,7 +1224,25 @@ symfony-security-auditor init \
     --env-var=GATEWAY_TOKEN \
     --model=your-model \
     --no-interaction
+
+# a local Ollama: no credential is written, because a local install
+# authenticates nobody
+symfony-security-auditor init \
+    --provider=ollama \
+    --endpoint=http://localhost:11434 \
+    --model=llama3.2 \
+    --no-interaction
 ```
+
+A platform spells its connection URL `base_url` or `endpoint`, never both, so
+the two options each reject what the other accepts. `ollama` declares no default
+endpoint, so `init` refuses with exit code `2` rather than writing a
+configuration whose requests would go out against no base URI at all. It is also
+the one platform written without a credential by default: the bundle leaves its
+`api_key` optional and the docs list no required variable, so naming one would
+only produce a run that stops at `No API key available`. Pass `--env-var` to add
+a key anyway, which is what Ollama Cloud needs. That keyless shape is what
+`privacy.offline_only: true` expects — see [privacy.\*](#privacy--data-egress).
 
 Eight platforms are refused with exit code `2` rather than written
 half-configured, because `init` only ever writes an `api_key` and an optional

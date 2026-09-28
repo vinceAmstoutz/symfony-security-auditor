@@ -27,9 +27,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -65,7 +67,7 @@ final readonly class InitCommand
     ): int {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        if (!$initCommandInput->force && $this->isOverwriteDeclined($symfonyStyle, $configFile)) {
+        if ($this->isOverwriteDeclined($symfonyStyle, $configFile, $initCommandInput->force)) {
             $symfonyStyle->warning('Aborted; the existing configuration was left untouched (use --force to overwrite).');
 
             return Command::SUCCESS;
@@ -80,7 +82,7 @@ final readonly class InitCommand
         $provider = $this->providerKeyNormalizer->normalize($provider);
         $providerKey = ProviderKey::of($provider);
 
-        if ($this->refused($symfonyStyle, InitRefusal::forProvider($providerKey, $provider, $initCommandInput->baseUrl, $configFile))) {
+        if ($this->refused($symfonyStyle, InitRefusal::forProvider($providerKey, $provider, $initCommandInput, $configFile))) {
             return Command::INVALID;
         }
 
@@ -90,7 +92,7 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $envVar = b($initCommandInput->envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey)))->trim()->toString();
+        $envVar = $this->resolveApiKeyVariable($symfonyStyle, $initCommandInput, $providerKey);
 
         if ($this->refused($symfonyStyle, InitRefusal::forEnvironmentVariable($envVar))) {
             return Command::INVALID;
@@ -102,17 +104,17 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
+        $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey);
+
+        if ($this->refused($symfonyStyle, InitRefusal::forResolvedEndpoint($providerKey, $provider, $endpoint))) {
+            return Command::INVALID;
+        }
+
         $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', OutputFormatter::escape($providerKey->platform)));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
 
-        $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
-        $symfonyStyle->definitionList(
-            ['Provider' => OutputFormatter::escape($provider)],
-            ['Model' => OutputFormatter::escape($model)],
-            ['API key variable' => $envVar],
-        );
-        $this->offerToStoreCredential($symfonyStyle, $envVar);
+        $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
 
         return Command::SUCCESS;
     }
@@ -160,9 +162,24 @@ final readonly class InitCommand
         return true;
     }
 
-    private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile): bool
+    private function reportWritten(SymfonyStyle $symfonyStyle, string $configFile, string $provider, string $model, ?string $envVar): void
     {
-        return $this->filesystem->exists($configFile)
+        $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
+        $symfonyStyle->definitionList(
+            ['Provider' => OutputFormatter::escape($provider)],
+            ['Model' => OutputFormatter::escape($model)],
+            ['API key variable' => $envVar ?? 'none — this platform is configured without a credential'],
+        );
+
+        if (null !== $envVar) {
+            $this->offerToStoreCredential($symfonyStyle, $envVar);
+        }
+    }
+
+    private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile, bool $force): bool
+    {
+        return !$force
+            && $this->filesystem->exists($configFile)
             && !$symfonyStyle->confirm(\sprintf('A configuration already exists at %s. Overwrite it?', $configFile), false);
     }
 
@@ -174,9 +191,48 @@ final readonly class InitCommand
         return $answer;
     }
 
-    private function defaultApiKeyVariable(ProviderKey $providerKey): string
+    /**
+     * A platform that makes you supply its endpoint is one you host yourself,
+     * so no credential is invented for it: naming a variable nobody set is what
+     * made `init --provider=ollama` end in "No API key available".
+     */
+    private function defaultApiKeyVariable(ProviderKey $providerKey): ?string
     {
-        return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+        return EndpointPlatforms::requires($providerKey)
+            ? null
+            : \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+    }
+
+    /**
+     * Null means the connection is written without an `api_key`. Only the
+     * platforms whose key the bundle leaves optional may reach that, so an
+     * empty answer elsewhere still falls through to the refusal.
+     */
+    private function resolveApiKeyVariable(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    {
+        if ($initCommandInput->noApiKey) {
+            return null;
+        }
+
+        $default = $this->defaultApiKeyVariable($providerKey);
+        $answer = $initCommandInput->envVar ?? (null === $default
+            ? $this->askRequired($symfonyStyle, \sprintf('Which environment variable holds the API key for %s? Leave it empty to write none, which is what a local install needs', $providerKey->platform))
+            : $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $default));
+
+        $envVar = b($answer)->trim()->toString();
+
+        return '' === $envVar && OptionalApiKeyPlatforms::accept($providerKey) ? null : $envVar;
+    }
+
+    private function resolveEndpoint(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    {
+        if (!EndpointPlatforms::accept($providerKey)) {
+            return null;
+        }
+
+        $endpoint = b($initCommandInput->endpoint ?? $this->askRequired($symfonyStyle, \sprintf('Endpoint %s should reach (e.g. http://localhost:11434)%s', $providerKey->platform, EndpointPlatforms::requires($providerKey) ? '' : ', or leave it empty to keep the default')))->trim()->toString();
+
+        return '' !== $endpoint ? $endpoint : null;
     }
 
     /**

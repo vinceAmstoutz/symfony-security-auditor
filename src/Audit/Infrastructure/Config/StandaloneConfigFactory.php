@@ -22,22 +22,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryInterface
 {
     #[Override]
-    public function create(string $provider, string $model, string $apiKeyEnvironmentVariable, ?string $baseUrl = null): array
+    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, ?string $baseUrl = null, ?string $endpoint = null): array
     {
         return [
             'provider' => $provider,
-            'platform' => $this->platformBlock(ProviderKey::of($provider), $apiKeyEnvironmentVariable, $baseUrl),
+            'platform' => $this->platformBlock(ProviderKey::of($provider), $this->connection($apiKeyEnvironmentVariable, $baseUrl, $endpoint)),
             'model' => $model,
         ];
     }
 
     /**
+     * @param array<string, string> $connection
+     *
      * @return array<string, mixed>
      */
-    private function platformBlock(ProviderKey $providerKey, string $apiKeyEnvironmentVariable, ?string $baseUrl): array
+    private function platformBlock(ProviderKey $providerKey, array $connection): array
     {
-        $connection = $this->connection($apiKeyEnvironmentVariable, $baseUrl);
-
         if (null === $providerKey->instance) {
             return [$providerKey->platform => $connection];
         }
@@ -46,12 +46,23 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
     }
 
     /**
+     * A null variable is the caller saying the platform runs without a
+     * credential, so the key is left out rather than written as an
+     * `%env()%` placeholder pointing at a variable nobody will ever set.
+     *
      * @return array<string, string>
      */
-    private function connection(string $apiKeyEnvironmentVariable, ?string $baseUrl): array
+    private function connection(?string $apiKeyEnvironmentVariable, ?string $baseUrl, ?string $endpoint): array
     {
         $connection = null !== $baseUrl ? ['base_url' => $baseUrl] : [];
-        $connection['api_key'] = \sprintf('%%env(%s)%%', $apiKeyEnvironmentVariable);
+
+        if (null !== $endpoint) {
+            $connection['endpoint'] = $endpoint;
+        }
+
+        if (null !== $apiKeyEnvironmentVariable) {
+            $connection['api_key'] = \sprintf('%%env(%s)%%', $apiKeyEnvironmentVariable);
+        }
 
         return $connection;
     }
