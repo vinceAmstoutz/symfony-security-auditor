@@ -290,7 +290,7 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
 
         self::assertEquals(
-            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init" to download it.'),
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init --provider=<platform>" to download it.'),
             $results[1],
         );
     }

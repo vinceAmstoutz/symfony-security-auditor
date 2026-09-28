@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatformBlock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
@@ -104,6 +106,39 @@ final class PlatformShapeKnowledgeTest extends TestCase
     public function test_every_platform_declared_per_instance_is_named(): void
     {
         self::assertSame(InstanceKeyedPlatforms::NAMES, $this->platformsDeclaring_useAttributeAsKey());
+    }
+
+    #[DataProvider('handWrittenPlatformCases')]
+    public function test_every_hand_written_platform_has_a_block_to_paste(string $platform): void
+    {
+        self::assertArrayHasKey($platform, HandWrittenPlatformBlock::CONNECTIONS);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function handWrittenPlatformCases(): iterable
+    {
+        foreach (array_keys(HandWrittenPlatforms::REQUIREMENTS) as $platform) {
+            yield $platform => [$platform];
+        }
+    }
+
+    public function test_every_setting_of_a_block_to_paste_is_one_its_platform_declares(): void
+    {
+        $undeclared = [];
+
+        foreach (HandWrittenPlatformBlock::CONNECTIONS as $platform => $connection) {
+            $contents = (string) file_get_contents(\sprintf('%s/%s.php', self::PLATFORM_CONFIG_GLOB, $platform));
+
+            foreach (array_keys($connection) as $setting) {
+                if (1 !== preg_match(\sprintf('/Node\(\x27%s\x27\)/', $setting), $contents)) {
+                    $undeclared[] = \sprintf('%s.%s', $platform, $setting);
+                }
+            }
+        }
+
+        self::assertSame([], $undeclared);
     }
 
     public function test_every_hand_written_platform_still_exists_in_the_bundle(): void

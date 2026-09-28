@@ -20,6 +20,7 @@ use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
@@ -31,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPla
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatformBlock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
@@ -46,6 +48,8 @@ final readonly class InitCommand
     public const string NAME = 'init';
 
     public const string DESCRIPTION = 'Create the standalone configuration and download the selected provider bridge';
+
+    private const string MODEL_PLACEHOLDER = '<model id>';
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -82,7 +86,7 @@ final readonly class InitCommand
         $provider = $this->providerKeyNormalizer->normalize($provider);
         $providerKey = ProviderKey::of($provider);
 
-        if ($this->refused($symfonyStyle, InitRefusal::forProvider($providerKey, $provider, $initCommandInput, $configFile))) {
+        if ($this->refusedProvider($symfonyStyle, $provider, $providerKey, $initCommandInput, $configFile)) {
             return Command::INVALID;
         }
 
@@ -110,8 +114,7 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', OutputFormatter::escape($providerKey->platform)));
-        $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
+        $this->installBridge($symfonyStyle, $provider, $providerKey);
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
 
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
@@ -149,6 +152,38 @@ final readonly class InitCommand
         }
 
         $symfonyStyle->success(\sprintf('Stored %s (%s). You can run "audit <path>" now — no environment variable needed.', $envVar, CredentialIdentity::of($credential)->maskedPreview));
+    }
+
+    /**
+     * A platform whose block `init` cannot write still gets its bridge and
+     * the block to complete; either way the provider is not taken further.
+     *
+     * @throws UnresolvableConfigPathException
+     * @throws BridgeInstallationFailedException
+     */
+    private function refusedProvider(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey, InitCommandInput $initCommandInput, string $configFile): bool
+    {
+        $handWritten = InitRefusal::forHandWrittenPlatform($providerKey, $provider, $configFile);
+
+        if (null === $handWritten) {
+            return $this->refused($symfonyStyle, InitRefusal::forProvider($providerKey, $provider, $initCommandInput));
+        }
+
+        $this->installBridge($symfonyStyle, $provider, $providerKey);
+        $symfonyStyle->error($handWritten);
+        $symfonyStyle->writeln(OutputFormatter::escape(Yaml::dump(HandWrittenPlatformBlock::for($providerKey, $initCommandInput->model ?? self::MODEL_PLACEHOLDER), 4, 4)));
+
+        return true;
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws BridgeInstallationFailedException
+     */
+    private function installBridge(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey): void
+    {
+        $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', OutputFormatter::escape($providerKey->platform)));
+        $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
     }
 
     private function refused(SymfonyStyle $symfonyStyle, ?string $violation): bool

@@ -26,10 +26,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformSer
 /**
  * Why `init` will not write a configuration for what it was asked for, as the
  * sentence the user reads. The order is what keeps a refusal from sending the
- * reader into a second one: a platform `init` cannot write at all is named
- * before the shape of its provider string, and `--base-url` last of all, so a
- * provider that names a platform wrongly hears why before it hears that
- * `--base-url` does not apply to what it named. The option refusals come last
+ * reader into a second one: the shape of the provider string comes before
+ * `--base-url`, so a provider that names a platform wrongly hears why before
+ * it hears that `--base-url` does not apply to what it named. The option refusals come last
  * and in the order the options are written, so a run passing two that do not
  * apply is told about the connection field before the credential.
  *
@@ -75,14 +74,13 @@ final readonly class InitRefusal
             : null;
     }
 
-    public static function forProvider(ProviderKey $providerKey, string $provider, InitCommandInput $initCommandInput, string $configFile): ?string
+    public static function forProvider(ProviderKey $providerKey, string $provider, InitCommandInput $initCommandInput): ?string
     {
         if ('' === $providerKey->platform) {
             return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
         }
 
-        return self::forUnwritablePlatform($providerKey, $provider, $configFile)
-            ?? self::forInstanceShape($providerKey, $provider)
+        return self::forInstanceShape($providerKey, $provider)
             ?? self::forInapplicableBaseUrl($providerKey, $provider, $initCommandInput->baseUrl)
             ?? self::forInapplicableEndpoint($providerKey, $provider, $initCommandInput->endpoint)
             ?? self::forContradictoryCredentialOptions($initCommandInput)
@@ -115,12 +113,17 @@ final readonly class InitRefusal
             : \sprintf('The base URL for "%s" holds "%%...%%", which would be read as a container parameter rather than as part of the URL. Give the URL itself, or "%%env(VAR)%%" to read it from the environment.', $provider);
     }
 
-    private static function forUnwritablePlatform(ProviderKey $providerKey, string $provider, string $configFile): ?string
+    /**
+     * Checked before anything else about the provider: `init` still installs
+     * the bridge for such a platform and prints the block to complete, so the
+     * user is told what to write rather than refused outright.
+     */
+    public static function forHandWrittenPlatform(ProviderKey $providerKey, string $provider, string $configFile): ?string
     {
         $requirement = HandWrittenPlatforms::requirementOf($providerKey);
 
         return null !== $requirement
-            ? \sprintf('"%s" needs %s, which "init" does not write, so nothing was created. Write the block by hand in %s; docs/configuration.md#init--generating-the-standalone-configuration says how, and what is still missing for its bridge.', $provider, $requirement, $configFile)
+            ? \sprintf('"%s" needs %s, which "init" does not ask for, so %s was not written. Its bridge is installed: paste the block below into that file and replace every <placeholder>.', $provider, $requirement, $configFile)
             : null;
     }
 

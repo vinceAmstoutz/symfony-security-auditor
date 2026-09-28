@@ -116,7 +116,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         }
 
         if (!is_file($bridgeAutoloadFile)) {
-            return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init" to download it.');
+            return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init --provider=<platform>" to download it.');
         }
 
         if (!$configurationResolves) {
