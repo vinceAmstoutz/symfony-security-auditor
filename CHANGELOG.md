@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   answering under an id no catalog knows never drops the cost to `$0`. The
   budget guard and `estimated_cost_usd` follow; `usage_by_model` stays keyed by
   the configured model, so the report schema does not change.
+
 - **The standalone binary serves the auditor over MCP too.**
   `symfony-security-auditor mcp:serve` starts the same Model Context Protocol
   server `bin/console mcp:serve` already offered in bundle mode, so Claude Code,
