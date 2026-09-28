@@ -85,7 +85,7 @@ final class PlatformResultExtractorTest extends TestCase
     #[DataProvider('reportedModelCases')]
     public function test_it_extracts_the_model_the_provider_reports(?TokenUsage $tokenUsage, ?string $expectedModel): void
     {
-        $deferredResult = null === $tokenUsage ? $this->deferredResult() : $this->deferredResultWithTokenUsage($tokenUsage);
+        $deferredResult = $tokenUsage instanceof TokenUsage ? $this->deferredResultWithTokenUsage($tokenUsage) : $this->deferredResult();
 
         self::assertSame($expectedModel, (new PlatformResultExtractor(null))->extractReportedModel($deferredResult));
     }
