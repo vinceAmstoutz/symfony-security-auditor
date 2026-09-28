@@ -34,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneP
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -89,6 +90,7 @@ final readonly class StandaloneContainerFactory
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
+        $containerBuilder->getDefinition(McpServeCommand::class)->setPublic(true);
         $containerBuilder->addCompilerPass(new PricingPlatformPass());
         $containerBuilder->compile(true);
 
