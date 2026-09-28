@@ -24,6 +24,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
@@ -108,7 +109,7 @@ final readonly class StandaloneContainerFactory
         }
 
         $containerBuilder->register(ConsoleBannerInterface::class, CredentialConsoleBanner::class)
-            ->setArguments([$credentialIdentity->maskedPreview]);
+            ->setArguments([ContainerParameterSyntax::escape($credentialIdentity->maskedPreview)]);
     }
 
     /**

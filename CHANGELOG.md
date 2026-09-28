@@ -149,7 +149,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `StandalonePlatformConfigResolver` (`src/Audit/Infrastructure/Config/`) now
   escapes every value it substitutes, and
   `StandalonePlatformConfig::credentialIdentity()` unescapes it again, so the
-  masked preview and fingerprint still describe the key the provider receives.
+  masked preview and fingerprint still describe the key the provider receives;
+  the preview shown in the audit header is escaped on its way into the container
+  too, where a `%%` in the key's first or last characters used to be halved.
   `init --model` rejects a `%…%` pair with exit code `2`, as `--base-url`
   already did. Reported alongside
   [#369](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/369).
