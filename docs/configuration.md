@@ -215,6 +215,15 @@ ai:
             cache_retention: long   # 1-hour cache window
 ```
 
+Each model is priced from the `symfony/models-dev` listing of the `symfony/ai`
+platform the audit runs against — the one `PlatformInterface` resolves to, or
+the standalone `provider` — so a model served by Together, Venice, OVH, Bedrock
+or another gateway is billed at that platform's rate rather than at whichever
+provider re-lists the same id. A model the platform does not list, or a platform
+with no listing of its own (`generic`, `ollama`, `lmstudio`, …), falls back to
+the first-party providers, and then to the catalog at large for a
+provider-qualified id.
+
 When the provider reports cache usage, the auditor prices it into the cost it
 tracks and reports using the model's real per-provider cache rates from the
 `symfony/models-dev` catalog (for Anthropic that works out to cache reads at
