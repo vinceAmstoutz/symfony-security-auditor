@@ -47,4 +47,31 @@ final class StandalonePlatformConfigTest extends TestCase
 
         self::assertNull($standalonePlatformConfig->credentialIdentity());
     }
+
+    public function test_it_names_the_credential_of_the_provider_the_run_selects(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(
+            ['anthropic' => ['api_key' => 'anthropic-test-key-for-previews'], 'openai' => ['api_key' => 'openai-test-key-for-previews-2']],
+            'openai',
+        );
+
+        self::assertSame('openai…ws-2', $standalonePlatformConfig->credentialIdentity()?->maskedPreview);
+    }
+
+    public function test_it_names_the_credential_of_the_selected_instance(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(
+            ['generic' => ['a' => ['api_key' => 'generic-test-key-instance-a-000'], 'b' => ['api_key' => 'generic-test-key-instance-b-111']]],
+            'generic.b',
+        );
+
+        self::assertSame('generi…-111', $standalonePlatformConfig->credentialIdentity()?->maskedPreview);
+    }
+
+    public function test_it_names_no_credential_when_the_selected_provider_is_not_configured(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => ['api_key' => 'anthropic-test-key-for-previews']], 'mistral');
+
+        self::assertNull($standalonePlatformConfig->credentialIdentity());
+    }
 }

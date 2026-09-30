@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
@@ -48,6 +49,52 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         (new YamlStandaloneConfigWriter())->write($this->configFile, $config);
 
         self::assertSame($config, Yaml::parseFile($this->configFile));
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_leaves_ordinary_values_as_plain_as_a_person_would_write_them(): void
+    {
+        (new YamlStandaloneConfigWriter())->write($this->configFile, ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-4-8']);
+
+        self::assertStringEqualsFile($this->configFile, "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: claude-opus-4-8\n");
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    #[DataProvider('stringsYamlWouldReadAsSomethingElse')]
+    public function test_every_string_it_writes_is_read_back_as_the_same_string(string $value): void
+    {
+        $config = ['provider' => $value, 'platform' => ['generic' => ['default' => ['base_url' => $value]]], 'model' => $value];
+
+        (new YamlStandaloneConfigWriter())->write($this->configFile, $config);
+
+        self::assertSame($config, Yaml::parseFile($this->configFile));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function stringsYamlWouldReadAsSomethingElse(): iterable
+    {
+        yield 'infinity' => ['.inf'];
+        yield 'capitalised infinity' => ['.Inf'];
+        yield 'negative infinity' => ['-.inf'];
+        yield 'not a number' => ['.nan'];
+        yield 'capitalised not a number' => ['.NaN'];
+        yield 'a float with digit separators' => ['1_000.5'];
+        yield 'an exponent' => ['1e3'];
+        yield 'a hexadecimal number' => ['0x1F'];
+        yield 'an integer' => ['42'];
+        yield 'a tilde' => ['~'];
+        yield 'null' => ['null'];
+        yield 'a boolean' => ['true'];
+        yield 'a date' => ['2026-09-30'];
+        yield 'an empty string' => [''];
     }
 
     /**

@@ -191,7 +191,7 @@ not provided by v1.
 | Key                    | Type     | Default                                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------------- | -------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cache.enabled`        | `bool`   | `true`                                                 | Enable the filesystem caches keyed by content hash: attacker chunks (skips the LLM call when an identical chunk was analyzed before) and reviewer verdicts (skips re-reviewing a finding with identical content against the same code context). The reviewer-verdict cache applies to every review mode: one-finding-per-call reviews (the default — structured, JSON, and concurrent, which serve cached verdicts first and dispatch only the misses) and batched reviews (`reviewer_batch_size > 1`, which serve cached verdicts first and batch only the cache-miss findings to the LLM). The attacker cache also covers iterations 2+ (chunks carrying prior-finding or rejected-finding context are keyed by chunk + context). Default `true` — large cost saver on repeated runs (CI, PR scans). Set `false` for one-shot audits or to debug LLM behavior. |
-| `cache.dir`            | `string` | `%kernel.cache_dir%/symfony_security_auditor/attacker` | Attacker cache storage path. Created on first write. The reviewer-verdict cache lives in a `reviewer` subdirectory alongside it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `cache.dir`            | `string` | `%kernel.cache_dir%/symfony_security_auditor/attacker` | Attacker cache storage path. Created on first write. The reviewer-verdict cache lives in a `reviewer` subdirectory alongside it. In the standalone user config, give an absolute path: a relative one is read against the directory the binary runs from, usually the audited checkout.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `cache.prompt_caching` | `bool`   | `true`                                                 | **Deprecated since 1.7 and ignored.** Previously set `cache_control: ephemeral` on every LLM call, but current `symfony/ai` bridges drive caching elsewhere (see below). The key is still accepted for BC and emits a deprecation notice when set. Configure caching as described under [Prompt caching](#prompt-caching) instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 #### Prompt caching
@@ -487,13 +487,16 @@ API key. Everything else in their prototype is optional: `http_client` and the
 route key (`completions_path` on `generic`, `responses_path` on `openresponses`)
 carry defaults, `generic` adds `supports_completions`, `supports_embeddings` and
 `embeddings_path`, and `model_catalog` has no default at all. Set any of them by
-hand. Eight platforms need something it never asks for and are refused with exit
+hand. Six platforms need something it never asks for and are refused with exit
 code `2` rather than written half-configured: `azure` (a `deployment`),
 `cartesia` (a `version`) and `higgsfield` (an `api_secret`) want an extra field
-beside the key, and `cache`, `failover`, `dockermodelrunner`, `lmstudio` and
-`transformersphp` have no `api_key` node at all. Write those blocks by hand,
-pointing `provider:` at the matching `<platform>.<instance>` when the platform
-is instance keyed.
+beside the key, and `dockermodelrunner`, `lmstudio` and `transformersphp` have
+no `api_key` node at all. Write those blocks by hand, pointing `provider:` at
+the matching `<platform>.<instance>` when the platform is instance keyed.
+`cache` and `failover` are refused outright: they wrap other platforms through a
+container service only a Symfony application defines (the serializer for
+`cache`, a rate limiter for `failover`), so they run from the bundle but not
+from the standalone binary.
 
 Being instance keyed and taking a `base_url` are independent. `albert` and
 `amazeeai` require a `base_url` on a flat block, so `init` asks them for one too
@@ -591,19 +594,26 @@ uses the native app-data directories:
 container base images export `XDG_CONFIG_HOME` to a root-owned path — Caddy and
 FrankenPHP set it to `/config`, for example — so a non-root user running `init`
 there hits `mkdir(): Permission denied`. Set `SYMFONY_SECURITY_AUDITOR_HOME` to
-any writable directory to override where the config, cache, and bridge
-directories live; it outranks the XDG variables and `$HOME`, giving `~/.config`,
-`~/.cache`, and `~/.local/share` beneath it:
+the absolute path of any writable directory to override where the config, cache,
+and bridge directories live; it outranks the XDG variables and `$HOME`, giving
+`~/.config`, `~/.cache`, and `~/.local/share` beneath it:
 
 ```bash
 SYMFONY_SECURITY_AUDITOR_HOME=/app/var/ssa symfony-security-auditor init
 # → /app/var/ssa/.config/symfony-security-auditor/config.yaml
 ```
 
+A relative path is refused rather than resolved against the directory the
+command runs in, which would put the config, the credentials and the cache
+inside the project being audited: the command stops and names the variable. An
+empty value counts as unset.
+
 Run `symfony-security-auditor init` to generate the file interactively and fetch
-the provider bridge. The file is **rootless** — the same keys as the bundle
-configuration above, without the `symfony_security_auditor:` wrapper — plus two
-standalone-only top-level keys:
+the provider bridge — into its own composer project under the data directory,
+pinned to the binary's PHP version and to the `symfony/ai-platform` release the
+binary bundles, both refreshed on every run. The file is **rootless** — the same
+keys as the bundle configuration above, without the `symfony_security_auditor:`
+wrapper — plus two standalone-only top-level keys:
 
 - **`platform:`** — handed verbatim to `symfony/ai`'s `ai.platform` config, so
   it takes the exact shape documented in
@@ -674,6 +684,10 @@ effective precedence, highest first, is:
 3. The user-level `config.yaml`
 4. Built-in defaults
 
+When a project file is found, the audit header notes it —
+`Project config <path> is layered over your user config: …` — so a setting that
+comes from the checkout rather than from your own file is never silent.
+
 > Scalars and mappings deep-merge; a **list** key (e.g. `scan.included_paths`)
 > set in both files is replaced wholesale by whichever file sets it last — the
 > per-project file's list fully overrides the user config's list rather than
@@ -692,12 +706,67 @@ an absolute path included — and folds its contents into the LLM prompt, so a
 project file declaring it would let the repository point the scanner at paths of
 its own choosing. Configure SARIF imports in your user config instead.
 
+Five more keys are yours alone, because they decide what the run trusts or
+writes rather than what it audits: `cache` (a cache directory inside the
+repository could be pre-seeded with forged "no findings" entries), `privacy`
+(the offline guard), `audit.custom_skills` (text placed in the attacker's system
+prompt), `scan.custom_risk_patterns` (regexes and descriptions placed in the
+attacker prompt as pre-scanner hints) and `scan.secret_scrubbing`. A project
+file declaring any of them is rejected before the run starts, naming the key. A
+project file may override single keys beneath a section of your user config,
+never replace the section itself: `audit: []` or `audit: ~` would drop your
+budget caps and custom skills in one stroke, so a non-map value where your
+config has a map is rejected too. Hyphenated spellings (`secret-scrubbing`) are
+folded to their underscore form before these rules apply, exactly as the
+configuration component does when it reads the merged file. Every value the
+project file sets must be plain text the container takes literally: one holding
+a control character (a tab aside), a line break, a bidirectional override, bytes
+that are not UTF-8, a double colon or a legacy `##[`, which would reach your
+terminal or CI log — as a workflow command, for the last two — when the value is
+echoed back, is rejected before the run starts, naming the key without echoing
+the value; a key holding a double colon or a legacy `##[` is rejected the same
+way, before any other check can quote it. So is a value or key holding a
+container reference such as `%env(VAR)%`, which would read your environment into
+a setting the repository chose: write the value itself (a single `%` stays
+text), or keep the placeholder in your user config, where a value needing two
+`%` signs is written with each doubled. A model name the project file sets must
+be a model id alone — letters, digits and `. _ : / @ + -`, without `..` or `//`:
+the request options symfony/ai reads after a `?` (`?temperature=…`, `?effort=…`)
+and any path segment reach the provider as written, tools and headers included,
+so options belong in your user config. The project file itself must not be a
+symlink: one committed as a symlink could point at any file of yours, so it is
+rejected before it is read. `audit.budget` may only tighten your caps: a project
+file setting `max_cost_usd` or `max_tokens` at or below your own value (or where
+you set none) is honoured; one raising, removing or mis-typing a cap is
+rejected. `scan.included_paths` stays available to the project file: every
+included path is confined to the project root by its **real** path, so a symlink
+committed in the repository cannot walk the scanner out of it.
+
+Everything else stays open to the project file — the models, `profile`,
+`max_iterations`, concurrency and PoC or fix synthesis included — and
+`audit.budget` has no cap by default, so an untrusted repository decides what an
+uncapped run spends. Before auditing a repository you do not trust, set
+`audit.budget.max_cost_usd` (or `max_tokens`) in your user config: the project
+file can then only lower it.
+
 ### Switching providers
 
 `%env(VAR)%` placeholders in the `platform:` block are resolved from the
 environment, so secrets never live in the file. To switch providers, configure
-several platforms and change `provider:` (run `init` again to fetch the other
-bridge):
+several platforms and change `provider:`. `init` writes a single-platform file,
+so fetch the second bridge by hand instead of running it again — into the bridge
+directory, whose `composer.json` already pins the PHP and `symfony/ai-platform`
+versions the binary needs:
+
+```bash
+composer require symfony/ai-open-ai-platform \
+    --working-dir="${XDG_DATA_HOME:-$HOME/.local/share}/symfony-security-auditor"
+```
+
+That is the bridge directory from the [table above](#standalone-configuration):
+with `SYMFONY_SECURITY_AUDITOR_HOME` set, use
+`"$SYMFONY_SECURITY_AUDITOR_HOME/.local/share/symfony-security-auditor"`
+instead, and on Windows `"%LOCALAPPDATA%\symfony-security-auditor"`.
 
 ```yaml
 provider: openai
@@ -718,6 +787,12 @@ Where that value comes from is yours to choose:
 | Stored on this machine | `'%env(ANTHROPIC_API_KEY)%'`           | `auth:set` — a developer laptop, set up once                      |
 | File on disk           | `'%env(file:ANTHROPIC_API_KEY_FILE)%'` | Docker/Kubernetes secrets, `systemd` `LoadCredential=`, 0600 file |
 | Secret manager         | either of the above                    | `pass`, 1Password, Vault — read at launch, see below              |
+
+For a value that is a placeholder as a whole, those two spellings are the only
+ones the standalone binary resolves: it applies no Symfony env processor there,
+so `%env(trim:VAR)%` or `%env(default::VAR)%` stops the run with a message
+naming the supported forms. The bundle, inside a Symfony application, keeps
+every env processor Symfony offers.
 
 ### Which one wins
 
@@ -770,7 +845,30 @@ your API key, so rotate it with your provider, then run "chmod 600 …".
 
 Only reading refuses. `auth:set` and `auth:remove` rewrite the file and restore
 `0600` as they go, so an exposed key is always replaceable or deletable from the
-tool itself rather than only by hand.
+tool itself rather than only by hand. A file that no longer parses as JSON is
+refused on read the same way, and `auth:set` replaces it.
+
+**Exit codes.** All three commands exit `2` when no API-key variable is
+configured yet and none is named with `--env-var`, and when the name given is
+not a valid environment variable name (letters, digits and underscores, not
+starting with a digit — the name a `%env()%` placeholder can read back). The
+error quotes a short name as typed, with control bytes escaped, and masks
+anything longer than 23 characters the way a key is masked, in case it is the
+key itself pasted into the wrong option. `auth:status` then exits `0` when a key
+resolves for the variable — exported, read from the file a `%env(file:VAR)%`
+placeholder points at, or stored — and `1` when none does; `auth:set` exits `2`
+when nothing usable was entered or the terminal cannot hide what you type, `1`
+when there is nowhere to store the key (checked before it asks for one), the
+file cannot be read or written, or the key is not valid UTF-8, `0` once the key
+is stored; `auth:remove` exits `1` when the file cannot be read or rewritten,
+`0` whether or not a key was stored.
+
+`auth:status --env-var` naming the variable your configuration reads through
+`%env(file:VAR)%` reports the key in that file, the way an audit reads it; any
+other variable is reported as its own value. When an exported variable decides
+the key, a credential file that cannot be read is reported as a warning rather
+than a failure — the audit does not open it either — and a run that needs no key
+(`--dry-run`) never opens it at all.
 
 Windows has no POSIX permission bits — `fileperms()` reports the same mode for
 every file on an NTFS volume — so the permission check is skipped there and the
@@ -782,10 +880,12 @@ tooling protects, or a secret manager.
 **Naming the key in output.** A stored or exported key is never printed. It is
 identified two ways instead: a masked preview (`sk-ant…qF4A`, the first six and
 last four characters, matching what your provider console shows) and a truncated
-SHA-256 fingerprint (`SHA256:ed9ff73cc4b2cd57`) that identifies it exactly while
-revealing nothing. A key shorter than 24 characters is masked entirely. Every
-audit run prints the preview in its header; `auth:status` and `doctor` print
-both.
+SHA-256 fingerprint (`SHA256:ed9ff73cc4b2cd57`) that identifies it exactly and
+cannot be turned back into the key — though anyone who already holds a candidate
+key can confirm whether it is the one, so treat a fingerprint as you would a
+username rather than as public noise. A key shorter than 24 characters is masked
+entirely. Every audit run prints the preview in its header; `auth:status` and
+`doctor` print both.
 
 **Nothing is required.** The store is a convenience for a machine you set up by
 hand. A container with no resolvable home directory simply has nothing stored,
@@ -893,7 +993,7 @@ bin/console audit [<project-path>] [options]
 | ---------------------- | ----- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--format`             | `-f`  | `console`  | Output format: `console` (human-readable), `executive` (stakeholder summary — risk level, one-line business impact, and the severity / vulnerability-type / most-affected-file distributions, with no per-finding technical detail), `json`, `sarif`, `html` (self-contained, HTML-escaped report for sharing or archiving, with inline-SVG severity and vulnerability-type distribution charts), `markdown` (GitHub-flavored report for a PR comment or `$GITHUB_STEP_SUMMARY`), `junit` (JUnit XML — one failed test case per finding, rendered by CI test-report panels such as GitLab merge-request widgets on every tier), `github` (GitHub Actions workflow-command annotations — one `::error`/`::warning`/`::notice` line per finding, rendered inline on the PR's Files Changed view without a SARIF upload step), or `github-comment` (_since 1.19_ — a pull-request comment body: the grade and normalized score as a headline, then the most severe findings one table row each, opened by a marker comment so a rerun can edit its own comment in place) |
 | `--output`             | `-o`  | none       | Write the rendered report to a file path, for any `--format`. Also works with `--dry-run`. Not recommended with `--format=github` — annotations must go to the workflow log for GitHub to render them; see the CI recipes below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `--dry-run`            |       | `false`    | Estimate token usage and cost without invoking the LLM. Exits `0` with zero findings and a populated `cost` block. If a configured model (`model`, `attacker_model`, `reviewer_model`) has no pricing entry in the `PricingProviderInterface`, a warning is printed to stderr and that role's estimated cost shows `$0.00`. The estimate does not model provider prompt-cache discounts, so real runs with caching enabled typically come in under it. In the standalone binary it also runs without a provider credential: an unresolved `%env(...)%` placeholder in the `platform` block is tolerated for a dry run, since nothing reaches the provider — a real run still refuses to start without it.                                                                                                                                                                                                                                                                                                                                                             |
+| `--dry-run`            |       | `false`    | Estimate token usage and cost without invoking the LLM. Exits `0` with zero findings and a populated `cost` block. If a configured model (`model`, `attacker_model`, `reviewer_model`) has no pricing entry in the `PricingProviderInterface`, a warning is printed to stderr and that role's estimated cost shows `$0.00`. The estimate does not model provider prompt-cache discounts, so real runs with caching enabled typically come in under it. In the standalone binary it also runs without a provider credential: an unresolved `%env(...)%` placeholder that makes up a whole value in the `platform` block is tolerated for a dry run, since nothing reaches the provider — a real run still refuses to start without it. A placeholder no run could resolve, such as `%env(trim:API_KEY)%`, is refused by a dry run too.                                                                                                                                                                                                                                 |
 | `--path`               | `-p`  | none       | Restrict the scan to a project subdirectory (relative to the root). Repeat to include several. Useful for monorepos.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `--show-scanned`       |       | `false`    | List the files that would be audited — after applying `included_paths` and any `--path` filters — grouped by type with a per-type and total count, then exit, without invoking the LLM. Use it to confirm your scan scope before paying for a run. Combine with `--dry-run` to print the file list first and the cost estimate after.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `--no-cache`           |       | `false`    | Bypass the filesystem caches — attacker chunks and reviewer verdicts — for this run (no reads, no writes). Use after upgrading the auditor or to force a fresh analysis.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -1311,15 +1411,15 @@ needs. Every option it is not given is prompted for. Under `--no-interaction`
 the ones with defaults fall back to them, and a platform that requires a
 `--base-url` or an `--endpoint` is refused rather than written half-configured.
 
-| Option         | Default                | Description                                                                                                                                                                |
-| -------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--provider`   | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                                                                     |
-| `--model`      | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                                                                  |
-| `--env-var`    | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead.                                       |
-| `--base-url`   | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform.                                     |
-| `--endpoint`   | prompted when required | The same thing under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. Rejected for any other platform.            |
-| `--no-api-key` | off                    | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`bedrock`, `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`, `vertexai`). |
-| `--force`      | off                    | Overwrite an existing configuration without asking.                                                                                                                        |
+| Option         | Default                | Description                                                                                                                                                     |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--provider`   | `anthropic`            | Any `symfony/ai` platform. A platform configured per instance takes it too, e.g. `generic.my_gateway`.                                                          |
+| `--model`      | `claude-opus-4-8`      | Used for every provider, not derived from one — set it for anything other than Anthropic.                                                                       |
+| `--env-var`    | `<PLATFORM>_API_KEY`   | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead.                            |
+| `--base-url`   | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform.                          |
+| `--endpoint`   | prompted when required | The same thing under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. Rejected for any other platform. |
+| `--no-api-key` | off                    | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`bedrock`, `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`).  |
+| `--force`      | off                    | Overwrite an existing configuration without asking.                                                                                                             |
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
@@ -1352,6 +1452,12 @@ only produce a run that stops at `No API key available`. Pass `--env-var` to add
 a key anyway, which is what Ollama Cloud needs. That keyless shape is what
 `privacy.offline_only: true` expects — see [privacy.\*](#privacy--data-egress).
 
+A URL may carry percent-encoded octets (`https://gw.example/v1%2Fx%3Fy`): `init`
+writes it with every `%` doubled, the container's own escape, so it reaches the
+platform exactly as typed. Any other `%…%` in a URL is refused, since the
+container would read it as a parameter; pass `%env(VAR)%` as the whole value to
+read the URL from the environment instead.
+
 `bedrock` is written on a Bedrock Mantle route, the one that takes an API key
 where the default InvokeModel route needs an AWS SDK client service. Name the
 model after its vendor, as Bedrock does: `anthropic.claude-opus-4-8` is written
@@ -1363,22 +1469,21 @@ route. The key comes from `BEDROCK_API_KEY` by default; `--no-api-key` writes
 none, so requests are signed with AWS SigV4 from your usual AWS credentials.
 Mantle defaults to `us-west-2`: add `region:` to the block for another one.
 
-Eight platforms are not written, because `init` only ever writes an `api_key`
-and an optional `base_url` or `endpoint`: `azure`, `cartesia` and `higgsfield`
-need an extra field beside the key, and `cache`, `failover`,
-`dockermodelrunner`, `lmstudio` and `transformersphp` take no `api_key` at all.
-The refusal names the field the platform wants; its connection block goes under
-`platform:` in `config.yaml`, with the same children `symfony/ai-bundle`
-documents for it. Three of the eight (`azure`, `cache`, `failover`) nest one
+Six platforms are not written, because `init` only ever writes an `api_key` and
+an optional `base_url` or `endpoint`: `azure`, `cartesia` and `higgsfield` need
+an extra field beside the key, and `dockermodelrunner`, `lmstudio` and
+`transformersphp` take no `api_key` at all. The refusal names the field the
+platform wants; its connection block goes under `platform:` in `config.yaml`,
+with the same children `symfony/ai-bundle` documents for it. `azure` nests one
 level deeper under an instance name — see
-[Instance-keyed platforms](#instance-keyed-platforms); `cartesia`,
-`dockermodelrunner`, `higgsfield`, `lmstudio` and `transformersphp` take a flat
-block.
+[Instance-keyed platforms](#instance-keyed-platforms); the other five take a
+flat block.
 
 For these, `init` still installs the bridge into the standalone data directory,
-pinned to the binary's own PHP version, then prints the block to paste into
-`config.yaml` instead of writing it, and exits with code `2`. Replace every
-`<placeholder>` before running an audit:
+pinned to the binary's own PHP version and to the `symfony/ai-platform` release
+it bundles, then prints the block to paste into `config.yaml` instead of writing
+it, and exits with code `2`. Replace every `<placeholder>` before running an
+audit:
 
 ```bash
 symfony-security-auditor init --provider=lmstudio --model=qwen3-coder --no-interaction
@@ -1391,6 +1496,17 @@ platform:
         host_url: 'http://127.0.0.1:1234'
 model: qwen3-coder
 ```
+
+`cache` and `failover` get neither a block nor a bridge: `init` exits with code
+`2` and says why. Both wrap other platforms through a container service only a
+Symfony application defines — the serializer for `cache`, a rate limiter for
+`failover` — which the standalone binary does not have and its `config.yaml`
+cannot declare, so no block written for them could boot. Configure the platform
+they would wrap directly, or use them from the bundle.
+
+Every value `init` writes or prints is quoted whenever YAML would otherwise read
+it back as something else, so a model named `.inf` stays the string `.inf`
+rather than becoming a float.
 
 ### `self-update` — updating the standalone binary
 

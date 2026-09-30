@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandal
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
 
 final class InitCommandTest extends TestCase
 {
@@ -177,7 +178,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
 
         $commandTester->execute([]);
 
@@ -189,7 +190,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
 
         $commandTester->execute([]);
 
@@ -233,11 +234,49 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
 
         $commandTester->execute([]);
 
         self::assertStringContainsString('--force', $commandTester->getDisplay());
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('refusedOverAnExistingConfigurationCases')]
+    public function test_it_refuses_what_it_cannot_write_before_asking_to_overwrite_the_existing_configuration(array $options): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute($options);
+
+        self::assertStringNotContainsString('Overwrite it?', $commandTester->getDisplay());
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('refusedOverAnExistingConfigurationCases')]
+    public function test_it_reports_the_refusal_rather_than_an_aborted_overwrite(array $options): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+
+        $commandTester = $this->commandTester();
+
+        self::assertSame(Command::INVALID, $commandTester->execute($options));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function refusedOverAnExistingConfigurationCases(): iterable
+    {
+        yield 'a platform whose block it cannot write' => [['--provider' => 'lmstudio', '--model' => 'our-model']];
+        yield 'a bedrock model naming no vendor' => [['--provider' => 'bedrock.prod', '--model' => 'claude-opus-4-8']];
+        yield 'a platform left without its required base url' => [['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'GATEWAY_TOKEN']];
     }
 
     public function test_it_overwrites_an_existing_configuration_when_confirmed(): void
@@ -245,7 +284,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['yes', 'openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'yes', '']);
 
         $commandTester->execute([]);
 
@@ -452,7 +491,7 @@ final class InitCommandTest extends TestCase
 
     public function test_it_still_reports_success_when_the_key_cannot_be_stored(): void
     {
-        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+        (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
@@ -462,7 +501,7 @@ final class InitCommandTest extends TestCase
 
     public function test_it_tells_the_user_to_export_the_variable_when_the_key_cannot_be_stored(): void
     {
-        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+        (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
@@ -475,7 +514,7 @@ final class InitCommandTest extends TestCase
 
     public function test_it_does_not_claim_to_have_stored_a_key_it_could_not_store(): void
     {
-        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+        (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
@@ -499,7 +538,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
 
         $commandTester->execute([]);
 
@@ -511,7 +550,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
 
         $commandTester->execute([]);
 
@@ -659,9 +698,27 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--provider' => $provider, '--model' => $model], ['interactive' => false]);
 
         self::assertSame(
-            array_map(fn (string $platform): array => [$platform, $this->dataHome.'/symfony-security-auditor'], $expectedPlatforms),
+            [[$expectedPlatforms[0], $this->dataHome.'/symfony-security-auditor', ...\array_slice($expectedPlatforms, 1)]],
             $this->recordingBridgeInstaller->installations,
         );
+    }
+
+    public function test_it_installs_every_bridge_a_route_needs_in_a_single_composer_run(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'bedrock.prod', '--model' => 'openai.gpt-oss-120b'], ['interactive' => false]);
+
+        self::assertCount(1, $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_it_names_every_bridge_it_downloads(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'bedrock.prod', '--model' => 'openai.gpt-oss-120b'], ['interactive' => false]);
+
+        self::assertStringContainsString('Downloading the bedrock and generic provider bridges with composer', $this->unwrappedDisplay($commandTester));
     }
 
     /**
@@ -729,23 +786,122 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString("deployment: '<deployment>'", $commandTester->getDisplay());
     }
 
+    public function test_it_prints_the_block_with_the_model_it_was_given_trimmed(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'azure.prod', '--model' => ' our-model '], ['interactive' => false]);
+
+        self::assertStringContainsString("model: our-model\n", $commandTester->getDisplay());
+    }
+
     public function test_it_prints_the_block_as_yaml_ready_to_paste(): void
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'failover'], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'azure'], ['interactive' => false]);
 
         self::assertStringContainsString(
             <<<'YAML'
-                provider: failover.default
+                provider: azure.default
                 platform:
-                    failover:
+                    azure:
                         default:
-                            platforms: ['ai.platform.<first choice>', ai.platform.<fallback>]
+                            base_url: 'https://<resource>.openai.azure.com'
+                            deployment: '<deployment>'
+                            api_version: '<api version>'
+                            api_key: '%env(AZURE_API_KEY)%'
                 model: '<model id>'
                 YAML,
             $commandTester->getDisplay(),
         );
+    }
+
+    public function test_the_block_it_prints_reads_back_the_model_it_was_given_as_a_string(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'lmstudio', '--model' => '.inf'], ['interactive' => false]);
+
+        preg_match('/^"?provider"?: .*/ms', $commandTester->getDisplay(), $block);
+        self::assertSame(
+            ['provider' => 'lmstudio', 'platform' => ['lmstudio' => ['host_url' => 'http://127.0.0.1:1234']], 'model' => '.inf'],
+            Yaml::parse($block[0] ?? ''),
+        );
+    }
+
+    public function test_the_configuration_it_writes_reads_back_the_model_it_was_given_as_a_string(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'openai', '--model' => '.nan'], ['interactive' => false]);
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => '.nan'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    #[DataProvider('platformsTheStandaloneBinaryCannotBootCases')]
+    public function test_it_refuses_a_platform_the_standalone_binary_cannot_boot(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        self::assertSame(Command::INVALID, $commandTester->execute(['--provider' => $provider, '--model' => 'our-model'], ['interactive' => false]));
+    }
+
+    #[DataProvider('platformsTheStandaloneBinaryCannotBootCases')]
+    public function test_it_installs_no_bridge_for_a_platform_the_standalone_binary_cannot_boot(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => $provider, '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertSame([], $this->recordingBridgeInstaller->installations);
+    }
+
+    #[DataProvider('platformsTheStandaloneBinaryCannotBootCases')]
+    public function test_it_offers_no_block_to_paste_for_a_platform_the_standalone_binary_cannot_boot(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => $provider, '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertStringNotContainsString('platform:', $commandTester->getDisplay());
+    }
+
+    public function test_it_says_why_the_standalone_binary_cannot_boot_a_platform_wrapping_others(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'failover.prod', '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertStringContainsString(
+            '"failover.prod" wraps other platforms through a rate limiter service, which only a Symfony application defines',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_says_a_platform_wrapping_others_cannot_boot_before_asking_for_an_instance(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'cache', '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertStringContainsString(
+            '"cache" wraps other platforms through the serializer service, which only a Symfony application defines',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function platformsTheStandaloneBinaryCannotBootCases(): iterable
+    {
+        yield 'failover, named without an instance' => ['failover'];
+        yield 'failover, named with one' => ['failover.prod'];
+        yield 'cache' => ['cache.prod'];
     }
 
     public function test_it_names_the_instance_the_block_is_written_for(): void
@@ -860,6 +1016,54 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString(
             'names no platform before the dot',
             $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string, string}>
+     */
+    public static function textThatIsNotPlain(): iterable
+    {
+        yield 'a provider carrying a terminal escape sequence' => [['--provider' => "generic.\e]0;pwned\x07gateway", '--model' => 'our-model', '--env-var' => 'TOKEN'], 'The provider must not hold a control character, a line break or a bidirectional override.', "\e]0;pwned"];
+        yield 'a provider carrying an eight-bit control' => [['--provider' => "generic.\u{9B}2Jgateway", '--model' => 'our-model', '--env-var' => 'TOKEN'], 'The provider must not hold a control character, a line break or a bidirectional override.', "\u{9B}"];
+        yield 'a hand-written platform carrying a terminal escape sequence' => [['--provider' => "azure.x\e]0;pwned\x07y", '--model' => 'our-model', '--env-var' => 'TOKEN'], 'The provider must not hold a control character, a line break or a bidirectional override.', "\e]0;pwned"];
+        yield 'a model carrying a workflow command line' => [['--provider' => 'bedrock.x', '--model' => "gpt\n::stop-commands::pwned", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\n::stop-commands::"];
+        yield 'a model reversing its direction' => [['--provider' => 'openai', '--model' => "gpt\u{202E}denwp", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{202E}"];
+        yield 'a model for a hand-written platform carrying an eight-bit control' => [['--provider' => 'azure.prod', '--model' => "gpt\u{9B}2J\u{202E}rev", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{9B}"];
+        yield 'a model for a hand-written platform that is not UTF-8' => [['--provider' => 'azure.prod', '--model' => "caf\xE9", '--env-var' => 'TOKEN'], 'The model must be valid UTF-8 text.', "\xE9"];
+    }
+
+    /**
+     * @param array<string, string> $input
+     */
+    #[DataProvider('textThatIsNotPlain')]
+    public function test_it_refuses_a_provider_or_model_that_is_not_plain_text_before_quoting_it(array $input, string $refusal, string $rawText): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute($input, ['interactive' => false]);
+
+        self::assertSame(Command::INVALID, $commandTester->getStatusCode());
+        self::assertSame(1, substr_count($this->unwrappedDisplay($commandTester), $refusal));
+        self::assertStringNotContainsString($rawText, $commandTester->getDisplay());
+        self::assertStringNotContainsString('Downloading', $commandTester->getDisplay());
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    public function test_the_summary_quotes_an_accented_provider_and_model_as_written(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.équipe', '--model' => "modèle\tété", '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString('generic.équipe', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString("modèle\tété", $commandTester->getDisplay());
+        self::assertSame(
+            ['provider' => 'generic.équipe', 'platform' => ['generic' => ['équipe' => ['base_url' => 'https://gw.example', 'api_key' => '%env(TOKEN)%']]], 'model' => "modèle\tété"],
+            Yaml::parseFile($this->configFile()),
         );
     }
 
@@ -1037,6 +1241,33 @@ final class InitCommandTest extends TestCase
             'would be read as a container parameter',
             $this->unwrappedDisplay($commandTester),
         );
+    }
+
+    public function test_it_writes_a_percent_encoded_base_url_escaped_for_the_container(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example/v1%2Fx%3Fy'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            ['provider' => 'generic.my_gateway', 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy', 'api_key' => '%env(TOKEN)%']]], 'model' => 'our-model'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_still_refuses_an_env_placeholder_inside_a_base_url(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.my_gateway', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://%env(GATEWAY_HOST)%/v1'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(Command::INVALID, $exitCode);
     }
 
     public function test_it_accepts_a_base_url_that_is_an_env_placeholder(): void
@@ -1382,5 +1613,58 @@ final class InitCommandTest extends TestCase
     private function configFile(): string
     {
         return $this->configHome.'/symfony-security-auditor/config.yaml';
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_replaces_a_credential_file_it_cannot_parse_when_storing_the_key(): void
+    {
+        (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->execute([]);
+
+        self::assertSame('openai-test-key-pasted-at-init', $this->storedCredential('OPENAI_API_KEY'));
+    }
+
+    public function test_it_explains_when_the_terminal_cannot_hide_the_key(): void
+    {
+        $commandTester = $this->commandTesterThatCannotHideInput();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+
+        self::assertSame(Command::SUCCESS, $commandTester->execute([]));
+        $display = $this->unwrappedDisplay($commandTester);
+
+        self::assertStringContainsString('cannot hide what you type', $display);
+        self::assertStringContainsString('export OPENAI_API_KEY before auditing', $display);
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_stores_nothing_when_the_terminal_cannot_hide_the_key(): void
+    {
+        $commandTester = $this->commandTesterThatCannotHideInput();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+
+        $commandTester->execute([]);
+
+        self::assertNull($this->storedCredential('OPENAI_API_KEY'));
+    }
+
+    private function commandTesterThatCannotHideInput(): CommandTester
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
+
+        return new CommandTester(new InitCommand(
+            $xdgConfigPathResolver,
+            new StandaloneConfigFactory(),
+            new YamlStandaloneConfigWriter(),
+            $this->recordingBridgeInstaller,
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+            credentialPrompt: new UnhideableCredentialPrompt(),
+        ));
     }
 }

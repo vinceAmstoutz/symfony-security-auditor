@@ -20,10 +20,12 @@ final readonly class StandaloneConfig
 {
     /**
      * @param array<array-key, mixed> $auditConfig
+     * @param ?string                 $projectConfigFile the project config layered over the user config, when the working directory had one
      */
     public function __construct(
         public array $auditConfig,
         public StandalonePlatformConfig $platform,
+        public ?string $projectConfigFile = null,
     ) {}
 
     public function offlineOnly(): bool

@@ -31,26 +31,46 @@ final readonly class ConfiguredCredentialVariable
         private XdgConfigPathResolver $xdgConfigPathResolver,
     ) {}
 
+    /**
+     * Why the directory the configuration lives under cannot be used — a
+     * relative `SYMFONY_SECURITY_AUDITOR_HOME` — or null when it can.
+     */
+    public function applicationHomeRefusal(): ?string
+    {
+        return $this->xdgConfigPathResolver->applicationHomeRefusal();
+    }
+
     public function name(): ?string
     {
-        $platform = $this->platformConfig();
-        if (null === $platform) {
-            return null;
-        }
-
-        $apiKey = PlatformApiKey::valueIn($platform);
-
-        return null !== $apiKey ? EnvPlaceholder::in($apiKey)?->variableName : null;
+        return $this->placeholder()?->variableName;
     }
 
     /**
-     * @return array<array-key, mixed>|null
+     * The placeholder the configuration reads the key through — the key of the
+     * platform `provider:` selects when several are configured — or null for
+     * a literal key, a platform needing none, or no configuration at all.
      */
-    private function platformConfig(): ?array
+    public function placeholder(): ?EnvPlaceholder
     {
-        $platform = $this->parsedConfig()['platform'] ?? null;
+        $parsed = $this->parsedConfig();
+        $platform = $parsed['platform'] ?? null;
+        if (!\is_array($platform)) {
+            return null;
+        }
 
-        return \is_array($platform) ? $platform : null;
+        $apiKey = PlatformApiKey::valueForProvider($platform, $this->activeProvider($parsed));
+
+        return null !== $apiKey ? EnvPlaceholder::in($apiKey) : null;
+    }
+
+    /**
+     * @param array<array-key, mixed> $parsed
+     */
+    private function activeProvider(array $parsed): ?string
+    {
+        $provider = $parsed['provider'] ?? null;
+
+        return \is_string($provider) && '' !== $provider ? $provider : null;
     }
 
     /**

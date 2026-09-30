@@ -33,8 +33,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
  * listener could not cover it.
  *
  * Mutable by design — non-readonly because the invocation is captured on the
- * way in and read back later: the command line if something throws, and
- * whether the run needs provider credentials when the audit command is built.
+ * way in and read back later: the command line if something throws, whether
+ * the run needs provider credentials when the audit command is built, and
+ * whether it only describes the commands it would build.
  * See .claude/rules/php-classes.md for the opt-out policy.
  *
  * @internal not part of the BC promise — see docs/versioning.md
@@ -47,9 +48,21 @@ final class StandaloneApplication extends Application
      */
     private const array COMPLETION_COMMANDS = ['_complete', 'completion'];
 
+    /**
+     * Commands that read other commands' definitions without running them,
+     * matched the way the base class resolves an abbreviation. Running with
+     * no command name runs `list`, and shell completion reads definitions
+     * too.
+     */
+    private const array DESCRIBING_COMMANDS = ['help', 'list'];
+
+    private const string COMPLETION_REQUEST = '_complete';
+
     private string $invocation = '';
 
     private bool $dryRun = false;
+
+    private bool $describing = false;
 
     public function __construct(
         string $name,
@@ -71,12 +84,36 @@ final class StandaloneApplication extends Application
     {
         $this->invocation = $input instanceof ArgvInput ? (string) $input : '';
         $this->dryRun = $input->hasParameterOption('--dry-run', true);
+        $this->describing = $input->hasParameterOption(['--help', '-h'], true) || $this->namesADescribingCommand($this->getCommandName($input));
 
         if (!$this->completionRun($input)) {
             $this->consoleBanner->render($this->errorOutput($output));
         }
 
         return parent::doRun($input, $output);
+    }
+
+    private function namesADescribingCommand(?string $name): bool
+    {
+        return null === $name || self::COMPLETION_REQUEST === $name || $this->abbreviatesADescribingCommand(strtolower($name));
+    }
+
+    /**
+     * The base class runs `hel audit` as `help audit`, matching an abbreviation
+     * case-insensitively when nothing else does, and no other command starts
+     * like `help` or `list`. Matching the prefix here, rather than through
+     * `find()`, keeps the lookup from building a command out of the
+     * configuration before this flag is set.
+     */
+    private function abbreviatesADescribingCommand(string $name): bool
+    {
+        foreach (self::DESCRIBING_COMMANDS as $describingCommand) {
+            if (str_starts_with($describingCommand, $name)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -89,6 +126,17 @@ final class StandaloneApplication extends Application
     public function needsProviderCredentials(): bool
     {
         return !$this->dryRun;
+    }
+
+    /**
+     * Help, a listing and shell completion only describe commands, so a
+     * command built from the configuration can be described from its class
+     * instead — before `init` has written a configuration, or with one that
+     * would not boot. Mirrors the `--help` detection of the base class.
+     */
+    public function describesCommandsOnly(): bool
+    {
+        return $this->describing;
     }
 
     /**

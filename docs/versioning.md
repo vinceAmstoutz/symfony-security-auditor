@@ -140,8 +140,8 @@ following surface is BC-protected:
   `albert`, `amazeeai`, `generic` and `openresponses`; `--endpoint` by the
   platforms naming the same field that way: `deepgram`, `elevenlabs`, `minimax`,
   `ollama`, `together` and `venice`; `--no-api-key` by the platforms whose
-  `api_key` the bundle leaves optional: `deepgram`, `elevenlabs`, `generic`,
-  `ollama`, `openresponses` and `vertexai`). The standalone exposes the
+  `api_key` the bundle leaves optional: `bedrock`, `deepgram`, `elevenlabs`,
+  `generic`, `ollama` and `openresponses`). The standalone exposes the
   **identical** `audit:run` command (and its `audit` alias), arguments, options,
   and exit-code surface listed above.
 - The `self-update` command name and its `--check` option (see

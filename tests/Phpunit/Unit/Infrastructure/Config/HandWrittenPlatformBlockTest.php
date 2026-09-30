@@ -49,10 +49,10 @@ final class HandWrittenPlatformBlockTest extends TestCase
         ];
 
         yield 'an instance-keyed platform named without one gets a default instance' => [
-            'cache',
+            'azure',
             [
-                'provider' => 'cache.default',
-                'platform' => ['cache' => ['default' => ['platform' => 'ai.platform.<platform to cache>']]],
+                'provider' => 'azure.default',
+                'platform' => ['azure' => ['default' => ['base_url' => 'https://<resource>.openai.azure.com', 'deployment' => '<deployment>', 'api_version' => '<api version>', 'api_key' => '%env(AZURE_API_KEY)%']]],
                 'model' => 'our-model',
             ],
         ];

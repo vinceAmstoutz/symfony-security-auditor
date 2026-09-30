@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use Symfony\AI\Platform\Bridge\Generic\Factory;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
@@ -26,11 +27,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -38,6 +41,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
 
@@ -74,14 +78,17 @@ final class WrittenConfigurationBootsEndToEndTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws MissingPlatformException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
      * @throws StandaloneConfigWriteException
      * @throws UnknownPlatformProviderException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
      * @throws UnresolvableConfigPathException
      * @throws UnsafeStandaloneConfigWriteException
+     * @throws UnsupportedEnvPlaceholderException
      */
     #[DataProvider('providersInitCanWrite')]
     #[RunInSeparateProcess]
@@ -104,6 +111,46 @@ final class WrittenConfigurationBootsEndToEndTest extends TestCase
             PlatformInterface::class,
             (new StandaloneContainerFactory())->create($standaloneConfig, $this->cacheDir)->get(PlatformInterface::class),
         );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MalformedProjectConfigException
+     * @throws MissingBundleExtensionException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws StandaloneConfigWriteException
+     * @throws UnknownPlatformProviderException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnresolvableConfigPathException
+     * @throws UnsafeStandaloneConfigWriteException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[RunInSeparateProcess]
+    public function test_a_percent_encoded_base_url_init_writes_reaches_the_platform_as_typed(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->home.'/config', $this->cacheDir, $this->home);
+
+        (new YamlStandaloneConfigWriter())->write(
+            $xdgConfigPathResolver->configFile(),
+            (new StandaloneConfigFactory())->create('generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example/v1%2Fx%3Fy'),
+        );
+
+        $standaloneConfig = (new StandaloneConfigLoader(
+            $xdgConfigPathResolver,
+            new StandalonePlatformConfigResolver(['GATEWAY_TOKEN' => 'a-token']),
+        ))->load();
+        $platform = (new StandaloneContainerFactory())->create($standaloneConfig, $this->cacheDir)->get(PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+        $platform->getModelCatalog();
+
+        self::assertSame('https://gw.example/v1%2Fx%3Fy', Factory::$lastBaseUrl);
     }
 
     /**

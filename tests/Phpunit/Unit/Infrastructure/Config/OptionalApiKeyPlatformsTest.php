@@ -39,6 +39,7 @@ final class OptionalApiKeyPlatformsTest extends TestCase
         yield 'the instance name never decides' => ['anthropic.ollama', false];
         yield 'a hosted platform insists on one' => ['anthropic', false];
         yield 'a platform carrying a default endpoint can still insist' => ['minimax', false];
+        yield 'a platform whose validation insists on a key unless a project is configured' => ['vertexai', false];
     }
 
     public function test_the_no_api_key_option_help_names_every_platform_it_accepts(): void

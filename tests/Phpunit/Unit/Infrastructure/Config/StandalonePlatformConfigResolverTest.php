@@ -17,10 +17,12 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config\Fixture\InMemoryCredentialStore;
 
@@ -49,6 +51,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_passes_the_platform_block_through_untouched(): void
     {
@@ -63,6 +66,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_resolves_env_placeholders_anywhere_in_the_platform_block(): void
     {
@@ -77,6 +81,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_resolves_placeholders_in_a_nested_generic_platform(): void
     {
@@ -94,6 +99,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_a_run_that_needs_no_credential_substitutes_an_unusable_stand_in(): void
     {
@@ -111,6 +117,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_a_run_that_needs_no_credential_still_prefers_the_real_one_when_it_is_set(): void
     {
@@ -125,6 +132,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_carries_the_active_provider_selector(): void
     {
@@ -141,6 +149,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_has_no_active_provider_when_the_selector_is_absent(): void
     {
@@ -155,6 +164,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_ignores_an_empty_active_provider_selector(): void
     {
@@ -169,6 +179,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_rejects_a_config_without_a_platform_block(): void
     {
@@ -182,6 +193,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_rejects_an_empty_platform_block(): void
     {
@@ -195,6 +207,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_rejects_an_env_placeholder_whose_variable_is_unset(): void
     {
@@ -210,6 +223,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_rejects_a_mixed_case_env_placeholder_instead_of_passing_it_through_as_a_literal(): void
     {
@@ -225,6 +239,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     #[DataProvider('credentialFileContents')]
     public function test_it_reads_the_credential_from_the_file_its_variable_points_at(string $contents): void
@@ -253,6 +268,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_rejects_a_file_placeholder_whose_variable_is_unset(): void
     {
@@ -268,13 +284,14 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_rejects_a_credential_file_that_cannot_be_read(): void
     {
         $missingFile = \sprintf('%s/absent-api-key', $this->tmpDir);
 
         $this->expectException(UnreadableCredentialFileException::class);
-        $this->expectExceptionMessage(\sprintf('The credential file "%s", referenced by your config, could not be read.', $missingFile));
+        $this->expectExceptionMessage('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" could not be read');
 
         (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $missingFile]))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
@@ -285,13 +302,14 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_rejects_a_credential_file_holding_only_whitespace(): void
     {
         $blankFile = $this->writeCredentialFile(" \n");
 
         $this->expectException(UnreadableCredentialFileException::class);
-        $this->expectExceptionMessage(\sprintf('The credential file "%s", referenced by your config, is empty.', $blankFile));
+        $this->expectExceptionMessage('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" is empty');
 
         (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $blankFile]))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
@@ -302,6 +320,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_a_run_that_needs_no_credential_tolerates_an_unset_file_variable(): void
     {
@@ -319,6 +338,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_a_run_that_needs_no_credential_tolerates_an_unreadable_credential_file(): void
     {
@@ -336,6 +356,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_a_run_that_needs_no_credential_tolerates_a_blank_credential_file(): void
     {
@@ -353,6 +374,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     #[DataProvider('credentialSources')]
     public function test_it_escapes_a_resolved_credential_so_the_container_reads_it_literally(string $placeholder, bool $fromFile, bool $fromStore): void
@@ -385,6 +407,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_leaves_a_literal_written_in_the_configuration_as_written(): void
     {
@@ -407,6 +430,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_falls_back_to_the_stored_credential_when_the_variable_is_unset(): void
     {
@@ -421,6 +445,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_lets_an_exported_variable_override_the_stored_credential(): void
     {
@@ -435,6 +460,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_falls_back_to_the_stored_credential_when_a_credential_file_is_not_configured(): void
     {
@@ -449,6 +475,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws MissingPlatformException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function test_it_reports_a_credential_that_is_neither_exported_nor_stored(): void
     {
@@ -457,5 +484,194 @@ final class StandalonePlatformConfigResolverTest extends TestCase
 
         (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore()))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_names_the_variable_rather_than_the_value_it_holds_when_the_credential_file_cannot_be_read(): void
+    {
+        $keyPastedWhereAPathBelongs = 'sk-ant-api03-pasted-where-a-path-belongs';
+
+        try {
+            (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $keyPastedWhereAPathBelongs]))
+                ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
+            self::fail('A credential file that does not exist must be refused.');
+        } catch (UnreadableCredentialFileException $unreadableCredentialFileException) {
+            self::assertStringContainsString('(ANTHROPIC_API_KEY_FILE holds "sk-ant…ongs")', $unreadableCredentialFileException->getMessage());
+            self::assertStringNotContainsString($keyPastedWhereAPathBelongs, $unreadableCredentialFileException->getMessage());
+        }
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_reports_a_plain_setting_whose_variable_is_unset_without_speaking_of_the_api_key(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage('The environment variable "LLM_BASE_URL", referenced by your config, is not set.');
+
+        (new StandalonePlatformConfigResolver(['LLM_API_KEY' => 'sk-from-env']))
+            ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(LLM_BASE_URL)%', 'api_key' => '%env(LLM_API_KEY)%']]]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_run_that_needs_no_credential_never_opens_the_credential_store(): void
+    {
+        $credentialStore = $this->createMock(CredentialStoreInterface::class);
+        $credentialStore->expects(self::never())->method('read');
+
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver([], credentialStore: $credentialStore))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]], false);
+
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_never_reads_a_plain_setting_from_the_credential_store(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage('"LLM_BASE_URL"');
+
+        (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore(['LLM_BASE_URL' => 'http://stored.example'])))
+            ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(LLM_BASE_URL)%']]]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_reads_a_plain_setting_from_a_file_its_variable_points_at(): void
+    {
+        $baseUrlFile = $this->writeCredentialFile("http://gateway.example\n");
+
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['LLM_BASE_URL_FILE' => $baseUrlFile]))
+            ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(file:LLM_BASE_URL_FILE)%']]]]);
+
+        self::assertSame(['platform' => ['generic' => ['default' => ['base_url' => 'http://gateway.example']]]], $standalonePlatformConfig->toAiConfig());
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_run_that_needs_no_credential_tolerates_an_unset_plain_setting(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(LLM_BASE_URL)%']]]], false);
+
+        self::assertSame(
+            ['platform' => ['generic' => ['default' => ['base_url' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('placeholdersItCannotResolve')]
+    public function test_it_refuses_a_placeholder_it_cannot_resolve_rather_than_asking_for_a_variable_nobody_can_export(string $placeholder, bool $credentialsRequired): void
+    {
+        $this->expectException(UnsupportedEnvPlaceholderException::class);
+
+        (new StandalonePlatformConfigResolver(['API_KEY' => 'sk-from-env']))
+            ->resolve(['platform' => ['anthropic' => ['api_key' => $placeholder]]], $credentialsRequired);
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function placeholdersItCannotResolve(): iterable
+    {
+        yield 'the trim processor' => ['%env(trim:API_KEY)%', true];
+        yield 'the string processor' => ['%env(string:API_KEY)%', true];
+        yield 'the default processor' => ['%env(default::API_KEY)%', true];
+        yield 'a processor chained after file' => ['%env(file:trim:API_KEY)%', true];
+        yield 'a name no shell can export' => ['%env(API-KEY)%', true];
+        yield 'a file placeholder naming no variable' => ['%env(file:)%', true];
+        yield 'a processor in a run that needs no credential' => ['%env(trim:API_KEY)%', false];
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_names_the_spellings_it_supports_when_refusing_a_placeholder(): void
+    {
+        $this->expectExceptionMessage('The placeholder "%env(trim:API_KEY)%" applies an env processor, and the standalone binary applies none (trim:, string:, default:, …): it reads only "%env(VAR)%" and "%env(file:VAR)%"');
+
+        (new StandalonePlatformConfigResolver(['API_KEY' => 'sk-from-env']))
+            ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(trim:API_KEY)%']]]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_quotes_a_long_refused_placeholder_in_full_so_the_line_can_be_found(): void
+    {
+        $this->expectExceptionMessage('The placeholder "%env(default::ANTHROPIC_API_KEY)%"');
+
+        (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(default::ANTHROPIC_API_KEY)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_a_key_pasted_as_the_placeholder_name_is_never_echoed_in_the_refusal(): void
+    {
+        $pastedKey = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789';
+
+        $caught = null;
+        try {
+            (new StandalonePlatformConfigResolver())->resolve(['platform' => ['anthropic' => ['api_key' => '%env('.$pastedKey.')%']]]);
+        } catch (UnsupportedEnvPlaceholderException $unsupportedEnvPlaceholderException) {
+            $caught = $unsupportedEnvPlaceholderException;
+        }
+
+        self::assertInstanceOf(UnsupportedEnvPlaceholderException::class, $caught);
+        self::assertStringNotContainsString($pastedKey, $caught->getMessage());
     }
 }

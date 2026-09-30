@@ -32,10 +32,8 @@ final readonly class HandWrittenPlatforms
      */
     public const array REQUIREMENTS = [
         'azure' => 'a "deployment" name beside the api_key',
-        'cache' => 'the "platform" it wraps rather than an api_key',
         'cartesia' => 'a "version" beside the api_key',
         'dockermodelrunner' => 'a "host_url" rather than an api_key',
-        'failover' => 'the list of "platforms" it falls back through rather than an api_key',
         'higgsfield' => 'an "api_secret" beside the api_key',
         'lmstudio' => 'a "host_url" rather than an api_key',
         'transformersphp' => 'an empty connection block rather than an api_key',

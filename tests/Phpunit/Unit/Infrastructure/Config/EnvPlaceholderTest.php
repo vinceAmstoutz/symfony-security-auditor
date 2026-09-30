@@ -54,5 +54,6 @@ final class EnvPlaceholderTest extends TestCase
         yield 'an unterminated placeholder' => ['%env(ANTHROPIC_API_KEY'];
         yield 'a placeholder with text around it' => ['prefix %env(ANTHROPIC_API_KEY)%'];
         yield 'an empty value' => [''];
+        yield 'a placeholder followed by a newline' => ["%env(ANTHROPIC_API_KEY)%\n"];
     }
 }

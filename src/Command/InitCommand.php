@@ -20,7 +20,6 @@ use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
@@ -35,9 +34,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatformBlock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\RoundTripYaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 
 use function Symfony\Component\String\b;
 use function Symfony\Component\String\u;
@@ -60,6 +61,7 @@ final readonly class InitCommand
         private CredentialStoreInterface $credentialStore,
         private Filesystem $filesystem = new Filesystem(),
         private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
+        private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
     ) {}
 
     /**
@@ -71,12 +73,6 @@ final readonly class InitCommand
         #[MapInput] InitCommandInput $initCommandInput,
     ): int {
         $configFile = $this->xdgConfigPathResolver->configFile();
-
-        if ($this->isOverwriteDeclined($symfonyStyle, $configFile, $initCommandInput->force)) {
-            $symfonyStyle->warning('Aborted; the existing configuration was left untouched (use --force to overwrite).');
-
-            return Command::SUCCESS;
-        }
 
         $provider = b($initCommandInput->provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama, or generic.my_gateway for an AI gateway)', 'anthropic'))->trim()->toString();
 
@@ -115,6 +111,12 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
+        if ($this->isOverwriteDeclined($symfonyStyle, $configFile, $initCommandInput->force)) {
+            $symfonyStyle->warning('Aborted; the existing configuration was left untouched (use --force to overwrite).');
+
+            return Command::SUCCESS;
+        }
+
         $this->installBridges($symfonyStyle, $provider, $providerKey, $model);
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
 
@@ -130,10 +132,15 @@ final readonly class InitCommand
      */
     private function offerToStoreCredential(SymfonyStyle $symfonyStyle, string $envVar): void
     {
-        $answer = $symfonyStyle->askHidden(\sprintf('Paste the API key for %s to store it on this machine, or press Enter to skip (input stays hidden)', $envVar));
-        $credential = b(\is_string($answer) ? $answer : '')->trim()->toString();
+        try {
+            $credential = $this->credentialPrompt->ask($symfonyStyle, \sprintf('Paste the API key for %s to store it on this machine, or press Enter to skip (input stays hidden)', $envVar));
+        } catch (HiddenInputUnavailableException) {
+            $symfonyStyle->note(\sprintf('This terminal cannot hide what you type, so no key was asked for. Run "auth:set" on one that can, or export %s before auditing.', $envVar));
 
-        if ('' === $credential) {
+            return;
+        }
+
+        if (null === $credential) {
             $symfonyStyle->note(\sprintf('No key stored. Export %1$s before auditing, or run "auth:set" at any time to store it. Keeping the key out of your shell history: docs/configuration.md#providing-the-api-key', $envVar));
 
             return;
@@ -170,9 +177,15 @@ final readonly class InitCommand
             return $this->refused($symfonyStyle, InitRefusal::forProvider($providerKey, $provider, $initCommandInput));
         }
 
+        $model = null === $initCommandInput->model ? self::MODEL_PLACEHOLDER : b($initCommandInput->model)->trim()->toString();
+
+        if ($this->refused($symfonyStyle, InitRefusal::forModelText($model))) {
+            return true;
+        }
+
         $this->installBridge($symfonyStyle, $provider, $providerKey);
         $symfonyStyle->error($handWritten);
-        $symfonyStyle->writeln(OutputFormatter::escape(Yaml::dump(HandWrittenPlatformBlock::for($providerKey, $initCommandInput->model ?? self::MODEL_PLACEHOLDER), 4, 4)));
+        $symfonyStyle->writeln(OutputFormatter::escape(RoundTripYaml::dump(HandWrittenPlatformBlock::for($providerKey, $model), \PHP_INT_MAX, 4)));
 
         return true;
     }
@@ -183,22 +196,23 @@ final readonly class InitCommand
      */
     private function installBridges(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey, string $model): void
     {
-        $this->installBridge($symfonyStyle, $provider, $providerKey);
-
         $companionPlatform = BedrockMantleRoute::applies($providerKey) ? BedrockMantleRoute::companionPlatform($model) : null;
-        if (null !== $companionPlatform) {
-            $this->installBridge($symfonyStyle, $companionPlatform, ProviderKey::of($companionPlatform));
-        }
+
+        $this->installBridge($symfonyStyle, $provider, $providerKey, ...(null !== $companionPlatform ? [$companionPlatform] : []));
     }
 
     /**
      * @throws UnresolvableConfigPathException
      * @throws BridgeInstallationFailedException
      */
-    private function installBridge(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey): void
+    private function installBridge(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey, string ...$companionPlatforms): void
     {
-        $symfonyStyle->text(\sprintf('Downloading the %s provider bridge with composer — this can take a minute…', OutputFormatter::escape($providerKey->platform)));
-        $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
+        $symfonyStyle->text(\sprintf(
+            'Downloading the %s provider bridge%s with composer — this can take a minute…',
+            OutputFormatter::escape(implode(' and ', [$providerKey->platform, ...$companionPlatforms])),
+            [] === $companionPlatforms ? '' : 's',
+        ));
+        $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir(), ...$companionPlatforms);
     }
 
     private function refused(SymfonyStyle $symfonyStyle, ?string $violation): bool

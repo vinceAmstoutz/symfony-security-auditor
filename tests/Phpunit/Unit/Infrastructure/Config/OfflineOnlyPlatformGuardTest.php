@@ -59,6 +59,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
         yield 'localhost subdomain' => ['http://models.localhost:11434'];
         yield 'uppercase host' => ['http://LOCALHOST:11434'];
         yield 'ipv4-mapped loopback' => ['http://[::ffff:127.0.0.1]:11434'];
+        yield 'a percent-encoded path escaped for the container' => ['http://localhost:11434/v1%%2Fx%%3Fy'];
     }
 
     /**
@@ -86,6 +87,19 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
         yield 'ipv4-mapped public ipv6' => ['https://[::ffff:8.8.8.8]:443'];
         yield 'ipv4-mapped public ipv6 hex form' => ['https://[::ffff:808:808]:443'];
         yield 'scheme without host' => ['file:///etc/passwd'];
+    }
+
+    /**
+     * @throws NonLocalPlatformEndpointException
+     */
+    public function test_it_judges_an_escaped_url_as_the_container_will_read_it(): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessage('"https://gw.example/v1%2Fx%3Fy"');
+
+        $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
+            new StandalonePlatformConfig(['generic' => ['gw' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy']]]),
+        );
     }
 
     /**

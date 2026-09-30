@@ -24,7 +24,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  *
  * Optional is not the same as unnecessary. A gateway behind `generic` still
  * wants its token, which is why the key is omitted only when asked for, never
- * by default.
+ * by default. Nor is an optional node the whole story: `vertexai` leaves its
+ * `api_key` node optional but insists on it in a `validate()` closure unless
+ * `location` and `project_id` are set, which `init` never writes, so a keyless
+ * block of it can never boot and it is not among these.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -33,7 +36,7 @@ final readonly class OptionalApiKeyPlatforms
     /**
      * @var list<string>
      */
-    public const array NAMES = ['bedrock', 'deepgram', 'elevenlabs', 'generic', 'ollama', 'openresponses', 'vertexai'];
+    public const array NAMES = ['bedrock', 'deepgram', 'elevenlabs', 'generic', 'ollama', 'openresponses'];
 
     public static function accept(ProviderKey $providerKey): bool
     {

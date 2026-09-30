@@ -38,8 +38,20 @@ $environment = getenv();
         return;
     }
 
-    if (is_file($bridgeAutoloadFile)) {
+    if (!is_file($bridgeAutoloadFile)) {
+        return;
+    }
+
+    try {
         require_once $bridgeAutoloadFile;
+    } catch (RuntimeException $runtimeException) {
+        fwrite(\STDERR, \sprintf(
+            'The provider bridge under "%s" cannot be loaded by this binary: %s'.\PHP_EOL.'Run "init --provider=<platform>" again to rebuild it for the bundled PHP.'.\PHP_EOL,
+            \dirname($bridgeAutoloadFile, 2),
+            $runtimeException->getMessage(),
+        ));
+
+        return;
     }
 })($environment);
 

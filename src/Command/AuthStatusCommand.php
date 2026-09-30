@@ -17,9 +17,12 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Filesystem\Exception\IOException;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 
 /** @internal not part of the BC promise — the command *name* (`auth:status`) is public, but the PHP class itself is for internal use only. */
@@ -41,6 +44,7 @@ final readonly class AuthStatusCommand
         private CredentialStoreInterface $credentialStore,
         private ConfiguredCredentialVariable $configuredCredentialVariable,
         private array $environment = [],
+        private Filesystem $filesystem = new Filesystem(),
     ) {}
 
     /**
@@ -51,19 +55,72 @@ final readonly class AuthStatusCommand
         #[Option(description: 'Environment variable to report on; defaults to the one your configuration reads')]
         ?string $envVar = null,
     ): int {
-        $variableName = $envVar ?? $this->configuredCredentialVariable->name();
+        if (ApplicationHomeRefusal::reported($symfonyStyle, $this->configuredCredentialVariable)) {
+            return Command::FAILURE;
+        }
+
+        $placeholder = $this->configuredCredentialVariable->placeholder();
+        $variableName = $envVar ?? $placeholder?->variableName;
         if (null === $variableName) {
             $symfonyStyle->error('No API-key variable is configured yet. Run "init" to create a configuration, or name one explicitly with --env-var.');
 
             return Command::INVALID;
         }
 
-        $exported = $this->environment[$variableName] ?? '';
-        $stored = $this->credentialStore->read($variableName);
+        if (EnvironmentVariableRefusal::reported($symfonyStyle, $variableName)) {
+            return Command::INVALID;
+        }
 
-        return '' !== $exported
-            ? $this->reportResolved($symfonyStyle, $variableName, $exported, self::ENVIRONMENT_SOURCE, null !== $stored)
-            : $this->reportStoredOrMissing($symfonyStyle, $variableName, $stored);
+        $exported = $this->environment[$variableName] ?? '';
+        if ('' === $exported) {
+            return $this->reportStoredOrMissing($symfonyStyle, $variableName, $this->credentialStore->read($variableName));
+        }
+
+        $shadowsStoredCredential = $this->holdsStoredCredential($symfonyStyle, $variableName);
+
+        return $placeholder?->variableName === $variableName && $placeholder->readsFile
+            ? $this->reportFromFile($symfonyStyle, $variableName, $exported, $shadowsStoredCredential)
+            : $this->reportResolved($symfonyStyle, $variableName, $exported, self::ENVIRONMENT_SOURCE, $shadowsStoredCredential);
+    }
+
+    /**
+     * The exported variable wins, so a store that cannot be read changes
+     * nothing about the key an audit would use — it is worth a warning, not a
+     * failure.
+     */
+    private function holdsStoredCredential(SymfonyStyle $symfonyStyle, string $variableName): bool
+    {
+        try {
+            return null !== $this->credentialStore->read($variableName);
+        } catch (UnreadableCredentialStoreException $unreadableCredentialStoreException) {
+            $symfonyStyle->warning($unreadableCredentialStoreException->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * A configuration reading the key through `%env(file:VAR)%` exports the
+     * file's path, not the key, so the key an audit would use is the file's
+     * content — and a file that cannot be read means no key resolves at all.
+     */
+    private function reportFromFile(SymfonyStyle $symfonyStyle, string $variableName, string $path, bool $shadowsStoredCredential): int
+    {
+        try {
+            $credential = trim($this->filesystem->readFile($path));
+        } catch (IOException) {
+            $symfonyStyle->error(UnreadableCredentialFileException::forVariable($variableName, $path)->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        if ('' === $credential) {
+            $symfonyStyle->error(UnreadableCredentialFileException::forBlankFile($variableName, $path)->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        return $this->reportResolved($symfonyStyle, $variableName, $credential, \sprintf('the file %s names', $variableName), $shadowsStoredCredential);
     }
 
     private function reportStoredOrMissing(SymfonyStyle $symfonyStyle, string $variableName, ?string $stored): int

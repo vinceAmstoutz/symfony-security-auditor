@@ -230,9 +230,20 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), ['OPENAI_API_KEY_FILE' => $missingCredentialFile], true)->diagnose();
 
         self::assertEquals(
-            new DoctorCheckResult('API key', DoctorCheckStatus::Failure, UnreadableCredentialFileException::forPath($missingCredentialFile)->getMessage()),
+            new DoctorCheckResult('API key', DoctorCheckStatus::Failure, UnreadableCredentialFileException::forVariable('OPENAI_API_KEY_FILE', $missingCredentialFile)->getMessage()),
             $results[0],
         );
+    }
+
+    public function test_it_fails_the_configuration_check_when_a_placeholder_applies_an_env_processor(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: '%env(trim:OPENAI_API_KEY)%'\n");
+
+        $results = $this->doctorWith($this->resolver(), ['OPENAI_API_KEY' => 'sk-test'], true)->diagnose();
+
+        self::assertSame('Configuration', $results[0]->label);
+        self::assertSame(DoctorCheckStatus::Failure, $results[0]->status);
+        self::assertStringContainsString('The placeholder "%env(trim:OPENAI_API_KEY)%" applies an env processor', $results[0]->detail);
     }
 
     public function test_it_fails_the_configuration_check_when_the_config_file_is_malformed(): void
@@ -270,6 +281,20 @@ final class EnvironmentDoctorTest extends TestCase
         self::assertSame('Configuration', $results[0]->label);
         self::assertSame(DoctorCheckStatus::Failure, $results[0]->status);
         self::assertStringContainsString('must not be able to point the scanner at paths of its choosing', $results[0]->detail);
+    }
+
+    public function test_it_fails_the_configuration_check_when_the_audited_project_declares_a_user_only_key(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        (new Filesystem())->dumpFile($projectConfigFile, "privacy:\n    allow_external_llm: true\n");
+
+        $results = $this->doctorWith($this->resolver(), [], true, projectConfigFile: $projectConfigFile)->diagnose();
+
+        self::assertSame('Configuration', $results[0]->label);
+        self::assertSame(DoctorCheckStatus::Failure, $results[0]->status);
+        self::assertStringContainsString('privacy', $results[0]->detail);
+        self::assertStringContainsString($projectConfigFile, $results[0]->detail);
     }
 
     public function test_it_fails_the_configuration_and_bridge_checks_when_the_home_directory_is_unresolvable(): void

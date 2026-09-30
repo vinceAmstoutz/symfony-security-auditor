@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CompoundPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatformBlock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
@@ -24,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 
 /**
- * `BaseUrlPlatforms`, `EndpointPlatforms`, `HandWrittenPlatforms`, `InstanceKeyedPlatforms` and
+ * `BaseUrlPlatforms`, `CompoundPlatforms`, `EndpointPlatforms`, `HandWrittenPlatforms`, `InstanceKeyedPlatforms` and
  * `OptionalApiKeyPlatforms` restate what `symfony/ai-bundle`
  * declares about each platform's connection block. A bundle upgrade that adds a
  * platform, or gives an existing one a `base_url`, would otherwise leave them
@@ -148,14 +149,58 @@ final class PlatformShapeKnowledgeTest extends TestCase
 
     public function test_no_platform_requiring_an_extra_field_is_left_writable(): void
     {
-        self::assertSame([], array_diff($this->platformsRequiringMoreThanACredential(), array_keys(HandWrittenPlatforms::REQUIREMENTS)));
+        self::assertSame([], array_diff($this->platformsRequiringMoreThanACredential(), $this->platformsInitRefusesToWrite()));
     }
 
     public function test_no_platform_without_an_api_key_node_is_left_writable(): void
     {
         $withoutApiKey = array_values(array_diff($this->platformNames(), $this->platformsDeclaring('api_key')));
 
-        self::assertSame([], array_diff($withoutApiKey, array_keys(HandWrittenPlatforms::REQUIREMENTS)));
+        self::assertSame([], array_diff($withoutApiKey, $this->platformsInitRefusesToWrite()));
+    }
+
+    /**
+     * A platform whose connection block names another platform's service —
+     * `cache` the one it caches, `failover` the ones it falls back through —
+     * wraps platforms rather than reaching a provider.
+     */
+    public function test_every_platform_wrapping_another_is_named(): void
+    {
+        self::assertSame(array_keys(CompoundPlatforms::SERVICES_NEEDED), $this->platformsDeclaringAnyOf(['platform', 'platforms']));
+    }
+
+    public function test_no_platform_wrapping_another_is_offered_as_one_to_write_by_hand(): void
+    {
+        self::assertSame([], array_intersect(array_keys(CompoundPlatforms::SERVICES_NEEDED), array_keys(HandWrittenPlatforms::REQUIREMENTS)));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function platformsInitRefusesToWrite(): array
+    {
+        return [...array_keys(HandWrittenPlatforms::REQUIREMENTS), ...array_keys(CompoundPlatforms::SERVICES_NEEDED)];
+    }
+
+    /**
+     * @param list<string> $nodes
+     *
+     * @return list<string>
+     */
+    private function platformsDeclaringAnyOf(array $nodes): array
+    {
+        $names = [];
+        $pattern = \sprintf('/Node\(\x27(?:%s)\x27\)/', implode('|', array_map(static fn (string $node): string => preg_quote($node, '/'), $nodes)));
+
+        foreach ($this->configFiles() as $finder) {
+            if (1 === preg_match($pattern, $finder->getContents())) {
+                $names[] = $finder->getBasename('.php');
+            }
+        }
+
+        sort($names);
+
+        return $names;
     }
 
     /**
@@ -279,7 +324,7 @@ final class PlatformShapeKnowledgeTest extends TestCase
         foreach ($this->configFiles() as $finder) {
             $declaration = $this->nodeDeclaration($finder->getContents(), 'api_key');
 
-            if (null !== $declaration && !str_contains($declaration, '->isRequired()')) {
+            if (null !== $declaration && !str_contains($declaration, '->isRequired()') && !$this->validationInsistsOnApiKey($finder->getContents())) {
                 $names[] = $finder->getBasename('.php');
             }
         }
@@ -287,6 +332,17 @@ final class PlatformShapeKnowledgeTest extends TestCase
         sort($names);
 
         return $names;
+    }
+
+    /**
+     * A node left optional in its own declaration can still be demanded by
+     * the platform's `->validate()` closure — `vertexai` insists on `api_key`
+     * unless a project-scoped endpoint is configured instead, which `init`
+     * never writes.
+     */
+    private function validationInsistsOnApiKey(string $contents): bool
+    {
+        return 1 === preg_match('/->validate\(\)(.*?)->end\(\)/s', $contents, $matches) && str_contains($matches[1], 'api_key');
     }
 
     /**

@@ -46,18 +46,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the configured model and names the models its calls were billed as under the
   additive `billed_models` key.
 
-- **`init` configures AWS Bedrock.** `init --provider=bedrock.<instance>` used
-  to install the bridge and print a block to finish by hand, because Bedrock's
-  default InvokeModel route needs an AWS SDK client service. `symfony/ai` 0.14
-  adds the Bedrock Mantle routes, which take an API key, so `init` now writes
-  the block itself: `BedrockMantleRoute` picks `api: messages` for an
-  `anthropic.*` model, `api: responses` for `google.gemma-*` and
-  `api: completions` for every other one, and `init` also installs the `generic`
-  or `openresponses` bridge those two routes need. The key is read from
-  `BEDROCK_API_KEY`; `--no-api-key`, which now accepts `bedrock`, leaves it out
-  so requests are signed with AWS SigV4. A model that does not name its vendor,
-  such as the default `claude-opus-4-8`, is refused with exit code `2` and an
-  example of the id Bedrock expects.
+- **`init` configures AWS Bedrock.** Bedrock's default InvokeModel route needs
+  an AWS SDK client service, which a standalone config cannot declare.
+  `symfony/ai` 0.14 adds the Bedrock Mantle routes, which take an API key, so
+  `init --provider=bedrock.<instance>` now writes a block that boots:
+  `BedrockMantleRoute` picks `api: messages` for an `anthropic.*` model,
+  `api: responses` for `google.gemma-*` and `api: completions` for every other
+  one, and `init` also installs the `generic` or `openresponses` bridge those
+  two routes need, in the same `composer require` as
+  `symfony/ai-bedrock-platform` (`BridgeInstallerInterface::install()` takes
+  further providers). The key is read from `BEDROCK_API_KEY`; `--no-api-key`,
+  which accepts `bedrock`, leaves it out so requests are signed with AWS SigV4.
+  A model that does not name its vendor, such as the default `claude-opus-4-8`,
+  is refused with exit code `2` and an example of the id Bedrock expects.
 
 - **The standalone binary serves the auditor over MCP too.**
   `symfony-security-auditor mcp:serve` starts the same Model Context Protocol
@@ -74,16 +75,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   local one such as Ollama.
 
 - **`init` installs the bridge for a platform it cannot configure, and prints
-  the block to finish by hand.** For the eight platforms whose connection block
-  `init` does not write (`azure`, `cache`, `cartesia`, `dockermodelrunner`,
-  `failover`, `higgsfield`, `lmstudio`, `transformersphp`), it used to exit `2`
-  with nothing installed, and a hand-run `composer require` missed the PHP
-  version pin the binary needs. `init` now installs the bridge the same way it
-  does for every other platform, then prints a ready-to-edit `config.yaml` block
-  (`HandWrittenPlatformBlock`, `src/Audit/Infrastructure/Config/`) with a
-  `<placeholder>` for every value only you know. It still exits `2` and writes
-  no configuration. `doctor` now points at `init --provider=<platform>` for a
-  missing bridge. Closes
+  the block to finish by hand.** For the six platforms whose connection block
+  `init` does not write (`azure`, `cartesia`, `dockermodelrunner`, `higgsfield`,
+  `lmstudio`, `transformersphp`), `init` installs the bridge the same way it
+  does for every other platform — a hand-run `composer require` would miss the
+  PHP version pin the binary needs — then prints a ready-to-edit `config.yaml`
+  block (`HandWrittenPlatformBlock`, `src/Audit/Infrastructure/Config/`) with a
+  `<placeholder>` for every value only you know. It exits `2` and writes no
+  configuration. `doctor` now points at `init --provider=<platform>` for a
+  missing bridge. `cache` and `failover` get neither, since no standalone block
+  for them could boot (see Fixed). Closes
   [#370](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/370).
 
 - **`init` can now configure a local Ollama end to end, and writes no credential
@@ -106,9 +107,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   takes instead — `--base-url` on `ollama`, the first thing a reader of the old
   error tries, now answers `use --endpoint`. **`--no-api-key`** writes no
   `api_key` at all, for the platforms whose key `symfony/ai-bundle` leaves
-  optional (`deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`,
-  `vertexai`); it is refused for every other platform, whose container
-  validation fails without one.
+  optional (`deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`); it
+  is refused for every other platform, whose container validation fails without
+  one — `vertexai` included: its `api_key` node is optional in the schema, but a
+  validation closure requires it unless `location` and `project_id` are set,
+  which `init` never writes. The knowledge test also reads the bundle's
+  validation closures, so a platform of that kind cannot slip into the list.
 
   `ollama` needs neither flag to come out right: it is the only platform whose
   `endpoint` node declares no default, so `init` now treats it as one you host
@@ -153,6 +157,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   falls back to the environment exactly as before. See
   [Providing the API key](docs/configuration.md#providing-the-api-key).
 
+  `auth:set` checks it can store the key before asking for it, and with no
+  per-user configuration directory refuses up front with "No per-user
+  configuration directory could be resolved, so there is nowhere to store the
+  credentials…". The prompt it shares with `init` (`HiddenCredentialPrompt`,
+  `src/Command/`) never falls back to echoing: a terminal that cannot hide input
+  is told to export the variable instead (`auth:set` exits `2`, `init` still
+  writes its configuration), and stdin closing mid-prompt counts as nothing
+  entered. The three commands refuse, with exit code `2`, a variable name no
+  `%env()%` placeholder could read back (`EnvironmentVariableName`,
+  `src/Audit/Infrastructure/Config/`), which
+  `FilesystemCredentialStore::write()` refuses too, so the store never writes a
+  file it cannot encode, and `auth:set` and `auth:remove` report a store they
+  cannot use with its own error and exit code `1`. With several platforms
+  configured, `auth:set`, `auth:status`, the audit header and `doctor` describe
+  the key of the selected `provider:` (`PlatformApiKey::valueForProvider()`);
+  the whole `platform:` block is searched only when no provider is selected. A
+  `credentials.json` that no longer parses is replaced by the next `auth:set`;
+  reading it and `auth:remove` still refuse it, and a file that cannot be read
+  at all still fails a write.
+
+  `auth:status` checks the environment first, so an exported key is reported
+  even when `credentials.json` cannot be read — that is only a warning — and it
+  reads a `%env(file:VAR)%` key through its file, also when `--env-var` names
+  that variable: the file's content is described as the key
+  (`Source: the file VAR names`), and a file that cannot be read or is empty
+  exits `1` with the reason. Only a platform's `api_key` falls back to the
+  store: an unset variable behind a `base_url` or `endpoint` is reported as that
+  variable, never as a missing API key, and a `--dry-run` never opens the
+  credential file.
+
 - **Documented that `base_url` is the origin only.** The `generic` bridge
   appends its own `completions_path` (default `/v1/chat/completions`), so a
   `base_url` ending in `/v1` produced `/v1/v1/chat/completions`, a path the
@@ -168,7 +202,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   you chose. `init --help` documents those defaults and shows an instance-keyed
   invocation; `docs/configuration.md` gains an
   [`init` CLI reference](docs/configuration.md#init--generating-the-standalone-configuration)
-  with the option table and what the eight platforms it refuses still need.
+  with the option table and what each platform it refuses still needs.
 - **A refusal now leaves somewhere to go.** The base-URL prompt offered an empty
   default, so pressing Enter looked legal while it in fact threw away every
   answer already given. The marker is gone and the prompt names the platform it
@@ -180,8 +214,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   instead of three. `--base-url applies to the platforms that expose one` now
   spells the two instance-keyed ones as `generic.<instance>` and
   `openresponses.<instance>`, rather than naming a form that would be refused
-  again. The eight platforms `init` cannot write are told that nothing was
-  created and where the shape is documented, and `transformersphp` no longer
+  again. The platforms `init` cannot write are told what each one needs — the
+  six it prints a block for, with their bridge already installed, and `cache`
+  and `failover`, with why no block could boot — and `transformersphp` no longer
   reads as needing "no connection options at all, which init does not write".
 - **`init --base-url`** supplies the platform endpoint without the prompt, for
   the platforms `init` can write a block for that declare one: `albert`,
@@ -190,14 +225,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   is refused for needing a `deployment`, so naming it would only send a reader
   into a second refusal. Passing `--base-url` with any other platform is
   rejected with exit code `2` rather than writing a key that platform has no
-  node for. A URL holding a `%...%` pair is rejected too
-  (`ContainerParameterSyntax`, `src/Audit/Infrastructure/Config/`): the value
-  reaches the container verbatim, where `%v%` is a parameter reference that
-  aborts the run with `You have requested a non-existent parameter "v".` and
-  `%%` is silently rewritten to a single `%`. A whole-value `%env(VAR)%` is
-  still accepted, because `StandalonePlatformConfigResolver` resolves it before
-  the container is built. Listed in `docs/versioning.md` as part of the `init`
-  surface.
+  node for. A URL — here and for `--endpoint` — whose every `%` starts a
+  percent-encoded octet (`https://gw.example/v1%2Fx`) is written with each `%`
+  doubled, the container's own escape, so the platform receives it exactly as
+  typed and `privacy.offline_only` judges it as the container will read it. Any
+  other `%` is refused (`ContainerParameterSyntax`,
+  `src/Audit/Infrastructure/Config/`): the container would read `%v%` as a
+  parameter reference and abort the run with
+  `You have requested a non-existent parameter "v".`, and a lone `%` is not
+  valid in a URL. A whole-value `%env(VAR)%` is still accepted, because
+  `StandalonePlatformConfigResolver` resolves it before the container is built.
+  Listed in `docs/versioning.md` as part of the `init` surface.
 
 - **`symfony/ai-generic-platform`, `symfony/ai-albert-platform` and
   `symfony/ai-amazee-ai-platform` in the README platform table and in
@@ -245,13 +283,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `^0.14`, which brings the Fireworks, Together, Venice, Eden AI, TypeSafe and
   Higgsfield platforms. `init` writes the ones it can: `together` and `venice`
   take `--endpoint` (both keep a default), while `higgsfield`, which needs an
-  `api_secret`, joins the platforms `init` refuses. `bedrock` stays refused: its
-  new Mantle routes accept an `api_key` but need an `api` choice `init` does not
-  ask for. `ComposerBridgeInstaller` (`src/Audit/Infrastructure/Bridge/`)
-  resolves `edenai` and `typesafe` to their real packages
-  (`symfony/ai-eden-ai-platform`, `symfony/ai-type-safe-platform`), and a new
-  test reads the bundle's own package checks so a future bridge cannot be
-  installed under the wrong name.
+  `api_secret`, joins the platforms `init` refuses. `bedrock`'s new Mantle
+  routes accept an `api_key`, so `init` now writes it too (see "`init`
+  configures AWS Bedrock"). `ComposerBridgeInstaller`
+  (`src/Audit/Infrastructure/Bridge/`) resolves `edenai` and `typesafe` to their
+  real packages (`symfony/ai-eden-ai-platform`,
+  `symfony/ai-type-safe-platform`), and a new test reads the bundle's own
+  package checks so a future bridge cannot be installed under the wrong name.
 
 - **`init` no longer prints a paste-ready `export` line.**
   `InitCommand::__invoke()` (`src/Command/InitCommand.php`) ended with
@@ -358,6 +396,84 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the whole answer is stripped now; a fenced block inside prose is still
   recovered.
 
+- **A standalone config using a Symfony env processor now says so instead of
+  asking you to export a variable no shell can have.** `%env(trim:API_KEY)%`,
+  `%env(default::API_KEY)%` and the like were read by
+  `StandalonePlatformConfigResolver` as a variable literally named
+  `trim:API_KEY`, so the run stopped at "No API key available … export
+  trim:API_KEY" and `auth:set` refused that name with exit `2`. The standalone
+  binary resolves only `%env(VAR)%` and `%env(file:VAR)%`; any other placeholder
+  that makes up a whole value in the `platform:` block now stops the run, a
+  `--dry-run` included, with `UnsupportedEnvPlaceholderException` — "The
+  placeholder "%env(trim:API_KEY)%" applies an env processor, and the standalone
+  binary applies none (trim:, string:, default:, …): it reads only "%env(VAR)%"
+  and "%env(file:VAR)%" …", or, for a name no shell can export such as
+  `%env(1PASSWORD_KEY)%`, the rule that name breaks — and `doctor` reports it
+  under `Configuration`. Either message spells out the processors only when
+  every segment before the variable names a Symfony env processor, and otherwise
+  masks the whole expression as a key is masked, however short, so a key pasted
+  into it — an `id:secret` pair split on its colon included — is not echoed.
+  `init` refuses the same placeholder as a base URL or endpoint instead of
+  writing a config that cannot run. The bundle keeps Symfony's full
+  env-processor support.
+
+- **A relative `SYMFONY_SECURITY_AUDITOR_HOME` is refused instead of silently
+  ignored.** `XdgConfigPathResolver` dropped a relative override and fell back
+  to the XDG variables or `$HOME` — the very directory the override is set to
+  escape — with no word to the user, while `docs/configuration.md` promised "any
+  writable directory". It now stops with `UnresolvableConfigPathException`:
+  "SYMFONY_SECURITY_AUDITOR_HOME is set to "…", which is not an absolute path. …
+  Set SYMFONY_SECURITY_AUDITOR_HOME to an absolute path, or unset it." An empty
+  value still counts as unset. `auth:set`, `auth:status` and `auth:remove`
+  report the same refusal and exit `1`, where they claimed that no directory was
+  set, that no variable was configured, or that nothing was stored. **When
+  upgrading:** a setup that relied on the silent fallback now stops at that
+  message on every command that reads the configuration or the credentials; set
+  the variable to an absolute path, or unset it.
+
+- **`init --provider=cache` / `--provider=failover` no longer hands you a block
+  that cannot boot.** `symfony/ai-bundle` wires `failover` to a rate limiter
+  service (`rate_limiter`, which the printed block did not even carry — the
+  container stopped at `Undefined array key "rate_limiter"`) and `cache` to the
+  `serializer` and the Symfony clock; the standalone container defines none of
+  them and `config.yaml` cannot declare one, so no block pasted from `init`
+  could ever boot. `init` now refuses both with exit `2`, installs no bridge and
+  prints no block, and says why: "… wraps other platforms through a rate limiter
+  service, which only a Symfony application defines …". They keep working from
+  the bundle, and a hand-written block for either that stops at a missing bridge
+  now says the same through `ProviderBridgeException` instead of pointing at an
+  `init` that refuses it.
+
+- **Every value `init` writes or prints reads back as the string it was.**
+  `Yaml::dump()` leaves `.inf`, `.nan` (any case) and digit-separated floats
+  such as `1_000.5` unquoted, so `init --model=.inf` wrote `model: .inf` and the
+  next run read a float. `YamlStandaloneConfigWriter` and the block `init`
+  prints for a hand-written platform now go through `RoundTripYaml::dump()`,
+  which re-dumps with every value double-quoted whenever the plain dump would
+  not read back as written; an ordinary configuration looks exactly as before.
+
+- **`init` refuses what it cannot write before asking to overwrite your
+  configuration.** `InitCommand` asked "A configuration already exists at …
+  Overwrite it?" first, so you could confirm an overwrite and then be refused —
+  and under `--no-interaction` the default "no" aborted with exit `0` before the
+  refusal (or the block to paste for a hand-written platform) was ever shown.
+  The question now comes after every refusal, right before the bridge is
+  installed and the file written.
+
+- **`--help`, `help`, `list --format=json|xml|md` and shell completion work for
+  the standalone `audit` and `mcp:serve` commands before `init` has run.** Both
+  are registered as `LazyCommand`s whose factory builds the whole container from
+  `config.yaml` (`src/Standalone/StandaloneApplicationFactory.php`), and a
+  `LazyCommand` builds its command for every description, so `mcp:serve --help`
+  or `audit --help` failed with "No LLM platform configured. Add a "platform:"
+  block to your config.yaml (run the "init" command to create one)." (or any
+  other configuration error). `StandaloneApplication::describesCommandsOnly()`
+  now recognises a help, listing or completion run — abbreviated ones such as
+  `hel audit` or `li` included — and
+  `StandaloneConsoleCommandFactory::describe()` then describes the command from
+  its class — its `#[AsCommand]` and `__invoke()` signature — without building
+  the container; running either command still requires a valid configuration.
+
 - **A genuine rate limit is retried even when its body quotes a request id or
   token count that looks like a `4xx`.**
   `TransientFailureClassifier::isTransient()` tested the non-transient status
@@ -440,6 +556,49 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `--show-scanned` alone writes no report, so it checks and creates nothing —
   and a write that still fails prints the rendered document to standard output
   before the failure is reported.
+
+- **`init` holds the bridge tree to the `symfony/ai-platform` release the binary
+  bundles.** The bridge's `composer.json` pinned only the PHP version, so a
+  `symfony/ai-<slug>-platform` release depending on a newer
+  `symfony/ai-platform` pulled that version into the data directory, whose
+  autoloader is registered ahead of the binary's: the newer classes shadowed the
+  bundled ones and every audit died with a raw `TypeError`.
+  `BundledAiPlatformVersion` reads the release from the binary's own
+  installed-package data (never the bridge tree's), and
+  `ComposerBridgeInstaller` writes it to `require` and names it on the
+  `composer require` line, so an already installed newer copy is moved back.
+
+- **`init` refreshes the pins of an existing bridge manifest, and a bridge the
+  binary cannot load says so instead of killing every command.** A
+  `composer.json` written before 1.15 had no `config.platform.php`; `init` kept
+  it untouched forever, `composer` resolved the bridge against the host PHP, and
+  `vendor/composer/platform_check.php` then threw from the binary's unguarded
+  `require_once` — `--version`, `doctor` and `init` itself all died with
+  Composer's message. The manifest is rewritten with both pins on every install
+  — other keys preserved, and decoded as objects so an empty one such as
+  `config.allow-plugins: {}` stays the object Composer requires; an unparsable
+  manifest is refused with its path. The binary catches the platform check,
+  prints the data directory and the `init --provider=<platform>` that rebuilds
+  it on stderr, and runs the command anyway: `init` rebuilds the tree,
+  `self-update` and `--version` still work, and `audit` reports the missing
+  bridge through `ProviderBridgeException`.
+
+- **A platform whose bridge is not installed is answered with the `init`
+  command, not `composer require`.** The standalone container surfaced
+  `symfony/ai-bundle`'s "Try running composer require
+  symfony/ai-<slug>-platform" — a command that installs into the audited
+  project's vendor directory, which the binary never loads.
+  `ProviderBridgeException` names the bridge package and
+  `symfony-security-auditor init --provider=<provider>`; `doctor`'s "Provider
+  bridge" check shows the same message.
+
+- **A stale `$PWD` no longer points the standalone binary at another directory's
+  project config.** `StandaloneApplicationFactory::projectConfigFile()` trusted
+  the `PWD` shell export over the process working directory, so a launcher that
+  inherited it from elsewhere — an MCP client, a `Process`, a task runner — read
+  (or missed) `.symfony-security-auditor.yaml` in the wrong directory. `PWD` is
+  used only while it names the process working directory (keeping the shell's
+  spelling through symlinks); otherwise the process directory wins.
 
 - **A file that failed in one attacker iteration and was analyzed in a later one
   no longer marks the audit incomplete.** Coverage rows accumulate across the
@@ -586,9 +745,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   nesting covers all six instance-keyed platforms (`generic`, `openresponses`,
   `azure`, `bedrock`, `cache`, `failover`); `init` writes a bootable block for
   the two whose prototype is `base_url` plus `api_key`, namely `generic` and
-  `openresponses`. The other four take different fields (`azure` also requires
-  `deployment`, and `bedrock`, `cache` and `failover` have no `api_key` node at
-  all) and still have to be written by hand.
+  `openresponses`. The other four take different fields: `azure` also requires
+  `deployment` and gets a block to finish by hand, `bedrock` is written with a
+  Mantle route, and `cache` and `failover` are refused.
 
 - **`init` wrote an unbootable config for `albert` and `amazeeai`.** Both
   platforms declare `base_url` as a required child, but neither is instance
@@ -604,8 +763,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   named an instance, and refused `--base-url` otherwise. Both now key off
   `BaseUrlPlatforms` (`src/Audit/Infrastructure/Config/`), so the two flat
   platforms that need a `base_url` are asked for one and have it written beside
-  their `api_key`, while `bedrock`, `cache` and `failover` are refused earlier
-  still, as platforms `init` cannot write at all.
+  their `api_key`, while `cache` and `failover` are refused earlier still, as
+  platforms no standalone block can serve.
 
 - **A mistyped platform instance now names the real ones.**
   `provider: generic.typo` against a configured `generic.eu` reported:
@@ -712,7 +871,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   using the original casing no longer matched `provider:`. Only the platform
   half is folded now.
 
-- **`init` wrote a config the container refuses for eight platforms.** It only
+- **`init` wrote a config the container refuses for several platforms.** It only
   ever writes an `api_key` plus an optional `base_url`, so a platform that
   rejects `api_key` or requires a field it never asks for ended up with a block
   that failed on the next run, for example:
@@ -724,11 +883,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `init --provider=lmstudio` was newly reachable because this release also fixed
   that bridge's package slug, so the bridge now installed cleanly and only then
   produced an unusable config. `HandWrittenPlatforms`
-  (`src/Audit/Infrastructure/Config/`) names the eight and what each needs
-  instead: `azure` (a `deployment`), `cartesia` (a `version`), and `bedrock`,
-  `cache`, `failover`, `dockermodelrunner`, `lmstudio` and `transformersphp` (no
+  (`src/Audit/Infrastructure/Config/`) names each and what it needs instead:
+  `azure` (a `deployment`), `cartesia` (a `version`), `higgsfield` (an
+  `api_secret`), and `dockermodelrunner`, `lmstudio` and `transformersphp` (no
   `api_key` node at all). `init` now names the missing piece and exits `2`
-  without writing anything, rather than reporting success.
+  without writing a configuration, rather than reporting success. `bedrock` is
+  written with a Mantle route, and `cache` and `failover` are refused (see
+  above).
 
 - **Five provider bridges installed a package that does not exist.**
   `ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES`
@@ -829,6 +990,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Security
 
+- **A key pasted into `--env-var` is no longer echoed back in the error.**
+  `EnvironmentVariableName::violationFor()`
+  (`src/Audit/Infrastructure/Config/EnvironmentVariableName.php`), which `init`,
+  `auth:set`, `auth:status` and `auth:remove` share, quoted the refused value
+  verbatim, so `auth:set --env-var=sk-ant-…` printed the whole key into the
+  terminal and any CI log. A value longer than 23 characters is now masked the
+  way a key is (`sk-ant…-var`), and a shorter one has its control bytes escaped
+  (`FOO\n`) instead of reaching the terminal raw.
+  `CredentialStoreWriteException::forInvalidVariableName()` quotes a refused
+  name the same way.
+
+- **`init` refuses a provider or model that is not plain text before printing
+  it.** `init` quoted `--provider` and `--model` as typed in its refusals, the
+  bridge download line, the block it prints for a platform it cannot write and
+  its summary, control characters included. `InitRefusal::forProviderText()` and
+  `InitRefusal::forModelText()` (`src/Command/InitRefusal.php`) now refuse a
+  value holding a control character, a line break or a bidirectional override
+  (`TerminalText::isPlain()`) before any of them runs, and the block for a
+  hand-written platform quotes the model trimmed, as the written configuration
+  does.
+
 - **Attacker prompt preambles neutralize every Unicode line break, and a
   first-pass candidate title cannot escape its line.**
   `AttackerContextPromptRenderer`
@@ -839,6 +1021,103 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   every Unicode line break (via `\R` under `/u`, after `mb_scrub()`), and a
   candidate finding's title — free text from a cheaper first-pass model — is
   quoted, has its own double quotes folded, and is capped at 120 characters.
+
+- **The audit header names a project config layered over the user config.** When
+  a `.symfony-security-auditor.yaml` in the working directory tunes the run
+  (paths, profile, models, a tighter budget), `StandaloneContainerFactory`
+  (`src/Standalone/StandaloneContainerFactory.php`) now adds a pre-flight notice
+  naming the file, so a setting coming from the audited checkout rather than
+  from the user's own config is never silent.
+
+- **A relative `$HOME` no longer places the config, credentials and cache inside
+  the audited project.** `XdgConfigPathResolver`
+  (`src/Audit/Infrastructure/Config/XdgConfigPathResolver.php`) accepted a
+  relative `$HOME` and resolved the tool's directories against the current
+  working directory — the audited repository, when the binary is run from it. Up
+  to 1.20.1 that let the audited repository ship
+  `.local/share/symfony-security-auditor/vendor/autoload.php`, which the binary
+  `require`s at start-up — code from the repository ran as the user — and a
+  `.config/symfony-security-auditor/config.yaml` whose `platform:` block could
+  send the user's key to an endpoint of its choosing. If you ran the binary with
+  a relative `HOME` (some CI images set one), check the repositories it audited
+  and rotate the key it used. A relative `$HOME` is now treated as unset,
+  exactly like a relative XDG variable.
+
+- **The audited repository's `.symfony-security-auditor.yaml` can no longer set
+  the cache directory, the offline guard, secret scrubbing or the attacker's
+  custom skills or risk patterns, nor loosen the budget cap.** Those keys were
+  merged like any other, so a repository could aim `cache.dir` at hash-named "no
+  findings" entries it ships (a forged clean report at no cost), lift
+  `audit.budget.max_cost_usd`, switch `scan.secret_scrubbing.enabled` off, turn
+  `privacy.offline_only` off, or write `audit.custom_skills` instructions
+  straight into the attacker's system prompt. `StandaloneConfigLoader` now
+  rejects a project file declaring `cache`, `privacy`, `audit.custom_skills`,
+  `scan.secret_scrubbing` or `scan.custom_risk_patterns` — a repository's
+  regexes and descriptions, placed in the attacker prompt as pre-scanner hints —
+  (`ProjectConfigUserOnlyKeyException`, naming the keys), the way it already
+  rejected `platform`, `provider` and `scan.import_sarif`. A project value that
+  would replace a whole section of the user config with a non-map, such as
+  `audit: []` or `audit: ~`, is rejected too
+  (`ProjectConfigUserOnlyKeyException::forErasedSection()`), and every key is
+  read with its hyphens folded to underscores and its control characters — the
+  ASCII ones, the eight-bit C1 controls, the line and paragraph separators and
+  the bidirectional overrides and marks — escaped before any guard runs
+  (`TerminalText`), so a key carrying terminal escape sequences is printed
+  escaped in any refusal while an accented key such as `équipe` reads as
+  written; a YAML error in the file, which quotes the offending line, is escaped
+  the same way. Once the key guards pass, a value holding a control character, a
+  line break, a bidirectional override or bytes that are not UTF-8, which no
+  project setting takes, is refused, naming the key without echoing the value
+  (`ProjectConfigValueGuard`,
+  `MalformedProjectConfigException::forControlCharacter()`), so a model name
+  cannot carry an escape sequence into the pricing warning or a validation
+  error, nor a line break into a CI runner's log — a tab is kept. A value or key
+  holding a double colon or a legacy `##[` is refused the same way, since the
+  console wraps a long message wherever it likes and a runner reads either as a
+  workflow command (`MalformedProjectConfigException::forWorkflowCommand()`,
+  `::forWorkflowCommandInKey()`); keys are checked before any other guard, since
+  each may quote one back, and a YAML error defuses both markers in the line it
+  quotes. Also, `audit --dry-run` prints a model name's console tags
+  (`<href=…>`, `<fg=…>`) as text instead of rendering them
+  (`AuditPresenter::dryRunResult()`), as the Markdown report now escapes it like
+  the rest of its text (`MarkdownReportRenderer`). The hyphen folding closes a
+  gap that predates this release: `import-sarif:` passed the `scan.import_sarif`
+  guard, and `symfony/config` folded it onto the guarded key afterwards.
+  `audit.budget` may still tighten the user's caps — a repository lowering its
+  own CI spend is legitimate — but a cap raised above the user's, removed, or
+  set to anything but a number is rejected the same way.
+
+- **A project config can no longer read your environment through `%env()%`.** A
+  value in the working directory's `.symfony-security-auditor.yaml` reached the
+  container as written, so `model: '%env(AWS_SECRET_ACCESS_KEY)%'` was resolved
+  from the environment of whoever ran the audit: the repository could send any
+  variable, a CI secret included, to the provider as a model name and have the
+  unpriced-model warning print it. A key did the same where a list setting such
+  as `audit.excluded_types` was handed a map:
+  `'%env(enum:…:SECRET)%': sql_injection` printed the variable in the resulting
+  container error. `ProjectConfigValueGuard`
+  (`src/Audit/Infrastructure/Config/ProjectConfigValueGuard.php`) now refuses a
+  project value or key holding a container reference — `%env(VAR)%`, `%name%`,
+  an escaped `%%`, or the `env_…` placeholder the container writes for an
+  `%env()%` your user config reads — with
+  `MalformedProjectConfigException::forContainerReference()` or
+  `::forContainerReferenceInKey()`, naming the setting without echoing the
+  value; a lone `%` stays text. The user config keeps its placeholders.
+  **Upgrade note:** a project file that wrote a `%name%` or `%env()%` reference
+  must write the value itself or move the setting to your user config, and one
+  that escaped a percent as `%%` must write a single `%`; a value that needs two
+  `%` signs, such as `docs%20v1%20final`, can only be set in your user config,
+  with each `%` doubled.
+
+- **A project config committed as a symlink can no longer print one of your
+  files.** `StandaloneConfigLoader`
+  (`src/Audit/Infrastructure/Config/StandaloneConfigLoader.php`) followed a
+  `.symfony-security-auditor.yaml` symlink, and a YAML error quotes the line it
+  stopped on: a repository linking the file to `/proc/self/environ` or
+  `~/.aws/credentials` had the run print the environment or the key in its
+  error. A project config that is a symlink, dangling or not, is now refused
+  before it is read (`MalformedProjectConfigException::forSymlink()`); replace
+  the link with the file itself.
 
 - **A report, error or progress line printed on a GitHub Actions runner can no
   longer issue workflow commands.** A runner reads a log line that starts with
@@ -861,24 +1140,42 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   annotations are meant for the runner, and a report saved with `--output` are
   written as before.
 
+- **A project config can no longer add request options or path segments to a
+  model name.** symfony/ai reads what follows a `?` in a model name as request
+  options, so a project file's `model: 'claude-opus-4-8?tool_choice[type]=none'`
+  could switch off the tools the attacker records findings with and so return a
+  clean audit with no warning, and `server_tools[…]` or `beta_features[]` could
+  run server tools or send beta headers on your key; the Gemini bridge builds
+  its request path from the model name, so
+  `gemini-2.5-pro:x/../../../v1beta/cachedContents` sent your key to another
+  endpoint. `ProjectConfigValueGuard` now accepts a `model`, `attacker_model`,
+  `reviewer_model` or `audit.escalation.cheap_model` from a project file only as
+  a model id — letters, digits and `. _ : / @ + -`, without `..` or `//`
+  (`MalformedProjectConfigException::forModelName()`). **Upgrade note:** a
+  project file that tuned its model with `?temperature=…` or `?effort=…` must
+  name the model alone; set the options in your user config, which keeps the
+  syntax.
+
 - **A stored credential is written owner-only, and an exposed one is refused
   rather than used.** `FilesystemCredentialStore`
-  (`src/Audit/Infrastructure/Config/FilesystemCredentialStore.php`) creates
-  `credentials.json` empty, tightens it to `0600` and its directory to `0700`,
-  and only then writes the key into it — so the secret never occupies a path the
-  process umask has left group- or world-readable. On a read, a file others can
-  open stops the run:
+  (`src/Audit/Infrastructure/Config/FilesystemCredentialStore.php`) tightens its
+  directory to `0700`, creates `credentials.json` empty and tightens it to
+  `0600`, and only then writes the key into it — a directory whose mode cannot
+  be tightened stops the write before any file is left in it — so the secret
+  never occupies a path the process umask has left group- or world-readable. On
+  a read, a file others can open stops the run:
 
   ```text
-  The stored credentials at "…/credentials.json" are readable by other users on this machine (permissions 0644). Anyone who could read them may already have your API key, so rotate it with your provider, then run "chmod 600 …".
+  The stored credentials at "…/credentials.json" are readable by other users on this machine (permissions 0644). Anyone who could read them may already have your API key, so rotate it with your provider, then run "chmod 600 '…'".
   ```
 
-  Only reading refuses: `auth:set` and `auth:remove` rewrite the file and
-  restore `0600` as they go, so an exposed key is always replaceable or
-  deletable from the tool itself rather than only by hand. Windows has no POSIX
-  permission bits, so the check is skipped there and the file is protected by
-  the user-profile ACL it inherits from `%APPDATA%` — documented as the weaker
-  guarantee it is, rather than claimed as parity.
+  The path in that command is quoted for a POSIX shell, so it pastes as is even
+  when it holds spaces or quotes. Only reading refuses: `auth:set` and
+  `auth:remove` rewrite the file and restore `0600` as they go, so an exposed
+  key is always replaceable or deletable from the tool itself rather than only
+  by hand. Windows has no POSIX permission bits, so the check is skipped there
+  and the file is protected by the user-profile ACL it inherits from `%APPDATA%`
+  — documented as the weaker guarantee it is, rather than claimed as parity.
 
 - **The API key is named in output, never printed.** `CredentialIdentity`
   (`src/Audit/Infrastructure/Config/CredentialIdentity.php`) renders a
@@ -905,10 +1202,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   whitespace, so Docker and Kubernetes secrets, `systemd` `LoadCredential=` and
   a plain `0600` file all work without a shell being involved. An unreadable
   file or a file holding only whitespace stops the run before the provider is
-  contacted (`UnreadableCredentialFileException`), and an unset variable falls
-  through to the ordinary `MissingEnvironmentVariableException`; `doctor`
-  reports it under its `API key` check, and `--dry-run` tolerates all three
-  because it never reaches the provider. See
+  contacted (`UnreadableCredentialFileException`, which names the variable and
+  shows its value only as the masked preview a key gets, so a key put behind
+  `file:` by mistake is never printed), and an unset variable falls through to
+  the ordinary `MissingEnvironmentVariableException`; `doctor` reports it under
+  its `API key` check, and `--dry-run` tolerates all three because it never
+  reaches the provider. See
   [Providing the API key](docs/configuration.md#providing-the-api-key).
 
 ## [1.20.1] — 2026-08-23 — Herald

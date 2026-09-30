@@ -35,15 +35,15 @@ final readonly class AuthRemoveCommand
         private ConfiguredCredentialVariable $configuredCredentialVariable,
     ) {}
 
-    /**
-     * @throws CredentialStoreWriteException
-     * @throws UnreadableCredentialStoreException
-     */
     public function __invoke(
         SymfonyStyle $symfonyStyle,
         #[Option(description: 'Environment variable whose stored key to forget; defaults to the one your configuration reads')]
         ?string $envVar = null,
     ): int {
+        if (ApplicationHomeRefusal::reported($symfonyStyle, $this->configuredCredentialVariable)) {
+            return Command::FAILURE;
+        }
+
         $variableName = $envVar ?? $this->configuredCredentialVariable->name();
         if (null === $variableName) {
             $symfonyStyle->error('No API-key variable is configured yet, so there is nothing to forget. Name one explicitly with --env-var if you stored it under a different name.');
@@ -51,7 +51,19 @@ final readonly class AuthRemoveCommand
             return Command::INVALID;
         }
 
-        if (!$this->credentialStore->remove($variableName)) {
+        if (EnvironmentVariableRefusal::reported($symfonyStyle, $variableName)) {
+            return Command::INVALID;
+        }
+
+        try {
+            $removed = $this->credentialStore->remove($variableName);
+        } catch (CredentialStoreWriteException|UnreadableCredentialStoreException $exception) {
+            $symfonyStyle->error($exception->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        if (!$removed) {
             $symfonyStyle->warning(\sprintf('Nothing was stored for %s, so nothing changed.', $variableName));
 
             return Command::SUCCESS;
