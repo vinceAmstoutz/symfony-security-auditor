@@ -487,9 +487,10 @@ Sorts files by security priority before chunking:
 | 5        | Everything else |
 
 `analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
-`bypassCache`, `previousFindings`, `rejectedFindings`) plus a
-`CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan,
-optional lean-mode filtering, chunking, strategy selection, and the
+`bypassCache`, `previousFindings`, `rejectedFindings`, and the
+`candidateFindings` an escalation deep pass receives from the cheap sweep) plus
+a `CoverageRecorderInterface`. The agent itself is a thin orchestrator —
+pre-scan, optional lean-mode filtering, chunking, strategy selection, and the
 start/complete logging — delegating the per-chunk work to `Chunk\` collaborators
 it builds at construction time: `ChunkContextFactory` assembles each chunk's
 prompts (markers + cross-iteration preambles, code slicing) and derives the
@@ -520,7 +521,17 @@ structured-collection mode those investigation tools ride alongside each chunk's
 `record_vulnerability` registry. JSON output is parsed via
 `LLMResponse::parseJson()` and hydrated via `VulnerabilityFactory::fromList()`.
 LLM or JSON errors are caught and logged; the chunk returns an empty array
-rather than propagating.
+rather than propagating. A chunk the model cannot take in whole — thrown as
+`LLMRequestTooLargeException` by a single call, answered as a
+`request_too_large` response per request by the batch client — goes to
+`OversizedChunkRecovery`, which splits it in two and sends each half back
+through the same per-chunk path (cache lookup included) until every part fits;
+once every file of the chunk has come back `analyzed` or from the cache, the
+merged findings are cached under the whole chunk's own key, so the next run
+serves it from the cache instead of refusing and splitting it again. A single
+file the model cannot fit is recorded as errored and the run goes on, unless the
+file is under a tenth of the refused prompt — then the prompt's fixed part is
+what leaves no room, and the run stops with `LLMFixedPromptTooLargeException`.
 
 Identical chunks (same content hash) are short-circuited by
 `AttackerCacheInterface` (`FilesystemAttackerCache` by default,
@@ -583,7 +594,10 @@ verdict payload to a finding; `BatchVerdictApplier` matches batch verdicts to
 findings by id; `ReviewOutcomeRecorder` turns verdicts, raw responses, and
 failures into the reviewed finding plus its coverage entry;
 `ReviewerVerdictCache` adapts the optional cache port; `CodeContextResolver`
-resolves a finding's source content.
+resolves a finding's source content (dropping the `./` a model may prepend to
+the path); `OversizedReviewBatchRecovery` splits a batch the model cannot take
+in whole. A single review the model refuses as too large records that finding as
+errored and the review goes on — only other provider failures stop it.
 
 ### `VulnerabilityFactory`
 

@@ -19,15 +19,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
 /**
  * Reviews findings one at a time, collecting each verdict through a
  * schema-enforced `record_review` tool call. Cache hits short-circuit the LLM.
+ *
+ * A finding the model cannot review with its whole file in the prompt is
+ * recorded as errored and the review goes on with the next one.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -110,19 +115,17 @@ final readonly class StructuredReviewAnalyzer
         $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
 
         try {
-            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $structuredReviewCollectionSession->toolRegistry, $this->maxToolIterations);
+            $llmResponse = $this->llmClient->completeWithTools($systemPrompt, $userMessage, $structuredReviewCollectionSession->toolRegistry, $this->maxToolIterations);
 
             $verdicts = $structuredReviewCollectionSession->drain();
-            $verdict = array_pop($verdicts);
-            if (!$bypassCache) {
-                $this->reviewerVerdictCache->store($vulnerability, $codeContext, $verdict);
-            }
 
-            return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
+            return $this->recordDrainedVerdict($vulnerability, $llmResponse, array_pop($verdicts), $codeContextForCache, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
             $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'aborted', $coverageRecorder, $codeContextForCache);
 
             throw $budgetExceededException;
+        } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
+            return $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $llmRequestTooLargeException, $coverageRecorder);
         } catch (LLMProviderException $llmProviderException) {
             $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'errored', $coverageRecorder, $codeContextForCache);
 
@@ -131,6 +134,27 @@ final readonly class StructuredReviewAnalyzer
             return $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder, $codeContextForCache)
                 ?? $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $exception, $coverageRecorder);
         }
+    }
+
+    /**
+     * A conversation cut short (tool-loop cap, token limit, content filter,
+     * no content) that recorded no verdict is an error, not a rejection: the
+     * finding is recorded as errored and left out of the cache. A verdict the
+     * model did record before the cut-off is genuine and applied as usual.
+     *
+     * @param array<string, mixed>|null $verdict
+     */
+    private function recordDrainedVerdict(Vulnerability $vulnerability, LLMResponse $llmResponse, ?array $verdict, ?string $codeContextForCache, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        if (null === $verdict && $llmResponse->isDegraded()) {
+            return $this->reviewOutcomeRecorder->recordIncompleteResponse($vulnerability, $llmResponse, $coverageRecorder);
+        }
+
+        if (null !== $codeContextForCache) {
+            $this->reviewerVerdictCache->store($vulnerability, $codeContextForCache, $verdict);
+        }
+
+        return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
     }
 
     private function recordAbortOrRecoveredVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, string $status, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache): void

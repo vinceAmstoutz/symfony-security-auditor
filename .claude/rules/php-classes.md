@@ -14,6 +14,17 @@ are documented **context carriers**:
 - `Command\AuditCommandInput` and `Command\InitCommandInput` — Symfony Console
   MapInput requires public mutable properties with property-level defaults;
   promoted readonly constructor params are invisible to its reflection.
+- Per-run accumulators, late-bound holders and stateful collaborators — a
+  collaborator whose job is to collect state while one audit runs, to receive it
+  after the container is built, or to keep a rate window, a lazily built
+  dependency or a memoized lookup across calls (`VulnerabilityCollector`,
+  `ReviewCollector`, `StatusTrackingCoverageRecorder`, `BudgetTracker`,
+  `TokenUsageRecorder`, `TokenBucketRateLimiter`, `DeferredAdvisoryDatabase`,
+  `ModelsDevPricingProvider`, `ConsoleProgressReporter`,
+  `CompositeReviewerFeedbackProvider`, `PendingBinarySwap`, the `*Holder`
+  delegates).
+- A subclass of a class that is not `readonly` itself: every exception
+  (extending PHP's own), `StandaloneApplication` and the bundle class.
 
 Each opt-out site declares the reason in a leading code comment and cites this
 rule. Anything outside that list must be `final readonly`. If inheritance feels

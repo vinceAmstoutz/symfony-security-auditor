@@ -35,6 +35,29 @@ Application and LLM I/O.
   `NonTransientLLMFailureException` (Infrastructure) extends
   `LLMProviderException` (Domain) so agents can catch the Domain type without
   importing Infrastructure.
+- **A prompt the model cannot fit** — `LLMRequestTooLargeException` (Domain,
+  extends `LLMProviderException`, raised by `RetryingPlatformInvoker` from
+  `TransientFailureClassifier::isRequestTooLarge()` and never retried) — is the
+  one provider failure an agent recovers from per chunk: it does not repeat on
+  every call, so the chunk analyzers hand the chunk to `OversizedChunkRecovery`,
+  which splits it in two, instead of rethrowing. Only a single file the model
+  cannot fit is recorded as errored — and when that file is under a tenth of the
+  refused prompt, the fixed part of the prompt is what leaves no room, so
+  `LLMFixedPromptTooLargeException` stops the run. The batch port cannot throw
+  for one request, so `ToolConversationWavefront` and `BatchWindowResolver`
+  answer a refused request with a `request_too_large` response
+  (`LLMResponse::isRequestTooLarge()`, degraded) instead of retrying or
+  restarting it, and the concurrent analyzer splits on that answer. The reviewer
+  recovers too: a single review records the finding as errored and moves on, and
+  `BatchReviewAnalyzer` hands a refused batch to `OversizedReviewBatchRecovery`,
+  which splits it.
+- **An answer with nothing usable in it is a degraded response, never a
+  failure.** A provider that reports the output-limit cut-off or the content
+  filter as an exception (`symfony/ai`'s `MaxOutputTokensException`,
+  `ContentFilterException`) gets the same `length` / `content-filter` response
+  as one that reports it as a finish reason —
+  `TransientFailureClassifier::degradedStopReason()` names it, on every call
+  path, without a retry. A `MalformedToolCallException` is transient.
 - `VulnerabilityFactory::fromArray()` returns `null` on invalid data —
   `fromList()` silently drops nulls. Do not throw from the factory.
 - **Structured collection seam.** When `audit.structured_collection: true`

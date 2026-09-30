@@ -49,6 +49,9 @@ final class AuditContext implements CoverageRecorderInterface
     /** @var list<string> */
     private array $consumedBaselineFingerprints = [];
 
+    /** @var list<Vulnerability> */
+    private array $baselineSkippedFindings = [];
+
     private DateTimeImmutable $startedAt;
 
     /**
@@ -134,6 +137,22 @@ final class AuditContext implements CoverageRecorderInterface
     public function consumedBaselineFingerprints(): array
     {
         return $this->consumedBaselineFingerprints;
+    }
+
+    /**
+     * Remembers a finding whose baseline credit was spent before review, so
+     * a later iteration that re-reports it is skipped again instead of being
+     * reviewed against an already-exhausted budget.
+     */
+    public function recordBaselineSkippedFinding(Vulnerability $vulnerability): void
+    {
+        $this->baselineSkippedFindings[] = $vulnerability;
+    }
+
+    /** @return list<Vulnerability> */
+    public function baselineSkippedFindings(): array
+    {
+        return $this->baselineSkippedFindings;
     }
 
     public function diffSinceRef(): ?string

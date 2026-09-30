@@ -391,7 +391,7 @@ final readonly class AuditConfigurationDefinition
                                 ->integerNode('input_tokens_per_minute')
                                     ->defaultNull()
                                     ->min(1)
-                                    ->info('Maximum input tokens per minute. `null` (default) disables this dimension. A single request whose estimated input exceeds this cap throws `RateLimitRequestTooLargeException`.')
+                                    ->info('Maximum input tokens per minute. `null` (default) disables this dimension. A chunk whose estimated input exceeds this cap is split in two and each half sent on its own; a single file whose prompt still exceeds the cap is recorded as errored, unless the file is under a tenth of that prompt: its fixed part, the system prompt and the project mapping, is then what leaves no room, and the run stops.')
                                 ->end()
                                 ->integerNode('output_tokens_per_minute')
                                     ->defaultNull()

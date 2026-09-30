@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
@@ -183,7 +184,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     private function dispatchPending(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
     {
         try {
-            $this->toolBatchCapableLLMClient->completeBatchWithTools($concurrentReviewBatch->requests, $this->maxConcurrent, $this->maxToolIterations);
+            $responses = $this->toolBatchCapableLLMClient->completeBatchWithTools($concurrentReviewBatch->requests, $this->maxConcurrent, $this->maxToolIterations);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
@@ -192,26 +193,36 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             return $this->recordPendingErrors($concurrentReviewBatch, $exception, $coverageRecorder, $reviewed);
         }
 
-        foreach ($concurrentReviewBatch->pendingIndexes as $index) {
-            $reviewed[$index] = $this->recordPendingVerdictOrError($index, $concurrentReviewBatch, $coverageRecorder);
+        foreach ($concurrentReviewBatch->pendingIndexes as $position => $index) {
+            $reviewed[$index] = $this->recordPendingVerdictOrError($index, $responses[$position], $concurrentReviewBatch, $coverageRecorder);
         }
 
         return $reviewed;
     }
 
-    private function recordPendingVerdictOrError(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    private function recordPendingVerdictOrError(int $index, LLMResponse $llmResponse, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         try {
-            return $this->recordPendingVerdict($index, $concurrentReviewBatch, $coverageRecorder);
+            return $this->recordPendingVerdict($index, $llmResponse, $concurrentReviewBatch, $coverageRecorder);
         } catch (Throwable $throwable) {
             return $this->recoveredOrErroredVerdict($index, $concurrentReviewBatch, $throwable, $coverageRecorder);
         }
     }
 
-    private function recordPendingVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    /**
+     * A conversation cut short (tool-loop cap, token limit, content filter,
+     * no content) that recorded no verdict is an error, not a rejection: the
+     * finding is recorded as errored and left out of the cache. A verdict the
+     * model did record before the cut-off is genuine and applied as usual.
+     */
+    private function recordPendingVerdict(int $index, LLMResponse $llmResponse, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         $verdicts = $concurrentReviewBatch->sessions[$index]->drain();
         $verdict = array_pop($verdicts);
+        if (null === $verdict && $llmResponse->isDegraded()) {
+            return $this->reviewOutcomeRecorder->recordIncompleteResponse($concurrentReviewBatch->vulnerabilities[$index], $llmResponse, $coverageRecorder);
+        }
+
         if (!$concurrentReviewBatch->bypassCache) {
             $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index], $verdict);
         }
