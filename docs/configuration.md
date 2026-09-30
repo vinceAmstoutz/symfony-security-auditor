@@ -1182,7 +1182,9 @@ stdio, exposing the auditor as MCP **tools** so any MCP client — Claude Code,
 Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can run an
 audit on demand. The server is built on the official
 [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC
-on stdin/stdout, so the command prints nothing else to stdout.
+on stdin/stdout, so the command prints nothing else to stdout: while it runs,
+PHP notices and warnings are displayed on stderr whatever `display_errors` says,
+so a stray one cannot corrupt the protocol stream.
 
 It is available both ways the auditor ships:
 
@@ -1368,16 +1370,23 @@ symfony-security-auditor self-update --check  # only report whether a newer vers
 
 It queries the GitHub releases API for the latest version and, when the running
 binary is older, downloads the asset for your platform (the same OS/arch
-detection `install.sh` uses), **verifies its `.sha256` checksum before replacing
-anything**, and atomically swaps the running executable. Downloads use `curl`,
-so it must be on the host (as it already is for the install script).
+detection `install.sh` uses) next to the running executable, **verifies its
+`.sha256` checksum before replacing anything**, and renames it over the
+executable — an atomic swap — as the command exits, once nothing more is loaded
+from the running binary. The command therefore reports
+`Downloaded and verified <new>; it replaces <old> as this command exits.`; if
+that final swap fails, it prints why on stderr, keeps the previous binary, and
+exits `1`. Downloads use `curl`, so it must be on the host (as it already is for
+the install script).
 
 | Option    | Default | Description                                                                 |
 | --------- | ------- | --------------------------------------------------------------------------- |
 | `--check` | off     | Report whether a newer version is available; make no changes to the binary. |
 
-If the binary is not writable (e.g. installed in `/usr/local/bin` without write
-access), the command refuses to update and tells you to re-run with the
+The swap writes a new file into the directory holding the binary, so that
+directory must be writable — the binary's own permissions do not matter. If it
+is not (e.g. installed in `/usr/local/bin` without write access), the command
+refuses to update before downloading anything and tells you to re-run with the
 necessary permissions (`sudo`) or reinstall with the install script.
 
 ### `doctor` — preflight environment check
@@ -1424,7 +1433,9 @@ The check is designed to stay out of the way:
   machine-readable stdout such as `--format=json` — are never touched.
 - The GitHub release lookup is **throttled to once per 24 hours** (the answer is
   cached under the XDG cache directory), and any failure (offline, rate-limited)
-  is silent — it never changes a command's exit code.
+  is silent — it never changes a command's exit code. When that cache cannot be
+  written (an unwritable or unresolvable cache directory), the lookup is skipped
+  rather than repeated on every command.
 - It exists **only in the standalone binary**; the Composer bundle updates
   through `composer update`.
 

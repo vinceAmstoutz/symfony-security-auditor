@@ -153,6 +153,104 @@ else
   echo "ok - init_can_prompt no-terminal probe skipped (setsid unavailable)"
 fi
 
+install_root=$(mktemp -d)
+trap 'rm -rf "$checksum_dir" "$init_stub_dir" "$install_root"' EXIT
+download_dir="$install_root/download"
+install_target="$install_root/bin"
+mkdir -p "$download_dir"
+
+stage_download() {
+  rm -rf "$install_target"
+  printf 'new-binary' >"$download_dir/asset"
+}
+
+stage_download
+if (install_binary "$download_dir/asset" "$install_target") >/dev/null 2>&1 \
+  && [ "$(cat "$install_target/$BINARY_NAME")" = "new-binary" ] \
+  && ls -l "$install_target/$BINARY_NAME" | grep -q '^-rwxr-xr-x'; then
+  echo "ok - install_binary installs the download as a world-executable binary"
+else
+  echo "NOT OK - install_binary did not install the download as a world-executable binary"
+  failures=$((failures + 1))
+fi
+
+stage_download
+mv_log="$install_root/mv-source-dir"
+mv() {
+  mv_source=""
+  mv_previous=""
+  for mv_argument in "$@"; do
+    mv_source=$mv_previous
+    mv_previous=$mv_argument
+  done
+  dirname -- "$mv_source" >"$mv_log"
+  command mv "$@"
+}
+install_binary "$download_dir/asset" "$install_target" >/dev/null 2>&1
+unset -f mv
+expect_equals "install_binary renames a copy staged inside the install directory, so the swap is atomic" \
+  "$install_target" "$(cat "$mv_log")"
+
+expect_equals "install_binary leaves no staged copy behind" "$BINARY_NAME" "$(ls -A "$install_target")"
+
+stage_download
+mkdir -p "$install_target"
+printf 'old-binary' >"$install_target/$BINARY_NAME"
+cp() {
+  printf 'partial' >"$2"
+  return 1
+}
+if (install_binary "$download_dir/asset" "$install_target") >/dev/null 2>&1; then
+  echo "NOT OK - install_binary reported success although copying the download failed"
+  failures=$((failures + 1))
+else
+  echo "ok - install_binary fails when the download cannot be copied into the install directory"
+fi
+unset -f cp
+expect_equals "a failed install keeps the previous binary untouched and removes the staged copy" \
+  "old-binary $BINARY_NAME" "$(cat "$install_target/$BINARY_NAME") $(ls -A "$install_target")"
+
+stage_download
+printf 'not a directory' >"$install_target"
+expect_failure "install_binary fails when the install directory cannot be created" \
+  install_binary "$download_dir/asset" "$install_target"
+
+release_dir="$install_root/release"
+mkdir -p "$release_dir"
+rm -rf "$install_target"
+printf 'released-binary' >"$release_dir/symfony-security-auditor-linux-x86_64"
+if command -v sha256sum >/dev/null 2>&1; then
+  (cd "$release_dir" && sha256sum symfony-security-auditor-linux-x86_64 >symfony-security-auditor-linux-x86_64.sha256)
+else
+  (cd "$release_dir" && shasum -a 256 symfony-security-auditor-linux-x86_64 >symfony-security-auditor-linux-x86_64.sha256)
+fi
+download() {
+  command cp "$release_dir/${1##*/}" "$2"
+}
+FAKE_OS=Linux FAKE_ARCH=x86_64
+if (SSA_INSTALL_DIR="$install_target" main) >/dev/null 2>&1; then
+  expect_equals "main installs the verified release binary and leaves nothing else in the install directory" \
+    "released-binary $BINARY_NAME" "$(cat "$install_target/$BINARY_NAME") $(ls -A "$install_target")"
+else
+  echo "NOT OK - main failed to install a verified release binary"
+  failures=$((failures + 1))
+fi
+
+for signal in HUP INT TERM; do
+  interrupted_root=$(mktemp -d)
+  # shellcheck disable=SC2016
+  sh -c '
+    SSA_INSTALL_SOURCED=1
+    . "$1/install.sh"
+    interrupting_signal=$3
+    download() { kill -"$interrupting_signal" "$$"; }
+    TMPDIR=$2 main
+  ' sh "$script_dir" "$interrupted_root" "$signal" >/dev/null 2>&1 || true
+  expect_equals "main removes its download directory when it receives SIG$signal mid-download" \
+    "" "$(ls -A "$interrupted_root")"
+  rm -rf "$interrupted_root"
+done
+
 if [ "$failures" -eq 0 ]; then
   echo "All install.sh tests passed."
   exit 0

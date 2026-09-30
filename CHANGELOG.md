@@ -244,6 +244,80 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`self-update` refuses a binary whose directory it cannot write to, before
+  downloading anything, instead of failing mid-update with a raw filesystem
+  error.** `SelfUpdater::replaceBinary()`
+  (`src/Audit/Infrastructure/SelfUpdate/SelfUpdater.php`) only checked
+  `is_writable()` on the binary itself, but the update stages the download next
+  to the binary and renames it over it, which needs the _directory_ to be
+  writable: a writable binary in a root-owned directory passed the check, then
+  the staging step threw an uncaught `IOException` ("A temporary file could not
+  be created: fopen(…): Failed to open stream: Permission denied"). Staging the
+  download is now the check, and its failure reports "The directory "<dir>"
+  holding the binary is not writable (<reason>), so the binary cannot be
+  replaced; re-run the update with the necessary permissions (e.g. sudo) or
+  reinstall with the install script." The binary's own permissions no longer
+  matter, so a read-only binary in a writable directory now updates instead of
+  being refused.
+
+- **`self-update` no longer claims "Updated from X to Y." before the binary is
+  swapped, and a swap that fails now exits `1` with a readable error instead of
+  a PHP fatal error.** The new binary is renamed over the running one only as
+  the process exits (the PHAR keeps loading classes from its own path), but
+  `SelfUpdateCommand` (`src/Command/SelfUpdateCommand.php`) printed its success
+  line first, and a failing rename then escaped the shutdown function as
+  `PHP Fatal error: Uncaught …SelfUpdateFailedException` with exit code 255. The
+  command now prints
+  `Downloaded and verified <new>; it replaces <old> as this command exits.`, and
+  the entry point commits the swap through `PendingBinarySwapCommitter`
+  (`src/Standalone/PendingBinarySwapCommitter.php`), which reports
+  `Failed to replace the binary at "<path>": <reason>` and "The update was not
+  applied: the previous version is still installed. Run "self-update" again once
+  the cause is fixed." on stderr and exits `1`. When the downloaded file cannot
+  be removed either, the same error names it — "The downloaded update at
+  "<path>" could not be removed either (<reason>); delete it by hand." — instead
+  of that second failure escaping as a fatal error. A download rejected earlier
+  — a checksum mismatch, a failed transfer — likewise keeps its own error when
+  it cannot be deleted, rather than surfacing as the removal failure.
+
+- **`install.sh` now replaces an existing binary atomically.** It downloaded
+  into a `mktemp -d` directory and `mv`'d the file into the install directory;
+  when the two sit on different filesystems (a tmpfs `/tmp`, a separate
+  `/usr/local`), `mv` falls back to deleting the destination and copying — the
+  binary is missing, then half-written, and left truncated if the copy is
+  interrupted. The new `install_binary()` (`install.sh`) copies the verified
+  download to a temporary file inside the install directory, makes it `0755`,
+  and renames it over the binary; a failed copy leaves the previous binary
+  untouched ("could not install symfony-security-auditor into <dir>; any
+  previous binary there is unchanged") and the exit trap removes any staged copy
+  — also when the install is interrupted by Ctrl-C, a closed terminal or `kill`,
+  which under `dash` (`/bin/sh` on Debian and Ubuntu) ended the script without
+  running that trap.
+
+- **`install.ps1` downloads at full speed on Windows PowerShell 5.1.**
+  `Invoke-WebRequest` redraws its progress bar for every received chunk there,
+  throttling the binary download many times over; `Get-Asset` (`install.ps1`)
+  now sets `$ProgressPreference = 'SilentlyContinue'` in its own scope.
+
+- **The standalone update check no longer contacts GitHub on every command when
+  its cache directory cannot be written.** `ThrottledUpdateAvailabilityNotifier`
+  (`src/Audit/Infrastructure/SelfUpdate/ThrottledUpdateAvailabilityNotifier.php`)
+  throttles the release lookup to once a day through a timestamp in the XDG
+  cache directory, but `FilesystemUpdateCheckStore::write()` silently dropped a
+  failed write, so with an unwritable or unresolvable cache directory the
+  throttle was never recorded and every command made a lookup.
+  `UpdateCheckStoreInterface::write()` now reports whether the state was
+  persisted, and the notifier records the throttle window before looking up:
+  when it cannot, the lookup is skipped and the last known answer is kept.
+
+- **`mcp:serve` keeps PHP notices and warnings out of the JSON-RPC stream.**
+  STDOUT is the MCP protocol channel, and the CLI SAPI displays PHP errors there
+  by default, so a single notice corrupted the stream the client parses.
+  `McpServeCommand::__invoke()` (`src/Command/Mcp/McpServeCommand.php`), shared
+  by the bundle and the standalone binary, now sends PHP's error display to
+  STDERR while the server runs and restores the previous `display_errors` value
+  when it stops.
+
 - **Cost is priced at the rate of the platform that serves the model.**
   `ModelsDevPricingProvider` looked a model up by its id alone: a bare id was
   priced only from first-party providers, and a qualified one from whichever
