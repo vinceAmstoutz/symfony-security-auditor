@@ -331,8 +331,8 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'ollama/llama3.2', 'end_turn', TokenUsageSnapshot::of(500_000, 100_000)));
 
         self::assertSame([
-            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_000_000, 'output_tokens' => 200_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 6.0],
-            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 500_000, 'output_tokens' => 100_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.0],
+            'claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_000_000, 'output_tokens' => 200_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 6.0, 'billed_models' => ['claude-opus-5']],
+            'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 500_000, 'output_tokens' => 100_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.0, 'billed_models' => ['ollama/llama3.2']],
         ], $budgetTracker->usageByModel());
     }
 
@@ -369,7 +369,7 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-5', 'end_turn', TokenUsageSnapshot::of(400_000, 50_000)));
 
         self::assertSame(
-            ['model' => 'claude-opus-5', 'input_tokens' => 1_400_000, 'output_tokens' => 250_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 7.95],
+            ['model' => 'claude-opus-5', 'input_tokens' => 1_400_000, 'output_tokens' => 250_000, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 7.95, 'billed_models' => ['claude-opus-5']],
             $budgetTracker->usageByModel()['claude-opus-5'],
         );
     }
@@ -386,6 +386,20 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->reset();
 
         self::assertSame([], $budgetTracker->usageByModel());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_names_every_model_the_calls_of_a_configured_model_were_billed_as(): void
+    {
+        $budgetTracker = $this->splitModelBudgetTracker();
+
+        foreach (['claude-opus-5', 'unpriced-release', 'claude-opus-5', null] as $reportedModel) {
+            $budgetTracker->recordCall(LLMResponse::of('x', 'ollama/llama3.2', 'end_turn', TokenUsageSnapshot::of(1_000, 0))->withReportedModel($reportedModel));
+        }
+
+        self::assertSame(['claude-opus-5', 'ollama/llama3.2'], $budgetTracker->usageByModel()['ollama/llama3.2']['billed_models']);
     }
 
     /** A tracker whose pricing provider knows `claude-opus-5` and prices everything else at zero, as an unlisted or self-hosted model does. */

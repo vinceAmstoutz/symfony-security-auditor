@@ -224,7 +224,12 @@ with no listing of its own (`generic`, `ollama`, `lmstudio`, …), falls back to
 the first-party providers, and then to the catalog at large for a
 provider-qualified id. When the provider reports which model actually answered —
 a gateway routing on its own, a failover platform, an alias resolved to a dated
-release — the call is billed as that model whenever the catalog lists it.
+release — the call is billed as that model whenever the serving platform's own
+listing prices it, and as the configured model otherwise, so another provider
+re-listing the reported id at its own price never sets the bill. On a platform
+with no listing of its own, the reported model is billed as itself whenever the
+catalog lists it at all. The JSON report names the models each configured model
+was billed as under `cost.by_model.<model>.billed_models`.
 
 When the provider reports cache usage, the auditor prices it into the cost it
 tracks and reports using the model's real per-provider cache rates from the

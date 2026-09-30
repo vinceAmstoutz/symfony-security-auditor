@@ -27,7 +27,7 @@ final class PricingPlatformPassTest extends TestCase
         $containerBuilder = new ContainerBuilder();
         $containerBuilder->setAlias(PlatformInterface::class, $platformServiceId);
 
-        (new PricingPlatformPass())->process($containerBuilder);
+        (new PricingPlatformPass(PlatformInterface::class))->process($containerBuilder);
 
         self::assertSame($expectedPlatform, $containerBuilder->getParameter(PricingPlatformPass::PARAMETER));
     }
@@ -44,7 +44,7 @@ final class PricingPlatformPassTest extends TestCase
         $containerBuilder = new ContainerBuilder();
         $containerBuilder->setAlias(PlatformInterface::class, 'app.platform');
 
-        (new PricingPlatformPass())->process($containerBuilder);
+        (new PricingPlatformPass(PlatformInterface::class))->process($containerBuilder);
 
         self::assertNull($containerBuilder->getParameter(PricingPlatformPass::PARAMETER));
     }
@@ -54,7 +54,7 @@ final class PricingPlatformPassTest extends TestCase
         $containerBuilder = new ContainerBuilder();
         $containerBuilder->register(PlatformInterface::class);
 
-        (new PricingPlatformPass())->process($containerBuilder);
+        (new PricingPlatformPass(PlatformInterface::class))->process($containerBuilder);
 
         self::assertTrue($containerBuilder->hasParameter(PricingPlatformPass::PARAMETER));
         self::assertNull($containerBuilder->getParameter(PricingPlatformPass::PARAMETER));

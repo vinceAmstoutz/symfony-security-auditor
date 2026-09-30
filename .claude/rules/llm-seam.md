@@ -17,6 +17,7 @@ Application and LLM I/O.
   `SymfonyAiLLMClient` implements the Domain ports and builds the
   platform-facing collaborators (`RetryingPlatformInvoker`,
   `SequentialToolLoop`, `BatchWindowResolver`, `ToolConversationWavefront`,
+  `InFlightRequestCanceller`, `DegradedAnswerBooker`, `DispatchedRequest`,
   `PlatformResultExtractor`, `PlatformOptionsFactory`, `PlatformToolsMapper`)
   that share the imports. Nothing outside that namespace touches `symfony/ai`.
 - Swapping providers (Anthropic → OpenAI → Ollama) must require **zero code

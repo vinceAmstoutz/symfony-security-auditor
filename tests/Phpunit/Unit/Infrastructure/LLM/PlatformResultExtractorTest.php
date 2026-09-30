@@ -99,7 +99,7 @@ final class PlatformResultExtractorTest extends TestCase
         yield 'no token usage at all' => [null, null];
     }
 
-    public function test_it_extracts_the_raw_provider_stop_reason(): void
+    public function test_it_keeps_the_provider_word_for_a_stop_reason_that_is_not_degraded(): void
     {
         $platformResultExtractor = new PlatformResultExtractor(null);
 
@@ -133,7 +133,7 @@ final class PlatformResultExtractorTest extends TestCase
             $this->deferredResultWithFinishReason(new FinishReason(FinishReasonCase::LENGTH, 'max_tokens')),
         );
 
-        self::assertSame('max_tokens', $stopReason);
+        self::assertSame('length', $stopReason);
     }
 
     public function test_it_warns_when_the_response_was_suppressed_by_the_content_filter(): void
@@ -152,7 +152,7 @@ final class PlatformResultExtractorTest extends TestCase
             $this->deferredResultWithFinishReason(new FinishReason(FinishReasonCase::CONTENT_FILTER, 'content_filtered')),
         );
 
-        self::assertSame('content_filtered', $stopReason);
+        self::assertSame('content-filter', $stopReason);
     }
 
     public function test_it_does_not_warn_on_a_normal_stop(): void

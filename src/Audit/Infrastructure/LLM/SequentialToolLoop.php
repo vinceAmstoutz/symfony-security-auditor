@@ -19,11 +19,13 @@ use Symfony\AI\Platform\Message\Content\Text;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
+use Symfony\AI\Platform\Result\DeferredResult;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
@@ -54,12 +56,14 @@ final readonly class SequentialToolLoop
         private PlatformOptionsFactory $platformOptionsFactory,
         private PromptTokenEstimator $promptTokenEstimator,
         private EmptyLLMResponseFactory $emptyLLMResponseFactory,
+        private DegradedAnswerBooker $degradedAnswerBooker,
     ) {}
 
     /**
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
+     * @throws LLMRequestTooLargeException
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
@@ -85,10 +89,10 @@ final readonly class SequentialToolLoop
         $totalCacheReadTokens = 0;
         $totalCacheCreationTokens = 0;
         while ($iteration < $maxToolIterations) {
-            try {
-                $deferredResult = $this->retryingPlatformInvoker->invoke($messageBag, $options, $estimatedInputTokens);
-            } catch (EmptyLLMResponseException $emptyllmResponseException) {
-                return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens));
+            $this->budgetTracker?->assertWithinBudget();
+            $deferredResult = $this->invokeOrEndConversation($messageBag, $options, $estimatedInputTokens, $iteration, TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens));
+            if ($deferredResult instanceof LLMResponse) {
+                return $deferredResult;
             }
 
             $platformResult = $deferredResult->getResult();
@@ -166,6 +170,38 @@ final readonly class SequentialToolLoop
         );
     }
 
+    /**
+     * Returns the platform's deferred answer, or the response that ends the
+     * conversation instead: the model answered with no content, or the
+     * conversation outgrew the model after tool results were appended.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws LLMRequestTooLargeException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     */
+    private function invokeOrEndConversation(MessageBag $messageBag, array $options, int $estimatedInputTokens, int $iteration, TokenUsageSnapshot $tokenUsageSnapshot): DeferredResult|LLMResponse
+    {
+        try {
+            return $this->retryingPlatformInvoker->invoke($messageBag, $options, $estimatedInputTokens);
+        } catch (EmptyLLMResponseException $emptyllmResponseException) {
+            $this->degradedAnswerBooker->book($estimatedInputTokens, $emptyllmResponseException->stopReason);
+
+            return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, $tokenUsageSnapshot);
+        } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
+            if (0 === $iteration) {
+                throw $llmRequestTooLargeException;
+            }
+
+            return $this->outgrownConversationResponseAndLog($llmRequestTooLargeException, $iteration, $tokenUsageSnapshot);
+        }
+    }
+
     private function emptyToolLoopResponseAndLog(
         EmptyLLMResponseException $emptyllmResponseException,
         int $iteration,
@@ -173,12 +209,33 @@ final readonly class SequentialToolLoop
     ): LLMResponse {
         $context = [
             'iterations' => $iteration,
+            'stop_reason' => $emptyllmResponseException->stopReason,
             'input_tokens' => $tokenUsageSnapshot->inputTokens(),
             'output_tokens' => $tokenUsageSnapshot->outputTokens(),
             'error' => $emptyllmResponseException->getMessage(),
         ];
 
         $this->logEmptyContentResponse($iteration, $context);
+
+        return $this->emptyLLMResponseFactory->create($this->model, $tokenUsageSnapshot, $emptyllmResponseException->stopReason);
+    }
+
+    /**
+     * The initial prompt fit, so it is the tool results appended since that
+     * outgrew the model — splitting the chunk would not change what the model
+     * asks to read. The conversation ends here with what it recorded.
+     */
+    private function outgrownConversationResponseAndLog(
+        LLMRequestTooLargeException $llmRequestTooLargeException,
+        int $iteration,
+        TokenUsageSnapshot $tokenUsageSnapshot,
+    ): LLMResponse {
+        $this->logger->warning('Tool-using conversation outgrew the model input limit after tool results were appended; it ends as an empty response and keeps the tool results already recorded', [
+            'iterations' => $iteration,
+            'input_tokens' => $tokenUsageSnapshot->inputTokens(),
+            'output_tokens' => $tokenUsageSnapshot->outputTokens(),
+            'error' => $llmRequestTooLargeException->getMessage(),
+        ]);
 
         return $this->emptyLLMResponseFactory->create($this->model, $tokenUsageSnapshot);
     }

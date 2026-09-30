@@ -91,7 +91,7 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
         $containerBuilder->getDefinition(McpServeCommand::class)->setPublic(true);
-        $containerBuilder->addCompilerPass(new PricingPlatformPass());
+        $containerBuilder->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
         $containerBuilder->compile(true);
 
         return $containerBuilder;

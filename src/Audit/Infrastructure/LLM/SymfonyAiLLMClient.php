@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -63,6 +64,8 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
     private RetryingPlatformInvoker $retryingPlatformInvoker;
 
     private EmptyLLMResponseFactory $emptyLLMResponseFactory;
+
+    private DegradedAnswerBooker $degradedAnswerBooker;
 
     private SequentialToolLoop $sequentialToolLoop;
 
@@ -105,6 +108,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformResilienceConfig->retryAfterHeaderParser,
         );
         $this->emptyLLMResponseFactory = new EmptyLLMResponseFactory();
+        $this->degradedAnswerBooker = new DegradedAnswerBooker($platformBinding->model, $platformAccountingConfig->budgetTracker, $platformBinding->logger, $platformAccountingConfig->tokenUsageRecorder);
 
         $this->sequentialToolLoop = new SequentialToolLoop(
             $platformBinding->model,
@@ -116,7 +120,10 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformOptionsFactory,
             $this->promptTokenEstimator,
             $this->emptyLLMResponseFactory,
+            $this->degradedAnswerBooker,
         );
+
+        $inFlightRequestCanceller = new InFlightRequestCanceller($platformBinding->model, $this->rateLimiter, $platformAccountingConfig->budgetTracker, $platformBinding->logger, $platformAccountingConfig->tokenUsageRecorder);
 
         $this->batchWindowResolver = new BatchWindowResolver(
             $platformBinding->platform,
@@ -128,6 +135,9 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $this->promptTokenEstimator,
             $this,
             $platformBinding->logger,
+            $platformResilienceConfig->transientFailureClassifier,
+            $inFlightRequestCanceller,
+            $this->degradedAnswerBooker,
         );
 
         $this->toolConversationWavefront = new ToolConversationWavefront(
@@ -141,6 +151,9 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $this->promptTokenEstimator,
             $this,
             $this->retryingPlatformInvoker,
+            $platformResilienceConfig->transientFailureClassifier,
+            $inFlightRequestCanceller,
+            $this->degradedAnswerBooker,
         );
     }
 
@@ -148,6 +161,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
+     * @throws LLMRequestTooLargeException
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
@@ -171,9 +185,12 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
         $estimatedInputTokens = $this->promptTokenEstimator->estimate($systemPrompt, $userMessage);
+        $this->budgetTracker?->assertWithinBudget();
         try {
             $deferredResult = $this->retryingPlatformInvoker->invoke($messageBag, $this->platformOptionsFactory->baseOptions(), $estimatedInputTokens);
         } catch (EmptyLLMResponseException $emptyllmResponseException) {
+            $this->degradedAnswerBooker->book($estimatedInputTokens, $emptyllmResponseException->stopReason);
+
             return $this->emptyResponseAndLog($emptyllmResponseException);
         }
 
@@ -209,6 +226,11 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
      */
     #[Override]
     public function completeBatch(array $requests, int $maxConcurrent): array
@@ -228,10 +250,17 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
     }
 
     /**
+     * A conversation that fails before any tool ran is restarted through
+     * `completeWithTools()`, reached as the `LLMClientInterface` port, whose
+     * failures PHPStan cannot see; the three it lets through are listed last.
+     *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
      */
     #[Override]
     public function completeBatchWithTools(array $requests, int $maxConcurrent, int $maxToolIterations): array
@@ -254,6 +283,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
+     * @throws LLMRequestTooLargeException
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
@@ -281,9 +311,10 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
     private function emptyResponseAndLog(EmptyLLMResponseException $emptyllmResponseException): LLMResponse
     {
         $this->logger->warning('LLM returned a response with no content blocks', [
+            'stop_reason' => $emptyllmResponseException->stopReason,
             'error' => $emptyllmResponseException->getMessage(),
         ]);
 
-        return $this->emptyLLMResponseFactory->create($this->model, TokenUsageSnapshot::of(0, 0));
+        return $this->emptyLLMResponseFactory->create($this->model, TokenUsageSnapshot::of(0, 0), $emptyllmResponseException->stopReason);
     }
 }

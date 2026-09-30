@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ServingPlatformPricingProviderInterface;
 
 final class CostCalculatorTest extends TestCase
 {
@@ -143,6 +144,52 @@ final class CostCalculatorTest extends TestCase
         yield 'a listed reported model' => ['listed-model', 'listed-model'];
         yield 'an unlisted reported model' => ['gateway-internal-id', 'configured-model'];
         yield 'no reported model' => [null, 'configured-model'];
+    }
+
+    #[DataProvider('servingPlatformBilledModelCases')]
+    public function test_it_bills_the_reported_model_only_when_the_serving_platform_prices_it(string $reportedModel, string $expectedBilledModel): void
+    {
+        $costCalculator = new CostCalculator($this->pricingServing('served-model'));
+
+        self::assertSame($expectedBilledModel, $costCalculator->billedModel('configured-model', $reportedModel));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function servingPlatformBilledModelCases(): iterable
+    {
+        yield 'a reported model the serving platform prices' => ['served-model', 'served-model'];
+        yield 'a reported model only another provider prices' => ['relisted-model', 'configured-model'];
+    }
+
+    private function pricingServing(string $servedModel): ServingPlatformPricingProviderInterface
+    {
+        return new class($servedModel) implements ServingPlatformPricingProviderInterface {
+            public function __construct(private readonly string $servedModel) {}
+
+            #[Override]
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return 1.0;
+            }
+
+            #[Override]
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return 1.0;
+            }
+
+            #[Override]
+            public function hasModel(string $model): bool
+            {
+                return true;
+            }
+
+            #[Override]
+            public function hasServingPlatformPrice(string $model): bool
+            {
+                return $this->servedModel === $model;
+            }
+        };
     }
 
     private function pricingKnowing(string $knownModel): PricingProviderInterface

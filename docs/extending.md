@@ -62,8 +62,9 @@ LLMResponse::of(
 > factory is **deprecated since 1.13** and removed in the next `MAJOR`; use
 > `of()` in new code.
 
-Key read methods: `content()`, `parseJson(): array` (strips markdown fences then
-JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
+Key read methods: `content()`, `parseJson(): array` (strips a markdown fence
+wrapping the whole answer, then JSON-decodes), `isEmpty(): bool`,
+`totalTokens(): int`.
 
 ### Implementation
 
@@ -383,8 +384,11 @@ in `config/services.yaml` to override the bundled behaviour (see
   (default: `ModelsDevPricingProvider` reading the `symfony/models-dev`
   catalog). Also implement `CacheAwarePricingProviderInterface` if your source
   knows cache-read/cache-write rates — the cost report then prices cached tokens
-  at their discounted rate. Implement for private model deployments or
-  negotiated pricing.
+  at their discounted rate, and `ServingPlatformPricingProviderInterface` if it
+  knows which rates belong to the platform serving the audit — a model the
+  provider reports answering a call is then billed as that model only when that
+  platform prices it. Implement for private model deployments or negotiated
+  pricing.
 - `RateLimiterInterface` — `acquire()` / `record()` / `pauseUntil()` around
   every LLM call (default: `NullRateLimiter`, or `TokenBucketRateLimiter` when
   any `audit.rate_limit.*` key is set). Implement it to coordinate quota

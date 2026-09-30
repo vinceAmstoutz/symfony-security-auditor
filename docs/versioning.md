@@ -227,7 +227,11 @@ deprecated by the other.
   (its `A`-`F` letter, since 1.19) beside the unchanged `risk_score` and
   `risk_level` — both additive. Since 1.21 it also carries `complete`, `false`
   whenever some file was never analyzed (an LLM call failed or the run was
-  aborted; the `coverage` array holds the detail) — additive as well.
+  aborted; the `coverage` array holds the detail) — additive as well. Each
+  `cost.by_model` entry, still keyed by the configured model, also carries
+  `billed_models` since 1.21: the models its calls were billed as, which differ
+  from the configured one when the provider reports another model answering —
+  another additive key.
 - The **SARIF 2.1.0 output** produced by `--format=sarif`. The
   `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
   The `version` is sourced dynamically from installed Composer metadata, so it
@@ -271,6 +275,12 @@ overriding the alias in `config/services.yaml` is a supported integration path:
   `PricingProviderInterface` for providers that expose real per-model
   prompt-cache rates. `CostCalculator` checks `instanceof` and falls back to the
   base input rate, so it never breaks an existing pricing provider.
+- `ServingPlatformPricingProviderInterface` — opt-in extension of
+  `PricingProviderInterface` (since 1.21) for providers that know the platform
+  the audit runs against. `CostCalculator` bills the model a provider reports
+  answering a call as that model only when `hasServingPlatformPrice()` is
+  `true`; without the interface it falls back to `hasModel()`, so it never
+  breaks an existing pricing provider.
 - `TokenEstimatorInterface`
 - `AttackerSkillPromptRendererInterface` — host applications may implement this
   and alias it to control how the attacker's skill-block text is rendered for a

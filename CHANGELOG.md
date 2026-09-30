@@ -20,11 +20,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `PlatformResultExtractor::extractReportedModel()` reads it, every per-call
   `LLMResponse` carries it through the new `LLMResponse::withReportedModel()` /
   `LLMResponse::reportedModel()`, and `BudgetTracker` prices the call through
-  `CostCalculator::billedModel()`, which takes the reported model whenever the
-  pricing source lists it and keeps the configured one otherwise, so a gateway
-  answering under an id no catalog knows never drops the cost to `$0`. The
-  budget guard and `estimated_cost_usd` follow; `usage_by_model` stays keyed by
-  the configured model, so the report schema does not change.
+  `CostCalculator::billedModel()`, which takes the reported model when the
+  serving platform's own listing prices it — any listing when that platform has
+  none, through the new opt-in `ServingPlatformPricingProviderInterface` port
+  that `ModelsDevPricingProvider` implements — and keeps the configured one
+  otherwise, so another provider's rate for the same id never sets the bill and
+  a gateway answering under an id no catalog knows never drops the cost to `$0`.
+  The budget guard and `estimated_cost_usd` follow; `by_model` stays keyed by
+  the configured model and names the models its calls were billed as under the
+  additive `billed_models` key.
 
 - **`init` configures AWS Bedrock.** `init --provider=bedrock.<instance>` used
   to install the bridge and print a block to finish by hand, because Bedrock's
@@ -178,6 +182,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   still accepted, because `StandalonePlatformConfigResolver` resolves it before
   the container is built. Listed in `docs/versioning.md` as part of the `init`
   surface.
+
 - **`symfony/ai-generic-platform`, `symfony/ai-albert-platform` and
   `symfony/ai-amazee-ai-platform` in the README platform table and in
   `composer.json` `suggest`**, plus a new
@@ -188,6 +193,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   nothing.
 
 ### Changed
+
+- **A model's price is resolved once per run.** `ModelsDevPricingProvider`
+  recomputed the catalog lookup — for a provider-qualified id without a
+  serving-platform listing, a sort of every provider key — on every input,
+  output, cache and `hasModel()` query of every call. Lookups are now memoized
+  per model id (5,000 calls: 1,058 ms → 10 ms).
+
+- **A concurrent tool-using window stops as soon as every conversation has its
+  answer.** `ToolConversationWavefront`
+  (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) kept running
+  empty rounds up to `max_tool_iterations` after every conversation had
+  answered; it now ends the window there.
 
 - **Runs on `symfony/ai` 0.14.** `symfony/ai-bundle` moves from `^0.13` to
   `^0.14`, which brings the Fireworks, Together, Venice, Eden AI, TypeSafe and
@@ -243,6 +260,89 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `generic` platform this release adds.
 
 ### Fixed
+
+- **An answer cut off by the output limit or withheld by a content filter is
+  handled the same whether the provider reports it as a stop reason or as an
+  error.** Bridges that throw `symfony/ai`'s `MaxOutputTokensException` or
+  `ContentFilterException` instead of returning a finish reason had their call
+  classified non-transient, which aborted the audit. `RetryingPlatformInvoker`,
+  `ToolConversationWavefront` and `BatchWindowResolver` now answer it with the
+  degraded `length` or `content-filter` response
+  (`TransientFailureClassifier::degradedStopReason()`), without retrying the
+  same prompt, so the file or finding is recorded as errored and the run goes
+  on; the `LLM returned a response with no content blocks` and
+  `Tool-using loop ended with empty content response` log entries now carry a
+  `stop_reason`. Because the run now goes on past such an answer, the new
+  `DegradedAnswerBooker` books it — and an empty answer delivered as an error —
+  at its estimated input tokens against `audit.budget`, the report's token
+  totals and the rate-limit window, since the provider took in and bills the
+  request; before, no spend was recorded for it. A `MalformedToolCallException`
+  — tool-call arguments that are not valid JSON — is a sampling glitch and is
+  retried.
+
+- **The concurrent reviewer's batch window no longer aborts on one oversized
+  request, and it winds down the requests still in flight when it fails.**
+  `BatchWindowResolver` (`src/Audit/Infrastructure/LLM/BatchWindowResolver.php`)
+  let a request larger than the rate-limit window throw out of the whole window,
+  re-sent a request the model refused as too large through `complete()`, whose
+  second refusal then aborted the review, and left the window's other requests
+  open when a fallback call failed — each of them then ran to completion in its
+  destructor and was never billed. It now answers such a request
+  `request_too_large` on its own (the reviewer records that finding as errored),
+  and a failure that ends the window cancels the requests still in flight and
+  books their estimated input tokens against the budget, the rate limiter and
+  the report's token totals, through the `InFlightRequestCanceller` it now
+  shares with the tool-using window. Both windows also release the rate-limit
+  reservation of a request whose dispatch had failed and that the failure left
+  unconsumed, which otherwise stayed counted against the window.
+
+- **A finding that quotes a Markdown code block keeps its backticks.**
+  `LLMResponse::parseJson()` (`src/Audit/Domain/Port/LLMResponse.php`) removed
+  every ` ```json ` and ` ``` ` anywhere in the answer, so a `vulnerable_code`
+  such as ` ```php … ``` ` reached the report as `php …`. Only a fence wrapping
+  the whole answer is stripped now; a fenced block inside prose is still
+  recovered.
+
+- **A genuine rate limit is retried even when its body quotes a request id or
+  token count that looks like a `4xx`.**
+  `TransientFailureClassifier::isTransient()` tested the non-transient status
+  codes (`400`, `401`, `403`, `404`, `422`) against the whole message before
+  recognizing a rate limit, so OpenAI's 429 body ("…Requested 404. Please try
+  again in 1s.") was classified fatal and aborted the run. A recognized rate
+  limit (a typed `RateLimitExceededException`, or a 429/"rate limit" message) is
+  now treated as transient first.
+
+- **An LLM answer cut short is never cached or reported as a verdict.** A
+  response stopped by the output token limit, a content filter, the tool-loop
+  cap or a call that produced no content was treated like a complete one: the
+  attacker recorded the chunk as `analyzed` and cached an empty result — a "no
+  findings" entry every later run replayed as safe — and the reviewer counted a
+  missing verdict as `rejected`, a truncated batch answer rejecting (and caching
+  the rejection of) every member it never reached. `LLMResponse::isDegraded()`
+  names these stop reasons (`PlatformResultExtractor` normalizes the provider's
+  truncation and content-filter words to `length` / `content-filter`),
+  `SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` keep what such an
+  answer still carries (the recorded `record_vulnerability` calls, or the first
+  complete object of a truncated JSON array) but record the chunk as `errored`
+  and skip the cache, `ReviewOutcomeRecorder::recordIncompleteResponse()` marks
+  the finding `errored` instead of rejected, the structured reviewers do the
+  same when no `record_review` call landed, and `BatchReviewAnalyzer` applies
+  the verdicts a cut-short batch did reach and marks the rest `errored`. The
+  report then names the files that could not be fully analyzed, and the next run
+  retries them.
+
+- **The budget is checked before a call is dispatched, and a whole batch window
+  is accounted for before the abort.** `SymfonyAiLLMClient`,
+  `SequentialToolLoop`, `BatchWindowResolver` and `ToolConversationWavefront`
+  asserted the budget only after each response: a run already over budget still
+  dispatched the next call — or a whole window of `attacker_max_concurrent` /
+  `reviewer_max_concurrent` calls, and the recovery review after an abort
+  dispatched yet another — and when the first response of a window blew the
+  budget, its in-flight siblings were billed by the provider but never recorded,
+  so the report and `estimated_cost_usd` undercounted the spend. Every call site
+  asserts the budget before dispatching, and a window records every dispatched
+  response before its budget verdict, so `BudgetExceededException` names the
+  whole window's spend.
 
 - **Cost is priced at the rate of the platform that serves the model.**
   `ModelsDevPricingProvider` looked a model up by its id alone: a bare id was
@@ -514,6 +614,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `symfony/ai-bundle`'s own `composer.json` and compares them with the ones
   `init` would request, so the next renamed bridge fails the build rather than a
   user's `composer require`.
+
+- **A provider that cannot be reached is retried instead of ending the audit.**
+  `TransientFailureClassifier` recognised `Connection refused` but not cURL's
+  `Failed to connect to api.anthropic.com port 443` (error 7),
+  `Could not resolve host` (error 6) or PHP's
+  `Temporary failure in name resolution`, so a TCP-level refusal or a DNS hiccup
+  on one call aborted the run as a non-transient failure. The three phrases are
+  transient hints now: the call backs off and retries per `audit.retry`, and
+  only exhausted attempts abort.
 
 ### Security
 

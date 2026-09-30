@@ -213,6 +213,22 @@ final class AuditCostTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_to_array_names_the_models_each_configured_model_was_billed_as(): void
+    {
+        $auditCost = AuditCost::of(3_000, 0, 0.0, 'openrouter/auto')->withUsageByModel([
+            'openrouter/auto' => ['model' => 'openrouter/auto', 'input_tokens' => 2_000, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0, 'billed_models' => ['anthropic/claude-sonnet-4.5', 'openai/gpt-4o']],
+            'legacy-entry' => ['model' => 'legacy-entry', 'input_tokens' => 1_000, 'output_tokens' => 0, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        self::assertSame(
+            ['openrouter/auto' => ['anthropic/claude-sonnet-4.5', 'openai/gpt-4o'], 'legacy-entry' => []],
+            array_column((array) $auditCost->toArray()['by_model'], 'billed_models', 'model'),
+        );
+    }
+
+    /**
      * The top-level cost and the dry-run's per-role costs are both rounded to
      * six decimals, so accumulated float noise must not leave one field in the
      * same document reading `0.10491600000000001` while another reads
@@ -227,7 +243,7 @@ final class AuditCostTest extends TestCase
         ]);
 
         self::assertEquals(
-            (object) ['claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_111, 'output_tokens' => 777, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.104916]],
+            (object) ['claude-opus-5' => ['model' => 'claude-opus-5', 'input_tokens' => 1_111, 'output_tokens' => 777, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.104916, 'billed_models' => []]],
             $auditCost->toArray()['by_model'],
         );
     }
@@ -245,7 +261,7 @@ final class AuditCostTest extends TestCase
         ]);
 
         self::assertEquals(
-            (object) ['gemini-flash-lite' => ['model' => 'gemini-flash-lite', 'input_tokens' => 1, 'output_tokens' => 0, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.0]],
+            (object) ['gemini-flash-lite' => ['model' => 'gemini-flash-lite', 'input_tokens' => 1, 'output_tokens' => 0, 'cache_read_tokens' => 0, 'cache_creation_tokens' => 0, 'estimated_cost_usd' => 0.0, 'billed_models' => []]],
             $auditCost->toArray()['by_model'],
         );
     }

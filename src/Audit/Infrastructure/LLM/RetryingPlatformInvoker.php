@@ -19,6 +19,7 @@ use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
@@ -55,6 +56,7 @@ final readonly class RetryingPlatformInvoker
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
      * @throws EmptyLLMResponseException
+     * @throws LLMRequestTooLargeException
      * @throws NonTransientLLMFailureException
      * @throws InvalidRetryConfigurationException
      */
@@ -75,7 +77,7 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
-                $this->rateLimiter->record(0, 0);
+                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($throwable, $estimatedInputTokens), 0);
                 $this->rethrowWhenNonTransient($throwable);
 
                 if ($attempt >= $maxAttempts) {
@@ -90,12 +92,18 @@ final readonly class RetryingPlatformInvoker
 
     /**
      * @throws EmptyLLMResponseException
+     * @throws LLMRequestTooLargeException
      * @throws NonTransientLLMFailureException
      */
     private function rethrowWhenNonTransient(Throwable $throwable): void
     {
-        if ($this->transientFailureClassifier->isEmptyContent($throwable)) {
-            throw EmptyLLMResponseException::from($throwable);
+        $degradedStopReason = $this->transientFailureClassifier->degradedStopReason($throwable);
+        if (null !== $degradedStopReason) {
+            throw EmptyLLMResponseException::from($throwable, $degradedStopReason);
+        }
+
+        if ($this->transientFailureClassifier->isRequestTooLarge($throwable)) {
+            throw LLMRequestTooLargeException::fromProviderRejection($throwable);
         }
 
         if (!$this->transientFailureClassifier->isTransient($throwable)) {
