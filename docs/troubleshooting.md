@@ -566,6 +566,16 @@ symfony_security_auditor:
         dir: '/tmp/symfony-security-auditor/cache'
 ```
 
+### Every run misses the cache and logs `cache entry path was a symlink`
+
+A symlink below `cache.dir` — a sub-directory or an entry file — is refused, on
+a read (`Attacker cache entry path was a symlink, ignoring`) as on a write
+(`Failed to write attacker cache entry`), so a link planted there cannot feed a
+forged entry to the audit or redirect a write. `cache.dir` itself and the
+directories above it are taken as you configured them: a symlinked `var/`,
+`~/.cache` or `$XDG_CACHE_HOME` is fine. Remove the link below the cache
+directory, or point `cache.dir` at the directory it targets.
+
 ### Disable cache for one-off debugging
 
 ```yaml

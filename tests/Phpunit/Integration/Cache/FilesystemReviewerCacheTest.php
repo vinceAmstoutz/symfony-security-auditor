@@ -777,6 +777,58 @@ final class FilesystemReviewerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_still_caches_when_a_directory_above_the_cache_is_a_symlink(): void
+    {
+        $base = sys_get_temp_dir().'/reviewer_cache_symlinked_parent_'.uniqid('', true);
+        mkdir($base.'/real', recursive: true);
+        symlink($base.'/real', $base.'/link');
+        $filesystemReviewerCache = new FilesystemReviewerCache($base.'/link/cache', new Filesystem(), new NullLogger());
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        chdir($base);
+        try {
+            $filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+            self::assertSame(['accepted' => true], $filesystemReviewerCache->get($vulnerability, 'code'));
+        } finally {
+            chdir($workingDirectory);
+            (new Filesystem())->remove($base);
+        }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_refuses_its_own_directory_below_the_cache_root_when_that_is_a_symlink(): void
+    {
+        $base = sys_get_temp_dir().'/reviewer_cache_symlinked_self_'.uniqid('', true);
+        mkdir($base.'/elsewhere', recursive: true);
+        mkdir($base.'/cache');
+        symlink($base.'/elsewhere', $base.'/cache/reviewer');
+        $filesystemReviewerCache = new FilesystemReviewerCache($base.'/cache/reviewer', new Filesystem(), new NullLogger());
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        try {
+            $filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+            self::assertSame(['.', '..'], scandir($base.'/elsewhere'));
+            self::assertNull($filesystemReviewerCache->get($vulnerability, 'code'));
+        } finally {
+            (new Filesystem())->remove($base);
+        }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
      */
     #[Override]
     protected function setUp(): void

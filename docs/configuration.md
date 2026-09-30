@@ -306,6 +306,18 @@ first call and caches the result for the lifetime of the request.
   from `FriendsOfPHP/security-advisories` plus GitHub Security Advisories.
   Output is per-package CVE entries with affected version ranges and advisory
   links.
+- **The audited project's own Composer settings.** `composer audit` runs inside
+  the audited project and reads its `composer.json`. An advisory that project
+  filters out with `config.audit.ignore` (or `config.audit.ignore-severity`, on
+  the Composer releases that have it) is still looked up: Composer reports it
+  under `ignored-advisories`, which the auditor reads as well, so the repository
+  under audit cannot hide a vulnerable dependency that way. Its `repositories`
+  still decide where advisories come from, though, and no `composer audit`
+  option overrides them: a project that disables Packagist
+  (`"packagist.org": false`) and lists no other repository publishing advisories
+  leaves the feed empty. When the audited `composer.json` cannot be trusted, run
+  `composer audit` against its `composer.lock` from a project of your own too,
+  or override the source as shown below.
 - **Graceful degradation.** When `composer` is missing from `PATH`, when
   `composer.lock` is absent, when the JSON is malformed, or when the process
   errors out for any reason, the database initializes empty and a

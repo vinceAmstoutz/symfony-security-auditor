@@ -244,6 +244,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **The secret scrubber no longer hides the code an audit has to read.**
+  `RegexSecretScrubber`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) redacted
+  whatever followed a credential-named key, so
+  `$password = $request->get('password');`, `'secret' => getenv('APP_SECRET'),`
+  or a `WHERE password = '" . $pw . "'` concatenation reached the attacker and
+  the reviewer as `***REDACTED***` — the taint source or the injection sink they
+  had to see. A value shaped the way PHP code is now stays as written: a
+  variable followed by an access or ending the statement (`$request->`,
+  `$_GET[`, `$plain,`), a class constant ending it (`self::DEFAULT_SECRET;`), a
+  call that ends the statement or opens on a string, a variable or another call
+  (`uniqid();`, `password_hash($plain, PASSWORD_DEFAULT);`,
+  `hash_hmac('sha256', …)`) — judged on the value's first word, or a quoted
+  fragment joined to a variable or a call. Any other value is still redacted,
+  whatever `(`, `::`, `->` or `$` it holds (`Xk9(qL2!vB7z`, `summer(2024)`,
+  `P4ss::WORD_1`, `$2y$13$…`), and so is every credential-named upper-case
+  `KEY=value` environment line. A literal written in exactly one of the code
+  shapes — `password: hunter('2');`, say — is left as written too: that is the
+  trade-off for letting the audit read the code.
+
+- **The same project is chunked the same way on every machine.**
+  `ProjectFileScanner::scan()`
+  (`src/Audit/Infrastructure/FileSystem/ProjectFileScanner.php`) returned files
+  in the filesystem's directory order, which `FileChunker` keeps within a file
+  type, so chunk membership — and with it prompts and attacker cache keys —
+  could differ between a laptop and CI and miss each other's cache. Files are
+  now returned in relative-path order; a chunk whose files come out in a new
+  order misses the attacker cache once after upgrading.
+
 - **Cost is priced at the rate of the platform that serves the model.**
   `ModelsDevPricingProvider` looked a model up by its id alone: a bare id was
   priced only from first-party providers, and a qualified one from whichever
@@ -516,6 +545,63 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   user's `composer require`.
 
 ### Security
+
+- **An audited project can no longer hide a vulnerable dependency from
+  `lookup_advisory` through its own Composer config.** `composer audit` runs in
+  the audited project and honours its `config.audit.ignore` (and
+  `ignore-severity`), and `ComposerAuditAdvisoryDatabase`
+  (`src/Audit/Infrastructure/Advisory/ComposerAuditAdvisoryDatabase.php`) read
+  only `advisories`. It now also reads the `ignored-advisories` Composer reports
+  them under. A project's `repositories` still decide where advisories come
+  from; `docs/configuration.md` documents that limit.
+
+- **The secret scrubber redacts glued credential names and five more vendor
+  token shapes.** `RegexSecretScrubber`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) missed
+  credential keys written without a separator — `SECRETKEY=`, `APIKEY=`,
+  `DBPASS=`, `PGPASSWORD=` and the like — while still leaving `MONKEY`, `TURKEY`
+  and `COMPASS` alone, and did not know GitLab (`glpat-`, `glrt-`, …), Hugging
+  Face (`hf_`), npm (`npm_`), SendGrid (`SG.`) and PyPI (`pypi-`) tokens. All
+  are now redacted before the file reaches the LLM.
+
+- **A symlinked directory above a report or baseline file no longer redirects
+  the write.** `ReportWriter` and `Baseline` refused a symlink only as the file
+  or its parent directory: with `build -> /elsewhere` committed in the
+  repository, `--output=build/reports/report.sarif` created and wrote the report
+  wherever the symlink pointed. The shared `SymlinkGuard`
+  (`src/Audit/Infrastructure/FileSystem/SymlinkGuard.php`) also refuses a
+  symlink on any directory between the process working directory and the file.
+  It walks the path's directory prefixes as written, so a committed `..`
+  (`build/link/../report.sarif`) cannot hide the symlinked directory the kernel
+  traverses, drops a trailing slash first, and reads a relative path against the
+  working directory, as the write does. Directories above the working directory,
+  the operating system's included, are left alone: in CI, keep `output`,
+  `baseline` and `generate-baseline` inside the working directory, or give an
+  absolute path outside the checkout (see [`docs/ci.md`](docs/ci.md)).
+  `FilesystemAttackerCache`, `FilesystemReviewerCache`,
+  `FilesystemTriageMemoryStore` and `LockfileHashedAdvisoryCache` apply the same
+  guard below the configured `cache.dir`, so a symlinked `reviewer/` directory
+  is now refused as a shard is, while a cache reached through a symlinked
+  `var/`, `~/.cache` or `$XDG_CACHE_HOME` keeps its hits.
+
+- **`DB_PASS=…`, `MYSQL_ROOT_PW=…` and `pass: '…'` are redacted before the code
+  reaches the LLM.** The secret scrubber's environment-assignment pattern knew
+  `PASSWORD`, `PASSWD` and `PASSPHRASE` but not the `PASS` / `PW` suffixes, and
+  its inline pattern had no `pass` key, so those values were sent as they were.
+  Both patterns cover them — `PASS` and `PW` only as the last word of the
+  variable, so `MAX_PW_LENGTH=…` and `PASS_RATE=…` stay untouched, as do
+  `PASSPORT_NUMBER=…`, `BYPASS_CACHE=…` and `passport:`.
+
+- **A symlink committed in the audited repository can no longer walk the scanner
+  out of the project.** `ProjectFileScanner` refused a symlinked included path
+  only when the symlink was the path's last component, and checked containment
+  on the spelling of the path: with `src/link -> /` in the repository,
+  `scan.included_paths: ['src/link/']` (or `src/link/deep/..`, or the explicit
+  file `src/link/home/dev/.aws/credentials`) passed both checks and the scanner
+  read — and sent to the LLM — files from anywhere on the machine. Containment
+  is now decided on the real path of each included path against the real path of
+  the project root, so any path that resolves outside it is skipped and logged
+  whatever it is spelled like.
 
 - **A stored credential is written owner-only, and an exposed one is refused
   rather than used.** `FilesystemCredentialStore`

@@ -360,6 +360,54 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
         self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('vendor/bar', '1.0.0'));
     }
 
+    public function test_lookup_returns_an_advisory_the_audited_project_ignores_in_its_composer_config(): void
+    {
+        $json = (string) json_encode([
+            'advisories' => [],
+            'ignored-advisories' => [
+                'vendor/foo' => [
+                    ['title' => 'Ignored by the project', 'affectedVersions' => '>=1.0', 'ignoreReason' => 'not exploitable here'],
+                ],
+            ],
+            'abandoned' => [],
+        ]);
+
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertSame(['Ignored by the project'], array_column($composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'), 'title'));
+    }
+
+    public function test_lookup_returns_both_the_reported_and_the_ignored_advisories_of_a_package(): void
+    {
+        $json = (string) json_encode([
+            'advisories' => [
+                'vendor/foo' => [['title' => 'Reported', 'affectedVersions' => '>=1.0']],
+            ],
+            'ignored-advisories' => [
+                'Vendor/Foo' => [['title' => 'Ignored', 'affectedVersions' => '>=1.0']],
+                'vendor/bar' => 'not a list',
+            ],
+        ]);
+
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertSame(['Reported', 'Ignored'], array_column($composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'), 'title'));
+    }
+
+    public function test_lookup_keeps_the_reported_advisories_when_the_ignored_ones_are_not_a_map(): void
+    {
+        $json = (string) json_encode([
+            'advisories' => [
+                'vendor/foo' => [['title' => 'Reported', 'affectedVersions' => '>=1.0']],
+            ],
+            'ignored-advisories' => 'unexpected',
+        ]);
+
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertSame(['Reported'], array_column($composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'), 'title'));
+    }
+
     public function test_the_audit_runs_against_the_path_the_holder_carries(): void
     {
         $composerAuditRunner = $this->createMock(ComposerAuditRunnerInterface::class);

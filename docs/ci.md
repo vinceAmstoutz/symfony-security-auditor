@@ -205,6 +205,15 @@ floor, 0-100 — independent of `fail-on`, either gate failing fails the audit),
 `setup-php: false` / `install-dependencies: false` when your job has already
 done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
+Keep `output`, `baseline` and `generate-baseline` inside `working-directory`, or
+give an absolute path outside the checkout such as
+`${{ runner.temp }}/report.sarif`. A report or baseline write refuses a symlink
+on any directory between the working directory and the file, but trusts every
+directory above the working directory: with a sub-directory `working-directory`,
+a path climbing out of it (`../build/reports/report.sarif`) passes through
+directories the checked-out repository controls, where a committed symlink could
+redirect the write.
+
 Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, and — only
 when `format: json` — `findings-count`, `highest-severity` (the report's
 aggregate `risk_level`) and `grade` (its `A`-`F` letter).

@@ -683,7 +683,9 @@ value is not an array. `isEmpty()` checks for blank content.
 
 Walks a project directory, reads `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files,
 constructs `ProjectFile` instances with relative paths (relative to the scanned
-root).
+root), returned in relative-path order so the chunks built from them — and their
+prompts and cache keys — are the same on every machine, whatever order the
+filesystem lists a directory in.
 
 ### `AttackerPromptBuilder` / `ReviewerPromptBuilder`
 

@@ -223,6 +223,23 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame(['bin/console.php', 'public/index.php'], $paths);
     }
 
+    public function test_it_returns_files_in_relative_path_order_whatever_the_filesystem_lists_first(): void
+    {
+        mkdir($this->tmpDir.'/src/Controller', 0o777, true);
+        mkdir($this->tmpDir.'/config', 0o777, true);
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        foreach (['src/b.php', 'src/Controller/a.php', 'src/a.php', 'src/c.php', 'config/z.yaml', 'config/a.yaml', 'public/index.php'] as $path) {
+            file_put_contents(\sprintf('%s/%s', $this->tmpDir, $path), '<?php');
+        }
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'public/index.php', 'config']);
+
+        self::assertSame(
+            ['config/a.yaml', 'config/z.yaml', 'public/index.php', 'src/Controller/a.php', 'src/a.php', 'src/b.php', 'src/c.php'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScanner->scan($this->tmpDir)),
+        );
+    }
+
     public function test_it_logs_warning_and_returns_empty_when_no_included_paths_exist(): void
     {
         $warningLogs = [];
@@ -643,7 +660,7 @@ final class ProjectFileScannerTest extends TestCase
             $files = $projectFileScanner->scan($this->tmpDir);
 
             $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
-            self::assertSame(['src/Real.php', 'config/security.yaml'], $paths);
+            self::assertSame(['config/security.yaml', 'src/Real.php'], $paths);
 
             self::assertCount(1, $warnings);
             self::assertSame('Skipped included path outside the project root', $warnings[0][0]);
@@ -694,5 +711,62 @@ final class ProjectFileScannerTest extends TestCase
         }
 
         rmdir($dir);
+    }
+
+    public function test_an_included_path_reached_through_a_symlinked_directory_is_skipped_and_logged(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Real.php', '<?php class Real {}');
+
+        $outsideDir = sys_get_temp_dir().'/scanner_int_outside_dir_'.uniqid('', true);
+        mkdir($outsideDir, 0o777, true);
+        file_put_contents($outsideDir.'/Secret.php', '<?php $secretApiKey = \'AKIAIOSFODNN7EXAMPLE\';');
+        mkdir($outsideDir.'/deep', 0o777, true);
+        symlink($outsideDir, $this->tmpDir.'/src/link');
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('info');
+
+        $projectFileScanner = new ProjectFileScanner($logger, ['src/link/', 'src/link/deep/..', 'src/Real.php']);
+
+        try {
+            $files = $projectFileScanner->scan($this->tmpDir);
+
+            $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
+            self::assertSame(['src/Real.php'], $paths);
+
+            self::assertSame(['Skipped included path outside the project root', 'Skipped included path outside the project root'], array_column($warnings, 0));
+        } finally {
+            $this->rmdirRecursive($outsideDir);
+        }
+    }
+
+    public function test_an_explicit_file_reached_through_a_symlinked_directory_is_skipped(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+
+        $outsideDir = sys_get_temp_dir().'/scanner_int_outside_dir_'.uniqid('', true);
+        mkdir($outsideDir, 0o777, true);
+        file_put_contents($outsideDir.'/credentials', 'aws_secret_access_key = AKIAIOSFODNN7EXAMPLE');
+        symlink($outsideDir, $this->tmpDir.'/src/link');
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), ['src/link/credentials']);
+
+        try {
+            self::assertSame([], $projectFileScanner->scan($this->tmpDir));
+        } finally {
+            $this->rmdirRecursive($outsideDir);
+        }
+    }
+
+    public function test_it_scans_nothing_when_the_project_path_does_not_exist(): void
+    {
+        self::assertSame([], $this->projectFileScanner->scan($this->tmpDir.'/missing-'.uniqid('', true)));
     }
 }
