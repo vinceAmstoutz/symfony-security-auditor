@@ -30,4 +30,13 @@ interface ReportWriterInterface
      * @throws ReportWriteFailedException
      */
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void;
+
+    /**
+     * Refuses an output path the report could not be saved to, before the
+     * audit spends anything on it.
+     *
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function assertWritable(?string $outputFile): void;
 }

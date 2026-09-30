@@ -20,6 +20,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
@@ -137,7 +138,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         }
 
         $this->progressBar->clear();
-        $this->output->writeln($line);
+        $this->output->writeln(WorkflowCommandText::inLine($line));
         $this->progressBar->display();
     }
 

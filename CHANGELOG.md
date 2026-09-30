@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`--fail-on-incomplete` fails a run that could not analyze every file, and
+  such a run now always says so.** An audit whose LLM call for some file still
+  failed after its retries ran to its end with the exit code its gates earned,
+  so a partial report could pass CI unless the pipeline read `complete: false`
+  itself — and with a machine-readable report on stdout, nothing on the terminal
+  mentioned it. `audit:run --fail-on-incomplete` now exits with the new code `3`
+  for such a run (a tripped `--fail-on` or `--min-score` gate still exits `1`,
+  an aborted run keeps `1` or `2`), including under `--generate-baseline`.
+  Without the option, the run prints an
+  `Audit incomplete: N file(s) could not be fully analyzed …` warning — naming
+  the option when no gate failed the run — on stderr when the report goes to
+  stdout (`AuditPresenter::incompleteRunNotice()`). The GitHub Action gains a
+  `fail-on-incomplete` input, a `complete` output read from a JSON or SARIF
+  report, and a warning annotation when the report is incomplete and the input
+  is off.
+
 - **A call is billed as the model the provider says answered it.** A gateway
   routing on its own (`openrouter/auto`), a failover platform or an alias the
   provider resolves (`claude-opus-4-8` answered as a dated release) used to be
@@ -219,6 +235,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   request, remembered per mapping instance in a `WeakMap`, or appended in place;
   no cache key changes.
 
+- **`audit:diff` pairs findings without copying the list for each one.**
+  `ReportDiffer` (`src/Command/ReportDiffer.php`) appended each fingerprint
+  group of disappeared findings by copying the whole list so far; it now appends
+  in place, so a diff of two large reports no longer grows quadratically. The
+  diff result is unchanged.
+
 - **Runs on `symfony/ai` 0.14.** `symfony/ai-bundle` moves from `^0.13` to
   `^0.14`, which brings the Fireworks, Together, Venice, Eden AI, TypeSafe and
   Higgsfield platforms. `init` writes the ones it can: `together` and `venice`
@@ -407,6 +429,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   byte-based, and a matched line is scrubbed before it is returned so the tool
   result stays valid for the provider.
 
+- **An `--output` path the report could never be saved to is refused before the
+  audit runs, and a report that fails to save is kept on the console.**
+  `ReportWriter` checked the path only after the audit: a symlink planted at a
+  documented path (`report.sarif -> /dev/null`) or a directory that cannot be
+  written discarded the whole report after the full spend.
+  `ReportWriterInterface::assertWritable()` runs before the pipeline — a symlink
+  anywhere on the way, a directory as the target, a path beneath a regular file
+  or a directory the report cannot be written into exits `1` at once;
+  `--show-scanned` alone writes no report, so it checks and creates nothing —
+  and a write that still fails prints the rendered document to standard output
+  before the failure is reported.
+
 - **A file that failed in one attacker iteration and was analyzed in a later one
   no longer marks the audit incomplete.** Coverage rows accumulate across the
   up-to-three iterations, and `AuditReport::unanalyzedFiles()` flagged a file as
@@ -417,6 +451,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   every time, because the finding it was judging is lost for good. The notice
   reads `N file(s) could not be fully analyzed`, since a reviewer failure is not
   a file that was never looked at.
+
+- **The `audit` MCP tool says why it failed.** `mcp/sdk` answers a tool that
+  throws anything but its own `ToolCallException` with a bare
+  `Error while executing tool` (JSON-RPC `-32603`), so a relative path, an
+  exhausted budget or a refused credential reached the client with no reason and
+  nothing on stderr. `AuditTool` rethrows every failure as a `ToolCallException`
+  carrying the message.
+
+- **`audit:diff` and `audit:trend` no longer call a finding fixed when the later
+  run never looked at its file.** Both read only the `vulnerabilities` of a
+  report, so a finding that disappeared because the later run could not fully
+  analyze its file (`complete: false`) was listed under **Fixed** and counted as
+  a downward trend. `ReportFindingsLoader` now reads the report's `coverage`
+  ledger with the same rule the run itself applies (`UnanalyzedFiles`,
+  `src/Audit/Domain/Model/`), and `ReportDiffer` keeps such findings apart as
+  **Unverified** — dropping a leading `./` on both sides through
+  `EchoedFilePath::normalize()`, since a finding and the reviewer's ledger
+  entries hold the path the attacker echoed: the JSON diff gains an `unverified`
+  list and each trend point an `unverified` count (additive; a report written
+  before the ledger existed has none), the console diff shows the section — and
+  counts it in its summary line — only when it is not empty, and a trend line
+  mentions `N unverified` only when there are some.
 
 - **Cost is priced at the rate of the platform that serves the model.**
   `ModelsDevPricingProvider` looked a model up by its id alone: a bare id was
@@ -450,9 +506,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `AuditReport::unanalyzedFiles()` and `AuditReport::isComplete()`
   (`src/Audit/Domain/Model/`) now expose that gap. The console, executive,
   Markdown, HTML and GitHub-comment reports replace the clean line with
-  `Audit incomplete: N file(s) were never analyzed …` (and print it above the
-  findings when there are some). The GitHub comment headlines the run as
-  `incomplete`, `--format=github` emits a `::warning`, and the success banner
+  `Audit incomplete: N file(s) could not be fully analyzed …` (and print it
+  above the findings when there are some). The GitHub comment headlines the run
+  as `incomplete`, `--format=github` emits a `::warning`, and the success banner
   becomes a warning. Machine-readable formats gain additive fields: the JSON
   report carries `complete`, and SARIF runs carry
   `invocations[0].executionSuccessful` with the reason as an `error`
@@ -783,6 +839,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   every Unicode line break (via `\R` under `/u`, after `mb_scrub()`), and a
   candidate finding's title — free text from a cheaper first-pass model — is
   quoted, has its own double quotes folded, and is capped at 120 characters.
+
+- **A report, error or progress line printed on a GitHub Actions runner can no
+  longer issue workflow commands.** A runner reads a log line that starts with
+  `::`, leading whitespace aside, as a workflow command, and the legacy
+  `##[command]` form wherever it sits in a line. The console, Markdown,
+  GitHub-comment, JUnit and HTML reports quote the audited code and what the
+  model wrote about it line by line, an error may quote a checkout path, and
+  progress lines and the `--show-scanned` listing print file names: a vulnerable
+  line such as `echo "::stop-commands::x"`, a prompt-injected finding or a
+  committed `src/##[stop-commands]x.php` could forge annotations, mask values or
+  stop the runner from reading the rest of the step. While `GITHUB_ACTIONS` is
+  `true`, `ReportWriter` (`src/Command/ReportWriter.php`) now defuses what it
+  prints as the format allows (`WorkflowCommandNeutralizer`): a line-leading
+  `::` becomes `:\:` and `##[` becomes `#\#[` in the text formats, and `##[`
+  becomes `#\u0023[` in the JSON and SARIF reports, which decode to the same
+  document, so piping them into `jq` still works; `AuditPresenter::error()`
+  defuses every marker. Progress lines, the `--show-scanned` listing and
+  `audit:diff` always defuse `##[` (`WorkflowCommandText`), and
+  `audit:diff --format=json` writes it `#\u0023[`. The `github` format, whose
+  annotations are meant for the runner, and a report saved with `--output` are
+  written as before.
 
 - **A stored credential is written owner-only, and an exposed one is refused
   rather than used.** `FilesystemCredentialStore`

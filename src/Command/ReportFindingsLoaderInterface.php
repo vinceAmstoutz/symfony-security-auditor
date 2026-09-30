@@ -20,10 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadable
 interface ReportFindingsLoaderInterface
 {
     /**
-     * @return list<DiffFinding>
-     *
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
      */
-    public function load(string $path): array;
+    public function load(string $path): LoadedReport;
 }

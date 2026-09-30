@@ -14,18 +14,19 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The process exit codes of `audit:run`. The integer VALUES are public API
- * (see docs/versioning.md); this enum is the internal source of truth for them.
+ * What a JSON audit report tells a comparison: its findings, and the files it
+ * could not fully analyze — where the absence of a finding proves nothing.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-enum ExitCode: int
+final readonly class LoadedReport
 {
-    case Success = 0;
-
-    case Failure = 1;
-
-    case BudgetAborted = 2;
-
-    case Incomplete = 3;
+    /**
+     * @param list<DiffFinding> $findings
+     * @param list<string>      $unanalyzedFiles
+     */
+    public function __construct(
+        public array $findings,
+        public array $unanalyzedFiles = [],
+    ) {}
 }

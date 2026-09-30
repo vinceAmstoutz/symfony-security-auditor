@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
@@ -42,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteExce
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
 
 final class ReportWriterTest extends TestCase
 {
@@ -110,6 +112,114 @@ final class ReportWriterTest extends TestCase
         $content = file_get_contents($outputFile);
         self::assertIsString($content);
         self::assertIsArray(json_decode($content, true));
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_report_printed_on_a_github_actions_runner_has_its_workflow_commands_defused(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->runnerReportWriter()->write($this->makeReport($this->makeVulnWithProof("echo ok\n::stop-commands::pwned")), OutputFormat::Console, null, $symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString(':\\:stop-commands::pwned', $display);
+        self::assertDoesNotMatchRegularExpression('/^\s*::/m', $display);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_github_annotations_are_left_for_the_runner_to_read(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->runnerReportWriter()->write($this->makeReport(), OutputFormat::GithubAnnotations, null, $symfonyStyle);
+
+        self::assertStringNotContainsString(':\\:', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_report_saved_to_a_file_is_written_as_rendered(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $outputFile = $this->tmpDir.'/report.json';
+
+        $this->runnerReportWriter()->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+
+        self::assertJson($this->filesystem->readFile($outputFile));
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeReportWriteException
+     */
+    public function test_a_report_kept_on_the_console_of_a_github_actions_runner_has_its_workflow_commands_defused(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $blockingFile = $this->tmpDir.'/blocking';
+        $this->filesystem->dumpFile($blockingFile, 'x');
+
+        $writeFailed = false;
+        try {
+            $this->runnerReportWriter()->write($this->makeReport($this->makeVulnWithProof('##[warning]forged')), OutputFormat::Json, $blockingFile.'/report.json', $symfonyStyle);
+        } catch (ReportWriteFailedException) {
+            $writeFailed = true;
+        }
+
+        $display = $bufferedOutput->fetch();
+        self::assertTrue($writeFailed);
+        self::assertStringNotContainsString('##[', $display);
+        self::assertJson(trim($display));
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_report_refused_on_a_github_actions_runner_for_a_symlink_has_its_workflow_commands_defused(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $this->filesystem->dumpFile($this->tmpDir.'/target.txt', '');
+        $this->filesystem->symlink($this->tmpDir.'/target.txt', $this->tmpDir.'/report.txt');
+
+        $refused = false;
+        try {
+            $this->runnerReportWriter()->write($this->makeReport($this->makeVulnWithProof("echo ok\n::stop-commands::pwned")), OutputFormat::Console, $this->tmpDir.'/report.txt', $symfonyStyle);
+        } catch (UnsafeReportWriteException) {
+            $refused = true;
+        }
+
+        self::assertTrue($refused);
+        self::assertStringContainsString(':\\:stop-commands::pwned', $bufferedOutput->fetch());
     }
 
     /**
@@ -326,6 +436,11 @@ final class ReportWriterTest extends TestCase
         $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
     }
 
+    private function runnerReportWriter(): ReportWriter
+    {
+        return new ReportWriter([new ConsoleReportRenderer(), new JsonReportRenderer(), new GithubAnnotationsReportRenderer()], $this->filesystem, new WorkflowCommandNeutralizer(true));
+    }
+
     /**
      * @throws InvalidAuditContextException
      */
@@ -344,6 +459,21 @@ final class ReportWriterTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    private function makeVulnWithProof(string $proof): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Finding', 0.9),
+            new CodeLocation('src/A.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', $proof, 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     private function makeVuln(): Vulnerability
     {
         return Vulnerability::of(
@@ -352,5 +482,119 @@ final class ReportWriterTest extends TestCase
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
             'code',
         )->withReviewerValidation(true);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_report_that_cannot_reach_its_file_is_kept_on_the_console(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $blockingFile = $this->tmpDir.'/blocking';
+        $this->filesystem->dumpFile($blockingFile, 'x');
+
+        $writeFailed = false;
+        try {
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $blockingFile.'/report.json', $symfonyStyle);
+        } catch (ReportWriteFailedException) {
+            $writeFailed = true;
+        }
+
+        self::assertTrue($writeFailed);
+        self::assertJson(trim($bufferedOutput->fetch()));
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_report_refused_for_a_symlinked_file_is_kept_on_the_console(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        symlink($this->tmpDir.'/elsewhere.json', $this->tmpDir.'/report.json');
+
+        $writeRefused = false;
+        try {
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $this->tmpDir.'/report.json', $symfonyStyle);
+        } catch (UnsafeReportWriteException) {
+            $writeRefused = true;
+        }
+
+        self::assertTrue($writeRefused);
+        self::assertJson(trim($bufferedOutput->fetch()));
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_accepts_a_new_file_under_directories_that_do_not_exist_yet(): void
+    {
+        $outputFile = $this->tmpDir.'/build/reports/report.json';
+
+        $this->reportWriter->assertWritable($outputFile);
+
+        self::assertDirectoryExists($this->tmpDir.'/build/reports');
+        self::assertFileDoesNotExist($outputFile);
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_accepts_an_existing_writable_file(): void
+    {
+        $outputFile = $this->tmpDir.'/report.json';
+        $this->filesystem->dumpFile($outputFile, 'previous run');
+
+        $this->reportWriter->assertWritable($outputFile);
+
+        self::assertStringEqualsFile($outputFile, 'previous run');
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_symlinked_output_file(): void
+    {
+        symlink($this->tmpDir.'/elsewhere.json', $this->tmpDir.'/report.json');
+
+        $this->expectException(UnsafeReportWriteException::class);
+
+        $this->reportWriter->assertWritable($this->tmpDir.'/report.json');
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_path_beneath_a_regular_file(): void
+    {
+        $blockingFile = $this->tmpDir.'/blocking';
+        $this->filesystem->dumpFile($blockingFile, 'x');
+
+        $this->expectException(ReportWriteFailedException::class);
+        $this->expectExceptionMessage('before the audit spends anything');
+
+        $this->reportWriter->assertWritable($blockingFile.'/report.json');
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_directory_as_the_output_file(): void
+    {
+        $this->expectException(ReportWriteFailedException::class);
+
+        $this->reportWriter->assertWritable($this->tmpDir);
     }
 }

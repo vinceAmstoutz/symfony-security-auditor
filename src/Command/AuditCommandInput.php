@@ -62,7 +62,7 @@ final class AuditCommandInput
     #[Option(description: 'Baseline file of accepted-finding fingerprints. Findings whose fingerprint is listed are suppressed from the report and excluded from the exit code. Overrides the audit.baseline config key. A missing file suppresses nothing.', name: 'baseline')]
     public ?string $baseline = null;
 
-    #[Option(description: 'Run the audit, then write every current finding fingerprint to the given file as a baseline and exit 0 without failing on findings. Use this to accept the current findings so future runs only report new ones.', name: 'generate-baseline')]
+    #[Option(description: 'Run the audit, then write every current finding fingerprint to the given file as a baseline and exit 0 without failing on findings (3 under --fail-on-incomplete when some file could not be fully analyzed). Use this to accept the current findings so future runs only report new ones.', name: 'generate-baseline')]
     public ?string $generateBaseline = null;
 
     #[Option(description: 'Minimum aggregate risk level (safe|low|medium|high|critical) that makes the command exit 1. Overrides the audit.fail_on config key for this run. Defaults to the configured value (critical) when omitted.', name: 'fail-on')]
@@ -70,6 +70,9 @@ final class AuditCommandInput
 
     #[Option(description: 'Minimum normalized score (0-100) below which the command exits 1. Independent of --fail-on: the audit fails when either gate trips. Omit to gate on the risk level alone.', name: 'min-score')]
     public ?int $minScore = null;
+
+    #[Option(description: 'Exit 3 when some file could not be fully analyzed (an LLM call still failed after its retries), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning.', name: 'fail-on-incomplete')]
+    public bool $failOnIncomplete = false;
 
     /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
@@ -147,6 +150,15 @@ final class AuditCommandInput
         if ($this->showScanned) {
             throw ConflictingCommandOptionsException::forGenerateBaselineWithPreviewFlag('--show-scanned');
         }
+    }
+
+    /**
+     * `--show-scanned` alone lists the files and exits: it writes no report,
+     * so it has no output file to check or create.
+     */
+    public function reportFile(): ?string
+    {
+        return $this->showScanned && !$this->dryRun ? null : $this->output;
     }
 
     public function isMachineReadableToStdout(): bool

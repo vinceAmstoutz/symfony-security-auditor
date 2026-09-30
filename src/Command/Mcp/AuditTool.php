@@ -13,13 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp;
 
+use Mcp\Exception\ToolCallException;
 use Symfony\Component\Filesystem\Path;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
@@ -34,14 +31,31 @@ final readonly class AuditTool
     ) {}
 
     /**
-     * @throws AuditAbortedByBudgetException
-     * @throws AuditAbortedByProviderException
-     * @throws InvalidAuditContextException
-     * @throws InvalidAuditCostException
-     * @throws InvalidProjectPathException
-     * @throws InvalidTokenUsageException
+     * `mcp/sdk` answers a tool that throws anything but its own
+     * `ToolCallException` with a bare "Error while executing tool", so every
+     * failure — a relative path, an exhausted budget, a refused credential — is
+     * rethrown as one, and its reason reaches the client that asked.
+     *
+     * @throws ToolCallException
      */
     public function audit(string $path): string
+    {
+        try {
+            return $this->reportRenderer->render($this->runAuditUseCase->execute($this->canonicalPath($path)));
+        } catch (Throwable $throwable) {
+            throw $this->toolCallFailure($throwable);
+        }
+    }
+
+    private function toolCallFailure(Throwable $throwable): ToolCallException
+    {
+        return new ToolCallException($throwable->getMessage(), previous: $throwable);
+    }
+
+    /**
+     * @throws InvalidProjectPathException
+     */
+    private function canonicalPath(string $path): string
     {
         if (!Path::isAbsolute($path)) {
             throw InvalidProjectPathException::forNonAbsolutePath($path);
@@ -50,6 +64,6 @@ final readonly class AuditTool
         $canonicalPath = Path::canonicalize($path);
         $this->auditedProjectPathHolder->set($canonicalPath);
 
-        return $this->reportRenderer->render($this->runAuditUseCase->execute($canonicalPath));
+        return $canonicalPath;
     }
 }

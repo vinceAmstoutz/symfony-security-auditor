@@ -81,7 +81,7 @@ final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInt
         if (0 === $totalFindings) {
             return $complete
                 ? 'No validated findings: this audit identified no business exposure in the scanned surface.'
-                : 'Unknown business exposure: the audit did not finish, so finding nothing says nothing about the files it never analyzed.';
+                : 'Unknown business exposure: the audit did not finish, so finding nothing says nothing about the files it could not fully analyze.';
         }
 
         return 'Negligible business exposure: the validated findings are low-impact — fold the fixes into routine maintenance.';

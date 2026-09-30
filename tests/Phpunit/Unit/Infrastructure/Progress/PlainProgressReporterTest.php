@@ -119,6 +119,18 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  [VALIDATED] sql_injection — src/Foo.php</> <fg=grey>injected</>:18\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_a_legacy_workflow_command_in_a_reported_file_path_is_defused(): void
+    {
+        $this->plainProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'high',
+            'type' => 'sql_injection',
+            'file' => 'src/##[stop-commands]zz.php',
+            'line' => 42,
+        ]);
+
+        self::assertSame("  [HIGH] sql_injection — src/#\\#[stop-commands]zz.php:42\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_a_raw_ansi_escape_byte_in_a_reported_file_path_is_stripped(): void
     {
         $this->plainProgressReporter->report('attacker.finding.recorded', [

@@ -205,6 +205,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizerInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -389,6 +391,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(GithubAnnotationsReportRenderer::class);
     $defaultsConfigurator->set(GithubCommentReportRenderer::class);
     $defaultsConfigurator->set(ExecutiveSummaryReportRenderer::class);
+
+    $defaultsConfigurator->set(WorkflowCommandNeutralizer::class)
+        ->factory([WorkflowCommandNeutralizer::class, 'fromEnvironment']);
+    $defaultsConfigurator->alias(WorkflowCommandNeutralizerInterface::class, WorkflowCommandNeutralizer::class);
 
     $defaultsConfigurator->set(ReportWriter::class)
         ->args([tagged_iterator('symfony_security_auditor.report_renderer')]);

@@ -445,7 +445,7 @@ Then verify with `ollama list`. The model name in
 
 ## Empty / Surprising Reports
 
-### `Audit incomplete: N file(s) were never analyzed`
+### `Audit incomplete: N file(s) could not be fully analyzed`
 
 Some file never got an answer from the model: its LLM call failed even after the
 retries in `audit.retry.*`, or an abort (a provider error, a budget cap) stopped

@@ -28,7 +28,7 @@ inputs:
     required: false
     default: ""
   generate-baseline:
-    description: If set to a path, run the audit, write the current findings to that baseline file, and exit 0.
+    description: If set to a path, run the audit, write the current findings to that baseline file, and exit 0 (3 under fail-on-incomplete when some file could not be fully analyzed).
     required: false
     default: ""
   since:
@@ -43,6 +43,10 @@ inputs:
     description: Minimum normalized score (0-100) below which the audit exits 1. Independent of fail-on — the audit fails when either gate trips. Leave empty to gate on the risk level alone.
     required: false
     default: ""
+  fail-on-incomplete:
+    description: Whether the audit exits 3 when some file could not be fully analyzed (an LLM call still failed after its retries), so a partial report cannot pass the job. A tripped fail-on or min-score gate still exits 1. Left false, such a run only raises a warning annotation (when format is json or sarif and output is a file).
+    required: false
+    default: "false"
   comment-pr:
     description: Whether to post the report as a single pull-request comment, editing the previous one in place on every rerun instead of appending. Requires format github-comment plus a non-empty output, a pull_request event, and pull-requests write permission on the calling job's GITHUB_TOKEN (passed as the GITHUB_TOKEN env var).
     required: false
@@ -78,11 +82,14 @@ inputs:
 
 outputs:
   exit-code:
-    description: The audit command's exit code (0 = passed, 1 = failed the fail-on or min-score gate, 2 = budget aborted).
+    description: The audit command's exit code (0 = passed, 1 = failed the fail-on or min-score gate, 2 = budget aborted, 3 = incomplete under fail-on-incomplete).
     value: ${{ steps.audit.outputs.exit-code }}
   report-path:
     description: The path the report was written to (mirrors the output input; empty when the report was printed to stdout).
     value: ${{ steps.audit.outputs.report-path }}
+  complete:
+    description: Whether every file was fully analyzed ("true" or "false"). Only populated when format is json or sarif and the report went to a file (empty otherwise).
+    value: ${{ steps.audit.outputs.complete }}
   findings-count:
     description: Total number of findings in the report. Only populated when format is json (empty for other formats).
     value: ${{ steps.audit.outputs.findings-count }}
@@ -153,6 +160,7 @@ runs:
         SSA_SINCE: ${{ inputs.since }}
         SSA_FAIL_ON: ${{ inputs.fail-on }}
         SSA_MIN_SCORE: ${{ inputs.min-score }}
+        SSA_FAIL_ON_INCOMPLETE: ${{ inputs.fail-on-incomplete }}
         SSA_EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
         set -uo pipefail
@@ -163,12 +171,14 @@ runs:
         if [ -n "$SSA_SINCE" ]; then args+=("--since=$SSA_SINCE"); fi
         if [ -n "$SSA_FAIL_ON" ]; then args+=("--fail-on=$SSA_FAIL_ON"); fi
         if [ -n "$SSA_MIN_SCORE" ]; then args+=("--min-score=$SSA_MIN_SCORE"); fi
+        if [ "$SSA_FAIL_ON_INCOMPLETE" = "true" ]; then args+=("--fail-on-incomplete"); fi
         # shellcheck disable=SC2206 -- intentional word-splitting of caller-supplied extra args
         if [ -n "$SSA_EXTRA_ARGS" ]; then args+=($SSA_EXTRA_ARGS); fi
 
         # Capture the audit exit code without letting the inherited errexit
-        # abort before the outputs below are written — the fail-on gate exit 1
-        # (and budget-abort exit 2) are the cases those outputs exist to report.
+        # abort before the outputs below are written — the fail-on gate exit 1,
+        # budget-abort exit 2 and fail-on-incomplete exit 3 are the cases those
+        # outputs exist to report.
         exit_code=0
         if [ "$SSA_MODE" = "standalone" ]; then
           symfony-security-auditor audit "${args[@]}" || exit_code=$?
@@ -182,6 +192,24 @@ runs:
           echo "findings-count=$(jq -r '.total_vulnerabilities' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
           echo "highest-severity=$(jq -r '.risk_level' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
           echo "grade=$(jq -r '.grade' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
+        fi
+
+        # jq must not fail the step: a runner without it, or a report it cannot
+        # parse, leaves the complete output empty instead.
+        complete=""
+        if [ -n "$SSA_OUTPUT" ] && [ -f "$SSA_OUTPUT" ]; then
+          case "$SSA_FORMAT" in
+            json) complete="$(jq -r '.complete' "$SSA_OUTPUT" 2>/dev/null)" || complete="" ;;
+            sarif) complete="$(jq -r '.runs[0].invocations[0].executionSuccessful' "$SSA_OUTPUT" 2>/dev/null)" || complete="" ;;
+          esac
+        fi
+        case "$complete" in
+          true | false) ;;
+          *) complete="" ;;
+        esac
+        echo "complete=$complete" >> "$GITHUB_OUTPUT"
+        if [ "$complete" = "false" ] && [ "$SSA_FAIL_ON_INCOMPLETE" != "true" ]; then
+          echo "::warning::The audit could not fully analyze every file, so its report cannot vouch that the project is free of vulnerabilities. Set fail-on-incomplete to true to fail the job when this happens."
         fi
 
         exit "$exit_code"

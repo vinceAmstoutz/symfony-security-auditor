@@ -24,17 +24,20 @@ final readonly class ReportDiff
      * @param list<DiffFinding> $newFindings        present in the current report, absent from the previous one
      * @param list<DiffFinding> $fixedFindings      present in the previous report, absent from the current one
      * @param list<DiffFinding> $persistingFindings present in both reports
+     * @param list<DiffFinding> $unverifiedFindings present in the previous report, absent from the current one — whose file the current run could not fully analyze, so nothing says they are fixed
      */
     public function __construct(
         public array $newFindings,
         public array $fixedFindings,
         public array $persistingFindings,
+        public array $unverifiedFindings = [],
     ) {}
 
     /**
      * @return array{
      *     new: list<array{fingerprint: string, type: string, file: string, title: string, severity: string}>,
      *     fixed: list<array{fingerprint: string, type: string, file: string, title: string, severity: string}>,
+     *     unverified: list<array{fingerprint: string, type: string, file: string, title: string, severity: string}>,
      *     persisting: list<array{fingerprint: string, type: string, file: string, title: string, severity: string}>,
      * }
      */
@@ -43,6 +46,7 @@ final readonly class ReportDiff
         return [
             'new' => $this->toArrayList($this->newFindings),
             'fixed' => $this->toArrayList($this->fixedFindings),
+            'unverified' => $this->toArrayList($this->unverifiedFindings),
             'persisting' => $this->toArrayList($this->persistingFindings),
         ];
     }

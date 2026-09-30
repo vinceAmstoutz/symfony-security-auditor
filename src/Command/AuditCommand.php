@@ -115,6 +115,7 @@ final readonly class AuditCommand
         try {
             try {
                 $auditCommandInput->assertNoConflictingOptions();
+                $this->reportWriter->assertWritable($auditCommandInput->reportFile());
 
                 if ($auditCommandInput->showScanned) {
                     $this->showScannedFiles($displayStyle, $projectPath, $scanPaths, $auditCommandInput->since);
@@ -263,11 +264,15 @@ final readonly class AuditCommand
         $fingerprintCount = $this->baselineProcessor->generate($auditReport, $generateBaseline);
         $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
+        $exitCode = $auditCommandInput->failOnIncomplete && !$auditReport->isComplete() ? ExitCode::Incomplete->value : ExitCode::Success->value;
+
         if (!$auditCommandInput->isMachineReadableToStdout()) {
             $this->auditPresenter->baselineGenerated($symfonyStyle, $generateBaseline, $fingerprintCount);
         }
 
-        return ExitCode::Success->value;
+        $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $auditReport, $exitCode);
+
+        return $exitCode;
     }
 
     /**
@@ -289,11 +294,16 @@ final readonly class AuditCommand
             $baselineResult->report,
             $auditCommandInput->failOn ?? $this->riskLevel,
             $auditCommandInput->minScore,
+            $auditCommandInput->failOnIncomplete,
         );
 
-        if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->result($symfonyStyle, $baselineResult->report, $exitCode);
+        if ($auditCommandInput->isMachineReadableToStdout()) {
+            $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $baselineResult->report, $exitCode);
+
+            return $exitCode;
         }
+
+        $this->auditPresenter->result($symfonyStyle, $baselineResult->report, $exitCode);
 
         return $exitCode;
     }

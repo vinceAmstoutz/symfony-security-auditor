@@ -88,10 +88,12 @@ is a `MAJOR` change.
   including its accepted values (`safe`, `low`, `medium`, `high`, `critical`).
 - The `--min-score` option (since 1.19) — a second, independent CI gate on the
   normalized 0-100 score. The audit exits `1` when either gate trips.
+- The `--fail-on-incomplete` option (since 1.21) — exits `3` when some file
+  could not be fully analyzed and no gate tripped.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
-  - `0` — audit completed; aggregate risk level is below the `fail_on` threshold
-    (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default) and, when
-    `--min-score` is given, the normalized score is at or above it.
+  - `0` — audit ran to its end; aggregate risk level is below the `fail_on`
+    threshold (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default)
+    and, when `--min-score` is given, the normalized score is at or above it.
   - `1` — aggregate risk level is at or above the `fail_on` threshold (default
     `critical`), the normalized score is below `--min-score`, or the audit
     itself failed.
@@ -101,6 +103,8 @@ is a `MAJOR` change.
     `audit.budget.max_cost_usd` unenforceable and either the user declined the
     interactive confirmation or the run is non-interactive (no report emitted in
     that case).
+  - `3` (since 1.21) — `--fail-on-incomplete` is set, no gate tripped, and some
+    file could not be fully analyzed.
 - The command name `audit:diff` (see
   [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)),
   its `previous-report` and `current-report` arguments, its `--format` option
@@ -176,13 +180,13 @@ deprecated by the other.
 
 - The composite action defined by `action.yml` at the repository root and its
   input names: `mode`, `project-path`, `format`, `output`, `baseline`,
-  `generate-baseline`, `since`, `fail-on`, `min-score`, `comment-pr`,
-  `update-badge`, `badge-path`, `extra-args`, `php-version`, `setup-php`,
-  `install-dependencies`, `working-directory`, and its output names:
-  `exit-code`, `report-path`, `findings-count`, `highest-severity`, `grade`,
-  `badge-path`, `comment-url`. New inputs/outputs may be added in a `MINOR`;
-  renaming or removing one is a `MAJOR`. The Marketplace `name`
-  (`Symfony Security Auditor`) is also stable.
+  `generate-baseline`, `since`, `fail-on`, `min-score`, `fail-on-incomplete`,
+  `comment-pr`, `update-badge`, `badge-path`, `extra-args`, `php-version`,
+  `setup-php`, `install-dependencies`, `working-directory`, and its output
+  names: `exit-code`, `report-path`, `complete`, `findings-count`,
+  `highest-severity`, `grade`, `badge-path`, `comment-url`. New inputs/outputs
+  may be added in a `MINOR`; renaming or removing one is a `MAJOR`. The
+  Marketplace `name` (`Symfony Security Auditor`) is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —
   `uses: vinceamstoutz/symfony-security-auditor@1.20.1` — matching the tag
   format used on Packagist. Bump the pin when upgrading. There is intentionally
@@ -226,8 +230,8 @@ deprecated by the other.
   also carries `score` (a normalized 0-100 health score, since 1.19) and `grade`
   (its `A`-`F` letter, since 1.19) beside the unchanged `risk_score` and
   `risk_level` — both additive. Since 1.21 it also carries `complete`, `false`
-  whenever some file was never analyzed (an LLM call failed or the run was
-  aborted; the `coverage` array holds the detail) — additive as well. Each
+  whenever some file could not be fully analyzed (an LLM call failed or the run
+  was aborted; the `coverage` array holds the detail) — additive as well. Each
   `cost.by_model` entry, still keyed by the configured model, also carries
   `billed_models` since 1.21: the models its calls were billed as, which differ
   from the configured one when the provider reports another model answering —
