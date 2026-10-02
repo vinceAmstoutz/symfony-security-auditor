@@ -18,7 +18,11 @@ interface UpdateCheckStoreInterface
 {
     public function read(): ?UpdateCheckState;
 
-    public function write(UpdateCheckState $updateCheckState): void;
+    /**
+     * @return bool whether the state was persisted — a caller that throttles
+     *              on it must not act when it cannot record having done so
+     */
+    public function write(UpdateCheckState $updateCheckState): bool;
 
     public function clear(): void;
 }

@@ -12,7 +12,9 @@
 
 declare(strict_types=1);
 
+use Symfony\Component\Console\Output\ConsoleOutput;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\PendingBinarySwapCommitter;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 (static function (): void {
@@ -58,10 +60,15 @@ $environment = getenv();
 $runningBinaryPath = \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) ? $_SERVER['SCRIPT_FILENAME'] : '';
 
 $standaloneApplicationFactory = StandaloneApplicationFactory::fromEnvironment($environment, $runningBinaryPath);
+$pendingBinarySwapCommitter = new PendingBinarySwapCommitter($standaloneApplicationFactory->pendingBinarySwap());
+$swapErrorOutput = (new ConsoleOutput())->getErrorOutput();
 
 // Committed at shutdown, past the last autoload from the archive being replaced.
-register_shutdown_function(static function () use ($standaloneApplicationFactory): void {
-    $standaloneApplicationFactory->pendingBinarySwap()->commit();
+register_shutdown_function(static function () use ($pendingBinarySwapCommitter, $swapErrorOutput): void {
+    $exitCode = $pendingBinarySwapCommitter->commit($swapErrorOutput);
+    if (0 !== $exitCode) {
+        exit($exitCode);
+    }
 });
 
 exit($standaloneApplicationFactory->create()->run());
