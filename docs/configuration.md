@@ -644,7 +644,8 @@ bin/console audit [<project-path>] [options]
 | `--baseline` |  | none | Path to a baseline file of accepted findings. Baselined findings skip the reviewer entirely (streamed as `[BASELINE-SKIPPED]` lines) and are excluded from the report and the exit code. With `--format=sarif`, a matching finding is instead kept and marked with a SARIF `suppressions` entry — see `audit.baseline` above. Entries annotated with a `reason` also feed the reviewer prompt as false-positive feedback — see `audit.baseline` above. Overrides the `audit.baseline` config key. A missing file suppresses nothing. |
 | `--fail-on` |  | `critical` | Minimum aggregate risk level (`safe`, `low`, `medium`, `high`, `critical`) that makes the command exit `1`. Overrides the `audit.fail_on` config key for this run. Defaults to the configured value (`critical`) when omitted. |
 | `--min-score` |  | none | _Since 1.19._ Minimum [normalized score](#normalized-score-and-grade) (0-100) below which the command exits `1`. Independent of `--fail-on`: the audit fails when **either** gate trips, so a project can be gated on one tunable number instead of severity buckets. Omit to gate on the risk level alone. |
-| `--generate-baseline` |  | none | Run the audit, then write one baseline entry per current finding (`fingerprint`, `type`, `file`, `title`, `added_at`) to the given file and exit `0` without failing on findings. Use to accept the current findings so future runs only report new ones. Needs a real audit run, so combining it with `--dry-run` or `--show-scanned` (both of which exit before the LLM is invoked) fails fast with a clear error instead of silently writing nothing. |
+| `--fail-on-incomplete` |  | `false` | _Since 1.21._ Exit `3` when some file could not be fully analyzed — an LLM call still failed after its retries — so a partial report cannot pass CI. A tripped `--fail-on` or `--min-score` gate still exits `1`, and an aborted run keeps its own code. Without it, such a run keeps the exit code its gates earn and prints an `Audit incomplete` warning (on stderr when the report goes to stdout). |
+| `--generate-baseline` |  | none | Run the audit, then write one baseline entry per current finding (`fingerprint`, `type`, `file`, `title`, `added_at`) to the given file and exit `0` without failing on findings (`3` under `--fail-on-incomplete` when some file could not be fully analyzed, since its findings are then missing from the baseline). Use to accept the current findings so future runs only report new ones. Needs a real audit run, so combining it with `--dry-run` or `--show-scanned` (both of which exit before the LLM is invoked) fails fast with a clear error instead of silently writing nothing. |
 
 ### Examples
 
@@ -781,15 +782,18 @@ The grade boundaries mirror the `risk_level` thresholds, so the two never disagr
 
 | Code | Meaning |
 | --- | --- |
-| `0` | Audit completed; aggregate risk level is below the `fail_on` threshold (default `critical` → SAFE, LOW, MEDIUM, or HIGH) and, when `--min-score` is given, the normalized score is at or above it |
+| `0` | Audit ran to its end; aggregate risk level is below the `fail_on` threshold (default `critical` → SAFE, LOW, MEDIUM, or HIGH) and, when `--min-score` is given, the normalized score is at or above it |
 | `1` | Aggregate risk level is at or above the `fail_on` threshold (default `critical`), the normalized score is below `--min-score`, **the scan discovered no file to audit**, the audit itself failed, or the path was invalid |
 | `2` | The audit budget could not be honored: either it aborted mid-run because the configured token or cost budget was exceeded (partial report still emitted), or it never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable and the run was declined or non-interactive (no report emitted in that case) |
+| `3` | _Since 1.21._ `--fail-on-incomplete` is set, no gate tripped, and some file could not be fully analyzed |
+
+An audit that ran to its end but could not fully analyze every file (an LLM call still failed after its retries) keeps the exit code its gates earn unless `--fail-on-incomplete` is set, in which case it exits `3` — or still `1` when a gate tripped. Either way it says so: the report reads `Audit incomplete`, the JSON report carries `complete: false`, SARIF sets `executionSuccessful: false`, and the command prints its own `Audit incomplete` notice — a warning naming `--fail-on-incomplete` when the run would otherwise pass, a plain warning when a gate already failed it, and an error when the option turned it into exit `3` — on stderr when the report itself goes to stdout, so a partial run never passes silently. An aborted run keeps exit code `1` (or `2` for a budget abort).
 
 A run whose scan discovered **no file at all** exits `1` rather than reporting SAFE with a perfect score. Nothing was examined, so there is no verdict to pass — this catches a mistyped `project-path`, a `scan.included_paths` entry matching nothing, or an over-broad `excluded_paths`, instead of letting the gate go green. A `--since` run whose diff left nothing changed still exits `0`: there the scan did find files, and none of them changed.
 
 ### `audit:diff` — comparing two reports
 
-Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title`.
+Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A finding that disappeared from a file the later run could not fully analyze (its `coverage` ledger says the file `errored` or was `aborted`, so the report carries `complete: false`) is **Unverified** rather than fixed: nobody looked, so nothing says it is gone. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title` — and one written before the coverage ledger existed simply has no unverified findings.
 
 ```bash
 bin/console audit:diff previous.json current.json
@@ -808,7 +812,9 @@ bin/console audit:diff previous.json current.json
 bin/console audit:diff previous.json current.json --format=json
 ```
 
-Exit codes: `0` on a successful comparison (regardless of whether any findings are new, fixed, or persisting), `1` if a report file is missing or is not valid JSON.
+The JSON document carries a `new`, `fixed`, `unverified` and `persisting` list; the console output shows the **Unverified** section, and counts it in its summary line, only when there is something in it.
+
+Exit codes: `0` on a successful comparison (regardless of whether any findings are new, fixed, unverified, or persisting), `1` if a report file is missing or is not valid JSON.
 
 ### `audit:trend` — tracking findings across reports
 
@@ -834,7 +840,7 @@ Summary: 5 → 6 findings (+1) across 3 reports.
 | ---------- | ----- | --------- | ------------------------------------------- |
 | `--format` | `-f`  | `console` | Output format: `console`, `json`, or `html` |
 
-With `--format=json` the trend is emitted as a `points` array — one entry per report with `report`, `total`, `new`, and `fixed` keys (`new` and `fixed` are `null` on the first point, which has no predecessor to compare against).
+With `--format=json` the trend is emitted as a `points` array — one entry per report with `report`, `total`, `new`, `fixed`, and `unverified` keys (`new`, `fixed`, and `unverified` are `null` on the first point, which has no predecessor to compare against). `unverified` counts the findings that disappeared from files the report's run could not fully analyze — they are neither fixed nor part of its total, and the console line mentions them only when there are some.
 
 With `--format=html` the trend is emitted as a single self-contained HTML page (no external assets, light and dark mode): an SVG line chart of finding totals over the report series plus a table of per-report new/fixed deltas — redirect stdout to publish it as a dashboard:
 
@@ -935,6 +941,7 @@ The audit runs with the auditor's own configured platform, models and profile: `
 - An audit needs **no API key** only when the configured platform takes none, such as a local [Ollama](#supported-platforms) — nothing then leaves your machine either.
 - A client started from a desktop app does not inherit your shell's environment variables. With the standalone binary, store the key once with [`auth:set`](#providing-the-api-key) so the server finds it however it is launched; otherwise pass the variable through the client's `env` setting.
 - A full report can be large. Claude Code caps a tool's output at 25,000 tokens by default; raise `MAX_MCP_OUTPUT_TOKENS` if a report is cut off.
+- An audit takes minutes and the tool call is synchronous: it sends no progress, and a client that gives up on it — the MCP TypeScript SDK's default request timeout is 60 seconds — leaves the server finishing the audit, and spending on the provider, for an answer nobody reads. Raise the client's tool timeout (Claude Code reads `MCP_TOOL_TIMEOUT`, in milliseconds) or keep audits driven over MCP short with the `fast` profile and a narrow `scan.included_paths`.
 
 ### `init` — generating the standalone configuration
 

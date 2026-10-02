@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
 
 final class AuditPresenterTest extends TestCase
 {
@@ -81,6 +82,19 @@ final class AuditPresenterTest extends TestCase
 
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('Unexpected error: Disk full', $display);
+    }
+
+    public function test_an_error_printed_on_a_github_actions_runner_has_its_workflow_commands_defused(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $auditPresenter = new AuditPresenter($this->pricingProviderKnowing(), workflowCommandNeutralizer: new WorkflowCommandNeutralizer(true));
+
+        $auditPresenter->error($symfonyStyle, new RuntimeException('src/a ::error title=Forged::x.php'));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString(':\\:error title=Forged:\\:x.php', $display);
+        self::assertStringNotContainsString('::', $display);
     }
 
     public function test_long_run_notice_warns_that_the_audit_can_take_a_while(): void
@@ -222,7 +236,73 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext($auditContext), Command::SUCCESS);
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
-        self::assertStringContainsString('[WARNING] Audit incomplete: 1 file(s) were never analyzed', $flattened);
+        self::assertStringContainsString('[WARNING] Audit incomplete: 1 file(s) could not be fully analyzed', $flattened);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_result_for_an_incomplete_audit_names_the_flag_that_would_fail_it(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext($auditContext), Command::SUCCESS);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('Risk: SAFE | Vulnerabilities: 0. Pass --fail-on-incomplete to fail the run when this happens.', $flattened);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_result_for_an_incomplete_audit_failed_on_purpose_says_why(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext($auditContext), 3);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('[ERROR] Audit incomplete: 1 file(s) could not be fully analyzed', $flattened);
+        self::assertStringContainsString('The run fails because --fail-on-incomplete is set.', $flattened);
+        self::assertStringNotContainsString('Pass --fail-on-incomplete', $flattened);
+        self::assertStringNotContainsString('[WARNING]', $flattened);
+        self::assertStringNotContainsString('Audit complete. Risk:', $flattened);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_result_for_a_failed_gate_on_an_incomplete_audit_also_says_it_is_incomplete(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        $this->auditPresenter->result($symfonyStyle, AuditReport::fromContext($auditContext), Command::FAILURE);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('Audit failed a configured gate.', $flattened);
+        self::assertStringContainsString('[WARNING] Audit incomplete: 1 file(s) could not be fully analyzed', $flattened);
+        self::assertStringNotContainsString('Pass --fail-on-incomplete', $flattened);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_incomplete_run_notice_stays_silent_for_a_complete_audit(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->auditPresenter->incompleteRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext(AuditContext::forProject($this->tmpDir)), Command::SUCCESS);
+
+        self::assertSame('', $bufferedOutput->fetch());
     }
 
     /**
@@ -653,6 +733,23 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('config (1)', $flattened);
         self::assertStringContainsString('config/packages/security.yaml', $flattened);
         self::assertStringContainsString('2 file(s) in scope.', $flattened);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_defuse_a_legacy_workflow_command_in_a_path(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/##[stop-commands]zz.php', '/p/src/Controller/##[stop-commands]zz.php', '<?php class Zz {}'),
+        ]);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('src/Controller/#\\#[stop-commands]zz.php', $display);
+        self::assertStringNotContainsString('##[', $display);
     }
 
     /**

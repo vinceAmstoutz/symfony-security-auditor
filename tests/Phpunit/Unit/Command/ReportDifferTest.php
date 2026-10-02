@@ -422,4 +422,164 @@ final class ReportDifferTest extends TestCase
 
         return $path;
     }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_keeps_a_finding_gone_from_a_file_the_current_run_could_not_analyze_apart_from_the_fixed_ones(): void
+    {
+        $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
+        $current = $this->writeReportWithCoverage('current.json', [], [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'errored']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertCount(1, $reportDiff->unverifiedFindings);
+        self::assertSame('SQL Injection', $reportDiff->unverifiedFindings[0]->title);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_calls_a_finding_fixed_when_the_current_run_analyzed_its_file(): void
+    {
+        $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
+        $current = $this->writeReportWithCoverage('current.json', [], [
+            ['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'errored'],
+            ['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'analyzed'],
+        ]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertSame([], $reportDiff->unverifiedFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_only_reads_the_coverage_of_the_current_report(): void
+    {
+        $previous = $this->writeReportWithCoverage('previous.json', [$this->vulnerability('SQL Injection')], [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'errored']]);
+        $current = $this->writeReport('current.json', []);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertSame([], $reportDiff->unverifiedFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    #[DataProvider('coverageLedgersNamingNoFile')]
+    public function test_diff_treats_a_report_without_a_readable_coverage_ledger_as_complete(mixed $coverage): void
+    {
+        $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
+        $current = $this->writeReportWithCoverage('current.json', [], $coverage);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertSame([], $reportDiff->unverifiedFindings);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function coverageLedgersNamingNoFile(): iterable
+    {
+        yield 'a ledger that is not a list' => ['errored'];
+        yield 'an entry that is not an object' => [['src/Foo.php']];
+        yield 'an entry missing its status' => [[['stage' => 'attacker', 'file' => 'src/Foo.php']]];
+        yield 'an entry whose file is not a string' => [[['stage' => 'attacker', 'file' => 42, 'status' => 'errored']]];
+        yield 'an entry whose stage is not a string' => [[['stage' => null, 'file' => 'src/Foo.php', 'status' => 'errored']]];
+        yield 'a file another run finished' => [[['stage' => 'attacker', 'file' => 'src/Bar.php', 'status' => 'errored']]];
+    }
+
+    /**
+     * @param list<array<string, string>> $vulnerabilities
+     */
+    private function writeReportWithCoverage(string $filename, array $vulnerabilities, mixed $coverage): string
+    {
+        $path = $this->tmpDir.'/'.$filename;
+        $this->filesystem->dumpFile($path, json_encode(['vulnerabilities' => $vulnerabilities, 'coverage' => $coverage], \JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_keeps_sorting_the_findings_that_disappeared_after_an_unverified_one(): void
+    {
+        $inUnanalyzedFile = $this->vulnerability('SQL Injection');
+        $inAnalyzedFile = [
+            'type' => 'mass_assignment',
+            'file' => 'src/Bar.php',
+            'title' => 'Mass Assignment',
+            'severity' => 'medium',
+            'fingerprint' => Vulnerability::fingerprintOf('mass_assignment', 'src/Bar.php', 'Mass Assignment'),
+        ];
+        $previous = $this->writeReport('previous.json', [$inUnanalyzedFile, $inAnalyzedFile]);
+        $current = $this->writeReportWithCoverage('current.json', [], [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'errored']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame(['SQL Injection'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->unverifiedFindings));
+        self::assertSame(['Mass Assignment'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->fixedFindings));
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_keeps_a_finding_echoed_with_a_leading_dot_slash_apart_when_its_file_could_not_be_analyzed(): void
+    {
+        $echoed = ['type' => 'sql_injection', 'file' => './src/Foo.php', 'title' => 'SQL Injection', 'severity' => 'high', 'fingerprint' => Vulnerability::fingerprintOf('sql_injection', './src/Foo.php', 'SQL Injection')];
+        $previous = $this->writeReport('previous.json', [$echoed]);
+        $current = $this->writeReportWithCoverage('current.json', [], [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'errored']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertSame(['./src/Foo.php'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->file, $reportDiff->unverifiedFindings));
+    }
+
+    /**
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_diff_keeps_a_finding_apart_when_the_reviewer_failed_on_it_under_the_path_the_attacker_echoed(): void
+    {
+        $echoed = ['type' => 'sql_injection', 'file' => './src/Foo.php', 'title' => 'SQL Injection', 'severity' => 'high', 'fingerprint' => Vulnerability::fingerprintOf('sql_injection', './src/Foo.php', 'SQL Injection')];
+        $previous = $this->writeReport('previous.json', [$echoed]);
+        $current = $this->writeReportWithCoverage('current.json', [], [['stage' => 'reviewer', 'file' => './src/Foo.php', 'status' => 'errored']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertSame(['./src/Foo.php'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->file, $reportDiff->unverifiedFindings));
+    }
+
+    /**
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_diff_keeps_a_plain_path_finding_apart_when_the_reviewer_failed_on_it_under_an_echoed_path(): void
+    {
+        $plain = ['type' => 'sql_injection', 'file' => 'src/Foo.php', 'title' => 'SQL Injection', 'severity' => 'high', 'fingerprint' => Vulnerability::fingerprintOf('sql_injection', 'src/Foo.php', 'SQL Injection')];
+        $previous = $this->writeReport('previous.json', [$plain]);
+        $current = $this->writeReportWithCoverage('current.json', [], [['stage' => 'reviewer', 'file' => './src/Foo.php', 'status' => 'errored']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertCount(1, $reportDiff->unverifiedFindings);
+    }
 }

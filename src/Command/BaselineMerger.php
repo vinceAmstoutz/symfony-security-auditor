@@ -36,7 +36,7 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     #[Override]
     public function plan(string $reportPath, string $baselinePath, bool $prune): BaselineMergePlan
     {
-        $findings = $this->reportFindingsLoader->load($reportPath);
+        $findings = $this->reportFindingsLoader->load($reportPath)->findings;
         $entries = $this->baseline->entries($baselinePath);
 
         [$keptEntries, $prunedCount] = $prune ? $this->pruned($entries, $findings) : [$entries, 0];

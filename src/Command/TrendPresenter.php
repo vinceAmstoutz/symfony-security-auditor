@@ -76,7 +76,11 @@ final readonly class TrendPresenter implements TrendPresenterInterface
             return $line;
         }
 
-        return \sprintf('%s (%d new, %d fixed)', $line, $trendPoint->newCount, $trendPoint->fixedCount);
+        $unverified = null !== $trendPoint->unverifiedCount && 0 !== $trendPoint->unverifiedCount
+            ? \sprintf(', %d unverified', $trendPoint->unverifiedCount)
+            : '';
+
+        return \sprintf('%s (%d new, %d fixed%s)', $line, $trendPoint->newCount, $trendPoint->fixedCount, $unverified);
     }
 
     /**

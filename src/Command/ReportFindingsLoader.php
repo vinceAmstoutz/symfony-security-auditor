@@ -17,6 +17,7 @@ use JsonException;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\UnanalyzedFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
@@ -26,7 +27,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadable
  * `fingerprint` key existed is still accepted: its fingerprint is recomputed
  * from `type`, `file`, and `title` with the exact formula
  * {@see Vulnerability::fingerprintOf()} uses, so it never drifts from the
- * canonical identity.
+ * canonical identity. The report's `coverage` ledger, when it carries one,
+ * names the files the run could not fully analyze the same way
+ * {@see UnanalyzedFiles} reads it for the run itself.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -37,11 +40,13 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
     ) {}
 
     #[Override]
-    public function load(string $path): array
+    public function load(string $path): LoadedReport
     {
+        $decoded = $this->decodeReport($path);
+
         $findings = [];
         $index = 0;
-        foreach ($this->decodeVulnerabilities($path) as $vulnerability) {
+        foreach ($this->vulnerabilitiesIn($decoded, $path) as $vulnerability) {
             if (!\is_array($vulnerability)) {
                 throw MalformedReportFileException::vulnerabilityEntryNotAnObject($path, $index);
             }
@@ -50,7 +55,7 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
             ++$index;
         }
 
-        return $findings;
+        return new LoadedReport($findings, $this->unanalyzedFilesIn($decoded));
     }
 
     /**
@@ -59,7 +64,7 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
      */
-    private function decodeVulnerabilities(string $path): array
+    private function decodeReport(string $path): array
     {
         if (!$this->filesystem->exists($path)) {
             throw ReportFileNotReadableException::forPath($path);
@@ -81,12 +86,49 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
             throw MalformedReportFileException::missingVulnerabilitiesArray($path);
         }
 
+        return $decoded;
+    }
+
+    /**
+     * @param array<array-key, mixed> $decoded
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws MalformedReportFileException
+     */
+    private function vulnerabilitiesIn(array $decoded, string $path): array
+    {
         $vulnerabilities = $decoded['vulnerabilities'] ?? null;
         if (!\is_array($vulnerabilities)) {
             throw MalformedReportFileException::missingVulnerabilitiesArray($path);
         }
 
         return $vulnerabilities;
+    }
+
+    /**
+     * A report written before the ledger existed, or one whose entries do not
+     * have the expected shape, simply names no such file.
+     *
+     * @param array<array-key, mixed> $decoded
+     *
+     * @return list<string>
+     */
+    private function unanalyzedFilesIn(array $decoded): array
+    {
+        $coverage = $decoded['coverage'] ?? null;
+        if (!\is_array($coverage)) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($coverage as $entry) {
+            if (\is_array($entry) && \is_string($entry['stage'] ?? null) && \is_string($entry['file'] ?? null) && \is_string($entry['status'] ?? null)) {
+                $entries[] = ['stage' => $entry['stage'], 'file' => $entry['file'], 'status' => $entry['status']];
+            }
+        }
+
+        return UnanalyzedFiles::in($entries);
     }
 
     /**

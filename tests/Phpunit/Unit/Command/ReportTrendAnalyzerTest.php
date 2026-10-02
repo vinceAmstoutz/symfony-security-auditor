@@ -83,7 +83,7 @@ final class ReportTrendAnalyzerTest extends TestCase
         $reportTrend = $this->reportTrendAnalyzer->analyze([$first, $second]);
 
         self::assertSame(
-            ['report' => $first, 'total' => 2, 'new' => null, 'fixed' => null],
+            ['report' => $first, 'total' => 2, 'new' => null, 'fixed' => null, 'unverified' => null],
             $reportTrend->points[0]->toArray(),
         );
     }
@@ -109,7 +109,7 @@ final class ReportTrendAnalyzerTest extends TestCase
         $reportTrend = $this->reportTrendAnalyzer->analyze([$first, $second]);
 
         self::assertSame(
-            ['report' => $second, 'total' => 3, 'new' => 2, 'fixed' => 1],
+            ['report' => $second, 'total' => 3, 'new' => 2, 'fixed' => 1, 'unverified' => 0],
             $reportTrend->points[1]->toArray(),
         );
     }
@@ -129,7 +129,7 @@ final class ReportTrendAnalyzerTest extends TestCase
         $reportTrend = $this->reportTrendAnalyzer->analyze([$first, $second, $third]);
 
         self::assertSame(
-            ['report' => $third, 'total' => 1, 'new' => 0, 'fixed' => 0],
+            ['report' => $third, 'total' => 1, 'new' => 0, 'fixed' => 0, 'unverified' => 0],
             $reportTrend->points[2]->toArray(),
         );
     }
@@ -168,6 +168,36 @@ final class ReportTrendAnalyzerTest extends TestCase
     {
         $path = $this->tmpDir.'/'.$filename;
         $this->filesystem->dumpFile($path, json_encode(['vulnerabilities' => $vulnerabilities], \JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    /**
+     * @throws InsufficientTrendReportsException
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_a_finding_gone_from_a_file_the_later_run_could_not_analyze_counts_as_unverified_not_fixed(): void
+    {
+        $unverifiable = $this->vulnerability('SQL Injection', 'src/Repository/B.php');
+        $first = $this->writeReport('first.json', [$this->vulnerability('CSRF Missing', 'src/Controller/A.php'), $unverifiable]);
+        $second = $this->writeIncompleteReport('second.json', [], ['src/Repository/B.php']);
+
+        $reportTrend = $this->reportTrendAnalyzer->analyze([$first, $second]);
+
+        self::assertSame(['report' => $first, 'total' => 2, 'new' => null, 'fixed' => null, 'unverified' => null], $reportTrend->points[0]->toArray());
+        self::assertSame(['report' => $second, 'total' => 0, 'new' => 0, 'fixed' => 1, 'unverified' => 1], $reportTrend->points[1]->toArray());
+    }
+
+    /**
+     * @param list<array<string, string>> $vulnerabilities
+     * @param list<string>                $unanalyzedFiles
+     */
+    private function writeIncompleteReport(string $filename, array $vulnerabilities, array $unanalyzedFiles): string
+    {
+        $path = $this->tmpDir.'/'.$filename;
+        $coverage = array_map(static fn (string $file): array => ['stage' => 'attacker', 'file' => $file, 'status' => 'errored'], $unanalyzedFiles);
+        $this->filesystem->dumpFile($path, json_encode(['complete' => false, 'vulnerabilities' => $vulnerabilities, 'coverage' => $coverage], \JSON_THROW_ON_ERROR));
 
         return $path;
     }

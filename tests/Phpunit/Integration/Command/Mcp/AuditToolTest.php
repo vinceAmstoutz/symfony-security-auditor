@@ -13,16 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp;
 
+use Mcp\Exception\ToolCallException;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
@@ -48,12 +44,7 @@ final class AuditToolTest extends TestCase
     }
 
     /**
-     * @throws AuditAbortedByBudgetException
-     * @throws AuditAbortedByProviderException
-     * @throws InvalidAuditContextException
-     * @throws InvalidAuditCostException
-     * @throws InvalidProjectPathException
-     * @throws InvalidTokenUsageException
+     * @throws ToolCallException
      */
     public function test_it_audits_the_given_path_and_returns_the_rendered_json_report(): void
     {
@@ -66,12 +57,7 @@ final class AuditToolTest extends TestCase
     }
 
     /**
-     * @throws AuditAbortedByBudgetException
-     * @throws AuditAbortedByProviderException
-     * @throws InvalidAuditContextException
-     * @throws InvalidAuditCostException
-     * @throws InvalidProjectPathException
-     * @throws InvalidTokenUsageException
+     * @throws ToolCallException
      */
     public function test_it_returns_the_report_as_rendered_by_the_report_renderer(): void
     {
@@ -92,12 +78,7 @@ final class AuditToolTest extends TestCase
      * same for its own `path` argument, or those collaborators silently
      * resolve against the wrong project when the tool is invoked over MCP.
      *
-     * @throws AuditAbortedByBudgetException
-     * @throws AuditAbortedByProviderException
-     * @throws InvalidAuditContextException
-     * @throws InvalidAuditCostException
-     * @throws InvalidProjectPathException
-     * @throws InvalidTokenUsageException
+     * @throws ToolCallException
      */
     public function test_it_sets_the_audited_project_path_holder_before_running_the_use_case(): void
     {
@@ -118,21 +99,19 @@ final class AuditToolTest extends TestCase
      * back to, so a relative `path` is rejected rather than silently
      * resolved against the server process's own cwd.
      *
-     * @throws AuditAbortedByBudgetException
-     * @throws AuditAbortedByProviderException
-     * @throws InvalidAuditContextException
-     * @throws InvalidAuditCostException
-     * @throws InvalidProjectPathException
-     * @throws InvalidTokenUsageException
+     * @throws ToolCallException
      */
     public function test_it_rejects_a_non_absolute_path(): void
     {
         $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer(), $this->auditedProjectPathHolder());
 
-        $this->expectException(InvalidProjectPathException::class);
-        $this->expectExceptionMessage('must be absolute');
-
-        $auditTool->audit('relative/path');
+        try {
+            $auditTool->audit('relative/path');
+            self::fail('A relative path must be refused.');
+        } catch (ToolCallException $toolCallException) {
+            self::assertStringContainsString('must be absolute', $toolCallException->getMessage());
+            self::assertInstanceOf(InvalidProjectPathException::class, $toolCallException->getPrevious());
+        }
     }
 
     /**
@@ -143,12 +122,7 @@ final class AuditToolTest extends TestCase
      * `AuditedProjectPathHolder::path()` a stable cache/lookup key regardless
      * of entry point.
      *
-     * @throws AuditAbortedByBudgetException
-     * @throws AuditAbortedByProviderException
-     * @throws InvalidAuditContextException
-     * @throws InvalidAuditCostException
-     * @throws InvalidProjectPathException
-     * @throws InvalidTokenUsageException
+     * @throws ToolCallException
      */
     public function test_it_canonicalizes_the_path_before_setting_the_holder_and_running(): void
     {

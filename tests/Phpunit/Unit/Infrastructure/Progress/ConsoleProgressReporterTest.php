@@ -237,6 +237,17 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('🟠 HIGH sql_injection — src/X.php:42', $this->bufferedOutput->fetch());
     }
 
+    public function test_a_legacy_workflow_command_in_a_reported_file_path_is_defused(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'sql_injection', 'file' => 'src/##[error]Forged.php', 'line' => 42]);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('src/#\\#[error]Forged.php:42', $rendered);
+        self::assertStringNotContainsString('##[', $rendered);
+    }
+
     public function test_a_forged_console_tag_in_a_reported_file_path_does_not_crash_the_audit(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);

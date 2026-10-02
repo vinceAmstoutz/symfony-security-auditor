@@ -62,6 +62,33 @@ final class AuditCommandInputTest extends TestCase
         self::assertFalse($auditCommandInput->isMachineReadableToStdout());
     }
 
+    public function test_the_report_file_is_the_output_option_when_a_report_is_written(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = '/tmp/report.json';
+
+        self::assertSame('/tmp/report.json', $auditCommandInput->reportFile());
+    }
+
+    public function test_show_scanned_alone_has_no_report_file_since_it_writes_no_report(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = '/tmp/report.json';
+        $auditCommandInput->showScanned = true;
+
+        self::assertNull($auditCommandInput->reportFile());
+    }
+
+    public function test_show_scanned_with_dry_run_keeps_the_report_file_of_its_estimate(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = '/tmp/report.json';
+        $auditCommandInput->showScanned = true;
+        $auditCommandInput->dryRun = true;
+
+        self::assertSame('/tmp/report.json', $auditCommandInput->reportFile());
+    }
+
     public function test_default_format_is_console(): void
     {
         $auditCommandInput = new AuditCommandInput();

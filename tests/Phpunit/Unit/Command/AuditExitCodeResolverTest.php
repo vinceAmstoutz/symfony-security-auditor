@@ -174,9 +174,61 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function reportWith(int $criticalFindings): AuditReport
+    public function test_an_incomplete_report_fails_with_its_own_code_when_asked_to(): void
+    {
+        self::assertSame(3, $this->auditExitCodeResolver->resolve($this->reportWith(0, incomplete: true), RiskLevel::Critical, null, true));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_incomplete_report_passes_when_not_asked_to_fail(): void
+    {
+        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve($this->reportWith(0, incomplete: true), RiskLevel::Critical));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_complete_report_passes_when_asked_to_fail_on_an_incomplete_one(): void
+    {
+        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve($this->reportWith(0), RiskLevel::Critical, null, true));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_tripped_gate_keeps_its_code_on_an_incomplete_report(): void
+    {
+        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve($this->reportWith(5, incomplete: true), RiskLevel::Critical, null, true));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function reportWith(int $criticalFindings, bool $incomplete = false): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
+        if ($incomplete) {
+            $auditContext->recordCoverage('attacker', 'src/Audited.php', 'errored');
+        }
+
         $auditContext->setProjectFiles([ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
         for ($i = 1; $i <= $criticalFindings; ++$i) {
             $auditContext->addVulnerability(

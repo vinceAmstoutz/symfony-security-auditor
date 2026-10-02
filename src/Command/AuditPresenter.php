@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -33,6 +34,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     public function __construct(
         private PricingProviderInterface $pricingProvider,
         private ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
+        private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
     ) {}
 
     #[Override]
@@ -251,11 +253,12 @@ final readonly class AuditPresenter implements AuditPresenterInterface
      * override. `OutputFormatter::escape()` neutralises `<`/`>` markup but not
      * those characters, so the path is first collapsed to a single line and
      * stripped of control/bidi characters — a crafted filename cannot forge a
-     * fake listing entry or spoof the terminal.
+     * fake listing entry or spoof the terminal — and a legacy `##[command]`
+     * in it is defused for a CI runner's log.
      */
     private function sanitizePathForListing(string $relativePath): string
     {
-        return OutputFormatter::escape(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($relativePath, 'UTF-8')));
+        return OutputFormatter::escape(WorkflowCommandText::inLine(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($relativePath, 'UTF-8'))));
     }
 
     /**
@@ -307,7 +310,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             ? $throwable->getMessage()
             : \sprintf('Unexpected error: %s', $throwable->getMessage());
 
-        $symfonyStyle->error($message);
+        $symfonyStyle->error($this->workflowCommandNeutralizer->message($message));
     }
 
     #[Override]
@@ -322,17 +325,13 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                 $totalVulnerabilities,
                 1 === $totalVulnerabilities ? 'vulnerability' : 'vulnerabilities',
             ));
+            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode);
 
             return;
         }
 
         if (!$auditReport->isComplete()) {
-            $symfonyStyle->warning(\sprintf(
-                'Audit incomplete: %d file(s) were never analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d',
-                \count($auditReport->unanalyzedFiles()),
-                $auditReport->riskLevel(),
-                $auditReport->totalVulnerabilities(),
-            ));
+            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode);
 
             return;
         }
@@ -342,6 +341,29 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $auditReport->riskLevel(),
             $auditReport->totalVulnerabilities(),
         ));
+    }
+
+    #[Override]
+    public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
+    {
+        if ($auditReport->isComplete()) {
+            return;
+        }
+
+        $summary = \sprintf(
+            'Audit incomplete: %d file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
+            \count($auditReport->unanalyzedFiles()),
+            $auditReport->riskLevel(),
+            $auditReport->totalVulnerabilities(),
+        );
+
+        if (ExitCode::Incomplete->value === $exitCode) {
+            $symfonyStyle->error(\sprintf('%s The run fails because --fail-on-incomplete is set.', $summary));
+
+            return;
+        }
+
+        $symfonyStyle->warning(ExitCode::Success->value === $exitCode ? \sprintf('%s Pass --fail-on-incomplete to fail the run when this happens.', $summary) : $summary);
     }
 
     #[Override]

@@ -17,6 +17,7 @@ use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
@@ -54,9 +55,13 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
         };
     }
 
+    /**
+     * Every line starts with a prefix of ours, but a finding's file or title
+     * may still carry a legacy `##[command]` a CI runner would act on.
+     */
     private function writeln(string $line): void
     {
-        $this->output->writeln($line, OutputInterface::OUTPUT_RAW);
+        $this->output->writeln(WorkflowCommandText::inLine($line), OutputInterface::OUTPUT_RAW);
     }
 
     /** @param array<string, mixed> $context */

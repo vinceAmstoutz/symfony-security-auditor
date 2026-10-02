@@ -30,7 +30,7 @@ final class IncompleteAuditNoticeTest extends TestCase
         $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
         $auditContext->recordCoverage('attacker', 'src/B.php', 'aborted');
 
-        self::assertStringStartsWith('Audit incomplete: 2 file(s) were never analyzed', (string) IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)));
+        self::assertStringStartsWith('Audit incomplete: 2 file(s) could not be fully analyzed', (string) IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)));
     }
 
     /**

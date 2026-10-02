@@ -29,7 +29,7 @@ final readonly class ReportTrend
     ) {}
 
     /**
-     * @return array{points: list<array{report: string, total: int, new: int|null, fixed: int|null}>}
+     * @return array{points: list<array{report: string, total: int, new: int|null, fixed: int|null, unverified: int|null}>}
      */
     public function toArray(): array
     {

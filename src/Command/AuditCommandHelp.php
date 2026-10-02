@@ -18,7 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class AuditCommandHelp
+final readonly class AuditCommandHelp
 {
     public const string HELP = <<<'HELP'
         The <info>%command.name%</info> command runs a multi-agent LLM security audit against a Symfony project.
@@ -50,6 +50,8 @@ final class AuditCommandHelp
           <info>2</info>  audit budget could not be honored: it aborted mid-run because the configured token or cost budget was
                 exceeded (partial report still emitted), or it never started because an unpriced model makes the cost
                 budget unenforceable and the run was declined or non-interactive (no report emitted in that case)
+          <info>3</info>  <info>--fail-on-incomplete</info> is set and some file could not be fully analyzed (a tripped gate still exits 1);
+                without the option such a run keeps the code its gates earn and prints a warning
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
         and costs a few cents to a few dollars depending on the selected model. Configure

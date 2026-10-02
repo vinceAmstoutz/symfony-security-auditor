@@ -538,7 +538,7 @@ Console command `audit:run` (alias `audit`). Arguments and options:
 
 Input mapping and resolution live in `AuditCommandInput`; output writing in `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
-Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold (default `critical`, so SAFE/LOW/MEDIUM/HIGH) and any `--min-score` is met; `1` when it is at or above the threshold, the normalized score is below `--min-score`, the scan discovered no file to audit at all, the path was invalid, or the audit itself failed; `2` when the budget could not be honored — either aborted mid-run with a partial report still emitted, or never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable. The canonical table lives in [`docs/configuration.md`](configuration.md#exit-codes).
+Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold (default `critical`, so SAFE/LOW/MEDIUM/HIGH) and any `--min-score` is met; `1` when it is at or above the threshold, the normalized score is below `--min-score`, the scan discovered no file to audit at all, the path was invalid, or the audit itself failed; `2` when the budget could not be honored — either aborted mid-run with a partial report still emitted, or never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable; `3` when `--fail-on-incomplete` is set, no gate tripped, and some file could not be fully analyzed. The canonical table lives in [`docs/configuration.md`](configuration.md#exit-codes).
 
 ## Extension Points
 

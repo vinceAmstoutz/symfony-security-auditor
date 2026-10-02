@@ -36,6 +36,7 @@ final readonly class ReportWriter implements ReportWriterInterface
     public function __construct(
         iterable $renderers,
         private Filesystem $filesystem,
+        private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
     ) {
         $indexed = [];
         foreach ($renderers as $renderer) {
@@ -58,21 +59,72 @@ final readonly class ReportWriter implements ReportWriterInterface
         $content = $this->renderContent($outputFormat, $auditReport, $baselinedFingerprints);
 
         if (null === $outputFile) {
-            // OUTPUT_RAW: no renderer emits real Symfony tags, so a finding's own `<...>` text must never reach the console formatter.
-            $symfonyStyle->writeln($content, OutputInterface::OUTPUT_RAW);
+            $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
 
+            return;
+        }
+
+        try {
+            $this->assertSafeToWrite($outputFile);
+            $this->filesystem->dumpFile($outputFile, $content);
+        } catch (UnsafeReportWriteException $unsafeReportWriteException) {
+            $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
+
+            throw $unsafeReportWriteException;
+        } catch (IOException $ioException) {
+            $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
+
+            throw ReportWriteFailedException::fromIOException($outputFile, $ioException);
+        }
+
+        $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    #[Override]
+    public function assertWritable(?string $outputFile): void
+    {
+        if (null === $outputFile) {
             return;
         }
 
         $this->assertSafeToWrite($outputFile);
 
         try {
-            $this->filesystem->dumpFile($outputFile, $content);
+            $this->filesystem->mkdir(\dirname($outputFile));
         } catch (IOException $ioException) {
-            throw ReportWriteFailedException::fromIOException($outputFile, $ioException);
+            throw ReportWriteFailedException::forUncreatableDirectory($outputFile, $ioException);
         }
 
-        $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
+        if (!$this->canBeWritten($outputFile)) {
+            throw ReportWriteFailedException::forUnwritablePath($outputFile);
+        }
+    }
+
+    /**
+     * The directories are created up front — `dumpFile()` would create them
+     * anyway — so what remains to check is what `dumpFile()` needs: a writable
+     * directory in every case (it writes a temporary file beside the target
+     * and renames it), plus a destination that is not a directory and, when
+     * it already exists, is writable itself.
+     */
+    private function canBeWritten(string $outputFile): bool
+    {
+        return is_writable(\dirname($outputFile)) && (!file_exists($outputFile) || (!is_dir($outputFile) && is_writable($outputFile)));
+    }
+
+    /**
+     * A report reaches the console when no `--output` was given, and also
+     * when its file cannot be written: the audit already ran and paid for
+     * it, so it goes to the console instead of vanishing with the exception.
+     */
+    private function keepOnConsole(SymfonyStyle $symfonyStyle, OutputFormat $outputFormat, string $content): void
+    {
+        // OUTPUT_RAW: no renderer emits real Symfony tags, so a finding's own `<...>` text must never reach the console formatter.
+        $symfonyStyle->writeln($this->workflowCommandNeutralizer->report($outputFormat, $content), OutputInterface::OUTPUT_RAW);
     }
 
     /**

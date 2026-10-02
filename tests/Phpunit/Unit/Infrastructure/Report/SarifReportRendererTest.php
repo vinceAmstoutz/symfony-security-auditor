@@ -94,7 +94,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame(
             [[
                 'executionSuccessful' => false,
-                'toolExecutionNotifications' => [['level' => 'error', 'message' => ['text' => 'Audit incomplete: 2 file(s) were never analyzed because an LLM call failed or the run was aborted, so this report cannot vouch that the project is free of vulnerabilities.']]],
+                'toolExecutionNotifications' => [['level' => 'error', 'message' => ['text' => 'Audit incomplete: 2 file(s) could not be fully analyzed because an LLM call failed or the run was aborted, so this report cannot vouch that the project is free of vulnerabilities.']]],
             ]],
             $this->invocationsOf($this->makeIncompleteReport()),
         );

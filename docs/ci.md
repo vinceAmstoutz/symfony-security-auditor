@@ -164,11 +164,11 @@ jobs:
           sarif_file: report.sarif
 ```
 
-Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`), `project-path` (default `.`), `format` (`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`, default `sarif`), `output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`, `fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score floor, 0-100 — independent of `fail-on`, either gate failing fails the audit), `comment-pr` (default `false`), `update-badge` (default `false`), `badge-path` (default `.github/security-auditor-badge.json`), `extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`, ignored in standalone mode), and `working-directory` (default `.`). Set `setup-php: false` / `install-dependencies: false` when your job has already done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
+Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`), `project-path` (default `.`), `format` (`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`, default `sarif`), `output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`, `fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score floor, 0-100 — independent of `fail-on`, either gate failing fails the audit), `fail-on-incomplete` (default `false`; `true` makes a run that could not fully analyze every file exit `3`), `comment-pr` (default `false`), `update-badge` (default `false`), `badge-path` (default `.github/security-auditor-badge.json`), `extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`, ignored in standalone mode), and `working-directory` (default `.`). Set `setup-php: false` / `install-dependencies: false` when your job has already done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
 Keep `output`, `baseline` and `generate-baseline` inside `working-directory`, or give an absolute path outside the checkout such as `${{ runner.temp }}/report.sarif`. A report or baseline write refuses a symlink on any directory between the working directory and the file, but trusts every directory above the working directory: with a sub-directory `working-directory`, a path climbing out of it (`../build/reports/report.sarif`) passes through directories the checked-out repository controls, where a committed symlink could redirect the write.
 
-Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter).
+Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (`true` or `false` when `format` is `json` or `sarif` and the report went to a file), and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter). A run that could not fully analyze every file raises a warning annotation — when `format` is `json` or `sarif` and the report went to a file, the cases where `complete` is populated — unless `fail-on-incomplete` is set, in which case it fails the job instead.
 
 ```yaml
       - name: Symfony Security Audit
@@ -289,6 +289,8 @@ jobs:
 ```
 
 Critical and high-severity findings become `::error`, medium becomes `::warning`, and low/info become `::notice` — the annotation level only affects how GitHub displays the finding, not the job's exit code; combine with `--fail-on` to also fail the check run. Don't pass `--output` — annotations must reach stdout for GitHub to parse them.
+
+Every other format printed to the job log is defused for the runner: while `GITHUB_ACTIONS` is `true`, a line of audited code or model text that starts with `::` gets a backslash (`:\:`), and so does a legacy `##[` anywhere (`#\#[`), so neither acts as a workflow command. JSON and SARIF keep their meaning byte for byte once decoded (`##[` is written `#\u0023[`), so piping them into `jq` still works. A report saved with `--output` is written unchanged.
 
 ### Sticky PR comment with the audit summary
 

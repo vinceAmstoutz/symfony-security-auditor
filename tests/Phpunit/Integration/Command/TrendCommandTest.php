@@ -125,8 +125,8 @@ final class TrendCommandTest extends TestCase
         self::assertSame(
             [
                 'points' => [
-                    ['report' => $first, 'total' => 0, 'new' => null, 'fixed' => null],
-                    ['report' => $second, 'total' => 1, 'new' => 1, 'fixed' => 0],
+                    ['report' => $first, 'total' => 0, 'new' => null, 'fixed' => null, 'unverified' => null],
+                    ['report' => $second, 'total' => 1, 'new' => 1, 'fixed' => 0, 'unverified' => 0],
                 ],
             ],
             json_decode($commandTester->getDisplay(), true),

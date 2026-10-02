@@ -1484,6 +1484,42 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('Running audit pipeline', $display);
     }
 
+    public function test_show_scanned_alone_creates_no_directory_for_the_report_it_does_not_write(): void
+    {
+        $this->createProjectDir();
+        $reportDirectory = $this->fixtureDir.'/reports';
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--output' => $reportDirectory.'/report.json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertDirectoryDoesNotExist($reportDirectory);
+    }
+
+    public function test_show_scanned_with_dry_run_still_writes_the_report_it_estimates(): void
+    {
+        $this->createProjectDir();
+        $reportPath = $this->fixtureDir.'/reports/report.json';
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--dry-run' => true,
+            '--format' => 'json',
+            '--output' => $reportPath,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertFileExists($reportPath);
+    }
+
     public function test_show_scanned_honors_the_path_filter(): void
     {
         $this->createProjectDir();
