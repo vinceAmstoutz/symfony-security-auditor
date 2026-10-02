@@ -1,0 +1,34 @@
+{
+  "anthropic": {
+    "models": {
+      "claude-opus-4-8": {
+        "cost": {
+          "input": 5,
+          "output": 25
+        }
+      },
+      "claude-opus-4-8-20260101": {
+        "cost": {
+          "input": 5,
+          "output": 25
+        }
+      }
+    }
+  },
+  "venice": {
+    "models": {
+      "claude-opus-4-8": {
+        "cost": {
+          "input": 6,
+          "output": 30
+        }
+      },
+      "venice-uncensored": {
+        "cost": {
+          "input": 0.5,
+          "output": 2
+        }
+      }
+    }
+  }
+}

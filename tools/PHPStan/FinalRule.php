@@ -22,6 +22,7 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 use PHPStan\ShouldNotHappenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 
 /**
  * @implements Rule<Class_>
@@ -34,7 +35,7 @@ final readonly class FinalRule implements Rule
      *
      * @var list<string>
      */
-    private const array ALLOWED_NON_FINAL = [LLMProviderException::class];
+    private const array ALLOWED_NON_FINAL = [LLMProviderException::class, LLMRequestTooLargeException::class];
 
     #[Override]
     public function getNodeType(): string

@@ -115,7 +115,20 @@ final readonly class PlatformResultExtractor
 
         $this->warnWhenDegraded($finishReason);
 
-        return $finishReason->getRaw();
+        return $this->normalizedStopReason($finishReason);
+    }
+
+    /**
+     * Truncation and content filtering come back as symfony/ai's case values
+     * whatever the provider calls them (`max_tokens`, `MAX_TOKENS`, `length`,
+     * …), so `LLMResponse::isDegraded()` recognizes them; every other reason
+     * keeps the provider's own word.
+     */
+    private function normalizedStopReason(FinishReason $finishReason): string
+    {
+        return $finishReason->is(FinishReasonCase::LENGTH, FinishReasonCase::CONTENT_FILTER)
+            ? $finishReason->getCase()->value
+            : $finishReason->getRaw();
     }
 
     private function warnWhenDegraded(FinishReason $finishReason): void

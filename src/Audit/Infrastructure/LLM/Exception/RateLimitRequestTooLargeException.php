@@ -13,17 +13,17 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 
 /**
  * Thrown when a single request's estimated input tokens exceed the entire
  * rate-limit window — the request can never fit, no amount of waiting helps.
- * Extends `LLMProviderException` so it surfaces through the same Domain
- * catch hierarchy as other non-transient LLM failures.
+ * Extends `LLMRequestTooLargeException` so the chunk analyzers split the
+ * chunk the same way they do for a prompt the model itself refuses.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class RateLimitRequestTooLargeException extends LLMProviderException
+final class RateLimitRequestTooLargeException extends LLMRequestTooLargeException
 {
     public static function from(int $estimatedInputTokens, int $windowCapacityTokens): self
     {

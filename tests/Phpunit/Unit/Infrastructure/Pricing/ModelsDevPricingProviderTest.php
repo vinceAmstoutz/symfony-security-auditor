@@ -381,6 +381,38 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame(0.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-promo'));
     }
 
+    #[DataProvider('servingPlatformPriceCases')]
+    public function test_it_tells_whether_the_serving_platform_prices_a_model(?string $platform, string $model, bool $expected): void
+    {
+        $modelsDevPricingProvider = null === $platform ? $this->providerForCatalog('platform-listings.json') : $this->providerServedBy($platform);
+
+        self::assertSame($expected, $modelsDevPricingProvider->hasServingPlatformPrice($model));
+    }
+
+    /** @return iterable<string, array{?string, string, bool}> */
+    public static function servingPlatformPriceCases(): iterable
+    {
+        yield 'a model the serving platform lists' => ['venice', 'venice-uncensored', true];
+        yield 'a model the serving platform lists, with query-string options' => ['venice', 'venice-uncensored?temperature=0.2', true];
+        yield 'a model the serving platform lists under another id' => ['bedrock', 'nova-micro', true];
+        yield 'a model the serving platform lists for free' => ['anthropic', 'claude-promo', true];
+        yield 'a model only another provider lists' => ['venice', 'claude-opus-4-8', false];
+        yield 'a model only an aggregator relists' => ['venice', 'vendor/relisted-model', false];
+        yield 'a known model on a platform with no listing of its own' => ['generic', 'claude-opus-4-8', true];
+        yield 'an unknown model on a platform with no listing of its own' => ['generic', 'nobody-lists-this', false];
+        yield 'a known model on a platform the catalog does not list' => ['cerebras', 'claude-opus-4-8', true];
+        yield 'a known model with no serving platform' => [null, 'claude-opus-4-8', true];
+        yield 'a model only a platform lists, with no serving platform' => [null, 'venice-uncensored', false];
+    }
+
+    public function test_a_model_the_serving_platform_does_not_list_keeps_its_catalog_wide_price(): void
+    {
+        $modelsDevPricingProvider = $this->providerServedBy('venice');
+
+        self::assertFalse($modelsDevPricingProvider->hasServingPlatformPrice('claude-opus-4-8'));
+        self::assertSame(5.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-opus-4-8'));
+    }
+
     private function providerServedBy(string $platform): ModelsDevPricingProvider
     {
         return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/platform-listings.json', 'vinceamstoutz/not-a-real-package', $platform);

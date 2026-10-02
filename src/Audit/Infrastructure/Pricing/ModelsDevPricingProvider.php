@@ -20,17 +20,20 @@ use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ServingPlatformPricingProviderInterface;
 
 /**
  * Sources per-million-token USD pricing (input/output and real prompt-cache
  * rates) from the daily `symfony/models-dev` catalog snapshot, read once from
  * `vendor/` with no network call. Replaces the hand-maintained price table.
  * A model is priced from the listing of the `symfony/ai` platform the audit
- * runs against first, and only then from the catalog at large.
+ * runs against first, and only then from the catalog at large. Each model's
+ * price is resolved once per run and remembered, since every call asks for it
+ * several times.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterface
+final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterface, ServingPlatformPricingProviderInterface
 {
     public const string CATALOG_PACKAGE = 'symfony/models-dev';
 
@@ -53,6 +56,12 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
 
     /** @var array<array-key, mixed>|null */
     private ?array $catalog = null;
+
+    /** @var array<string, ?ModelPrice> */
+    private array $pricesByModel = [];
+
+    /** @var array<string, ?ModelPrice> */
+    private array $servingPlatformPricesByModel = [];
 
     public function __construct(
         private readonly LoggerInterface $logger,
@@ -91,6 +100,16 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return $this->lookup($model) instanceof ModelPrice;
     }
 
+    #[Override]
+    public function hasServingPlatformPrice(string $model): bool
+    {
+        if (!$this->hasServingPlatformListing()) {
+            return $this->hasModel($model);
+        }
+
+        return $this->servingPlatformPrice($model) instanceof ModelPrice;
+    }
+
     private function priced(string $model): ModelPrice
     {
         $price = $this->lookup($model);
@@ -105,9 +124,35 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
 
     private function lookup(string $model): ?ModelPrice
     {
-        $model = $this->stripOptionsQueryString($model);
+        if (!\array_key_exists($model, $this->pricesByModel)) {
+            $this->pricesByModel[$model] = $this->servingPlatformPrice($model) ?? $this->priceFromCatalog($this->stripOptionsQueryString($model));
+        }
 
-        return $this->priceFromServingPlatform($model) ?? $this->priceFromCatalog($model);
+        return $this->pricesByModel[$model];
+    }
+
+    private function servingPlatformPrice(string $model): ?ModelPrice
+    {
+        if (!\array_key_exists($model, $this->servingPlatformPricesByModel)) {
+            $this->servingPlatformPricesByModel[$model] = $this->priceFromServingPlatform($this->stripOptionsQueryString($model));
+        }
+
+        return $this->servingPlatformPricesByModel[$model];
+    }
+
+    /**
+     * A platform the catalog has no listing for leaves the catalog at large
+     * as the only rate there is.
+     */
+    private function hasServingPlatformListing(): bool
+    {
+        if (null === $this->platform) {
+            return false;
+        }
+
+        $provider = PlatformCatalogProviders::providerOf($this->platform);
+
+        return null !== $provider && \array_key_exists($provider, $this->catalog());
     }
 
     /**

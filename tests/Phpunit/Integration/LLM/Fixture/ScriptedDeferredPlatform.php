@@ -18,50 +18,39 @@ use RuntimeException;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
-use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
-use Symfony\AI\Platform\Result\InMemoryRawResult;
-use Symfony\AI\Platform\Result\ResultInterface;
-use Symfony\AI\Platform\TokenUsage\TokenUsage;
 
-final class ScriptedTokenUsagePlatform implements PlatformInterface
+/**
+ * Test fake: hands back the scripted deferred results in order — so a test
+ * decides what each one wraps and when it fails — and throws a scripted
+ * exception at dispatch time.
+ */
+final class ScriptedDeferredPlatform implements PlatformInterface
 {
+    public int $invocations = 0;
+
     /**
-     * @param list<ResultInterface|RuntimeException> $results     a RuntimeException entry is thrown by that invocation
-     * @param list<TokenUsage>                       $tokenUsages
+     * @param list<DeferredResult|RuntimeException> $results a RuntimeException entry is thrown by that invocation
      */
     public function __construct(
         private array $results,
-        private array $tokenUsages,
     ) {}
-
-    public int $invocations = 0;
 
     #[Override]
     public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
     {
         ++$this->invocations;
         $result = array_shift($this->results);
-        $tokenUsage = array_shift($this->tokenUsages);
         if ($result instanceof RuntimeException) {
             throw $result;
         }
 
-        if (!$result instanceof ResultInterface) {
-            throw new RuntimeException('ScriptedTokenUsagePlatform invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+        if (!$result instanceof DeferredResult) {
+            throw new RuntimeException('ScriptedDeferredPlatform invoked more times than scripted.');
         }
 
-        $deferredResult = new DeferredResult(
-            new PlainConverter($result),
-            new InMemoryRawResult(['text' => ''], [], (object) []),
-            $options,
-        );
-        if ($tokenUsage instanceof TokenUsage) {
-            $deferredResult->getMetadata()->add('token_usage', $tokenUsage);
-        }
-
-        return $deferredResult;
+        return $result;
     }
 
     #[Override]

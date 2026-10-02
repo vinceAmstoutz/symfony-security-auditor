@@ -257,6 +257,15 @@ When raising the cap, raise `audit.rate_limit.output_tokens_per_minute` proporti
 
 When the provider reports why generation stopped (`symfony/ai` ≥ 0.11 exposes a normalized finish reason), the auditor logs an explicit `LLM response was truncated by the output token limit` warning — no output-token forensics needed. A `LLM response was suppressed by the provider content filter` warning likewise flags responses the provider filtered out.
 
+Some provider bridges report the same two outcomes as an error rather than a finish reason. They are handled identically — the call is not retried, and the file or finding it covered is recorded as errored — and the request is booked at its estimated input tokens against `audit.budget`, the report's token totals and the rate-limit window, since the provider bills it. The entries that report it carry its `stop_reason` (`length` or `content-filter`): a `debug` entry for the booking, and the warning of the path that ran the call where it logs one:
+
+```text
+An answer the provider delivered as an error is booked at its estimated input tokens, since the provider bills the request it accepted
+LLM returned a response with no content blocks
+Tool-using loop ended with empty content response
+Concurrent tool-using conversation ended without usable content; it is answered as a degraded response and keeps the tool results already recorded
+```
+
 ### `Ollama: model not found`
 
 Pull the model first:

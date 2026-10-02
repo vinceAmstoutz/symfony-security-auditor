@@ -96,7 +96,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     #[Override]
     public function build(ContainerBuilder $container): void
     {
-        $container->addCompilerPass(new PricingPlatformPass());
+        $container->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
     }
 
     #[Override]

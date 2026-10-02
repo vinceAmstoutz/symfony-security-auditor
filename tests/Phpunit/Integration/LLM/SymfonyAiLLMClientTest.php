@@ -57,6 +57,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
@@ -94,6 +95,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_returns_text_from_platform_invoke(): void
     {
@@ -117,6 +119,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_surfaces_the_provider_finish_reason_as_stop_reason(): void
     {
@@ -127,7 +130,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
 
-        self::assertSame('max_tokens', $llmResponse->stopReason());
+        self::assertSame('length', $llmResponse->stopReason());
     }
 
     /**
@@ -139,6 +142,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
      * @throws InvalidToolRegistryException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_surfaces_the_provider_finish_reason_as_stop_reason(): void
     {
@@ -154,7 +158,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             3,
         );
 
-        self::assertSame('max_tokens', $llmResponse->stopReason());
+        self::assertSame('length', $llmResponse->stopReason());
     }
 
     /**
@@ -162,6 +166,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws MissingAiPlatformException
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_surfaces_the_provider_finish_reason_as_stop_reason(): void
     {
@@ -172,7 +179,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
 
-        self::assertSame('max_tokens', $responses[0]->stopReason());
+        self::assertSame('length', $responses[0]->stopReason());
     }
 
     /**
@@ -181,6 +188,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws InvalidToolRegistryException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_surfaces_the_provider_finish_reason_as_stop_reason(): void
     {
@@ -193,7 +203,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             ['system' => 's', 'user' => 'u', 'tools' => new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger())],
         ], 4, 3);
 
-        self::assertSame('max_tokens', $responses[0]->stopReason());
+        self::assertSame('length', $responses[0]->stopReason());
     }
 
     /**
@@ -204,6 +214,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_logs_debug_with_prompt_lengths_and_temperature(): void
     {
@@ -235,6 +246,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_logs_debug_response_with_content_length(): void
     {
@@ -268,6 +280,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_passes_temperature_via_options(): void
     {
@@ -290,6 +303,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_omits_temperature_when_left_at_default(): void
     {
@@ -311,6 +325,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_never_sends_cache_control_even_for_anthropic_model(): void
     {
@@ -332,6 +347,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_passes_provider_json_mode_response_format_for_anthropic_model(): void
     {
@@ -353,6 +369,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_omits_response_format_for_non_anthropic_model_even_when_json_mode_enabled(): void
     {
@@ -374,6 +391,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_passes_all_anthropic_options_together_when_multiple_flags_enabled(): void
     {
@@ -401,6 +419,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_omits_response_format_when_provider_json_mode_disabled(): void
     {
@@ -422,6 +441,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_passes_max_output_tokens_via_options_for_anthropic_model(): void
     {
@@ -445,6 +465,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_omits_max_output_tokens_for_non_anthropic_model_even_when_configured(): void
     {
@@ -468,6 +489,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_still_sends_temperature_for_non_anthropic_model(): void
     {
@@ -489,6 +511,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_omits_max_output_tokens_when_left_at_default(): void
     {
@@ -511,6 +534,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_passes_max_output_tokens_via_options_for_anthropic_model(): void
     {
@@ -545,6 +569,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_throws_when_no_ai_platform_is_configured(): void
     {
@@ -565,6 +590,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_throws_when_no_ai_platform_is_configured(): void
     {
@@ -580,6 +606,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_throws_when_no_ai_platform_is_configured(): void
     {
@@ -594,6 +625,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_returns_empty_for_no_requests(): void
     {
@@ -605,6 +641,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_returns_one_response_per_request_in_order(): void
     {
@@ -625,6 +666,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_processes_more_requests_than_window_size(): void
     {
@@ -643,6 +689,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_clamps_non_positive_window_to_one(): void
     {
@@ -659,6 +710,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_records_token_usage_per_response(): void
     {
@@ -687,6 +743,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_acquires_rate_limit_for_each_request(): void
     {
@@ -709,6 +770,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_falls_back_to_the_sequential_complete_path_when_dispatch_throws(): void
     {
@@ -730,6 +796,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_releases_the_rate_limiter_reservation_when_dispatch_fails(): void
     {
@@ -762,6 +833,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_releases_the_rate_limiter_reservation_when_token_extraction_fails(): void
     {
@@ -803,6 +875,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_releases_the_rate_limiter_reservation_when_token_extraction_fails_without_a_token_usage_recorder(): void
     {
@@ -834,6 +907,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_releases_the_rate_limiter_reservation_when_the_result_has_no_text(): void
     {
@@ -865,6 +939,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_releases_the_rate_limiter_reservation_when_token_extraction_fails(): void
     {
@@ -893,6 +968,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_releases_exactly_the_failed_reservation_before_falling_back_to_complete(): void
     {
@@ -941,6 +1021,11 @@ final class SymfonyAiLLMClientTest extends TestCase
      *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_releases_a_clean_reservation_when_extraction_fails_then_records_the_fallbacks_reservation_independently(): void
     {
@@ -967,6 +1052,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_resolves_each_conversation_against_its_own_registry(): void
     {
@@ -1009,6 +1097,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_returns_empty_list_for_empty_requests(): void
     {
@@ -1023,6 +1114,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
      * @throws InvalidToolRegistryException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_grows_the_rate_limiter_estimate_as_tool_results_accumulate_in_the_conversation(): void
     {
@@ -1054,6 +1148,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_caps_iterations_and_warns(): void
     {
@@ -1097,6 +1194,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_sends_each_prompt_under_its_own_role(): void
     {
@@ -1119,6 +1221,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_sends_each_prompt_under_its_own_role(): void
     {
@@ -1144,6 +1249,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_reports_tokens_accumulated_across_rounds_when_capping(): void
     {
@@ -1190,6 +1298,8 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_dispatch_fails_before_tools_ran(): void
     {
@@ -1219,6 +1329,8 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_the_retry_itself_fails_before_tools_ran(): void
     {
@@ -1249,6 +1361,8 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_releases_the_rate_limiter_reservation_when_dispatch_fails_before_tools_ran(): void
     {
@@ -1278,6 +1392,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_releases_exactly_the_failed_reservation_before_falling_back(): void
     {
@@ -1332,6 +1449,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_releases_a_clean_reservation_when_extraction_fails_then_records_the_fallbacks_reservation_independently(): void
     {
@@ -1361,6 +1481,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_resolution_fails_before_tools_ran(): void
     {
@@ -1425,6 +1548,8 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_finalizes_as_empty_content_when_failing_after_tools_ran(): void
     {
@@ -1479,6 +1604,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_rethrows_a_non_transient_failure_instead_of_finalizing_as_empty_content_after_tools_ran(): void
     {
@@ -1511,6 +1639,8 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_retries_through_the_seam_and_recovers_when_failing_after_tools_ran(): void
     {
@@ -1551,6 +1681,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidAuditBudgetException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_propagates_budget_exceeded_when_a_post_tool_retry_exceeds_it(): void
     {
@@ -1619,6 +1752,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_finalizes_as_empty_content_when_the_retry_itself_fails_after_tools_ran(): void
     {
@@ -1680,6 +1816,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_accumulates_tokens_across_rounds(): void
     {
@@ -1714,6 +1853,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_records_rate_limit_for_each_round(): void
     {
@@ -1742,6 +1884,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_appends_assistant_then_tool_call_message_between_rounds(): void
     {
@@ -1784,6 +1929,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_dispatches_one_window_at_a_time_when_concurrency_is_one(): void
     {
@@ -1826,6 +1974,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_keeps_dispatching_later_conversations_after_an_earlier_one_finishes(): void
     {
@@ -1858,6 +2009,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidAuditBudgetException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_records_budget_and_aborts_when_a_response_exceeds_it(): void
     {
@@ -1888,6 +2042,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_acquires_rate_limit_for_each_dispatch(): void
     {
@@ -1911,6 +2068,11 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_records_budget_and_aborts_when_a_response_exceeds_it(): void
     {
@@ -1935,6 +2097,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_dispatches_one_request_per_window_when_concurrency_is_one(): void
     {
@@ -1976,6 +2143,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_falls_back_to_complete_when_resolving_a_response_throws(): void
     {
@@ -2013,6 +2185,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_warns_when_falling_back_to_complete_after_a_resolve_failure(): void
     {
@@ -2056,6 +2233,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_rethrows_budget_exceeded_without_falling_back_to_complete(): void
     {
@@ -2113,6 +2295,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
     {
@@ -2140,6 +2323,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_executes_tool_calls_then_returns_final_text(): void
     {
@@ -2167,6 +2351,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_grows_the_rate_limiter_estimate_as_tool_results_accumulate_in_the_conversation(): void
     {
@@ -2199,6 +2384,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_stops_at_iteration_cap_and_warns(): void
     {
@@ -2246,6 +2432,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_invokes_platform_exact_max_iterations_times_when_all_iterations_return_tool_calls(): void
     {
@@ -2277,6 +2464,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_logs_loop_ended_debug_with_iterations_count_and_content_length(): void
     {
@@ -2318,6 +2506,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_appends_assistant_message_then_tool_call_message_between_iterations(): void
     {
@@ -2364,6 +2553,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_logs_tool_invocation_with_tool_name_and_iteration_number(): void
     {
@@ -2406,6 +2596,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_passes_tool_definitions_in_options(): void
     {
@@ -2464,6 +2655,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_handles_bare_tool_call_result_not_wrapped_in_multipart(): void
     {
@@ -2490,6 +2682,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_handles_bare_text_result_not_wrapped_in_multipart(): void
     {
@@ -2513,6 +2706,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_falls_back_to_empty_text_when_platform_returns_unknown_result_type(): void
     {
@@ -2546,6 +2740,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_normalize_schema_tolerates_missing_properties_and_required(): void
     {
@@ -2586,6 +2781,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_populates_input_and_output_tokens_from_platform_metadata(): void
     {
@@ -2616,6 +2812,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_populates_cache_tokens_from_platform_metadata(): void
     {
@@ -2645,6 +2842,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_defaults_cache_tokens_to_zero_when_token_usage_omits_them(): void
     {
@@ -2668,6 +2866,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_returns_zero_tokens_when_platform_metadata_omits_token_usage(): void
     {
@@ -2695,6 +2894,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_returns_zero_tokens_when_token_usage_prompt_and_completion_are_null(): void
     {
@@ -2723,6 +2923,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_consecutive_complete_calls_accumulate_in_shared_recorder(): void
     {
@@ -2756,6 +2957,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_aborts_mid_loop_when_budget_exceeded(): void
     {
@@ -2798,6 +3000,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_records_budget_call_and_aborts_when_exceeded(): void
     {
@@ -2828,6 +3031,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_bills_the_call_at_the_rate_of_the_model_the_provider_reports(): void
     {
@@ -2842,6 +3046,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_bills_each_call_at_the_rate_of_the_model_the_provider_reports(): void
     {
@@ -2862,6 +3071,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_bills_each_iteration_at_the_rate_of_the_model_the_provider_reports(): void
     {
@@ -2879,6 +3089,9 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
      */
     public function test_complete_batch_with_tools_bills_each_call_at_the_rate_of_the_model_the_provider_reports(): void
     {
@@ -2975,6 +3188,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_accumulates_tokens_across_iterations(): void
     {
@@ -3032,6 +3246,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_retries_transient_failures_and_succeeds(): void
     {
@@ -3060,6 +3275,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_releases_the_rate_limiter_reservation_for_each_failed_retry_attempt(): void
     {
@@ -3091,6 +3307,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_throws_transient_failure_after_exhausting_attempts(): void
     {
@@ -3124,6 +3341,32 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_batch_with_tools_lets_a_transient_failure_the_restart_also_hits_escape(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform(array_fill(0, 10, new RuntimeException('HTTP 503 Service Unavailable'))), 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(TransientLLMFailureException::class);
+        $this->expectExceptionMessage('LLM call failed after 3 attempts');
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger())],
+        ], 2, 3);
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_logs_warning_with_full_context_when_retrying_transient_failure(): void
     {
@@ -3163,6 +3406,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_logs_one_warning_per_intermediate_attempt_no_warning_on_last(): void
     {
@@ -3203,6 +3447,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_does_not_retry_non_transient_failures(): void
     {
@@ -3239,6 +3484,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_recovers_when_the_provider_truncates_the_response_mid_read(): void
     {
@@ -3262,6 +3508,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_returns_empty_response_when_platform_reports_empty_content(): void
     {
@@ -3290,6 +3537,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_logs_warning_when_platform_reports_empty_content(): void
     {
@@ -3329,6 +3577,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_returns_empty_response_when_platform_reports_empty_content_on_first_iteration(): void
     {
@@ -3357,6 +3606,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_logs_warning_when_platform_reports_empty_content(): void
     {
@@ -3400,6 +3650,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_demotes_empty_content_to_debug_after_at_least_one_tool_iteration(): void
     {
@@ -3450,6 +3701,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_does_not_retry_empty_content_failures(): void
     {
@@ -3475,6 +3727,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_uses_rate_limit_delay_for_429_errors(): void
     {
@@ -3501,6 +3754,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_uses_regular_delay_for_non_rate_limit_transient_errors(): void
     {
@@ -3527,6 +3781,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_non_rate_limit_transient_error_never_pauses_the_rate_limiter(): void
     {
@@ -3553,6 +3808,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_eager_resolution_catches_transient_failure_thrown_from_deferred_result(): void
     {
@@ -3580,6 +3836,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_acquire_runs_before_invoke_with_estimated_input_tokens(): void
     {
@@ -3604,6 +3861,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_record_runs_after_success_with_actual_tokens(): void
     {
@@ -3631,6 +3889,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_with_tools_records_actual_tokens_after_each_iteration(): void
     {
@@ -3666,6 +3925,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_429_with_retry_after_uses_server_hint_and_pauses_rate_limiter(): void
     {
@@ -3694,6 +3954,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_429_with_retry_after_exceeding_the_ceiling_clamps_the_rate_limiter_pause_too(): void
     {
@@ -3726,6 +3987,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_429_without_retry_after_falls_back_to_exponential_delay(): void
     {

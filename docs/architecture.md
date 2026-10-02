@@ -73,7 +73,8 @@ src/
 │   │                      PoCSynthesizer, Chunking/FileChunker
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop,
-│       │                  BatchWindowResolver, ToolConversationWavefront, PlatformResultExtractor,
+│       │                  BatchWindowResolver, ToolConversationWavefront, InFlightRequestCanceller,
+│       │                  DegradedAnswerBooker, DispatchedRequest, PlatformResultExtractor,
 │       │                  PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator),
 │       │                  RetryPolicy, TransientFailureClassifier,
 │       │                  TokenEstimator/{ProviderTokenEstimatorInterface, ResolvingTokenEstimator,
@@ -419,11 +420,11 @@ Around each invocation, `RateLimiterInterface` (default `NullRateLimiter`, opt-i
 
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no code changes — only `ai.yaml` configuration.
 
-The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
+The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `InFlightRequestCanceller` (cancels and books the requests a failed window leaves open), `DegradedAnswerBooker` (books an answer a provider delivered as an error at its estimated input tokens), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
 
 ### `LLMResponse`
 
-Thin value object wrapping the raw string content. Key method: `parseJson()` strips markdown code fences that models sometimes emit, then JSON-decodes. Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded value is not an array. `isEmpty()` checks for blank content.
+Thin value object wrapping the raw string content. Key method: `parseJson()` strips a markdown code fence that models sometimes wrap the whole answer in — never one quoted inside a JSON string — then JSON-decodes. Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded value is not an array. `isEmpty()` checks for blank content.
 
 ### `ProjectFileScanner`
 
@@ -561,4 +562,4 @@ Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold (
 
 **Replace token estimator** — implement `Audit\Domain\Port\TokenEstimatorInterface` to plug in a provider-specific token counter. Default: `ResolvingTokenEstimator`, which dispatches each model to a per-provider `ProviderTokenEstimatorInterface` implementation (`AnthropicTokenEstimator`, `OpenAiTokenEstimator`, `GeminiTokenEstimator`, `MistralTokenEstimator`, `LlamaTokenEstimator`, `DeepSeekTokenEstimator`, `MiniMaxTokenEstimator`) and falls back to a default character-to-token ratio for unknown models — each a `mb_strlen ÷ ratio` heuristic via the shared `CharacterRatioCounter`. Register your own implementation tagged `symfony_security_auditor.token_estimator` to add a provider, or alias `TokenEstimatorInterface` to replace the whole strategy.
 
-**Replace pricing provider** — implement `Audit\Domain\Port\PricingProviderInterface` (or `CacheAwarePricingProviderInterface` to also supply real prompt-cache rates) to supply custom per-token prices. Default: `ModelsDevPricingProvider`, which reads the daily `symfony/models-dev` catalog snapshot from `vendor/` (no network).
+**Replace pricing provider** — implement `Audit\Domain\Port\PricingProviderInterface` (or `CacheAwarePricingProviderInterface` to also supply real prompt-cache rates, and `ServingPlatformPricingProviderInterface` to say which prices belong to the platform serving the audit) to supply custom per-token prices. Default: `ModelsDevPricingProvider`, which reads the daily `symfony/models-dev` catalog snapshot from `vendor/` (no network).

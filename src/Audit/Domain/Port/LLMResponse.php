@@ -21,6 +21,16 @@ final readonly class LLMResponse
 {
     private const int JSON_MAX_DEPTH = 512;
 
+    /**
+     * Stop reasons after which the response is not the model's complete
+     * answer: output cut by the token limit, suppressed by a content filter,
+     * a tool loop stopped at its iteration cap, a call that produced no
+     * content at all, or a request the model could not take in.
+     */
+    private const array DEGRADED_STOP_REASONS = ['length', 'content-filter', 'max_tool_iterations', 'empty_content', self::REQUEST_TOO_LARGE_STOP_REASON];
+
+    private const string REQUEST_TOO_LARGE_STOP_REASON = 'request_too_large';
+
     private function __construct(
         private string $content,
         private int $inputTokens,
@@ -142,12 +152,7 @@ final readonly class LLMResponse
      */
     public function parseJson(): array
     {
-        $content = $this->content;
-
-        // Strip markdown fences that LLMs sometimes wrap JSON in
-        $content = (string) preg_replace('/```json\s*/', '', $content);
-        $content = (string) preg_replace('/```\s*/', '', $content);
-        $content = trim($content);
+        $content = $this->withoutWrappingFence($this->content);
 
         try {
             $decoded = json_decode($content, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
@@ -160,6 +165,16 @@ final readonly class LLMResponse
         }
 
         return $decoded;
+    }
+
+    /**
+     * Only a Markdown fence around the whole answer is stripped: the same
+     * backticks inside a JSON string, such as a finding quoting a code block,
+     * are part of the payload.
+     */
+    private function withoutWrappingFence(string $content): string
+    {
+        return trim((string) preg_replace(['/\A\s*```(?:json)?/', '/```\s*\z/'], '', $content));
     }
 
     /**
@@ -374,5 +389,27 @@ final readonly class LLMResponse
     public function isEmpty(): bool
     {
         return '' === trim($this->content);
+    }
+
+    /**
+     * Whether the answer was cut short (see `DEGRADED_STOP_REASONS`), in
+     * which case an empty or partial payload is not the model's verdict and
+     * must never be cached or reported as one.
+     */
+    public function isDegraded(): bool
+    {
+        return \in_array($this->stopReason, self::DEGRADED_STOP_REASONS, true);
+    }
+
+    /**
+     * Whether the provider refused the request because the prompt alone
+     * exceeds the model's input window — the content carries the refusal. A
+     * batch client answers this per request where a single call throws, so
+     * the caller can split the work; it is degraded too, so no consumer
+     * counts it as a verdict.
+     */
+    public function isRequestTooLarge(): bool
+    {
+        return self::REQUEST_TOO_LARGE_STOP_REASON === $this->stopReason;
     }
 }

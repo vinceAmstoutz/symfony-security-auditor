@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -132,6 +133,33 @@ final class LLMResponseTest extends TestCase
         $data = $llmResponse->parseJson();
 
         self::assertSame('value', $data['key']);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws JsonException
+     */
+    #[DataProvider('payloadsQuotingAFence')]
+    public function test_it_keeps_a_fence_quoted_inside_a_json_string(string $wrapper): void
+    {
+        $vulnerableCode = "```php\necho \$request->get('q');\n``` and ```json {} ```";
+        $content = \sprintf($wrapper, json_encode([['vulnerable_code' => $vulnerableCode]], \JSON_THROW_ON_ERROR));
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        self::assertSame([['vulnerable_code' => $vulnerableCode]], $llmResponse->parseJson());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function payloadsQuotingAFence(): iterable
+    {
+        yield 'bare payload' => ['%s'];
+        yield 'json fence' => ["```json\n%s\n```"];
+        yield 'plain fence' => ["```\n%s\n```"];
+        yield 'fence on one line' => ['```json%s```'];
+        yield 'fence behind whitespace' => ["  \n```json\n%s\n```\n  "];
+        yield 'fence in prose' => ["Here are the findings:\n```json\n%s\n```\nThat is all."];
     }
 
     /**
@@ -510,6 +538,18 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_parse_json_rejects_a_fenced_payload_nested_too_deep_instead_of_returning_an_inner_block(): void
+    {
+        $content = \sprintf("```json\n%s%s\n```", str_repeat('[', 512), str_repeat(']', 512));
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        $this->expectException(JsonException::class);
+        $llmResponse->parseJson();
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_parse_json_strips_null_bytes_before_decoding(): void
     {
         // trim() removes \x00 (null byte); json_decode does NOT handle null bytes.
@@ -576,5 +616,39 @@ final class LLMResponseTest extends TestCase
 
         self::assertSame(0, $llmResponse->cacheReadTokens());
         self::assertSame(0, $llmResponse->cacheCreationTokens());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_tells_a_request_the_model_could_not_take_in_from_the_other_answers_cut_short(): void
+    {
+        self::assertTrue(LLMResponse::of('prompt is too long', 'm', 'request_too_large', TokenUsageSnapshot::of(0, 0))->isRequestTooLarge());
+        self::assertFalse(LLMResponse::of('', 'm', 'length', TokenUsageSnapshot::of(1, 1))->isRequestTooLarge());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('stopReasons')]
+    public function test_it_knows_which_stop_reasons_cut_the_answer_short(string $stopReason, bool $degraded): void
+    {
+        self::assertSame($degraded, LLMResponse::of('{}', 'm', $stopReason, TokenUsageSnapshot::of(1, 1))->isDegraded());
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: bool}>
+     */
+    public static function stopReasons(): iterable
+    {
+        yield 'output token limit' => ['length', true];
+        yield 'content filter' => ['content-filter', true];
+        yield 'tool-loop cap' => ['max_tool_iterations', true];
+        yield 'no content' => ['empty_content', true];
+        yield 'a request the model could not take in' => ['request_too_large', true];
+        yield 'normal stop' => ['end_turn', false];
+        yield 'normalized normal stop' => ['stop', false];
+        yield 'one tool round of a loop' => ['tool_iteration', false];
+        yield 'a provider truncation word the extractor did not normalize' => ['max_tokens', false];
     }
 }
