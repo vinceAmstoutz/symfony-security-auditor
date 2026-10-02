@@ -143,9 +143,36 @@ final readonly class AuditReport
         return UnanalyzedFiles::in($this->coverage);
     }
 
+    /**
+     * Whether every file in scope was analyzed: no stage left one unfinished,
+     * and the attacker ran at all — a dry run makes no LLM call, so it never
+     * does, and neither does a run stopped before its first one. A `--since`
+     * run whose diff left no file to analyze has nothing left unfinished.
+     */
     public function isComplete(): bool
     {
-        return [] === $this->unanalyzedFiles();
+        return [] === $this->unanalyzedFiles() && !$this->attackerNeverRan();
+    }
+
+    /**
+     * Whether the run analyzed none of the files it had to: every attacker call
+     * failed or was cut short, or none was made. Such a report carries no
+     * verdict, whatever its risk level and grade read — a SAFE there vouches
+     * for code nobody read.
+     */
+    public function analyzedNoFile(): bool
+    {
+        return !$this->isComplete() && [] === AnalyzedFiles::in($this->coverage);
+    }
+
+    private function attackerNeverRan(): bool
+    {
+        $attackerEntries = array_filter(
+            $this->coverage,
+            static fn (array $entry): bool => AgentRole::Attacker->value === $entry['stage'],
+        );
+
+        return $this->reportIdentity->filesScanned > 0 && [] === $attackerEntries;
     }
 
     /** @return list<Vulnerability> */

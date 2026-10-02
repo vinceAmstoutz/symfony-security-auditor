@@ -15,8 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\IncompleteAuditNotice;
 
 final class IncompleteAuditNoticeTest extends TestCase
@@ -42,5 +44,24 @@ final class IncompleteAuditNoticeTest extends TestCase
         $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
 
         self::assertNull(IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_says_no_file_was_analyzed_when_no_llm_call_was_made(): void
+    {
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/A.php', 'src/A.php', '<?php'),
+            ProjectFile::create('src/B.php', 'src/B.php', '<?php'),
+            ProjectFile::create('src/C.php', 'src/C.php', '<?php'),
+        ]);
+
+        self::assertSame(
+            'Audit incomplete: none of the 3 file(s) in scope was analyzed, because no LLM call was made or the run stopped before its first one, so this report cannot vouch that the project is free of vulnerabilities.',
+            IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)),
+        );
     }
 }

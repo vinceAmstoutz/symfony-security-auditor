@@ -52,7 +52,7 @@ inputs:
     required: false
     default: "false"
   update-badge:
-    description: Whether to write a shields.io endpoint-schema JSON file carrying the report's grade, for a live security badge in your README. Requires format json and a non-empty output. Only runs on push events. The file is written but never committed — that stays your workflow's decision.
+    description: Whether to write a shields.io endpoint-schema JSON file carrying the report's grade, for a live security badge in your README — or a grey "incomplete" badge when the audit could not fully analyze every file, since its grade covers only the files analyzed. Requires format json and a non-empty output. Only runs on push events. The file is written but never committed — that stays your workflow's decision.
     required: false
     default: "false"
   badge-path:
@@ -91,13 +91,13 @@ outputs:
     description: Whether every file was fully analyzed ("true" or "false"). Only populated when format is json or sarif and the report went to a file (empty otherwise).
     value: ${{ steps.audit.outputs.complete }}
   findings-count:
-    description: Total number of findings in the report. Only populated when format is json (empty for other formats).
+    description: Total number of findings in the report. Only populated when format is json (empty for other formats). When complete is "false" it counts only the findings in the files analyzed.
     value: ${{ steps.audit.outputs.findings-count }}
   highest-severity:
-    description: The report's aggregate risk level (safe, low, medium, high, critical). Only populated when format is json (empty for other formats).
+    description: The report's aggregate risk level (safe, low, medium, high, critical). Only populated when format is json (empty for other formats). When complete is "false" it covers only the files analyzed, so read it together with complete.
     value: ${{ steps.audit.outputs.highest-severity }}
   grade:
-    description: The report's A-F security grade. Only populated when format is json (empty for other formats).
+    description: The report's A-F security grade. Only populated when format is json (empty for other formats). When complete is "false" it covers only the files analyzed, so read it together with complete.
     value: ${{ steps.audit.outputs.grade }}
   badge-path:
     description: The path the shields.io badge endpoint JSON was written to (empty when update-badge is false or no grade was available).
@@ -208,7 +208,7 @@ runs:
           *) complete="" ;;
         esac
         echo "complete=$complete" >> "$GITHUB_OUTPUT"
-        if [ "$complete" = "false" ] && [ "$SSA_FAIL_ON_INCOMPLETE" != "true" ]; then
+        if [ "$complete" = "false" ] && [ "$SSA_FAIL_ON_INCOMPLETE" != "true" ] && [ "$exit_code" -eq 0 ]; then
           echo "::warning::The audit could not fully analyze every file, so its report cannot vouch that the project is free of vulnerabilities. Set fail-on-incomplete to true to fail the job when this happens."
         fi
 
@@ -225,6 +225,7 @@ runs:
       env:
         SSA_BADGE_PATH: ${{ inputs.badge-path }}
         SSA_GRADE: ${{ steps.audit.outputs.grade }}
+        SSA_COMPLETE: ${{ steps.audit.outputs.complete }}
       run: |
         set -euo pipefail
         if [ -z "$SSA_GRADE" ] || [ "$SSA_GRADE" = "null" ]; then
@@ -232,6 +233,7 @@ runs:
           exit 0
         fi
 
+        message="$SSA_GRADE"
         case "$SSA_GRADE" in
           A) color=brightgreen ;;
           B) color=green ;;
@@ -244,13 +246,20 @@ runs:
             ;;
         esac
 
+        # The grade of an incomplete run covers only the files it analyzed, so
+        # the badge shows no grade rather than vouch for the files it skipped.
+        if [ "$SSA_COMPLETE" = "false" ]; then
+          message=incomplete
+          color=lightgrey
+        fi
+
         mkdir -p "$(dirname "$SSA_BADGE_PATH")"
-        jq -n --arg message "$SSA_GRADE" --arg color "$color" \
+        jq -n --arg message "$message" --arg color "$color" \
           '{schemaVersion: 1, label: "security audit", message: $message, color: $color}' \
           > "$SSA_BADGE_PATH"
 
         echo "badge-path=$SSA_BADGE_PATH" >> "$GITHUB_OUTPUT"
-        echo "Wrote the shields.io badge endpoint for grade $SSA_GRADE to $SSA_BADGE_PATH."
+        echo "Wrote the shields.io badge endpoint ($message) to $SSA_BADGE_PATH."
 
     # `always()` for the same reason as the badge step: the audit exits 1 on a
     # tripped gate, and that is exactly the run whose summary reviewers need.

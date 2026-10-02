@@ -18,11 +18,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SecurityGrade;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -939,5 +941,66 @@ final class AuditReportTest extends TestCase
         $auditContext->recordCoverage('reviewer', 'src/A.php', 'validated');
 
         self::assertSame(['src/A.php'], AuditReport::fromContext($auditContext)->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_report_whose_files_the_attacker_never_reached_is_not_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+
+        self::assertFalse(AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_diff_run_that_left_no_file_to_analyze_stays_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setMappingFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+
+        self::assertTrue(AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @param list<array{string, string, string}> $coverage
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('analyzedNoFileCases')]
+    public function test_it_knows_when_the_run_analyzed_none_of_its_files(array $coverage, bool $expected): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php'),
+            ProjectFile::create('src/B.php', $this->tmpDir.'/src/B.php', '<?php'),
+        ]);
+        foreach ($coverage as [$stage, $file, $status]) {
+            $auditContext->recordCoverage($stage, $file, $status);
+        }
+
+        self::assertSame($expected, AuditReport::fromContext($auditContext)->analyzedNoFile());
+    }
+
+    /**
+     * @return iterable<string, array{list<array{string, string, string}>, bool}>
+     */
+    public static function analyzedNoFileCases(): iterable
+    {
+        yield 'every call failed' => [[['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'aborted']], true];
+        yield 'no call was made' => [[], true];
+        yield 'one file analyzed, the other failed' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/B.php', 'errored']], false];
+        yield 'one file served from the cache, the other failed' => [[['attacker', 'src/A.php', 'cached'], ['attacker', 'src/B.php', 'errored']], false];
+        yield 'a file analyzed before a later iteration failed on it' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'errored']], false];
+        yield 'every file analyzed' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/B.php', 'analyzed']], false];
+        yield 'every file left out by the lean filter' => [[['attacker', 'src/A.php', 'skipped'], ['attacker', 'src/B.php', 'skipped']], false];
+        yield 'lean filter left one out, the other failed' => [[['attacker', 'src/A.php', 'skipped'], ['attacker', 'src/B.php', 'errored']], true];
+        yield 'only another stage claims to have analyzed a file' => [[['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'errored'], ['reviewer', 'src/A.php', 'analyzed']], true];
     }
 }

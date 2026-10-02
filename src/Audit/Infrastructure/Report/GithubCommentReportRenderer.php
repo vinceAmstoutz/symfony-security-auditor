@@ -57,6 +57,10 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
 
     private function headline(AuditReport $auditReport): string
     {
+        if ($auditReport->analyzedNoFile()) {
+            return '## Security audit: incomplete (no file was analyzed)';
+        }
+
         return \sprintf(
             $auditReport->isComplete() ? '## Security audit: %s (%d/100)' : '## Security audit: incomplete (%s, %d/100 on the files analyzed)',
             $auditReport->grade()->value,
@@ -68,7 +72,7 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
     {
         return \sprintf(
             '**Risk level:** %s · **Findings:** %d · **Files scanned:** %d · **Duration:** %ss',
-            $auditReport->riskLevel(),
+            RiskHeadline::riskLevel($auditReport),
             $auditReport->totalVulnerabilities(),
             $auditReport->filesScanned(),
             number_format($auditReport->durationSeconds(), 1, '.', ''),

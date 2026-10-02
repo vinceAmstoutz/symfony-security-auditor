@@ -50,8 +50,8 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
             '{{cost}}' => number_format($cost->estimatedCostUsd(), 4, '.', ''),
             '{{costRateLabel}}' => $cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model',
-            '{{riskLevel}}' => $auditReport->riskLevel(),
-            '{{riskScore}}' => $auditReport->riskScore(),
+            '{{riskLevel}}' => RiskHeadline::riskLevel($auditReport),
+            '{{riskDetail}}' => RiskHeadline::scoreDetail($auditReport, 'Score:'),
             '{{body}}' => $this->body($auditReport),
         ]);
     }

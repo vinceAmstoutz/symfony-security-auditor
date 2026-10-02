@@ -316,7 +316,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
-        if (Command::FAILURE === $exitCode) {
+        if (Command::FAILURE === $exitCode && !$auditReport->analyzedNoFile()) {
             $totalVulnerabilities = $auditReport->totalVulnerabilities();
             $symfonyStyle->caution(\sprintf(
                 'Audit failed a configured gate. Risk: %s. Score: %d/100. %d %s found.',
@@ -350,12 +350,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        $summary = \sprintf(
-            'Audit incomplete: %d file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
-            \count($auditReport->unanalyzedFiles()),
-            $auditReport->riskLevel(),
-            $auditReport->totalVulnerabilities(),
-        );
+        $summary = $this->incompleteSummary($auditReport);
 
         if (ExitCode::Incomplete->value === $exitCode) {
             $symfonyStyle->error(\sprintf('%s The run fails because --fail-on-incomplete is set.', $summary));
@@ -363,7 +358,35 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
+        if (ExitCode::Failure->value === $exitCode && $auditReport->analyzedNoFile()) {
+            $symfonyStyle->error(\sprintf('%s A run with no verdict cannot pass, so it fails.', $summary));
+
+            return;
+        }
+
         $symfonyStyle->warning(ExitCode::Success->value === $exitCode ? \sprintf('%s Pass --fail-on-incomplete to fail the run when this happens.', $summary) : $summary);
+    }
+
+    /**
+     * A run that analyzed no file states no risk level: a SAFE there would
+     * vouch for code nobody read.
+     */
+    private function incompleteSummary(AuditReport $auditReport): string
+    {
+        if ($auditReport->analyzedNoFile()) {
+            return \sprintf(
+                'Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict. Vulnerabilities: %d.',
+                $auditReport->filesScanned(),
+                $auditReport->totalVulnerabilities(),
+            );
+        }
+
+        return \sprintf(
+            'Audit incomplete: %d file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
+            \count($auditReport->unanalyzedFiles()),
+            $auditReport->riskLevel(),
+            $auditReport->totalVulnerabilities(),
+        );
     }
 
     #[Override]

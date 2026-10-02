@@ -156,6 +156,29 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
+    #[DataProvider('failOnIncompleteSettings')]
+    public function test_it_fails_a_run_that_analyzed_none_of_its_files(bool $failOnIncomplete): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/Failed.php', $this->tmpDir.'/src/Failed.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/Failed.php', 'errored');
+
+        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve(AuditReport::fromContext($auditContext), RiskLevel::Critical, null, $failOnIncomplete));
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function failOnIncompleteSettings(): iterable
+    {
+        yield 'by default' => [false];
+        yield 'under --fail-on-incomplete' => [true];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_passes_a_diff_run_whose_reference_left_no_changed_file_to_audit(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -225,11 +248,12 @@ final class AuditExitCodeResolverTest extends TestCase
     private function reportWith(int $criticalFindings, bool $incomplete = false): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        if ($incomplete) {
-            $auditContext->recordCoverage('attacker', 'src/Audited.php', 'errored');
-        }
-
-        $auditContext->setProjectFiles([ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php'),
+            ProjectFile::create('src/Failed.php', $this->tmpDir.'/src/Failed.php', '<?php'),
+        ]);
+        $auditContext->recordCoverage('attacker', 'src/Audited.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/Failed.php', $incomplete ? 'errored' : 'analyzed');
         for ($i = 1; $i <= $criticalFindings; ++$i) {
             $auditContext->addVulnerability(
                 Vulnerability::of(
