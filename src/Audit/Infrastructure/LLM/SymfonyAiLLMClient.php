@@ -97,6 +97,8 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $platformRequestConfig->temperature, $platformRequestConfig->providerJsonMode, $platformBinding->maxOutputTokens);
         $this->platformOptionsFactory = $platformOptionsFactory;
 
+        $conversionFailureExplainer = new ConversionFailureExplainer();
+
         $this->retryingPlatformInvoker = new RetryingPlatformInvoker(
             $platformBinding->platform,
             $platformBinding->model,
@@ -106,6 +108,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformResilienceConfig->transientFailureClassifier,
             $platformResilienceConfig->sleeper,
             $platformResilienceConfig->retryAfterHeaderParser,
+            $conversionFailureExplainer,
         );
         $this->emptyLLMResponseFactory = new EmptyLLMResponseFactory();
         $this->degradedAnswerBooker = new DegradedAnswerBooker($platformBinding->model, $platformAccountingConfig->budgetTracker, $platformBinding->logger, $platformAccountingConfig->tokenUsageRecorder);
@@ -138,6 +141,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformResilienceConfig->transientFailureClassifier,
             $inFlightRequestCanceller,
             $this->degradedAnswerBooker,
+            $conversionFailureExplainer,
         );
 
         $this->toolConversationWavefront = new ToolConversationWavefront(
@@ -154,6 +158,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformResilienceConfig->transientFailureClassifier,
             $inFlightRequestCanceller,
             $this->degradedAnswerBooker,
+            $conversionFailureExplainer,
         );
     }
 

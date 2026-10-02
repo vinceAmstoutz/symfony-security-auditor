@@ -16,13 +16,16 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Symfony\AI\Platform\Exception\BadRequestException;
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
+use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
 final class TransientFailureClassifierTest extends TestCase
@@ -207,6 +210,13 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'empty_content' => [new RuntimeException('Response does not contain any content.'), 'empty_content'];
         yield 'transient_failure' => [new RuntimeException('HTTP 503 Service Unavailable'), null];
         yield 'malformed_tool_call' => [new MalformedToolCallException('bad arguments'), null];
+        yield 'generic_bridge_unsupported_content_filter_finish_reason' => [new PlatformRuntimeException('Unsupported finish reason "content_filter".'), 'content-filter'];
+        yield 'responses_api_incomplete_for_the_content_filter' => [new PlatformRuntimeException('Responses API response is incomplete (content_filter) and contains no content.'), 'content-filter'];
+        yield 'cohere_unsupported_max_tokens_finish_reason' => [new PlatformRuntimeException('Unsupported finish reason "MAX_TOKENS".'), 'length'];
+        yield 'unsupported_finish_reason_that_cuts_nothing_short' => [new PlatformRuntimeException('Unsupported finish reason "ERROR".'), null];
+        yield 'responses_api_incomplete_for_another_reason' => [new PlatformRuntimeException('Responses API response is incomplete (unknown) and contains no content.'), null];
+        yield 'answer_its_raw_answer_shows_filtered' => [UnconvertedAnswerException::cutShort(new BadRequestException('The response was filtered'), 'content-filter'), 'content-filter'];
+        yield 'answer_its_raw_answer_shows_cut_off_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length')), 'length'];
     }
 
     #[DataProvider('emptyContentCases')]

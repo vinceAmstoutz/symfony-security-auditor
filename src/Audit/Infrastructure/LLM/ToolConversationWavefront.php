@@ -85,6 +85,7 @@ final readonly class ToolConversationWavefront
         private TransientFailureClassifier $transientFailureClassifier,
         private InFlightRequestCanceller $inFlightRequestCanceller,
         private DegradedAnswerBooker $degradedAnswerBooker,
+        private ConversionFailureExplainer $conversionFailureExplainer,
     ) {}
 
     /**
@@ -343,9 +344,10 @@ final readonly class ToolConversationWavefront
             $platformResult = $deferredResult->getResult();
             [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
         } catch (Throwable $throwable) {
-            $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($throwable, $conversationState->estimatedInputTokens), 0);
+            $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
+            $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($failure, $conversationState->estimatedInputTokens), 0);
 
-            throw $throwable;
+            throw $failure;
         }
 
         $conversationState = $conversationState->withRecordedTokens($callInput, $callOutput, $callCacheRead, $callCacheCreation);

@@ -61,6 +61,7 @@ final readonly class BatchWindowResolver
         private TransientFailureClassifier $transientFailureClassifier,
         private InFlightRequestCanceller $inFlightRequestCanceller,
         private DegradedAnswerBooker $degradedAnswerBooker,
+        private ConversionFailureExplainer $conversionFailureExplainer,
     ) {}
 
     /**
@@ -227,11 +228,12 @@ final readonly class BatchWindowResolver
 
             return $llmResponse;
         } catch (Throwable $throwable) {
+            $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
             if (!$reconciled) {
-                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($throwable, $dispatchedRequest->estimatedInputTokens), 0);
+                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($failure, $dispatchedRequest->estimatedInputTokens), 0);
             }
 
-            return $this->recoverFailedResolution($throwable, $llmRequest, $dispatchedRequest->estimatedInputTokens);
+            return $this->recoverFailedResolution($failure, $llmRequest, $dispatchedRequest->estimatedInputTokens);
         }
     }
 

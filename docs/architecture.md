@@ -74,8 +74,9 @@ src/
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop,
 │       │                  BatchWindowResolver, ToolConversationWavefront, InFlightRequestCanceller,
-│       │                  DegradedAnswerBooker, DispatchedRequest, PlatformResultExtractor,
-│       │                  PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator),
+│       │                  DegradedAnswerBooker, ConversionFailureExplainer, DispatchedRequest,
+│       │                  PlatformResultExtractor, PlatformOptionsFactory, PlatformToolsMapper,
+│       │                  PromptTokenEstimator),
 │       │                  RetryPolicy, TransientFailureClassifier,
 │       │                  TokenEstimator/{ProviderTokenEstimatorInterface, ResolvingTokenEstimator,
 │       │                  CharacterRatioCounter, AnthropicTokenEstimator, OpenAiTokenEstimator,
@@ -420,7 +421,7 @@ Around each invocation, `RateLimiterInterface` (default `NullRateLimiter`, opt-i
 
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no code changes — only `ai.yaml` configuration.
 
-The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `InFlightRequestCanceller` (cancels and books the requests a failed window leaves open), `DegradedAnswerBooker` (books an answer a provider delivered as an error at its estimated input tokens), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
+The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `InFlightRequestCanceller` (cancels and books the requests a failed window leaves open), `DegradedAnswerBooker` (books an answer a provider delivered as an error at its estimated input tokens), `ConversionFailureExplainer` (reads the raw answer of a conversion that failed for what the bridge's exception lost, such as Azure's HTTP 400 `content_filter`), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
 
 ### `LLMResponse`
 

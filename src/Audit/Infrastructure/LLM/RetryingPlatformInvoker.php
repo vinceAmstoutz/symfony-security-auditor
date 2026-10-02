@@ -48,6 +48,7 @@ final readonly class RetryingPlatformInvoker
         private TransientFailureClassifier $transientFailureClassifier,
         private SleeperInterface $sleeper,
         private RetryAfterHeaderParser $retryAfterHeaderParser,
+        private ConversionFailureExplainer $conversionFailureExplainer,
     ) {}
 
     /**
@@ -68,6 +69,7 @@ final readonly class RetryingPlatformInvoker
 
         $maxAttempts = $this->retryPolicy->maxAttempts();
         $attempt = 1;
+        $deferredResult = null;
         while (true) {
             $this->rateLimiter->acquire($estimatedInputTokens);
 
@@ -77,14 +79,15 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
-                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($throwable, $estimatedInputTokens), 0);
-                $this->rethrowWhenNonTransient($throwable);
+                $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
+                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($failure, $estimatedInputTokens), 0);
+                $this->rethrowWhenNonTransient($failure);
 
                 if ($attempt >= $maxAttempts) {
-                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
+                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $failure);
                 }
 
-                $this->backOffBeforeNextAttempt($throwable, $attempt, $maxAttempts);
+                $this->backOffBeforeNextAttempt($failure, $attempt, $maxAttempts);
                 ++$attempt;
             }
         }

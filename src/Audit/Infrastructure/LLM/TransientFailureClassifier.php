@@ -19,6 +19,7 @@ use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 
 use function Symfony\Component\String\u;
 
@@ -112,6 +113,17 @@ final readonly class TransientFailureClassifier
     ];
 
     /** @var list<string> */
+    private const array OUTPUT_LIMIT_HINTS = [
+        'unsupported finish reason "max_tokens"',
+    ];
+
+    /** @var list<string> */
+    private const array CONTENT_FILTER_HINTS = [
+        'unsupported finish reason "content_filter"',
+        'incomplete (content_filter)',
+    ];
+
+    /** @var list<string> */
     private const array EMPTY_CONTENT_HINTS = [
         'does not contain any content',
         'response does not contain',
@@ -149,15 +161,28 @@ final readonly class TransientFailureClassifier
      * The stop reason `LLMResponse` gives the same outcome when a provider
      * delivers it as a response rather than a failure: the model answered, but
      * with nothing usable — cut off by the output limit, withheld by a content
-     * filter, or empty. Null for any other failure.
+     * filter, or empty. A bridge reports the first two as a typed exception or
+     * as a plain one naming the provider's own reason (the generic bridge's
+     * `Unsupported finish reason "content_filter".`, the Responses API's
+     * `response is incomplete (content_filter)`, Cohere's `Unsupported finish
+     * reason "MAX_TOKENS".`), and an answer it failed to convert can only
+     * show it in its raw answer (`UnconvertedAnswerException`). Null for any
+     * other failure.
      */
     public function degradedStopReason(Throwable $throwable): ?string
     {
-        if ($this->hasInChain($throwable, MaxOutputTokensException::class)) {
+        $unconvertedAnswer = $this->firstInChain($throwable, UnconvertedAnswerException::class);
+        if ($unconvertedAnswer instanceof UnconvertedAnswerException) {
+            return $unconvertedAnswer->stopReason;
+        }
+
+        $joined = $this->joinMessages($throwable);
+
+        if ($this->hasInChain($throwable, MaxOutputTokensException::class) || u($joined)->containsAny(self::OUTPUT_LIMIT_HINTS)) {
             return 'length';
         }
 
-        if ($this->hasInChain($throwable, ContentFilterException::class)) {
+        if ($this->hasInChain($throwable, ContentFilterException::class) || u($joined)->containsAny(self::CONTENT_FILTER_HINTS)) {
             return 'content-filter';
         }
 
@@ -244,16 +269,28 @@ final readonly class TransientFailureClassifier
      */
     private function hasInChain(Throwable $throwable, string $exceptionClass): bool
     {
+        return $this->firstInChain($throwable, $exceptionClass) instanceof Throwable;
+    }
+
+    /**
+     * @template T of Throwable
+     *
+     * @param class-string<T> $exceptionClass
+     *
+     * @return T|null
+     */
+    private function firstInChain(Throwable $throwable, string $exceptionClass): ?Throwable
+    {
         $current = $throwable;
         while ($current instanceof Throwable) {
             if ($current instanceof $exceptionClass) {
-                return true;
+                return $current;
             }
 
             $current = $current->getPrevious();
         }
 
-        return false;
+        return null;
     }
 
     private function joinMessages(Throwable $throwable): string
