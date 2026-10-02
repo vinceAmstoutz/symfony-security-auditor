@@ -49,14 +49,19 @@ final class SelfUpdateFailedException extends RuntimeException
         return new self(\sprintf('Could not read the downloaded file at "%s" to verify its checksum; the download was not trusted and has been discarded.', $downloadPath));
     }
 
-    public static function forUnwritableBinary(string $binaryPath): self
+    public static function forUnwritableBinaryDirectory(string $directory, Throwable $throwable): self
     {
-        return new self(\sprintf('The binary at "%s" is not writable; re-run the update with the necessary permissions (e.g. sudo) or reinstall with the install script.', $binaryPath));
+        return new self(\sprintf('The directory "%s" holding the binary is not writable (%s), so the binary cannot be replaced; re-run the update with the necessary permissions (e.g. sudo) or reinstall with the install script.', $directory, $throwable->getMessage()), previous: $throwable);
     }
 
     public static function forFailedReplacement(string $binaryPath, Throwable $throwable): self
     {
         return new self(\sprintf('Failed to replace the binary at "%s": %s', $binaryPath, $throwable->getMessage()), previous: $throwable);
+    }
+
+    public static function forFailedReplacementLeavingDownload(string $binaryPath, string $downloadPath, Throwable $replacementFailure, Throwable $removalFailure): self
+    {
+        return new self(\sprintf('Failed to replace the binary at "%s": %s. The downloaded update at "%s" could not be removed either (%s); delete it by hand.', $binaryPath, $replacementFailure->getMessage(), $downloadPath, $removalFailure->getMessage()), previous: $replacementFailure);
     }
 
     public static function forInvalidCatalogDownload(string $url): self

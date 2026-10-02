@@ -3472,6 +3472,34 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * A peer that closes the TLS connection mid-read — a stale keep-alive socket
+     * taken from the HTTP client's pool is the common trigger — is a transport
+     * truncation, not a rejected request. It must be retried on a fresh
+     * connection instead of aborting the whole audit.
+     *
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     */
+    public function test_complete_recovers_when_the_provider_truncates_the_response_mid_read(): void
+    {
+        $platform = $this->flakyPlatform([
+            new RuntimeException('OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0 for "https://example.com/v1/chat/completions".'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        self::assertSame('recovered', $symfonyAiLLMClient->complete('sys', 'usr')->content());
+    }
+
+    /**
      * @throws InvalidRetryConfigurationException
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException

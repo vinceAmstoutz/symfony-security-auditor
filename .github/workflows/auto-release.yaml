@@ -169,7 +169,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          codename="$(grep -m1 "^## \[$VERSION\]" CHANGELOG.md | sed -E 's/^## \[[^]]+\] — [0-9-]+ — //')"
+          codename="$(grep -m1 "^## \[$VERSION\]" CHANGELOG.md | sed -nE 's/^## \[[^]]+\] — [0-9-]+ — (.+)$/\1/p')"
           if [ -n "$codename" ]; then
             echo "name=$VERSION - $codename" >> "$GITHUB_OUTPUT"
           else
@@ -185,8 +185,8 @@ jobs:
         # manual replay still honours its own `publish` input.
         run: echo "publish=${PUBLISH:-true}" >> "$GITHUB_OUTPUT"
 
-      - name: Draft the GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+      - name: Draft the GitHub Release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ needs.detect.outputs.version }}
           name: ${{ steps.release-name.outputs.name }}

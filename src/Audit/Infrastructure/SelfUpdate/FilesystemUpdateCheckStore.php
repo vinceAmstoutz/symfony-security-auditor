@@ -25,8 +25,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPa
 /**
  * Persists the last update check under the XDG cache directory as a small JSON
  * document. Every I/O or decoding failure degrades to a cache miss (`read()`
- * returns `null`) or a no-op (`write()`), logged but never thrown, so the update
- * notice is only ever a best-effort convenience and can never abort a command.
+ * returns `null`) or an unpersisted write (`write()` returns `false`), logged
+ * but never thrown, so the update notice is only ever a best-effort convenience
+ * and can never abort a command.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -64,11 +65,11 @@ final readonly class FilesystemUpdateCheckStore implements UpdateCheckStoreInter
     }
 
     #[Override]
-    public function write(UpdateCheckState $updateCheckState): void
+    public function write(UpdateCheckState $updateCheckState): bool
     {
         $path = $this->cacheFilePath();
         if (null === $path) {
-            return;
+            return false;
         }
 
         $payload = json_encode([
@@ -81,7 +82,11 @@ final readonly class FilesystemUpdateCheckStore implements UpdateCheckStoreInter
             $this->filesystem->dumpFile($path, $payload);
         } catch (IOException $ioException) {
             $this->logger->warning('Failed to write the update-check cache', ['error' => $ioException->getMessage()]);
+
+            return false;
         }
+
+        return true;
     }
 
     #[Override]

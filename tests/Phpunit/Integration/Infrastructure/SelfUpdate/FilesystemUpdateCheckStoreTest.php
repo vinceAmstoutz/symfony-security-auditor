@@ -94,6 +94,23 @@ final class FilesystemUpdateCheckStoreTest extends TestCase
         self::assertNull($filesystemUpdateCheckStore->read());
     }
 
+    public function test_it_reports_a_persisted_write(): void
+    {
+        self::assertTrue($this->resolvableStore()->write(new UpdateCheckState(new DateTimeImmutable('@1700000000'), '2.0.0')));
+    }
+
+    public function test_it_reports_a_write_it_cannot_place_when_the_cache_path_is_unresolvable(): void
+    {
+        self::assertFalse($this->unresolvableStore()->write(new UpdateCheckState(new DateTimeImmutable('@1700000000'), '2.0.0')));
+    }
+
+    public function test_it_reports_a_failed_write(): void
+    {
+        $this->filesystem->dumpFile($this->cacheDir(), 'blocks the cache directory');
+
+        self::assertFalse($this->resolvableStore()->write(new UpdateCheckState(new DateTimeImmutable('@1700000000'), '2.0.0')));
+    }
+
     public function test_it_clears_a_previously_written_state(): void
     {
         $filesystemUpdateCheckStore = $this->resolvableStore();

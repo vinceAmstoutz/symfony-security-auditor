@@ -766,6 +766,56 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_still_caches_when_a_directory_above_the_cache_is_a_symlink(): void
+    {
+        $base = sys_get_temp_dir().'/attacker_cache_symlinked_parent_'.uniqid('', true);
+        mkdir($base.'/real', recursive: true);
+        symlink($base.'/real', $base.'/link');
+        $filesystemAttackerCache = new FilesystemAttackerCache($base.'/link/cache', new Filesystem(), new NullLogger());
+        $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        chdir($base);
+        try {
+            $filesystemAttackerCache->store($chunk, [['type' => 'xss']]);
+
+            self::assertSame([['type' => 'xss']], $filesystemAttackerCache->get($chunk));
+        } finally {
+            chdir($workingDirectory);
+            (new Filesystem())->remove($base);
+        }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_relative_cache_directory_is_read_against_the_working_directory(): void
+    {
+        $base = sys_get_temp_dir().'/attacker_cache_relative_'.uniqid('', true);
+        mkdir($base);
+        $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        chdir($base);
+        try {
+            $filesystemAttackerCache = new FilesystemAttackerCache('var/cache', new Filesystem(), new NullLogger());
+            $filesystemAttackerCache->store($chunk, [['type' => 'xss']]);
+
+            self::assertSame([['type' => 'xss']], $filesystemAttackerCache->get($chunk));
+            self::assertDirectoryExists($base.'/var/cache');
+        } finally {
+            chdir($workingDirectory);
+            (new Filesystem())->remove($base);
+        }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
      */
     #[Override]
     protected function setUp(): void
