@@ -54,6 +54,14 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'timeout_message_with_embedded_non_transient_digits' => [new RuntimeException('cURL error 28: timed out after 1400 ms')];
         yield 'rate_limit_quota_with_thousands_separator' => [new RuntimeException("This request would exceed your organization's rate limit of 400,000 input tokens per minute")];
         yield 'timeout_with_thousands_separated_duration' => [new RuntimeException('Request timed out after 1,400 ms')];
+        yield 'openssl_unexpected_eof_while_reading' => [new RuntimeException('OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0 for "https://example.com/v1/chat/completions".')];
+        yield 'php_openssl_eof_in_violation_of_protocol' => [new RuntimeException('SSL: eof occurred in violation of protocol')];
+        yield 'curl_recv_failure' => [new RuntimeException('cURL error 56: Recv failure')];
+        yield 'curl_send_failure' => [new RuntimeException('cURL error 55: Failed sending data to the peer')];
+        yield 'curl_error_18_partial_file' => [new RuntimeException('cURL error 18: end of response with 0 bytes read')];
+        yield 'empty_reply_from_server' => [new RuntimeException('Empty reply from server')];
+        yield 'broken_pipe' => [new RuntimeException('Broken pipe')];
+        yield 'connection_closed_by_peer' => [new RuntimeException('Connection closed by peer')];
     }
 
     #[DataProvider('nonTransientCases')]
