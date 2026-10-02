@@ -230,10 +230,10 @@ final readonly class BatchWindowResolver
         } catch (Throwable $throwable) {
             $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
             if (!$reconciled) {
-                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($failure, $dispatchedRequest->estimatedInputTokens), 0);
+                $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $dispatchedRequest->estimatedInputTokens);
             }
 
-            return $this->recoverFailedResolution($failure, $llmRequest, $dispatchedRequest->estimatedInputTokens);
+            return $this->recoverFailedResolution($failure, $llmRequest);
         }
     }
 
@@ -244,14 +244,11 @@ final readonly class BatchWindowResolver
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
-     * @throws NegativeTokenCountException
      */
-    private function recoverFailedResolution(Throwable $throwable, LLMRequest $llmRequest, int $estimatedInputTokens): LLMResponse
+    private function recoverFailedResolution(Throwable $throwable, LLMRequest $llmRequest): LLMResponse
     {
         $degradedStopReason = $this->transientFailureClassifier->degradedStopReason($throwable);
         if (null !== $degradedStopReason) {
-            $this->degradedAnswerBooker->book($estimatedInputTokens, $degradedStopReason);
-
             return LLMResponse::of('', $this->model, $degradedStopReason, TokenUsageSnapshot::of(0, 0));
         }
 

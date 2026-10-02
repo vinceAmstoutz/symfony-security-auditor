@@ -297,7 +297,7 @@ final readonly class ToolConversationWavefront
     private function advanceConversation(ConversationState $conversationState, DeferredResult|Throwable $dispatched, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
     {
         if ($dispatched instanceof Throwable) {
-            $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($dispatched, $conversationState->estimatedInputTokens), 0);
+            $this->degradedAnswerBooker->bookFailedCall($dispatched, null, $conversationState->estimatedInputTokens);
 
             return $this->recoverFailedInvocation($conversationState, $dispatched, $toolLLMRequest, $maxToolIterations);
         }
@@ -337,6 +337,7 @@ final readonly class ToolConversationWavefront
     /**
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
      */
     private function processDeferredResult(ConversationState $conversationState, DeferredResult $deferredResult, ToolLLMRequest $toolLLMRequest): ConversationState
     {
@@ -345,7 +346,7 @@ final readonly class ToolConversationWavefront
             [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
         } catch (Throwable $throwable) {
             $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
-            $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($failure, $conversationState->estimatedInputTokens), 0);
+            $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $conversationState->estimatedInputTokens);
 
             throw $failure;
         }
@@ -392,7 +393,6 @@ final readonly class ToolConversationWavefront
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
-     * @throws NegativeTokenCountException
      */
     private function retryOrAbortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
     {
@@ -416,7 +416,6 @@ final readonly class ToolConversationWavefront
      *
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
-     * @throws NegativeTokenCountException
      */
     private function retryInvocation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): DeferredResult|ConversationState
     {
@@ -488,11 +487,9 @@ final readonly class ToolConversationWavefront
      * already recorded.
      *
      * @throws InvalidTokenUsageException
-     * @throws NegativeTokenCountException
      */
     private function endDegradedConversation(ConversationState $conversationState, Throwable $throwable, string $stopReason): ConversationState
     {
-        $this->degradedAnswerBooker->book($conversationState->estimatedInputTokens, $stopReason);
         $this->logger->warning('Concurrent tool-using conversation ended without usable content; it is answered as a degraded response and keeps the tool results already recorded', [
             'stop_reason' => $stopReason,
             'input_tokens' => $conversationState->input,

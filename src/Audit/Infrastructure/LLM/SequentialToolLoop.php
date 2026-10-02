@@ -56,7 +56,6 @@ final readonly class SequentialToolLoop
         private PlatformOptionsFactory $platformOptionsFactory,
         private PromptTokenEstimator $promptTokenEstimator,
         private EmptyLLMResponseFactory $emptyLLMResponseFactory,
-        private DegradedAnswerBooker $degradedAnswerBooker,
     ) {}
 
     /**
@@ -190,8 +189,6 @@ final readonly class SequentialToolLoop
         try {
             return $this->retryingPlatformInvoker->invoke($messageBag, $options, $estimatedInputTokens);
         } catch (EmptyLLMResponseException $emptyllmResponseException) {
-            $this->degradedAnswerBooker->book($estimatedInputTokens, $emptyllmResponseException->stopReason);
-
             return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, $tokenUsageSnapshot);
         } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
             if (0 === $iteration) {

@@ -26,6 +26,8 @@ use function Symfony\Component\String\u;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class TransientFailureClassifier
 {
+    private const string MALFORMED_TOOL_CALL_STOP_REASON = 'malformed_tool_call';
+
     /** @var list<string> */
     private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504', '529'];
 
@@ -190,13 +192,16 @@ final readonly class TransientFailureClassifier
     }
 
     /**
-     * A degraded answer is one the provider took in and answered, so its
-     * input counts against the rate window as it does against the budget; any
-     * other failure released nothing the window has to hold.
+     * Why a call that failed was still billed: the provider took the request
+     * in and answered it, with nothing usable (the degraded stop reason) or
+     * with a tool call whose arguments are not valid JSON
+     * (`malformed_tool_call`). Null for a failure it never answered, which
+     * spent nothing the budget or the rate window has to hold.
      */
-    public function inputTokensTakenIn(Throwable $throwable, int $estimatedInputTokens): int
+    public function billedStopReason(Throwable $throwable): ?string
     {
-        return null !== $this->degradedStopReason($throwable) ? $estimatedInputTokens : 0;
+        return $this->degradedStopReason($throwable)
+            ?? ($this->hasInChain($throwable, MalformedToolCallException::class) ? self::MALFORMED_TOOL_CALL_STOP_REASON : null);
     }
 
     /**

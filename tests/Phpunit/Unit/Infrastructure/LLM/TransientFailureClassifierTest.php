@@ -219,6 +219,23 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'answer_its_raw_answer_shows_cut_off_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length')), 'length'];
     }
 
+    #[DataProvider('billedStopReasonCases')]
+    public function test_it_names_why_a_failed_call_the_provider_answered_was_still_billed(Throwable $throwable, ?string $expectedStopReason): void
+    {
+        self::assertSame($expectedStopReason, (new TransientFailureClassifier())->billedStopReason($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable, ?string}> */
+    public static function billedStopReasonCases(): iterable
+    {
+        yield 'answer_cut_off_by_the_output_limit' => [new MaxOutputTokensException('cut off'), 'length'];
+        yield 'answer_withheld_by_a_content_filter' => [new ContentFilterException('blocked'), 'content-filter'];
+        yield 'tool_call_with_malformed_arguments' => [new MalformedToolCallException('bad arguments'), 'malformed_tool_call'];
+        yield 'wrapped_tool_call_with_malformed_arguments' => [new RuntimeException('call failed', previous: new MalformedToolCallException('bad arguments')), 'malformed_tool_call'];
+        yield 'tool_call_its_raw_answer_shows_cut_off' => [UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length'), 'length'];
+        yield 'failure_the_provider_never_answered' => [new RuntimeException('HTTP 503 Service Unavailable'), null];
+    }
+
     #[DataProvider('emptyContentCases')]
     public function test_it_recognizes_empty_content_failures(Throwable $throwable): void
     {

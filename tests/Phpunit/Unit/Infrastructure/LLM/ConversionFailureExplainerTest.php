@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\AI\Platform\Exception\BadRequestException;
+use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
@@ -47,6 +48,28 @@ final class ConversionFailureExplainerTest extends TestCase
     /**
      * @param array<string, mixed> $rawAnswer
      */
+    #[DataProvider('rawAnswersCutOffByTheOutputLimitCases')]
+    public function test_an_answer_whose_raw_answer_shows_the_output_limit_cut_it_off_is_cut_short_by_length(array $rawAnswer): void
+    {
+        $malformedToolCallException = new MalformedToolCallException('Model returned malformed JSON arguments for the "record_vulnerability" tool: "Syntax error"');
+
+        $throwable = (new ConversionFailureExplainer())->explain($malformedToolCallException, $this->failedConversion($malformedToolCallException, $rawAnswer));
+
+        self::assertInstanceOf(UnconvertedAnswerException::class, $throwable);
+        self::assertSame('length', $throwable->stopReason);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function rawAnswersCutOffByTheOutputLimitCases(): iterable
+    {
+        yield 'chat completions finish reason' => [['choices' => [['index' => 0, 'finish_reason' => 'length']]]];
+        yield 'chat completions finish reason of a later choice' => [['choices' => [['index' => 0, 'finish_reason' => 'tool_calls'], ['index' => 1, 'finish_reason' => 'length']]]];
+        yield 'responses api incomplete reason' => [['status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens']]];
+    }
+
+    /**
+     * @param array<string, mixed> $rawAnswer
+     */
     #[DataProvider('rawAnswersThatExplainNothingCases')]
     public function test_a_raw_answer_that_names_nothing_the_bridge_lost_leaves_the_failure_as_it_is(array $rawAnswer): void
     {
@@ -62,6 +85,11 @@ final class ConversionFailureExplainerTest extends TestCase
         yield 'an error without a code' => [['error' => ['message' => 'Bad Request']]];
         yield 'an error that is only a message' => [['error' => 'content_filter']];
         yield 'no error at all' => [[]];
+        yield 'a choice the model finished' => [['choices' => [['index' => 0, 'finish_reason' => 'tool_calls']]]];
+        yield 'choices that are not a list' => [['choices' => 'length']];
+        yield 'a choice that is not an object' => [['choices' => ['length']]];
+        yield 'a responses answer incomplete for another reason' => [['status' => 'incomplete', 'incomplete_details' => ['reason' => 'unknown']]];
+        yield 'incomplete details that are not an object' => [['status' => 'incomplete', 'incomplete_details' => 'max_output_tokens']];
     }
 
     public function test_a_raw_answer_that_cannot_be_read_leaves_the_failure_as_it_is(): void

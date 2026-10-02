@@ -21,7 +21,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unco
  * Reads the raw answer of a call its bridge failed to convert again, for what
  * the bridge's exception no longer says. Azure, and the gateways relaying it,
  * refuse a prompt the content filter caught with an HTTP 400 whose
- * `error.code` is `content_filter`; the bridges keep only its message. Only
+ * `error.code` is `content_filter`; the bridges keep only its message. A tool
+ * call the output token limit cut off mid-way through its arguments fails as
+ * a malformed tool call, while the answer's finish reason — `length` in Chat
+ * Completions, `incomplete_details.reason: max_output_tokens` in the Responses
+ * API — says it was cut off, so asking again would hit the same limit. Only
  * the failure to convert that very answer is read against it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
@@ -30,17 +34,19 @@ final readonly class ConversionFailureExplainer
 {
     private const string CONTENT_FILTER_ERROR_CODE = 'content_filter';
 
+    private const string OUTPUT_LIMIT_FINISH_REASON = 'length';
+
+    private const string OUTPUT_LIMIT_INCOMPLETE_REASON = 'max_output_tokens';
+
     public function explain(Throwable $throwable, ?DeferredResult $deferredResult): Throwable
     {
         if (!$deferredResult instanceof DeferredResult || !$this->isConversionFailure($throwable, $deferredResult)) {
             return $throwable;
         }
 
-        if (self::CONTENT_FILTER_ERROR_CODE === $this->errorCode($this->rawAnswer($deferredResult))) {
-            return UnconvertedAnswerException::cutShort($throwable, 'content-filter');
-        }
+        $stopReason = $this->stopReasonOf($this->rawAnswer($deferredResult));
 
-        return $throwable;
+        return null === $stopReason ? $throwable : UnconvertedAnswerException::cutShort($throwable, $stopReason);
     }
 
     private function isConversionFailure(Throwable $throwable, DeferredResult $deferredResult): bool
@@ -69,10 +75,33 @@ final readonly class ConversionFailureExplainer
     /**
      * @param array<array-key, mixed> $rawAnswer
      */
-    private function errorCode(array $rawAnswer): mixed
+    private function stopReasonOf(array $rawAnswer): ?string
     {
-        $error = $rawAnswer['error'] ?? null;
+        return match (true) {
+            self::CONTENT_FILTER_ERROR_CODE === $this->field($rawAnswer['error'] ?? null, 'code') => 'content-filter',
+            self::OUTPUT_LIMIT_INCOMPLETE_REASON === $this->field($rawAnswer['incomplete_details'] ?? null, 'reason'),
+            $this->anyChoiceFinishedFor(self::OUTPUT_LIMIT_FINISH_REASON, $rawAnswer['choices'] ?? null) => 'length',
+            default => null,
+        };
+    }
 
-        return \is_array($error) ? $error['code'] ?? null : null;
+    private function anyChoiceFinishedFor(string $finishReason, mixed $choices): bool
+    {
+        if (!\is_array($choices)) {
+            return false;
+        }
+
+        foreach ($choices as $choice) {
+            if ($finishReason === $this->field($choice, 'finish_reason')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function field(mixed $object, string $key): mixed
+    {
+        return \is_array($object) ? $object[$key] ?? null : null;
     }
 }

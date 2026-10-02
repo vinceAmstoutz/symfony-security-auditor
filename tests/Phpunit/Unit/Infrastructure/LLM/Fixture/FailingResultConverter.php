@@ -30,6 +30,7 @@ final readonly class FailingResultConverter implements ResultConverterInterface
 {
     public function __construct(
         private RuntimeException $runtimeException,
+        private ?TokenUsageExtractorInterface $tokenUsageExtractor = null,
     ) {}
 
     #[Override]
@@ -47,6 +48,6 @@ final readonly class FailingResultConverter implements ResultConverterInterface
     #[Override]
     public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
     {
-        return null;
+        return $this->tokenUsageExtractor;
     }
 }
