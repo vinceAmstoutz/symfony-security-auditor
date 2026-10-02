@@ -78,19 +78,36 @@ final class TrendHtmlRendererTest extends TestCase
         );
     }
 
-    public function test_the_first_report_row_shows_dashes_instead_of_new_and_fixed_counts(): void
+    public function test_the_first_report_row_shows_dashes_instead_of_new_fixed_and_unverified_counts(): void
     {
         self::assertStringContainsString(
-            '<tr><td>1</td><td>previous.json</td><td>2</td><td>—</td><td>—</td></tr>',
+            '<tr><td>1</td><td>previous.json</td><td>2</td><td>—</td><td>—</td><td>—</td></tr>',
             $this->trendHtmlRenderer->render($this->twoPointTrend()),
         );
     }
 
-    public function test_a_later_report_row_shows_its_new_and_fixed_counts(): void
+    public function test_a_later_report_row_shows_its_new_fixed_and_unverified_counts(): void
     {
         self::assertStringContainsString(
-            '<tr><td>2</td><td>current.json</td><td>3</td><td>2</td><td>1</td></tr>',
+            '<tr><td>2</td><td>current.json</td><td>3</td><td>2</td><td>1</td><td>0</td></tr>',
             $this->trendHtmlRenderer->render($this->twoPointTrend()),
+        );
+    }
+
+    public function test_the_table_has_a_column_for_the_unverified_findings(): void
+    {
+        self::assertStringContainsString('<th>Fixed</th>
+          <th>Unverified</th>', $this->trendHtmlRenderer->render($this->twoPointTrend()));
+    }
+
+    public function test_the_summary_says_how_many_findings_went_unverified_rather_than_fixed(): void
+    {
+        self::assertStringContainsString(
+            '5 → 2 findings (-3) across 2 reports, 3 unverified rather than fixed.',
+            $this->trendHtmlRenderer->render(new ReportTrend([
+                new TrendPoint('previous.json', 5, null, null),
+                new TrendPoint('current.json', 2, 0, 0, 3),
+            ])),
         );
     }
 
@@ -229,7 +246,7 @@ final class TrendHtmlRendererTest extends TestCase
     {
         return new ReportTrend([
             new TrendPoint('previous.json', 2, null, null),
-            new TrendPoint('current.json', 3, 2, 1),
+            new TrendPoint('current.json', 3, 2, 1, 0),
         ]);
     }
 }

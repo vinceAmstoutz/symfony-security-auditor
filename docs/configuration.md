@@ -816,7 +816,7 @@ _Since 1.21_, the same holds for a run that ran to its end without analyzing **a
 
 ### `audit:diff` — comparing two reports
 
-Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A finding that disappeared from a file the later run could not fully analyze (its `coverage` ledger says the file `errored` or was `aborted`, so the report carries `complete: false`) is **Unverified** rather than fixed: nobody looked, so nothing says it is gone. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title` — and one written before the coverage ledger existed simply has no unverified findings.
+Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A finding that disappeared from a file the later run could not fully analyze (its `coverage` ledger says the file `errored` or was `aborted`, so the report carries `complete: false`) is **Unverified** rather than fixed: nobody looked, so nothing says it is gone. _Since 1.21_, the same holds for a file the later run never looked at — one the lean pre-scan skipped, one outside its `--since` or `--path` scope: a finding counts as fixed only when the later report's ledger says the attacker analyzed its file, or served it from its cache. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title` — and one written before the coverage ledger existed simply has no unverified findings.
 
 ```bash
 bin/console audit:diff previous.json current.json
@@ -855,6 +855,8 @@ Trend (3 reports)
 Summary: 5 → 6 findings (+1) across 3 reports.
 ```
 
+When some finding disappeared from a file a later run could not analyze, the summary says how many, as in `Summary: 5 → 2 findings (-3) across 2 reports, 3 unverified rather than fixed.` (_since 1.21_).
+
 | Argument | Required | Description |
 | --- | --- | --- |
 | `reports` | yes | Paths to two or more JSON reports, ordered oldest to newest. |
@@ -865,7 +867,7 @@ Summary: 5 → 6 findings (+1) across 3 reports.
 
 With `--format=json` the trend is emitted as a `points` array — one entry per report with `report`, `total`, `new`, `fixed`, and `unverified` keys (`new`, `fixed`, and `unverified` are `null` on the first point, which has no predecessor to compare against). `unverified` counts the findings that disappeared from files the report's run could not fully analyze — they are neither fixed nor part of its total, and the console line mentions them only when there are some.
 
-With `--format=html` the trend is emitted as a single self-contained HTML page (no external assets, light and dark mode): an SVG line chart of finding totals over the report series plus a table of per-report new/fixed deltas — redirect stdout to publish it as a dashboard:
+With `--format=html` the trend is emitted as a single self-contained HTML page (no external assets, light and dark mode): an SVG line chart of finding totals over the report series plus a table of per-report new/fixed/unverified deltas, under the same summary sentence as the console — redirect stdout to publish it as a dashboard:
 
 ```bash
 bin/console audit:trend nightly-*.json --format=html > trend.html
@@ -888,7 +890,7 @@ bin/console audit:baseline report.json .security-baseline.json --prune --annotat
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--prune` | off | Drop baseline entries whose findings no longer appear in the report. |
+| `--prune` | off | Drop baseline entries whose findings no longer appear in the report. _Since 1.21_, an entry whose file the report did not analyze — its run failed on the file, or never looked at it — is kept with its reason, the way `audit:diff` calls such a finding unverified rather than fixed. |
 | `--annotate` | off | Ask a reason for each newly accepted finding; reasoned entries teach the reviewer. |
 
 Each appended entry carries `fingerprint`, `type`, `file`, `title`, `added_at`, and — when `--annotate` supplied one — `reason`. Matching is count-aware, the same rule the audit itself applies: each entry accepts one occurrence, so a finding duplicated beyond its accepted count registers as new again. Entries whose `attacker_fingerprint` matches a report finding count as covering it.
