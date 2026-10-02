@@ -116,20 +116,35 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     private function replaceBinary(GitHubBinaryAsset $gitHubBinaryAsset): void
     {
         $binaryPath = $this->runningBinaryLocator->path();
-        if (!is_writable($binaryPath)) {
-            throw SelfUpdateFailedException::forUnwritableBinary($binaryPath);
-        }
-
-        $downloadPath = $this->filesystem->tempnam(\dirname($binaryPath), \sprintf('.%s.', $gitHubBinaryAsset->name), '.download');
+        $downloadPath = $this->stageDownloadNextTo($binaryPath, $gitHubBinaryAsset);
 
         try {
             $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath);
             $this->assertChecksumMatches($gitHubBinaryAsset, $downloadPath);
             $this->scheduleInstall($downloadPath, $binaryPath);
         } catch (Throwable $throwable) {
-            $this->filesystem->remove($downloadPath);
+            $this->discardDownload($downloadPath);
 
             throw $throwable;
+        }
+    }
+
+    /**
+     * The binary is replaced by renaming a file over it, which needs the
+     * directory to be writable and not the binary itself: a writable binary in
+     * a root-owned directory still cannot be replaced. Staging the download in
+     * that directory is the check, made before anything is downloaded.
+     *
+     * @throws SelfUpdateFailedException
+     */
+    private function stageDownloadNextTo(string $binaryPath, GitHubBinaryAsset $gitHubBinaryAsset): string
+    {
+        $directory = \dirname($binaryPath);
+
+        try {
+            return $this->filesystem->tempnam($directory, \sprintf('.%s.', $gitHubBinaryAsset->name), '.download');
+        } catch (IOException $ioException) {
+            throw SelfUpdateFailedException::forUnwritableBinaryDirectory($directory, $ioException);
         }
     }
 
@@ -180,9 +195,20 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         try {
             $this->filesystem->rename($downloadPath, $binaryPath, true);
         } catch (IOException $ioException) {
-            $this->filesystem->remove($downloadPath);
+            $removalFailure = $this->discardDownload($downloadPath);
 
-            throw SelfUpdateFailedException::forFailedReplacement($binaryPath, $ioException);
+            throw $removalFailure instanceof IOException ? SelfUpdateFailedException::forFailedReplacementLeavingDownload($binaryPath, $downloadPath, $ioException, $removalFailure) : SelfUpdateFailedException::forFailedReplacement($binaryPath, $ioException);
         }
+    }
+
+    private function discardDownload(string $downloadPath): ?IOException
+    {
+        try {
+            $this->filesystem->remove($downloadPath);
+        } catch (IOException $ioException) {
+            return $ioException;
+        }
+
+        return null;
     }
 }

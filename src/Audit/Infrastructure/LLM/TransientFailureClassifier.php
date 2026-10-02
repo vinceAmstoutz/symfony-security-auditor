@@ -48,6 +48,14 @@ final readonly class TransientFailureClassifier
         'connection refused',
         'connection aborted',
         'network is unreachable',
+        'unexpected eof while reading',
+        'eof occurred in violation of protocol',
+        'recv failure',
+        'failed sending data to the peer',
+        'curl error 18',
+        'empty reply from server',
+        'broken pipe',
+        'connection closed by peer',
     ];
 
     /** @var list<string> */

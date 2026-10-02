@@ -91,14 +91,15 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
   and has been discarded.
   ```
 
-- **Binary not writable**:
+- **Directory not writable** — the binary is replaced by renaming a new file over it, so the directory holding it must be writable, whatever the binary's own permissions; nothing is downloaded:
 
   ```text
-  The binary at "<path>" is not writable; re-run the update with the
-  necessary permissions (e.g. sudo) or reinstall with the install script.
+  The directory "<dir>" holding the binary is not writable (<reason>), so the
+  binary cannot be replaced; re-run the update with the necessary permissions
+  (e.g. sudo) or reinstall with the install script.
   ```
 
-- **Replacement failed mid-swap** — `Failed to replace the binary at "<path>": <reason>.` The new binary is moved into place as the command exits, not while it runs — the running process still loads classes from the archive being replaced — so this one surfaces after `Updated from … to ….` has already printed. The previous binary is left in place, so re-running `self-update` is safe.
+- **Replacement failed mid-swap** — `Failed to replace the binary at "<path>": <reason>`, followed by `The update was not applied: the previous version is still installed.`, on stderr, and the command exits `1`. The new binary is moved into place as the command exits, not while it runs — the running process still loads classes from the archive being replaced — so this one surfaces after `Downloaded and verified <new>; it replaces <old> as this command exits.` has printed. The previous binary is left in place, so re-running `self-update` is safe.
 
 ### `init` fails to install the provider bridge
 
@@ -253,6 +254,17 @@ The reviewer handles a prompt it cannot fit the same way: a batch of findings (`
 ```text
 Reviewer batch exceeds the model input limit; it is split in two and each half reviewed on its own
 ```
+
+### `OpenSSL SSL_read: … unexpected eof while reading` / `cURL error 56`
+
+The peer closed the connection while the response was still being read. `error:0A000126` is `SSL_R_UNEXPECTED_EOF_WHILE_READING` and `errno 0` means no OS-level error — the endpoint hung up without a TLS `close_notify`. This is a transport truncation, so it is classified as transient and the LLM call is retried on a fresh connection (`audit.retry.max_attempts`, default `3`).
+
+Self-hosted endpoints and proxied APIs produce it most often, in two ways:
+
+- **Stale keep-alive reuse.** Auditor calls are slow and far apart, so the idle gap exceeds the endpoint's or your reverse proxy's `keepalive_timeout`. The server drops the socket; the HTTP client takes the dead one from its pool for the next call. Raise `keepalive_timeout` above the longest gap between calls, and `proxy_read_timeout` / `proxy_send_timeout` above the longest generation time.
+- **More concurrent connections than the endpoint serves.** The `fast` profile opens up to four attacker and four reviewer calls (`audit.attacker_max_concurrent` / `audit.reviewer_max_concurrent`). A local model server with a small worker pool drops the excess. Set both to `1`; `balanced` and `thorough` already default to `1`.
+
+When every retry fails, the run still aborts with exit `1` and the report says it is incomplete (#378). Running again resumes from the cache (`cache.enabled`, on by default), so only the failed chunks are retried. Streaming, which should remove the problem at its source, is tracked in #379.
 
 ### `LLM response was empty` / `Failed to parse … JSON response`
 
@@ -423,6 +435,10 @@ symfony_security_auditor:
     cache:
         dir: '/tmp/symfony-security-auditor/cache'
 ```
+
+### Every run misses the cache and logs `cache entry path was a symlink`
+
+A symlink below `cache.dir` — a sub-directory or an entry file — is refused, on a read (`Attacker cache entry path was a symlink, ignoring`) as on a write (`Failed to write attacker cache entry`), so a link planted there cannot feed a forged entry to the audit or redirect a write. `cache.dir` itself and the directories above it are taken as you configured them: a symlinked `var/`, `~/.cache` or `$XDG_CACHE_HOME` is fine. Remove the link below the cache directory, or point `cache.dir` at the directory it targets.
 
 ### Disable cache for one-off debugging
 

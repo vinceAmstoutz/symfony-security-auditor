@@ -27,6 +27,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
  * entries are cached for the lifetime of the instance. Composer's advisories
  * stream is the same dataset that powers `composer audit` on the CLI.
  *
+ * The advisories the audited project filters out in its own composer config
+ * (`config.audit.ignore`, and `ignore-severity` where composer has it) are read
+ * from the `ignored-advisories` key composer reports them under: the repository
+ * under audit must not be able to hide a vulnerable dependency from its
+ * auditor.
+ *
  * Failure modes (composer missing, lock file absent, malformed JSON) degrade
  * gracefully to an empty database — `lookup()` always returns a list, never
  * propagates an exception, so the orchestrator and the tool layer stay
@@ -36,6 +42,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
  */
 final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseInterface
 {
+    private const string IGNORED_ADVISORIES_KEY = 'ignored-advisories';
+
     /**
      * @var array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>>
      */
@@ -112,16 +120,30 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
             throw MalformedAdvisoryPayloadException::forMissingAdvisoriesKey();
         }
 
-        $entries = [];
-        /** @var array<string, mixed> $advisoriesByPackage */
-        $advisoriesByPackage = $decoded['advisories'];
+        $ignoredAdvisories = $decoded[self::IGNORED_ADVISORIES_KEY] ?? [];
 
+        return $this->withAdvisories(
+            $this->withAdvisories([], $decoded['advisories']),
+            \is_array($ignoredAdvisories) ? $ignoredAdvisories : [],
+        );
+    }
+
+    /**
+     * @param array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>> $entries
+     * @param array<array-key, mixed>                                                                                            $advisoriesByPackage
+     *
+     * @return array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>>
+     */
+    private function withAdvisories(array $entries, array $advisoriesByPackage): array
+    {
+        /** @var array<string, mixed> $advisoriesByPackage */
         foreach ($advisoriesByPackage as $packageName => $advisories) {
             if (!\is_array($advisories)) {
                 continue;
             }
 
-            $entries[PackageNameNormalizer::normalize($packageName)] = $this->mapAdvisories($advisories);
+            $normalizedName = PackageNameNormalizer::normalize($packageName);
+            $entries[$normalizedName] = [...($entries[$normalizedName] ?? []), ...$this->mapAdvisories($advisories)];
         }
 
         return $entries;

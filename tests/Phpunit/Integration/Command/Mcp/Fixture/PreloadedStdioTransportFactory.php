@@ -23,6 +23,8 @@ final class PreloadedStdioTransportFactory implements McpTransportFactoryInterfa
 {
     public string $outputPath = '';
 
+    public string|false $displayErrorsWhileServing = false;
+
     /**
      * @param list<string> $messages
      */
@@ -34,6 +36,7 @@ final class PreloadedStdioTransportFactory implements McpTransportFactoryInterfa
     #[Override]
     public function create(): TransportInterface
     {
+        $this->displayErrorsWhileServing = \ini_get('display_errors');
         $inputPath = tempnam(sys_get_temp_dir(), 'ssa-mcp-in');
         $outputPath = tempnam(sys_get_temp_dir(), 'ssa-mcp-out');
         if (false === $inputPath || false === $outputPath) {

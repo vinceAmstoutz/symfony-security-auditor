@@ -428,7 +428,7 @@ Thin value object wrapping the raw string content. Key method: `parseJson()` str
 
 ### `ProjectFileScanner`
 
-Walks a project directory, reads `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files, constructs `ProjectFile` instances with relative paths (relative to the scanned root).
+Walks a project directory, reads `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files, constructs `ProjectFile` instances with relative paths (relative to the scanned root), returned in relative-path order so the chunks built from them — and their prompts and cache keys — are the same on every machine, whatever order the filesystem lists a directory in.
 
 ### `AttackerPromptBuilder` / `ReviewerPromptBuilder`
 

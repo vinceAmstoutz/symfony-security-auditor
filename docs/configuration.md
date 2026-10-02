@@ -243,6 +243,7 @@ symfony_security_auditor:
 The `lookup_advisory` tool exposed to the attacker is backed by `ComposerAuditAdvisoryDatabase`, which shells out to **`composer audit --format=json --locked`** against `%kernel.project_dir%` on first call and caches the result for the lifetime of the request.
 
 - **Data source.** `composer audit` is the Composer 2.4+ built-in command. It reads `composer.lock` and queries Packagist's advisory feed, which is sourced from `FriendsOfPHP/security-advisories` plus GitHub Security Advisories. Output is per-package CVE entries with affected version ranges and advisory links.
+- **The audited project's own Composer settings.** `composer audit` runs inside the audited project and reads its `composer.json`. An advisory that project filters out with `config.audit.ignore` (or `config.audit.ignore-severity`, on the Composer releases that have it) is still looked up: Composer reports it under `ignored-advisories`, which the auditor reads as well, so the repository under audit cannot hide a vulnerable dependency that way. Its `repositories` still decide where advisories come from, though, and no `composer audit` option overrides them: a project that disables Packagist (`"packagist.org": false`) and lists no other repository publishing advisories leaves the feed empty. When the audited `composer.json` cannot be trusted, run `composer audit` against its `composer.lock` from a project of your own too, or override the source as shown below.
 - **Graceful degradation.** When `composer` is missing from `PATH`, when `composer.lock` is absent, when the JSON is malformed, or when the process errors out for any reason, the database initializes empty and a `LoggerInterface::warning()` is recorded. `lookup_advisory` then returns `[]` for every package — the audit continues without CVE data.
 - **Pair with `audit.tools_enabled: true`.** With tools disabled, the attacker cannot call `lookup_advisory`, so the live advisory feed is wasted effort. The recommended setup for any real audit is `tools_enabled: true` combined with Anthropic prompt caching (`cache_retention` in `ai.yaml`) to amortize the additional round-trips.
 - **Overriding the source.** Need a custom feed (Snyk, internal CVE list, …)? Implement `Audit\Domain\Port\AdvisoryDatabaseInterface` in your project and override the alias in `config/services.yaml`:
@@ -867,7 +868,7 @@ Exit codes: `0` on success, `1` if the report is missing or malformed, the basel
 
 ### `mcp:serve` — Model Context Protocol server
 
-Starts a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, exposing the auditor as MCP **tools** so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can run an audit on demand. The server is built on the official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC on stdin/stdout, so the command prints nothing else to stdout.
+Starts a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, exposing the auditor as MCP **tools** so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can run an audit on demand. The server is built on the official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC on stdin/stdout, so the command prints nothing else to stdout: while it runs, PHP notices and warnings are displayed on stderr whatever `display_errors` says, so a stray one cannot corrupt the protocol stream.
 
 It is available both ways the auditor ships:
 
@@ -999,13 +1000,13 @@ symfony-security-auditor self-update          # download + verify + replace, if 
 symfony-security-auditor self-update --check  # only report whether a newer version exists
 ```
 
-It queries the GitHub releases API for the latest version and, when the running binary is older, downloads the asset for your platform (the same OS/arch detection `install.sh` uses), **verifies its `.sha256` checksum before replacing anything**, and atomically swaps the running executable. Downloads use `curl`, so it must be on the host (as it already is for the install script).
+It queries the GitHub releases API for the latest version and, when the running binary is older, downloads the asset for your platform (the same OS/arch detection `install.sh` uses) next to the running executable, **verifies its `.sha256` checksum before replacing anything**, and renames it over the executable — an atomic swap — as the command exits, once nothing more is loaded from the running binary. The command therefore reports `Downloaded and verified <new>; it replaces <old> as this command exits.`; if that final swap fails, it prints why on stderr, keeps the previous binary, and exits `1`. Downloads use `curl`, so it must be on the host (as it already is for the install script).
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `--check` | off | Report whether a newer version is available; make no changes to the binary. |
 
-If the binary is not writable (e.g. installed in `/usr/local/bin` without write access), the command refuses to update and tells you to re-run with the necessary permissions (`sudo`) or reinstall with the install script.
+The swap writes a new file into the directory holding the binary, so that directory must be writable — the binary's own permissions do not matter. If it is not (e.g. installed in `/usr/local/bin` without write access), the command refuses to update before downloading anything and tells you to re-run with the necessary permissions (`sudo`) or reinstall with the install script.
 
 ### `doctor` — preflight environment check
 
@@ -1040,7 +1041,7 @@ A new version (1.17.0) is available. Run "symfony-security-auditor self-update" 
 The check is designed to stay out of the way:
 
 - It runs **only on an interactive terminal**, so piped or CI runs — and machine-readable stdout such as `--format=json` — are never touched.
-- The GitHub release lookup is **throttled to once per 24 hours** (the answer is cached under the XDG cache directory), and any failure (offline, rate-limited) is silent — it never changes a command's exit code.
+- The GitHub release lookup is **throttled to once per 24 hours** (the answer is cached under the XDG cache directory), and any failure (offline, rate-limited) is silent — it never changes a command's exit code. When that cache cannot be written (an unwritable or unresolvable cache directory), the lookup is skipped rather than repeated on every command.
 - It exists **only in the standalone binary**; the Composer bundle updates through `composer update`.
 
 Set `SSA_NO_UPDATE_CHECK=1` to turn the check off entirely.
