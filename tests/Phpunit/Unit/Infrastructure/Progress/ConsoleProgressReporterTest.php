@@ -158,6 +158,26 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('✓ chunk 1/3 analyzed (47s)', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_marks_a_chunk_whose_analysis_failed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored']);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('✗ chunk 2/3 failed (12s)', $rendered);
+        self::assertStringNotContainsString('✓ chunk', $rendered);
+    }
+
+    public function test_it_marks_an_analyzed_chunk_as_analyzed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 0.0, 'status' => 'analyzed']);
+
+        self::assertStringContainsString('✓ chunk 2/3 analyzed', $this->bufferedOutput->fetch());
+    }
+
     public function test_it_omits_the_duration_for_a_sub_second_chunk_completion(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);

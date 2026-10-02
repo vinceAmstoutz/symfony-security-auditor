@@ -253,6 +253,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * Findings the reviewer has already rejected in earlier iterations. Fed back
      * to the attacker so it stops re-reporting them — that would otherwise burn
      * tool-call and reviewer budget on findings the deduplication step discards.
+     * A finding whose review failed reached no verdict, so it is left out: the
+     * attacker may report it again and the reviewer get another chance at it.
      *
      * @return list<Vulnerability>
      */
@@ -260,7 +262,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     {
         return array_values(array_filter(
             $auditContext->vulnerabilities(),
-            static fn (Vulnerability $vulnerability): bool => !$vulnerability->isReviewerValidated(),
+            static fn (Vulnerability $vulnerability): bool => !$vulnerability->isReviewerValidated() && $auditContext->wasRejectedByReviewer($vulnerability),
         ));
     }
 

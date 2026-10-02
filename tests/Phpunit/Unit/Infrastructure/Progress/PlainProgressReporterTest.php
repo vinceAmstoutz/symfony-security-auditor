@@ -69,6 +69,20 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  ✓ chunk 1/3 done (47s)\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_it_marks_a_chunk_whose_analysis_failed(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored']);
+
+        self::assertSame("  ✗ chunk 2/3 failed (12s)\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_marks_an_analyzed_chunk_as_done(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 0.0, 'status' => 'analyzed']);
+
+        self::assertSame("  ✓ chunk 2/3 done\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_omits_duration_for_a_sub_second_chunk_completion(): void
     {
         $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 0.0]);

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -98,6 +99,63 @@ final class ReviewOutcomeRecorderTest extends TestCase
         $vulnerability = $this->recorder($progressReporter)->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), new NullCoverageRecorder());
 
         self::assertFalse($vulnerability->isReviewerValidated());
+    }
+
+    /**
+     * @param array<string, mixed>|null $verdict
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('rejectingVerdicts')]
+    public function test_a_rejection_is_recorded_as_one(?array $verdict): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), $verdict, $recordingCoverageRecorder);
+
+        self::assertSame(['T'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->rejected));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>|null}>
+     */
+    public static function rejectingVerdicts(): iterable
+    {
+        yield 'an explicit rejection' => [['accepted' => false]];
+        yield 'no verdict at all' => [null];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_acceptance_is_not_recorded_as_a_rejection(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), ['accepted' => true], $recordingCoverageRecorder);
+
+        self::assertSame([], $recordingCoverageRecorder->rejected);
+    }
+
+    /**
+     * A failed review reached no verdict, so the finding must not be fed back
+     * to the attacker as one the reviewer dismissed.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_failed_review_is_not_recorded_as_a_rejection(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), $recordingCoverageRecorder);
+
+        self::assertSame([], $recordingCoverageRecorder->rejected);
     }
 
     /**

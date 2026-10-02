@@ -33,7 +33,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
  * stage.completed advances it, and pipeline.completed finishes it. The audit
  * narrative is printed as lines above the bar: audit.started (attack-surface
  * overview), attacker.finding.recorded (each finding as it is flagged),
- * attacker.chunk.completed (each chunk with its elapsed time), review.skipped
+ * attacker.chunk.completed (each chunk with its elapsed time, marked as
+ * failed when the attacker left it errored), review.skipped
  * (acknowledges a zero-finding pass so the reviewer step doesn't read as
  * having silently disappeared), and review.completed (the reviewer tally).
  * Unhandled events are ignored. The non-decorated counterpart is
@@ -188,7 +189,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         }
 
         $this->writeAboveBar(\sprintf(
-            '<fg=green>  ✓ chunk %d/%d analyzed%s</>',
+            'errored' === ProgressContext::string($context, 'status') ? '<fg=red>  ✗ chunk %d/%d failed%s</>' : '<fg=green>  ✓ chunk %d/%d analyzed%s</>',
             $chunk,
             $totalChunks,
             ProgressContext::durationSuffix($context, 'elapsed_seconds'),

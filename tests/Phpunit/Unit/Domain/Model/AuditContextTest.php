@@ -592,4 +592,37 @@ final class AuditContextTest extends TestCase
             '$query',
         );
     }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_remembers_only_the_findings_the_reviewer_rejected(): void
+    {
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $vulnerability = $this->rejectionCandidate('src/Rejected.php');
+        $failed = $this->rejectionCandidate('src/Failed.php');
+
+        $auditContext->recordRejectedFinding($vulnerability);
+
+        self::assertTrue($auditContext->wasRejectedByReviewer($vulnerability));
+        self::assertFalse($auditContext->wasRejectedByReviewer($failed));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function rejectionCandidate(string $filePath): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Candidate', 0.9),
+            new CodeLocation($filePath, 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
+        );
+    }
 }

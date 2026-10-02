@@ -19,6 +19,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\StatusTrackingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
@@ -73,6 +74,7 @@ final readonly class SequentialChunkAnalyzer
     {
         $allVulnerabilities = [];
         $totalDropsByReason = [];
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder($coverageRecorder);
 
         foreach ($chunks as $index => $chunk) {
             $this->logger->debug(\sprintf('Analyzing chunk %d/%d', $index + 1, \count($chunks)));
@@ -83,7 +85,7 @@ final readonly class SequentialChunkAnalyzer
 
             $start = microtime(true);
             try {
-                $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+                $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $statusTrackingCoverageRecorder, $toolRegistry, $riskMarkerIndex);
             } catch (BudgetExceededException $budgetExceededException) {
                 $this->failRemainingChunks($chunks, $index + 1, 'aborted', $coverageRecorder);
 
@@ -103,6 +105,7 @@ final readonly class SequentialChunkAnalyzer
                 'chunk' => $index + 1,
                 'total_chunks' => \count($chunks),
                 'elapsed_seconds' => microtime(true) - $start,
+                'status' => $statusTrackingCoverageRecorder->chunkStatus($chunk),
             ]);
             array_push($allVulnerabilities, ...$chunkResult->vulnerabilities());
 
