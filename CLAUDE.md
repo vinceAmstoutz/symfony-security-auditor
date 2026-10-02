@@ -56,7 +56,8 @@ bin/castor up
 `bin/castor lint` runs sequentially: Prettier (check) → Markdown lint
 (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,
 500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict
-scan) → Install script tests (`tests/Shell/install_script_test.sh`) → PHPUnit →
+scan) → Install script tests (`tests/Shell/install_script_test.sh`) → Pull
+request check tests (`tests/Shell/pull_request_check_test.sh`) → PHPUnit →
 Infection. `bin/castor lint:fix` auto-fixes steps 1–3 (Prettier, Markdown lint,
 Composer Normalize); the remaining steps are check-only.
 
@@ -110,7 +111,7 @@ tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)
   Integration/       # Wire real classes, no LLM calls
   EndToEnd/          # Full pipeline, uses stub LLM client
-tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh)
+tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh; pull_request_check_test.sh — covers .github/scripts/check-pull-request.sh)
 config/services.php  # DI wiring for all bundle services
 docs/
   architecture.md    # Layer overview, data flow, domain model details
@@ -225,10 +226,41 @@ and keep the top of the PR short:
 - **Title: 50 characters or fewer**, same
   [Conventional Commits](https://www.conventionalcommits.org/) format as a
   commit subject.
+- **Sections, in this order:** `## Summary`, `## Type of change`,
+  `## Target branch`, an optional `## Details`, then `## Checklist`. No other
+  sections.
 - **`## Summary`: 500 characters or fewer.** State the user-visible outcome and
-  stop. Per-finding walkthroughs, verification tables and reviewer notes belong
-  in their own sections further down — the summary is the part everyone reads,
-  so it must stay skimmable.
+  stop, then add a `Closes #N` or `Refs #N` line when an issue is involved — the
+  summary is the part everyone reads, so it must stay skimmable. Implementation
+  notes, backward compatibility and upgrade steps go under `## Details`.
+- **Only the ticked boxes** under Type of change, Target branch and Checklist:
+  delete the others and every template instruction. Append `(CI)` to the
+  `bin/castor lint` and Infection items when CI, not a local run, verified them.
+- **Label** the PR `bug` or `enhancement` and assign it to the maintainer.
+
+**Stack as little as possible.** Open every PR against its release branch, and
+stack it on another open PR only when it needs code that PR adds — never because
+both touch `CHANGELOG.md`, `CLAUDE.md` or the docs, whose conflicts are resolved
+by updating the branch once the first one merges. When splitting work into
+several PRs, cut along code dependencies so each builds and passes on the
+release branch alone. A stacked PR ticks `stacked` and names its parent under
+`## Details`: `Stacked on #N` and the code it needs from it. Once the parent
+merges, retarget it, untick `stacked`, drop the `Stacked on` line and update the
+branch — the squash-merge left it carrying commits the base no longer has, and
+its CI ran on top of unmerged code.
+
+On every edit, the `Pull request target` check
+([`.github/scripts/check-pull-request.sh`](.github/scripts/check-pull-request.sh))
+fails the PR on a title over 50 characters, a missing, extra or misplaced
+section, a Summary over 500 characters, an unticked box or leftover template
+text, a base that does not match the ticked branch, and a stacked PR that does
+not name its parent — or still does once unstacked. Run it before opening or
+editing a PR:
+
+```bash
+PR_TITLE='fix(scan): …' PR_BODY="$(cat body.md)" BASE_REF=1.x \
+  sh .github/scripts/check-pull-request.sh
+```
 
 **Always squash-merge, never rebase-merge.** Every PR becomes exactly one commit
 on its base branch. Rebase-merging replays each of the PR's commits individually
@@ -252,14 +284,16 @@ and broke `Commit Lint` (see
 Seven jobs must all pass before merging: **Prettier Check** (markdown
 formatting) → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint**
 (commitlint, conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer,
-Rector, PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script
-shell tests) → **zizmor** (GitHub Actions security scan via
+Rector, PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script and
+pull-request-check shell tests) → **zizmor** (GitHub Actions security scan via
 [`zizmorcore/zizmor-action`](https://github.com/zizmorcore/zizmor-action), SARIF
 uploaded to Code Scanning) → **Tests + Mutation** (PHPUnit matrix on PHP
 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then Infection 100% MSI;
 coverage uploads to Codecov and the mutation report uploads to the Stryker
 dashboard via Infection's `stryker` logger — the badge tracks `main`, and
-same-repo branches publish their own report).
+same-repo branches publish their own report). Every pull request also runs
+**Pull request target** (`.github/workflows/pr-target.yaml`), which fails on a
+title, description or base branch that breaks [Pull Requests](#pull-requests).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
