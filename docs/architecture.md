@@ -1,8 +1,6 @@
 # Architecture
 
-This document describes the internal design of the `symfony-security-auditor`
-Symfony bundle for contributors and integrators. It covers layer
-responsibilities, data flow, key design decisions, and extension points.
+This document describes the internal design of the `symfony-security-auditor` Symfony bundle for contributors and integrators. It covers layer responsibilities, data flow, key design decisions, and extension points.
 
 ## Table of Contents
 
@@ -31,13 +29,11 @@ responsibilities, data flow, key design decisions, and extension points.
 - [`Command/AuditCommand`](#commandauditcommand)
 - [Extension Points](#extension-points)
 
-> See also: [Configuration](configuration.md) · [Extending](extending.md) ·
-> [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
+> See also: [Configuration](configuration.md) · [Extending](extending.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
 
 ## Layer Overview
 
-The bundle follows a strict Domain-Driven Design layering under `src/Audit/`.
-Infrastructure dependencies never leak into the Domain or Application layers.
+The bundle follows a strict Domain-Driven Design layering under `src/Audit/`. Infrastructure dependencies never leak into the Domain or Application layers.
 
 ```text
 src/
@@ -144,29 +140,15 @@ graph LR
 
 ### The framework-specific boundary
 
-`deptrac.yaml` splits `Infrastructure` in two. A `SymfonyProfile` layer holds
-everything that only makes sense for a Symfony application:
+`deptrac.yaml` splits `Infrastructure` in two. A `SymfonyProfile` layer holds everything that only makes sense for a Symfony application:
 
-- `Infrastructure/Prompt/**` — the prompt builders and the `Skill/` blocks,
-  whose wording names controllers, voters, forms, Twig templates and Doctrine
-  repositories.
-- the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`,
-  `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`,
-  `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and
-  `SymfonyYamlSecurityConfigParser`.
-- the container-building classes in `Infrastructure/Config/` —
-  `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory` and
-  `ContainerParameterRegistrar`.
+- `Infrastructure/Prompt/**` — the prompt builders and the `Skill/` blocks, whose wording names controllers, voters, forms, Twig templates and Doctrine repositories.
+- the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`, `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`, `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and `SymfonyYamlSecurityConfigParser`.
+- the container-building classes in `Infrastructure/Config/` — `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory` and `ContainerParameterRegistrar`.
 
-The `Infrastructure` layer is then everything under `Infrastructure/` that is
-_not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain`
-and `Application` already cannot reach `Infrastructure` at all. So the audit
-engine, the LLM client, the caches, the report renderers and the scanners stay
-reusable for a non-Symfony target, while `Command`, the bundle class and the
-standalone entry point are free to wire the Symfony profile up.
+The `Infrastructure` layer is then everything under `Infrastructure/` that is _not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain` and `Application` already cannot reach `Infrastructure` at all. So the audit engine, the LLM client, the caches, the report renderers and the scanners stay reusable for a non-Symfony target, while `Command`, the bundle class and the standalone entry point are free to wire the Symfony profile up.
 
-Deptrac counts a dependency only when a class is actually used, not when it is
-merely imported, so an unused `use` statement is not a violation.
+Deptrac counts a dependency only when a class is actually used, not when it is merely imported, so an unused `use` statement is not a violation.
 
 ## Data Flow
 
@@ -203,9 +185,7 @@ flowchart TD
 
 ### `AuditContext` — mutable pipeline accumulator
 
-`AuditContext` is the single shared object threaded through every pipeline
-stage. It is intentionally mutable: stages write to it; the use case reads the
-final state.
+`AuditContext` is the single shared object threaded through every pipeline stage. It is intentionally mutable: stages write to it; the use case reads the final state.
 
 ```text
 AuditContext {
@@ -227,9 +207,7 @@ Key computed reads:
 
 ### `AuditReport` — immutable final snapshot
 
-Created exactly once via `AuditReport::fromContext(AuditContext)` after the
-pipeline finishes. It captures only `validatedVulnerabilities()` — unvalidated
-attacker findings are discarded.
+Created exactly once via `AuditReport::fromContext(AuditContext)` after the pipeline finishes. It captures only `validatedVulnerabilities()` — unvalidated attacker findings are discarded.
 
 ```text
 AuditReport {
@@ -238,9 +216,7 @@ AuditReport {
 }
 ```
 
-Computed methods: `riskScore()`, `riskLevel()` (SAFE / LOW / MEDIUM / HIGH /
-CRITICAL), `durationSeconds()`, `vulnerabilitiesBySeverity()`,
-`vulnerabilitiesByType()`, `toArray()`.
+Computed methods: `riskScore()`, `riskLevel()` (SAFE / LOW / MEDIUM / HIGH / CRITICAL), `durationSeconds()`, `vulnerabilitiesBySeverity()`, `vulnerabilitiesByType()`, `toArray()`.
 
 Risk level thresholds (based on summed severity scores):
 
@@ -257,14 +233,11 @@ Risk level thresholds (based on summed severity scores):
 All properties are `readonly`. State changes return new instances:
 
 - `withReviewerValidation(bool): self` — called by `ReviewerAgent`
-- `withElevatedSeverity(VulnerabilitySeverity): self` — called when reviewer
-  adjusts severity
+- `withElevatedSeverity(VulnerabilitySeverity): self` — called when reviewer adjusts severity
 
 The `id` is deterministic: `VULN-{sha1(type+filePath+lineStart)[0..7]}`.
 
-Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
-`filePath`, `lineStart`, `lineEnd`, `vulnerableCode`, `attackVector`, `proof`,
-`remediation`, `confidence` (0.0–1.0), `reviewerValidated`, `detectedAt`.
+Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`, `filePath`, `lineStart`, `lineEnd`, `vulnerableCode`, `attackVector`, `proof`, `remediation`, `confidence` (0.0–1.0), `reviewerValidated`, `detectedAt`.
 
 ### `VulnerabilitySeverity` — backed enum
 
@@ -276,173 +249,79 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 | LOW      | 2     | false             |
 | INFO     | 0     | false             |
 
-`score()` drives the risk calculation. `isExploitable()` is used by
-`Vulnerability::isHighRisk()`.
+`score()` drives the risk calculation. `isExploitable()` is used by `Vulnerability::isHighRisk()`.
 
 ### `VulnerabilityType` — backed enum with OWASP and CWE references
 
 49 cases in six categories:
 
-| Category              | Examples                                                                   |
-| --------------------- | -------------------------------------------------------------------------- |
-| Injection             | `SQL_INJECTION`, `COMMAND_INJECTION`, `TWIG_INJECTION`, …                  |
-| Broken Access Control | `BROKEN_ACCESS_CONTROL`, `MISSING_VOTER`, `MISSING_CSRF_PROTECTION`, …     |
-| Logic Flaw            | `BUSINESS_LOGIC_FLAW`, `RACE_CONDITION`, `STATE_MACHINE_BYPASS`, …         |
-| Symfony-Specific      | `MASS_ASSIGNMENT`, `UNSAFE_PARAMETER_BINDING`, `MISCONFIGURED_FIREWALL`, … |
-| Data Exposure         | `SENSITIVE_DATA_EXPOSURE`, `PATH_TRAVERSAL`, `SSRF`, `XXE`, …              |
-| Cryptographic         | `WEAK_CRYPTOGRAPHY`, `HARDCODED_SECRET`, `INSECURE_RANDOM`                 |
+| Category | Examples |
+| --- | --- |
+| Injection | `SQL_INJECTION`, `COMMAND_INJECTION`, `TWIG_INJECTION`, … |
+| Broken Access Control | `BROKEN_ACCESS_CONTROL`, `MISSING_VOTER`, `MISSING_CSRF_PROTECTION`, … |
+| Logic Flaw | `BUSINESS_LOGIC_FLAW`, `RACE_CONDITION`, `STATE_MACHINE_BYPASS`, … |
+| Symfony-Specific | `MASS_ASSIGNMENT`, `UNSAFE_PARAMETER_BINDING`, `MISCONFIGURED_FIREWALL`, … |
+| Data Exposure | `SENSITIVE_DATA_EXPOSURE`, `PATH_TRAVERSAL`, `SSRF`, `XXE`, … |
+| Cryptographic | `WEAK_CRYPTOGRAPHY`, `HARDCODED_SECRET`, `INSECURE_RANDOM` |
 
-`category()` and `owaspReference()` return human-readable strings used in report
-output and LLM prompts. `cwe(): CweReference` returns the matching MITRE CWE
-value object, whose `label()` (e.g. `CWE-89`) and `url()`
-(`https://cwe.mitre.org/data/definitions/<n>.html`) are surfaced alongside the
-OWASP mapping in every report renderer.
+`category()` and `owaspReference()` return human-readable strings used in report output and LLM prompts. `cwe(): CweReference` returns the matching MITRE CWE value object, whose `label()` (e.g. `CWE-89`) and `url()` (`https://cwe.mitre.org/data/definitions/<n>.html`) are surfaced alongside the OWASP mapping in every report renderer.
 
 ### `ProjectFile` — immutable scanned file
 
-Holds `relativePath`, `absolutePath`, `content`, a `ProjectFileType` enum case,
-and `linesCount`. `type()` returns the enum's string value (stable wire format);
-`fileType()` returns the typed `ProjectFileType` case, computed once at
-construction time by `ProjectFileTypeClassifier::classify()` (the single
-`match(true)` over path/content heuristics — pure Domain, no I/O).
-Classification methods (`isController()`, `isEntity()`, `isVoter()`,
-`isRepository()`, `isForm()`, `isAuthenticator()`, `isLdapService()`,
-`isSonataAdmin()`, `isEasyAdminCrud()`, `isMessengerHandler()`,
-`isEventSubscriber()`, `isNormalizer()`, `isWebhookConsumer()`, `isScheduler()`,
-`isTemplate()`) are thin comparisons against `fileType()`, so they can never
-disagree with it; `isService()` is the one derived predicate (true for a `.php`
-file whose `fileType()` is none of the above). `isConfiguration()` is
-deliberately independent of `fileType()` — it matches every
-`.yaml`/`.yml`/`.xml`/dotenv path regardless of directory, which `MappingStage`
-relies on to extract security config from every config file in the project.
-These predicates and `SymfonyMapping` construction (`ProjectFileInventory`)
-drive metadata/reporting buckets; `AttackerAgent` chunking priority and skill
-selection key off `fileType()` directly. `ProjectFileType` is the single source
-of truth for the file-type vocabulary, referenced by the chunker, the static
-pre-scanner buckets, and the attacker skill-block ordering.
+Holds `relativePath`, `absolutePath`, `content`, a `ProjectFileType` enum case, and `linesCount`. `type()` returns the enum's string value (stable wire format); `fileType()` returns the typed `ProjectFileType` case, computed once at construction time by `ProjectFileTypeClassifier::classify()` (the single `match(true)` over path/content heuristics — pure Domain, no I/O). Classification methods (`isController()`, `isEntity()`, `isVoter()`, `isRepository()`, `isForm()`, `isAuthenticator()`, `isLdapService()`, `isSonataAdmin()`, `isEasyAdminCrud()`, `isMessengerHandler()`, `isEventSubscriber()`, `isNormalizer()`, `isWebhookConsumer()`, `isScheduler()`, `isTemplate()`) are thin comparisons against `fileType()`, so they can never disagree with it; `isService()` is the one derived predicate (true for a `.php` file whose `fileType()` is none of the above). `isConfiguration()` is deliberately independent of `fileType()` — it matches every `.yaml`/`.yml`/`.xml`/dotenv path regardless of directory, which `MappingStage` relies on to extract security config from every config file in the project. These predicates and `SymfonyMapping` construction (`ProjectFileInventory`) drive metadata/reporting buckets; `AttackerAgent` chunking priority and skill selection key off `fileType()` directly. `ProjectFileType` is the single source of truth for the file-type vocabulary, referenced by the chunker, the static pre-scanner buckets, and the attacker skill-block ordering.
 
-`archetype()` returns the framework-neutral shape of the file — a
-`SurfaceArchetype` case (`HTTP_ENTRYPOINT`, `AUTHORIZATION_RULE`,
-`AUTHENTICATION`, `DOMAIN_MODEL`, `PERSISTENCE_QUERY`, `INPUT_BINDING`,
-`ASYNC_HANDLER`, `EVENT_HOOK`, `SERIALIZATION`, `TEMPLATE`, `CONFIG`, `OTHER`).
-Every `ProjectFileType` case maps onto exactly one, via
-`ProjectFileType::archetype()`. A PHP enum cannot be extended, so the 21-case
-Symfony taxonomy is the biggest obstacle to reusing this pipeline for another
-framework; the archetype is the coarser axis core logic can switch on without
-naming a Symfony concept, and a second framework's taxonomy would map onto the
-same archetypes rather than widening `ProjectFileType`.
+`archetype()` returns the framework-neutral shape of the file — a `SurfaceArchetype` case (`HTTP_ENTRYPOINT`, `AUTHORIZATION_RULE`, `AUTHENTICATION`, `DOMAIN_MODEL`, `PERSISTENCE_QUERY`, `INPUT_BINDING`, `ASYNC_HANDLER`, `EVENT_HOOK`, `SERIALIZATION`, `TEMPLATE`, `CONFIG`, `OTHER`). Every `ProjectFileType` case maps onto exactly one, via `ProjectFileType::archetype()`. A PHP enum cannot be extended, so the 21-case Symfony taxonomy is the biggest obstacle to reusing this pipeline for another framework; the archetype is the coarser axis core logic can switch on without naming a Symfony concept, and a second framework's taxonomy would map onto the same archetypes rather than widening `ProjectFileType`.
 
-`HTTP_ENTRYPOINT` is deliberately narrow — a **route-guarded** action surface,
-which is exactly what `isControllerLike()` means, so that predicate now
-delegates to it. A file whose requests arrive through a transport rather than a
-route (a webhook consumer) is an `ASYNC_HANDLER`, because this archetype decides
-which files reach the access-control and form-binding maps and widening it would
-change that silently. A unit test asserts the two sets stay identical.
+`HTTP_ENTRYPOINT` is deliberately narrow — a **route-guarded** action surface, which is exactly what `isControllerLike()` means, so that predicate now delegates to it. A file whose requests arrive through a transport rather than a route (a webhook consumer) is an `ASYNC_HANDLER`, because this archetype decides which files reach the access-control and form-binding maps and widening it would change that silently. A unit test asserts the two sets stay identical.
 
 ### `SymfonyMapping` — immutable project structure snapshot
 
-Groups `ProjectFile` instances by role and holds `routeAccessMap` and
-`firewallRules`. Passed to `AttackerAgent` so it can reason about the full
-security surface rather than file contents alone. Notable helpers:
+Groups `ProjectFile` instances by role and holds `routeAccessMap` and `firewallRules`. Passed to `AttackerAgent` so it can reason about the full security surface rather than file contents alone. Notable helpers:
 
-- `controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
-  `denyAccessUnlessGranted` calls (filename-heuristic).
-- `routeAccessControls()` returns the route → controller graph: one
-  `RouteAccessControl` per public action with its parsed `#[Route]`, class- and
-  method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call sites.
-- `controllersWithoutAccessCheck()` filters the graph to actions that carry a
-  route but no enforcement.
+- `controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or `denyAccessUnlessGranted` calls (filename-heuristic).
+- `routeAccessControls()` returns the route → controller graph: one `RouteAccessControl` per public action with its parsed `#[Route]`, class- and method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call sites.
+- `controllersWithoutAccessCheck()` filters the graph to actions that carry a route but no enforcement.
 
 ### `RouteAccessControl` — immutable per-action access-control summary
 
-One entry per public controller action emitted by
-`ControllerAccessControlParserInterface` (default impl
-`PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`).
-Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus four
-boolean / list signals — `methodLevelIsGranted`, `methodHasIsGrantedAttribute`
-(a method-level `#[IsGranted]`/`#[Security]` value present but not resolvable to
-a literal string, e.g. an enum case or `new Expression(...)`),
-`methodHasDenyAccess`, `classHasIsGranted` — combined by `hasAccessCheck()` and
-`lacksAccessCheck()`. The attacker prompt renders the full graph as a
-`Route Access-Control Map` block so the LLM can spot missing enforcement without
-re-deriving it from source.
+One entry per public controller action emitted by `ControllerAccessControlParserInterface` (default impl `PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`). Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus four boolean / list signals — `methodLevelIsGranted`, `methodHasIsGrantedAttribute` (a method-level `#[IsGranted]`/`#[Security]` value present but not resolvable to a literal string, e.g. an enum case or `new Expression(...)`), `methodHasDenyAccess`, `classHasIsGranted` — combined by `hasAccessCheck()` and `lacksAccessCheck()`. The attacker prompt renders the full graph as a `Route Access-Control Map` block so the LLM can spot missing enforcement without re-deriving it from source.
 
 ### `VoterCapability` — immutable per-voter `supports()` summary
 
-One entry per voter file emitted by `VoterCapabilityParserInterface` (default
-impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`,
-`supportedAttributes` (string literals seen inside `supports()`) and
-`supportedSubjects` (right-hand class names of `instanceof` checks). Helpers
-`coversAttribute(string)` and `coversSubject(string)` answer "is there a voter
-that handles this access decision?" so the prompt's `Voter Coverage` block lets
-the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually
-backs.
+One entry per voter file emitted by `VoterCapabilityParserInterface` (default impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`, `supportedAttributes` (string literals seen inside `supports()`) and `supportedSubjects` (right-hand class names of `instanceof` checks). Helpers `coversAttribute(string)` and `coversSubject(string)` answer "is there a voter that handles this access decision?" so the prompt's `Voter Coverage` block lets the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually backs.
 
 ### `FormBinding` — immutable controller → form-type binding
 
-One entry per `$this->createForm(SomeFormType::class)` call site emitted by
-`FormBindingParserInterface` (default impl `PhpParserFormBindingParser`).
-Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The
-attacker prompt renders the list as a `Form Bindings` block so the LLM can
-cross-reference call sites against the form types involved for mass-assignment /
-CSRF analysis without re-deriving the binding from source.
+One entry per `$this->createForm(SomeFormType::class)` call site emitted by `FormBindingParserInterface` (default impl `PhpParserFormBindingParser`). Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The attacker prompt renders the list as a `Form Bindings` block so the LLM can cross-reference call sites against the form types involved for mass-assignment / CSRF analysis without re-deriving the binding from source.
 
 ### Pipeline ports (`Domain/Pipeline/`)
 
 - `PipelineInterface::process(AuditContext): void`
 - `StageInterface::process(AuditContext): void` + `name(): string`
 
-Both are pure domain ports. Concrete implementations live in
-`Application/Pipeline/`.
+Both are pure domain ports. Concrete implementations live in `Application/Pipeline/`.
 
 ## Application Layer
 
 ### `RunAuditUseCase`
 
-Single public method: `execute(string $projectPath): AuditReport`. Owns the
-lifecycle: creates `AuditContext`, delegates to `AuditPipeline`, seals
-`AuditReport`. No I/O, no LLM calls — those are behind interfaces injected into
-the stages.
+Single public method: `execute(string $projectPath): AuditReport`. Owns the lifecycle: creates `AuditContext`, delegates to `AuditPipeline`, seals `AuditReport`. No I/O, no LLM calls — those are behind interfaces injected into the stages.
 
 ### `AuditPipeline`
 
-Ordered stage container. Stages are added via `addStage(StageInterface)` (wired
-by the extension). Logs stage name and elapsed time per stage.
+Ordered stage container. Stages are added via `addStage(StageInterface)` (wired by the extension). Logs stage name and elapsed time per stage.
 
 ### Stages
 
-**`IngestionStage`** — calls `ProjectFileScanner::scan(string $projectPath)`,
-calls `AuditContext::setProjectFiles()` (diff-filtered when `--since` is set)
-and `AuditContext::setMappingFiles()` (the full scan scope, never diff-filtered)
-so `MappingStage` always sees the whole project.
+**`IngestionStage`** — calls `ProjectFileScanner::scan(string $projectPath)`, calls `AuditContext::setProjectFiles()` (diff-filtered when `--since` is set) and `AuditContext::setMappingFiles()` (the full scan scope, never diff-filtered) so `MappingStage` always sees the whole project.
 
-**`MappingStage`** — classifies `AuditContext::mappingFiles()` into roles,
-constructs `SymfonyMapping`, calls `AuditContext::setMapping()`. May use the LLM
-client for semantic mapping or fall back to heuristic classification. The route
-access-control map and firewall rules come from `SecurityConfigParserInterface`
-(default impl `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse):
-list-form and scalar `roles`, `allow_if` expressions,
-`methods`/`ips`/`requires_channel` constraints, `when@<env>` overrides, and
-firewall `security: false` / `stateless` flags all land in the map the attacker
-prompt renders.
+**`MappingStage`** — classifies `AuditContext::mappingFiles()` into roles, constructs `SymfonyMapping`, calls `AuditContext::setMapping()`. May use the LLM client for semantic mapping or fall back to heuristic classification. The route access-control map and firewall rules come from `SecurityConfigParserInterface` (default impl `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse): list-form and scalar `roles`, `allow_if` expressions, `methods`/`ips`/`requires_channel` constraints, `when@<env>` overrides, and firewall `security: false` / `stateless` flags all land in the map the attacker prompt renders.
 
-**`DependencyExpansionStage`** — no-op unless `audit.since_closure: direct` and
-a `--since` diff-mode run is active (`AuditContext::diffSinceRef() !== null`).
-When both hold, reads the `AccessControlMap` `MappingStage` just built from the
-full project scope, finds every changed file in `AuditContext::projectFiles()`
-that is a voter, collects the attributes its `supports()` accepts, and widens
-`projectFiles()` with any controller (resolved from `mappingFiles()`, the full
-scan scope) whose `#[IsGranted]` attribute matches one of those — so a voter
-edit that silently weakens an unrelated controller's access control is still
-caught by a diff-scoped CI run. Sets `dependency_expansion.files_added`.
+**`DependencyExpansionStage`** — no-op unless `audit.since_closure: direct` and a `--since` diff-mode run is active (`AuditContext::diffSinceRef() !== null`). When both hold, reads the `AccessControlMap` `MappingStage` just built from the full project scope, finds every changed file in `AuditContext::projectFiles()` that is a voter, collects the attributes its `supports()` accepts, and widens `projectFiles()` with any controller (resolved from `mappingFiles()`, the full scan scope) whose `#[IsGranted]` attribute matches one of those — so a voter edit that silently weakens an unrelated controller's access control is still caught by a diff-scoped CI run. Sets `dependency_expansion.files_added`.
 
-**`AuditStage`** — delegates entirely to
-`AuditOrchestrator::orchestrate(AuditContext)`.
+**`AuditStage`** — delegates entirely to `AuditOrchestrator::orchestrate(AuditContext)`.
 
-**`PoCSynthesisStage`** — optional final stage (off by default). When enabled,
-synthesizes a concrete reproduction artifact (the `synthesized_poc` report
-field) for validated findings at or above the configured severity floor,
-delegating to `PoCSynthesizer`.
+**`PoCSynthesisStage`** — optional final stage (off by default). When enabled, synthesizes a concrete reproduction artifact (the `synthesized_poc` report field) for validated findings at or above the configured severity floor, delegating to `PoCSynthesizer`.
 
 ### `AuditOrchestrator`
 
@@ -469,8 +348,7 @@ flowchart TD
     META --> END
 ```
 
-Duplicate detection: two vulnerabilities are duplicates when their IDs match, or
-when `filePath`, `type`, and line ranges all overlap.
+Duplicate detection: two vulnerabilities are duplicates when their IDs match, or when `filePath`, `type`, and line ranges all overlap.
 
 ### `AttackerAgent`
 
@@ -485,122 +363,27 @@ Sorts files by security priority before chunking:
 | 4        | Forms           |
 | 5        | Everything else |
 
-`analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
-`bypassCache`, `previousFindings`, `rejectedFindings`) plus a
-`CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan,
-optional lean-mode filtering, chunking, strategy selection, and the
-start/complete logging — delegating the per-chunk work to `Chunk\` collaborators
-it builds at construction time: `ChunkContextFactory` assembles each chunk's
-prompts (markers + cross-iteration preambles, code slicing) and derives the
-cache key/cacheability into a `ChunkContext` — the key folds in a fingerprint of
-the mapping's access-control data (firewall rules, route access-control map,
-voter capabilities, form bindings, controllers without a voter) alongside the
-marker/rejected/previous preambles, so a `security.yaml` edit or a voter added
-elsewhere invalidates a chunk's cached verdict even though the chunk's own file
-content never changed; `AttackerChunkCache` adapts `AttackerCacheInterface`
-(context-aware key when supported) and turns a hit into a hydrated result;
-`SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are the two analysis
-strategies, and both build their structured-collection round (a fresh collector
-wired into a single-tool `record_vulnerability` registry) through the shared
-`StructuredVulnerabilityCollectionSession::begin()`; `ChunkCoverageRecorder`
-records per-file coverage. The chunk-priority ordering above is defined once on
-`FileChunker` over `ProjectFileType` cases. Risk markers are indexed by
-`RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt
-preambles are rendered by `AttackerContextPromptRenderer`.
+`analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping, `bypassCache`, `previousFindings`, `rejectedFindings`) plus a `CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan, optional lean-mode filtering, chunking, strategy selection, and the start/complete logging — delegating the per-chunk work to `Chunk\` collaborators it builds at construction time: `ChunkContextFactory` assembles each chunk's prompts (markers + cross-iteration preambles, code slicing) and derives the cache key/cacheability into a `ChunkContext` — the key folds in a fingerprint of the mapping's access-control data (firewall rules, route access-control map, voter capabilities, form bindings, controllers without a voter) alongside the marker/rejected/previous preambles, so a `security.yaml` edit or a voter added elsewhere invalidates a chunk's cached verdict even though the chunk's own file content never changed; `AttackerChunkCache` adapts `AttackerCacheInterface` (context-aware key when supported) and turns a hit into a hydrated result; `SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are the two analysis strategies, and both build their structured-collection round (a fresh collector wired into a single-tool `record_vulnerability` registry) through the shared `StructuredVulnerabilityCollectionSession::begin()`; `ChunkCoverageRecorder` records per-file coverage. The chunk-priority ordering above is defined once on `FileChunker` over `ProjectFileType` cases. Risk markers are indexed by `RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt preambles are rendered by `AttackerContextPromptRenderer`.
 
-Chunks the files (default `feature` strategy; `type` for the legacy
-priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`,
-then either calls `LLMClientInterface::complete()` (single-shot) or
-`LLMClientInterface::completeWithTools()` (tool-using loop) depending on
-`audit.tools_enabled` and the collection mode. With tools enabled, the attacker
-can call `read_file`, `grep`, `list_files`, and `lookup_advisory` for cross-file
-investigation, bounded by `audit.max_tool_iterations` — in the default
-structured-collection mode those investigation tools ride alongside each chunk's
-`record_vulnerability` registry. JSON output is parsed via
-`LLMResponse::parseJson()` and hydrated via `VulnerabilityFactory::fromList()`.
-LLM or JSON errors are caught and logged; the chunk returns an empty array
-rather than propagating.
+Chunks the files (default `feature` strategy; `type` for the legacy priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`, then either calls `LLMClientInterface::complete()` (single-shot) or `LLMClientInterface::completeWithTools()` (tool-using loop) depending on `audit.tools_enabled` and the collection mode. With tools enabled, the attacker can call `read_file`, `grep`, `list_files`, and `lookup_advisory` for cross-file investigation, bounded by `audit.max_tool_iterations` — in the default structured-collection mode those investigation tools ride alongside each chunk's `record_vulnerability` registry. JSON output is parsed via `LLMResponse::parseJson()` and hydrated via `VulnerabilityFactory::fromList()`. LLM or JSON errors are caught and logged; the chunk returns an empty array rather than propagating.
 
-Identical chunks (same content hash) are short-circuited by
-`AttackerCacheInterface` (`FilesystemAttackerCache` by default,
-`NullAttackerCache` when `cache.enabled: false`). With
-`audit.attacker_max_concurrent` > 1, the default structured-collection mode
-analyses cache-miss chunks concurrently through
-`ToolBatchCapableLLMClientInterface` (each chunk keeps its own
-`StructuredVulnerabilityCollectionSession`, pairing a `record_vulnerability`
-registry with its own `VulnerabilityCollector`); cache hits short-circuit first
-and chunk order, coverage, caching, and drop accounting are identical to the
-sequential path. Chunks carrying cross-iteration context (prior validated
-findings, reviewer-rejected findings) or a non-empty mapping fingerprint (see
-above) are keyed by chunk + a SHA-256 of that context through the opt-in
-`ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too; a
-cache that does not implement the context-aware port is simply skipped for those
-chunks — in practice almost every chunk of a real Symfony project, since its
-mapping is rarely empty.
+Identical chunks (same content hash) are short-circuited by `AttackerCacheInterface` (`FilesystemAttackerCache` by default, `NullAttackerCache` when `cache.enabled: false`). With `audit.attacker_max_concurrent` > 1, the default structured-collection mode analyses cache-miss chunks concurrently through `ToolBatchCapableLLMClientInterface` (each chunk keeps its own `StructuredVulnerabilityCollectionSession`, pairing a `record_vulnerability` registry with its own `VulnerabilityCollector`); cache hits short-circuit first and chunk order, coverage, caching, and drop accounting are identical to the sequential path. Chunks carrying cross-iteration context (prior validated findings, reviewer-rejected findings) or a non-empty mapping fingerprint (see above) are keyed by chunk + a SHA-256 of that context through the opt-in `ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too; a cache that does not implement the context-aware port is simply skipped for those chunks — in practice almost every chunk of a real Symfony project, since its mapping is rarely empty.
 
 ### `ReviewerAgent`
 
-Reviews vulnerabilities one at a time (or in batches when `batchSize > 1`). For
-each: builds context from the source file content, calls
-`LLMClientInterface::complete()`, parses `accepted` (bool), `adjusted_severity`
-(optional string) and `corrected_type` (optional string) from the JSON response,
-returns a new `Vulnerability` instance via copy-on-write
-(`withReviewerValidation` / `withElevatedSeverity` / `withCorrectedType`). On
-any error: returns the vulnerability with `reviewerValidated = false`.
+Reviews vulnerabilities one at a time (or in batches when `batchSize > 1`). For each: builds context from the source file content, calls `LLMClientInterface::complete()`, parses `accepted` (bool), `adjusted_severity` (optional string) and `corrected_type` (optional string) from the JSON response, returns a new `Vulnerability` instance via copy-on-write (`withReviewerValidation` / `withElevatedSeverity` / `withCorrectedType`). On any error: returns the vulnerability with `reviewerValidated = false`.
 
-With `audit.reviewer_structured_collection: true` (the default), the reviewer
-instead records each verdict by calling a schema-enforced `record_review` tool —
-mirroring the attacker's `record_vulnerability` seam — and verdicts are drained
-from a `StructuredReviewCollectionSession` (the same collector-plus-registry
-pairing the attacker uses, mirrored for review verdicts). The explicit opt-in
-`reviewer_tools_enabled: true` takes precedence over the structured mode and
-keeps the JSON path. `reviewer_max_concurrent` > 1 composes with the structured
-mode when the client implements `ToolBatchCapableLLMClientInterface` (each
-finding records through its own `record_review` registry, resolved
-concurrently); otherwise it falls back to the JSON concurrent path.
+With `audit.reviewer_structured_collection: true` (the default), the reviewer instead records each verdict by calling a schema-enforced `record_review` tool — mirroring the attacker's `record_vulnerability` seam — and verdicts are drained from a `StructuredReviewCollectionSession` (the same collector-plus-registry pairing the attacker uses, mirrored for review verdicts). The explicit opt-in `reviewer_tools_enabled: true` takes precedence over the structured mode and keeps the JSON path. `reviewer_max_concurrent` > 1 composes with the structured mode when the client implements `ToolBatchCapableLLMClientInterface` (each finding records through its own `record_review` registry, resolved concurrently); otherwise it falls back to the JSON concurrent path.
 
-In the one-finding-per-call modes (the default — structured, JSON, sequential,
-or concurrent), verdicts for findings with identical content against unchanged
-code are short-circuited by `ReviewerCacheInterface` (`FilesystemReviewerCache`
-by default, `NullReviewerCache` when `cache.enabled: false`), mirroring the
-attacker cache; concurrent reviews serve cached verdicts first and dispatch only
-the misses. Batched reviews (`reviewer_batch_size > 1`) likewise serve cached
-verdicts first and batch only the cache-miss findings to the LLM. `--no-cache`
-bypasses both caches for the run.
+In the one-finding-per-call modes (the default — structured, JSON, sequential, or concurrent), verdicts for findings with identical content against unchanged code are short-circuited by `ReviewerCacheInterface` (`FilesystemReviewerCache` by default, `NullReviewerCache` when `cache.enabled: false`), mirroring the attacker cache; concurrent reviews serve cached verdicts first and dispatch only the misses. Batched reviews (`reviewer_batch_size > 1`) likewise serve cached verdicts first and batch only the cache-miss findings to the LLM. `--no-cache` bypasses both caches for the run.
 
-Like the attacker, the agent itself is a thin orchestrator — mode resolution and
-the start/complete logging — delegating to `Review\` collaborators it builds at
-construction time: `SequentialReviewAnalyzer`, `StructuredReviewAnalyzer`,
-`ConcurrentReviewAnalyzer`, `ConcurrentStructuredReviewAnalyzer`, and
-`BatchReviewAnalyzer` are the five analysis strategies; the three that collect
-structured verdicts (`StructuredReviewAnalyzer`,
-`ConcurrentStructuredReviewAnalyzer`, and the structured path of
-`BatchReviewAnalyzer`) all build their round through the shared
-`StructuredReviewCollectionSession::begin()` rather than wiring a
-`ReviewCollector` and `ToolRegistry` inline; `VerdictApplier` applies one
-verdict payload to a finding; `BatchVerdictApplier` matches batch verdicts to
-findings by id; `ReviewOutcomeRecorder` turns verdicts, raw responses, and
-failures into the reviewed finding plus its coverage entry;
-`ReviewerVerdictCache` adapts the optional cache port; `CodeContextResolver`
-resolves a finding's source content.
+Like the attacker, the agent itself is a thin orchestrator — mode resolution and the start/complete logging — delegating to `Review\` collaborators it builds at construction time: `SequentialReviewAnalyzer`, `StructuredReviewAnalyzer`, `ConcurrentReviewAnalyzer`, `ConcurrentStructuredReviewAnalyzer`, and `BatchReviewAnalyzer` are the five analysis strategies; the three that collect structured verdicts (`StructuredReviewAnalyzer`, `ConcurrentStructuredReviewAnalyzer`, and the structured path of `BatchReviewAnalyzer`) all build their round through the shared `StructuredReviewCollectionSession::begin()` rather than wiring a `ReviewCollector` and `ToolRegistry` inline; `VerdictApplier` applies one verdict payload to a finding; `BatchVerdictApplier` matches batch verdicts to findings by id; `ReviewOutcomeRecorder` turns verdicts, raw responses, and failures into the reviewed finding plus its coverage entry; `ReviewerVerdictCache` adapts the optional cache port; `CodeContextResolver` resolves a finding's source content.
 
 ### `VulnerabilityFactory`
 
-Parses raw `array<string, mixed>` from LLM JSON output into `Vulnerability`
-instances. Each entry is first checked against `symfony/validator` constraints
-(non-blank `title` / `description` / `file_path`, sane length bounds on every
-free-text field); on violation the entry is dropped under
-`VulnerabilityDropReason::VALIDATION_FAILED`. Surviving entries are hydrated;
-invalid or missing fields are handled with null-coalescing casts; invalid enum
-values cause a caught `\Throwable` and the entry is dropped under
-`VulnerabilityDropReason::HYDRATION_FAILED`. Non-array list entries are dropped
-under `VulnerabilityDropReason::NON_ARRAY_ENTRY`.
+Parses raw `array<string, mixed>` from LLM JSON output into `Vulnerability` instances. Each entry is first checked against `symfony/validator` constraints (non-blank `title` / `description` / `file_path`, sane length bounds on every free-text field); on violation the entry is dropped under `VulnerabilityDropReason::VALIDATION_FAILED`. Surviving entries are hydrated; invalid or missing fields are handled with null-coalescing casts; invalid enum values cause a caught `\Throwable` and the entry is dropped under `VulnerabilityDropReason::HYDRATION_FAILED`. Non-array list entries are dropped under `VulnerabilityDropReason::NON_ARRAY_ENTRY`.
 
-`fromArray()` still returns `?Vulnerability`. `fromList()` returns a
-`VulnerabilityHydrationResult` value object exposing both the hydrated
-vulnerabilities and per-reason drop counts. `AttackerAgent::analyze` aggregates
-the per-chunk drop counts and surfaces them on its `Attacker agent complete`
-info log as `total_dropped_entries` / `dropped_by_reason`.
+`fromArray()` still returns `?Vulnerability`. `fromList()` returns a `VulnerabilityHydrationResult` value object exposing both the hydrated vulnerabilities and per-reason drop counts. `AttackerAgent::analyze` aggregates the per-chunk drop counts and surfaces them on its `Attacker agent complete` info log as `total_dropped_entries` / `dropped_by_reason`.
 
 ## Infrastructure Layer
 
@@ -622,118 +405,47 @@ interface LLMClientInterface
 }
 ```
 
-This is the sole seam between Application and LLM I/O. Application agents never
-import any `symfony/ai` type. `LLMClientInterface` and `LLMResponse` live under
-`Audit\Domain\Port\`; tool ports live under `Audit\Domain\Port\Tool\`.
+This is the sole seam between Application and LLM I/O. Application agents never import any `symfony/ai` type. `LLMClientInterface` and `LLMResponse` live under `Audit\Domain\Port\`; tool ports live under `Audit\Domain\Port\Tool\`.
 
 ### `SymfonyAiLLMClient`
 
-Adapter implementing `LLMClientInterface`. Wraps
-`Symfony\AI\Agent\AgentInterface` (from `symfony/ai`). Builds a `MessageBag`
-with a system message and a user message per call, invokes
-`$agent->call($messages, ['stream' => false])`, and wraps the string result in
-`LLMResponse`.
+Adapter implementing `LLMClientInterface`. Wraps `Symfony\AI\Agent\AgentInterface` (from `symfony/ai`). Builds a `MessageBag` with a system message and a user message per call, invokes `$agent->call($messages, ['stream' => false])`, and wraps the string result in `LLMResponse`.
 
-Token usage (input, output tokens) is read from the platform response via
-`symfony/ai`'s `TokenUsageInterface` and forwarded to the shared
-`TokenUsageRecorder` so `RunAuditUseCase` can attribute cumulative usage to the
-final `AuditReport`. `BudgetTracker` receives the same counts to enforce
-`audit.budget.*` limits; it throws `BudgetExceededException` when a limit is
-breached, triggering a clean abort with exit code `2`.
+Token usage (input, output tokens) is read from the platform response via `symfony/ai`'s `TokenUsageInterface` and forwarded to the shared `TokenUsageRecorder` so `RunAuditUseCase` can attribute cumulative usage to the final `AuditReport`. `BudgetTracker` receives the same counts to enforce `audit.budget.*` limits; it throws `BudgetExceededException` when a limit is breached, triggering a clean abort with exit code `2`.
 
-Jittered exponential backoff is applied by the surrounding `RetryPolicy`;
-transient failures (HTTP 429, 5xx) are retried up to `audit.retry.max_attempts`
-times. Non-transient failures (auth, validation errors) are classified by
-`TransientFailureClassifier` and propagate immediately. Eager resolution of the
-`DeferredResult` (forcing `getResult()` before the retry wrapper exits) ensures
-errors emitted by `symfony/http-client`'s lazy body read surface inside the
-retry loop instead of escaping later in `complete()` / `completeWithTools()`.
+Jittered exponential backoff is applied by the surrounding `RetryPolicy`; transient failures (HTTP 429, 5xx) are retried up to `audit.retry.max_attempts` times. Non-transient failures (auth, validation errors) are classified by `TransientFailureClassifier` and propagate immediately. Eager resolution of the `DeferredResult` (forcing `getResult()` before the retry wrapper exits) ensures errors emitted by `symfony/http-client`'s lazy body read surface inside the retry loop instead of escaping later in `complete()` / `completeWithTools()`.
 
-Around each invocation, `RateLimiterInterface` (default `NullRateLimiter`,
-opt-in `TokenBucketRateLimiter`) gates outbound calls proactively:
-`acquire($estimatedInputTokens)` blocks until the next request fits inside the
-configured per-minute windows, `record($in, $out)` reconciles the estimate with
-actuals once the call completes, and `pauseUntil($at)` propagates a
-server-issued `Retry-After` (parsed by `RetryAfterHeaderParser` from
-`Symfony\AI\Platform\Exception\RateLimitExceededException::getRetryAfter()`) so
-concurrent chunks share the freeze instead of stampeding the provider.
+Around each invocation, `RateLimiterInterface` (default `NullRateLimiter`, opt-in `TokenBucketRateLimiter`) gates outbound calls proactively: `acquire($estimatedInputTokens)` blocks until the next request fits inside the configured per-minute windows, `record($in, $out)` reconciles the estimate with actuals once the call completes, and `pauseUntil($at)` propagates a server-issued `Retry-After` (parsed by `RetryAfterHeaderParser` from `Symfony\AI\Platform\Exception\RateLimitExceededException::getRetryAfter()`) so concurrent chunks share the freeze instead of stampeding the provider.
 
-Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no
-code changes — only `ai.yaml` configuration.
+Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no code changes — only `ai.yaml` configuration.
 
-The client itself is a facade over collaborators it builds at construction time,
-all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop
-above), `SequentialToolLoop` (the autonomous tool-using conversation behind
-`completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront`
-(the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling
-back to the sequential paths on failure), `PlatformResultExtractor` (token
-usage, tool calls, text, and the provider finish reason — warning when a
-response was truncated or content-filtered), `PlatformOptionsFactory`
-(temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain
-`ToolDefinition` → platform `Tool` schema mapping).
+The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
 
 ### `LLMResponse`
 
-Thin value object wrapping the raw string content. Key method: `parseJson()`
-strips markdown code fences that models sometimes emit, then JSON-decodes.
-Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded
-value is not an array. `isEmpty()` checks for blank content.
+Thin value object wrapping the raw string content. Key method: `parseJson()` strips markdown code fences that models sometimes emit, then JSON-decodes. Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded value is not an array. `isEmpty()` checks for blank content.
 
 ### `ProjectFileScanner`
 
-Walks a project directory, reads `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files,
-constructs `ProjectFile` instances with relative paths (relative to the scanned
-root).
+Walks a project directory, reads `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files, constructs `ProjectFile` instances with relative paths (relative to the scanned root).
 
 ### `AttackerPromptBuilder` / `ReviewerPromptBuilder`
 
-Build system and user prompts fed to `LLMClientInterface::complete()`. Both are
-pure string builders with no network or I/O dependencies. The attacker's
-`SymfonyMapping` sections (route access-control map, voter coverage, form
-bindings) are rendered by `SymfonyMappingContextRenderer`, and its numbered
-`<file>` source blocks by `NumberedFileContextRenderer`.
+Build system and user prompts fed to `LLMClientInterface::complete()`. Both are pure string builders with no network or I/O dependencies. The attacker's `SymfonyMapping` sections (route access-control map, voter coverage, form bindings) are rendered by `SymfonyMappingContextRenderer`, and its numbered `<file>` source blocks by `NumberedFileContextRenderer`.
 
 Each builder is a thin composer delegating the bulk to collaborators:
 
-- **Attacker** — the per-surface skill blocks are individual
-  `AttackerSkillInterface` strategies under `Prompt/Skill/` (one class per
-  attack surface: `ControllerAttackerSkill`, `ApiResourceAttackerSkill`,
-  `VoterAttackerSkill`, …), each declaring its `ProjectFileType` and emission
-  `priority()`. `AttackerSkillRegistry` collects them (via the
-  `symfony_security_auditor.attacker_skill` DI tag) and emits, in priority
-  order, the blocks whose file type appears in the chunk. Adding an attack
-  surface is one new tagged class — no edit to the builder.
-- **Reviewer** — the fixed system-prompt text lives in `ReviewerPromptSections`
-  and the two line-numbered user-message templates in `ReviewerMessageRenderer`
-  (both under `Prompt/Reviewer/`, behind interfaces); `ReviewerPromptBuilder`
-  only composes them per mode.
+- **Attacker** — the per-surface skill blocks are individual `AttackerSkillInterface` strategies under `Prompt/Skill/` (one class per attack surface: `ControllerAttackerSkill`, `ApiResourceAttackerSkill`, `VoterAttackerSkill`, …), each declaring its `ProjectFileType` and emission `priority()`. `AttackerSkillRegistry` collects them (via the `symfony_security_auditor.attacker_skill` DI tag) and emits, in priority order, the blocks whose file type appears in the chunk. Adding an attack surface is one new tagged class — no edit to the builder.
+- **Reviewer** — the fixed system-prompt text lives in `ReviewerPromptSections` and the two line-numbered user-message templates in `ReviewerMessageRenderer` (both under `Prompt/Reviewer/`, behind interfaces); `ReviewerPromptBuilder` only composes them per mode.
 
 The attacker prompt has two modes selected by `audit.structured_collection`:
 
-- **`true` (default)** — the prompt instructs the model to record findings via
-  the `record_vulnerability` tool, one call per finding. The tool's input schema
-  mirrors the `Vulnerability` shape and the provider validates each call before
-  the agent ever sees it, so bare-string and wrapper-object drift is
-  structurally impossible.
-- **`false`** — the prompt instructs the model to output a JSON array of
-  vulnerability objects matching `VulnerabilityFactory::fromArray()`'s expected
-  keys. The tightened rules block forbids non-object array elements,
-  environment-keyed wrapper objects, and bare environment-name strings; the
-  `VulnerabilityFactory` then validates each entry with `symfony/validator`
-  before hydration.
+- **`true` (default)** — the prompt instructs the model to record findings via the `record_vulnerability` tool, one call per finding. The tool's input schema mirrors the `Vulnerability` shape and the provider validates each call before the agent ever sees it, so bare-string and wrapper-object drift is structurally impossible.
+- **`false`** — the prompt instructs the model to output a JSON array of vulnerability objects matching `VulnerabilityFactory::fromArray()`'s expected keys. The tightened rules block forbids non-object array elements, environment-keyed wrapper objects, and bare environment-name strings; the `VulnerabilityFactory` then validates each entry with `symfony/validator` before hydration.
 
-Both modes share the same intro, severity/confidence rubrics, file-numbering
-protocol, scope guidance, single few-shot example, and — when files of the
-corresponding `ProjectFile` type appear in the chunk — per-artifact skill blocks
-(controller, api_resource, live_component, voter, form, repository, entity,
-template, config, php, …). Skill blocks emit both attack patterns to hunt and
-patterns explicitly NOT to flag, reducing reviewer noise. Blocks are emitted in
-attack-surface priority order, not alphabetically.
+Both modes share the same intro, severity/confidence rubrics, file-numbering protocol, scope guidance, single few-shot example, and — when files of the corresponding `ProjectFile` type appear in the chunk — per-artifact skill blocks (controller, api_resource, live_component, voter, form, repository, entity, template, config, php, …). Skill blocks emit both attack patterns to hunt and patterns explicitly NOT to flag, reducing reviewer noise. Blocks are emitted in attack-surface priority order, not alphabetically.
 
-Source files are wrapped as `<file path="…" type="…">…</file>` and every line is
-prefixed with a line-number marker of the form `` `NNN | ` `` (line number,
-space, pipe, space). The model is instructed to populate `line_start` /
-`line_end` using those exact numbers rather than counting manually.
+Source files are wrapped as `<file path="…" type="…">…</file>` and every line is prefixed with a line-number marker of the form `` `NNN | ` `` (line number, space, pipe, space). The model is instructed to populate `line_start` / `line_end` using those exact numbers rather than counting manually.
 
 The reviewer prompt expects each entry of the JSON array to be shaped:
 
@@ -748,61 +460,39 @@ The reviewer prompt expects each entry of the JSON array to be shaped:
 }
 ```
 
-With `audit.reviewer_structured_collection: true` (the default), the same fields
-are recorded through the schema-enforced `record_review` tool instead (`id` and
-`accepted` required, the enums constrained by the schema), so the provider
-validates every verdict before the agent sees it.
+With `audit.reviewer_structured_collection: true` (the default), the same fields are recorded through the schema-enforced `record_review` tool instead (`id` and `accepted` required, the enums constrained by the schema), so the provider validates every verdict before the agent sees it.
 
-It includes a Symfony-specific false-positive playbook (Doctrine
-`setParameter()`, default CSRF, `mapped: false`, hardcoded-argv `Process`, etc.)
-so the reviewer rejects known non-issues with a one-line note. The single- and
-batch-mode system prompts share a single core-instructions block to prevent
-drift.
+It includes a Symfony-specific false-positive playbook (Doctrine `setParameter()`, default CSRF, `mapped: false`, hardcoded-argv `Process`, etc.) so the reviewer rejects known non-issues with a one-line note. The single- and batch-mode system prompts share a single core-instructions block to prevent drift.
 
 ### `ReportRenderer`
 
 Three render methods:
 
 - `renderConsole(AuditReport): string` — human-readable terminal output
-- `renderJson(AuditReport): string` — delegates to `AuditReport::toArray()` then
-  `json_encode`
-- `renderSarif(AuditReport): string` — SARIF 2.1.0; `tool.driver.version`
-  sourced dynamically from installed Composer metadata
+- `renderJson(AuditReport): string` — delegates to `AuditReport::toArray()` then `json_encode`
+- `renderSarif(AuditReport): string` — SARIF 2.1.0; `tool.driver.version` sourced dynamically from installed Composer metadata
 
 ## Bundle Wiring (`SymfonySecurityAuditorBundle`)
 
 ### `SymfonySecurityAuditorBundle`
 
-Extends `AbstractBundle`. All wiring lives directly in this class — no separate
-Extension or Configuration class.
+Extends `AbstractBundle`. All wiring lives directly in this class — no separate Extension or Configuration class.
 
-`configure(DefinitionConfigurator $definition)` defines the config tree under
-root key `symfony_security_auditor`. Top-level scalars:
+`configure(DefinitionConfigurator $definition)` defines the config tree under root key `symfony_security_auditor`. Top-level scalars:
 
-| Key              | Default             | Purpose                                         |
-| ---------------- | ------------------- | ----------------------------------------------- |
-| `model`          | `'claude-opus-4-8'` | Model name for both Attacker and Reviewer roles |
-| `attacker_model` | `null`              | Override: dedicated model for the Attacker role |
-| `reviewer_model` | `null`              | Override: dedicated model for the Reviewer role |
+| Key | Default | Purpose |
+| --- | --- | --- |
+| `model` | `'claude-opus-4-8'` | Model name for both Attacker and Reviewer roles |
+| `attacker_model` | `null` | Override: dedicated model for the Attacker role |
+| `reviewer_model` | `null` | Override: dedicated model for the Reviewer role |
 
 Nested sections:
 
-- `scan.*` — `included_paths`, `respect_gitignore`, `max_file_size_kb`,
-  `secret_scrubbing.enabled`, `secret_scrubbing.additional_patterns` (file
-  discovery + credential redaction)
-- `audit.*` — `max_iterations`, `min_confidence`, `reviewer_batch_size`,
-  `tools_enabled`, `max_tool_iterations` (orchestrator knobs);
-  `budget.max_tokens`, `budget.max_cost_usd` (abort limits);
-  `retry.max_attempts`, `retry.initial_delay_ms`, `retry.backoff_multiplier`,
-  `retry.jitter_ratio` (LLM resilience)
-- `cache.*` — `enabled`, `dir` (chunk cache). `prompt_caching` is deprecated
-  since 1.7 and ignored; provider-side prompt caching is configured on the
-  `symfony/ai` platform (`cache_retention` in `ai.yaml` for Anthropic; automatic
-  for OpenAI/Gemini).
+- `scan.*` — `included_paths`, `respect_gitignore`, `max_file_size_kb`, `secret_scrubbing.enabled`, `secret_scrubbing.additional_patterns` (file discovery + credential redaction)
+- `audit.*` — `max_iterations`, `min_confidence`, `reviewer_batch_size`, `tools_enabled`, `max_tool_iterations` (orchestrator knobs); `budget.max_tokens`, `budget.max_cost_usd` (abort limits); `retry.max_attempts`, `retry.initial_delay_ms`, `retry.backoff_multiplier`, `retry.jitter_ratio` (LLM resilience)
+- `cache.*` — `enabled`, `dir` (chunk cache). `prompt_caching` is deprecated since 1.7 and ignored; provider-side prompt caching is configured on the `symfony/ai` platform (`cache_retention` in `ai.yaml` for Anthropic; automatic for OpenAI/Gemini).
 
-Model names must be supported by the platform configured in
-`config/packages/ai.yaml`. See [`docs/configuration.md`](configuration.md) for
-the full reference.
+Model names must be supported by the platform configured in `config/packages/ai.yaml`. See [`docs/configuration.md`](configuration.md) for the full reference.
 
 Minimal configuration:
 
@@ -828,100 +518,47 @@ ai:
             api_key: '%env(ANTHROPIC_API_KEY)%'
 ```
 
-The `loadExtension()` method (receiving `$config`, `ContainerConfigurator`,
-`ContainerBuilder`) imports `config/services.php`, then registers two
-`SymfonyAiLLMClient` service definitions (`security_auditor.attacker_client` and
-`security_auditor.reviewer_client`). Each receives `PlatformInterface`, the
-resolved model name (`attacker_model` or `reviewer_model`, falling back to
-`model`) and the default temperature, so `AttackerAgent` and `ReviewerAgent`
-each receive the correct client. Sets `LLMClientInterface::class` as a private
-alias to the attacker client.
+The `loadExtension()` method (receiving `$config`, `ContainerConfigurator`, `ContainerBuilder`) imports `config/services.php`, then registers two `SymfonyAiLLMClient` service definitions (`security_auditor.attacker_client` and `security_auditor.reviewer_client`). Each receives `PlatformInterface`, the resolved model name (`attacker_model` or `reviewer_model`, falling back to `model`) and the default temperature, so `AttackerAgent` and `ReviewerAgent` each receive the correct client. Sets `LLMClientInterface::class` as a private alias to the attacker client.
 
-`AttackerCacheInterface` is aliased to `FilesystemAttackerCache` when
-`cache.enabled: true`, otherwise to `NullAttackerCache`.
-`AdvisoryDatabaseInterface` is aliased to `ComposerAuditAdvisoryDatabase` (the
-default backed by `composer audit --format=json --locked`).
+`AttackerCacheInterface` is aliased to `FilesystemAttackerCache` when `cache.enabled: true`, otherwise to `NullAttackerCache`. `AdvisoryDatabaseInterface` is aliased to `ComposerAuditAdvisoryDatabase` (the default backed by `composer audit --format=json --locked`).
 
-Parameters exposed for debugging: `symfony_security_auditor.attacker_model`,
-`symfony_security_auditor.reviewer_model`, and the matching `scan.*`, `audit.*`,
-`cache.*` parameters.
+Parameters exposed for debugging: `symfony_security_auditor.attacker_model`, `symfony_security_auditor.reviewer_model`, and the matching `scan.*`, `audit.*`, `cache.*` parameters.
 
 ## `Command/AuditCommand`
 
 Console command `audit:run` (alias `audit`). Arguments and options:
 
-| Name            | Type     | Default    | Purpose                                                                                                                    |
-| --------------- | -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `project-path`  | argument | `getcwd()` | Path to target project; defaults to CWD                                                                                    |
-| `--format / -f` | option   | `console`  | Any `OutputFormat` value: `console`, `executive`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`, `github-comment` |
-| `--output / -o` | option   | `null`     | Write JSON/SARIF report to file                                                                                            |
-| `--dry-run`     | option   | `false`    | Estimate cost without invoking the LLM; exits `0`                                                                          |
+| Name | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `project-path` | argument | `getcwd()` | Path to target project; defaults to CWD |
+| `--format / -f` | option | `console` | Any `OutputFormat` value: `console`, `executive`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`, `github-comment` |
+| `--output / -o` | option | `null` | Write JSON/SARIF report to file |
+| `--dry-run` | option | `false` | Estimate cost without invoking the LLM; exits `0` |
 
-Input mapping and resolution live in `AuditCommandInput`; output writing in
-`ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in
-`AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
+Input mapping and resolution live in `AuditCommandInput`; output writing in `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
-Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold
-(default `critical`, so SAFE/LOW/MEDIUM/HIGH) and any `--min-score` is met; `1`
-when it is at or above the threshold, the normalized score is below
-`--min-score`, the scan discovered no file to audit at all, the path was
-invalid, or the audit itself failed; `2` when the budget could not be honored —
-either aborted mid-run with a partial report still emitted, or never started
-because an unpriced model makes `audit.budget.max_cost_usd` unenforceable. The
-canonical table lives in [`docs/configuration.md`](configuration.md#exit-codes).
+Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold (default `critical`, so SAFE/LOW/MEDIUM/HIGH) and any `--min-score` is met; `1` when it is at or above the threshold, the normalized score is below `--min-score`, the scan discovered no file to audit at all, the path was invalid, or the audit itself failed; `2` when the budget could not be honored — either aborted mid-run with a partial report still emitted, or never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable. The canonical table lives in [`docs/configuration.md`](configuration.md#exit-codes).
 
 ## Extension Points
 
-**Add a new pipeline stage** — implement `StageInterface`, register it as a
-service, inject it into the pipeline via the bundle extension. Stages process
-`AuditContext` sequentially in registration order.
+**Add a new pipeline stage** — implement `StageInterface`, register it as a service, inject it into the pipeline via the bundle extension. Stages process `AuditContext` sequentially in registration order.
 
-**Swap the LLM provider** — change `ai.yaml` only. `SymfonyAiLLMClient` is
-provider-agnostic.
+**Swap the LLM provider** — change `ai.yaml` only. `SymfonyAiLLMClient` is provider-agnostic.
 
-**Use a custom LLM client** — implement `LLMClientInterface` and alias it for
-`LLMClientInterface::class`. The Application layer has no other dependency on
-`symfony/ai`.
+**Use a custom LLM client** — implement `LLMClientInterface` and alias it for `LLMClientInterface::class`. The Application layer has no other dependency on `symfony/ai`.
 
-**Add new vulnerability types** — add a case to `VulnerabilityType`, add a
-branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`, and `cwe()`.
-The factory, agents, and report serialization require no changes.
+**Add new vulnerability types** — add a case to `VulnerabilityType`, add a branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`, and `cwe()`. The factory, agents, and report serialization require no changes.
 
-**Add new severity levels** — add a case to `VulnerabilitySeverity` with
-`score()`, `label()`, `isExploitable()` implementations, and update the
-`riskLevel()` thresholds in `AuditReport` accordingly.
+**Add new severity levels** — add a case to `VulnerabilitySeverity` with `score()`, `label()`, `isExploitable()` implementations, and update the `riskLevel()` thresholds in `AuditReport` accordingly.
 
-**Custom report format** — add a case to `Command\OutputFormat`, add a `render*`
-method to `ReportRenderer`, and add the matching `match` arm in `ReportWriter`.
+**Custom report format** — add a case to `Command\OutputFormat`, add a `render*` method to `ReportRenderer`, and add the matching `match` arm in `ReportWriter`.
 
-**Replace advisory source** — implement
-`Audit\Domain\Port\AdvisoryDatabaseInterface` and override the alias in
-`config/services.yaml` to wire a custom CVE feed (Snyk, internal database, …).
+**Replace advisory source** — implement `Audit\Domain\Port\AdvisoryDatabaseInterface` and override the alias in `config/services.yaml` to wire a custom CVE feed (Snyk, internal database, …).
 
-**Add cross-file investigation tools** — implement
-`Audit\Domain\Port\Tool\ToolInterface`, register it as a service, and inject it
-into `SymfonyToolRegistryFactory` so the attacker can call it when
-`audit.tools_enabled: true`.
+**Add cross-file investigation tools** — implement `Audit\Domain\Port\Tool\ToolInterface`, register it as a service, and inject it into `SymfonyToolRegistryFactory` so the attacker can call it when `audit.tools_enabled: true`.
 
-**Replace credential scrubber** — implement
-`Audit\Domain\Port\SecretScrubberInterface` and alias it in
-`config/services.yaml`. Default: `RegexSecretScrubber`; disabled:
-`NullSecretScrubber`.
+**Replace credential scrubber** — implement `Audit\Domain\Port\SecretScrubberInterface` and alias it in `config/services.yaml`. Default: `RegexSecretScrubber`; disabled: `NullSecretScrubber`.
 
-**Replace token estimator** — implement
-`Audit\Domain\Port\TokenEstimatorInterface` to plug in a provider-specific token
-counter. Default: `ResolvingTokenEstimator`, which dispatches each model to a
-per-provider `ProviderTokenEstimatorInterface` implementation
-(`AnthropicTokenEstimator`, `OpenAiTokenEstimator`, `GeminiTokenEstimator`,
-`MistralTokenEstimator`, `LlamaTokenEstimator`, `DeepSeekTokenEstimator`,
-`MiniMaxTokenEstimator`) and falls back to a default character-to-token ratio
-for unknown models — each a `mb_strlen ÷ ratio` heuristic via the shared
-`CharacterRatioCounter`. Register your own implementation tagged
-`symfony_security_auditor.token_estimator` to add a provider, or alias
-`TokenEstimatorInterface` to replace the whole strategy.
+**Replace token estimator** — implement `Audit\Domain\Port\TokenEstimatorInterface` to plug in a provider-specific token counter. Default: `ResolvingTokenEstimator`, which dispatches each model to a per-provider `ProviderTokenEstimatorInterface` implementation (`AnthropicTokenEstimator`, `OpenAiTokenEstimator`, `GeminiTokenEstimator`, `MistralTokenEstimator`, `LlamaTokenEstimator`, `DeepSeekTokenEstimator`, `MiniMaxTokenEstimator`) and falls back to a default character-to-token ratio for unknown models — each a `mb_strlen ÷ ratio` heuristic via the shared `CharacterRatioCounter`. Register your own implementation tagged `symfony_security_auditor.token_estimator` to add a provider, or alias `TokenEstimatorInterface` to replace the whole strategy.
 
-**Replace pricing provider** — implement
-`Audit\Domain\Port\PricingProviderInterface` (or
-`CacheAwarePricingProviderInterface` to also supply real prompt-cache rates) to
-supply custom per-token prices. Default: `ModelsDevPricingProvider`, which reads
-the daily `symfony/models-dev` catalog snapshot from `vendor/` (no network).
+**Replace pricing provider** — implement `Audit\Domain\Port\PricingProviderInterface` (or `CacheAwarePricingProviderInterface` to also supply real prompt-cache rates) to supply custom per-token prices. Default: `ModelsDevPricingProvider`, which reads the daily `symfony/models-dev` catalog snapshot from `vendor/` (no network).

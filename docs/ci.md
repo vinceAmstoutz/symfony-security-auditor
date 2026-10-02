@@ -1,7 +1,6 @@
 # CI Integration
 
-Run the AI security audit on a nightly schedule and ship the SARIF report to
-GitHub Code Scanning or the GitLab Security Dashboard.
+Run the AI security audit on a nightly schedule and ship the SARIF report to GitHub Code Scanning or the GitLab Security Dashboard.
 
 ## Table of Contents
 
@@ -15,25 +14,17 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 - [GitLab CI](#gitlab-ci)
 - [Output Formats in CI](#output-formats-in-ci)
 
-> See also: [Configuration](configuration.md) · [FAQ](faq.md) ·
-> [Troubleshooting](troubleshooting.md)
+> See also: [Configuration](configuration.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
 
 ## Why Scheduled, Not Per-Push
 
-The auditor runs a multi-agent LLM loop (up to 3 attacker/reviewer iterations).
-A single audit can take **30 seconds to several minutes** depending on project
-size and provider latency. Running it on every push or pull request blocks
-developers and inflates CI costs with no proportional benefit — vulnerabilities
-are not introduced commit-by-commit.
+The auditor runs a multi-agent LLM loop (up to 3 attacker/reviewer iterations). A single audit can take **30 seconds to several minutes** depending on project size and provider latency. Running it on every push or pull request blocks developers and inflates CI costs with no proportional benefit — vulnerabilities are not introduced commit-by-commit.
 
-**Recommended pattern**: nightly scheduled pipeline. Results land in your
-security dashboard (GitHub Code Scanning, GitLab Security Dashboard) and can
-trigger alerts on new findings.
+**Recommended pattern**: nightly scheduled pipeline. Results land in your security dashboard (GitHub Code Scanning, GitLab Security Dashboard) and can trigger alerts on new findings.
 
 ## Managing LLM Costs
 
-Each audit run makes multiple LLM API calls: up to **3 iterations × N file
-chunks × 2 agents** (Attacker + Reviewer). Token usage grows with project size.
+Each audit run makes multiple LLM API calls: up to **3 iterations × N file chunks × 2 agents** (Attacker + Reviewer). Token usage grows with project size.
 
 ### Reduce cost with split-model
 
@@ -46,13 +37,11 @@ symfony_security_auditor:
     reviewer_model: 'claude-haiku-4-5-20251001'  # ~20× cheaper for false-positive filtering
 ```
 
-Any supported provider works — see
-[Configuration](configuration.md#split-model-setup) for all options.
+Any supported provider works — see [Configuration](configuration.md#split-model-setup) for all options.
 
 ### Run less often on large projects
 
-Nightly is a sensible default. For large monorepos or expensive models, weekly
-is fine — most vulnerability patterns are stable across commits:
+Nightly is a sensible default. For large monorepos or expensive models, weekly is fine — most vulnerability patterns are stable across commits:
 
 ```yaml
 # GitHub Actions
@@ -75,33 +64,27 @@ See [Configuration](configuration.md#supported-platforms) for Ollama setup.
 
 ### Set a spend cap
 
-All major providers offer budget alerts or hard caps — set one before enabling
-scheduled runs:
+All major providers offer budget alerts or hard caps — set one before enabling scheduled runs:
 
-- Anthropic: [console.anthropic.com](https://console.anthropic.com) → Billing →
-  Usage limits
+- Anthropic: [console.anthropic.com](https://console.anthropic.com) → Billing → Usage limits
 - OpenAI: [platform.openai.com](https://platform.openai.com) → Settings → Limits
 - Others: check your provider's billing dashboard
 
 ## Report Visibility on Public Repositories
 
-> [!WARNING] Security audit reports list vulnerabilities in your application.
-> Storing them where anyone can read them **advertises your attack surface
-> publicly**. Evaluate report storage carefully before enabling CI uploads.
+> [!WARNING] Security audit reports list vulnerabilities in your application. Storing them where anyone can read them **advertises your attack surface publicly**. Evaluate report storage carefully before enabling CI uploads.
 
-| Storage method                   | Public repo risk          | Notes                                                    |
-| -------------------------------- | ------------------------- | -------------------------------------------------------- |
-| GitHub Actions artifact          | **Publicly downloadable** | Anyone with repo URL can fetch it                        |
-| GitLab CI artifact               | **Publicly downloadable** | Same — public project = public artifacts                 |
-| GitHub Code Scanning (SARIF)     | **Safe**                  | Security tab requires write access, even on public repos |
-| External storage (S3, GCS + IAM) | **Safe**                  | Access controlled by your cloud IAM policy               |
-| Notification only (Slack, email) | **Safe**                  | No persistent file stored                                |
+| Storage method | Public repo risk | Notes |
+| --- | --- | --- |
+| GitHub Actions artifact | **Publicly downloadable** | Anyone with repo URL can fetch it |
+| GitLab CI artifact | **Publicly downloadable** | Same — public project = public artifacts |
+| GitHub Code Scanning (SARIF) | **Safe** | Security tab requires write access, even on public repos |
+| External storage (S3, GCS + IAM) | **Safe** | Access controlled by your cloud IAM policy |
+| Notification only (Slack, email) | **Safe** | No persistent file stored |
 
 ### Option 1 — GitHub Code Scanning (recommended for GitHub)
 
-SARIF upload to Code Scanning is restricted to collaborators even on public
-repositories. The workflow shown below already uses this approach — prefer it
-over raw artifact uploads.
+SARIF upload to Code Scanning is restricted to collaborators even on public repositories. The workflow shown below already uses this approach — prefer it over raw artifact uploads.
 
 ### Option 2 — External private storage
 
@@ -115,13 +98,11 @@ over raw artifact uploads.
           AWS_DEFAULT_REGION: eu-west-1
 ```
 
-Replace the `upload-artifact` step with this. Requires an S3 bucket with a
-bucket policy that blocks public access.
+Replace the `upload-artifact` step with this. Requires an S3 bucket with a bucket policy that blocks public access.
 
 ### Option 3 — Notification only (no stored report)
 
-Run the audit and send a summary notification — no file persisted, no public
-exposure:
+Run the audit and send a summary notification — no file persisted, no public exposure:
 
 ```yaml
       - name: Run security audit
@@ -136,25 +117,17 @@ exposure:
 
 ### Option 4 — Store artifact in a private repository
 
-Use a scoped Personal Access Token (PAT) with `contents: write` on a private
-repo to push reports there. Keeps your source repo public while centralising
-security findings privately.
+Use a scoped Personal Access Token (PAT) with `contents: write` on a private repo to push reports there. Keeps your source repo public while centralising security findings privately.
 
 ## GitHub Actions
 
-Add your LLM provider key as a repository secret
-(`Settings → Secrets → Actions`). Example for Anthropic: `ANTHROPIC_API_KEY`.
+Add your LLM provider key as a repository secret (`Settings → Secrets → Actions`). Example for Anthropic: `ANTHROPIC_API_KEY`.
 
 See [supported platforms](../README.md#supported-platforms) for other providers.
 
 ### Reusable GitHub Action
 
-This repository **is** a GitHub Action (published to the
-[GitHub Marketplace](https://github.com/marketplace/actions/symfony-security-auditor)),
-so you can run an audit with `uses:` instead of scripting the steps yourself. It
-sets up PHP, installs Composer dependencies (or, in `mode: standalone`,
-downloads the standalone binary instead), and runs the audit with the inputs you
-pass.
+This repository **is** a GitHub Action (published to the [GitHub Marketplace](https://github.com/marketplace/actions/symfony-security-auditor)), so you can run an audit with `uses:` instead of scripting the steps yourself. It sets up PHP, installs Composer dependencies (or, in `mode: standalone`, downloads the standalone binary instead), and runs the audit with the inputs you pass.
 
 ```yaml
 # .github/workflows/security-audit.yaml
@@ -191,23 +164,9 @@ jobs:
           sarif_file: report.sarif
 ```
 
-Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`),
-`project-path` (default `.`), `format`
-(`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`,
-default `sarif`), `output` (default `report.sarif`), `baseline`,
-`generate-baseline`, `since`, `fail-on`
-(`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score
-floor, 0-100 — independent of `fail-on`, either gate failing fails the audit),
-`comment-pr` (default `false`), `update-badge` (default `false`), `badge-path`
-(default `.github/security-auditor-badge.json`), `extra-args`, `php-version`
-(default `8.3`), `setup-php` (default `true`), `install-dependencies` (default
-`true`, ignored in standalone mode), and `working-directory` (default `.`). Set
-`setup-php: false` / `install-dependencies: false` when your job has already
-done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
+Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`), `project-path` (default `.`), `format` (`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`, default `sarif`), `output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`, `fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score floor, 0-100 — independent of `fail-on`, either gate failing fails the audit), `comment-pr` (default `false`), `update-badge` (default `false`), `badge-path` (default `.github/security-auditor-badge.json`), `extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`, ignored in standalone mode), and `working-directory` (default `.`). Set `setup-php: false` / `install-dependencies: false` when your job has already done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
-Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, and — only
-when `format: json` — `findings-count`, `highest-severity` (the report's
-aggregate `risk_level`) and `grade` (its `A`-`F` letter).
+Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter).
 
 ```yaml
       - name: Symfony Security Audit
@@ -222,24 +181,9 @@ aggregate `risk_level`) and `grade` (its `A`-`F` letter).
       - run: echo "found ${{ steps.audit.outputs.findings-count }} findings (${{ steps.audit.outputs.highest-severity }})"
 ```
 
-**Standalone mode** (`mode: standalone`) downloads the checksum-verified
-standalone binary instead of requiring the bundle in your project's
-`composer.json` — a host PHP and Composer are still installed by this action
-(`setup-php` stays `true`) since `init` fetches the provider bridge through
-Composer even for the standalone binary. Non-Anthropic providers currently
-require running `symfony-security-auditor init` interactively once outside CI to
-pick a provider; standalone mode in this action always configures the
-`anthropic`/`claude-opus-4-8` default non-interactively.
+**Standalone mode** (`mode: standalone`) downloads the checksum-verified standalone binary instead of requiring the bundle in your project's `composer.json` — a host PHP and Composer are still installed by this action (`setup-php` stays `true`) since `init` fetches the provider bridge through Composer even for the standalone binary. Non-Anthropic providers currently require running `symfony-security-auditor init` interactively once outside CI to pick a provider; standalone mode in this action always configures the `anthropic`/`claude-opus-4-8` default non-interactively.
 
-`mode` defaults to `bundle`, not `standalone`, so upgrading to a newer action
-version never silently changes what an existing workflow does — `bundle` is
-exactly today's behavior with no `mode` input at all. It also avoids opting
-every new adopter into the Anthropic-only standalone path by default when they
-may already have a different provider configured via `config/packages/ai.yaml`.
-Neither install method is otherwise preferred; see the
-[Standalone tool](../README.md#standalone-tool-binary) and
-[bundle](../README.md#use-it-as-a-symfony-bundle) sections for the general
-tradeoffs.
+`mode` defaults to `bundle`, not `standalone`, so upgrading to a newer action version never silently changes what an existing workflow does — `bundle` is exactly today's behavior with no `mode` input at all. It also avoids opting every new adopter into the Anthropic-only standalone path by default when they may already have a different provider configured via `config/packages/ai.yaml`. Neither install method is otherwise preferred; see the [Standalone tool](../README.md#standalone-tool-binary) and [bundle](../README.md#use-it-as-a-symfony-bundle) sections for the general tradeoffs.
 
 ```yaml
       - name: Symfony Security Audit
@@ -252,16 +196,14 @@ tradeoffs.
           output: report.sarif
 ```
 
-Accept the current findings as a baseline once (locally), then commit it so
-future PRs only report new findings:
+Accept the current findings as a baseline once (locally), then commit it so future PRs only report new findings:
 
 ```bash
 php bin/console audit:run --generate-baseline=.security-baseline.json
 git add .security-baseline.json
 ```
 
-Baselined findings are dropped from the report and do **not** affect the exit
-code, so a green PR check means "no new findings since the baseline".
+Baselined findings are dropped from the report and do **not** affect the exit code, so a green PR check means "no new findings since the baseline".
 
 ### Nightly SARIF upload to GitHub Code Scanning
 
@@ -308,11 +250,7 @@ jobs:
 
 ### Inline PR annotations (no SARIF upload step)
 
-`--format github` renders each finding as a GitHub Actions workflow-command
-annotation (`::error`/`::warning`/`::notice`). GitHub parses these directly from
-the step's log output, so findings show up inline on the pull request's **Files
-changed** view, next to the vulnerable line — no SARIF upload step, no
-`security-events: write` permission, and no Code Scanning setup required.
+`--format github` renders each finding as a GitHub Actions workflow-command annotation (`::error`/`::warning`/`::notice`). GitHub parses these directly from the step's log output, so findings show up inline on the pull request's **Files changed** view, next to the vulnerable line — no SARIF upload step, no `security-events: write` permission, and no Code Scanning setup required.
 
 ```yaml
 # .github/workflows/security-audit.yaml
@@ -348,22 +286,11 @@ jobs:
           php bin/console audit:run --since origin/${{ github.base_ref }} --format github
 ```
 
-Critical and high-severity findings become `::error`, medium becomes
-`::warning`, and low/info become `::notice` — the annotation level only affects
-how GitHub displays the finding, not the job's exit code; combine with
-`--fail-on` to also fail the check run. Don't pass `--output` — annotations must
-reach stdout for GitHub to parse them.
+Critical and high-severity findings become `::error`, medium becomes `::warning`, and low/info become `::notice` — the annotation level only affects how GitHub displays the finding, not the job's exit code; combine with `--fail-on` to also fail the check run. Don't pass `--output` — annotations must reach stdout for GitHub to parse them.
 
 ### Sticky PR comment with the audit summary
 
-Inline annotations are easy to miss once a PR has more than a couple of review
-comments, and a fresh top-level comment on every push spams the thread.
-[`marocchino/sticky-pull-request-comment`](https://github.com/marketplace/actions/sticky-pull-request-comment)
-solves both: it finds its own previous comment (matched by the `header` input)
-and edits it in place, so the PR always shows exactly one up-to-date audit
-comment regardless of how many times the workflow reruns. Pair it with
-`--format markdown` so the comment renders as native GitHub markdown — headings,
-a findings table — rather than a log dump.
+Inline annotations are easy to miss once a PR has more than a couple of review comments, and a fresh top-level comment on every push spams the thread. [`marocchino/sticky-pull-request-comment`](https://github.com/marketplace/actions/sticky-pull-request-comment) solves both: it finds its own previous comment (matched by the `header` input) and edits it in place, so the PR always shows exactly one up-to-date audit comment regardless of how many times the workflow reruns. Pair it with `--format markdown` so the comment renders as native GitHub markdown — headings, a findings table — rather than a log dump.
 
 ```yaml
 # .github/workflows/security-audit.yaml
@@ -407,22 +334,11 @@ jobs:
           path: report.md
 ```
 
-The report file is written before the exit code is computed, so it exists even
-on a failing run — `if: always()` on the comment step is what lets it post
-regardless, while the job itself still fails on the `audit:run` step so
-`--fail-on` still gates the check run. `header: security-audit` scopes this
-action to its own comment; give a second sticky-comment step in the same
-workflow (e.g. one posting coverage) a different `header` so the two never
-overwrite each other.
+The report file is written before the exit code is computed, so it exists even on a failing run — `if: always()` on the comment step is what lets it post regardless, while the job itself still fails on the `audit:run` step so `--fail-on` still gates the check run. `header: security-audit` scopes this action to its own comment; give a second sticky-comment step in the same workflow (e.g. one posting coverage) a different `header` so the two never overwrite each other.
 
 #### Without a third-party action
 
-_Since 1.19._ The action does the same thing itself with `comment-pr: true`,
-paired with `format: github-comment` — a
-[format](configuration.md#github-comment) purpose-built for a comment body:
-grade and score headline, the run on one line, and the ten most severe findings
-as table rows. It opens with an invisible marker, which is how the step finds
-its own previous comment and `PATCH`es it instead of appending a new one.
+_Since 1.19._ The action does the same thing itself with `comment-pr: true`, paired with `format: github-comment` — a [format](configuration.md#github-comment) purpose-built for a comment body: grade and score headline, the run on one line, and the ten most severe findings as table rows. It opens with an invisible marker, which is how the step finds its own previous comment and `PATCH`es it instead of appending a new one.
 
 ```yaml
 permissions:
@@ -444,26 +360,15 @@ permissions:
           fail-on: high
 ```
 
-`GITHUB_TOKEN` has to be passed explicitly: a composite action cannot read the
-calling workflow's secrets on its own. When it is missing, or the format is not
-`github-comment`, or no report file was produced, the step emits a `::warning::`
-naming the reason and leaves the audit's own exit code untouched rather than
-failing the job over a comment.
+`GITHUB_TOKEN` has to be passed explicitly: a composite action cannot read the calling workflow's secrets on its own. When it is missing, or the format is not `github-comment`, or no report file was produced, the step emits a `::warning::` naming the reason and leaves the audit's own exit code untouched rather than failing the job over a comment.
 
-The step runs under `if: always()` internally, so a run that trips `--fail-on`
-still posts its summary — that being the run reviewers most need to see.
+The step runs under `if: always()` internally, so a run that trips `--fail-on` still posts its summary — that being the run reviewers most need to see.
 
 ### Live security badge in your README
 
-_Since 1.19._ Set `update-badge: true` and the action writes a
-[shields.io endpoint](https://shields.io/badges/endpoint-badge) JSON file
-carrying the report's [grade](configuration.md#normalized-score-and-grade). The
-action **only writes the file** — committing it stays your workflow's decision,
-so the action never pushes to your repository on your behalf.
+_Since 1.19._ Set `update-badge: true` and the action writes a [shields.io endpoint](https://shields.io/badges/endpoint-badge) JSON file carrying the report's [grade](configuration.md#normalized-score-and-grade). The action **only writes the file** — committing it stays your workflow's decision, so the action never pushes to your repository on your behalf.
 
-It needs a JSON report to read the grade from (`format: json` plus a non-empty
-`output`), and it only runs on `push` events, since a badge should track your
-default branch rather than whichever pull request ran last.
+It needs a JSON report to read the grade from (`format: json` plus a non-empty `output`), and it only runs on `push` events, since a badge should track your default branch rather than whichever pull request ran last.
 
 ```yaml
       - name: Symfony Security Audit
@@ -485,9 +390,7 @@ default branch rather than whichever pull request ran last.
           git push
 ```
 
-Both steps use `if: always()` on purpose: the audit exits `1` when it trips the
-`fail-on` (or `--min-score`) gate, and that is exactly the run whose grade you
-want published. The action's own badge step already does this internally.
+Both steps use `if: always()` on purpose: the audit exits `1` when it trips the `fail-on` (or `--min-score`) gate, and that is exactly the run whose grade you want published. The action's own badge step already does this internally.
 
 Then point shields.io at the committed file:
 
@@ -495,8 +398,7 @@ Then point shields.io at the committed file:
 ![Security audit](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/main/.github/security-auditor-badge.json)
 ```
 
-The grade maps to a badge color: `A` brightgreen, `B` green, `C` yellow, `D`
-orange, `F` red.
+The grade maps to a badge color: `A` brightgreen, `B` green, `C` yellow, `D` orange, `F` red.
 
 ### JSON report as artifact
 
@@ -517,15 +419,11 @@ orange, `F` red.
 
 ## GitLab CI
 
-Add your LLM provider key as a CI/CD variable (`Settings → CI/CD → Variables`).
-Example: `ANTHROPIC_API_KEY` (masked, not protected unless you only audit
-protected branches).
+Add your LLM provider key as a CI/CD variable (`Settings → CI/CD → Variables`). Example: `ANTHROPIC_API_KEY` (masked, not protected unless you only audit protected branches).
 
 ### Scheduled pipeline with Security Dashboard upload
 
-GitLab natively parses SARIF and displays findings in the **Security Dashboard**
-and **Vulnerability Report** when you upload a `gl-sast-report.json` (GitLab
-SAST format) or use the `security` artifact report type.
+GitLab natively parses SARIF and displays findings in the **Security Dashboard** and **Vulnerability Report** when you upload a `gl-sast-report.json` (GitLab SAST format) or use the `security` artifact report type.
 
 ```yaml
 # .gitlab-ci.yml (add to existing file or create standalone)
@@ -555,9 +453,7 @@ Set the schedule in `CI/CD → Schedules` (e.g., every night at 02:00).
 
 ### JUnit test report (free tier)
 
-The `sast:` report above renders in GitLab's security dashboard, which requires
-the Ultimate tier. On any tier — including free — the JUnit format shows every
-finding directly in the merge-request test widget instead:
+The `sast:` report above renders in GitLab's security dashboard, which requires the Ultimate tier. On any tier — including free — the JUnit format shows every finding directly in the merge-request test widget instead:
 
 ```yaml
 security_audit_junit:
@@ -571,8 +467,7 @@ security_audit_junit:
       junit: junit-security.xml
 ```
 
-Each finding appears as a failed test case named `<title> (<file>:<line>)`,
-grouped under its vulnerability type.
+Each finding appears as a failed test case named `<title> (<file>:<line>)`, grouped under its vulnerability type.
 
 ### JSON artifact only (no dashboard)
 
@@ -615,5 +510,4 @@ php bin/console audit:run /path/to/project --format sarif --output report.sarif
 php bin/console audit:run /path/to/project --format html --output report.html
 ```
 
-Every format, its options and sample output live in the
-[Output Formats Reference](configuration.md#output-formats-reference).
+Every format, its options and sample output live in the [Output Formats Reference](configuration.md#output-formats-reference).
