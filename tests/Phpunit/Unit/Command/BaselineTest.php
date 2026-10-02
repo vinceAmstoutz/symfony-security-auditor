@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
@@ -458,6 +459,26 @@ final class BaselineTest extends TestCase
         $baselineEntry = new BaselineEntry('SSA-SAME', 'SSA-SAME', 'SSA-SAME');
 
         self::assertSame(['SSA-SAME'], $baselineEntry->fingerprints());
+    }
+
+    /**
+     * A baseline file is part of the audited repository, so a pull request
+     * controls its reasons — and every reason reaches the reviewer's system
+     * prompt. It is capped the way the reviewer's own triage memory is.
+     *
+     * @throws MalformedBaselineFileException
+     */
+    public function test_feedback_caps_a_reason_the_way_the_triage_memory_does(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $this->filesystem->dumpFile($path, json_encode([[...$this->entry('SSA-AAA'), 'reason' => str_repeat('é', FilesystemTriageMemoryStore::MAX_REASON_LENGTH + 1)]], \JSON_THROW_ON_ERROR));
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            (new Baseline($this->filesystem))->feedback($path)->entries,
+        );
+
+        self::assertSame([str_repeat('é', FilesystemTriageMemoryStore::MAX_REASON_LENGTH)], $reasons);
     }
 
     /**

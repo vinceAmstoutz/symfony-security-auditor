@@ -19,6 +19,7 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
@@ -115,6 +116,11 @@ final readonly class Baseline implements BaselineInterface
         return $decoded;
     }
 
+    /**
+     * The baseline is part of the audited repository, so a pull request
+     * controls every reason, and each one reaches the reviewer's system
+     * prompt: it is capped the way the reviewer's own triage memory is.
+     */
     private function feedbackOf(mixed $entry): ?AcceptedFindingFeedback
     {
         if (!\is_array($entry)) {
@@ -130,7 +136,7 @@ final readonly class Baseline implements BaselineInterface
             $this->stringField($entry, 'type'),
             $this->stringField($entry, 'file'),
             $this->stringField($entry, 'title'),
-            $reason,
+            u($reason)->truncate(FilesystemTriageMemoryStore::MAX_REASON_LENGTH)->toString(),
         );
     }
 
