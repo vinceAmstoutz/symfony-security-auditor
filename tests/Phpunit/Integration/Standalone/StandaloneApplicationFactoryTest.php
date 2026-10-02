@@ -106,6 +106,27 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertTrue($standaloneApplication->has('init'));
     }
 
+    #[DataProvider('credentialCommandNames')]
+    public function test_it_registers_the_credential_commands(string $commandName): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertTrue($standaloneApplication->has($commandName));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function credentialCommandNames(): iterable
+    {
+        yield 'set' => ['auth:set'];
+        yield 'status' => ['auth:status'];
+        yield 'remove' => ['auth:remove'];
+    }
+
     public function test_it_registers_the_self_update_command(): void
     {
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
@@ -285,6 +306,16 @@ final class StandaloneApplicationFactoryTest extends TestCase
     private function writeConfig(string $yaml): void
     {
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $yaml);
+    }
+
+    public function test_it_registers_the_mcp_server_command_as_visible_without_reading_a_config_file(): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertFalse($standaloneApplication->get('mcp:serve')->isHidden());
     }
 
     public function test_it_registers_the_audit_command_as_visible(): void

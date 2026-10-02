@@ -237,7 +237,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
      * type: ...)`) — resolve `type` the same way `Route`'s `path` and
      * `IsGranted`'s `attribute` are resolved elsewhere in this scanner.
      *
-     * @param list<Arg|Node\VariadicPlaceholder> $args
+     * @param list<Node> $args
      */
     private function typeArgument(array $args): ?Arg
     {

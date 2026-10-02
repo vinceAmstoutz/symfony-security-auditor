@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Budget;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
@@ -126,6 +127,47 @@ final class CostCalculatorTest extends TestCase
         $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
 
         self::assertEqualsWithDelta(0.003, $costCalculator->costForCall(1_000, 0, 'model'), 1e-12);
+    }
+
+    #[DataProvider('billedModelCases')]
+    public function test_it_bills_the_reported_model_only_when_the_pricing_source_knows_it(?string $reportedModel, string $expectedBilledModel): void
+    {
+        $costCalculator = new CostCalculator($this->pricingKnowing('listed-model'));
+
+        self::assertSame($expectedBilledModel, $costCalculator->billedModel('configured-model', $reportedModel));
+    }
+
+    /** @return iterable<string, array{?string, string}> */
+    public static function billedModelCases(): iterable
+    {
+        yield 'a listed reported model' => ['listed-model', 'listed-model'];
+        yield 'an unlisted reported model' => ['gateway-internal-id', 'configured-model'];
+        yield 'no reported model' => [null, 'configured-model'];
+    }
+
+    private function pricingKnowing(string $knownModel): PricingProviderInterface
+    {
+        return new class($knownModel) implements PricingProviderInterface {
+            public function __construct(private readonly string $knownModel) {}
+
+            #[Override]
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return 1.0;
+            }
+
+            #[Override]
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return 1.0;
+            }
+
+            #[Override]
+            public function hasModel(string $model): bool
+            {
+                return $this->knownModel === $model;
+            }
+        };
     }
 
     private function fixedPricing(float $inputPrice, float $outputPrice): PricingProviderInterface

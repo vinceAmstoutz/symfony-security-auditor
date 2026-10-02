@@ -21,12 +21,20 @@ use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -72,18 +80,40 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->register('event_dispatcher', EventDispatcher::class)->setPublic(true);
         $containerBuilder->register('logger', NullLogger::class);
         $containerBuilder->register(ClockInterface::class, NativeClock::class);
+        $containerBuilder->register('http_client', HttpClientInterface::class)->setFactory([HttpClient::class, 'create']);
 
         $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), $standaloneConfig->auditConfig, $containerBuilder);
 
-        $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
+        $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
+        $containerBuilder->getDefinition(McpServeCommand::class)->setPublic(true);
+        $containerBuilder->addCompilerPass(new PricingPlatformPass());
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    /**
+     * The product banner is already on screen by the time a command runs, so
+     * the audit header carries the credential the run will spend instead of
+     * repeating it — named by its masked preview, never printed.
+     */
+    private function registerAuditHeaderBanner(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void
+    {
+        $credentialIdentity = $standalonePlatformConfig->credentialIdentity();
+
+        if (!$credentialIdentity instanceof CredentialIdentity) {
+            $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
+
+            return;
+        }
+
+        $containerBuilder->register(ConsoleBannerInterface::class, CredentialConsoleBanner::class)
+            ->setArguments([ContainerParameterSyntax::escape($credentialIdentity->maskedPreview)]);
     }
 
     /**
@@ -97,7 +127,7 @@ final readonly class StandaloneContainerFactory
         if (null !== $activeProvider) {
             $platformServiceId = \sprintf('%s%s', self::PLATFORM_SERVICE_PREFIX, $activeProvider);
             if (!$containerBuilder->hasDefinition($platformServiceId)) {
-                throw UnknownPlatformProviderException::forProvider($activeProvider);
+                throw $this->unknownProvider($containerBuilder, $activeProvider);
             }
 
             $containerBuilder->setAlias(PlatformInterface::class, $platformServiceId)->setPublic(true);
@@ -108,5 +138,36 @@ final readonly class StandaloneContainerFactory
         if (\count($containerBuilder->findTaggedServiceIds(self::PLATFORM_TAG)) > 1) {
             throw AmbiguousPlatformException::create();
         }
+    }
+
+    private function unknownProvider(ContainerBuilder $containerBuilder, string $activeProvider): UnknownPlatformProviderException
+    {
+        $providerKey = ProviderKey::of($activeProvider);
+        $instances = $this->configuredInstancesOf($containerBuilder, $providerKey->platform);
+
+        if ([] === $instances) {
+            return UnknownPlatformProviderException::forProvider($activeProvider);
+        }
+
+        return null === $providerKey->instance
+            ? UnknownPlatformProviderException::forInstanceKeyedProvider($providerKey->platform, $instances)
+            : UnknownPlatformProviderException::forUnknownInstance($providerKey->platform, $providerKey->instance, $instances);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function configuredInstancesOf(ContainerBuilder $containerBuilder, string $platform): array
+    {
+        $instances = [];
+
+        foreach (array_keys($containerBuilder->findTaggedServiceIds(self::PLATFORM_TAG)) as $serviceId) {
+            $providerKey = ProviderKey::of(substr($serviceId, \strlen(self::PLATFORM_SERVICE_PREFIX)));
+            if ($platform === $providerKey->platform && null !== $providerKey->instance) {
+                $instances[] = $providerKey->instance;
+            }
+        }
+
+        return $instances;
     }
 }

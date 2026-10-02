@@ -1,5 +1,6 @@
 includes:
     - vendor/spaze/phpstan-disallowed-calls/disallowed-execution-calls.neon
+    - vendor/symplify/phpstan-rules/config/services/services.neon
 
 parameters:
     bootstrapFiles:

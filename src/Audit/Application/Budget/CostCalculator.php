@@ -60,6 +60,16 @@ final readonly class CostCalculator
         return $inputCost + $outputCost + $cacheReadCost + $cacheCreationCost;
     }
 
+    /**
+     * The model a call is billed as: the one the provider reports serving it
+     * when the pricing source knows it, the configured one otherwise, so a
+     * gateway answering under an id no catalog lists still prices the call.
+     */
+    public function billedModel(string $configuredModel, ?string $reportedModel): string
+    {
+        return null !== $reportedModel && $this->pricingProvider->hasModel($reportedModel) ? $reportedModel : $configuredModel;
+    }
+
     private function cacheReadPrice(string $model): float
     {
         if ($this->pricingProvider instanceof CacheAwarePricingProviderInterface) {

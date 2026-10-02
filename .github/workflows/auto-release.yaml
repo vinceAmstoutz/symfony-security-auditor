@@ -15,8 +15,8 @@ on:
       publish:
         description:
           "Publish the release immediately instead of leaving it as a draft.
-          Rarely needed — normally review the drafted release notes and publish
-          manually in the GitHub UI."
+          Only consulted on a manual replay: a release merged to main already
+          publishes itself once every asset is attached."
         required: false
         type: boolean
         default: false
@@ -180,10 +180,13 @@ jobs:
         id: publish-state
         env:
           PUBLISH: ${{ github.event.inputs.publish }}
-        run: echo "publish=${PUBLISH:-false}" >> "$GITHUB_OUTPUT"
+        # Empty only on the push path — `github.event.inputs` does not exist
+        # for a push — so a release merged to main publishes itself, while a
+        # manual replay still honours its own `publish` input.
+        run: echo "publish=${PUBLISH:-true}" >> "$GITHUB_OUTPUT"
 
       - name: Draft the GitHub Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
         with:
           tag_name: ${{ needs.detect.outputs.version }}
           name: ${{ steps.release-name.outputs.name }}
@@ -200,8 +203,9 @@ jobs:
           REPO: ${{ github.repository }}
           VERSION: ${{ needs.detect.outputs.version }}
           PUBLISH_WHEN_DONE: ${{ steps.publish-state.outputs.publish }}
+          RELEASE_NAME: ${{ steps.release-name.outputs.name }}
         run: |
           set -euo pipefail
 
           # GITHUB_TOKEN-authored events don't cascade into other workflows (GitHub's anti-recursion guard), so dispatch explicitly rather than rely on release:published.
-          gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION" --field keep_draft=true --field publish_when_done="$PUBLISH_WHEN_DONE"
+          gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION" --field keep_draft=true --field publish_when_done="$PUBLISH_WHEN_DONE" --field release_name="$RELEASE_NAME"

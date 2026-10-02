@@ -2,38 +2,32 @@
 
 ## Keeping This File Up to Date
 
-Update the relevant section in the same commit/PR whenever the project evolves.
-Rules scoped to specific paths live in `.claude/rules/` — update them too. Never
-leave this file describing a state that no longer exists.
+Update the relevant section in the same commit/PR whenever the project evolves. Rules scoped to specific paths live in `.claude/rules/` — update them too. Never leave this file describing a state that no longer exists.
 
 ---
 
 ## Project Overview
 
-**symfony-security-auditor** — AI-powered multi-agent security auditor for
-Symfony applications. Distributed as a **Symfony bundle** (`symfony-bundle`
-package type). Uses a dual-agent attacker/reviewer loop backed by `symfony/ai`
-to detect vulnerabilities and produce structured reports.
+**symfony-security-auditor** — AI-powered multi-agent security auditor for Symfony applications. Distributed as a **Symfony bundle** (`symfony-bundle` package type). Uses a dual-agent attacker/reviewer loop backed by `symfony/ai` to detect vulnerabilities and produce structured reports.
 
-> Always check `composer.json` for authoritative dependency versions — never
-> rely on version numbers written here.
+> Always check `composer.json` for authoritative dependency versions — never rely on version numbers written here.
 
 ## Tech Stack
 
-| Layer             | Technology                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language          | PHP (see `composer.json` → `require.php`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Framework         | Symfony (see `composer.json`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| LLM               | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Packaging         | symfony-bundle + Flex recipe; standalone self-contained native binary (`box` + `static-php-cli` micro) for Linux/macOS/Windows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Tests             | PHPUnit (Unit / Integration / EndToEnd); 100% line coverage enforced via the custom `MinimumLineCoverageExtension` (`tools/PHPUnit/`); the report-only `ergebnis/phpunit-slow-test-detector` surfaces tests over its `maximum-duration` (500 ms), and `SlowTestGuardExtension` (`tools/PHPUnit/`) derives its gate from that same threshold — read straight from the detector's config, single source of truth — multiplying it by `GUARD_HEADROOM_FACTOR` (3, i.e. 1500 ms) before failing the run, because one wall-clock sample on a shared CI runner can push a 3 ms test past a 500 ms bar; the report still surfaces everything over 500 ms and per-test `#[MaximumDuration]` overrides replace the bar outright — which is why overrides only ever _raise_ it (every one in the suite is 4000 or 8000 ms): an override below the shared bar opts that test out of the headroom and turns one unlucky wall-clock sample into a red build |
-| Mutation          | Infection (100% MSI required); `infection.json5` sets `testFrameworkOptions: "--no-extensions"` because Infection decides kill-vs-escape by parsing PHPUnit's stdout, and `ergebnis/phpunit-agent-reporter` replaces that stdout with a JSON report whenever it detects a coding-agent environment variable (`CLAUDECODE`, `AI_AGENT`, `CURSOR_AGENT`, …) — Infection then reads every mutant as killed and reports 100% MSI unconditionally, so a run inside an agent session silently proves nothing. `--no-extensions` also keeps the coverage and slow-test gates out of per-mutant runs, where they never belonged                                                                                                                                                                                                                                                                                                                        |
-| Static analysis   | PHPStan max + phpstan-strict-rules + custom rules (`FinalRule`, `MaxParameterCountRule`, `NoEmptyCatchRule`, `NoSilencingErrorHandlerRule`, `ForbiddenTestAttributeRule`, `SprintfOverConcatRule` — in `tools/PHPStan/`) + symplify/spaze rules + Rector                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Layer conformance | deptrac (DDD layer rules + the `SymfonyProfile` framework boundary — `deptrac.yaml`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Complexity        | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Dead code         | rector/swiss-knife (`check-commented-code`, `check-conflicts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Style             | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| CI/CD security    | zizmor (static analysis for GitHub Actions — scans `.github/workflows/` + `action.yml`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Layer | Technology |
+| --- | --- |
+| Language | PHP (see `composer.json` → `require.php`) |
+| Framework | Symfony (see `composer.json`) |
+| LLM | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …) |
+| Packaging | symfony-bundle + Flex recipe; standalone self-contained native binary (`box` + `static-php-cli` micro) for Linux/macOS/Windows |
+| Tests | PHPUnit (Unit / Integration / EndToEnd); 100% line coverage enforced via the custom `MinimumLineCoverageExtension` (`tools/PHPUnit/`); the report-only `ergebnis/phpunit-slow-test-detector` surfaces tests over its `maximum-duration` (500 ms), and `SlowTestGuardExtension` (`tools/PHPUnit/`) derives its gate from that same threshold — read straight from the detector's config, single source of truth — multiplying it by `GUARD_HEADROOM_FACTOR` (3, i.e. 1500 ms) before failing the run, because one wall-clock sample on a shared CI runner can push a 3 ms test past a 500 ms bar; the report still surfaces everything over 500 ms and per-test `#[MaximumDuration]` overrides replace the bar outright — which is why overrides only ever _raise_ it (every one in the suite is 4000 or 8000 ms): an override below the shared bar opts that test out of the headroom and turns one unlucky wall-clock sample into a red build |
+| Mutation | Infection (100% MSI required); `infection.json5` sets `testFrameworkOptions: "--no-extensions"` because Infection decides kill-vs-escape by parsing PHPUnit's stdout, and `ergebnis/phpunit-agent-reporter` replaces that stdout with a JSON report whenever it detects a coding-agent environment variable (`CLAUDECODE`, `AI_AGENT`, `CURSOR_AGENT`, …) — Infection then reads every mutant as killed and reports 100% MSI unconditionally, so a run inside an agent session silently proves nothing. `--no-extensions` also keeps the coverage and slow-test gates out of per-mutant runs, where they never belonged |
+| Static analysis | PHPStan max + phpstan-strict-rules + custom rules (`FinalRule`, `MaxParameterCountRule`, `NoEmptyCatchRule`, `NoSilencingErrorHandlerRule`, `ForbiddenTestAttributeRule`, `SprintfOverConcatRule` — in `tools/PHPStan/`) + spaze rules + hand-picked symplify rules (`composer.json` keeps `symplify/phpstan-rules` out of `phpstan/extension-installer`, which from 14.14 would register every symplify rule set; `phpstan.dist.neon` includes only its `services.neon` and lists each rule) + Rector |
+| Layer conformance | deptrac (DDD layer rules + the `SymfonyProfile` framework boundary — `deptrac.yaml`) |
+| Complexity | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40) |
+| Dead code | rector/swiss-knife (`check-commented-code`, `check-conflicts`) |
+| Style | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets); Prettier for Markdown, one line per paragraph and list item, never hard-wrapped (`proseWrap: never`, checked by the Prettier Check job) |
+| CI/CD security | zizmor (static analysis for GitHub Actions — scans `.github/workflows/` + `action.yml`) |
 
 ## Build, Test & Lint Commands
 
@@ -41,39 +35,23 @@ to detect vulnerabilities and produce structured reports.
 bin/castor up
 ```
 
-| Task                    | Command                                                                     |
-| ----------------------- | --------------------------------------------------------------------------- |
-| Install dependencies    | `bin/castor up` (runs `docker compose up --wait`)                           |
-| Stop containers         | `bin/castor down`                                                           |
-| Lint (check only)       | `bin/castor lint`                                                           |
-| Lint + auto-fix         | `bin/castor lint:fix`                                                       |
-| Markdown check only     | `bin/castor lint:docs` (fast pre-push check)                                |
-| Run PHP tests           | `docker compose exec php vendor/bin/phpunit`                                |
-| Run mutation tests      | `bin/castor lint` (its Infection step mirrors CI's flags — see below)       |
+| Task | Command |
+| --- | --- |
+| Install dependencies | `bin/castor up` (runs `docker compose up --wait`) |
+| Stop containers | `bin/castor down` |
+| Lint (check only) | `bin/castor lint` |
+| Lint + auto-fix | `bin/castor lint:fix` |
+| Markdown check only | `bin/castor lint:docs` (fast pre-push check) |
+| Run PHP tests | `docker compose exec php vendor/bin/phpunit` |
+| Run mutation tests | `bin/castor lint` (its Infection step mirrors CI's flags — see below) |
 | Score detection quality | `bin/castor eval` (audits a ground-truth fixture, reports precision/recall) |
-| Symfony console         | `docker compose exec php bin/console <command>`                             |
+| Symfony console | `docker compose exec php bin/console <command>` |
 
-`bin/castor lint` runs sequentially: Prettier (check) → Markdown lint
-(markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,
-500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict
-scan) → Install script tests (`tests/Shell/install_script_test.sh`) → PHPUnit →
-Infection. `bin/castor lint:fix` auto-fixes steps 1–3 (Prettier, Markdown lint,
-Composer Normalize); the remaining steps are check-only.
+`bin/castor lint` runs sequentially: Prettier (check) → Markdown lint (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max, 500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict scan) → Install script tests (`tests/Shell/install_script_test.sh`) → Pull request check tests (`tests/Shell/pull_request_check_test.sh`) → PHPUnit → Infection. `bin/castor lint:fix` auto-fixes steps 1–3 (Prettier, Markdown lint, Composer Normalize); the remaining steps are check-only.
 
-Run Infection **through `bin/castor lint`**, never as a bare `bin/infection`.
-The task's PHPUnit step emits the
-`--coverage-clover`/`--coverage-xml`/`--log-junit` set that its Infection step
-then reuses via
-`--coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100`,
-matching `.github/workflows/ci.yaml`; invoking `bin/infection` with ad-hoc flags
-has twice reported a green 100% MSI on a commit CI then rejected. Note that a
-single green run is still not proof of CI parity: Infection rewrites
-`phpunit.dist.xml` to force `executionOrder="defects,random"` while disabling
-result caching, so test order is effectively random per invocation — see #275.
+Run Infection **through `bin/castor lint`**, never as a bare `bin/infection`. The task's PHPUnit step emits the `--coverage-clover`/`--coverage-xml`/`--log-junit` set that its Infection step then reuses via `--coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100`, matching `.github/workflows/ci.yaml`; invoking `bin/infection` with ad-hoc flags has twice reported a green 100% MSI on a commit CI then rejected. Note that a single green run is still not proof of CI parity: Infection rewrites `phpunit.dist.xml` to force `executionOrder="defects,random"` while disabling result caching, so test order is effectively random per invocation — see #275.
 
-Commit messages are validated separately in CI via
-[commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
-[Commit Messages](#commit-messages).
+Commit messages are validated separately in CI via [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see [Commit Messages](#commit-messages).
 
 ## Project Structure
 
@@ -99,17 +77,18 @@ src/
       Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer, Skill/{AttackerSkillInterface, AttackerSkillRegistry, one *AttackerSkill per attack surface, ConfiguredAttackerSkill for config-driven audit.custom_skills}), ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSectionsInterface, ReviewerPromptSections, ReviewerMessageRendererInterface, ReviewerMessageRenderer, ReviewerFeedbackHolder})
       Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default) + LockfileHashedAdvisoryCache (TTL-bounded lockfile-hash cache in front of it, wired when cache.enabled), DeferredAdvisoryDatabase (lazy wrapper), InMemoryAdvisoryDatabase (fallback), ComposerAuditRunnerInterface + SymfonyProcessComposerAuditRunner
-      Pricing/       # ModelsDevPricingProvider (default), ModelPrice
+      Pricing/       # ModelsDevPricingProvider (default; prices from the serving platform's listing first), PlatformCatalogProviders (symfony/ai platform → models.dev provider key, + the Bedrock bridge's id forms), ModelPrice
       Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
+      Config/        # Standalone configuration: XdgConfigPathResolver, StandaloneConfigLoader, StandalonePlatformConfigResolver (+ EnvPlaceholder, PlatformApiKey), and the per-user credential store — CredentialStoreInterface + FilesystemCredentialStore (0600 credentials.json, refuses a group/world-readable file) / NullCredentialStore, CredentialIdentity (masked preview + SHA-256 fingerprint), ConfiguredCredentialVariable; plus what `init` may write per platform — BaseUrlPlatforms (the six whose connection node declares a `base_url`), EndpointPlatforms (those naming it `endpoint`, and `ollama`, the one with no default), OptionalApiKeyPlatforms (the writable ones whose `api_key` is optional), BedrockMantleRoute (the Mantle `api` route and companion bridge `init` writes Bedrock with, read from the model's vendor prefix), HandWrittenPlatforms (the eight `init` refuses because they reject `api_key` or need a field it never asks for; HandWrittenPlatformBlock holds the block it prints for them instead, with a `<placeholder>` per missing value) and InstanceKeyedPlatforms (the six declared with `useAttributeAsKey`, whose provider must name an instance), all five read back from `symfony/ai-bundle`'s own definitions by PlatformShapeKnowledgeTest, plus PricingPlatformPass (publishes the `ai.platform.<name>` `PlatformInterface` resolves to, so pricing reads that platform's rates) and the three that refuse a name or value the run could not use: ConfigKeyInstanceName (folds an instance name the way `symfony/config` will, and refuses one the config file could not be read back with), PlatformServiceId (refuses one `ContainerBuilder::setDefinition()` cannot name a service by) and ContainerParameterSyntax (refuses an instance or base URL the container would read as a `%parameter%`)
       Report/        # ReportRendererInterface (format/render) + one class per format ({Console,ExecutiveSummary,Json,Sarif,Html,Markdown,Junit,GithubAnnotations,GithubComment}ReportRenderer) + MarkdownTextEscaper (shared Markdown-injection defenses) + DistributionBarChart/ChartBar (inline-SVG charts in the HTML report) + ReportPackage + TemplateLoader; + Template/*.txt + *.html stubs
-  Command/           # AuditCommand (Symfony Console: audit:run, alias audit) + AuditCommandInput, AuditPresenter, ConsoleBanner (the identity banner, also rendered by StandaloneApplication for every non-audit command), ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|executive|json|sarif|html|markdown|junit|github|github-comment), Baseline (accepted-finding suppression); DiffCommand (audit:diff — compares two JSON reports by finding fingerprint) + ReportDiffer, ReportDiff/DiffFinding, DiffPresenter, DiffOutputFormat enum (console|json); TrendCommand (audit:trend — tracks finding counts across two or more JSON reports) + ReportTrendAnalyzer, ReportTrend/TrendPoint, TrendPresenter, TrendOutputFormat enum (console|json)
+  Command/           # AuditCommand (Symfony Console: audit:run, alias audit) + AuditCommandInput, AuditPresenter, ConsoleBanner (the identity banner, also rendered by StandaloneApplication for every non-audit command), ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|executive|json|sarif|html|markdown|junit|github|github-comment), Baseline (accepted-finding suppression); DiffCommand (audit:diff — compares two JSON reports by finding fingerprint) + ReportDiffer, ReportDiff/DiffFinding, DiffPresenter, DiffOutputFormat enum (console|json); TrendCommand (audit:trend — tracks finding counts across two or more JSON reports) + ReportTrendAnalyzer, ReportTrend/TrendPoint, TrendPresenter, TrendOutputFormat enum (console|json); AuthSetCommand / AuthStatusCommand / AuthRemoveCommand (auth:set, auth:status, auth:remove — the standalone per-user API-key store) + CredentialConsoleBanner (names the key a run spends, masked, in the audit header); Mcp/{McpServeCommand (mcp:serve — stdio MCP server exposing the `audit` tool, in the bundle and the standalone binary), McpServerFactory, AuditTool, StdioMcpTransportFactory}
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)
   Integration/       # Wire real classes, no LLM calls
   EndToEnd/          # Full pipeline, uses stub LLM client
-tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh)
+tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh; pull_request_check_test.sh — covers .github/scripts/check-pull-request.sh)
 config/services.php  # DI wiring for all bundle services
 docs/
   architecture.md    # Layer overview, data flow, domain model details
@@ -124,45 +103,24 @@ docs/
 
 ## Architecture: DDD Layers
 
-Strict DDD layering under `src/Audit/`. Infrastructure never leaks into Domain
-or Application.
+Strict DDD layering under `src/Audit/`. Infrastructure never leaks into Domain or Application.
 
 ```text
 Command → Application → Domain ← Infrastructure (implements ports)
 ```
 
-**`LLMClientInterface`** is the sole seam between Application and LLM I/O.
-`AttackerAgent` and `ReviewerAgent` never import any `symfony/ai` type directly.
+**`LLMClientInterface`** is the sole seam between Application and LLM I/O. `AttackerAgent` and `ReviewerAgent` never import any `symfony/ai` type directly.
 
 **Dual-agent loop** (up to 3 iterations, stops earlier when no new findings):
 
-1. (optional) `StaticPreScanner` tags files with deterministic risk markers;
-   (optional) `CodeSlicer` trims large files to security-relevant lines
-2. `AttackerAgent` — chunks files (default `feature` strategy: a controller with
-   its entity/repository/form/voter/templates together; `type` for the legacy
-   priority window; API Platform `#[ApiResource]` classes classify as
-   `api_resource` with their own skill block), injects markers + prior-iteration
-   findings, calls LLM. By default (`audit.structured_collection: true`),
-   findings come in through `record_vulnerability` tool calls validated by the
-   provider against the tool's JSON schema; with the flag off, the attacker
-   parses a JSON array from the response. With `audit.attacker_max_concurrent` >
-   1 (the `fast` profile sets 4) and a tool-batch-capable client, cache-miss
-   chunks are analyzed concurrently. Optional `EscalatingAttackerAgent` runs a
-   cheap model first and only escalates flagged files to the expensive model.
+1. (optional) `StaticPreScanner` tags files with deterministic risk markers; (optional) `CodeSlicer` trims large files to security-relevant lines
+2. `AttackerAgent` — chunks files (default `feature` strategy: a controller with its entity/repository/form/voter/templates together; `type` for the legacy priority window; API Platform `#[ApiResource]` classes classify as `api_resource` with their own skill block), injects markers + prior-iteration findings, calls LLM. By default (`audit.structured_collection: true`), findings come in through `record_vulnerability` tool calls validated by the provider against the tool's JSON schema; with the flag off, the attacker parses a JSON array from the response. With `audit.attacker_max_concurrent` > 1 (the `fast` profile sets 4) and a tool-batch-capable client, cache-miss chunks are analyzed concurrently. Optional `EscalatingAttackerAgent` runs a cheap model first and only escalates flagged files to the expensive model.
 3. Filter — confidence ≥ 0.6
-4. `ReviewerAgent` — validates each finding, may adjust severity. By default
-   (`audit.reviewer_structured_collection: true`), verdicts come in through
-   schema-enforced `record_review` tool calls; the explicit opt-in
-   `reviewer_tools_enabled` keeps the JSON path, and `reviewer_max_concurrent`
-   > 1 reviews findings concurrently (structured when the client supports tool
-   > batching, JSON otherwise). Verdicts are cached across runs
-   > (`FilesystemReviewerCache`) when `cache.enabled` is on; every review mode —
-   > concurrent and batched (`reviewer_batch_size > 1`) alike — serves cached
-   > verdicts first and dispatches/batches only the misses.
+4. `ReviewerAgent` — validates each finding, may adjust severity. By default (`audit.reviewer_structured_collection: true`), verdicts come in through schema-enforced `record_review` tool calls; the explicit opt-in `reviewer_tools_enabled` keeps the JSON path, and `reviewer_max_concurrent`
+   > 1 reviews findings concurrently (structured when the client supports tool batching, JSON otherwise). Verdicts are cached across runs (`FilesystemReviewerCache`) when `cache.enabled` is on; every review mode — concurrent and batched (`reviewer_batch_size > 1`) alike — serves cached verdicts first and dispatches/batches only the misses.
 5. Deduplicate → persist to `AuditContext`
 
-After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction
-artifacts for high-severity findings).
+After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction artifacts for high-severity findings).
 
 Full details: [`docs/architecture.md`](docs/architecture.md)
 
@@ -190,15 +148,13 @@ symfony_security_auditor:
     reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 
-Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code
-changes.
+Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code changes.
 
 Full reference: [`docs/configuration.md`](docs/configuration.md)
 
 ## Commit Messages
 
-Format: `<type>[optional scope]: <description>` —
-[Conventional Commits](https://www.conventionalcommits.org/)
+Format: `<type>[optional scope]: <description>` — [Conventional Commits](https://www.conventionalcommits.org/)
 
 | Type       | When                    |
 | ---------- | ----------------------- |
@@ -212,159 +168,84 @@ Format: `<type>[optional scope]: <description>` —
 | `ci`       | CI configuration        |
 | `perf`     | Performance improvement |
 
-Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
-`standalone`, `scan`, `deps`, `ci`, `rate-limit`, `release`. Breaking changes:
-`feat!:` with `BREAKING CHANGE:` footer.
+Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`, `standalone`, `scan`, `deps`, `ci`, `rate-limit`, `release`. Breaking changes: `feat!:` with `BREAKING CHANGE:` footer.
 
 ## Pull Requests
 
-Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)
-and keep the top of the PR short:
+Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and keep the top of the PR short:
 
-- **Title: 50 characters or fewer**, same
-  [Conventional Commits](https://www.conventionalcommits.org/) format as a
-  commit subject.
-- **`## Summary`: 500 characters or fewer.** State the user-visible outcome and
-  stop. Per-finding walkthroughs, verification tables and reviewer notes belong
-  in their own sections further down — the summary is the part everyone reads,
-  so it must stay skimmable.
+- **Title: 50 characters or fewer**, same [Conventional Commits](https://www.conventionalcommits.org/) format as a commit subject.
+- **Four sections, in this order:** `## Summary`, `## Type of change`, `## Target branch`, `## Checklist`. No other sections: the CHANGELOG entry and the commit body carry the implementation, compatibility and upgrade notes.
+- **`## Summary`: 500 characters or fewer.** State the user-visible outcome and stop, then add a `Closes #N` or `Refs #N` line when an issue is involved — the summary is the part everyone reads, so it must stay skimmable.
+- **Only the ticked boxes** under Type of change, Target branch and Checklist: delete the others and every template instruction. The Checklist lists only what CI cannot check, and its license box is always ticked.
+- **Label** the PR `bug` or `enhancement` and assign it to the maintainer.
 
-**Always squash-merge, never rebase-merge.** Every PR becomes exactly one commit
-on its base branch. Rebase-merging replays each of the PR's commits individually
-— with a fresh SHA apiece, even when nothing about them changed.
+**Stack as little as possible.** Open every PR against its release branch, and stack it on another open PR only when it needs code that PR adds — never because both touch `CHANGELOG.md`, `CLAUDE.md` or the docs, whose conflicts are resolved by updating the branch once the first one merges. When splitting work into several PRs, cut along code dependencies so each builds and passes on the release branch alone. A stacked PR ticks `stacked` and ends its Summary with `Stacked on #N` and the code it needs from it. Once the parent merges, retarget it, untick `stacked`, drop the `Stacked on` line and update the branch — the squash-merge left it carrying commits the base no longer has, and its CI ran on top of unmerged code.
 
-**Exception: the `chore: release X.Y.Z` PR that merges `<N>.x` into `main`.**
-Use a regular merge (a merge commit) there instead, never squash and never
-rebase. `main` is supposed to end up with the exact same commit SHAs as `<N>.x`
-— that's how every release before this one actually happened (PR #226, for
-1.18.0). Squashing collapses `<N>.x`'s commits into one new SHA that doesn't
-exist on `<N>.x`, so the two branches permanently diverge in commit identity and
-need a cherry-pick-back reconciliation after every single release.
-Rebase-merging is worse: it replays every commit `<N>.x` has accumulated since
-it last diverged from `main` with a fresh SHA apiece — which is how PR #305
-quietly turned a one-commit release into ~40 replayed commits landing on `main`
-and broke `Commit Lint` (see
-[Branches & maintenance](docs/versioning.md#branches--maintenance)).
+On every edit, the `Pull request target` check ([`.github/scripts/check-pull-request.sh`](.github/scripts/check-pull-request.sh)) fails the PR on a title over 50 characters, a missing, extra or misplaced section, a Summary over 500 characters, an unticked box, leftover template text or a missing license box, a base that does not match the ticked branch, and a stacked PR that does not name its parent — or still does once unstacked. Run it before opening or editing a PR:
+
+```bash
+PR_TITLE='fix(scan): …' PR_BODY="$(cat body.md)" BASE_REF=1.x \
+  sh .github/scripts/check-pull-request.sh
+```
+
+**Always squash-merge, never rebase-merge.** Every PR becomes exactly one commit on its base branch. Rebase-merging replays each of the PR's commits individually — with a fresh SHA apiece, even when nothing about them changed.
+
+**Exception: the `chore: release X.Y.Z` PR that merges `<N>.x` into `main`.** Use a regular merge (a merge commit) there instead, never squash and never rebase. `main` is supposed to end up with the exact same commit SHAs as `<N>.x` — that's how every release before this one actually happened (PR #226, for 1.18.0). Squashing collapses `<N>.x`'s commits into one new SHA that doesn't exist on `<N>.x`, so the two branches permanently diverge in commit identity and need a cherry-pick-back reconciliation after every single release. Rebase-merging is worse: it replays every commit `<N>.x` has accumulated since it last diverged from `main` with a fresh SHA apiece — which is how PR #305 quietly turned a one-commit release into ~40 replayed commits landing on `main` and broke `Commit Lint` (see [Branches & maintenance](docs/versioning.md#branches--maintenance)).
 
 ## CI Pipeline
 
-Seven jobs must all pass before merging: **Prettier Check** (markdown
-formatting) → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint**
-(commitlint, conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer,
-Rector, PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script
-shell tests) → **zizmor** (GitHub Actions security scan via
-[`zizmorcore/zizmor-action`](https://github.com/zizmorcore/zizmor-action), SARIF
-uploaded to Code Scanning) → **Tests + Mutation** (PHPUnit matrix on PHP
-8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then Infection 100% MSI;
-coverage uploads to Codecov and the mutation report uploads to the Stryker
-dashboard via Infection's `stryker` logger — the badge tracks `main`, and
-same-repo branches publish their own report).
+Seven jobs must all pass before merging: **Prettier Check** (markdown formatting) → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint, conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script and pull-request-check shell tests) → **zizmor** (GitHub Actions security scan via [`zizmorcore/zizmor-action`](https://github.com/zizmorcore/zizmor-action), SARIF uploaded to Code Scanning) → **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then Infection 100% MSI; coverage uploads to Codecov and the mutation report uploads to the Stryker dashboard via Infection's `stryker` logger — the badge tracks `main`, and same-repo branches publish their own report). Every pull request also runs **Pull request target** (`.github/workflows/pr-target.yaml`), which fails on a title, description or base branch that breaks [Pull Requests](#pull-requests).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
 ## Security Posture
 
-This project is itself a security tool — it must not ship the vulnerability
-classes it hunts. Command and code execution is therefore banned at the
-static-analysis level: `phpstan.dist.neon` explicitly `includes:` the
-`spaze/phpstan-disallowed-calls` `disallowed-execution-calls.neon` ruleset,
-forbidding raw execution sinks (`exec`, `shell_exec`, `system`, `passthru`,
-`proc_open`, `popen`, `pcntl_exec`, backtick operator, `eval`). `eval` is
-double-locked — also forbidden via the `ForbiddenNodeRule` `Eval_` entry.
+This project is itself a security tool — it must not ship the vulnerability classes it hunts. Command and code execution is therefore banned at the static-analysis level: `phpstan.dist.neon` explicitly `includes:` the `spaze/phpstan-disallowed-calls` `disallowed-execution-calls.neon` ruleset, forbidding raw execution sinks (`exec`, `shell_exec`, `system`, `passthru`, `proc_open`, `popen`, `pcntl_exec`, backtick operator, `eval`). `eval` is double-locked — also forbidden via the `ForbiddenNodeRule` `Eval_` entry.
 
-**This ban is a deliberate manual opt-in, not a freebie.** Although
-`phpstan/extension-installer` is installed, it only auto-loads the package's
-`extension.neon`, which registers the rule engine with **every** `disallowed*`
-array empty (zero bans by default). The curated
-`disallowed-execution-calls.neon` set is wired in by hand on line 2 of
-`phpstan.dist.neon` — delete that line and the ban silently disappears with no
-error. Keep it.
+**This ban is a deliberate manual opt-in, not a freebie.** Although `phpstan/extension-installer` is installed, it only auto-loads the package's `extension.neon`, which registers the rule engine with **every** `disallowed*` array empty (zero bans by default). The curated `disallowed-execution-calls.neon` set is wired in by hand on line 2 of `phpstan.dist.neon` — delete that line and the ban silently disappears with no error. Keep it.
 
 Consequences for contributors:
 
-- **All subprocess work routes through Symfony `Process`** (e.g.
-  `ProcessGitChangedFilesResolver`, `SymfonyProcessComposerAuditRunner`), never
-  a raw exec call — `Process` does not invoke a shell by default, so there is no
-  argument-interpolation command-injection surface.
-- Never satisfy a disallowed-call error with an `allowIn`/exclusion entry; route
-  through `Process` instead. Suppressing this gate is covered by the
-  [Never Silence Quality Gates](#5-never-silence-quality-gates) rule.
+- **All subprocess work routes through Symfony `Process`** (e.g. `ProcessGitChangedFilesResolver`, `SymfonyProcessComposerAuditRunner`), never a raw exec call — `Process` does not invoke a shell by default, so there is no argument-interpolation command-injection surface.
+- Never satisfy a disallowed-call error with an `allowIn`/exclusion entry; route through `Process` instead. Suppressing this gate is covered by the [Never Silence Quality Gates](#5-never-silence-quality-gates) rule.
 
-The same "don't ship what we hunt" posture applies to the project's own GitHub
-Actions: a dedicated **zizmor** job scans `.github/workflows/` and `action.yml`
-on every push and pull request, and every third-party `uses:` — including
-`zizmor-action` itself — is pinned to a commit SHA (never a mutable tag) for the
-same reason `Process` is required over raw exec: a moving reference is an
-unreviewed-code-execution surface. These pins aren't manually-maintained dead
-weight — the existing `github-actions` entry in `.github/dependabot.yaml`
-recognizes the `# vX.Y.Z` trailing-comment convention and opens a PR bumping
-both the SHA and the comment whenever a pinned action releases. Both
-`dependabot.yaml` update entries also carry a 7-day `cooldown`
-(`default-days: 7`), so Dependabot never opens a bump PR for a release younger
-than a week — the window in which a compromised or yanked supply-chain release
-is typically caught — which also clears zizmor's `dependabot-cooldown` audit.
+The same "don't ship what we hunt" posture applies to the project's own GitHub Actions: a dedicated **zizmor** job scans `.github/workflows/` and `action.yml` on every push and pull request, and every third-party `uses:` — including `zizmor-action` itself — is pinned to a commit SHA (never a mutable tag) for the same reason `Process` is required over raw exec: a moving reference is an unreviewed-code-execution surface. These pins aren't manually-maintained dead weight — the existing `github-actions` entry in `.github/dependabot.yaml` recognizes the `# vX.Y.Z` trailing-comment convention and opens a PR bumping both the SHA and the comment whenever a pinned action releases. Both `dependabot.yaml` update entries also carry a 7-day `cooldown` (`default-days: 7`), so Dependabot never opens a bump PR for a release younger than a week — the window in which a compromised or yanked supply-chain release is typically caught — which also clears zizmor's `dependabot-cooldown` audit.
 
 ## Behavioral Guidelines
 
 ### 1. Think Before Coding
 
-Before implementing: state assumptions explicitly, surface tradeoffs, present
-multiple interpretations rather than picking silently. If unclear, stop and ask.
+Before implementing: state assumptions explicitly, surface tradeoffs, present multiple interpretations rather than picking silently. If unclear, stop and ask.
 
 ### 2. Simplicity First
 
-Minimum code that solves the problem. No speculative features, no abstractions
-for single-use code, no error handling for impossible scenarios.
+Minimum code that solves the problem. No speculative features, no abstractions for single-use code, no error handling for impossible scenarios.
 
 ### 3. Surgical Changes
 
-Touch only what the request requires. Don't improve adjacent code. Match
-existing style. If you notice unrelated dead code, mention it — don't delete it.
-Remove only imports/variables that YOUR changes made unused.
+Touch only what the request requires. Don't improve adjacent code. Match existing style. If you notice unrelated dead code, mention it — don't delete it. Remove only imports/variables that YOUR changes made unused.
 
 ### 4. Goal-Driven Execution
 
-Transform tasks into verifiable goals. For multistep tasks, state a brief plan
-with a verify step for each.
+Transform tasks into verifiable goals. For multistep tasks, state a brief plan with a verify step for each.
 
 ### 5. Never Silence Quality Gates
 
-Never bypass static analysis or mutation testing via suppression annotations or
-config opt-outs. **Forbidden** (non-exhaustive):
+Never bypass static analysis or mutation testing via suppression annotations or config opt-outs. **Forbidden** (non-exhaustive):
 
-- PHPStan — `@phpstan-ignore`, `@phpstan-ignore-line`,
-  `@phpstan-ignore-next-line`, `ignoreErrors` entries in `phpstan.dist.neon`,
-  baseline files.
-- Infection — `@infection-ignore-all`, `@infection-ignore-all-for`, per-mutator
-  `ignore` entries in `infection.json5`, `ignoreSourceCodeByRegex`.
-- PHPUnit / coverage — `@codeCoverageIgnore*`, `@requires`/`markTestSkipped`
-  used to dodge a failing test, `@group` used to exclude from CI.
-- PHP CS Fixer / Rector — `@phpcs:ignore`, `// @phpstan-ignore`, `\Rector\Skip`,
-  blanket `--no-check`.
+- PHPStan — `@phpstan-ignore`, `@phpstan-ignore-line`, `@phpstan-ignore-next-line`, `ignoreErrors` entries in `phpstan.dist.neon`, baseline files.
+- Infection — `@infection-ignore-all`, `@infection-ignore-all-for`, per-mutator `ignore` entries in `infection.json5`, `ignoreSourceCodeByRegex`.
+- PHPUnit / coverage — `@codeCoverageIgnore*`, `@requires`/`markTestSkipped` used to dodge a failing test, `@group` used to exclude from CI.
+- PHP CS Fixer / Rector — `@phpcs:ignore`, `// @phpstan-ignore`, `\Rector\Skip`, blanket `--no-check`.
 
-If a tool flags something, **fix the underlying code**. Genuine exceptions (a
-real false positive, a library bug) require a PR-description justification and a
-linked issue tracking removal — never silent suppression.
+If a tool flags something, **fix the underlying code**. Genuine exceptions (a real false positive, a library bug) require a PR-description justification and a linked issue tracking removal — never silent suppression.
 
 ### 6. Backward Compatibility
 
-The project follows [Semantic Versioning 2.0.0](https://semver.org) and, for its
-PHP API surface, the
-[Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html)
-(`@internal` code is exempt). Treat every public-API element as load-bearing:
-configuration keys (and their defaults), the `audit:run` command (and its
-`audit` alias) arguments/options/exit codes, JSON and SARIF output schemas,
-Domain ports under `src/Audit/Domain/Port/` (including
-`AdvisoryDatabaseInterface`), Domain models/enums/exceptions, `RunAuditUseCase`,
-and the Bundle class. A change that removes or alters any of these is a `MAJOR`
-and requires a deprecation cycle.
+The project follows [Semantic Versioning 2.0.0](https://semver.org) and, for its PHP API surface, the [Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html) (`@internal` code is exempt). Treat every public-API element as load-bearing: configuration keys (and their defaults), the `audit:run` command (and its `audit` alias) arguments/options/exit codes, JSON and SARIF output schemas, Domain ports under `src/Audit/Domain/Port/` (including `AdvisoryDatabaseInterface`), Domain models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A change that removes or alters any of these is a `MAJOR` and requires a deprecation cycle.
 
-Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
-infrastructure adapters, Command collaborators — may be refactored freely in a
-`MINOR`. When you add a class that is **not** an extension point, add the
-`@internal` tag. When you add a public configuration key, list it in
-`docs/versioning.md` and add it to `resources/schema.json` (the JSON Schema that
-powers editor autocompletion for `symfony_security_auditor.yaml`).
+Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages, infrastructure adapters, Command collaborators — may be refactored freely in a `MINOR`. When you add a class that is **not** an extension point, add the `@internal` tag. When you add a public configuration key, list it in `docs/versioning.md` and add it to `resources/schema.json` (the JSON Schema that powers editor autocompletion for `symfony_security_auditor.yaml`).
 
 Canonical policy: [`docs/versioning.md`](docs/versioning.md).
 
@@ -372,18 +253,10 @@ Canonical policy: [`docs/versioning.md`](docs/versioning.md).
 
 Rules scoped to specific paths live in `.claude/rules/`:
 
-- [`changelog.md`](.claude/rules/changelog.md) — classify every change
-  (major/minor/patch or Unreleased) and update `CHANGELOG.md` in the same
-  commit; release-notes format.
-- [`ddd-layers.md`](.claude/rules/ddd-layers.md) — dependency direction across
-  layers.
-- [`domain-models.md`](.claude/rules/domain-models.md) — immutability,
-  copy-on-write, deterministic IDs in `src/Audit/Domain/**`.
-- [`llm-seam.md`](.claude/rules/llm-seam.md) — `LLMClientInterface` boundary
-  between Application and `symfony/ai`.
-- [`php-classes.md`](.claude/rules/php-classes.md) — `final readonly`,
-  interfaces/SOLID, single responsibility, Symfony components in `src/**`.
-- [`testing.md`](.claude/rules/testing.md) — TDD red/green/refactor, stub vs
-  mock, suite layout, mutation score.
-- [`no-comments.md`](.claude/rules/no-comments.md) — no multi-line comment
-  blocks; comments signal poorly-written code; fix the code instead.
+- [`changelog.md`](.claude/rules/changelog.md) — classify every change (major/minor/patch or Unreleased) and update `CHANGELOG.md` in the same commit; release-notes format.
+- [`ddd-layers.md`](.claude/rules/ddd-layers.md) — dependency direction across layers.
+- [`domain-models.md`](.claude/rules/domain-models.md) — immutability, copy-on-write, deterministic IDs in `src/Audit/Domain/**`.
+- [`llm-seam.md`](.claude/rules/llm-seam.md) — `LLMClientInterface` boundary between Application and `symfony/ai`.
+- [`php-classes.md`](.claude/rules/php-classes.md) — `final readonly`, interfaces/SOLID, single responsibility, Symfony components in `src/**`.
+- [`testing.md`](.claude/rules/testing.md) — TDD red/green/refactor, stub vs mock, suite layout, mutation score.
+- [`no-comments.md`](.claude/rules/no-comments.md) — no multi-line comment blocks; comments signal poorly-written code; fix the code instead.

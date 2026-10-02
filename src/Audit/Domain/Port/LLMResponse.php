@@ -29,6 +29,7 @@ final readonly class LLMResponse
         private string $stopReason,
         private int $cacheReadTokens,
         private int $cacheCreationTokens,
+        private ?string $reportedModel = null,
     ) {}
 
     public static function of(
@@ -98,6 +99,30 @@ final readonly class LLMResponse
     public function stopReason(): string
     {
         return $this->stopReason;
+    }
+
+    /**
+     * The same response carrying the model the provider says answered it,
+     * which a gateway or a failover platform may pick on its own. Null when
+     * the provider reports none.
+     */
+    public function withReportedModel(?string $reportedModel): self
+    {
+        return new self(
+            $this->content,
+            $this->inputTokens,
+            $this->outputTokens,
+            $this->model,
+            $this->stopReason,
+            $this->cacheReadTokens,
+            $this->cacheCreationTokens,
+            $reportedModel,
+        );
+    }
+
+    public function reportedModel(): ?string
+    {
+        return $this->reportedModel;
     }
 
     public function totalTokens(): int

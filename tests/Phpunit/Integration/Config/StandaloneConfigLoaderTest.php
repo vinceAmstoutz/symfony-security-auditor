@@ -17,12 +17,16 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -48,11 +52,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_passes_audit_settings_through_and_strips_the_platform_keys(): void
     {
@@ -63,11 +69,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_resolves_the_platform_connection(): void
     {
@@ -81,11 +89,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_leaves_the_audit_settings_empty_when_only_a_platform_is_configured(): void
     {
@@ -96,11 +106,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_a_config_without_a_platform(): void
     {
@@ -113,11 +125,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_project_config_overrides_the_user_config(): void
     {
@@ -130,11 +144,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_every_key_a_project_config_declares_reaches_the_audit_settings(): void
     {
@@ -150,11 +166,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_user_config_keys_survive_when_a_project_config_omits_them(): void
     {
@@ -167,11 +185,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     #[DataProvider('connectionOverrideCases')]
     public function test_a_project_config_may_not_redefine_the_llm_connection(string $projectYaml, string $expectedKey): void
@@ -197,11 +217,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_project_config_may_not_declare_a_sarif_import_path(): void
     {
@@ -217,11 +239,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_the_rejected_connection_override_names_every_offending_key_and_its_file(): void
     {
@@ -237,11 +261,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_project_config_list_replaces_the_user_config_list_wholesale(): void
     {
@@ -256,11 +282,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_project_config_overriding_one_nested_key_still_merges_sibling_keys(): void
     {
@@ -275,11 +303,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_a_missing_project_config_leaves_the_user_config_intact(): void
     {
@@ -290,11 +320,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_a_missing_config_file(): void
     {
@@ -305,11 +337,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_rejects_an_empty_config_file(): void
     {
@@ -322,11 +356,13 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     /**
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws UnreadableCredentialStoreException
      */
     public function test_it_wraps_a_malformed_yaml_config_file(): void
     {
@@ -335,6 +371,35 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->expectException(MalformedProjectConfigException::class);
 
         $this->loader()->load();
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_loads_a_configuration_whose_key_is_only_in_the_credential_store(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+        $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-only-stored');
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+
+        $standaloneConfig = (new StandaloneConfigLoader(
+            $xdgConfigPathResolver,
+            new StandalonePlatformConfigResolver(credentialStore: $filesystemCredentialStore),
+        ))->load();
+
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => 'anthropic-test-key-only-stored']]],
+            $standaloneConfig->platform->toAiConfig(),
+        );
     }
 
     private function loader(?string $projectConfigFile = null): StandaloneConfigLoader

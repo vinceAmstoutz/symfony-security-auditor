@@ -25,6 +25,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProv
  * Sources per-million-token USD pricing (input/output and real prompt-cache
  * rates) from the daily `symfony/models-dev` catalog snapshot, read once from
  * `vendor/` with no network call. Replaces the hand-maintained price table.
+ * A model is priced from the listing of the `symfony/ai` platform the audit
+ * runs against first, and only then from the catalog at large.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -56,6 +58,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         private readonly LoggerInterface $logger,
         private readonly ?string $catalogPath = null,
         private readonly string $catalogPackage = self::CATALOG_PACKAGE,
+        private readonly ?string $platform = null,
     ) {}
 
     #[Override]
@@ -104,6 +107,36 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     {
         $model = $this->stripOptionsQueryString($model);
 
+        return $this->priceFromServingPlatform($model) ?? $this->priceFromCatalog($model);
+    }
+
+    /**
+     * The platform the audit runs against bills at its own listed rate, which
+     * an aggregator or another cloud re-listing the same id does not share.
+     */
+    private function priceFromServingPlatform(string $model): ?ModelPrice
+    {
+        if (null === $this->platform) {
+            return null;
+        }
+
+        $provider = PlatformCatalogProviders::providerOf($this->platform);
+        if (null === $provider) {
+            return null;
+        }
+
+        foreach (PlatformCatalogProviders::listedIds($this->platform, $model) as $listedId) {
+            $cost = $this->costEntry($provider, $listedId);
+            if (null !== $cost) {
+                return $this->toModelPrice($cost);
+            }
+        }
+
+        return null;
+    }
+
+    private function priceFromCatalog(string $model): ?ModelPrice
+    {
         $firstParty = $this->priceFromProviders($model, self::FIRST_PARTY_PROVIDERS);
         if ($firstParty instanceof ModelPrice) {
             return $firstParty;

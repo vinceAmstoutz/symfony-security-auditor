@@ -59,12 +59,12 @@ final readonly class AttackerContextPromptRenderer
     public function renderPreviousFindings(array $previousFindings): string
     {
         $byType = [];
-        foreach ($previousFindings as $previouFinding) {
-            $byType[$previouFinding->type()->value][] = \sprintf(
+        foreach ($previousFindings as $previousFinding) {
+            $byType[$previousFinding->type()->value][] = \sprintf(
                 '%s:%d-%d',
-                $this->sanitizeLine($previouFinding->filePath()),
-                $previouFinding->lineStart(),
-                $previouFinding->lineEnd(),
+                $this->sanitizeLine($previousFinding->filePath()),
+                $previousFinding->lineStart(),
+                $previousFinding->lineEnd(),
             );
         }
 

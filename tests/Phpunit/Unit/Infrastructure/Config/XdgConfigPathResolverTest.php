@@ -237,4 +237,34 @@ final class XdgConfigPathResolverTest extends TestCase
 
         self::assertSame('/app/.ssa/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
     }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_keeps_credentials_beside_the_configuration(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev');
+
+        self::assertSame('/xdg/config/symfony-security-auditor/credentials.json', $xdgConfigPathResolver->credentialsFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_falls_back_to_the_home_directory_for_credentials(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, '/home/dev');
+
+        self::assertSame('/home/dev/.config/symfony-security-auditor/credentials.json', $xdgConfigPathResolver->credentialsFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_cannot_place_credentials_without_a_home(): void
+    {
+        $this->expectException(UnresolvableConfigPathException::class);
+
+        (new XdgConfigPathResolver(null, null, null))->credentialsFile();
+    }
 }

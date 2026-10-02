@@ -2820,6 +2820,124 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient->complete('sys', 'usr');
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_bills_the_call_at_the_rate_of_the_model_the_provider_reports(): void
+    {
+        $budgetTracker = $this->budgetTrackerPricingReportedModelAboveConfiguredOne();
+        $symfonyAiLLMClient = $this->clientBilling($budgetTracker, [new TextResult('done')]);
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(10.0, $budgetTracker->costUsdUsed());
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_bills_each_call_at_the_rate_of_the_model_the_provider_reports(): void
+    {
+        $budgetTracker = $this->budgetTrackerPricingReportedModelAboveConfiguredOne();
+        $symfonyAiLLMClient = $this->clientBilling($budgetTracker, [new TextResult('a'), new TextResult('b')]);
+
+        $symfonyAiLLMClient->completeBatch([['system' => 's1', 'user' => 'u1'], ['system' => 's2', 'user' => 'u2']], 4);
+
+        self::assertSame(20.0, $budgetTracker->costUsdUsed());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_with_tools_bills_each_iteration_at_the_rate_of_the_model_the_provider_reports(): void
+    {
+        $budgetTracker = $this->budgetTrackerPricingReportedModelAboveConfiguredOne();
+        $symfonyAiLLMClient = $this->clientBilling($budgetTracker, [new TextResult('done')]);
+
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', new ToolRegistry([$this->makeTool('echo', 'echo')], new NullLogger()), 5);
+
+        self::assertSame(10.0, $budgetTracker->costUsdUsed());
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     */
+    public function test_complete_batch_with_tools_bills_each_call_at_the_rate_of_the_model_the_provider_reports(): void
+    {
+        $budgetTracker = $this->budgetTrackerPricingReportedModelAboveConfiguredOne();
+        $symfonyAiLLMClient = $this->clientBilling($budgetTracker, [new TextResult('a'), new TextResult('b')]);
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's1', 'user' => 'u1', 'tools' => $toolRegistry],
+            ['system' => 's2', 'user' => 'u2', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame(20.0, $budgetTracker->costUsdUsed());
+    }
+
+    /**
+     * @param list<ResultInterface> $results
+     */
+    private function clientBilling(BudgetTracker $budgetTracker, array $results): SymfonyAiLLMClient
+    {
+        $tokenUsages = array_map(
+            static fn (): TokenUsage => new TokenUsage(promptTokens: 1_000_000, completionTokens: 0, model: 'reported-model'),
+            $results,
+        );
+
+        return new SymfonyAiLLMClient(
+            new PlatformBinding($this->scriptedPlatformWithTokenUsage($results, $tokenUsages), 'configured-model', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder(), budgetTracker: $budgetTracker),
+        );
+    }
+
+    private function budgetTrackerPricingReportedModelAboveConfiguredOne(): BudgetTracker
+    {
+        return new BudgetTracker(
+            AuditBudget::unlimited(),
+            new CostCalculator(new class implements PricingProviderInterface {
+                private const array INPUT_PRICES = ['configured-model' => 1.0, 'reported-model' => 10.0];
+
+                #[Override]
+                public function pricePerMillionInputTokens(string $model): float
+                {
+                    return self::INPUT_PRICES[$model] ?? 0.0;
+                }
+
+                #[Override]
+                public function pricePerMillionOutputTokens(string $model): float
+                {
+                    return 0.0;
+                }
+
+                #[Override]
+                public function hasModel(string $model): bool
+                {
+                    return \array_key_exists($model, self::INPUT_PRICES);
+                }
+            }),
+        );
+    }
+
     private function stubPricing(float $inputPrice, float $outputPrice): PricingProviderInterface
     {
         return new class($inputPrice, $outputPrice) implements PricingProviderInterface {
