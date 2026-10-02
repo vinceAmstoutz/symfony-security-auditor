@@ -166,6 +166,8 @@ jobs:
 
 Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`), `project-path` (default `.`), `format` (`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`, default `sarif`), `output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`, `fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score floor, 0-100 — independent of `fail-on`, either gate failing fails the audit), `comment-pr` (default `false`), `update-badge` (default `false`), `badge-path` (default `.github/security-auditor-badge.json`), `extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`, ignored in standalone mode), and `working-directory` (default `.`). Set `setup-php: false` / `install-dependencies: false` when your job has already done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
+Keep `output`, `baseline` and `generate-baseline` inside `working-directory`, or give an absolute path outside the checkout such as `${{ runner.temp }}/report.sarif`. A report or baseline write refuses a symlink on any directory between the working directory and the file, but trusts every directory above the working directory: with a sub-directory `working-directory`, a path climbing out of it (`../build/reports/report.sarif`) passes through directories the checked-out repository controls, where a committed symlink could redirect the write.
+
 Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter).
 
 ```yaml

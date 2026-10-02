@@ -19,6 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
@@ -86,7 +87,7 @@ final readonly class ReportWriter implements ReportWriterInterface
      */
     private function assertSafeToWrite(string $path): void
     {
-        if (is_link($path) || is_link(\dirname($path))) {
+        if (SymlinkGuard::isThroughSymlink($path)) {
             throw UnsafeReportWriteException::forSymlinkedPath($path);
         }
     }
