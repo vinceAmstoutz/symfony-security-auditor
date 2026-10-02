@@ -277,9 +277,11 @@ The reviewer handles a prompt it cannot fit the same way: a batch of findings (`
 Reviewer batch exceeds the model input limit; it is split in two and each half reviewed on its own
 ```
 
-### `OpenSSL SSL_read: … unexpected eof while reading` / `cURL error 56`
+### `OpenSSL SSL_read: … unexpected eof while reading` / `Transfer closed with … bytes remaining to read` / `cURL error 56`
 
 The peer closed the connection while the response was still being read. `error:0A000126` is `SSL_R_UNEXPECTED_EOF_WHILE_READING` and `errno 0` means no OS-level error — the endpoint hung up without a TLS `close_notify`. This is a transport truncation, so it is classified as transient and the LLM call is retried on a fresh connection (`audit.retry.max_attempts`, default `3`).
+
+Depending on the TLS library and the protocol, curl words the same cut differently, and every wording is retried the same way: `Transfer closed with 512 bytes remaining to read`, `Transfer closed with outstanding read data remaining`, `Failure when receiving data from the peer`, `OpenSSL SSL_read: SSL_ERROR_SYSCALL, errno 0` (OpenSSL 1.1, LibreSSL), `HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)` and `Error in the HTTP2 framing layer`.
 
 Self-hosted endpoints and proxied APIs produce it most often, in two ways:
 

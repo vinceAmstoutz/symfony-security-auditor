@@ -48,11 +48,21 @@ final readonly class TransientFailureClassifier
         'connection refused',
         'connection aborted',
         'network is unreachable',
+    ];
+
+    /** @var list<string> */
+    private const array CONNECTION_CUT_HINTS = [
         'unexpected eof while reading',
         'eof occurred in violation of protocol',
+        'ssl_error_syscall',
         'recv failure',
+        'failure when receiving data from the peer',
         'failed sending data to the peer',
         'curl error 18',
+        'transfer closed with',
+        'transferred a partial file',
+        'was not closed cleanly',
+        'framing layer',
         'empty reply from server',
         'broken pipe',
         'connection closed by peer',
@@ -118,7 +128,7 @@ final readonly class TransientFailureClassifier
             return true;
         }
 
-        if ($this->isRateLimit($throwable)) {
+        if ($this->isRateLimit($throwable) || $this->isConnectionCut($throwable)) {
             return true;
         }
 
@@ -187,7 +197,7 @@ final readonly class TransientFailureClassifier
      * size`, or an HTTP 413). Retrying the same prompt cannot succeed, but a
      * smaller one can — so callers split the work instead of retrying or
      * aborting. A 413 inside a rate-limit answer is a token count, not a
-     * status.
+     * status, and so is one in a connection cut off mid-response.
      */
     public function isRequestTooLarge(Throwable $throwable): bool
     {
@@ -198,7 +208,7 @@ final readonly class TransientFailureClassifier
         $joined = $this->joinMessages($throwable);
 
         return u($joined)->containsAny(self::REQUEST_TOO_LARGE_HINTS)
-            || (!$this->isRateLimit($throwable) && $this->containsStatusCode($joined, self::REQUEST_TOO_LARGE_STATUS_CODES));
+            || (!$this->isRateLimit($throwable) && !$this->isConnectionCut($throwable) && $this->containsStatusCode($joined, self::REQUEST_TOO_LARGE_STATUS_CODES));
     }
 
     /**
@@ -215,6 +225,18 @@ final readonly class TransientFailureClassifier
         }
 
         return $this->containsStatusCode($joined, self::RATE_LIMIT_STATUS_CODES);
+    }
+
+    /**
+     * The peer hung up while the response was being read — in curl's wording
+     * as symfony/http-client relays it, `Transfer closed with 512 bytes
+     * remaining to read for "https://…".` and the like. No HTTP status came
+     * back, so a byte count, an HTTP/2 stream id or the URL in that message is
+     * never a status code, and it is retried before any is looked for.
+     */
+    private function isConnectionCut(Throwable $throwable): bool
+    {
+        return u($this->joinMessages($throwable))->containsAny(self::CONNECTION_CUT_HINTS);
     }
 
     /**

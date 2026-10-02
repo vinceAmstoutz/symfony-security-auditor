@@ -21,6 +21,7 @@ use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\ServerException;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
@@ -72,6 +73,40 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'empty_reply_from_server' => [new RuntimeException('Empty reply from server')];
         yield 'broken_pipe' => [new RuntimeException('Broken pipe')];
         yield 'connection_closed_by_peer' => [new RuntimeException('Connection closed by peer')];
+        yield 'symfony_transfer_closed_with_bytes_remaining' => [self::transportFailure('Transfer closed with 1234 bytes remaining to read')];
+        yield 'symfony_transfer_closed_with_outstanding_read_data' => [self::transportFailure('Transfer closed with outstanding read data remaining')];
+        yield 'symfony_transferred_a_partial_file' => [self::transportFailure('Transferred a partial file')];
+        yield 'symfony_openssl_1_1_eof' => [self::transportFailure('OpenSSL SSL_read: SSL_ERROR_SYSCALL, errno 0')];
+        yield 'symfony_libressl_reset' => [self::transportFailure('LibreSSL SSL_read: SSL_ERROR_SYSCALL, errno 54')];
+        yield 'symfony_http2_stream_not_closed_cleanly' => [self::transportFailure('HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)')];
+        yield 'symfony_http2_framing_layer' => [self::transportFailure('Error in the HTTP2 framing layer')];
+        yield 'symfony_http2_stream_framing_layer' => [self::transportFailure('Stream error in the HTTP/2 framing layer')];
+        yield 'symfony_failure_when_receiving_data' => [self::transportFailure('Failure when receiving data from the peer')];
+        yield 'symfony_openssl_3_unexpected_eof' => [self::transportFailure('OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0')];
+        yield 'symfony_recv_failure' => [self::transportFailure('Recv failure: Connection reset by peer')];
+        yield 'symfony_failed_sending_data' => [self::transportFailure('Failed sending data to the peer')];
+        yield 'symfony_empty_reply_from_server' => [self::transportFailure('Empty reply from server')];
+        yield 'symfony_send_failure_broken_pipe' => [self::transportFailure('Send failure: Broken pipe')];
+    }
+
+    #[DataProvider('connectionCutCarryingAStatusLikeTokenCases')]
+    public function test_a_connection_cut_off_mid_response_is_retried_whatever_number_or_word_its_message_carries(Throwable $throwable): void
+    {
+        self::assertTrue((new TransientFailureClassifier())->isTransient($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function connectionCutCarryingAStatusLikeTokenCases(): iterable
+    {
+        yield 'byte_count_equal_to_a_non_transient_status' => [self::transportFailure('Transfer closed with 404 bytes remaining to read')];
+        yield 'http2_stream_id_equal_to_a_non_transient_status' => [self::transportFailure('HTTP/2 stream 401 was not closed cleanly: INTERNAL_ERROR (err 2)')];
+        yield 'url_path_segment_equal_to_a_non_transient_status' => [new TransportException('OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0 for "https://gw.example.com/403/v1/chat/completions".')];
+        yield 'url_host_carrying_a_non_transient_word' => [new TransportException('Recv failure: Connection reset by peer for "https://authentication-gw.example.com/v1/chat/completions".')];
+    }
+
+    private static function transportFailure(string $curlError): TransportException
+    {
+        return new TransportException(\sprintf('%s for "https://gw.example.com/v1/chat/completions".', $curlError));
     }
 
     #[DataProvider('nonTransientCases')]
@@ -149,6 +184,9 @@ final class TransientFailureClassifierTest extends TestCase
             new RuntimeException('connection reset', previous: new RuntimeException('HTTP 401')),
         ];
         yield 'content_filter_is_not_retried' => [new ContentFilterException('Blocked by the safety system')];
+        yield 'symfony_client_error_status' => [new RuntimeException('HTTP 401 returned for "https://gw.example.com/v1/chat/completions".')];
+        yield 'symfony_untrusted_certificate' => [self::transportFailure('SSL certificate problem: unable to get local issuer certificate')];
+        yield 'symfony_tls_alert_while_reading' => [self::transportFailure('OpenSSL SSL_read: error:0A000412:SSL routines::sslv3 alert bad certificate, errno 0')];
     }
 
     #[DataProvider('degradedStopReasonCases')]
@@ -257,5 +295,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'unauthorized_401' => [new RuntimeException('HTTP 401 Unauthorized')];
         yield 'request_id_embedding_413' => [new RuntimeException('HTTP 500 Internal Server Error (request id req-413-abc)')];
         yield 'rate_limit_quoting_a_413_token_count' => [new RuntimeException('HTTP 429 Too Many Requests: Rate limit reached on tokens per min. Limit 30000, Used 29800, Requested 413.')];
+        yield 'connection_cut_with_413_bytes_remaining' => [self::transportFailure('Transfer closed with 413 bytes remaining to read')];
+        yield 'connection_cut_on_http2_stream_413' => [self::transportFailure('HTTP/2 stream 413 was not closed cleanly: INTERNAL_ERROR (err 2)')];
     }
 }
