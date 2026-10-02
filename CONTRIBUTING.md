@@ -1,9 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution. This guide walks through the dev setup,
-expected workflow, and PR checklist. New to the codebase? Start with the
-[Architecture overview](docs/architecture.md) — it explains the DDD layering and
-the dual-agent loop before you touch code.
+Thanks for considering a contribution. This guide walks through the dev setup, expected workflow, and PR checklist. New to the codebase? Start with the [Architecture overview](docs/architecture.md) — it explains the DDD layering and the dual-agent loop before you touch code.
 
 ## Table of Contents
 
@@ -57,19 +54,13 @@ tests/Phpunit/
   EndToEnd/          # Full pipeline with stubbed LLM responses.
 ```
 
-Strict dependency direction: `Command → Application → Domain ← Infrastructure`.
-Infrastructure never leaks into Domain or Application. The sole LLM seam is
-`LLMClientInterface` — Application agents never import `symfony/ai` types
-directly.
+Strict dependency direction: `Command → Application → Domain ← Infrastructure`. Infrastructure never leaks into Domain or Application. The sole LLM seam is `LLMClientInterface` — Application agents never import `symfony/ai` types directly.
 
 Read more:
 
-- [Architecture](docs/architecture.md) — layers, data flow, domain model, design
-  decisions.
-- [Extending](docs/extending.md) — extension points (custom LLM client, agent,
-  stage, report format).
-- [`.claude/rules/`](.claude/rules/) — path-scoped rules (DDD boundaries,
-  immutability, LLM seam, testing).
+- [Architecture](docs/architecture.md) — layers, data flow, domain model, design decisions.
+- [Extending](docs/extending.md) — extension points (custom LLM client, agent, stage, report format).
+- [`.claude/rules/`](.claude/rules/) — path-scoped rules (DDD boundaries, immutability, LLM seam, testing).
 
 ## Daily Dev Loop
 
@@ -101,14 +92,13 @@ docker compose exec php vendor/bin/phpunit --testsuite Integration
 docker compose exec php vendor/bin/phpunit --testsuite EndToEnd
 ```
 
-| Suite       | Path                         | What it tests                            |
-| ----------- | ---------------------------- | ---------------------------------------- |
-| Unit        | `tests/Phpunit/Unit/`        | Isolated logic, all I/O mocked           |
-| Integration | `tests/Phpunit/Integration/` | Real filesystem + stub LLM               |
-| EndToEnd    | `tests/Phpunit/EndToEnd/`    | Full workflow with fixture LLM responses |
+| Suite | Path | What it tests |
+| --- | --- | --- |
+| Unit | `tests/Phpunit/Unit/` | Isolated logic, all I/O mocked |
+| Integration | `tests/Phpunit/Integration/` | Real filesystem + stub LLM |
+| EndToEnd | `tests/Phpunit/EndToEnd/` | Full workflow with fixture LLM responses |
 
-> End-to-end tests replace the LLM boundary with deterministic fixture
-> responses. No API credentials are required to run any test suite.
+> End-to-end tests replace the LLM boundary with deterministic fixture responses. No API credentials are required to run any test suite.
 
 ## Mutation Testing
 
@@ -116,31 +106,17 @@ docker compose exec php vendor/bin/phpunit --testsuite EndToEnd
 docker compose exec php bin/infection
 ```
 
-**100% MSI (Mutation Score Indicator) is required.** Every mutation must be
-killed. Suppression directives (`@infection-ignore-all`,
-`ignoreSourceCodeByRegex`, …) are not allowed — fix the underlying test gap
-instead. See
-[CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
+**100% MSI (Mutation Score Indicator) is required.** Every mutation must be killed. Suppression directives (`@infection-ignore-all`, `ignoreSourceCodeByRegex`, …) are not allowed — fix the underlying test gap instead. See [CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
 
 ## Evaluating Detection Quality
 
-Unit and mutation tests prove the code behaves as written; they say nothing
-about whether the auditor actually _finds vulnerabilities_. The eval harness
-closes that gap: it audits a fixture whose vulnerabilities are known ahead of
-time and scores the run against that ground truth.
+Unit and mutation tests prove the code behaves as written; they say nothing about whether the auditor actually _finds vulnerabilities_. The eval harness closes that gap: it audits a fixture whose vulnerabilities are known ahead of time and scores the run against that ground truth.
 
 ```bash
 bin/castor eval
 ```
 
-This audits `examples/vulnerable-app` (real LLM calls, so it costs tokens), then
-scores the JSON report against
-[`examples/vulnerable-app/ground-truth.json`](examples/vulnerable-app/ground-truth.json)
-— a manifest of `{"file", "type"}` seeds. Scoring is at `(file, type)`
-granularity: a seed the run reproduced is a true positive, a seed it missed a
-false negative, and a reported finding with no matching seed a false positive
-(so a safe decoy file the auditor flags lowers precision). Precision, recall,
-and F1 are printed overall and per vulnerability class.
+This audits `examples/vulnerable-app` (real LLM calls, so it costs tokens), then scores the JSON report against [`examples/vulnerable-app/ground-truth.json`](examples/vulnerable-app/ground-truth.json) — a manifest of `{"file", "type"}` seeds. Scoring is at `(file, type)` granularity: a seed the run reproduced is a true positive, a seed it missed a false negative, and a reported finding with no matching seed a false positive (so a safe decoy file the auditor flags lowers precision). Precision, recall, and F1 are printed overall and per vulnerability class.
 
 Point it at another fixture and gate a run on minimum quality:
 
@@ -149,10 +125,7 @@ bin/castor eval --target=path/to/app --ground-truth=path/to/manifest.json \
     --min-precision=0.8 --min-recall=0.9
 ```
 
-The harness lives in [`tools/Eval/`](tools/Eval/) (namespace `Tooling\Eval`) —
-`GroundTruthManifest` loads and validates the manifest, `EvalScorer` computes
-the `EvalReport`. It is a maintainer tool, not part of the shipped bundle, so it
-is excluded from coverage and mutation scope like the rest of `tools/`.
+The harness lives in [`tools/Eval/`](tools/Eval/) (namespace `Tooling\Eval`) — `GroundTruthManifest` loads and validates the manifest, `EvalScorer` computes the `EvalReport`. It is a maintainer tool, not part of the shipped bundle, so it is excluded from coverage and mutation scope like the rest of `tools/`.
 
 ## Code Quality
 
@@ -164,54 +137,35 @@ bin/castor lint
 bin/castor lint:fix
 ```
 
-This runs: **Prettier** ([prettier](https://prettier.io/)) → **Markdown lint**
-([markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)) →
-`composer normalize` → PHP CS Fixer (@PER-CS3x0, @Symfony) → Rector → PHPStan
-max → PHPUnit → Infection.
+This runs: **Prettier** ([prettier](https://prettier.io/)) → **Markdown lint** ([markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)) → `composer normalize` → PHP CS Fixer (@PER-CS3x0, @Symfony) → Rector → PHPStan max → PHPUnit → Infection.
 
-Prettier and Markdown lint both run via Docker (`tmknom/prettier`,
-`davidanson/markdownlint-cli2`) so no local Node installation is required.
-Configs: [`.prettierrc.json`](.prettierrc.json),
-[`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc).
+Prettier and Markdown lint both run via Docker (`tmknom/prettier`, `davidanson/markdownlint-cli2`) so no local Node installation is required. Configs: [`.prettierrc.json`](.prettierrc.json), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc).
 
-- Prettier handles **formatting** (line wrap to 80, table alignment, list/fence
-  style).
-- markdownlint handles **semantics** (heading hierarchy, broken anchors, missing
-  image alt text).
+- Prettier handles **formatting**: one line per paragraph and list item, never hard-wrapped, plus table layout and list/fence style. `bin/castor lint:fix` joins a hand-wrapped paragraph back into one line.
+- markdownlint handles **semantics** (heading hierarchy, broken anchors, missing image alt text).
 
-**Commit messages are linted separately** in CI via
-[commitlint](https://commitlint.js.org/) (Conventional Commits). Config:
-[`commitlint.config.js`](commitlint.config.js). Run locally:
+**Commit messages are linted separately** in CI via [commitlint](https://commitlint.js.org/) (Conventional Commits). Config: [`commitlint.config.js`](commitlint.config.js). Run locally:
 
 ```bash
 npx --yes @commitlint/cli --from=origin/main --to=HEAD --config commitlint.config.js
 ```
 
-**No silent suppressions allowed.** PHPStan `@phpstan-ignore*`, baseline files,
-Rector skips, `@codeCoverageIgnore`, `markTestSkipped` used to dodge failures —
-all forbidden. If a tool flags something, fix the code. Genuine false positives
-require a PR-description justification and a linked tracking issue.
+**No silent suppressions allowed.** PHPStan `@phpstan-ignore*`, baseline files, Rector skips, `@codeCoverageIgnore`, `markTestSkipped` used to dodge failures — all forbidden. If a tool flags something, fix the code. Genuine false positives require a PR-description justification and a linked tracking issue.
 
 ## Writing Tests
 
 **Mock vs Stub rule:**
 
-- Use `createStub()` when the test only needs a return value (method-not-called
-  → test still fails via assertions).
-- Use `createMock()` only when the test must fail if the method is not called
-  (`expects(self::never())`, `expects(self::once())`, etc.).
+- Use `createStub()` when the test only needs a return value (method-not-called → test still fails via assertions).
+- Use `createMock()` only when the test must fail if the method is not called (`expects(self::never())`, `expects(self::once())`, etc.).
 
-**TDD red/green/refactor.** Write the failing test first whenever practical. See
-[`.claude/rules/testing.md`](.claude/rules/testing.md) for the full convention.
+**TDD red/green/refactor.** Write the failing test first whenever practical. See [`.claude/rules/testing.md`](.claude/rules/testing.md) for the full convention.
 
-**Domain models** (`src/Audit/Domain/Model/`) are immutable. State changes
-return new instances. See
-[`.claude/rules/domain-models.md`](.claude/rules/domain-models.md).
+**Domain models** (`src/Audit/Domain/Model/`) are immutable. State changes return new instances. See [`.claude/rules/domain-models.md`](.claude/rules/domain-models.md).
 
 ## Which Branch to Target
 
-`main` holds exactly the latest release, so almost nothing belongs there
-directly. Development happens on version branches:
+`main` holds exactly the latest release, so almost nothing belongs there directly. Development happens on version branches:
 
 | Change                                    | Base   |
 | ----------------------------------------- | ------ |
@@ -219,40 +173,23 @@ directly. Development happens on version branches:
 | Breaking change, for the next major       | `2.x`  |
 | Release merge                             | `main` |
 
-A pull request opens against `main` by default, so **retarget the base**. Tick
-the same branch under `## Target branch` in the description; the
-`Pull request target` check fails the build when the two disagree. Full
-rationale in [Branches & maintenance](docs/versioning.md#branches--maintenance).
+A pull request opens against `main` by default, so **retarget the base**. Tick the same branch under `## Target branch` in the description; the `Pull request target` check fails the build when the two disagree. Full rationale in [Branches & maintenance](docs/versioning.md#branches--maintenance).
 
-Base a pull request on another open one's branch — stack it — only when it needs
-code that one adds, never because both edit `CHANGELOG.md` or the docs. Tick
-`stacked` as well, and end the Summary with `Stacked on #123` and what this one
-needs from it.
+Base a pull request on another open one's branch — stack it — only when it needs code that one adds, never because both edit `CHANGELOG.md` or the docs. Tick `stacked` as well, and end the Summary with `Stacked on #123` and what this one needs from it.
 
 ## Documenting Additions
 
-Because `main` tracks the latest release, its documentation matches what users
-can install — but a reader still needs to know which release introduced a key,
-and the config tree rejects an unknown key outright
-(`InvalidConfigurationException` from both the bundle and the standalone binary)
-if they are on an older version.
+Because `main` tracks the latest release, its documentation matches what users can install — but a reader still needs to know which release introduced a key, and the config tree rejects an unknown key outright (`InvalidConfigurationException` from both the bundle and the standalone binary) if they are on an older version.
 
-So when you document a new config key, CLI option or output format, mark it with
-the release that will carry it:
+So when you document a new config key, CLI option or output format, mark it with the release that will carry it:
 
 ```markdown
 | `audit.new_key` | `bool` | `false` | _Since 1.19._ What it does. |
 ```
 
-Use the next unreleased version — the one your `CHANGELOG.md` entry sits under.
-Removals already follow this convention (see `cache.prompt_caching`, marked
-_Deprecated since 1.7_); additions need it for the same reason.
+Use the next unreleased version — the one your `CHANGELOG.md` entry sits under. Removals already follow this convention (see `cache.prompt_caching`, marked _Deprecated since 1.7_); additions need it for the same reason.
 
-Do not point documentation or examples at a
-`raw.githubusercontent.com/.../main/` URL. User-facing files are published as
-release assets, so reference them through `releases/latest/download/`, which
-always resolves to the newest published release. See
-[Branches & maintenance](docs/versioning.md#branches--maintenance).
+Do not point documentation or examples at a `raw.githubusercontent.com/.../main/` URL. User-facing files are published as release assets, so reference them through `releases/latest/download/`, which always resolves to the newest published release. See [Branches & maintenance](docs/versioning.md#branches--maintenance).
 
 ## Common Tasks
 
@@ -262,61 +199,43 @@ always resolves to the newest published release. See
 2. Extend `category()` and `owaspReference()` with the new case.
 3. Update `AttackerPromptBuilder` to mention the new type so the LLM emits it.
 4. Add a fixture in `tests/Phpunit/Fixtures/` that exercises the new case.
-5. Update the type list in
-   [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-references).
+5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-references).
 
 ### Add a new pipeline stage
 
-Implement `Audit/Domain/Pipeline/StageInterface`. Stages are auto-tagged via
-`symfony_security_auditor.pipeline_stage` in `config/services.php`. See
-[Extending → Custom Pipeline Stage](docs/extending.md#2-custom-pipeline-stage).
+Implement `Audit/Domain/Pipeline/StageInterface`. Stages are auto-tagged via `symfony_security_auditor.pipeline_stage` in `config/services.php`. See [Extending → Custom Pipeline Stage](docs/extending.md#2-custom-pipeline-stage).
 
 ### Add a new output format
 
 1. Add a case to `Command/OutputFormat`.
-2. Add a `render<Name>(AuditReport): string` method to
-   `Audit/Infrastructure/Report/ReportRenderer`.
+2. Add a `render<Name>(AuditReport): string` method to `Audit/Infrastructure/Report/ReportRenderer`.
 3. Add the matching arm in `Command/ReportWriter::write()`.
 
 ### Add a new advisory source (CVE feed)
 
-Implement `Audit/Domain/Port/AdvisoryDatabaseInterface` and alias
-`AdvisoryDatabaseInterface` to your service in `config/services.yaml`. See
-[Configuration → Advisory Source](docs/configuration.md#advisory-source-lookup_advisory-tool).
+Implement `Audit/Domain/Port/AdvisoryDatabaseInterface` and alias `AdvisoryDatabaseInterface` to your service in `config/services.yaml`. See [Configuration → Advisory Source](docs/configuration.md#advisory-source-lookup_advisory-tool).
 
 ### Swap the LLM provider
 
-`config/packages/ai.yaml` change only — no PHP edits. See
-[Configuration → Platform Configuration](docs/configuration.md#platform-configuration).
+`config/packages/ai.yaml` change only — no PHP edits. See [Configuration → Platform Configuration](docs/configuration.md#platform-configuration).
 
-For a custom client implementation (direct HTTP, retry logic, …) see
-[Extending → Custom LLM Client](docs/extending.md#1-custom-llm-client).
+For a custom client implementation (direct HTTP, retry logic, …) see [Extending → Custom LLM Client](docs/extending.md#1-custom-llm-client).
 
 ## Submitting a Pull Request
 
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feat/my-feature`.
 3. Write tests for your change (unit + integration where applicable).
-4. Mind backward compatibility — the project follows
-   [Semantic Versioning 2.0.0](https://semver.org); any change that affects the
-   public API surface listed in [`docs/versioning.md`](docs/versioning.md) needs
-   a deprecation cycle and a `feat!:` commit.
+4. Mind backward compatibility — the project follows [Semantic Versioning 2.0.0](https://semver.org); any change that affects the public API surface listed in [`docs/versioning.md`](docs/versioning.md) needs a deprecation cycle and a `feat!:` commit.
 5. Ensure all checks pass: `bin/castor lint`.
-6. Open a pull request and fill in the
-   [PR template](.github/PULL_REQUEST_TEMPLATE.md): a title of 50 characters or
-   fewer, a `## Summary` of 500 or fewer, only the boxes you tick — the license
-   box included — and no section beyond the template's four. The
-   `Pull request target` check fails the pull request otherwise — run it first:
+6. Open a pull request and fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md): a title of 50 characters or fewer, a `## Summary` of 500 or fewer, only the boxes you tick — the license box included — and no section beyond the template's four. The `Pull request target` check fails the pull request otherwise — run it first:
 
    ```bash
    PR_TITLE='fix(scan): …' PR_BODY="$(cat body.md)" BASE_REF=1.x \
      sh .github/scripts/check-pull-request.sh
    ```
 
-The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit
-Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) →
-**Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1) →
-**Mutation** (Infection 100% MSI). All six must pass before merging.
+The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1) → **Mutation** (Infection 100% MSI). All six must pass before merging.
 
 Details: [`docs/ci.md`](docs/ci.md).
 
@@ -344,21 +263,14 @@ chore(deps): bump symfony/ai to 0.10
 | `ci`       | CI configuration        |
 | `perf`     | Performance improvement |
 
-Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
-`deps`, `ci`. Breaking changes: `feat!:` with a `BREAKING CHANGE:` footer.
+Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`, `deps`, `ci`. Breaking changes: `feat!:` with a `BREAKING CHANGE:` footer.
 
 ## Code of Conduct
 
-Be respectful and constructive. Personal attacks, harassment, or dismissive
-behavior are not tolerated. Report problems privately to the maintainer (see
-[`composer.json`](composer.json) → `authors.email`).
+Be respectful and constructive. Personal attacks, harassment, or dismissive behavior are not tolerated. Report problems privately to the maintainer (see [`composer.json`](composer.json) → `authors.email`).
 
 ## Security
 
-Report vulnerabilities **in the auditor itself** privately via
-[GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new)
-— not in a public issue. See [SECURITY.md](SECURITY.md) for the full policy.
+Report vulnerabilities **in the auditor itself** privately via [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new) — not in a public issue. See [SECURITY.md](SECURITY.md) for the full policy.
 
-Issues with audit output (false positives, missed vulnerabilities, weird LLM
-behavior) are not security issues — open them as normal GitHub issues with a
-reproducer, or check [Troubleshooting](docs/troubleshooting.md) first.
+Issues with audit output (false positives, missed vulnerabilities, weird LLM behavior) are not security issues — open them as normal GitHub issues with a reproducer, or check [Troubleshooting](docs/troubleshooting.md) first.

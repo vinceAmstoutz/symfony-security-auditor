@@ -1,6 +1,6 @@
 {
   "printWidth": 80,
-  "proseWrap": "always",
+  "proseWrap": "never",
   "tabWidth": 2,
   "useTabs": false,
   "endOfLine": "lf",
