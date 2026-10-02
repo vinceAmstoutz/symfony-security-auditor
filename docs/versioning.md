@@ -1,207 +1,82 @@
 # Versioning & Backward Compatibility
 
-`symfony-security-auditor` follows
-[Semantic Versioning 2.0.0](https://semver.org) from `1.0.0` onward.
+`symfony-security-auditor` follows [Semantic Versioning 2.0.0](https://semver.org) from `1.0.0` onward.
 
-For its PHP API surface it additionally adheres to the
-[Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html):
-code tagged `@internal` is exempt, and any breaking change to covered API goes
-through the [deprecation cycle](#deprecation-policy) below — a deprecated
-element keeps working until at least the next `MAJOR`.
+For its PHP API surface it additionally adheres to the [Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html): code tagged `@internal` is exempt, and any breaking change to covered API goes through the [deprecation cycle](#deprecation-policy) below — a deprecated element keeps working until at least the next `MAJOR`.
 
-> See also: [Configuration](configuration.md) · [Extending](extending.md) ·
-> [Architecture](architecture.md) · [CHANGELOG](../CHANGELOG.md)
+> See also: [Configuration](configuration.md) · [Extending](extending.md) · [Architecture](architecture.md) · [CHANGELOG](../CHANGELOG.md)
 
 ## Semantic Versioning
 
-| Version bump | Meaning                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------- |
-| `MAJOR`      | Removes or changes the contract of any public API element (see "Public API" below).      |
-| `MINOR`      | Adds public API in a backward-compatible way (new config keys, new ports, new commands). |
-| `PATCH`      | Bug fixes and internal changes only — no public API additions or removals.               |
+| Version bump | Meaning |
+| --- | --- |
+| `MAJOR` | Removes or changes the contract of any public API element (see "Public API" below). |
+| `MINOR` | Adds public API in a backward-compatible way (new config keys, new ports, new commands). |
+| `PATCH` | Bug fixes and internal changes only — no public API additions or removals. |
 
-Every `MAJOR` release ships a migration note in
-[`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt.
+Every `MAJOR` release ships a migration note in [`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt.
 
 ## Public API — what is covered by the BC promise
 
-Everything below is part of the public API and **will not break in a `MINOR` or
-`PATCH` release**.
+Everything below is part of the public API and **will not break in a `MINOR` or `PATCH` release**.
 
 ### Bundle configuration
 
-Every key under `symfony_security_auditor:` documented in
-[`docs/configuration.md`](configuration.md):
+Every key under `symfony_security_auditor:` documented in [`docs/configuration.md`](configuration.md):
 
-- `model`, `attacker_model`, `reviewer_model`, `max_output_tokens`,
-  `attacker_max_output_tokens`, `reviewer_max_output_tokens`,
-  `provider_json_mode`
-- `scan.included_paths`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
-  `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`,
-  `scan.custom_risk_patterns`, `scan.import_sarif`
+- `model`, `attacker_model`, `reviewer_model`, `max_output_tokens`, `attacker_max_output_tokens`, `reviewer_max_output_tokens`, `provider_json_mode`
+- `scan.included_paths`, `scan.respect_gitignore`, `scan.max_file_size_kb`, `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`, `scan.custom_risk_patterns`, `scan.import_sarif`
 - `profile`
-- `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`,
-  `audit.tools_enabled`, `audit.structured_collection`,
-  `audit.reviewer_structured_collection`, `audit.stable_system_prompt`,
-  `audit.max_tool_iterations`, `audit.reviewer_tools_enabled`,
-  `audit.reviewer_max_tool_iterations`, `audit.reviewer_max_concurrent`,
-  `audit.attacker_max_concurrent`, `audit.static_prescan.enabled`,
-  `audit.static_prescan.lean_mode`, `audit.chunking.strategy`,
-  `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`,
-  `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
-  `audit.fix_synthesis.enabled`, `audit.fix_synthesis.severity_floor`,
-  `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`,
-  `audit.triage_memory`, `audit.fail_on`, `audit.since_closure`,
-  `audit.excluded_types`, `audit.included_types`, `audit.custom_skills`,
-  `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
-  `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
-  `audit.budget.max_tokens`, `audit.budget.max_cost_usd`,
-  `audit.rate_limit.requests_per_minute`,
-  `audit.rate_limit.input_tokens_per_minute`,
-  `audit.rate_limit.output_tokens_per_minute`
-- `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated
-  since 1.7** — see [Deprecation policy](#deprecation-policy) — still accepted
-  but ignored)
+- `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`, `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_structured_collection`, `audit.stable_system_prompt`, `audit.max_tool_iterations`, `audit.reviewer_tools_enabled`, `audit.reviewer_max_tool_iterations`, `audit.reviewer_max_concurrent`, `audit.attacker_max_concurrent`, `audit.static_prescan.enabled`, `audit.static_prescan.lean_mode`, `audit.chunking.strategy`, `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`, `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`, `audit.fix_synthesis.enabled`, `audit.fix_synthesis.severity_floor`, `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`, `audit.triage_memory`, `audit.fail_on`, `audit.since_closure`, `audit.excluded_types`, `audit.included_types`, `audit.custom_skills`, `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`, `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`, `audit.budget.max_tokens`, `audit.budget.max_cost_usd`, `audit.rate_limit.requests_per_minute`, `audit.rate_limit.input_tokens_per_minute`, `audit.rate_limit.output_tokens_per_minute`
+- `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated since 1.7** — see [Deprecation policy](#deprecation-policy) — still accepted but ignored)
 - `privacy.offline_only`
 
-Default values for these keys are also part of the contract. Changing a default
-is a `MAJOR` change.
+Default values for these keys are also part of the contract. Changing a default is a `MAJOR` change.
 
-> **Planned default change.** `audit.fail_on` ships with the default `critical`
-> (only a `CRITICAL` aggregate risk level fails the build), which preserves the
-> historical exit-code behaviour. The default is **planned to become `high`** in
-> the next `MAJOR` release so a HIGH-risk audit fails CI by default. Pin
-> `audit.fail_on: critical` (or `high`) explicitly now to make your intent
-> immune to that change.
+> **Planned default change.** `audit.fail_on` ships with the default `critical` (only a `CRITICAL` aggregate risk level fails the build), which preserves the historical exit-code behaviour. The default is **planned to become `high`** in the next `MAJOR` release so a HIGH-risk audit fails CI by default. Pin `audit.fail_on: critical` (or `high`) explicitly now to make your intent immune to that change.
 
 ### CLI surface
 
-- The command name `audit:run` and its `audit` alias (both the bundle and the
-  standalone CLI accept either).
+- The command name `audit:run` and its `audit` alias (both the bundle and the standalone CLI accept either).
 - The `project-path` argument.
-- The `--format` (`-f`) and `--output` (`-o`) options, including the values
-  accepted by `--format` (`console`, `executive`, `json`, `sarif`, `html`,
-  `markdown`, `junit`, `github`, `github-comment` — the last added in 1.19).
-- The `--baseline` and `--generate-baseline` options (baseline suppression of
-  accepted findings).
-- The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`),
-  including its accepted values (`safe`, `low`, `medium`, `high`, `critical`).
-- The `--min-score` option (since 1.19) — a second, independent CI gate on the
-  normalized 0-100 score. The audit exits `1` when either gate trips.
-- The `--fail-on-incomplete` option (since 1.21) — exits `3` when some file
-  could not be fully analyzed and no gate tripped.
+- The `--format` (`-f`) and `--output` (`-o`) options, including the values accepted by `--format` (`console`, `executive`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`, `github-comment` — the last added in 1.19).
+- The `--baseline` and `--generate-baseline` options (baseline suppression of accepted findings).
+- The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`), including its accepted values (`safe`, `low`, `medium`, `high`, `critical`).
+- The `--min-score` option (since 1.19) — a second, independent CI gate on the normalized 0-100 score. The audit exits `1` when either gate trips.
+- The `--fail-on-incomplete` option (since 1.21) — exits `3` when some file could not be fully analyzed and no gate tripped.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
-  - `0` — audit ran to its end; aggregate risk level is below the `fail_on`
-    threshold (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default)
-    and, when `--min-score` is given, the normalized score is at or above it.
-  - `1` — aggregate risk level is at or above the `fail_on` threshold (default
-    `critical`), the normalized score is below `--min-score`, or the audit
-    itself failed.
-  - `2` — the audit budget could not be honored: either it aborted mid-run
-    because the configured token or cost budget was exceeded (partial report
-    still emitted), or it never started because an unpriced model makes
-    `audit.budget.max_cost_usd` unenforceable and either the user declined the
-    interactive confirmation or the run is non-interactive (no report emitted in
-    that case).
-  - `3` (since 1.21) — `--fail-on-incomplete` is set, no gate tripped, and some
-    file could not be fully analyzed.
-- The command name `audit:diff` (see
-  [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)),
-  its `previous-report` and `current-report` arguments, its `--format` option
-  (`console` or `json`), and its exit codes (`0` on a successful comparison, `1`
-  when a report file is missing or is not valid JSON).
-- The command name `audit:trend` (see
-  [CLI Reference → `audit:trend`](configuration.md#audittrend--tracking-findings-across-reports)),
-  its `reports` argument, its `--format` option (`console` or `json`), its JSON
-  output shape (the `points` array), and its exit codes (`0` on a successful
-  trend, `1` when fewer than two reports are given or a report file is missing
-  or is not valid JSON).
-- The command name `audit:baseline` (see
-  [CLI Reference → `audit:baseline`](configuration.md#auditbaseline--maintaining-the-accepted-finding-baseline)),
-  its arguments, options, and exit codes.
-- The command name `mcp:serve` (see
-  [CLI Reference → `mcp:serve`](configuration.md#mcpserve--model-context-protocol-server))
-  and the names and input schemas of the MCP tools it exposes (`audit`).
+  - `0` — audit ran to its end; aggregate risk level is below the `fail_on` threshold (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default) and, when `--min-score` is given, the normalized score is at or above it.
+  - `1` — aggregate risk level is at or above the `fail_on` threshold (default `critical`), the normalized score is below `--min-score`, or the audit itself failed.
+  - `2` — the audit budget could not be honored: either it aborted mid-run because the configured token or cost budget was exceeded (partial report still emitted), or it never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable and either the user declined the interactive confirmation or the run is non-interactive (no report emitted in that case).
+  - `3` (since 1.21) — `--fail-on-incomplete` is set, no gate tripped, and some file could not be fully analyzed.
+- The command name `audit:diff` (see [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)), its `previous-report` and `current-report` arguments, its `--format` option (`console` or `json`), and its exit codes (`0` on a successful comparison, `1` when a report file is missing or is not valid JSON).
+- The command name `audit:trend` (see [CLI Reference → `audit:trend`](configuration.md#audittrend--tracking-findings-across-reports)), its `reports` argument, its `--format` option (`console` or `json`), its JSON output shape (the `points` array), and its exit codes (`0` on a successful trend, `1` when fewer than two reports are given or a report file is missing or is not valid JSON).
+- The command name `audit:baseline` (see [CLI Reference → `audit:baseline`](configuration.md#auditbaseline--maintaining-the-accepted-finding-baseline)), its arguments, options, and exit codes.
+- The command name `mcp:serve` (see [CLI Reference → `mcp:serve`](configuration.md#mcpserve--model-context-protocol-server)) and the names and input schemas of the MCP tools it exposes (`audit`).
 
 ### Standalone executable & XDG configuration
 
-The standalone tool is a supported install method alongside the bundle, and the
-following surface is BC-protected:
+The standalone tool is a supported install method alongside the bundle, and the following surface is BC-protected:
 
-- The published per-platform binary assets and their release-asset names
-  (`symfony-security-auditor-{linux-x86_64,linux-aarch64,macos-x86_64,macos-arm64}`
-  and `symfony-security-auditor-windows-x86_64.exe`), each accompanied by a
-  `.sha256` checksum, plus the `install.sh` (Linux/macOS) and `install.ps1`
-  (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR` /
-  `SSA_INIT` environment variables.
-- The `init` command name and its `--provider`, `--model`, `--env-var`,
-  `--base-url`, `--endpoint`, `--no-api-key` and `--force` options (`--base-url`
-  accepted by the platforms `init` can write a block for that declare one:
-  `albert`, `amazeeai`, `generic` and `openresponses`; `--endpoint` by the
-  platforms naming the same field that way: `deepgram`, `elevenlabs`, `minimax`,
-  `ollama`, `together` and `venice`; `--no-api-key` by the platforms whose
-  `api_key` the bundle leaves optional: `deepgram`, `elevenlabs`, `generic`,
-  `ollama`, `openresponses` and `vertexai`). The standalone exposes the
-  **identical** `audit:run` command (and its `audit` alias), arguments, options,
-  and exit-code surface listed above.
-- The `self-update` command name and its `--check` option (see
-  [CLI Reference → `self-update`](configuration.md#self-update--updating-the-standalone-binary)).
-- The `doctor` command name and its exit-code contract (`0` when every check
-  passes or only warns, `1` when any check fails — see
-  [CLI Reference → `doctor`](configuration.md#doctor--preflight-environment-check)).
-- The `auth:set`, `auth:status` and `auth:remove` command names and their
-  `--env-var` option, which names the variable to store, report on or forget and
-  otherwise defaults to the one the configuration reads. `auth:status` carries
-  an exit-code contract: `0` when a key resolves for that variable, `1` when
-  none does, `2` when the name given is not a valid environment variable name
-  (see
-  [CLI Reference → Storing the key on this machine](configuration.md#storing-the-key-on-this-machine)).
-- The `SSA_NO_UPDATE_CHECK` environment variable, which disables the interactive
-  "update available" notice (see
-  [CLI Reference → Update notifications](configuration.md#update-notifications)).
-- The configuration path contract. On Linux/macOS the XDG Base Directory spec:
-  the config file `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`
-  (falling back to `~/.config/…`), the credential store `credentials.json`
-  beside it in that same directory, the cache directory
-  `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`), and the bridge
-  data directory `$XDG_DATA_HOME/symfony-security-auditor` (→
-  `~/.local/share/…`). On Windows the native app-data directories: `%APPDATA%`
-  for config and `%LOCALAPPDATA%` for cache and bridges (XDG variables still win
-  when set).
-- The standalone `config.yaml` shape: the bundle configuration keys **without**
-  the `symfony_security_auditor:` root wrapper, plus the standalone-only
-  top-level `platform:` block (passed verbatim to `symfony/ai-bundle`) and the
-  optional `provider:` selector. Removing or renaming these keys is a `MAJOR`.
+- The published per-platform binary assets and their release-asset names (`symfony-security-auditor-{linux-x86_64,linux-aarch64,macos-x86_64,macos-arm64}` and `symfony-security-auditor-windows-x86_64.exe`), each accompanied by a `.sha256` checksum, plus the `install.sh` (Linux/macOS) and `install.ps1` (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR` / `SSA_INIT` environment variables.
+- The `init` command name and its `--provider`, `--model`, `--env-var`, `--base-url`, `--endpoint`, `--no-api-key` and `--force` options (`--base-url` accepted by the platforms `init` can write a block for that declare one: `albert`, `amazeeai`, `generic` and `openresponses`; `--endpoint` by the platforms naming the same field that way: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`; `--no-api-key` by the platforms whose `api_key` the bundle leaves optional: `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses` and `vertexai`). The standalone exposes the **identical** `audit:run` command (and its `audit` alias), arguments, options, and exit-code surface listed above.
+- The `self-update` command name and its `--check` option (see [CLI Reference → `self-update`](configuration.md#self-update--updating-the-standalone-binary)).
+- The `doctor` command name and its exit-code contract (`0` when every check passes or only warns, `1` when any check fails — see [CLI Reference → `doctor`](configuration.md#doctor--preflight-environment-check)).
+- The `auth:set`, `auth:status` and `auth:remove` command names and their `--env-var` option, which names the variable to store, report on or forget and otherwise defaults to the one the configuration reads. `auth:status` carries an exit-code contract: `0` when a key resolves for that variable, `1` when none does, `2` when the name given is not a valid environment variable name (see [CLI Reference → Storing the key on this machine](configuration.md#storing-the-key-on-this-machine)).
+- The `SSA_NO_UPDATE_CHECK` environment variable, which disables the interactive "update available" notice (see [CLI Reference → Update notifications](configuration.md#update-notifications)).
+- The configuration path contract. On Linux/macOS the XDG Base Directory spec: the config file `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (falling back to `~/.config/…`), the credential store `credentials.json` beside it in that same directory, the cache directory `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`), and the bridge data directory `$XDG_DATA_HOME/symfony-security-auditor` (→ `~/.local/share/…`). On Windows the native app-data directories: `%APPDATA%` for config and `%LOCALAPPDATA%` for cache and bridges (XDG variables still win when set).
+- The standalone `config.yaml` shape: the bundle configuration keys **without** the `symfony_security_auditor:` root wrapper, plus the standalone-only top-level `platform:` block (passed verbatim to `symfony/ai-bundle`) and the optional `provider:` selector. Removing or renaming these keys is a `MAJOR`.
 
-The bundle remains a fully supported install method; neither method is
-deprecated by the other.
+The bundle remains a fully supported install method; neither method is deprecated by the other.
 
 ### GitHub Action
 
-- The composite action defined by `action.yml` at the repository root and its
-  input names: `mode`, `project-path`, `format`, `output`, `baseline`,
-  `generate-baseline`, `since`, `fail-on`, `min-score`, `fail-on-incomplete`,
-  `comment-pr`, `update-badge`, `badge-path`, `extra-args`, `php-version`,
-  `setup-php`, `install-dependencies`, `working-directory`, and its output
-  names: `exit-code`, `report-path`, `complete`, `findings-count`,
-  `highest-severity`, `grade`, `badge-path`, `comment-url`. New inputs/outputs
-  may be added in a `MINOR`; renaming or removing one is a `MAJOR`. The
-  Marketplace `name` (`Symfony Security Auditor`) is also stable.
-- **Version pinning.** Consumers pin the action to an exact release tag —
-  `uses: vinceamstoutz/symfony-security-auditor@1.20.1` — matching the tag
-  format used on Packagist. Bump the pin when upgrading. There is intentionally
-  no floating `v1` tag: the `uses:` ref and the config-schema URL both point at
-  the same release tag, so a given pin always resolves to one immutable release.
-  At release time, `bin/castor release:bump X.Y.Z` rewrites every pinned
-  location in one shot, and the `Release Guard` workflow fails the tag push if
-  any pin does not match the tag.
+- The composite action defined by `action.yml` at the repository root and its input names: `mode`, `project-path`, `format`, `output`, `baseline`, `generate-baseline`, `since`, `fail-on`, `min-score`, `fail-on-incomplete`, `comment-pr`, `update-badge`, `badge-path`, `extra-args`, `php-version`, `setup-php`, `install-dependencies`, `working-directory`, and its output names: `exit-code`, `report-path`, `complete`, `findings-count`, `highest-severity`, `grade`, `badge-path`, `comment-url`. New inputs/outputs may be added in a `MINOR`; renaming or removing one is a `MAJOR`. The Marketplace `name` (`Symfony Security Auditor`) is also stable.
+- **Version pinning.** Consumers pin the action to an exact release tag — `uses: vinceamstoutz/symfony-security-auditor@1.20.1` — matching the tag format used on Packagist. Bump the pin when upgrading. There is intentionally no floating `v1` tag: the `uses:` ref and the config-schema URL both point at the same release tag, so a given pin always resolves to one immutable release. At release time, `bin/castor release:bump X.Y.Z` rewrites every pinned location in one shot, and the `Release Guard` workflow fails the tag push if any pin does not match the tag.
 
 ### Domain models
 
-- `SymfonyMapping` stays public and fully working. Four of its accessors are
-  **deprecated since 1.19** in favour of the framework-neutral
-  `ApplicationSecurityMap`, reachable via
-  `SymfonyMapping::toApplicationSecurityMap()`:
+- `SymfonyMapping` stays public and fully working. Four of its accessors are **deprecated since 1.19** in favour of the framework-neutral `ApplicationSecurityMap`, reachable via `SymfonyMapping::toApplicationSecurityMap()`:
 
   | Deprecated                   | Replacement                             |
   | ---------------------------- | --------------------------------------- |
@@ -210,216 +85,92 @@ deprecated by the other.
   | `controllersWithoutVoters()` | `entrypointsWithoutAuthorizationRule()` |
   | `hasVoterForEntity()`        | `hasAuthorizationRuleForModel()`        |
 
-  Every other `SymfonyMapping` accessor, and `AuditContext::mapping()`, is
-  undeprecated and keeps its signature for all of `1.x`. `AuditContext` gains
-  `securityMap()` returning the neutral model. Removing `SymfonyMapping` is a
-  `MAJOR` step.
+  Every other `SymfonyMapping` accessor, and `AuditContext::mapping()`, is undeprecated and keeps its signature for all of `1.x`. `AuditContext` gains `securityMap()` returning the neutral model. Removing `SymfonyMapping` is a `MAJOR` step.
 
 ### Output schemas
 
-- The **JSON report schema** produced by `--format=json`. Keys present today
-  remain present; new keys may be added in `MINOR` releases. The `cwe` key on
-  each finding (added alongside the pre-existing `owasp` key) is one such
-  additive `MINOR` change — no existing key was removed or renamed. Each entry
-  in `vulnerabilities[]` also carries a `fingerprint` key (since 1.13) — the
-  same stable per-finding identity `Vulnerability::fingerprint()` already used
-  by baseline suppression — consumed by `audit:diff` to compare two reports.
-  Each entry additionally carries a `cvss` object (`version`, `vector`,
-  `base_score`) — a heuristic CVSS v4.0 base-metric estimate derived from the
-  finding's type and severity (another additive `MINOR` change). The report root
-  also carries `score` (a normalized 0-100 health score, since 1.19) and `grade`
-  (its `A`-`F` letter, since 1.19) beside the unchanged `risk_score` and
-  `risk_level` — both additive. Since 1.21 it also carries `complete`, `false`
-  whenever some file could not be fully analyzed (an LLM call failed or the run
-  was aborted; the `coverage` array holds the detail) — additive as well. Each
-  `cost.by_model` entry, still keyed by the configured model, also carries
-  `billed_models` since 1.21: the models its calls were billed as, which differ
-  from the configured one when the provider reports another model answering —
-  another additive key.
-- The **SARIF 2.1.0 output** produced by `--format=sarif`. The
-  `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
-  The `version` is sourced dynamically from installed Composer metadata, so it
-  tracks the package version automatically. Each rule's `properties.tags` array
-  additionally carries a `external/cwe/cwe-<n>` tag, and each result's
-  `properties` carries the CVSS estimate as `security-severity` (the numeric
-  score GitHub Code Scanning ranks by) plus a `cvssV4_0Vector`. Since 1.21 each
-  run also carries `invocations[0].executionSuccessful`, `false` for an
-  incomplete audit, with the reason as an `error`-level
-  `toolExecutionNotifications` entry.
+- The **JSON report schema** produced by `--format=json`. Keys present today remain present; new keys may be added in `MINOR` releases. The `cwe` key on each finding (added alongside the pre-existing `owasp` key) is one such additive `MINOR` change — no existing key was removed or renamed. Each entry in `vulnerabilities[]` also carries a `fingerprint` key (since 1.13) — the same stable per-finding identity `Vulnerability::fingerprint()` already used by baseline suppression — consumed by `audit:diff` to compare two reports. Each entry additionally carries a `cvss` object (`version`, `vector`, `base_score`) — a heuristic CVSS v4.0 base-metric estimate derived from the finding's type and severity (another additive `MINOR` change). The report root also carries `score` (a normalized 0-100 health score, since 1.19) and `grade` (its `A`-`F` letter, since 1.19) beside the unchanged `risk_score` and `risk_level` — both additive. Since 1.21 it also carries `complete`, `false` whenever some file could not be fully analyzed (an LLM call failed or the run was aborted; the `coverage` array holds the detail) — additive as well. Each `cost.by_model` entry, still keyed by the configured model, also carries `billed_models` since 1.21: the models its calls were billed as, which differ from the configured one when the provider reports another model answering — another additive key.
+- The **SARIF 2.1.0 output** produced by `--format=sarif`. The `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable. The `version` is sourced dynamically from installed Composer metadata, so it tracks the package version automatically. Each rule's `properties.tags` array additionally carries a `external/cwe/cwe-<n>` tag, and each result's `properties` carries the CVSS estimate as `security-severity` (the numeric score GitHub Code Scanning ranks by) plus a `cvssV4_0Vector`. Since 1.21 each run also carries `invocations[0].executionSuccessful`, `false` for an incomplete audit, with the reason as an `error`-level `toolExecutionNotifications` entry.
 
 ### Domain ports (extension points)
 
-All interfaces under `src/Audit/Domain/Port/` plus the documented Domain
-pipeline interfaces. Implementing one of these in your own application and
-overriding the alias in `config/services.yaml` is a supported integration path:
+All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipeline interfaces. Implementing one of these in your own application and overriding the alias in `config/services.yaml` is a supported integration path:
 
 - `LLMClientInterface`
-- `BatchCapableLLMClientInterface` — opt-in extension of `LLMClientInterface`
-  for clients that resolve several prompts concurrently. Consumers check
-  `instanceof` and fall back to looping `complete()`, so it never breaks an
-  existing client.
+- `BatchCapableLLMClientInterface` — opt-in extension of `LLMClientInterface` for clients that resolve several prompts concurrently. Consumers check `instanceof` and fall back to looping `complete()`, so it never breaks an existing client.
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
 - `AttackerCacheInterface`
-- `ReviewerCacheInterface` — host applications may implement this and alias it
-  to back the reviewer-verdict cache with their own store (Redis, a shared
-  filesystem, …).
-- `StaticPreScannerInterface` — host applications may implement this and alias
-  it to supply their own deterministic risk-marker scan.
-- `CodeSlicerInterface` — implement and alias to control how files are trimmed
-  before reaching the LLM.
-- `GitChangedFilesResolverInterface` — implement and alias to change how
-  `--since` resolves the changed-file set.
-- `AdvisoryDatabaseInterface` — host applications may implement this and alias
-  it to swap the CVE feed (Snyk, internal database, …). See
-  [`docs/extending.md`](extending.md).
+- `ReviewerCacheInterface` — host applications may implement this and alias it to back the reviewer-verdict cache with their own store (Redis, a shared filesystem, …).
+- `StaticPreScannerInterface` — host applications may implement this and alias it to supply their own deterministic risk-marker scan.
+- `CodeSlicerInterface` — implement and alias to control how files are trimmed before reaching the LLM.
+- `GitChangedFilesResolverInterface` — implement and alias to change how `--since` resolves the changed-file set.
+- `AdvisoryDatabaseInterface` — host applications may implement this and alias it to swap the CVE feed (Snyk, internal database, …). See [`docs/extending.md`](extending.md).
 - `SecretScrubberInterface`
 - `PricingProviderInterface`
-- `CacheAwarePricingProviderInterface` — opt-in extension of
-  `PricingProviderInterface` for providers that expose real per-model
-  prompt-cache rates. `CostCalculator` checks `instanceof` and falls back to the
-  base input rate, so it never breaks an existing pricing provider.
-- `ServingPlatformPricingProviderInterface` — opt-in extension of
-  `PricingProviderInterface` (since 1.21) for providers that know the platform
-  the audit runs against. `CostCalculator` bills the model a provider reports
-  answering a call as that model only when `hasServingPlatformPrice()` is
-  `true`; without the interface it falls back to `hasModel()`, so it never
-  breaks an existing pricing provider.
+- `CacheAwarePricingProviderInterface` — opt-in extension of `PricingProviderInterface` for providers that expose real per-model prompt-cache rates. `CostCalculator` checks `instanceof` and falls back to the base input rate, so it never breaks an existing pricing provider.
+- `ServingPlatformPricingProviderInterface` — opt-in extension of `PricingProviderInterface` (since 1.21) for providers that know the platform the audit runs against. `CostCalculator` bills the model a provider reports answering a call as that model only when `hasServingPlatformPrice()` is `true`; without the interface it falls back to `hasModel()`, so it never breaks an existing pricing provider.
 - `TokenEstimatorInterface`
-- `AttackerSkillPromptRendererInterface` — host applications may implement this
-  and alias it to control how the attacker's skill-block text is rendered for a
-  set of file types. See [`docs/extending.md`](extending.md).
-- `RateLimiterInterface` — host applications may implement this and alias it to
-  swap the throttling strategy (e.g. cross-process Redis-backed bucket). See
-  [`docs/extending.md`](extending.md).
-- Configuration value objects in `Audit\Domain\Configuration\*`
-  (BundleConfiguration and per-layer VOs)
+- `AttackerSkillPromptRendererInterface` — host applications may implement this and alias it to control how the attacker's skill-block text is rendered for a set of file types. See [`docs/extending.md`](extending.md).
+- `RateLimiterInterface` — host applications may implement this and alias it to swap the throttling strategy (e.g. cross-process Redis-backed bucket). See [`docs/extending.md`](extending.md).
+- Configuration value objects in `Audit\Domain\Configuration\*` (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
-- Domain exceptions: `LLMProviderException` (signals non-transient platform
-  failure; callers may catch this to detect misconfigured or retired models)
+- Domain exceptions: `LLMProviderException` (signals non-transient platform failure; callers may catch this to detect misconfigured or retired models)
 - `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
-- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
-  `Pipeline\CoverageRecorderInterface`
+- `Pipeline\PipelineInterface`, `Pipeline\StageInterface`, `Pipeline\CoverageRecorderInterface`
 
 ### Domain models and exceptions
 
-- Value objects and enums under `src/Audit/Domain/Model/` — `Vulnerability`,
-  `AuditReport`, `AuditContext`, `VulnerabilitySeverity`, `VulnerabilityType`,
-  etc. Their public accessors are stable.
-- Domain exception classes — callers may rely on the exception types thrown by
-  public methods.
+- Value objects and enums under `src/Audit/Domain/Model/` — `Vulnerability`, `AuditReport`, `AuditContext`, `VulnerabilitySeverity`, `VulnerabilityType`, etc. Their public accessors are stable.
+- Domain exception classes — callers may rely on the exception types thrown by public methods.
 
 ### Programmatic entry point
 
-`Audit\Application\UseCase\RunAuditUseCase` — the documented programmatic entry
-point for driving an audit from PHP. Its single public method `execute()` is
-BC-protected.
+`Audit\Application\UseCase\RunAuditUseCase` — the documented programmatic entry point for driving an audit from PHP. Its single public method `execute()` is BC-protected.
 
 ### Bundle class
 
-`VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle` — referenced
-from `config/bundles.php`. Its existence and FQCN are stable.
+`VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle` — referenced from `config/bundles.php`. Its existence and FQCN are stable.
 
 ## Internal — what is NOT covered
 
-Anything tagged `@internal` may be refactored, renamed, or removed in any
-`MINOR` release. This includes:
+Anything tagged `@internal` may be refactored, renamed, or removed in any `MINOR` release. This includes:
 
-- All concrete classes under `Audit/Application/Agent/` and
-  `Audit/Application/Pipeline/` (`AttackerAgent`, `ReviewerAgent`,
-  `EscalatingAttackerAgent`, `AuditOrchestrator`, `VulnerabilityFactory`,
-  `PoCSynthesizer`, `AuditPipeline`, `IngestionStage`, `MappingStage`,
-  `AuditStage`, `PoCSynthesisStage`).
-- `Audit\Application\UseCase\EstimateAuditCostUseCase` — the `--dry-run`
-  estimator. `RunAuditUseCase` above is the only BC-protected entry point; this
-  one is a collaborator of `AuditCommand` and its constructor changes whenever
-  the estimate gains a new input.
-- All concrete adapters under `Audit/Infrastructure/` — `SymfonyAiLLMClient`,
-  `ProjectFileScanner`, `AttackerPromptBuilder`, `ReviewerPromptBuilder`,
-  `FilesystemAttackerCache`, `NullAttackerCache`,
-  `ComposerAuditAdvisoryDatabase`, `InMemoryAdvisoryDatabase`,
-  `SymfonyProcessComposerAuditRunner`, `ReadFileTool`, `GrepTool`,
-  `ListFilesTool`, `LookupAdvisoryTool`, `SymfonyToolRegistryFactory`,
-  `ReportRenderer`.
-- Command-internal collaborators — `AuditCommandInput`, `AuditPresenter`,
-  `ReportWriter`, `AuditExitCodeResolver`.
-- Prompt template files under `src/Audit/Infrastructure/Prompt/` and
-  `src/Audit/Infrastructure/Report/Template/`.
+- All concrete classes under `Audit/Application/Agent/` and `Audit/Application/Pipeline/` (`AttackerAgent`, `ReviewerAgent`, `EscalatingAttackerAgent`, `AuditOrchestrator`, `VulnerabilityFactory`, `PoCSynthesizer`, `AuditPipeline`, `IngestionStage`, `MappingStage`, `AuditStage`, `PoCSynthesisStage`).
+- `Audit\Application\UseCase\EstimateAuditCostUseCase` — the `--dry-run` estimator. `RunAuditUseCase` above is the only BC-protected entry point; this one is a collaborator of `AuditCommand` and its constructor changes whenever the estimate gains a new input.
+- All concrete adapters under `Audit/Infrastructure/` — `SymfonyAiLLMClient`, `ProjectFileScanner`, `AttackerPromptBuilder`, `ReviewerPromptBuilder`, `FilesystemAttackerCache`, `NullAttackerCache`, `ComposerAuditAdvisoryDatabase`, `InMemoryAdvisoryDatabase`, `SymfonyProcessComposerAuditRunner`, `ReadFileTool`, `GrepTool`, `ListFilesTool`, `LookupAdvisoryTool`, `SymfonyToolRegistryFactory`, `ReportRenderer`.
+- Command-internal collaborators — `AuditCommandInput`, `AuditPresenter`, `ReportWriter`, `AuditExitCodeResolver`.
+- Prompt template files under `src/Audit/Infrastructure/Prompt/` and `src/Audit/Infrastructure/Report/Template/`.
 - Private constants and methods on any class.
 
-If you find yourself depending on an internal class, please open an issue — we
-will either promote it to public API or provide a stable replacement.
+If you find yourself depending on an internal class, please open an issue — we will either promote it to public API or provide a stable replacement.
 
 ## Deprecation policy
 
 When a public-API element needs to be removed:
 
-1. It is marked as deprecated in a `MINOR` release. The deprecation appears in
-   [`CHANGELOG.md`](../CHANGELOG.md) under `### Deprecated`, with a clear
-   migration path.
-2. The deprecated element keeps working for at least the rest of the current
-   `MAJOR` cycle.
-3. Removal happens in the next `MAJOR` release at the earliest, listed under
-   `### Removed` in the changelog.
+1. It is marked as deprecated in a `MINOR` release. The deprecation appears in [`CHANGELOG.md`](../CHANGELOG.md) under `### Deprecated`, with a clear migration path.
+2. The deprecated element keeps working for at least the rest of the current `MAJOR` cycle.
+3. Removal happens in the next `MAJOR` release at the earliest, listed under `### Removed` in the changelog.
 
-Every deprecated public-API element emits a **runtime deprecation** for the rest
-of the current `MAJOR` cycle, so callers find it in their deprecation log and CI
-(`failOnDeprecation`) before the removal lands — not as a hard fatal on the day
-they upgrade. Config keys use the Config component's `setDeprecated()`; PHP
-methods, classes, and arguments use
-`trigger_deprecation('vinceamstoutz/symfony-security-auditor', '<since>', '<message>')`
-(from `symfony/deprecation-contracts`). The `@deprecated` PHPDoc tag is added
-alongside it for static analysis and IDE hints. The only deprecations documented
-in the changelog _without_ a runtime trigger are those with no runtime call site
-to attach one to.
+Every deprecated public-API element emits a **runtime deprecation** for the rest of the current `MAJOR` cycle, so callers find it in their deprecation log and CI (`failOnDeprecation`) before the removal lands — not as a hard fatal on the day they upgrade. Config keys use the Config component's `setDeprecated()`; PHP methods, classes, and arguments use `trigger_deprecation('vinceamstoutz/symfony-security-auditor', '<since>', '<message>')` (from `symfony/deprecation-contracts`). The `@deprecated` PHPDoc tag is added alongside it for static analysis and IDE hints. The only deprecations documented in the changelog _without_ a runtime trigger are those with no runtime call site to attach one to.
 
 > [!WARNING]
 >
-> The **resolved root package version** must stay below the oldest
-> not-yet-removed deprecation. `staabm/phpstan-todo-by`'s `todoBy.sfDeprecation`
-> rule reads it through `Composer\InstalledVersions` and reports every
-> `trigger_deprecation()` whose since-version it satisfies, so a root version at
-> or above `1.13` fails PHPStan — and every `Tests + Mutation` leg with it,
-> since Infection runs PHPStan as its static-analysis tool.
+> The **resolved root package version** must stay below the oldest not-yet-removed deprecation. `staabm/phpstan-todo-by`'s `todoBy.sfDeprecation` rule reads it through `Composer\InstalledVersions` and reports every `trigger_deprecation()` whose since-version it satisfies, so a root version at or above `1.13` fails PHPStan — and every `Tests + Mutation` leg with it, since Infection runs PHPStan as its static-analysis tool.
 >
-> CI therefore pins `COMPOSER_ROOT_VERSION: 1.0.x-dev` in
-> `.github/workflows/ci.yaml` rather than relying on Composer to guess. The
-> guess depends on the checked-out branch name and on tags being reachable, and
-> holds for neither on a depth-1 detached-HEAD checkout — `extra.branch-alias`
-> alone is not enough, because an alias only applies when its key matches the
-> branch Composer manages to infer. The `Lint` job asserts the resolved version
-> before running PHPStan, so a drift reports itself instead of surfacing as
-> three unexplained deprecation errors.
+> CI therefore pins `COMPOSER_ROOT_VERSION: 1.0.x-dev` in `.github/workflows/ci.yaml` rather than relying on Composer to guess. The guess depends on the checked-out branch name and on tags being reachable, and holds for neither on a depth-1 detached-HEAD checkout — `extra.branch-alias` alone is not enough, because an alias only applies when its key matches the branch Composer manages to infer. The `Lint` job asserts the resolved version before running PHPStan, so a drift reports itself instead of surfacing as three unexplained deprecation errors.
 >
-> The pin is deliberately not rewritten by `bin/castor release:bump`: raising it
-> to the release actually in development would reintroduce the failure. It can
-> track reality once the deprecations below it are removed in a `MAJOR`.
+> The pin is deliberately not rewritten by `bin/castor release:bump`: raising it to the release actually in development would reintroduce the failure. It can track reality once the deprecations below it are removed in a `MAJOR`.
 
 ### Currently deprecated
 
-- **`cache.prompt_caching`** (since 1.7) — once set `cache_control: ephemeral`
-  on every LLM call, but current `symfony/ai` bridges no longer read that
-  option: Anthropic caching is driven by `cache_retention` on the platform in
-  `ai.yaml` (default `short`), and OpenAI/Gemini cache automatically. The key is
-  still accepted and emits a Symfony deprecation when set; it has no effect.
-  Remove it from your config and, if you want a longer Anthropic cache window,
-  set `cache_retention: long` on the `anthropic` platform in `ai.yaml`.
-  Scheduled for removal in the next `MAJOR`.
-- **`Vulnerability::create()`, `SymfonyMapping::create()`, and
-  `LLMResponse::create()`** (since 1.13) — superseded by the value-object
-  factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
-  `LLMResponse::of()` (taking
-  `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
-  `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot`
-  respectively). The old methods still work and delegate to the new factories,
-  and emit a runtime deprecation when called. Scheduled for removal in the next
-  `MAJOR`.
+- **`cache.prompt_caching`** (since 1.7) — once set `cache_control: ephemeral` on every LLM call, but current `symfony/ai` bridges no longer read that option: Anthropic caching is driven by `cache_retention` on the platform in `ai.yaml` (default `short`), and OpenAI/Gemini cache automatically. The key is still accepted and emits a Symfony deprecation when set; it has no effect. Remove it from your config and, if you want a longer Anthropic cache window, set `cache_retention: long` on the `anthropic` platform in `ai.yaml`. Scheduled for removal in the next `MAJOR`.
+- **`Vulnerability::create()`, `SymfonyMapping::create()`, and `LLMResponse::create()`** (since 1.13) — superseded by the value-object factories `Vulnerability::of()`, `SymfonyMapping::of()`, and `LLMResponse::of()` (taking `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`, `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot` respectively). The old methods still work and delegate to the new factories, and emit a runtime deprecation when called. Scheduled for removal in the next `MAJOR`.
 
 ## Branches & maintenance
 
-`main` holds **exactly the latest release** — nothing lands on it except a
-release merge. Development happens on version branches, so the default branch a
-reader lands on always documents a version they can install.
+`main` holds **exactly the latest release** — nothing lands on it except a release merge. Development happens on version branches, so the default branch a reader lands on always documents a version they can install.
 
 There is one branch per `MAJOR`, plus `main`:
 
@@ -429,74 +180,24 @@ There is one branch per `MAJOR`, plus `main`:
 | `1.x`  | current      | Fixes and features for the next 1.x release       |
 | `2.x`  | next `MAJOR` | Breaking work for a `MAJOR` not yet released      |
 
-A `<N>.x` branch lives for the whole life of that `MAJOR`. It carries fixes and
-features while the `MAJOR` is current, and once the next one ships it keeps the
-same name and becomes that line's maintenance branch — bug fixes only, then
-security fixes only. There are no per-`MINOR` branches: a fix for 1.19 ships as
-1.20 from `1.x` rather than being backported.
+A `<N>.x` branch lives for the whole life of that `MAJOR`. It carries fixes and features while the `MAJOR` is current, and once the next one ships it keeps the same name and becomes that line's maintenance branch — bug fixes only, then security fixes only. There are no per-`MINOR` branches: a fix for 1.19 ships as 1.20 from `1.x` rather than being backported.
 
-Base a change on the branch matching its nature: ordinary work goes to the
-current `<N>.x`, anything breaking goes to the next `MAJOR`'s. Fixes are merged
-forward — `1.x` into `2.x` — so they are never applied twice and the next
-`MAJOR` never regresses behind the current line.
+Base a change on the branch matching its nature: ordinary work goes to the current `<N>.x`, anything breaking goes to the next `MAJOR`'s. Fixes are merged forward — `1.x` into `2.x` — so they are never applied twice and the next `MAJOR` never regresses behind the current line.
 
-At any release, the `<N>.x` branch is merged into `main` and tagged there: open
-a `chore: release X.Y.Z` pull request from `<N>.x` — promoting the changelog and
-bumping every version pin via `bin/castor release:bump X.Y.Z` — against `main`.
-**Merge it with a regular merge commit — the one exception to
-["always squash-merge"](../CLAUDE.md#pull-requests).** `main` is meant to end up
-with `<N>.x`'s exact commit SHAs, matching every release before this one (e.g.
-1.18.0's PR #226); a regular merge is the only method that preserves them.
-Squash-merging collapses `<N>.x`'s commits into one new SHA absent from `<N>.x`,
-so the two branches permanently diverge in commit identity and need a
-cherry-pick-back reconciliation after every release. Rebase-merging is worse: it
-replays every commit `<N>.x` has accumulated since it last diverged from `main`
-with a fresh SHA apiece, which (a) causes that same divergence and (b) re-runs
-CI's `Commit Lint` job — which lints the full commit range on every push to
-`main` — over that entire replayed history, so one old commit whose scope has
-since fallen out of `commitlint.config.mjs`'s `scope-enum` turns the release
-push red for a commit nobody can amend. A regular merge lands `main` exactly on
-`<N>.x`'s tip (plus one merge commit), so `<N>.x` needs no cherry-pick afterward
-— it already has every commit, unchanged. Once the release commit lands, the
-[Auto Release](../.github/workflows/auto-release.yaml) workflow tags it `X.Y.Z`,
-generates a `What's Changed` summary from the merged pull requests since the
-previous tag, and drafts the GitHub Release, dispatching the binary-build
-workflow immediately against that draft — every binary is already attached by
-the time you publish it, so publishing is just a visibility flip, not a trigger.
-Its `push` trigger only fires going forward, so it cannot cover a release commit
-that already landed on `main` before the workflow existed (or before the
-workflow's `if:` could match it); for that case, dispatch it manually with the
-`version` `workflow_dispatch` input — it always tags and diffs against `main`'s
-history regardless of which ref the dispatch itself runs from.
+At any release, the `<N>.x` branch is merged into `main` and tagged there: open a `chore: release X.Y.Z` pull request from `<N>.x` — promoting the changelog and bumping every version pin via `bin/castor release:bump X.Y.Z` — against `main`. **Merge it with a regular merge commit — the one exception to ["always squash-merge"](../CLAUDE.md#pull-requests).** `main` is meant to end up with `<N>.x`'s exact commit SHAs, matching every release before this one (e.g. 1.18.0's PR #226); a regular merge is the only method that preserves them. Squash-merging collapses `<N>.x`'s commits into one new SHA absent from `<N>.x`, so the two branches permanently diverge in commit identity and need a cherry-pick-back reconciliation after every release. Rebase-merging is worse: it replays every commit `<N>.x` has accumulated since it last diverged from `main` with a fresh SHA apiece, which (a) causes that same divergence and (b) re-runs CI's `Commit Lint` job — which lints the full commit range on every push to `main` — over that entire replayed history, so one old commit whose scope has since fallen out of `commitlint.config.mjs`'s `scope-enum` turns the release push red for a commit nobody can amend. A regular merge lands `main` exactly on `<N>.x`'s tip (plus one merge commit), so `<N>.x` needs no cherry-pick afterward — it already has every commit, unchanged. Once the release commit lands, the [Auto Release](../.github/workflows/auto-release.yaml) workflow tags it `X.Y.Z`, generates a `What's Changed` summary from the merged pull requests since the previous tag, and drafts the GitHub Release, dispatching the binary-build workflow immediately against that draft — every binary is already attached by the time you publish it, so publishing is just a visibility flip, not a trigger. Its `push` trigger only fires going forward, so it cannot cover a release commit that already landed on `main` before the workflow existed (or before the workflow's `if:` could match it); for that case, dispatch it manually with the `version` `workflow_dispatch` input — it always tags and diffs against `main`'s history regardless of which ref the dispatch itself runs from.
 
-Because `main` is the default branch, a pull request opens against it by default
-even though almost nothing should land there directly. **Retarget the base** to
-the development branch — `1.x` for ordinary work, `2.x` for breaking work. The
-[Pull request target](../.github/workflows/pr-target.yaml) check enforces that
-the base branch matches the target declared in the pull-request description.
+Because `main` is the default branch, a pull request opens against it by default even though almost nothing should land there directly. **Retarget the base** to the development branch — `1.x` for ordinary work, `2.x` for breaking work. The [Pull request target](../.github/workflows/pr-target.yaml) check enforces that the base branch matches the target declared in the pull-request description.
 
-Additions are still marked _Since X.Y_ (see
-[Documenting Additions](../CONTRIBUTING.md#documenting-additions)) so a reader
-can tell which release introduced a key or option.
+Additions are still marked _Since X.Y_ (see [Documenting Additions](../CONTRIBUTING.md#documenting-additions)) so a reader can tell which release introduced a key or option.
 
 > [!IMPORTANT]
 >
-> Documentation on `main` describes the latest release, so everything it
-> documents is available in the version you get from Packagist or the installer.
-> Each addition is marked _Since X.Y_ so you can tell when it appeared; if one
-> carries a version later than the one you have installed, upgrade to get it.
+> Documentation on `main` describes the latest release, so everything it documents is available in the version you get from Packagist or the installer. Each addition is marked _Since X.Y_ so you can tell when it appeared; if one carries a version later than the one you have installed, upgrade to get it.
 
 ## LLM model identifiers
 
-Model identifiers passed to `model:`, `attacker_model:`, or `reviewer_model:`
-are free-form strings forwarded to `symfony/ai`. Their meaning, behavior,
-pricing, and availability are owned by the LLM provider, not by this bundle. If
-a provider deprecates a model, this bundle does not consider that a BC break —
-pin the identifier you want in your configuration.
+Model identifiers passed to `model:`, `attacker_model:`, or `reviewer_model:` are free-form strings forwarded to `symfony/ai`. Their meaning, behavior, pricing, and availability are owned by the LLM provider, not by this bundle. If a provider deprecates a model, this bundle does not consider that a BC break — pin the identifier you want in your configuration.
 
 ## Reporting BC breaks
 
-If you find a change between two `1.x` releases that breaks one of the public
-API elements listed above, please
-[open an issue](https://github.com/vinceamstoutz/symfony-security-auditor/issues/new)
-with a minimal reproduction. It is a bug and will be fixed in a patch release.
+If you find a change between two `1.x` releases that breaks one of the public API elements listed above, please [open an issue](https://github.com/vinceamstoutz/symfony-security-auditor/issues/new) with a minimal reproduction. It is a bug and will be fixed in a patch release.
