@@ -218,30 +218,14 @@ Configure `audit.rate_limit.requests_per_minute` / `input_tokens_per_minute` / `
 
 ### `OpenSSL SSL_read: … unexpected eof while reading` / `cURL error 56`
 
-The peer closed the connection while the response was still being read.
-`error:0A000126` is `SSL_R_UNEXPECTED_EOF_WHILE_READING` and `errno 0` means no
-OS-level error — the endpoint hung up without a TLS `close_notify`. This is a
-transport truncation, so it is classified as transient and the LLM call is
-retried on a fresh connection (`audit.retry.max_attempts`, default `3`).
+The peer closed the connection while the response was still being read. `error:0A000126` is `SSL_R_UNEXPECTED_EOF_WHILE_READING` and `errno 0` means no OS-level error — the endpoint hung up without a TLS `close_notify`. This is a transport truncation, so it is classified as transient and the LLM call is retried on a fresh connection (`audit.retry.max_attempts`, default `3`).
 
 Self-hosted endpoints and proxied APIs produce it most often, in two ways:
 
-- **Stale keep-alive reuse.** Auditor calls are slow and far apart, so the idle
-  gap exceeds the endpoint's or your reverse proxy's `keepalive_timeout`. The
-  server drops the socket; the HTTP client takes the dead one from its pool for
-  the next call. Raise `keepalive_timeout` above the longest gap between calls,
-  and `proxy_read_timeout` / `proxy_send_timeout` above the longest generation
-  time.
-- **More concurrent connections than the endpoint serves.** The `fast` profile
-  opens up to four attacker and four reviewer calls
-  (`audit.attacker_max_concurrent` / `audit.reviewer_max_concurrent`). A local
-  model server with a small worker pool drops the excess. Set both to `1`;
-  `balanced` and `thorough` already default to `1`.
+- **Stale keep-alive reuse.** Auditor calls are slow and far apart, so the idle gap exceeds the endpoint's or your reverse proxy's `keepalive_timeout`. The server drops the socket; the HTTP client takes the dead one from its pool for the next call. Raise `keepalive_timeout` above the longest gap between calls, and `proxy_read_timeout` / `proxy_send_timeout` above the longest generation time.
+- **More concurrent connections than the endpoint serves.** The `fast` profile opens up to four attacker and four reviewer calls (`audit.attacker_max_concurrent` / `audit.reviewer_max_concurrent`). A local model server with a small worker pool drops the excess. Set both to `1`; `balanced` and `thorough` already default to `1`.
 
-When every retry fails, the run still aborts with exit `1` and the report says
-it is incomplete (#378). Running again resumes from the cache (`cache.enabled`,
-on by default), so only the failed chunks are retried. Streaming, which should
-remove the problem at its source, is tracked in #379.
+When every retry fails, the run still aborts with exit `1` and the report says it is incomplete (#378). Running again resumes from the cache (`cache.enabled`, on by default), so only the failed chunks are retried. Streaming, which should remove the problem at its source, is tracked in #379.
 
 ### `LLM response was empty` / `Failed to parse … JSON response`
 
