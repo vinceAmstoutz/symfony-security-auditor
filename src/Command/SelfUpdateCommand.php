@@ -73,12 +73,18 @@ final readonly class SelfUpdateCommand
         $this->updateCheckStore->write(new UpdateCheckState($this->clock->now(), $selfUpdateResult->latestVersion));
     }
 
+    /**
+     * An update is only staged here: the binary is swapped as the process
+     * exits, once nothing more can be loaded from the archive being replaced,
+     * so the message says what has happened so far and the entry point
+     * reports a swap that then fails.
+     */
     private function report(SymfonyStyle $symfonyStyle, SelfUpdateResult $selfUpdateResult): int
     {
         match ($selfUpdateResult->status) {
             SelfUpdateStatus::AlreadyUpToDate => $symfonyStyle->success(\sprintf('Already up to date (%s).', $selfUpdateResult->currentVersion)),
             SelfUpdateStatus::UpdateAvailable => $symfonyStyle->warning(\sprintf('A newer version is available: %s (currently %s). Run "self-update" without --check to install it.', $selfUpdateResult->latestVersion, $selfUpdateResult->currentVersion)),
-            SelfUpdateStatus::Updated => $symfonyStyle->success(\sprintf('Updated from %s to %s.', $selfUpdateResult->currentVersion, $selfUpdateResult->latestVersion)),
+            SelfUpdateStatus::Updated => $symfonyStyle->success(\sprintf('Downloaded and verified %s; it replaces %s as this command exits.', $selfUpdateResult->latestVersion, $selfUpdateResult->currentVersion)),
         };
 
         if (PricingCatalogRefreshOutcome::Failed === $selfUpdateResult->pricingCatalogRefresh) {

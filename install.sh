@@ -110,6 +110,19 @@ run_init() {
   fi
 }
 
+# Staged next to the binary so the final mv is an atomic same-directory rename, never a cross-filesystem copy.
+install_binary() {
+  mkdir -p "$2" || fail "cannot create the install directory $2"
+  staged="$(mktemp "$2/.${BINARY_NAME}.XXXXXX")" || fail "cannot write to $2 — set SSA_INSTALL_DIR to a writable directory or re-run with the necessary permissions"
+  if cp "$1" "$staged" && chmod 755 "$staged" && mv -f "$staged" "$2/${BINARY_NAME}"; then
+    staged=""
+    return 0
+  fi
+  rm -f "$staged"
+  staged=""
+  fail "could not install ${BINARY_NAME} into $2; any previous binary there is unchanged"
+}
+
 warn_init_incomplete() {
   echo "note: '${BINARY_NAME} init' did not complete — run it yourself to finish configuration." >&2
 }
@@ -124,8 +137,13 @@ main() {
     base="https://github.com/${REPO}/releases/download/${VERSION}"
   fi
 
+  tmp=""
+  staged=""
+  trap '[ -z "$tmp" ] || rm -rf "$tmp"; [ -z "$staged" ] || rm -f "$staged"' EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
 
   echo "Downloading ${asset} (${VERSION})…"
   download "${base}/${asset}" "${tmp}/${asset}"
@@ -133,9 +151,7 @@ main() {
   verify_checksum "${tmp}/${asset}" "${tmp}/${asset}.sha256"
 
   install_dir="$(resolve_install_dir)"
-  mkdir -p "$install_dir"
-  chmod +x "${tmp}/${asset}"
-  mv "${tmp}/${asset}" "${install_dir}/${BINARY_NAME}"
+  install_binary "${tmp}/${asset}" "$install_dir"
 
   echo "Installed ${BINARY_NAME} to ${install_dir}/${BINARY_NAME}"
 

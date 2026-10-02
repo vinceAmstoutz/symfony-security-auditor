@@ -91,14 +91,15 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
   and has been discarded.
   ```
 
-- **Binary not writable**:
+- **Directory not writable** — the binary is replaced by renaming a new file over it, so the directory holding it must be writable, whatever the binary's own permissions; nothing is downloaded:
 
   ```text
-  The binary at "<path>" is not writable; re-run the update with the
-  necessary permissions (e.g. sudo) or reinstall with the install script.
+  The directory "<dir>" holding the binary is not writable (<reason>), so the
+  binary cannot be replaced; re-run the update with the necessary permissions
+  (e.g. sudo) or reinstall with the install script.
   ```
 
-- **Replacement failed mid-swap** — `Failed to replace the binary at "<path>": <reason>.` The new binary is moved into place as the command exits, not while it runs — the running process still loads classes from the archive being replaced — so this one surfaces after `Updated from … to ….` has already printed. The previous binary is left in place, so re-running `self-update` is safe.
+- **Replacement failed mid-swap** — `Failed to replace the binary at "<path>": <reason>`, followed by `The update was not applied: the previous version is still installed.`, on stderr, and the command exits `1`. The new binary is moved into place as the command exits, not while it runs — the running process still loads classes from the archive being replaced — so this one surfaces after `Downloaded and verified <new>; it replaces <old> as this command exits.` has printed. The previous binary is left in place, so re-running `self-update` is safe.
 
 ### `init` fails to install the provider bridge
 

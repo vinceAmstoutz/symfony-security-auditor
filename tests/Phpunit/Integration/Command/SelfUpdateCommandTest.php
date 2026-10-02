@@ -28,13 +28,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Recor
 
 final class SelfUpdateCommandTest extends TestCase
 {
-    public function test_it_reports_a_successful_update(): void
+    public function test_it_reports_that_the_verified_update_takes_over_as_the_command_exits(): void
     {
         $commandTester = $this->commandTester(new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0')));
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Updated from 1.0.0 to 2.0.0', $commandTester->getDisplay());
+        self::assertStringContainsString('Downloaded and verified 2.0.0; it replaces 1.0.0 as this command exits.', $this->flattened($commandTester->getDisplay()));
     }
 
     public function test_it_warns_when_the_pricing_catalog_could_not_be_refreshed(): void
@@ -171,6 +171,11 @@ final class SelfUpdateCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertNull($inMemoryUpdateCheckStore->read());
+    }
+
+    private function flattened(string $display): string
+    {
+        return (string) preg_replace('/\s+/', ' ', $display);
     }
 
     private function commandTester(RecordingSelfUpdater $recordingSelfUpdater, string $currentVersion = '1.0.0', ?InMemoryUpdateCheckStore $inMemoryUpdateCheckStore = null): CommandTester

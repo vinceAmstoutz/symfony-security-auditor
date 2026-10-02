@@ -297,8 +297,8 @@ jobs:
         with:
           name: ${{ matrix.asset }}
 
-      - name: Attach the binary and checksum to the release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+      - name: Attach the binary and checksum to the release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           # A release event carries its own tag context; a workflow_dispatch
           # rebuild does not, so target the tag explicitly (the input on
@@ -329,8 +329,8 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
 
-      - name: Attach the installers and config schema to the release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+      - name: Attach the installers and config schema to the release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           draft: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_draft }}

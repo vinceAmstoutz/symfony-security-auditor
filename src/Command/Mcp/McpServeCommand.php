@@ -29,9 +29,21 @@ final readonly class McpServeCommand
         private McpTransportFactoryInterface $mcpTransportFactory,
     ) {}
 
+    /**
+     * STDOUT is the JSON-RPC channel the client parses, and the CLI SAPI
+     * displays notices and warnings there by default: one stray notice would
+     * corrupt the protocol stream, so PHP's error display goes to STDERR while
+     * the server runs.
+     */
     public function __invoke(): int
     {
-        $this->mcpServerFactory->create()->run($this->mcpTransportFactory->create());
+        $displayErrors = ini_set('display_errors', 'stderr');
+
+        try {
+            $this->mcpServerFactory->create()->run($this->mcpTransportFactory->create());
+        } finally {
+            ini_set('display_errors', $displayErrors);
+        }
 
         return Command::SUCCESS;
     }
