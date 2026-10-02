@@ -3484,6 +3484,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
      */
     public function test_complete_recovers_when_the_provider_truncates_the_response_mid_read(): void
     {
