@@ -226,8 +226,8 @@ rationale in [Branches & maintenance](docs/versioning.md#branches--maintenance).
 
 Base a pull request on another open one's branch — stack it — only when it needs
 code that one adds, never because both edit `CHANGELOG.md` or the docs. Tick
-`stacked` as well, and name that pull request under `## Details`
-(`Stacked on #123`, with what this one needs from it).
+`stacked` as well, and end the Summary with `Stacked on #123` and what this one
+needs from it.
 
 ## Documenting Additions
 
@@ -304,8 +304,8 @@ For a custom client implementation (direct HTTP, retry logic, …) see
 5. Ensure all checks pass: `bin/castor lint`.
 6. Open a pull request and fill in the
    [PR template](.github/PULL_REQUEST_TEMPLATE.md): a title of 50 characters or
-   fewer, a `## Summary` of 500 or fewer, only the boxes you tick, and no
-   section beyond the template's own and an optional `## Details`. The
+   fewer, a `## Summary` of 500 or fewer, only the boxes you tick — the license
+   box included — and no section beyond the template's four. The
    `Pull request target` check fails the pull request otherwise — run it first:
 
    ```bash

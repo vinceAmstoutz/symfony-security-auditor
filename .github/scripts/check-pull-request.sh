@@ -86,6 +86,9 @@ function inspect_box_line(text,   label) {
   }
   if (text ~ /^[ \t]*[-*+][ \t]+\[[xX]\]/) {
     ticked[section]++
+    if (section == "## Checklist" && tolower(text) ~ /license/) {
+      licensed = 1
+    }
     if (section == "## Target branch") {
       label = text
       sub(/^[ \t]*[-*+][ \t]+\[[xX]\][ \t]*/, "", label)
@@ -141,6 +144,7 @@ END {
   check_sections()
   check_summary()
   check_boxes()
+  check_license()
   check_target()
   exit (errors > 0 ? 1 : 0)
 }
@@ -150,20 +154,19 @@ function check_sections(   order, i, name, allowed, seen, broken) {
   for (i = 1; i <= heading_count; i++) {
     order = order (i > 1 ? "|" : "") headings[i]
   }
-  if (order == "## Summary|## Type of change|## Target branch|## Checklist" || order == "## Summary|## Type of change|## Target branch|## Details|## Checklist") {
+  if (order == "## Summary|## Type of change|## Target branch|## Checklist") {
     return
   }
 
   allowed["## Summary"] = 1
   allowed["## Type of change"] = 1
   allowed["## Target branch"] = 1
-  allowed["## Details"] = 1
   allowed["## Checklist"] = 1
   broken = 0
   for (i = 1; i <= heading_count; i++) {
     name = headings[i]
     if (!(name in allowed)) {
-      fail("'\''" name "'\'' is not a section of .github/PULL_REQUEST_TEMPLATE.md; put anything else under '\''## Details'\''.")
+      fail("'\''" name "'\'' is not a section of .github/PULL_REQUEST_TEMPLATE.md: keep to its four, and let the CHANGELOG entry carry the details.")
       broken = 1
     } else if (++seen[name] == 2) {
       fail("'\''" name "'\'' appears more than once.")
@@ -178,7 +181,7 @@ function check_sections(   order, i, name, allowed, seen, broken) {
     }
   }
   if (!broken) {
-    fail("Keep the sections in the order of .github/PULL_REQUEST_TEMPLATE.md: '\''## Summary'\'', '\''## Type of change'\'', '\''## Target branch'\'', the optional '\''## Details'\'', then '\''## Checklist'\'' last.")
+    fail("Keep the sections in the order of .github/PULL_REQUEST_TEMPLATE.md: '\''## Summary'\'', '\''## Type of change'\'', '\''## Target branch'\'', then '\''## Checklist'\''.")
   }
 }
 
@@ -192,7 +195,7 @@ function check_summary(   length_in_characters) {
   if (length_in_characters == 0) {
     fail("Fill in '\''## Summary'\'': the user-visible outcome, in 500 characters or fewer.")
   } else if (length_in_characters > 500) {
-    fail("'\''## Summary'\'' is " length_in_characters " characters; keep it to 500 or fewer and move the rest under '\''## Details'\''.")
+    fail("'\''## Summary'\'' is " length_in_characters " characters; keep it to 500 or fewer and let the CHANGELOG entry carry the details.")
   }
 }
 
@@ -203,6 +206,12 @@ function check_boxes(   i, name) {
     if (seen_section(name) && ticked[name] == 0) {
       fail("Tick at least one box under '\''" name "'\''.")
     }
+  }
+}
+
+function check_license() {
+  if (seen_section("## Checklist") && !licensed) {
+    fail("Tick the license box under '\''## Checklist'\'': I license this contribution under the project'\''s MIT License (`LICENSE`).")
   }
 }
 
@@ -222,7 +231,7 @@ function check_target(   i, target, stacked, release_count) {
   }
 
   if (stacked && !names_parent) {
-    fail("A stacked pull request names the one it builds on: add '\''Stacked on #<number>'\'' under '\''## Details'\'', with the code it needs from it.")
+    fail("A stacked pull request names the one it builds on: end '\''## Summary'\'' with '\''Stacked on #<number>'\'' and the code it needs from it.")
   }
   if (!stacked && names_parent) {
     fail("This pull request is not stacked: remove '\''Stacked on #…'\'' from the description.")

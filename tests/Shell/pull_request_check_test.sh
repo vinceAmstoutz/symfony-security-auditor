@@ -12,6 +12,8 @@ check="$script_dir/.github/scripts/check-pull-request.sh"
 
 failures=0
 
+license_box="- [x] I license this contribution under the project's MIT License (\`LICENSE\`)"
+
 valid_parts() {
   title='fix(scan): stop following symlinks'
   base='1.x'
@@ -20,15 +22,15 @@ valid_parts() {
 Closes #12'
   type_of_change='- [x] Bug fix'
   target_branch='- [x] `1.x` — anything for the next minor release: bug fixes and new features'
-  details=''
-  checklist='- [x] Tests added or updated (unit + integration where applicable)
-- [x] All checks pass: `bin/castor lint` (CI)'
+  extra_section=''
+  checklist="$license_box
+- [x] A bug fix comes with a test that fails without it"
 }
 
 body() {
   printf '## Summary\n\n%s\n\n## Type of change\n\n%s\n\n## Target branch\n\n%s\n\n' "$summary" "$type_of_change" "$target_branch"
-  if [ -n "$details" ]; then
-    printf '## Details\n\n%s\n\n' "$details"
+  if [ -n "$extra_section" ]; then
+    printf '%s\n\n' "$extra_section"
   fi
   printf '## Checklist\n\n%s\n' "$checklist"
 }
@@ -72,10 +74,6 @@ valid_parts
 expect_pass 'a description that follows the template passes' "$(body)"
 
 valid_parts
-details='- `SymlinkGuard` walks every directory between the root and the file.'
-expect_pass 'an optional Details section before the Checklist passes' "$(body)"
-
-valid_parts
 title="fix: $(repeat 45 '…')"
 expect_pass 'a 50-character title passes, counting characters rather than bytes' "$(body)"
 
@@ -101,9 +99,22 @@ type_of_change='- [x] Bug fix
 expect_error 'an unticked box under Type of change fails' "Keep only the boxes you tick under '## Type of change': delete '- [ ] New feature'." "$(body)"
 
 valid_parts
-checklist='- [x] Tests added or updated (unit + integration where applicable)
-- [ ] All checks pass: `bin/castor lint`'
-expect_error 'an unticked box under Checklist fails' "Keep only the boxes you tick under '## Checklist': delete '- [ ] All checks pass: \`bin/castor lint\`'." "$(body)"
+checklist="$license_box
+- [ ] A bug fix comes with a test that fails without it"
+expect_error 'an unticked box under Checklist fails' "Keep only the boxes you tick under '## Checklist': delete '- [ ] A bug fix comes with a test that fails without it'." "$(body)"
+
+valid_parts
+checklist='- [x] A bug fix comes with a test that fails without it'
+expect_error 'a Checklist without the license box fails' "Tick the license box under '## Checklist'" "$(body)"
+
+valid_parts
+checklist="- [ ] I license this contribution under the project's MIT License (\`LICENSE\`)
+- [x] A bug fix comes with a test that fails without it"
+expect_error 'an unticked license box fails' "Tick the license box under '## Checklist'" "$(body)"
+
+valid_parts
+checklist='- [x] Contributed under the MIT License'
+expect_pass 'a license box in other words still counts' "$(body)"
 
 valid_parts
 target_branch='Tick the release branch this is ultimately headed for.
@@ -123,8 +134,9 @@ Tick the release branch this is ultimately headed for.
 expect_pass 'instructions inside HTML comments are ignored' "$(body)"
 
 valid_parts
-checklist='- [x] No `createMock` without a matching `expects()` (use `createStub`
-      otherwise)'
+checklist="$license_box
+- [x] User-facing additions are documented and marked
+      _Since X.Y_"
 expect_pass 'a box wrapped over an indented line passes' "$(body)"
 
 valid_parts
@@ -138,8 +150,10 @@ valid_parts
 expect_error 'a missing Checklist section fails' "The description is missing the '## Checklist' section from .github/PULL_REQUEST_TEMPLATE.md." "$(body | sed '/^## Checklist$/,$d')"
 
 valid_parts
-details='Verified by hand.'
-expect_error 'a section outside the template fails' "'## Verification' is not a section of .github/PULL_REQUEST_TEMPLATE.md; put anything else under '## Details'." "$(body | sed 's/^## Details$/## Verification/')"
+extra_section='## Details
+
+- `SymlinkGuard` walks every directory between the root and the file.'
+expect_error 'a Details section fails' "'## Details' is not a section of .github/PULL_REQUEST_TEMPLATE.md: keep to its four" "$(body)"
 
 valid_parts
 expect_error 'a level-one heading fails' "'# Notes' is not a section of .github/PULL_REQUEST_TEMPLATE.md" "$(body; printf '\n# Notes\n\nMore.\n')"
@@ -148,39 +162,47 @@ valid_parts
 expect_error 'a section appearing twice fails' "'## Summary' appears more than once." "$(body; printf '\n## Summary\n\nAgain.\n')"
 
 valid_parts
-expect_error 'Details after the Checklist fails' 'Keep the sections in the order of .github/PULL_REQUEST_TEMPLATE.md' "$(body; printf '\n## Details\n\nLate.\n')"
+expect_error 'sections out of order fail' 'Keep the sections in the order of .github/PULL_REQUEST_TEMPLATE.md' "$(printf '## Summary\n\n%s\n\n## Target branch\n\n%s\n\n## Type of change\n\n%s\n\n## Checklist\n\n%s\n' "$summary" "$target_branch" "$type_of_change" "$checklist")"
 
 valid_parts
 expect_error 'text above the Summary fails' "Start the description with '## Summary': delete 'Hello reviewers' above it." "$(printf 'Hello reviewers\n\n'; body)"
 
 valid_parts
-details='```markdown
+summary='Renders the example below.
+
+```markdown
 ## Not a section
 ```'
 expect_pass 'a heading inside a fenced code block is not a section' "$(body)"
 
 valid_parts
 base='claude/feature-1'
+summary='Refuses a symlinked cache directory.
+
+Stacked on #41: needs `SymlinkGuard` from it.'
 target_branch='- [x] `1.x` — anything for the next minor release: bug fixes and new features
 - [x] `stacked` — based on another open PR; retarget to the release branch
       ticked above once that PR merges'
-details='Stacked on #41: needs `SymlinkGuard` from it.'
 expect_pass 'a stacked pull request naming its parent passes' "$(body)"
 
 valid_parts
 base='claude/feature-1'
 target_branch='- [x] `1.x` — anything for the next minor release: bug fixes and new features
 - [x] `stacked` — based on another open PR; retarget once that PR merges'
-expect_error 'a stacked pull request that does not name its parent fails' "A stacked pull request names the one it builds on: add 'Stacked on #<number>'" "$(body)"
+expect_error 'a stacked pull request that does not name its parent fails' "A stacked pull request names the one it builds on: end '## Summary' with 'Stacked on #<number>'" "$(body)"
 
 valid_parts
-details='Stacked on #41: needs `SymlinkGuard` from it.'
+summary='Refuses a symlinked cache directory.
+
+Stacked on #41: needs `SymlinkGuard` from it.'
 expect_error 'a parent named on a pull request that is not stacked fails' "This pull request is not stacked: remove 'Stacked on #…' from the description." "$(body)"
 
 valid_parts
+summary='Refuses a symlinked cache directory.
+
+Stacked on #41: needs `SymlinkGuard` from it.'
 target_branch='- [x] `1.x` — anything for the next minor release: bug fixes and new features
 - [x] `stacked` — based on another open PR; retarget once that PR merges'
-details='Stacked on #41: needs `SymlinkGuard` from it.'
 expect_error 'stacked on a release branch fails' "You ticked 'stacked', which means the base should be another PR's feature branch — but this pull request is based on '1.x'." "$(body)"
 
 valid_parts
