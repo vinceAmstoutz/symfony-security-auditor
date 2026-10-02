@@ -93,7 +93,8 @@ final class InitRefusalTest extends TestCase
     public static function handWrittenCases(): iterable
     {
         yield 'the field the platform wants' => ['azure', '"azure" needs a "deployment" name beside the api_key, which "init" does not ask for'];
-        yield 'the file the block goes into' => ['cache.prod', \sprintf('so %s was not written', self::CONFIG_FILE)];
+        yield 'the file the block goes into' => ['azure.prod', \sprintf('so %s was not written', self::CONFIG_FILE)];
+        yield 'a platform wrapping others, which no block can make boot' => ['failover.prod', null];
         yield 'a platform init can write' => ['anthropic', null];
     }
 
@@ -134,6 +135,29 @@ final class InitRefusalTest extends TestCase
         yield 'a container parameter would not survive compilation' => ['ollama', 'http://%host%:11434', 'read as a container parameter'];
         yield 'an env placeholder is the documented way to defer it' => ['ollama', '%env(OLLAMA_ENDPOINT)%', null];
         yield 'a plain origin is accepted' => ['ollama', 'http://localhost:11434', null];
+        yield 'an env processor the run could not resolve is refused up front' => ['ollama', '%env(trim:OLLAMA_ENDPOINT)%', 'The placeholder "%env(trim:OLLAMA_ENDPOINT)%" applies an env processor, and the standalone binary applies none'];
+    }
+
+    #[DataProvider('resolvedBaseUrlCases')]
+    public function test_it_reports_what_is_wrong_with_the_base_url_it_resolved(string $provider, ?string $baseUrl, ?string $expected): void
+    {
+        $refusal = InitRefusal::forResolvedBaseUrl(ProviderKey::of($provider), $provider, $baseUrl);
+
+        null === $expected
+            ? self::assertNull($refusal)
+            : self::assertStringContainsString($expected, (string) $refusal);
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null, string|null}>
+     */
+    public static function resolvedBaseUrlCases(): iterable
+    {
+        yield 'a reference whose name opens with two hex digits is refused' => ['generic.gw', '%BASE_URL%', 'The base URL for "generic.gw" holds a "%" that starts no percent-encoded octet'];
+        yield 'a percent-encoded url is accepted' => ['generic.gw', 'https://gw.example/v1%2Fx', null];
+        yield 'a lone percent is refused' => ['generic.gw', 'https://gw.example/100%', 'and a lone "%" is not valid in one.'];
+        yield 'an env placeholder is accepted' => ['generic.gw', '%env(GATEWAY_URL)%', null];
+        yield 'an env processor the run could not resolve is refused up front' => ['generic.gw', '%env(default::GATEWAY_URL)%', 'The placeholder "%env(default::GATEWAY_URL)%"'];
     }
 
     private static function input(?string $baseUrl = null, ?string $endpoint = null, bool $noApiKey = false, ?string $envVar = null): InitCommandInput

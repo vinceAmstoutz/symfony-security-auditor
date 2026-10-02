@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
@@ -137,6 +138,40 @@ final class AuthRemoveCommandTest extends TestCase
         $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', "platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
     }
 
+    public function test_it_reports_a_store_it_cannot_parse_instead_of_crashing(): void
+    {
+        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', '{not json');
+        $this->filesystem->chmod($this->configHome.'/symfony-security-auditor/credentials.json', 0600);
+
+        $commandTester = $this->commandTester();
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertStringContainsString('are not valid JSON. Run "auth:set" to write them again.', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_reports_a_store_it_cannot_rewrite_instead_of_crashing(): void
+    {
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-to-forget');
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+        $commandTester = new CommandTester(new AuthRemoveCommand(
+            new FilesystemCredentialStore($xdgConfigPathResolver, new class extends Filesystem {
+                #[Override]
+                public function dumpFile(string $filename, $content): void
+                {
+                    throw new IOException(\sprintf('Failed to write "%s".', $filename));
+                }
+            }),
+            new ConfiguredCredentialVariable($xdgConfigPathResolver),
+        ));
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertStringContainsString('could not be written.', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
     private function commandTester(): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
@@ -150,5 +185,36 @@ final class AuthRemoveCommandTest extends TestCase
     private function store(): FilesystemCredentialStore
     {
         return new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null));
+    }
+
+    public function test_it_refuses_a_name_no_environment_variable_can_have(): void
+    {
+        $this->writeConfig();
+
+        self::assertSame(Command::INVALID, $this->commandTester()->execute(['--env-var' => 'not-a-var']));
+    }
+
+    public function test_it_says_what_a_valid_variable_name_looks_like(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--env-var' => 'not-a-var']);
+
+        self::assertStringContainsString('"not-a-var" is not a valid environment variable name', $this->flattened($commandTester));
+    }
+
+    public function test_it_refuses_a_relative_home_override_instead_of_reporting_no_directory(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, null, null, 'relative/home');
+        $commandTester = new CommandTester(new AuthRemoveCommand(
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+            new ConfiguredCredentialVariable($xdgConfigPathResolver),
+        ));
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertStringContainsString('SYMFONY_SECURITY_AUDITOR_HOME is set to "relative/home", which is not an absolute path', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+        self::assertSame(1, substr_count($commandTester->getDisplay(), '[ERROR]'), $commandTester->getDisplay());
+        self::assertStringNotContainsString('ANTHROPIC_API_KEY', $commandTester->getDisplay());
     }
 }

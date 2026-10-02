@@ -16,13 +16,18 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BedrockMantleRoute;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CompoundPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyInstanceName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EnvironmentVariableName;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EnvPlaceholder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformServiceId;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TerminalText;
 
 /**
  * Why `init` will not write a configuration for what it was asked for, as the
@@ -39,8 +44,6 @@ final readonly class InitRefusal
 {
     private const string PICK_A_NAME = 'Pick a plain name such as "%s.my_gateway".';
 
-    private const string ENV_VAR_NAME_PATTERN = '/^[A-Za-z_]\w*$/';
-
     /**
      * Checked on the raw bytes, before `ProviderKeyNormalizer` — its `u()` call
      * throws on non-UTF-8 input, which must refuse rather than crash.
@@ -49,15 +52,28 @@ final readonly class InitRefusal
     {
         return match (true) {
             1 !== preg_match('//u', $provider) => 'The provider must be valid UTF-8 text.',
+            !TerminalText::isPlain($provider) => 'The provider must not hold a control character, a line break or a bidirectional override.',
             '' === $provider => 'The provider must not be empty.',
+            default => null,
+        };
+    }
+
+    /**
+     * Checked before a hand-written platform's block quotes the model, so no
+     * model reaches the terminal before it is known to be plain text.
+     */
+    public static function forModelText(string $model): ?string
+    {
+        return match (true) {
+            1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
+            !TerminalText::isPlain($model) => 'The model must not hold a control character, a line break or a bidirectional override.',
             default => null,
         };
     }
 
     public static function forModel(string $model, ?ProviderKey $providerKey = null): ?string
     {
-        return match (true) {
-            1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
+        return self::forModelText($model) ?? match (true) {
             '' === $model => 'The model must not be empty.',
             !ContainerParameterSyntax::isAbsentFrom($model) => 'The model holds "%...%", which would be read as a container parameter rather than as part of its name. Give the name itself.',
             $providerKey instanceof ProviderKey && BedrockMantleRoute::applies($providerKey) && !BedrockMantleRoute::namesAVendor($model) => \sprintf('Bedrock names a model after its vendor, for example "anthropic.claude-opus-4-8" or "openai.gpt-oss-120b"; "%s" names none, so init cannot tell which Bedrock route serves it. Give the full model id.', $model),
@@ -71,9 +87,7 @@ final readonly class InitRefusal
      */
     public static function forEnvironmentVariable(?string $envVar): ?string
     {
-        return null !== $envVar && 1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)
-            ? \sprintf('"%s" is not a valid environment variable name (letters, digits, and underscores only; must not start with a digit).', $envVar)
-            : null;
+        return null !== $envVar ? EnvironmentVariableName::violationFor($envVar) : null;
     }
 
     public static function forProvider(ProviderKey $providerKey, string $provider, InitCommandInput $initCommandInput): ?string
@@ -82,7 +96,8 @@ final readonly class InitRefusal
             return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
         }
 
-        return self::forInstanceShape($providerKey, $provider)
+        return self::forCompoundPlatform($providerKey, $provider)
+            ?? self::forInstanceShape($providerKey, $provider)
             ?? self::forInapplicableBaseUrl($providerKey, $provider, $initCommandInput->baseUrl)
             ?? self::forInapplicableEndpoint($providerKey, $provider, $initCommandInput->endpoint)
             ?? self::forContradictoryCredentialOptions($initCommandInput)
@@ -97,9 +112,7 @@ final readonly class InitRefusal
                 : null;
         }
 
-        return ContainerParameterSyntax::isAbsentFrom($endpoint)
-            ? null
-            : \sprintf('The endpoint for "%s" holds "%%...%%", which would be read as a container parameter rather than as part of the URL. Give the URL itself, or "%%env(VAR)%%" to read it from the environment.', $provider);
+        return self::forUrl('endpoint', $provider, $endpoint);
     }
 
     public static function forResolvedBaseUrl(ProviderKey $providerKey, string $provider, ?string $baseUrl): ?string
@@ -110,9 +123,24 @@ final readonly class InitRefusal
                 : null;
         }
 
-        return ContainerParameterSyntax::isAbsentFrom($baseUrl)
+        return self::forUrl('base URL', $provider, $baseUrl);
+    }
+
+    /**
+     * A whole-value `%env()%` is read by the standalone resolver, so it is held
+     * to the spellings that resolver reads; anything else must not be taken
+     * for a container parameter.
+     */
+    private static function forUrl(string $setting, string $provider, string $url): ?string
+    {
+        $envPlaceholder = EnvPlaceholder::in($url);
+        if ($envPlaceholder instanceof EnvPlaceholder) {
+            return EnvironmentVariableName::isValid($envPlaceholder->variableName) ? null : UnsupportedEnvPlaceholderException::forPlaceholder($envPlaceholder)->getMessage();
+        }
+
+        return ContainerParameterSyntax::isAbsentFromUrl($url)
             ? null
-            : \sprintf('The base URL for "%s" holds "%%...%%", which would be read as a container parameter rather than as part of the URL. Give the URL itself, or "%%env(VAR)%%" to read it from the environment.', $provider);
+            : \sprintf('The %s for "%s" holds a "%%" that starts no percent-encoded octet (such as "%%2F"): a "%%NAME%%" would be read as a container parameter rather than as part of the URL, and a lone "%%" is not valid in one. Give the URL itself, or "%%env(VAR)%%" to read it from the environment.', $setting, $provider);
     }
 
     /**
@@ -126,6 +154,20 @@ final readonly class InitRefusal
 
         return null !== $requirement
             ? \sprintf('"%s" needs %s, which "init" does not ask for, so %s was not written. Its bridge is installed: paste the block below into that file and replace every <placeholder>.', $provider, $requirement, $configFile)
+            : null;
+    }
+
+    /**
+     * Named before the instance shape: whatever instance the provider names,
+     * nothing written for such a platform boots in the standalone binary, so
+     * neither a block to paste nor its bridge is offered.
+     */
+    private static function forCompoundPlatform(ProviderKey $providerKey, string $provider): ?string
+    {
+        $service = CompoundPlatforms::serviceNeededBy($providerKey);
+
+        return null !== $service
+            ? \sprintf('"%1$s" wraps other platforms through %2$s, which only a Symfony application defines: the standalone binary has none and its config file cannot declare one, so nothing was written and no bridge was installed. Configure the platform it would wrap directly, or use %3$s from the bundle inside a Symfony application.', $provider, $service, $providerKey->platform)
             : null;
     }
 

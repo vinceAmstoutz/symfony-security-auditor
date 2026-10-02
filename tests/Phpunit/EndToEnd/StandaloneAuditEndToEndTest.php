@@ -199,7 +199,7 @@ final class StandaloneAuditEndToEndTest extends TestCase
         $missingCredentialFile = \sprintf('%s/absent-api-key', $this->configHome);
 
         $this->expectException(UnreadableCredentialFileException::class);
-        $this->expectExceptionMessage($missingCredentialFile);
+        $this->expectExceptionMessage('through "PROVIDER_API_KEY_FILE"');
 
         $this->runWithCredentialFromFile(\sprintf('%s %s', AuditCommand::NAME, $this->projectDir), $missingCredentialFile);
     }

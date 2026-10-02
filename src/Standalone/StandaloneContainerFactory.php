@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
 use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use Symfony\AI\AiBundle\AiBundle;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Clock\NativeClock;
@@ -38,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
@@ -46,6 +48,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
  */
 final readonly class StandaloneContainerFactory
 {
+    private const string CONFIG_NOTICES_PARAMETER = 'symfony_security_auditor.config_notices';
+
+    private const string PROJECT_CONFIG_NOTICE = 'Project config %s is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.';
+
     private const string PLATFORM_TAG = 'ai.platform';
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
@@ -60,6 +66,7 @@ final readonly class StandaloneContainerFactory
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     public function create(StandaloneConfig $standaloneConfig, string $cacheDir): ContainerBuilder
     {
@@ -82,9 +89,15 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->register(ClockInterface::class, NativeClock::class);
         $containerBuilder->register('http_client', HttpClientInterface::class)->setFactory([HttpClient::class, 'create']);
 
-        $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
+        try {
+            $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
+        } catch (RuntimeException $runtimeException) {
+            throw ProviderBridgeException::forBundleFailure($runtimeException) ?? $runtimeException;
+        }
+
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), $standaloneConfig->auditConfig, $containerBuilder);
 
+        $this->announceProjectConfig($containerBuilder, $standaloneConfig->projectConfigFile);
         $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
@@ -95,6 +108,26 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    /**
+     * The audited repository may tune the run through its own config file, so
+     * the audit header says which file was layered in: a stricter `fail_on` or
+     * another model coming from the checkout rather than from the user's own
+     * file would otherwise be silent.
+     */
+    private function announceProjectConfig(ContainerBuilder $containerBuilder, ?string $projectConfigFile): void
+    {
+        if (null === $projectConfigFile) {
+            return;
+        }
+
+        $notices = $containerBuilder->getParameter(self::CONFIG_NOTICES_PARAMETER);
+
+        $containerBuilder->setParameter(self::CONFIG_NOTICES_PARAMETER, [
+            ...(\is_array($notices) ? $notices : []),
+            \sprintf(self::PROJECT_CONFIG_NOTICE, ContainerParameterSyntax::escape($projectConfigFile)),
+        ]);
     }
 
     /**

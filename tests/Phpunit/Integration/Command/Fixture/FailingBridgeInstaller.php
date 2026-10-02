@@ -29,7 +29,7 @@ final class FailingBridgeInstaller implements BridgeInstallerInterface
      * @throws BridgeInstallationFailedException
      */
     #[Override]
-    public function install(string $provider, string $targetDirectory): void
+    public function install(string $provider, string $targetDirectory, string ...$moreProviders): void
     {
         throw BridgeInstallationFailedException::forFailedProcess($provider, 'simulated outage');
     }

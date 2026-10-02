@@ -61,10 +61,10 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
      */
     private function connection(?string $apiKeyEnvironmentVariable, ?string $baseUrl, ?string $endpoint): array
     {
-        $connection = null !== $baseUrl ? ['base_url' => $baseUrl] : [];
+        $connection = null !== $baseUrl ? ['base_url' => ContainerParameterSyntax::literal($baseUrl)] : [];
 
         if (null !== $endpoint) {
-            $connection['endpoint'] = $endpoint;
+            $connection['endpoint'] = ContainerParameterSyntax::literal($endpoint);
         }
 
         if (null !== $apiKeyEnvironmentVariable) {

@@ -111,16 +111,53 @@ final readonly class XdgConfigPathResolver
             ?? throw UnresolvableConfigPathException::missingHome();
     }
 
-    private function applicationHomeBase(string $homeRelativeFallback): ?string
+    /**
+     * Why the `SYMFONY_SECURITY_AUDITOR_HOME` override cannot be used, or null
+     * when it can or is not set — for a caller that would otherwise read the
+     * refusal as no directory at all.
+     */
+    public function applicationHomeRefusal(): ?string
     {
-        $applicationHome = $this->absoluteBase($this->applicationHome);
+        try {
+            $this->applicationHomeBase('');
+        } catch (UnresolvableConfigPathException $unresolvableConfigPathException) {
+            return $unresolvableConfigPathException->getMessage();
+        }
 
-        return null !== $applicationHome ? \sprintf('%s/%s', $applicationHome, $homeRelativeFallback) : null;
+        return null;
     }
 
+    /**
+     * Unlike `$HOME` or an XDG variable, the override is only ever set on
+     * purpose, so a relative one is refused rather than skipped: falling back
+     * would quietly put the config back in the root-owned directory it was set
+     * to escape.
+     *
+     * @throws UnresolvableConfigPathException
+     */
+    private function applicationHomeBase(string $homeRelativeFallback): ?string
+    {
+        if (null === $this->applicationHome || '' === $this->applicationHome) {
+            return null;
+        }
+
+        if (!$this->isAbsolutePath($this->applicationHome)) {
+            throw UnresolvableConfigPathException::relativeApplicationHome(self::HOME_OVERRIDE_VARIABLE, $this->applicationHome);
+        }
+
+        return \sprintf('%s/%s', $this->applicationHome, $homeRelativeFallback);
+    }
+
+    /**
+     * A relative `$HOME` gets the same treatment as a relative XDG variable:
+     * resolving it against the audited project's directory would put the
+     * config, the credentials and the cache inside the repository.
+     */
     private function osHomeBase(string $homeRelativeFallback): ?string
     {
-        return null !== $this->home && '' !== $this->home ? \sprintf('%s/%s', $this->home, $homeRelativeFallback) : null;
+        $home = $this->absoluteBase($this->home);
+
+        return null !== $home ? \sprintf('%s/%s', $home, $homeRelativeFallback) : null;
     }
 
     private function absoluteBase(?string $path): ?string

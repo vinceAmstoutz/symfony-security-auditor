@@ -93,4 +93,46 @@ final class ConfiguredCredentialVariableTest extends TestCase
     {
         return new ConfiguredCredentialVariable(new XdgConfigPathResolver($this->configHome, null, null));
     }
+
+    public function test_it_names_the_variable_of_the_provider_the_configuration_selects(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        self::assertSame('OPENAI_API_KEY', $this->configuredCredentialVariable()->name());
+    }
+
+    public function test_it_names_the_variable_of_the_selected_instance(): void
+    {
+        $this->writeConfig("provider: generic.gateway\nplatform:\n    generic:\n        default:\n            api_key: '%env(DEFAULT_TOKEN)%'\n        gateway:\n            api_key: '%env(GATEWAY_TOKEN)%'\n");
+
+        self::assertSame('GATEWAY_TOKEN', $this->configuredCredentialVariable()->name());
+    }
+
+    public function test_it_names_no_variable_when_the_selected_provider_is_not_configured(): void
+    {
+        $this->writeConfig("provider: mistral\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+
+        self::assertNull($this->configuredCredentialVariable()->name());
+    }
+
+    public function test_it_ignores_a_blank_provider_selector(): void
+    {
+        $this->writeConfig("provider: ''\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+
+        self::assertSame('ANTHROPIC_API_KEY', $this->configuredCredentialVariable()->name());
+    }
+
+    public function test_it_says_when_the_variable_names_a_credential_file(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%'\n");
+
+        self::assertTrue($this->configuredCredentialVariable()->placeholder()?->readsFile);
+    }
+
+    public function test_it_says_when_the_variable_holds_the_key_itself(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+
+        self::assertFalse($this->configuredCredentialVariable()->placeholder()?->readsFile);
+    }
 }

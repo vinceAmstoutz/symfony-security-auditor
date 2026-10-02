@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInsta
 final class RecordingBridgeInstaller implements BridgeInstallerInterface
 {
     /**
-     * @var list<array{string, string}>
+     * @var list<list<string>>
      */
     public array $installations = [];
 
@@ -32,8 +32,8 @@ final class RecordingBridgeInstaller implements BridgeInstallerInterface
      * @throws void
      */
     #[Override]
-    public function install(string $provider, string $targetDirectory): void
+    public function install(string $provider, string $targetDirectory, string ...$moreProviders): void
     {
-        $this->installations[] = [$provider, $targetDirectory];
+        $this->installations[] = [$provider, $targetDirectory, ...array_values($moreProviders)];
     }
 }

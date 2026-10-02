@@ -22,7 +22,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  */
 final readonly class EnvPlaceholder
 {
-    private const string PATTERN = '/^%env\(([^)]+)\)%$/';
+    private const string PATTERN = '/^%env\(([^)]+)\)%$/D';
 
     private const string FILE_PROCESSOR = 'file:';
 

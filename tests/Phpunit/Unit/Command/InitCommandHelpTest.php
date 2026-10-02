@@ -58,4 +58,9 @@ final class InitCommandHelpTest extends TestCase
     {
         self::assertStringContainsString('still gets its bridge installed, and the block to complete by hand is printed instead', InitCommandHelp::HELP);
     }
+
+    public function test_it_says_the_platforms_wrapping_others_run_only_from_the_bundle(): void
+    {
+        self::assertStringContainsString('cache and failover, which wrap other platforms through services only a Symfony application defines, run from the bundle alone', InitCommandHelp::HELP);
+    }
 }

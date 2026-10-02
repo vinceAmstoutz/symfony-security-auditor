@@ -14,11 +14,14 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
 use Closure;
+use JsonException;
 use Override;
+use stdClass;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Process;
+use UnexpectedValueException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 
 /**
@@ -61,23 +64,33 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     private const string MANIFEST_FILENAME = 'composer.json';
 
+    private const string PLATFORM_PACKAGE = 'symfony/ai-platform';
+
     /**
-     * @param Closure(string, string): Process $processBuilder     the composer-require command builder (use self::defaultProcessBuilder() in production); tests inject a stub
-     * @param string                           $platformPhpVersion the PHP version the bridge tree must resolve for — defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
+     * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::defaultProcessBuilder() in production); tests inject a stub
+     * @param string                                               $platformPhpVersion the PHP version the bridge tree must resolve for — defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
+     * @param ?string                                              $aiPlatformPin      the `symfony/ai-platform` release the bridge tree is held to — the one this binary bundles ({@see BundledAiPlatformVersion}), so a newer release the bridge would otherwise pull in cannot shadow the bundled classes; null writes no pin
      */
     public function __construct(
         private Closure $processBuilder,
         private Filesystem $filesystem = new Filesystem(),
         private string $platformPhpVersion = \PHP_VERSION,
+        private ?string $aiPlatformPin = null,
     ) {}
 
     /**
-     * @return Closure(string, string): Process
+     * The pin is named on the command line as well as in the manifest:
+     * composer then moves an already installed newer `symfony/ai-platform`
+     * back to it, where the manifest pin alone would only report a conflict.
+     *
+     * @return Closure(string, ?string, string, string...): Process
      */
     public static function defaultProcessBuilder(): Closure
     {
-        return static function (string $package, string $targetDirectory): Process {
-            $process = new Process(['composer', 'require', $package, \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction']);
+        return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process {
+            $packages = [$package, ...$morePackages];
+            $required = null === $aiPlatformPin ? $packages : [...$packages, \sprintf('%s:%s', self::PLATFORM_PACKAGE, $aiPlatformPin)];
+            $process = new Process(['composer', 'require', ...$required, \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction']);
             $process->setTimeout(null);
 
             return $process;
@@ -85,24 +98,29 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
+     * Every bridge goes into one `composer require`, so a platform that also
+     * needs another's bridge resolves the tree once rather than twice.
+     *
      * @throws BridgeInstallationFailedException
      */
     #[Override]
-    public function install(string $provider, string $targetDirectory): void
+    public function install(string $provider, string $targetDirectory, string ...$moreProviders): void
     {
         $this->ensureComposerProject($targetDirectory);
 
         $package = self::packageFor($provider);
-        $process = ($this->processBuilder)($package, $targetDirectory);
+        $morePackages = array_map(self::packageFor(...), $moreProviders);
+        $process = ($this->processBuilder)($package, $this->aiPlatformPin, $targetDirectory, ...$morePackages);
+        $packageNames = implode('", "', [$package, ...$morePackages]);
 
         try {
             $process->run();
         } catch (ExceptionInterface $exception) {
-            throw BridgeInstallationFailedException::forUnavailableComposer($package, $exception);
+            throw BridgeInstallationFailedException::forUnavailableComposer($packageNames, $exception);
         }
 
         if (!$process->isSuccessful()) {
-            throw BridgeInstallationFailedException::forFailedProcess($package, $process->getErrorOutput());
+            throw BridgeInstallationFailedException::forFailedProcess($packageNames, $process->getErrorOutput());
         }
     }
 
@@ -118,6 +136,15 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
+     * The platform a bridge package's slug stands for — the reverse of
+     * {@see packageFor()}.
+     */
+    public static function platformForSlug(string $slug): string
+    {
+        return array_flip(self::PACKAGE_SLUG_OVERRIDES)[$slug] ?? $slug;
+    }
+
+    /**
      * @throws BridgeInstallationFailedException
      */
     private function ensureComposerProject(string $targetDirectory): void
@@ -125,32 +152,64 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         $manifest = \sprintf('%s/%s', $targetDirectory, self::MANIFEST_FILENAME);
         $this->assertSafeToWrite($manifest, $targetDirectory);
 
-        if ($this->filesystem->exists($manifest)) {
-            return;
-        }
+        $contents = $this->pinnedManifest($this->existingManifest($manifest));
 
         try {
-            $this->filesystem->dumpFile($manifest, $this->manifestContents());
+            $this->filesystem->dumpFile($manifest, $contents);
         } catch (IOException $ioException) {
             throw BridgeInstallationFailedException::forManifestWriteFailure($targetDirectory, $ioException);
         }
     }
 
     /**
-     * Pins `config.platform.php` so `composer require` resolves the bridge for
-     * the runtime that will load it. The standalone binary bundles its own PHP;
-     * without this, `init` resolves against the host's (possibly newer) PHP and
-     * the binary then aborts in `vendor/composer/platform_check.php`.
+     * Decoded as objects, not associative arrays, so an empty JSON object such
+     * as `config.allow-plugins: {}` survives the round-trip: `json_decode(...,
+     * true)` turns `{}` into `[]`, which `json_encode` writes back as `[]`, and
+     * Composer then rejects the manifest ("Array value found, but an object is
+     * required") — bricking every later `init` on the tree.
+     *
+     * @throws BridgeInstallationFailedException
      */
-    private function manifestContents(): string
+    private function existingManifest(string $manifest): stdClass
     {
-        return \sprintf(
-            "%s\n",
-            json_encode(
-                ['config' => ['platform' => ['php' => $this->platformPhpVersion]]],
-                \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR,
-            ),
-        );
+        if (!$this->filesystem->exists($manifest)) {
+            return new stdClass();
+        }
+
+        try {
+            $decoded = json_decode($this->filesystem->readFile($manifest), false, flags: \JSON_THROW_ON_ERROR);
+        } catch (IOException|JsonException $failure) {
+            throw BridgeInstallationFailedException::forUnreadableManifest($manifest, $failure);
+        }
+
+        return $decoded instanceof stdClass ? $decoded : throw BridgeInstallationFailedException::forUnreadableManifest($manifest, new UnexpectedValueException('The manifest is not a JSON object.'));
+    }
+
+    /**
+     * Pins `config.platform.php` so `composer require` resolves the bridge for
+     * the runtime that will load it — the standalone binary bundles its own
+     * PHP; resolved against the host's, the tree aborts in the binary's
+     * `vendor/composer/platform_check.php` — and `symfony/ai-platform` to the
+     * release the binary bundles. Both pins are refreshed on every install, so
+     * a manifest written by an older release is corrected rather than kept
+     * forever; every other key is preserved.
+     */
+    private function pinnedManifest(stdClass $manifest): string
+    {
+        $config = ($manifest->config ?? null) instanceof stdClass ? $manifest->config : new stdClass();
+        $platform = ($config->platform ?? null) instanceof stdClass ? $config->platform : new stdClass();
+        $platform->php = $this->platformPhpVersion;
+
+        $config->platform = $platform;
+        $manifest->config = $config;
+
+        if (null !== $this->aiPlatformPin) {
+            $require = ($manifest->require ?? null) instanceof stdClass ? (array) $manifest->require : [];
+            $require[self::PLATFORM_PACKAGE] = $this->aiPlatformPin;
+            $manifest->require = $require;
+        }
+
+        return \sprintf("%s\n", json_encode($manifest, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR));
     }
 
     /**

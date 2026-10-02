@@ -22,8 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
-
-use function Symfony\Component\String\b;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 
 /** @internal not part of the BC promise — the command *name* (`auth:set`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
@@ -36,17 +35,18 @@ final readonly class AuthSetCommand
     public function __construct(
         private CredentialStoreInterface $credentialStore,
         private ConfiguredCredentialVariable $configuredCredentialVariable,
+        private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
     ) {}
 
-    /**
-     * @throws CredentialStoreWriteException
-     * @throws UnreadableCredentialStoreException
-     */
     public function __invoke(
         SymfonyStyle $symfonyStyle,
         #[Option(description: 'Environment variable to store the key under; defaults to the one your configuration reads')]
         ?string $envVar = null,
     ): int {
+        if (ApplicationHomeRefusal::reported($symfonyStyle, $this->configuredCredentialVariable)) {
+            return Command::FAILURE;
+        }
+
         $variableName = $envVar ?? $this->configuredCredentialVariable->name();
         if (null === $variableName) {
             $symfonyStyle->error('No API-key variable is configured yet. Run "init" first, or name one explicitly with --env-var.');
@@ -54,33 +54,42 @@ final readonly class AuthSetCommand
             return Command::INVALID;
         }
 
-        $credential = $this->askForCredential($symfonyStyle, $variableName);
+        if (EnvironmentVariableRefusal::reported($symfonyStyle, $variableName)) {
+            return Command::INVALID;
+        }
+
+        $location = $this->credentialStore->location();
+        if (null === $location) {
+            $symfonyStyle->error(CredentialStoreWriteException::forUnresolvableLocation()->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        try {
+            $credential = $this->credentialPrompt->ask($symfonyStyle, \sprintf('Paste the API key for %s (input stays hidden)', $variableName));
+        } catch (HiddenInputUnavailableException) {
+            $symfonyStyle->error(\sprintf('This terminal cannot hide what you type, so the key was not asked for. Run this command on a terminal that can, or export %s instead.', $variableName));
+
+            return Command::INVALID;
+        }
+
         if (null === $credential) {
             $symfonyStyle->error(\sprintf('Nothing to store. Re-run this command on a terminal that can prompt, or export %s instead.', $variableName));
 
             return Command::INVALID;
         }
 
-        $this->credentialStore->write($variableName, $credential);
+        try {
+            $this->credentialStore->write($variableName, $credential);
+        } catch (CredentialStoreWriteException|UnreadableCredentialStoreException $exception) {
+            $symfonyStyle->error($exception->getMessage());
 
-        $location = $this->credentialStore->location();
-        \assert(null !== $location, 'A store that accepted a credential knows where it put it');
+            return Command::FAILURE;
+        }
 
         $symfonyStyle->success($this->storedMessage($variableName, $location, CredentialIdentity::of($credential)));
 
         return Command::SUCCESS;
-    }
-
-    /**
-     * A pasted key routinely carries the newline or the stray space that came
-     * with it, and the provider rejects those without saying why.
-     */
-    private function askForCredential(SymfonyStyle $symfonyStyle, string $variableName): ?string
-    {
-        $answer = $symfonyStyle->askHidden(\sprintf('Paste the API key for %s (input stays hidden)', $variableName));
-        $credential = b(\is_string($answer) ? $answer : '')->trim()->toString();
-
-        return '' !== $credential ? $credential : null;
     }
 
     private function storedMessage(string $variableName, string $location, CredentialIdentity $credentialIdentity): string

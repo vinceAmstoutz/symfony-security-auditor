@@ -29,12 +29,14 @@ Entries in this section apply only to the standalone binary (`init`, `self-updat
 - **`No provider is configured — run "init".`** — no `platform:` block in `config.yaml`; run `init`.
 - **`The environment variable "<VAR>", referenced by your config, is not set.`** (reported under the `API key` label) — export the `%env(VAR)%` variable your `platform:` block references.
 - **`Config file "<path>" is not valid YAML: <detail>`** — fix the malformed `config.yaml` or `.symfony-security-auditor.yaml` at `<path>`.
-- **Cannot resolve the user configuration directory** — set `$HOME`, or set `SYMFONY_SECURITY_AUDITOR_HOME` to a writable directory:
+- **Cannot resolve the user configuration directory** — set `$HOME`, or set `SYMFONY_SECURITY_AUDITOR_HOME` to the absolute path of a writable directory:
 
   ```text
   Cannot resolve the user configuration directory: neither the relevant XDG
-  base-directory variable nor $HOME is set.
+  base-directory variable nor $HOME holds an absolute path.
   ```
+
+  When it names `SYMFONY_SECURITY_AUDITOR_HOME` instead, the override holds a relative path: give it an absolute one, or unset it.
 
 Running `audit`/`init` directly without `doctor` first hits the same underlying failures.
 
@@ -100,6 +102,10 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
   ```
 
 - **Replacement failed mid-swap** — `Failed to replace the binary at "<path>": <reason>`, followed by `The update was not applied: the previous version is still installed.`, on stderr, and the command exits `1`. The new binary is moved into place as the command exits, not while it runs — the running process still loads classes from the archive being replaced — so this one surfaces after `Downloaded and verified <new>; it replaces <old> as this command exits.` has printed. The previous binary is left in place, so re-running `self-update` is safe.
+
+### Every command warns `The provider bridge under "…" cannot be loaded by this binary`
+
+The bridge tree under the data directory was resolved for another PHP than the one the binary bundles — typically a `composer.json` written by a release before 1.15, which pinned no PHP version — so Composer's `platform_check.php` refuses it. The binary prints that warning, naming the data directory, on stderr and runs the command without the bridge: `init`, `self-update` and `--version` work, and `audit` stops at the missing bridge with `ProviderBridgeException`. Run `init --provider=<platform>` again: it rewrites the manifest with the PHP and `symfony/ai-platform` pins and reinstalls the bridge.
 
 ### `init` fails to install the provider bridge
 

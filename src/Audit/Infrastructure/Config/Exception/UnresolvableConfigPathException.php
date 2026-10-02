@@ -20,6 +20,11 @@ final class UnresolvableConfigPathException extends RuntimeException
 {
     public static function missingHome(): self
     {
-        return new self('Cannot resolve the user configuration directory: neither the relevant XDG base-directory variable nor $HOME is set.');
+        return new self('Cannot resolve the user configuration directory: neither the relevant XDG base-directory variable nor $HOME holds an absolute path.');
+    }
+
+    public static function relativeApplicationHome(string $variable, string $value): self
+    {
+        return new self(\sprintf('Cannot resolve the user configuration directory: %1$s is set to "%2$s", which is not an absolute path. Resolved against the directory the command runs in, it would put the config, the credentials and the cache inside whatever project is being audited. Set %1$s to an absolute path, or unset it.', $variable, $value));
     }
 }

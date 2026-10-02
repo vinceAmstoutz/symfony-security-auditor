@@ -139,7 +139,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
         if ('' !== $cost->primaryModel()) {
             $lines = [];
-            $lines[] = \sprintf('Model : %s', $cost->primaryModel());
+            $lines[] = \sprintf('Model : %s', OutputFormatter::escape($cost->primaryModel()));
             $lines[] = \sprintf(
                 'Tokens: %s in / %s out (total: %s)',
                 number_format($cost->inputTokens()),
@@ -152,7 +152,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                 $lines[] = \sprintf(
                     '  %-8s (%s): $%s — %s in / %s out',
                     $role,
-                    $entry['model'],
+                    OutputFormatter::escape($entry['model']),
                     number_format($entry['estimated_cost_usd'], 4, '.', ''),
                     number_format($entry['input_tokens']),
                     number_format($entry['output_tokens']),

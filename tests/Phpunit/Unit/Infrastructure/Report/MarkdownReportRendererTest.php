@@ -103,6 +103,16 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_escapes_markup_in_the_primary_model(): void
+    {
+        $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('<details>[claude](https://evil.example)')));
+
+        self::assertStringContainsString('**Model:** &lt;details&gt;\\[claude\\](https://evil.example) ·', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_unknown_model_when_the_primary_model_is_blank(): void
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('')));

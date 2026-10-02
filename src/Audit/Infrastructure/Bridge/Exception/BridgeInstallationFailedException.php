@@ -29,6 +29,11 @@ final class BridgeInstallationFailedException extends RuntimeException
         return new self(\sprintf('Installing the "%s" provider bridge failed: %s', $package, '' !== $errorOutput ? $errorOutput : 'unknown error'));
     }
 
+    public static function forUnreadableManifest(string $manifest, Throwable $throwable): self
+    {
+        return new self(\sprintf('Could not read the composer manifest "%s" of the bridge directory: %s Fix or delete it, then run init again.', $manifest, $throwable->getMessage()), previous: $throwable);
+    }
+
     public static function forManifestWriteFailure(string $targetDirectory, Throwable $throwable): self
     {
         return new self(\sprintf('Could not initialize a composer project in "%s": %s', $targetDirectory, $throwable->getMessage()), previous: $throwable);

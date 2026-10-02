@@ -29,10 +29,8 @@ final readonly class HandWrittenPlatformBlock
      */
     public const array CONNECTIONS = [
         'azure' => ['base_url' => 'https://<resource>.openai.azure.com', 'deployment' => '<deployment>', 'api_version' => '<api version>', 'api_key' => '%env(AZURE_API_KEY)%'],
-        'cache' => ['platform' => 'ai.platform.<platform to cache>'],
         'cartesia' => ['api_key' => '%env(CARTESIA_API_KEY)%', 'version' => '<api version>'],
         'dockermodelrunner' => ['host_url' => 'http://127.0.0.1:12434'],
-        'failover' => ['platforms' => ['ai.platform.<first choice>', 'ai.platform.<fallback>']],
         'higgsfield' => ['api_key' => '%env(HIGGSFIELD_API_KEY)%', 'api_secret' => '%env(HIGGSFIELD_API_SECRET)%'],
         'lmstudio' => ['host_url' => 'http://127.0.0.1:1234'],
         'transformersphp' => [],

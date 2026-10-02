@@ -20,6 +20,7 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
@@ -29,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneP
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
 
@@ -53,6 +55,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -71,6 +74,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     public function test_offline_only_refuses_to_boot_against_a_remote_platform(): void
     {
@@ -91,6 +95,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -112,6 +117,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -132,6 +138,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -155,6 +162,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[DataProvider('servingPlatformCases')]
     #[RunInSeparateProcess]
@@ -185,6 +193,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -209,6 +218,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     public function test_it_rejects_a_selector_absent_from_the_platform_block(): void
@@ -227,6 +237,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     public function test_it_does_not_offer_instances_for_a_platform_configured_without_one(): void
@@ -248,6 +259,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     public function test_it_names_the_configured_instances_when_the_selected_one_does_not_exist(): void
@@ -269,6 +281,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     public function test_it_names_the_configured_instances_when_an_instance_keyed_platform_is_selected_without_one(): void
@@ -290,6 +303,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -313,6 +327,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     public function test_it_rejects_several_platforms_without_a_selector(): void
@@ -325,6 +340,134 @@ final class StandaloneContainerFactoryTest extends TestCase
                 new StandalonePlatformConfig(['generic' => ['primary' => ['base_url' => 'http://a'], 'secondary' => ['base_url' => 'http://b']]]),
             ),
             $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    public function test_a_platform_whose_bridge_is_not_installed_is_answered_with_the_init_command(): void
+    {
+        $this->expectException(ProviderBridgeException::class);
+        $this->expectExceptionMessage('Run "symfony-security-auditor init --provider=anthropic" to download it');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['anthropic' => ['api_key' => 'sk-test']])),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    public function test_the_init_advice_names_the_platform_whose_bridge_is_missing_not_the_selected_provider(): void
+    {
+        $this->expectException(ProviderBridgeException::class);
+        $this->expectExceptionMessage('init --provider=anthropic"');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']], 'anthropic' => ['api_key' => 'sk-test']], 'generic.default')),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    public function test_any_other_failure_of_the_bundle_keeps_its_own_exception(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => 'not a platform block'])),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_announces_the_project_config_layered_over_the_user_config_after_the_other_notices(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['audit' => ['reviewer_max_concurrent' => 2, 'reviewer_tools_enabled' => true, 'attacker_max_concurrent' => 2, 'structured_collection' => false]],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+                '/repo/.symfony-security-auditor.yaml',
+            ),
+            $this->cacheDir,
+        );
+
+        self::assertSame(
+            [
+                'audit.reviewer_max_concurrent > 1 has no effect while audit.reviewer_tools_enabled is true: tool-using reviews run sequentially. Drop reviewer_tools_enabled to review concurrently, or set reviewer_max_concurrent: 1 to silence this.',
+                'audit.attacker_max_concurrent > 1 has no effect while audit.structured_collection is false: the JSON-parsing attacker analyses chunks sequentially. Re-enable structured_collection to analyse concurrently, or set attacker_max_concurrent: 1 to silence this.',
+                'Project config /repo/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.',
+            ],
+            $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_announces_no_project_config_when_none_was_layered_in(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+
+        self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_project_config_path_containing_a_percent_is_escaped_so_it_does_not_abort_the_container(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                [],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+                '/repo/%weird%/.symfony-security-auditor.yaml',
+            ),
+            $this->cacheDir,
+        );
+
+        self::assertSame(
+            ['Project config /repo/%weird%/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.'],
+            $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
         );
     }
 }

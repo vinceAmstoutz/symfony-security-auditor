@@ -25,4 +25,9 @@ final class MissingEnvironmentVariableException extends RuntimeException
             $name,
         ));
     }
+
+    public static function forSetting(string $name): self
+    {
+        return new self(\sprintf('The environment variable "%s", referenced by your config, is not set.', $name));
+    }
 }

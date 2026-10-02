@@ -24,7 +24,7 @@ final class UnreadableCredentialStoreException extends RuntimeException
             'The stored credentials at "%s" are readable by other users on this machine (permissions %04o). Anyone who could read them may already have your API key, so rotate it with your provider, then run "chmod 600 %s".',
             $path,
             $mode,
-            $path,
+            self::shellQuoted($path),
         ));
     }
 
@@ -36,5 +36,14 @@ final class UnreadableCredentialStoreException extends RuntimeException
     public static function forMalformedContent(string $path): self
     {
         return new self(\sprintf('The stored credentials at "%s" are not valid JSON. Run "auth:set" to write them again.', $path));
+    }
+
+    /**
+     * The command is meant to be pasted into a POSIX shell — the only kind the
+     * permission check runs under — so the path survives spaces and quotes.
+     */
+    private static function shellQuoted(string $path): string
+    {
+        return \sprintf("'%s'", str_replace("'", "'\\''", $path));
     }
 }

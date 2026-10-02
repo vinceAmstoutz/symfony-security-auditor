@@ -20,9 +20,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -33,10 +35,22 @@ final readonly class StandaloneConfigLoader
 
     private const array SCAN_SURFACE_KEYS = ['import_sarif'];
 
+    /**
+     * What a run spends, trusts and writes is the user's to decide: the
+     * audited repository may tune what is audited and how, not lift the
+     * budget cap, switch secret scrubbing or the offline guard off, put words
+     * in the attacker's system prompt or in the risk markers it is handed, or
+     * aim the cache at files it ships.
+     */
+    private const array USER_ONLY_PATHS = ['cache', 'privacy', 'audit.custom_skills', 'scan.secret_scrubbing', 'scan.custom_risk_patterns'];
+
+    private const array BUDGET_CAPS = ['max_tokens', 'max_cost_usd'];
+
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandalonePlatformConfigResolver $standalonePlatformConfigResolver,
         private ?string $projectConfigFile = null,
+        private ProjectConfigValueGuard $projectConfigValueGuard = new ProjectConfigValueGuard(),
     ) {}
 
     /**
@@ -48,18 +62,23 @@ final readonly class StandaloneConfigLoader
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function load(bool $credentialsRequired = true): StandaloneConfig
     {
-        $rawConfig = $this->merge(
-            $this->read($this->xdgConfigPathResolver->configFile()),
-            $this->readProjectConfig(),
-        );
+        $userConfig = $this->read($this->xdgConfigPathResolver->configFile());
+        $rawConfig = $this->merge($userConfig, $this->readProjectConfig($userConfig));
 
         $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig, $credentialsRequired);
         $auditConfig = array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS));
 
-        return new StandaloneConfig($auditConfig, $standalonePlatformConfig);
+        return new StandaloneConfig($auditConfig, $standalonePlatformConfig, $this->existingProjectConfigFile());
+    }
+
+    private function existingProjectConfigFile(): ?string
+    {
+        return null !== $this->projectConfigFile && is_file($this->projectConfigFile) ? $this->projectConfigFile : null;
     }
 
     /**
@@ -98,28 +117,155 @@ final readonly class StandaloneConfigLoader
      * the connection would let it point the user's resolved API credentials at
      * an endpoint of its choosing.
      *
+     * @param array<array-key, mixed> $userConfig
+     *
      * @return array<array-key, mixed>
      *
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
      */
-    private function readProjectConfig(): array
+    private function readProjectConfig(array $userConfig): array
     {
         if (null === $this->projectConfigFile) {
             return [];
         }
 
+        if (is_link($this->projectConfigFile)) {
+            throw MalformedProjectConfigException::forSymlink($this->projectConfigFile);
+        }
+
         $projectConfig = $this->read($this->projectConfigFile);
+        $this->projectConfigValueGuard->assertPlainKeys($this->projectConfigFile, $projectConfig);
         $connectionKeys = array_values(array_intersect(self::PLATFORM_KEYS, array_keys($projectConfig)));
 
         if ([] !== $connectionKeys) {
             throw ProjectConfigPlatformOverrideException::forKeys($this->projectConfigFile, $connectionKeys);
         }
 
+        $this->guardAgainstSectionErasure($this->projectConfigFile, $projectConfig, $userConfig);
         $this->guardAgainstScanSurfaceOverride($this->projectConfigFile, $projectConfig);
+        $this->guardAgainstUserOnlyOverride($this->projectConfigFile, $projectConfig);
+        $this->guardAgainstLoosenedBudget($this->projectConfigFile, $projectConfig, $userConfig);
+        $this->projectConfigValueGuard->assertLiteralPlainText($this->projectConfigFile, $projectConfig);
 
         return $projectConfig;
+    }
+
+    /**
+     * `merge()` writes a non-map project value over a whole user section, so
+     * `audit: []` or `audit: ~` would drop the user's budget caps and custom
+     * skills without ever naming them; a repository may override single keys
+     * beneath a section, never the section itself.
+     *
+     * @param array<array-key, mixed> $projectConfig
+     * @param array<array-key, mixed> $userConfig
+     *
+     * @throws ProjectConfigUserOnlyKeyException
+     */
+    private function guardAgainstSectionErasure(string $projectConfigFile, array $projectConfig, array $userConfig): void
+    {
+        foreach ($projectConfig as $key => $value) {
+            if (!$this->isMap($value) && $this->isMap($userConfig[$key] ?? null)) {
+                throw ProjectConfigUserOnlyKeyException::forErasedSection($projectConfigFile, (string) $key);
+            }
+        }
+    }
+
+    /**
+     * A project file may cap the run tighter than the user config — a CI
+     * repository lowering its own spend is legitimate — but never loosen it:
+     * a raised, removed or non-numeric cap decides what the run spends, so it
+     * stays the user's alone. `merge()` writes a null or empty `budget` over
+     * the user's caps, which is why those count as loosening too.
+     *
+     * @param array<array-key, mixed> $projectConfig
+     * @param array<array-key, mixed> $userConfig
+     *
+     * @throws ProjectConfigUserOnlyKeyException
+     */
+    private function guardAgainstLoosenedBudget(string $projectConfigFile, array $projectConfig, array $userConfig): void
+    {
+        $audit = $projectConfig['audit'] ?? null;
+        if (!\is_array($audit) || !\array_key_exists('budget', $audit)) {
+            return;
+        }
+
+        if (!\is_array($audit['budget']) || [] === $audit['budget']) {
+            throw ProjectConfigUserOnlyKeyException::forLoosenedBudget($projectConfigFile, 'audit.budget');
+        }
+
+        foreach ($audit['budget'] as $cap => $value) {
+            if (!$this->tightensCap($cap, $value, $this->budgetOf($userConfig))) {
+                throw ProjectConfigUserOnlyKeyException::forLoosenedBudget($projectConfigFile, \sprintf('audit.budget.%s', $cap));
+            }
+        }
+    }
+
+    /**
+     * @param array<array-key, mixed> $config
+     *
+     * @return array<array-key, mixed>
+     */
+    private function budgetOf(array $config): array
+    {
+        $audit = $config['audit'] ?? null;
+        $budget = \is_array($audit) ? ($audit['budget'] ?? null) : null;
+
+        return \is_array($budget) ? $budget : [];
+    }
+
+    /**
+     * A known cap, given as a number no higher than the user's own number for
+     * it; a cap the user left open can only be tightened.
+     *
+     * @param array<array-key, mixed> $userBudget
+     */
+    private function tightensCap(int|string $cap, mixed $value, array $userBudget): bool
+    {
+        if (!\in_array($cap, self::BUDGET_CAPS, true) || (!\is_int($value) && !\is_float($value))) {
+            return false;
+        }
+
+        $userCap = $userBudget[$cap] ?? null;
+
+        return (!\is_int($userCap) && !\is_float($userCap)) || $value <= $userCap;
+    }
+
+    /**
+     * @param array<array-key, mixed> $projectConfig
+     *
+     * @throws ProjectConfigUserOnlyKeyException
+     */
+    private function guardAgainstUserOnlyOverride(string $projectConfigFile, array $projectConfig): void
+    {
+        $declared = array_values(array_filter(
+            self::USER_ONLY_PATHS,
+            fn (string $path): bool => $this->declares($projectConfig, explode('.', $path)),
+        ));
+
+        if ([] !== $declared) {
+            throw ProjectConfigUserOnlyKeyException::forKeys($projectConfigFile, $declared);
+        }
+    }
+
+    /**
+     * @param array<array-key, mixed> $config
+     * @param non-empty-list<string>  $segments
+     */
+    private function declares(array $config, array $segments): bool
+    {
+        $key = array_shift($segments);
+        if (!\array_key_exists($key, $config)) {
+            return false;
+        }
+
+        if ([] === $segments) {
+            return true;
+        }
+
+        return \is_array($config[$key]) && $this->declares($config[$key], $segments);
     }
 
     /**
@@ -165,6 +311,40 @@ final readonly class StandaloneConfigLoader
             throw MalformedProjectConfigException::fromParseException($configFile, $parseException);
         }
 
-        return \is_array($parsed) ? $parsed : [];
+        return \is_array($parsed) ? $this->foldHyphenatedKeys($parsed) : [];
+    }
+
+    /**
+     * `symfony/config` reads `secret-scrubbing` as `secret_scrubbing` when it
+     * normalizes the tree, after the guards above ran on the raw keys; folding
+     * the same way first keeps a hyphenated spelling from slipping past them.
+     * A key is also quoted back by every refusal, so its control characters
+     * are escaped here: a repository's config cannot send escape sequences,
+     * eight-bit ones included, to the terminal through a key no valid config
+     * uses.
+     *
+     * @param array<array-key, mixed> $config
+     *
+     * @return array<array-key, mixed>
+     */
+    private function foldHyphenatedKeys(array $config): array
+    {
+        $folded = [];
+        foreach ($config as $key => $value) {
+            $folded[\is_string($key) ? $this->foldedKey($key, $config) : $key] = \is_array($value) ? $this->foldHyphenatedKeys($value) : $value;
+        }
+
+        return $folded;
+    }
+
+    /**
+     * @param array<array-key, mixed> $siblings
+     */
+    private function foldedKey(string $key, array $siblings): string
+    {
+        $underscored = str_replace('-', '_', $key);
+        $foldedKey = str_contains($key, '-') && !str_contains($key, '_') && !\array_key_exists($underscored, $siblings) ? $underscored : $key;
+
+        return TerminalText::escaped($foldedKey);
     }
 }

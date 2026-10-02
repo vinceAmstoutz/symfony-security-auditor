@@ -24,6 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingCredentialPrompt;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
 
 final class AuthSetCommandTest extends TestCase
 {
@@ -183,5 +185,115 @@ final class AuthSetCommandTest extends TestCase
     private function store(): FilesystemCredentialStore
     {
         return new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null));
+    }
+
+    public function test_it_refuses_a_name_no_environment_variable_can_have(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['anthropic-test-key-never-stored']);
+
+        self::assertSame(Command::INVALID, $commandTester->execute(['--env-var' => 'not-a-var']));
+    }
+
+    public function test_it_says_what_a_valid_variable_name_looks_like(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['anthropic-test-key-never-stored']);
+
+        $commandTester->execute(['--env-var' => 'not-a-var']);
+
+        self::assertStringContainsString('"not-a-var" is not a valid environment variable name', $this->flattened($commandTester));
+    }
+
+    public function test_it_treats_the_end_of_input_as_nothing_to_store(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+
+        self::assertSame(Command::INVALID, $commandTester->execute([]));
+        self::assertStringContainsString('Nothing to store', $this->flattened($commandTester));
+    }
+
+    public function test_it_refuses_when_the_terminal_cannot_hide_the_key(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTesterThatCannotHideInput();
+
+        self::assertSame(Command::INVALID, $commandTester->execute([]));
+        self::assertStringContainsString('This terminal cannot hide what you type, so the key was not asked for. Run this command on a terminal that can, or export ANTHROPIC_API_KEY instead.', $this->flattened($commandTester));
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_stores_nothing_when_the_terminal_cannot_hide_the_key(): void
+    {
+        $this->writeConfig();
+
+        $this->commandTesterThatCannotHideInput()->execute([]);
+
+        self::assertNull($this->store()->read('ANTHROPIC_API_KEY'));
+    }
+
+    public function test_it_refuses_before_asking_for_the_key_when_there_is_nowhere_to_store_it(): void
+    {
+        $recordingCredentialPrompt = new RecordingCredentialPrompt('anthropic-test-key-never-asked');
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, null);
+        $commandTester = new CommandTester(new AuthSetCommand(
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+            new ConfiguredCredentialVariable($xdgConfigPathResolver),
+            $recordingCredentialPrompt,
+        ));
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertSame(0, $recordingCredentialPrompt->asked);
+        self::assertStringContainsString('No per-user configuration directory could be resolved, so there is nowhere to store the credentials.', $this->flattened($commandTester));
+    }
+
+    public function test_it_reports_a_key_it_could_not_store_instead_of_crashing(): void
+    {
+        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor', 'a file where the configuration directory belongs');
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['anthropic-test-key-blocked']);
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertStringContainsString('could not be written.', $this->flattened($commandTester));
+    }
+
+    public function test_it_reports_a_store_it_cannot_open_instead_of_crashing(): void
+    {
+        $this->filesystem->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['anthropic-test-key-blocked']);
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertStringContainsString('could not be read.', $this->flattened($commandTester));
+    }
+
+    private function commandTesterThatCannotHideInput(): CommandTester
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+
+        return new CommandTester(new AuthSetCommand(
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+            new ConfiguredCredentialVariable($xdgConfigPathResolver),
+            new UnhideableCredentialPrompt(),
+        ));
+    }
+
+    public function test_it_refuses_a_relative_home_override_instead_of_reporting_no_directory(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, null, null, 'relative/home');
+        $commandTester = new CommandTester(new AuthSetCommand(
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+            new ConfiguredCredentialVariable($xdgConfigPathResolver),
+        ));
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertStringContainsString('SYMFONY_SECURITY_AUDITOR_HOME is set to "relative/home", which is not an absolute path', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+        self::assertSame(1, substr_count($commandTester->getDisplay(), '[ERROR]'), $commandTester->getDisplay());
+        self::assertStringNotContainsString('ANTHROPIC_API_KEY', $commandTester->getDisplay());
     }
 }

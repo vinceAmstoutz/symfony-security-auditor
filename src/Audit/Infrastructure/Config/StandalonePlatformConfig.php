@@ -42,7 +42,7 @@ final readonly class StandalonePlatformConfig
      */
     public function credentialIdentity(): ?CredentialIdentity
     {
-        $apiKey = PlatformApiKey::valueIn($this->platform);
+        $apiKey = PlatformApiKey::valueForProvider($this->platform, $this->activeProvider);
 
         return null === $apiKey || StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL === $apiKey
             ? null

@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -50,6 +51,7 @@ final readonly class StandalonePlatformConfigResolver
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     public function resolve(array $rawConfig, bool $credentialsRequired = true): StandalonePlatformConfig
     {
@@ -67,6 +69,11 @@ final readonly class StandalonePlatformConfigResolver
     }
 
     /**
+     * Only a platform's `api_key` is a credential: it alone may come out of
+     * the store, and it alone is spoken of as the API key when it is missing.
+     * Every other placeholder — a `base_url`, an `endpoint` — is a plain
+     * setting the environment has to supply.
+     *
      * @param array<array-key, mixed> $config
      *
      * @return array<array-key, mixed>
@@ -74,6 +81,7 @@ final readonly class StandalonePlatformConfigResolver
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
     private function resolveEnvPlaceholders(array $config, bool $credentialsRequired): array
     {
@@ -81,7 +89,7 @@ final readonly class StandalonePlatformConfigResolver
         foreach ($config as $key => $value) {
             $resolved[$key] = match (true) {
                 \is_array($value) => $this->resolveEnvPlaceholders($value, $credentialsRequired),
-                \is_string($value) => $this->resolveValue($value, $credentialsRequired),
+                \is_string($value) => $this->resolveValue($value, PlatformApiKey::names($key), $credentialsRequired),
                 default => $value,
             };
         }
@@ -90,20 +98,31 @@ final readonly class StandalonePlatformConfigResolver
     }
 
     /**
+     * Only the plain and `file:` spellings are resolved here, so a Symfony env
+     * processor (`trim:`, `default::`) is refused by name rather than looked
+     * up as a variable called `trim:API_KEY` that no shell can export. A dry
+     * run refuses it too: no run could ever resolve it, so tolerating it would
+     * pass a dry run the real one then fails.
+     *
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
      */
-    private function resolveValue(string $value, bool $credentialsRequired): string
+    private function resolveValue(string $value, bool $isCredential, bool $credentialsRequired): string
     {
         $envPlaceholder = EnvPlaceholder::in($value);
         if (!$envPlaceholder instanceof EnvPlaceholder) {
             return $value;
         }
 
+        if (!EnvironmentVariableName::isValid($envPlaceholder->variableName)) {
+            throw UnsupportedEnvPlaceholderException::forPlaceholder($envPlaceholder);
+        }
+
         $resolved = $envPlaceholder->readsFile
-            ? $this->resolveCredentialFile($envPlaceholder->variableName, $credentialsRequired)
-            : $this->resolveEnvironmentVariable($envPlaceholder->variableName, $credentialsRequired);
+            ? $this->resolveCredentialFile($envPlaceholder->variableName, $isCredential, $credentialsRequired)
+            : $this->resolveEnvironmentVariable($envPlaceholder->variableName, $isCredential, $credentialsRequired);
 
         return ContainerParameterSyntax::escape($resolved);
     }
@@ -111,25 +130,27 @@ final readonly class StandalonePlatformConfigResolver
     /**
      * An exported variable outranks the stored credential, so a container, a
      * CI job or a `VAR=$(pass show …)` prefix keeps deciding what a run
-     * authenticates with on a machine that also has one stored.
+     * authenticates with on a machine that also has one stored. A run that
+     * needs no credential does not open the store at all, so a store it could
+     * not read cannot stop it.
      *
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialStoreException
      */
-    private function resolveEnvironmentVariable(string $name, bool $credentialsRequired): string
+    private function resolveEnvironmentVariable(string $name, bool $isCredential, bool $credentialsRequired): string
     {
         $resolved = $this->environment[$name] ?? '';
         if ('' !== $resolved) {
             return $resolved;
         }
 
-        $stored = $this->credentialStore->read($name);
+        $stored = $isCredential && $credentialsRequired ? $this->credentialStore->read($name) : null;
         if (null !== $stored) {
             return $stored;
         }
 
         if ($credentialsRequired) {
-            throw MissingEnvironmentVariableException::forName($name);
+            throw $isCredential ? MissingEnvironmentVariableException::forName($name) : MissingEnvironmentVariableException::forSetting($name);
         }
 
         return self::UNNEEDED_CREDENTIAL;
@@ -140,18 +161,18 @@ final readonly class StandalonePlatformConfigResolver
      * @throws UnreadableCredentialFileException
      * @throws UnreadableCredentialStoreException
      */
-    private function resolveCredentialFile(string $name, bool $credentialsRequired): string
+    private function resolveCredentialFile(string $name, bool $isCredential, bool $credentialsRequired): string
     {
         $path = $this->environment[$name] ?? '';
         if ('' === $path) {
-            return $this->resolveEnvironmentVariable($name, $credentialsRequired);
+            return $this->resolveEnvironmentVariable($name, $isCredential, $credentialsRequired);
         }
 
         try {
             $credential = trim($this->filesystem->readFile($path));
         } catch (IOException) {
             if ($credentialsRequired) {
-                throw UnreadableCredentialFileException::forPath($path);
+                throw UnreadableCredentialFileException::forVariable($name, $path);
             }
 
             return self::UNNEEDED_CREDENTIAL;
@@ -162,7 +183,7 @@ final readonly class StandalonePlatformConfigResolver
         }
 
         if ($credentialsRequired) {
-            throw UnreadableCredentialFileException::forBlankFile($path);
+            throw UnreadableCredentialFileException::forBlankFile($name, $path);
         }
 
         return self::UNNEEDED_CREDENTIAL;

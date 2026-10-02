@@ -60,9 +60,10 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     #[Override]
     public function write(string $variableName, string $credential): void
     {
+        $this->guardAgainstUnstorableVariableName($variableName);
         $this->guardAgainstUnstorableCredential($credential);
 
-        $credentials = $this->credentials();
+        $credentials = $this->credentials(replaceMalformed: true);
         $credentials[$variableName] = $credential;
 
         $this->persist($credentials);
@@ -97,20 +98,51 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
      *
      * @throws UnreadableCredentialStoreException
      */
-    private function credentials(): array
+    private function credentials(bool $replaceMalformed = false): array
     {
         $path = $this->location();
         if (null === $path || !$this->filesystem->exists($path)) {
             return [];
         }
 
+        $raw = $this->rawContent($path);
+
+        return '' !== $raw ? $this->decodeOrReplace($path, $raw, $replaceMalformed) : [];
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    private function rawContent(string $path): string
+    {
         try {
-            $raw = trim($this->filesystem->readFile($path));
+            return trim($this->filesystem->readFile($path));
         } catch (IOException) {
             throw UnreadableCredentialStoreException::forUnreadableFile($path);
         }
+    }
 
-        return '' !== $raw ? $this->decode($path, $raw) : [];
+    /**
+     * A file that no longer parses is the one a write is there to replace —
+     * the read refusing it says to run `auth:set` — whereas a file that cannot
+     * be read at all may still hold every key intact, so that failure stays
+     * fatal for a write too.
+     *
+     * @return array<string, string>
+     *
+     * @throws UnreadableCredentialStoreException
+     */
+    private function decodeOrReplace(string $path, string $raw, bool $replaceMalformed): array
+    {
+        if (!$replaceMalformed) {
+            return $this->decode($path, $raw);
+        }
+
+        try {
+            return $this->decode($path, $raw);
+        } catch (UnreadableCredentialStoreException) {
+            return [];
+        }
     }
 
     /**
@@ -168,6 +200,20 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     }
 
     /**
+     * A name no `%env()%` placeholder can spell would be stored and never read
+     * back — and, as a non-string array key, would break the JSON the whole
+     * file is kept in.
+     *
+     * @throws CredentialStoreWriteException
+     */
+    private function guardAgainstUnstorableVariableName(string $variableName): void
+    {
+        if (!EnvironmentVariableName::isValid($variableName)) {
+            throw CredentialStoreWriteException::forInvalidVariableName($variableName);
+        }
+    }
+
+    /**
      * @throws CredentialStoreWriteException
      */
     private function guardAgainstUnstorableCredential(string $credential): void
@@ -194,7 +240,7 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
         }
 
         $payload = json_encode($credentials);
-        \assert(false !== $payload, 'A map of UTF-8 validated strings is always JSON-encodable');
+        \assert(false !== $payload, 'A map of validated names to UTF-8 validated strings is always JSON-encodable');
 
         try {
             $this->createOwnerOnly($path);
@@ -207,17 +253,22 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     /**
      * `dumpFile()` gives a file it creates the process umask, so the file is
      * created empty and tightened before the credential is written into it —
-     * the secret only ever reaches a path that is already owner-only.
+     * the secret only ever reaches a path that is already owner-only. The
+     * directory is tightened first, so one whose mode cannot be changed stops
+     * the write before an empty file is left behind in it.
      *
      * @throws IOException
      */
     private function createOwnerOnly(string $path): void
     {
+        $directory = \dirname($path);
+        $this->filesystem->mkdir($directory);
+        $this->filesystem->chmod($directory, self::DIRECTORY_MODE);
+
         if (!$this->filesystem->exists($path)) {
             $this->filesystem->dumpFile($path, '');
         }
 
         $this->filesystem->chmod($path, self::FILE_MODE);
-        $this->filesystem->chmod(\dirname($path), self::DIRECTORY_MODE);
     }
 }

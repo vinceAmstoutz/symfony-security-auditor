@@ -20,9 +20,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -80,12 +82,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, 'No provider is configured — run "init".');
         } catch (MissingEnvironmentVariableException|UnreadableCredentialFileException|UnreadableCredentialStoreException $credentialResolutionFailure) {
             return new DoctorCheckResult('API key', DoctorCheckStatus::Failure, $credentialResolutionFailure->getMessage());
-        } catch (MalformedProjectConfigException $malformedProjectConfigException) {
-            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $malformedProjectConfigException->getMessage());
-        } catch (ProjectConfigPlatformOverrideException $projectConfigPlatformOverrideException) {
-            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $projectConfigPlatformOverrideException->getMessage());
-        } catch (ProjectConfigScanOverrideException $projectConfigScanOverrideException) {
-            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $projectConfigScanOverrideException->getMessage());
+        } catch (MalformedProjectConfigException|ProjectConfigPlatformOverrideException|ProjectConfigScanOverrideException|ProjectConfigUserOnlyKeyException|UnsupportedEnvPlaceholderException $configurationFailure) {
+            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $configurationFailure->getMessage());
         } catch (UnresolvableConfigPathException $unresolvableConfigPathException) {
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
         }

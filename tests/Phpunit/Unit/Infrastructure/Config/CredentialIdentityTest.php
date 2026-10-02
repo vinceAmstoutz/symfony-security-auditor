@@ -41,6 +41,7 @@ final class CredentialIdentityTest extends TestCase
         yield 'non-ascii bytes' => ["anthropic-test-key-\xc3\x28-padding"];
         yield 'an accidental multi-line paste' => ["anthropic-test-key-one\nanthropic-test-key-two"];
         yield 'a surrounding-whitespace paste' => ['anthropic-test-key-trailing '];
+        yield 'a trailing newline' => ["anthropic-test-key-trailing-newline\n"];
     }
 
     public function test_it_previews_a_credential_of_exactly_the_minimum_length(): void

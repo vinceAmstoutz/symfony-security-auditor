@@ -25,6 +25,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
@@ -34,9 +35,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\NullCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
@@ -69,6 +72,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChec
 use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
@@ -128,7 +132,7 @@ final readonly class StandaloneApplicationFactory
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
-            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder()),
+            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder(), aiPlatformPin: BundledAiPlatformVersion::detect()),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
@@ -153,17 +157,35 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * `$PWD` is a shell export that is absent on Windows and in cron/CI
-     * contexts; the process working directory is always available.
-     *
      * @param array<string, string> $environment
      */
     public static function projectConfigFile(array $environment): ?string
     {
-        $pwd = $environment['PWD'] ?? '';
-        $workingDirectory = '' !== $pwd ? $pwd : self::processWorkingDirectory();
+        $workingDirectory = self::workingDirectoryFor($environment);
 
         return null !== $workingDirectory ? \sprintf('%s/%s', $workingDirectory, self::PROJECT_CONFIG_FILENAME) : null;
+    }
+
+    /**
+     * `$PWD` keeps the spelling the shell shows (symlinks unresolved), but it
+     * is a shell export: absent on Windows and under cron, and stale under a
+     * launcher that inherited it from another directory — an MCP client, a
+     * `Process`, a task runner. It is trusted only while it names the process
+     * working directory, which is always available and wins otherwise.
+     *
+     * @param array<string, string> $environment
+     */
+    private static function workingDirectoryFor(array $environment): ?string
+    {
+        $pwd = $environment['PWD'] ?? '';
+        $processWorkingDirectory = self::processWorkingDirectory();
+        if ('' === $pwd || null === $processWorkingDirectory) {
+            return '' !== $pwd ? $pwd : $processWorkingDirectory;
+        }
+
+        $resolvedPwd = realpath($pwd);
+
+        return false !== $resolvedPwd && $resolvedPwd === realpath($processWorkingDirectory) ? $pwd : $processWorkingDirectory;
     }
 
     /**
@@ -186,7 +208,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
         $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
-        $standaloneApplication->addCommand($this->lazyMcpServeCommand());
+        $standaloneApplication->addCommand($this->lazyMcpServeCommand($standaloneApplication));
         $this->registerUpdateAvailabilityNotice($standaloneApplication);
 
         return $standaloneApplication;
@@ -367,7 +389,9 @@ final readonly class StandaloneApplicationFactory
             [AuditCommand::ALIAS],
             AuditCommand::DESCRIPTION,
             false,
-            fn (): Command => $this->loadAuditCommand($standaloneApplication->needsProviderCredentials()),
+            fn (): Command => $standaloneApplication->describesCommandsOnly()
+                ? $this->standaloneConsoleCommandFactory->describe(AuditCommand::class)
+                : $this->loadAuditCommand($standaloneApplication->needsProviderCredentials()),
         );
     }
 
@@ -383,22 +407,27 @@ final readonly class StandaloneApplicationFactory
      * @throws UnresolvableAuditCommandException
      * @throws MalformedProjectConfigException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
      */
     private function loadAuditCommand(bool $credentialsRequired): Command
     {
         return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired));
     }
 
-    private function lazyMcpServeCommand(): LazyCommand
+    private function lazyMcpServeCommand(StandaloneApplication $standaloneApplication): LazyCommand
     {
         return new LazyCommand(
             McpServeCommand::NAME,
             [],
             McpServeCommand::DESCRIPTION,
             false,
-            fn (): Command => $this->loadMcpServeCommand(),
+            fn (): Command => $standaloneApplication->describesCommandsOnly()
+                ? $this->standaloneConsoleCommandFactory->describe(McpServeCommand::class)
+                : $this->loadMcpServeCommand(),
         );
     }
 
@@ -414,8 +443,11 @@ final readonly class StandaloneApplicationFactory
      * @throws UnresolvableMcpServeCommandException
      * @throws MalformedProjectConfigException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
      */
     private function loadMcpServeCommand(): Command
     {
@@ -433,8 +465,11 @@ final readonly class StandaloneApplicationFactory
      * @throws AmbiguousPlatformException
      * @throws MalformedProjectConfigException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
      */
     private function buildContainer(bool $credentialsRequired): ContainerBuilder
     {

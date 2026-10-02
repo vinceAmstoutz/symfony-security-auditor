@@ -215,9 +215,9 @@ final class AuthStatusCommandTest extends TestCase
         return (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay());
     }
 
-    private function writeConfig(): void
+    private function writeConfig(string $contents = "platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n"): void
     {
-        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', "platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $contents);
     }
 
     /**
@@ -237,5 +237,138 @@ final class AuthStatusCommandTest extends TestCase
     private function store(): FilesystemCredentialStore
     {
         return new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null));
+    }
+
+    public function test_it_refuses_a_name_no_environment_variable_can_have(): void
+    {
+        $this->writeConfig();
+
+        self::assertSame(Command::INVALID, $this->commandTester()->execute(['--env-var' => 'not-a-var']));
+    }
+
+    public function test_it_says_what_a_valid_variable_name_looks_like(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--env-var' => 'not-a-var']);
+
+        self::assertStringContainsString('"not-a-var" is not a valid environment variable name', $this->flattened($commandTester));
+    }
+
+    public function test_it_reports_the_key_a_credential_file_holds_rather_than_the_files_path(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%'\n");
+        $credentialFile = $this->configHome.'/anthropic-api-key';
+        $this->filesystem->dumpFile($credentialFile, self::KEY."\n");
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY_FILE' => $credentialFile]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->execute([]));
+
+        $display = $this->flattened($commandTester);
+
+        self::assertStringContainsString('Source the file ANTHROPIC_API_KEY_FILE names', $display);
+        self::assertStringContainsString('Key anthro…iews Fingerprint SHA256:66ff24e605fe0e69', $display);
+    }
+
+    public function test_it_fails_when_the_credential_file_cannot_be_read(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%'\n");
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY_FILE' => $this->configHome.'/absent-api-key']);
+
+        self::assertSame(Command::FAILURE, $commandTester->execute([]));
+        self::assertStringContainsString('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" could not be read', $this->flattened($commandTester));
+    }
+
+    public function test_it_fails_when_the_credential_file_is_empty(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%'\n");
+        $credentialFile = $this->configHome.'/blank-api-key';
+        $this->filesystem->dumpFile($credentialFile, " \n");
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY_FILE' => $credentialFile]);
+
+        self::assertSame(Command::FAILURE, $commandTester->execute([]));
+        self::assertStringContainsString('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" is empty', $this->flattened($commandTester));
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_warns_that_an_exported_credential_file_shadows_the_stored_key(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%'\n");
+        $this->store()->write('ANTHROPIC_API_KEY_FILE', self::KEY);
+        $credentialFile = $this->configHome.'/anthropic-api-key';
+        $this->filesystem->dumpFile($credentialFile, 'anthropic-test-key-from-file');
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY_FILE' => $credentialFile]);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('the exported ANTHROPIC_API_KEY_FILE wins', $this->flattened($commandTester));
+    }
+
+    public function test_a_variable_the_configuration_does_not_read_is_reported_as_its_own_value(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%'\n");
+        $commandTester = $this->commandTester(['OPENAI_API_KEY' => self::KEY]);
+
+        $commandTester->execute(['--env-var' => 'OPENAI_API_KEY']);
+
+        self::assertStringContainsString('Source the environment Key anthro…iews', $this->flattened($commandTester));
+    }
+
+    public function test_the_variable_the_configuration_reads_through_a_file_is_reported_as_that_file_when_named_on_the_command_line(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(file:ANTHROPIC_API_KEY_FILE)%'\n");
+        $credentialFile = $this->configHome.'/anthropic-api-key';
+        $this->filesystem->dumpFile($credentialFile, self::KEY);
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY_FILE' => $credentialFile]);
+
+        $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY_FILE']);
+
+        self::assertStringContainsString('Source the file ANTHROPIC_API_KEY_FILE names Key anthro…iews', $this->flattened($commandTester));
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_an_exported_key_is_reported_even_when_the_store_cannot_be_read(): void
+    {
+        $this->writeConfig();
+        $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-in-an-open-store');
+        $this->filesystem->chmod($this->configHome.'/symfony-security-auditor/credentials.json', 0644);
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY' => self::KEY]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->execute([]));
+        $display = $this->flattened($commandTester);
+        self::assertStringContainsString('Source the environment Key anthro…iews', $display);
+        self::assertStringContainsString('are readable by other users on this machine (permissions 0644)', $display);
+        self::assertStringNotContainsString('is also stored on this machine', $display);
+    }
+
+    public function test_it_reports_on_the_provider_the_configuration_selects(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY' => self::KEY, 'OPENAI_API_KEY' => 'openai-test-key-for-previews-2']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Variable OPENAI_API_KEY', $this->flattened($commandTester));
+    }
+
+    public function test_it_refuses_a_relative_home_override_instead_of_reporting_no_directory(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, null, null, 'relative/home');
+        $commandTester = new CommandTester(new AuthStatusCommand(
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+            new ConfiguredCredentialVariable($xdgConfigPathResolver),
+        ));
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']));
+        self::assertStringContainsString('SYMFONY_SECURITY_AUDITOR_HOME is set to "relative/home", which is not an absolute path', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+        self::assertSame(1, substr_count($commandTester->getDisplay(), '[ERROR]'), $commandTester->getDisplay());
+        self::assertStringNotContainsString('ANTHROPIC_API_KEY', $commandTester->getDisplay());
     }
 }

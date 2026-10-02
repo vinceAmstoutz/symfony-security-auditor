@@ -21,12 +21,18 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * silently rewrites the value. A whole-value `%env(VAR)%` is the exception,
  * because `StandalonePlatformConfigResolver` resolves it before the container
  * is built, escaping what it substitutes so a secret is never read as syntax.
+ * A URL `init` writes is escaped the same way, so its percent-encoded octets
+ * (`%2F`) reach the container as typed.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ContainerParameterSyntax
 {
     private const string REFERENCE_PATTERN = '/%%|%[^%\s]++%/';
+
+    private const string PERCENT_NOT_STARTING_AN_OCTET = '/%(?![0-9A-Fa-f]{2})/';
+
+    private const string ENV_PLACEHOLDER_PREFIX = '/env_[0-9a-f]{16}_/i';
 
     public static function escape(string $literal): string
     {
@@ -41,6 +47,49 @@ final readonly class ContainerParameterSyntax
     public static function isAbsentFrom(string $value): bool
     {
         return EnvPlaceholder::in($value) instanceof EnvPlaceholder
-            || 1 !== preg_match(self::REFERENCE_PATTERN, $value);
+            || !self::holdsReference($value);
+    }
+
+    /**
+     * Whether the container would read part of the value as syntax — a
+     * `%name%` or `%env(VAR)%` reference, or an escaped `%%` — whatever the
+     * resolver makes of a whole-value placeholder first.
+     */
+    public static function holdsReference(string $value): bool
+    {
+        return 1 === preg_match(self::REFERENCE_PATTERN, $value);
+    }
+
+    /**
+     * Whether the value spells the placeholder the container writes for an
+     * `%env()%` it has already read, which it swaps for the variable wherever
+     * the text appears, whatever the case.
+     */
+    public static function holdsEnvPlaceholder(string $value): bool
+    {
+        return 1 === preg_match(self::ENV_PLACEHOLDER_PREFIX, $value);
+    }
+
+    /**
+     * A URL holds a `%` only to percent-encode an octet, which `literal()`
+     * carries to the container intact; a `%` that starts none — the closing
+     * one of `%BASE_URL%`, even when the name itself opens with two hex digits
+     * — belongs to a reference the user meant, which escaping would silently
+     * turn into text, or to no valid URL at all. A whole-value `%env()%` is
+     * the caller's to accept before asking.
+     */
+    public static function isAbsentFromUrl(string $url): bool
+    {
+        return 1 !== preg_match(self::PERCENT_NOT_STARTING_AN_OCTET, $url);
+    }
+
+    /**
+     * The spelling the container reads back as `$value`: a whole-value
+     * `%env(VAR)%` stays a placeholder for the resolver to substitute, and
+     * anything else has every `%` doubled.
+     */
+    public static function literal(string $value): string
+    {
+        return EnvPlaceholder::in($value) instanceof EnvPlaceholder ? $value : self::escape($value);
     }
 }

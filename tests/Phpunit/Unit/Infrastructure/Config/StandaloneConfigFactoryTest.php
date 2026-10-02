@@ -82,6 +82,42 @@ final class StandaloneConfigFactoryTest extends TestCase
             ],
         ];
 
+        yield 'a percent-encoded base url and endpoint are escaped for the container' => [
+            'openresponses.my_gateway',
+            'API_TOKEN',
+            'https://gw.example/v1%2Fx%3Fy',
+            null,
+            [
+                'provider' => 'openresponses.my_gateway',
+                'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy', 'api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'a percent-encoded endpoint is escaped for the container' => [
+            'ollama',
+            null,
+            null,
+            'http://localhost:11434/a%2Fb%3Fc',
+            [
+                'provider' => 'ollama',
+                'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434/a%%2Fb%%3Fc']],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'a base url read from the environment is left for the resolver' => [
+            'generic.my_gateway',
+            'API_TOKEN',
+            '%env(GATEWAY_URL)%',
+            null,
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => '%env(GATEWAY_URL)%', 'api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
         yield 'an instance-keyed platform keeps the nesting without a base url' => [
             'generic.my_gateway',
             'API_TOKEN',

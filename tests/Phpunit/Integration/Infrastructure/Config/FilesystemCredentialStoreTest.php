@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
@@ -371,6 +372,38 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-blocked');
     }
 
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_a_directory_whose_mode_cannot_be_tightened_stops_the_write_before_any_file_is_created(): void
+    {
+        $filesystem = new class extends Filesystem {
+            /**
+             * @param string|iterable<mixed> $files
+             */
+            #[Override]
+            public function chmod(string|iterable $files, int $mode, int $umask = 0o000, bool $recursive = false): void
+            {
+                if (\is_string($files) && is_dir($files)) {
+                    throw new IOException(\sprintf('Failed to chmod "%s".', $files));
+                }
+
+                parent::chmod($files, $mode, $umask, $recursive);
+            }
+        };
+        $filesystemCredentialStore = new FilesystemCredentialStore(new XdgConfigPathResolver($this->configHome, null, null), $filesystem);
+
+        $caught = null;
+        try {
+            $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-blocked');
+        } catch (CredentialStoreWriteException $credentialStoreWriteException) {
+            $caught = $credentialStoreWriteException;
+        }
+
+        self::assertInstanceOf(CredentialStoreWriteException::class, $caught);
+        self::assertFileDoesNotExist($this->credentialsFile());
+    }
+
     private function givenStoredCredentials(string $contents, int $mode = 0600): void
     {
         $this->filesystem->dumpFile($this->credentialsFile(), $contents);
@@ -403,5 +436,83 @@ final class FilesystemCredentialStoreTest extends TestCase
             $this->filesystem,
             $osFamily,
         );
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    #[DataProvider('namesNoPlaceholderCanRead')]
+    public function test_it_refuses_to_store_a_credential_under_a_name_no_placeholder_can_read(string $variableName): void
+    {
+        $this->expectException(CredentialStoreWriteException::class);
+        $this->expectExceptionMessage('is not a valid environment variable name');
+
+        $this->store()->write($variableName, 'anthropic-test-key-unstorable-name');
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_masks_a_refused_name_that_may_be_the_key_itself(): void
+    {
+        $this->expectException(CredentialStoreWriteException::class);
+        $this->expectExceptionMessage('The API key cannot be stored under "sk-ant…-var": it is not a valid environment variable name');
+
+        $this->store()->write('sk-ant-api03-pasted-into-env-var', 'anthropic-test-key-unstorable-name');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function namesNoPlaceholderCanRead(): iterable
+    {
+        yield 'a number, which JSON would turn into an integer key' => ['123'];
+        yield 'a hyphenated name no shell can export' => ['FOO-BAR'];
+        yield 'a non-UTF-8 byte, which the JSON encoder would refuse' => ["MY\xffKEY"];
+    }
+
+    /**
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_leaves_the_stored_credentials_untouched_when_refusing_a_name(): void
+    {
+        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"anthropic-test-key-kept"}');
+
+        try {
+            $this->store()->write("MY\xffKEY", 'anthropic-test-key-refused');
+            self::fail('A name the JSON encoder cannot serialize must be refused.');
+        } catch (CredentialStoreWriteException) {
+            self::assertSame('anthropic-test-key-kept', $this->store()->read('ANTHROPIC_API_KEY'));
+        }
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_replaces_a_credential_file_it_cannot_parse_when_writing(): void
+    {
+        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY": "anthropic-test-key-trunc');
+
+        $filesystemCredentialStore = $this->store();
+        $filesystemCredentialStore->write('ANTHROPIC_API_KEY', 'anthropic-test-key-rewritten');
+
+        self::assertSame('anthropic-test-key-rewritten', $filesystemCredentialStore->read('ANTHROPIC_API_KEY'));
+    }
+
+    /**
+     * @throws CredentialStoreWriteException
+     * @throws UnreadableCredentialStoreException
+     */
+    public function test_it_still_refuses_to_forget_from_a_credential_file_it_cannot_parse(): void
+    {
+        $this->givenStoredCredentials('{"ANTHROPIC_API_KEY": "anthropic-test-key-trunc');
+
+        $this->expectException(UnreadableCredentialStoreException::class);
+        $this->expectExceptionMessage('are not valid JSON');
+
+        $this->store()->remove('ANTHROPIC_API_KEY');
     }
 }

@@ -555,6 +555,29 @@ final class AuditPresenterTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
+    public function test_dry_run_result_prints_formatter_tags_in_a_model_name_as_text(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, '<href=https://evil.example>claude</>', [
+            'attacker' => ['model' => '<fg=black;bg=black>hidden</>', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0456],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Model : <href=https://evil.example>claude</>', $display);
+        self::assertStringContainsString('attacker (<fg=black;bg=black>hidden</>)', $display);
+        self::assertStringNotContainsString("\e]8;;", $display);
+        self::assertStringNotContainsString("\e[30;40m", $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_dry_run_result_formats_costs_to_exactly_four_decimal_places(): void
     {
         $bufferedOutput = new BufferedOutput();
