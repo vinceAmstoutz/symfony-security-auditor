@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Symfony\AI\Platform\Result\DeferredResult;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 
@@ -25,8 +27,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unco
  * call the output token limit cut off mid-way through its arguments fails as
  * a malformed tool call, while the answer's finish reason — `length` in Chat
  * Completions, `incomplete_details.reason: max_output_tokens` in the Responses
- * API — says it was cut off, so asking again would hit the same limit. Only
- * the failure to convert that very answer is read against it.
+ * API — says it was cut off, so asking again would hit the same limit. A
+ * gateway refusing a request as too large answers HTTP 413, often with an
+ * HTML page the bridges cannot decode (`Syntax error`), so its status is read
+ * too. Only the failure to convert that very answer is read against it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -38,10 +42,16 @@ final readonly class ConversionFailureExplainer
 
     private const string OUTPUT_LIMIT_INCOMPLETE_REASON = 'max_output_tokens';
 
+    private const int PAYLOAD_TOO_LARGE_STATUS = 413;
+
     public function explain(Throwable $throwable, ?DeferredResult $deferredResult): Throwable
     {
         if (!$deferredResult instanceof DeferredResult || !$this->isConversionFailure($throwable, $deferredResult)) {
             return $throwable;
+        }
+
+        if (self::PAYLOAD_TOO_LARGE_STATUS === $this->statusCode($deferredResult)) {
+            return UnconvertedAnswerException::refusedAsTooLarge($throwable);
         }
 
         $stopReason = $this->stopReasonOf($this->rawAnswer($deferredResult));
@@ -58,6 +68,20 @@ final readonly class ConversionFailureExplainer
         }
 
         return false;
+    }
+
+    private function statusCode(DeferredResult $deferredResult): ?int
+    {
+        $response = $deferredResult->getRawResult()->getObject();
+        if (!$response instanceof ResponseInterface) {
+            return null;
+        }
+
+        try {
+            return $response->getStatusCode();
+        } catch (TransportExceptionInterface) {
+            return null;
+        }
     }
 
     /**

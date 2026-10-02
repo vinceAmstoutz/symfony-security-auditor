@@ -217,6 +217,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'responses_api_incomplete_for_another_reason' => [new PlatformRuntimeException('Responses API response is incomplete (unknown) and contains no content.'), null];
         yield 'answer_its_raw_answer_shows_filtered' => [UnconvertedAnswerException::cutShort(new BadRequestException('The response was filtered'), 'content-filter'), 'content-filter'];
         yield 'answer_its_raw_answer_shows_cut_off_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length')), 'length'];
+        yield 'request_its_raw_answer_shows_refused_as_too_large' => [UnconvertedAnswerException::refusedAsTooLarge(new RuntimeException('Syntax error')), null];
     }
 
     #[DataProvider('billedStopReasonCases')]
@@ -305,6 +306,9 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'wrapped_typed_exceed_context_size' => [
             new RuntimeException('LLM call failed', previous: new ExceedContextSizeException('overflow')),
         ];
+        yield 'generic_bridge_relaying_a_gateway_413_body' => [new PlatformRuntimeException('Error "-"-- (-): "Payload too large".')];
+        yield 'gateway_413_reason_phrase' => [new RuntimeException('Request Entity Too Large')];
+        yield 'gateway_413_its_raw_answer_shows' => [UnconvertedAnswerException::refusedAsTooLarge(new RuntimeException('Syntax error for "https://gw.example.com/v1/chat/completions".'))];
     }
 
     #[DataProvider('notRequestTooLargeCases')]

@@ -19,20 +19,30 @@ use Throwable;
 /**
  * An answer the provider delivered but its bridge failed to convert, as its
  * raw answer shows it: cut short, which `$stopReason` names the way
- * `LLMResponse` does (`length`, `content-filter`). It keeps the bridge's
- * message.
+ * `LLMResponse` does (`length`, `content-filter`), keeping the bridge's
+ * message; or a request refused as too large with an HTTP 413, whose body the
+ * bridge could not make sense of.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final class UnconvertedAnswerException extends RuntimeException
 {
-    public function __construct(Throwable $previous, public readonly string $stopReason)
-    {
-        parent::__construct($previous->getMessage(), previous: $previous);
+    public function __construct(
+        string $message,
+        Throwable $previous,
+        public readonly ?string $stopReason = null,
+        public readonly bool $refusedAsTooLarge = false,
+    ) {
+        parent::__construct($message, previous: $previous);
     }
 
     public static function cutShort(Throwable $throwable, string $stopReason): self
     {
-        return new self($throwable, $stopReason);
+        return new self($throwable->getMessage(), $throwable, $stopReason);
+    }
+
+    public static function refusedAsTooLarge(Throwable $throwable): self
+    {
+        return new self(\sprintf('The provider refused the request as too large (HTTP 413): %s', $throwable->getMessage()), $throwable, refusedAsTooLarge: true);
     }
 }

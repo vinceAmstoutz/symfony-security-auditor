@@ -105,6 +105,8 @@ final readonly class TransientFailureClassifier
         'max_model_len',
         'exceed context limit',
         'exceeds the available context size',
+        'payload too large',
+        'request entity too large',
     ];
 
     /** @var list<string> */
@@ -173,9 +175,9 @@ final readonly class TransientFailureClassifier
      */
     public function degradedStopReason(Throwable $throwable): ?string
     {
-        $unconvertedAnswer = $this->firstInChain($throwable, UnconvertedAnswerException::class);
-        if ($unconvertedAnswer instanceof UnconvertedAnswerException) {
-            return $unconvertedAnswer->stopReason;
+        $rawStopReason = $this->firstInChain($throwable, UnconvertedAnswerException::class)?->stopReason;
+        if (null !== $rawStopReason) {
+            return $rawStopReason;
         }
 
         $joined = $this->joinMessages($throwable);
@@ -224,14 +226,16 @@ final readonly class TransientFailureClassifier
      * `maximum context length` / `context_length_exceeded`, Mistral's `too
      * large for model`, Gemini's `exceeds the maximum number of tokens`,
      * Bedrock's `Input is too long`, llama.cpp's `exceeds the available context
-     * size`, or an HTTP 413). Retrying the same prompt cannot succeed, but a
+     * size`, or an HTTP 413 — a gateway's `Payload Too Large`, or the 413
+     * status `UnconvertedAnswerException` read from an answer the bridge
+     * could not decode). Retrying the same prompt cannot succeed, but a
      * smaller one can — so callers split the work instead of retrying or
      * aborting. A 413 inside a rate-limit answer is a token count, not a
      * status, and so is one in a connection cut off mid-response.
      */
     public function isRequestTooLarge(Throwable $throwable): bool
     {
-        if ($this->hasInChain($throwable, ExceedContextSizeException::class)) {
+        if ($this->hasInChain($throwable, ExceedContextSizeException::class) || true === $this->firstInChain($throwable, UnconvertedAnswerException::class)?->refusedAsTooLarge) {
             return true;
         }
 

@@ -247,6 +247,8 @@ The files of one chunk add up to more than the model's input window (the default
 Attacker chunk exceeds the model input limit; it is split in two and each half analyzed on its own
 ```
 
+A gateway in front of the model can refuse the request body before the model sees it — nginx's `client_max_body_size` (1 MB by default), an AI gateway's payload limit. It answers HTTP `413`, often with an HTML page the provider bridge cannot decode (`Syntax error`); the auditor reads the status and splits the chunk the same way. Raising that limit above the largest prompt avoids the split.
+
 A single file that does not fit on its own is recorded as errored and listed under `Audit incomplete: N file(s) could not be fully analyzed`:
 
 ```text

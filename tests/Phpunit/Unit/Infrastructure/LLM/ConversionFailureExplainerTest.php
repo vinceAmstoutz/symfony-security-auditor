@@ -23,11 +23,11 @@ use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\TextResult;
-use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ConversionFailureExplainer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\FailingResultConverter;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\UnreadableResponse;
 
 final class ConversionFailureExplainerTest extends TestCase
 {
@@ -92,12 +92,36 @@ final class ConversionFailureExplainerTest extends TestCase
         yield 'incomplete details that are not an object' => [['status' => 'incomplete', 'incomplete_details' => 'max_output_tokens']];
     }
 
+    public function test_a_gateway_refusing_the_request_with_http_413_refuses_it_as_too_large_whatever_body_it_sent(): void
+    {
+        $runtimeException = new RuntimeException('Syntax error for "https://gw.example.com/v1/chat/completions".');
+        $payloadTooLarge = self::createStub(ResponseInterface::class);
+        $payloadTooLarge->method('getStatusCode')->willReturn(413);
+        $deferredResult = new DeferredResult(new FailingResultConverter($runtimeException), new RawHttpResult($payloadTooLarge));
+        $this->expectConversionToFailWith($runtimeException, $deferredResult);
+
+        $throwable = (new ConversionFailureExplainer())->explain($runtimeException, $deferredResult);
+
+        self::assertInstanceOf(UnconvertedAnswerException::class, $throwable);
+        self::assertTrue($throwable->refusedAsTooLarge);
+        self::assertSame('The provider refused the request as too large (HTTP 413): Syntax error for "https://gw.example.com/v1/chat/completions".', $throwable->getMessage());
+    }
+
+    public function test_a_status_other_than_413_refuses_nothing(): void
+    {
+        $badRequestException = new BadRequestException('Bad Request');
+        $badRequest = self::createStub(ResponseInterface::class);
+        $badRequest->method('getStatusCode')->willReturn(400);
+        $deferredResult = new DeferredResult(new FailingResultConverter($badRequestException), new RawHttpResult($badRequest));
+        $this->expectConversionToFailWith($badRequestException, $deferredResult);
+
+        self::assertSame($badRequestException, (new ConversionFailureExplainer())->explain($badRequestException, $deferredResult));
+    }
+
     public function test_a_raw_answer_that_cannot_be_read_leaves_the_failure_as_it_is(): void
     {
         $badRequestException = new BadRequestException('Bad Request');
-        $unreadable = self::createStub(ResponseInterface::class);
-        $unreadable->method('toArray')->willThrowException(new TransportException('Transfer closed with 512 bytes remaining to read for "https://gw.example.com/v1/chat/completions".'));
-        $deferredResult = new DeferredResult(new FailingResultConverter($badRequestException), new RawHttpResult($unreadable));
+        $deferredResult = new DeferredResult(new FailingResultConverter($badRequestException), new RawHttpResult(new UnreadableResponse()));
         $this->expectConversionToFailWith($badRequestException, $deferredResult);
 
         self::assertSame($badRequestException, (new ConversionFailureExplainer())->explain($badRequestException, $deferredResult));
