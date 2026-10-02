@@ -253,4 +253,18 @@ final class GrepToolTest extends TestCase
 
         self::assertSame('src/Mb.php:1:'.str_repeat('a', 499).'... [truncated]', $result);
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_execute_searches_a_file_that_is_not_valid_utf8_and_scrubs_the_matched_line(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', "first\n\xE9t\xE9 foo\n");
+        $grepTool = new GrepTool([$projectFile]);
+
+        $result = $grepTool->execute(['pattern' => 'foo']);
+
+        self::assertSame('src/A.php:2:?t? foo', $result);
+        self::assertTrue(mb_check_encoding($result, 'UTF-8'));
+    }
 }

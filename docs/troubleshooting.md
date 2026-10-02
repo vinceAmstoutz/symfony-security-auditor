@@ -217,6 +217,44 @@ Configure `audit.rate_limit.requests_per_minute` / `input_tokens_per_minute` / `
 - Use a split-model with a cheaper Reviewer (Haiku, DeepSeek, Mistral) — they have higher rate limits.
 - Run nightly, not on every PR.
 
+### `prompt is too long` / `context_length_exceeded` / HTTP `413`
+
+The files of one chunk add up to more than the model's input window (the default `feature` chunking sends up to ten related files per call). The audit does not stop there: the chunk is split in two and each half is analyzed on its own, again until every part fits — a half already in the cache costs no call, and once every part is analyzed the whole chunk is cached too, so the next run does not refuse and split it again. Every split is logged at `warning` level:
+
+```text
+Attacker chunk exceeds the model input limit; it is split in two and each half analyzed on its own
+```
+
+A single file that does not fit on its own is recorded as errored and listed under `Audit incomplete: N file(s) could not be fully analyzed`:
+
+```text
+Attacker chunk exceeds the model input limit as a single file; it is recorded as errored and left out of the cache
+```
+
+To get it analyzed:
+
+- Turn on `audit.code_slicing.enabled` (the `fast` profile already does): a large file is trimmed to its security-relevant lines before it is sent.
+- Give the attacker a model with a larger context window (`attacker_model`).
+- Leave generated or vendored trees out of `scan.included_paths`.
+
+When a file refused on its own — measured as the prompt carried it, after code slicing — is under a tenth of that prompt, no split can help: the system prompt and the project mapping around it take up the rest of the model's input window — or of `audit.rate_limit.input_tokens_per_minute` — so the run stops at once instead of recording every file as errored:
+
+```text
+The audit prompt was refused even with only the 512-byte file "src/Kernel.php" in it (…): the system prompt and the project mapping around it take up the rest, so no file can fit. Use a model with a larger context window for the attacker, raise audit.rate_limit.input_tokens_per_minute when that limit refused it, or narrow scan.included_paths.
+```
+
+A request larger than `audit.rate_limit.input_tokens_per_minute` is handled the same way. A tool-using conversation that only outgrows the model after tool results were appended ends with what it recorded so far, and the chunk is recorded as errored:
+
+```text
+Tool-using conversation outgrew the model input limit after tool results were appended; it ends as an empty response and keeps the tool results already recorded
+```
+
+The reviewer handles a prompt it cannot fit the same way: a batch of findings (`reviewer_batch_size` above `1`) is split in two until every part fits, and a finding the model cannot review with its whole file in the prompt is recorded as errored while the review goes on with the next one:
+
+```text
+Reviewer batch exceeds the model input limit; it is split in two and each half reviewed on its own
+```
+
 ### `OpenSSL SSL_read: … unexpected eof while reading` / `cURL error 56`
 
 The peer closed the connection while the response was still being read. `error:0A000126` is `SSL_R_UNEXPECTED_EOF_WHILE_READING` and `errno 0` means no OS-level error — the endpoint hung up without a TLS `close_notify`. This is a transport truncation, so it is classified as transient and the LLM call is retried on a fresh connection (`audit.retry.max_attempts`, default `3`).
@@ -232,7 +270,7 @@ When every retry fails, the run still aborts with exit `1` and the report says i
 
 The model returned blank or non-JSON output. The chunk is skipped automatically and logged at `error` level via `LoggerInterface`. The log entry includes a `content_preview` field with the first 512 bytes of the response — inspect it to see what the model actually emitted. Causes:
 
-- Model context limit exceeded — lower `audit.max_tool_iterations` or split-model to a model with a larger context.
+- Model context limit reached — see [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413) above; lower `audit.max_tool_iterations` when tool results are what overflow it.
 - Model refused the prompt — try a different model (some smaller open-weight models refuse "hacking" prompts).
 - Network timeout — retry; check the provider's status page.
 

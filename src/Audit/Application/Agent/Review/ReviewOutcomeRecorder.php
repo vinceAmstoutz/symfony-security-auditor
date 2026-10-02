@@ -78,6 +78,29 @@ final readonly class ReviewOutcomeRecorder
             'vulnerability_id' => $vulnerability->id(),
             'error' => $throwable->getMessage(),
         ]);
+
+        return $this->recordErrored($vulnerability, $coverageRecorder);
+    }
+
+    /**
+     * A response cut short — by the output token limit, a content filter, the
+     * tool-loop cap or a call that produced no content — carries no verdict
+     * the reviewer actually reached: the finding is recorded as errored, never
+     * as rejected, and nothing is cached, so the next run reviews it again
+     * instead of replaying a rejection the model never made.
+     */
+    public function recordIncompleteResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        $this->logger->warning('Reviewer response was cut short; the finding is recorded as errored and left out of the cache', [
+            'vulnerability_id' => $vulnerability->id(),
+            'stop_reason' => $llmResponse->stopReason(),
+        ]);
+
+        return $this->recordErrored($vulnerability, $coverageRecorder);
+    }
+
+    private function recordErrored(Vulnerability $vulnerability, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
         ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
         $errored = $vulnerability->withReviewerValidation(false);
         $coverageRecorder->recordReviewedFinding($errored);
@@ -123,6 +146,10 @@ final readonly class ReviewOutcomeRecorder
 
     public function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): Vulnerability
     {
+        if ($llmResponse->isDegraded()) {
+            return $this->recordIncompleteResponse($vulnerability, $llmResponse, $coverageRecorder);
+        }
+
         if ($llmResponse->isEmpty()) {
             return $this->recordVerdict($vulnerability, null, $coverageRecorder);
         }
@@ -136,11 +163,8 @@ final readonly class ReviewOutcomeRecorder
                 'error' => $jsonException->getMessage(),
                 'content_preview' => substr($llmResponse->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
-            ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
-            $errored = $vulnerability->withReviewerValidation(false);
-            $coverageRecorder->recordReviewedFinding($errored);
 
-            return $errored;
+            return $this->recordErrored($vulnerability, $coverageRecorder);
         }
 
         if (null !== $codeContextForCache) {

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
@@ -396,5 +397,60 @@ final class ReviewOutcomeRecorderTest extends TestCase
             new VulnerabilityNarrative('d', 'a', 'p', 'r'),
             'c',
         );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_apply_response_records_an_answer_cut_by_the_token_limit_as_errored_and_does_not_cache_it(): void
+    {
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->expects(self::never())->method('store');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Reviewer response was cut short; the finding is recorded as errored and left out of the cache',
+            ['vulnerability_id' => $this->vulnerability()->id(), 'stop_reason' => 'length'],
+        );
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache($reviewerCache, new NullLogger()),
+            $logger,
+            self::createStub(ProgressReporterInterface::class),
+        );
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $vulnerability = $reviewOutcomeRecorder->applyResponse(
+            $this->vulnerability(),
+            LLMResponse::of('{"accepted": true}', 'm', 'length', TokenUsageSnapshot::of(1, 1)),
+            $recordingCoverageRecorder,
+            'code-context',
+        );
+
+        self::assertFalse($vulnerability->isReviewerValidated());
+        self::assertSame([['stage' => 'reviewer', 'filePath' => 'src/A.php', 'status' => 'errored']], $recordingCoverageRecorder->coverage);
+        self::assertSame([$vulnerability], $recordingCoverageRecorder->reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_apply_response_records_a_call_that_produced_no_content_as_errored_not_rejected(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $vulnerability = $this->recorder(self::createStub(ProgressReporterInterface::class))->applyResponse(
+            $this->vulnerability(),
+            LLMResponse::of('', 'm', 'empty_content', TokenUsageSnapshot::of(1, 1)),
+            $recordingCoverageRecorder,
+        );
+
+        self::assertFalse($vulnerability->isReviewerValidated());
+        self::assertSame(['errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
     }
 }

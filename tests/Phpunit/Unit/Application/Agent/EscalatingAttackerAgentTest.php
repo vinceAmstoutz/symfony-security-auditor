@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
@@ -190,7 +191,7 @@ final class EscalatingAttackerAgentTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_expensive_pass_receives_cheap_findings_as_previous_context(): void
+    public function test_expensive_pass_receives_cheap_findings_as_unverified_candidates_not_as_confirmed_patterns(): void
     {
         $vulnerability = $this->makeVulnerability('src/Controller/A.php');
 
@@ -205,7 +206,8 @@ final class EscalatingAttackerAgentTest extends TestCase
             new NullCoverageRecorder(),
         );
 
-        self::assertSame([$vulnerability], $expensive->lastPreviousFindings);
+        self::assertSame([$vulnerability], $expensive->lastCandidateFindings);
+        self::assertSame([], $expensive->lastPreviousFindings);
     }
 
     /**
@@ -287,7 +289,7 @@ final class EscalatingAttackerAgentTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_expensive_pass_receives_original_previous_findings_plus_all_cheap_findings(): void
+    public function test_expensive_pass_keeps_the_original_previous_findings_and_receives_every_cheap_finding_as_a_candidate(): void
     {
         $previous = [$this->makeVulnerability('src/Controller/Z.php', title: 'prev')];
         $recordingAttackerAgent = $this->makeRecordingAttacker([
@@ -306,11 +308,8 @@ final class EscalatingAttackerAgentTest extends TestCase
             new NullCoverageRecorder(),
         );
 
-        $titles = array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $expensive->lastPreviousFindings);
-        self::assertCount(3, $expensive->lastPreviousFindings);
-        self::assertContains('prev', $titles);
-        self::assertContains('cheapA', $titles);
-        self::assertContains('cheapB', $titles);
+        self::assertSame($previous, $expensive->lastPreviousFindings);
+        self::assertSame(['cheapA', 'cheapB'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $expensive->lastCandidateFindings));
     }
 
     /**
@@ -375,5 +374,103 @@ final class EscalatingAttackerAgentTest extends TestCase
     private function makeRecordingAttacker(array $returnedFindings): RecordingAttackerAgent
     {
         return new RecordingAttackerAgent($returnedFindings);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('judgedStatuses')]
+    public function test_a_cheap_finding_the_deep_pass_did_not_re_report_on_a_file_it_judged_is_discarded(string $status): void
+    {
+        $recordingAttackerAgent = $this->makeRecordingAttacker([$this->makeVulnerability('src/Controller/A.php', title: 'cheap A')]);
+        $expensive = new RecordingAttackerAgent([], coverageStatus: $status);
+
+        $result = $this->callAnalyze(
+            new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger()),
+            [$this->makeFile('src/Controller/A.php')],
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertSame([], $result);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function judgedStatuses(): iterable
+    {
+        yield 'analyzed by the deep pass' => ['analyzed'];
+        yield 'served from the deep pass cache' => ['cached'];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_cheap_finding_on_a_file_the_deep_pass_errored_on_is_kept(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/Controller/A.php', title: 'cheap A');
+        $recordingAttackerAgent = new RecordingAttackerAgent([], coverageStatus: 'errored');
+
+        $result = $this->callAnalyze(
+            new EscalatingAttackerAgent($this->makeRecordingAttacker([$vulnerability]), $recordingAttackerAgent, new NullLogger()),
+            [$this->makeFile('src/Controller/A.php')],
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertSame([$vulnerability], $result);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_candidate_the_deep_pass_refined_to_other_lines_replaces_the_cheap_finding_instead_of_doubling_it(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'refined A', 0.9),
+            new CodeLocation('src/Controller/A.php', 12, 15),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
+        );
+        $recordingAttackerAgent = new RecordingAttackerAgent([$vulnerability], coverageStatus: 'analyzed');
+
+        $result = $this->callAnalyze(
+            new EscalatingAttackerAgent($this->makeRecordingAttacker([$this->makeVulnerability('src/Controller/A.php', title: 'cheap A')]), $recordingAttackerAgent, new NullLogger()),
+            [$this->makeFile('src/Controller/A.php')],
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertSame([$vulnerability], $result);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_cheap_finding_whose_path_carries_a_leading_dot_slash_is_matched_to_the_file_the_deep_pass_judged(): void
+    {
+        $recordingAttackerAgent = new RecordingAttackerAgent([], coverageStatus: 'analyzed');
+
+        $result = $this->callAnalyze(
+            new EscalatingAttackerAgent($this->makeRecordingAttacker([$this->makeVulnerability('./src/Controller/A.php', title: 'cheap A')]), $recordingAttackerAgent, new NullLogger()),
+            [$this->makeFile('src/Controller/A.php')],
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertSame([], $result);
     }
 }

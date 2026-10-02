@@ -3753,4 +3753,33 @@ final class AttackerAgentTest extends TestCase
             $overrides['logger'] ?? new NullLogger(),
         );
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_lean_mode_still_lets_the_tools_read_the_files_it_filtered_out(): void
+    {
+        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $scanner = new class implements StaticPreScannerInterface {
+            /**
+             * @throws InvalidRiskMarkerException
+             */
+            #[Override]
+            public function scan(array $files): array
+            {
+                return [RiskMarker::create('src/Service/Risky.php', 3, 'eval_call', 'eval() on dynamic input')];
+            }
+        };
+        $factory = $this->createMock(ToolRegistryFactoryInterface::class);
+        $factory->expects(self::once())->method('forProjectFiles')->with([$projectFile, $clean])->willReturn(new ToolRegistry([], new NullLogger()));
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true, 'toolRegistryFactory' => $factory, 'toolsEnabled' => true]);
+
+        $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
+    }
 }

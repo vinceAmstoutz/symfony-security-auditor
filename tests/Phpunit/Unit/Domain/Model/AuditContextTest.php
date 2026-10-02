@@ -130,6 +130,34 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_baseline_skipped_findings_default_to_an_empty_list(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertSame([], $auditContext->baselineSkippedFindings());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_remembers_the_findings_the_baseline_skipped_in_order(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('first', VulnerabilitySeverity::HIGH);
+        $second = $this->makeVulnerability('second', VulnerabilitySeverity::LOW);
+
+        $auditContext->recordBaselineSkippedFinding($vulnerability);
+        $auditContext->recordBaselineSkippedFinding($second);
+
+        self::assertSame([$vulnerability, $second], $auditContext->baselineSkippedFindings());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_audit_id_matches_expected_format(): void
     {
         for ($i = 0; $i < 64; ++$i) {

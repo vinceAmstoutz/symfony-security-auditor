@@ -35,8 +35,58 @@ final class ChunkContextKeyDeriverTest extends TestCase
         );
 
         self::assertNotSame(
-            $chunkContextKeyDeriver->derive('', '', '', $symfonyMapping),
-            $chunkContextKeyDeriver->derive('', '', '', $shifted),
+            $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping),
+            $chunkContextKeyDeriver->derive('', '', '', '', $shifted),
         );
+    }
+
+    public function test_the_candidate_preamble_alone_yields_a_key_of_its_own(): void
+    {
+        $chunkContextKeyDeriver = new ChunkContextKeyDeriver();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+
+        $withCandidates = $chunkContextKeyDeriver->derive('', '', '', 'candidate preamble', $symfonyMapping);
+
+        self::assertNotSame('', $withCandidates);
+        self::assertNotSame($chunkContextKeyDeriver->derive('', '', '', 'other candidate preamble', $symfonyMapping), $withCandidates);
+        self::assertNotSame($chunkContextKeyDeriver->derive('', '', 'candidate preamble', '', $symfonyMapping), $withCandidates);
+    }
+
+    public function test_the_key_hashes_each_preamble_in_order_with_the_candidate_preamble_before_the_mapping_fingerprint(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+
+        $key = (new ChunkContextKeyDeriver())->derive('markers', 'rejected', 'previous', 'candidates', $symfonyMapping);
+
+        self::assertSame(
+            hash('sha256', hash('sha256', 'markers').hash('sha256', 'rejected').hash('sha256', 'previous').hash('sha256', 'candidates').hash('sha256', '')),
+            $key,
+        );
+    }
+
+    public function test_without_candidates_the_key_is_the_one_earlier_releases_derived_so_their_cache_entries_still_hit(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+
+        $key = (new ChunkContextKeyDeriver())->derive('markers', 'rejected', 'previous', '', $symfonyMapping);
+
+        self::assertSame(
+            hash('sha256', hash('sha256', 'markers').hash('sha256', 'rejected').hash('sha256', 'previous').hash('sha256', '')),
+            $key,
+        );
+    }
+
+    public function test_the_mapping_fingerprint_is_remembered_per_mapping_instance_and_still_tells_mappings_apart(): void
+    {
+        $chunkContextKeyDeriver = new ChunkContextKeyDeriver();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: ['^/admin']));
+        $otherMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: ['^/api']));
+
+        $firstChunkKey = $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping);
+        $secondChunkKey = $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping);
+
+        self::assertSame($firstChunkKey, $secondChunkKey);
+        self::assertSame(hash('sha256', hash('sha256', '').hash('sha256', '').hash('sha256', '').hash('sha256', hash('sha256', hash('sha256', '^/admin')))), $firstChunkKey);
+        self::assertNotSame($firstChunkKey, $chunkContextKeyDeriver->derive('', '', '', '', $otherMapping));
     }
 }

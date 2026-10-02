@@ -888,4 +888,56 @@ final class AuditReportTest extends TestCase
             '$query',
         );
     }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_file_the_attacker_finished_on_a_later_iteration_counts_as_analyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame([], $auditReport->unanalyzedFiles());
+        self::assertTrue($auditReport->isComplete());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_file_served_from_cache_after_a_failed_iteration_counts_as_analyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'aborted');
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'cached');
+
+        self::assertTrue(AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_file_the_attacker_failed_on_a_later_iteration_counts_as_unanalyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        self::assertSame(['src/A.php'], AuditReport::fromContext($auditContext)->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_reviewer_failure_counts_however_a_later_review_of_the_same_file_went(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
+        $auditContext->recordCoverage('reviewer', 'src/A.php', 'errored');
+        $auditContext->recordCoverage('reviewer', 'src/A.php', 'validated');
+
+        self::assertSame(['src/A.php'], AuditReport::fromContext($auditContext)->unanalyzedFiles());
+    }
 }

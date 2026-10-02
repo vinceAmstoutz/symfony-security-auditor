@@ -20,8 +20,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
-use function Symfony\Component\String\u;
-
 /**
  * Case-sensitive substring search across the project files scanned by the
  * ingestion stage. Returns up to MAX_MATCHES matches as path:line lines.
@@ -137,17 +135,21 @@ final readonly class GrepTool implements ToolInterface
     }
 
     /**
+     * Matches on bytes: a file that is not valid UTF-8 (a Latin-1 comment, an
+     * embedded blob) must not fail the whole search, and its matched line is
+     * scrubbed so the tool result stays valid JSON for the provider.
+     *
      * @return iterable<string>
      */
     private function matchesInFile(ProjectFile $projectFile, string $pattern): iterable
     {
         $lines = explode("\n", $projectFile->content());
         foreach ($lines as $lineIndex => $line) {
-            if (!u($line)->containsAny($pattern)) {
+            if (!str_contains($line, $pattern)) {
                 continue;
             }
 
-            yield \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, $this->truncateLine(u($line)->trim()->toString()));
+            yield \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, $this->truncateLine(mb_scrub(trim($line), 'UTF-8')));
         }
     }
 

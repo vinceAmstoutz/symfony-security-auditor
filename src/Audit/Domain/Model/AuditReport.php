@@ -18,9 +18,6 @@ use DateTimeInterface;
 
 final readonly class AuditReport
 {
-    /** @var list<string> */
-    private const array UNANALYZED_STATUSES = ['errored', 'aborted'];
-
     /** @var list<Vulnerability> */
     private array $vulnerabilities;
 
@@ -135,22 +132,15 @@ final readonly class AuditReport
     }
 
     /**
-     * Files some stage set out to analyze and never finished: its call failed
-     * (`errored`) or an abort stopped the run before reaching it (`aborted`).
-     * A finding can hide in any of them, so a report listing one cannot vouch
-     * for the absence of vulnerabilities. Files the lean pre-scan left out on
-     * purpose (`skipped`) are not among them.
+     * Files some stage set out to analyze and never finished — see
+     * {@see UnanalyzedFiles}. A finding can hide in any of them, so a report
+     * listing one cannot vouch for the absence of vulnerabilities.
      *
      * @return list<string>
      */
     public function unanalyzedFiles(): array
     {
-        $unanalyzed = array_filter(
-            $this->coverage,
-            static fn (array $entry): bool => \in_array($entry['status'], self::UNANALYZED_STATUSES, true),
-        );
-
-        return array_values(array_unique(array_column($unanalyzed, 'file')));
+        return UnanalyzedFiles::in($this->coverage);
     }
 
     public function isComplete(): bool

@@ -146,7 +146,7 @@ Token-bucket limiter wrapped around every LLM call. Each dimension is independen
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `audit.rate_limit.requests_per_minute` | `int` (≥ 1) or null | `null` | Maximum LLM requests per minute. `null` disables this dimension. |
-| `audit.rate_limit.input_tokens_per_minute` | `int` (≥ 1) or null | `null` | Maximum input tokens per minute. `null` disables this dimension. A single request whose estimated input exceeds the cap throws `RateLimitRequestTooLargeException` (extends `LLMProviderException`). |
+| `audit.rate_limit.input_tokens_per_minute` | `int` (≥ 1) or null | `null` | Maximum input tokens per minute. `null` disables this dimension. A chunk whose estimated input exceeds the cap is split in two and each half sent on its own (`RateLimitRequestTooLargeException`, extending `LLMRequestTooLargeException`); a single file whose prompt still exceeds the cap is recorded as errored, unless the file is under a tenth of that prompt: its fixed part, the system prompt and the project mapping, is then what leaves no room, and the run stops. |
 | `audit.rate_limit.output_tokens_per_minute` | `int` (≥ 1) or null | `null` | Maximum output tokens per minute. `null` disables this dimension. Counted post-hoc from each call's actual usage so the next `acquire()` defers until the window resets once the bucket is full. |
 
 State is per-process. Parallel runs sharing one API key (e.g. CI matrix) still race on the provider window — out-of-process coordination (Redis/file lock) is not provided by v1.
