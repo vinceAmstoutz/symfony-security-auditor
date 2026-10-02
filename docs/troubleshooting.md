@@ -27,7 +27,8 @@ Entries in this section apply only to the standalone binary (`init`, `self-updat
 `doctor`'s "Configuration" and "API key" lines surface `StandaloneConfigLoader::load()` failures directly:
 
 - **`No provider is configured — run "init".`** — no `platform:` block in `config.yaml`; run `init`.
-- **`The environment variable "<VAR>", referenced by your config, is not set.`** (reported under the `API key` label) — export the `%env(VAR)%` variable your `platform:` block references.
+- **`No API key available. Your config reads it from "<VAR>", which is not set in the environment and has nothing stored for it. …`** (reported under the `API key` label) — store the key with `auth:set`, export `<VAR>`, or pass it for one run from a password manager; `auth:status` shows what resolves. With several platforms configured, only the one `provider:` selects needs its key.
+- **`The environment variable "<VAR>", referenced by your config, is not set.`** (reported under the `Configuration` label) — a setting other than the key, such as a `base_url` or `endpoint` written as `%env(VAR)%`, has no value: export the variable.
 - **`Config file "<path>" is not valid YAML: <detail>`** — fix the malformed `config.yaml` or `.symfony-security-auditor.yaml` at `<path>`.
 - **Cannot resolve the user configuration directory** — set `$HOME`, or set `SYMFONY_SECURITY_AUDITOR_HOME` to the absolute path of a writable directory:
 
@@ -45,7 +46,7 @@ Running `audit`/`init` directly without `doctor` first hits the same underlying 
 Two distinct "Provider bridge" failures:
 
 - **`Not installed — run "init --provider=<platform>" to download it.`** — `<data-dir>/vendor/autoload.php` does not exist yet.
-- **`Installed, but the audit cannot start with it: <reason>`** — the autoloader exists, but `doctor` also builds the container to confirm it actually boots, not just that the file is present. A bridge left over from a previously configured provider passes the file check but fails here, since the container needs the _currently_ configured provider's classes, not whichever bridge happens to be installed. Re-run `init` for the current provider (`--force` skips the overwrite prompt) to install the matching bridge.
+- **`Installed, but the audit cannot start with it: <reason>`** — the autoloader exists, but `doctor` also builds the container to confirm it actually boots, not just that the file is present. A bridge left over from a previously configured provider passes the file check but fails here, since the container needs the _currently_ configured provider's classes, not whichever bridge happens to be installed. Re-run `init` for the current provider (`--force` skips the overwrite prompt) to install the matching bridge. A bridge an older version of the binary installed fails here too, whatever the configuration says — see the entry below.
 
 On `1.20.1` and earlier, one reason string came from the binary rather than from the bridge:
 
@@ -56,6 +57,21 @@ service "http_client".
 ```
 
 The container the binary builds registers the services `symfony/ai-bundle` expects an application to provide, and `http_client` was missing from that list. Three bridges require it outright (`ollama`, `elevenlabs` and `deepgram`), and `ollama` is the only one an audit runs against, so this surfaced as an Ollama-only failure. Upgrade the binary (`symfony-security-auditor self-update`); re-running `init` does not help, since the bridge was never the problem.
+
+### `The provider bridge under "…" was installed for symfony/ai-platform …, but this binary bundles …`
+
+`audit`, `mcp:serve` and `doctor` stop with:
+
+```text
+The provider bridge under "/home/you/.local/share/symfony-security-auditor" was
+installed for symfony/ai-platform v0.12.0, but this binary bundles v0.14.1:
+loaded, its classes would replace the bundled ones and fail every LLM call, so
+the binary leaves it unloaded. Rebuild it with "symfony-security-auditor init
+--provider=ollama --force" — init rewrites config.yaml, so give it your model
+and connection options again.
+```
+
+The bridges under the data directory were installed by another version of the binary — 1.20.x resolved `symfony/ai-platform` 0.12 or 0.13 — and the binary loads them ahead of its own classes. Loaded, they failed every LLM call (`Call to undefined method Symfony\AI\Platform\TokenUsage\TokenUsage::getModel()`), which an audit only reported as incomplete, so the binary checks the release in `<data-dir>/vendor/composer/installed.php` before loading anything and leaves a mismatched tree alone. Run the `init` command it names, with the `--model` and connection options you use (`--endpoint`, `--base-url`, `--env-var`, `--no-api-key`): it requires every bridge the tree holds again, pinned to the bundled release. `--force` is what lets it run on a machine that already has a configuration — without it, `init` asks before overwriting `config.yaml`, and `--no-interaction` answers no before any bridge is touched.
 
 ### `.symfony-security-auditor.yaml` cannot override `platform`, `provider`, or `scan.import_sarif`
 
@@ -105,7 +121,7 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
 
 ### Every command warns `The provider bridge under "…" cannot be loaded by this binary`
 
-The bridge tree under the data directory was resolved for another PHP than the one the binary bundles — typically a `composer.json` written by a release before 1.15, which pinned no PHP version — so Composer's `platform_check.php` refuses it. The binary prints that warning, naming the data directory, on stderr and runs the command without the bridge: `init`, `self-update` and `--version` work, and `audit` stops at the missing bridge with `ProviderBridgeException`. Run `init --provider=<platform>` again: it rewrites the manifest with the PHP and `symfony/ai-platform` pins and reinstalls the bridge.
+The bridge tree under the data directory was resolved for another PHP than the one the binary bundles — typically a `composer.json` written by a release before 1.15, which pinned no PHP version — so Composer's `platform_check.php` refuses it. The binary prints that warning, naming the data directory, on stderr and runs the command without the bridge: `init`, `self-update` and `--version` work, and `audit` stops at the missing bridge with `ProviderBridgeException`. That holds whichever Composer generated the tree: 2.8.10 and later throw the refusal, earlier versions — the one Ubuntu's `apt` installs included — raise it as a fatal `E_USER_ERROR`, which the binary turns into the same warning. Run `init --provider=<platform> --force` again: it rewrites the manifest with the PHP and `symfony/ai-platform` pins and reinstalls the bridge.
 
 ### `init` fails to install the provider bridge
 
@@ -271,6 +287,48 @@ Self-hosted endpoints and proxied APIs produce it most often, in two ways:
 - **More concurrent connections than the endpoint serves.** The `fast` profile opens up to four attacker and four reviewer calls (`audit.attacker_max_concurrent` / `audit.reviewer_max_concurrent`). A local model server with a small worker pool drops the excess. Set both to `1`; `balanced` and `thorough` already default to `1`.
 
 When every retry fails, the run still aborts with exit `1` and the report says it is incomplete (#378). Running again resumes from the cache (`cache.enabled`, on by default), so only the failed chunks are retried. Streaming, which should remove the problem at its source, is tracked in #379.
+
+### `Idle timeout reached for "…"` / HTTP `499` in the gateway log
+
+The request reached the provider, but nothing came back before the HTTP client's idle timeout, so the client hung up — which an AI gateway logs as `499` (client closed the request). A non-streamed answer arrives only once the model has finished it, so a slow local model, or a self-hosted gateway in front of one, can stay silent for minutes on a long prompt. The call is retried (`audit.retry.max_attempts`), and the same wait fails it again.
+
+- **Standalone binary.** It waits 600 seconds by default. Raise `http_timeout` in `config.yaml`, in seconds:
+
+  ```yaml
+  # ~/.config/symfony-security-auditor/config.yaml
+  http_timeout: 1800
+  ```
+
+  Before 1.21 the binary left the timeout to PHP's `default_socket_timeout`, 60 seconds, and nothing could change it.
+
+- **Symfony bundle.** The platform uses your application's `http_client` service, whose idle timeout is PHP's `default_socket_timeout` unless you set one. Raise it for every request your application makes:
+
+  ```yaml
+  # config/packages/framework.yaml
+  framework:
+      http_client:
+          default_options:
+              timeout: 1800
+  ```
+
+  or only for the LLM platform, with a scoped client named in the platform's `http_client` option:
+
+  ```yaml
+  # config/packages/framework.yaml
+  framework:
+      http_client:
+          scoped_clients:
+              llm.http_client:
+                  base_uri: 'http://localhost:11434'
+                  timeout: 1800
+
+  # config/packages/ai.yaml
+  ai:
+      platform:
+          ollama:
+              endpoint: 'http://localhost:11434'
+              http_client: 'llm.http_client'
+  ```
 
 ### `LLM response was empty` / `Failed to parse … JSON response`
 

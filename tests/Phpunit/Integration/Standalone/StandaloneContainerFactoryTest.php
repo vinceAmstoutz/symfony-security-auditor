@@ -156,6 +156,35 @@ final class StandaloneContainerFactoryTest extends TestCase
     }
 
     /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('httpTimeouts')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_platform_reaches_the_provider_through_a_client_that_waits_as_long_as_configured(?float $configured, float $expected): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434']], 'ollama');
+        $standaloneConfig = null === $configured ? new StandaloneConfig([], $standalonePlatformConfig) : new StandaloneConfig([], $standalonePlatformConfig, httpTimeout: $configured);
+
+        $containerBuilder = (new StandaloneContainerFactory())->create($standaloneConfig, $this->cacheDir);
+
+        self::assertSame([['timeout' => $expected, 'max_duration' => 0]], $containerBuilder->getDefinition('http_client')->getArguments());
+    }
+
+    /**
+     * @return iterable<string, array{?float, float}>
+     */
+    public static function httpTimeouts(): iterable
+    {
+        yield 'ten minutes when none is configured' => [null, 600.0];
+        yield 'what the configuration sets' => [1800.0, 1800.0];
+    }
+
+    /**
      * @param array<string, mixed> $platform
      *
      * @throws AmbiguousPlatformException

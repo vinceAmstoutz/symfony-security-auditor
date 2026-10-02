@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
@@ -29,9 +30,9 @@ final readonly class StandalonePlatformConfigResolver
     /**
      * Stands in for a credential a run has been told it will not need — a
      * `--dry-run`, which estimates cost from the scanned files and never
-     * reaches the provider. It is deliberately not a plausible key: were a
-     * code path ever to send it, the provider rejects it outright rather than
-     * charging someone.
+     * reaches the provider, or a platform `provider:` does not select. It is
+     * deliberately not a plausible key: were a code path ever to send it, the
+     * provider rejects it outright rather than charging someone.
      */
     public const string UNNEEDED_CREDENTIAL = 'unneeded-for-this-run';
 
@@ -61,11 +62,62 @@ final readonly class StandalonePlatformConfigResolver
         }
 
         $activeProvider = $rawConfig['provider'] ?? null;
+        $activeProvider = \is_string($activeProvider) && '' !== $activeProvider ? $activeProvider : null;
 
         return new StandalonePlatformConfig(
-            $this->resolveEnvPlaceholders($platform, $credentialsRequired),
-            \is_string($activeProvider) && '' !== $activeProvider ? $activeProvider : null,
+            null === $activeProvider
+                ? $this->resolveEnvPlaceholders($platform, $credentialsRequired)
+                : $this->resolveSelected($platform, $this->selectedPath(ProviderKey::of($activeProvider)), $credentialsRequired),
+            $activeProvider,
         );
+    }
+
+    /**
+     * The keys leading from the `platform:` block to the connection a
+     * provider selects: the platform, then the instance of an instance-keyed
+     * one.
+     *
+     * @return non-empty-list<string>
+     */
+    private function selectedPath(ProviderKey $providerKey): array
+    {
+        return null === $providerKey->instance ? [$providerKey->platform] : [$providerKey->platform, $providerKey->instance];
+    }
+
+    /**
+     * The run connects through the block `provider:` selects and no other,
+     * so every other platform, and every other instance of the selected one,
+     * is resolved the way a dry run resolves it: a key the run never sends
+     * cannot stop it, nor send the user to store the wrong one — the
+     * credential commands and the audit header describe the selected block
+     * alone ({@see PlatformApiKey::valueForProvider()}). A provider naming an
+     * instance its platform's block does not hold selects nothing; the
+     * container then names the provider it cannot find.
+     *
+     * @param array<array-key, mixed> $config
+     * @param non-empty-list<string>  $selectedPath
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    private function resolveSelected(array $config, array $selectedPath, bool $credentialsRequired): array
+    {
+        $selectedKey = array_shift($selectedPath);
+        $resolved = [];
+        foreach ($config as $key => $value) {
+            $resolved[$key] = match (true) {
+                $selectedKey !== (string) $key => $this->resolveEntry($key, $value, false),
+                [] === $selectedPath => $this->resolveEntry($key, $value, $credentialsRequired),
+                \is_array($value) => $this->resolveSelected($value, $selectedPath, $credentialsRequired),
+                default => $this->resolveEntry($key, $value, false),
+            };
+        }
+
+        return $resolved;
     }
 
     /**
@@ -87,14 +139,25 @@ final readonly class StandalonePlatformConfigResolver
     {
         $resolved = [];
         foreach ($config as $key => $value) {
-            $resolved[$key] = match (true) {
-                \is_array($value) => $this->resolveEnvPlaceholders($value, $credentialsRequired),
-                \is_string($value) => $this->resolveValue($value, PlatformApiKey::names($key), $credentialsRequired),
-                default => $value,
-            };
+            $resolved[$key] = $this->resolveEntry($key, $value, $credentialsRequired);
         }
 
         return $resolved;
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    private function resolveEntry(int|string $key, mixed $value, bool $credentialsRequired): mixed
+    {
+        return match (true) {
+            \is_array($value) => $this->resolveEnvPlaceholders($value, $credentialsRequired),
+            \is_string($value) => $this->resolveValue($value, PlatformApiKey::names($key), $credentialsRequired),
+            default => $value,
+        };
     }
 
     /**

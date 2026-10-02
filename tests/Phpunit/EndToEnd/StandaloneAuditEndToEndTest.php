@@ -165,6 +165,19 @@ final class StandaloneAuditEndToEndTest extends TestCase
 
     /**
      * @throws UnresolvableConfigPathException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_scanned_files_are_listed_without_a_provider_credential(): void
+    {
+        self::assertSame(
+            0,
+            $this->runWithCredentialFromEnvironment(\sprintf('%s %s --show-scanned', AuditCommand::NAME, $this->projectDir)),
+        );
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws MissingBundleExtensionException

@@ -30,7 +30,7 @@ final class ProviderBridgeExceptionTest extends TestCase
             'The "anthropic" provider bridge (symfony/ai-anthropic-platform) is not installed under the standalone data directory. Run "symfony-security-auditor init --provider=anthropic" to download it; a "composer require" in the audited project does not help, the binary never loads that project\'s vendor directory.',
             $providerBridgeException->getMessage(),
         );
-        self::assertSame($runtimeException, $providerBridgeException->getPrevious());
+        self::assertNull($providerBridgeException->getPrevious(), 'the console renders every previous exception, which would print the "composer require" advice this one replaces');
     }
 
     public function test_the_advice_names_the_platform_behind_a_hyphenated_package(): void
@@ -65,7 +65,7 @@ final class ProviderBridgeExceptionTest extends TestCase
             'The "failover" platform wraps other platforms through a rate limiter service that only a Symfony application defines, so the standalone binary cannot run it. Configure the platform it wraps directly, or run the audit through the Symfony bundle.',
             $providerBridgeException->getMessage(),
         );
-        self::assertSame($runtimeException, $providerBridgeException->getPrevious());
+        self::assertNull($providerBridgeException->getPrevious(), 'the console renders every previous exception, which would print the "composer require" advice this one replaces');
     }
 
     public function test_any_other_bundle_failure_is_not_a_bridge_problem(): void

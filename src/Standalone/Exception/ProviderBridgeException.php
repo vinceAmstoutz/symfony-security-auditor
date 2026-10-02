@@ -25,8 +25,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKey
  * replaced with the command that installs the bridge where the binary looks,
  * for the platform the message names — or, for a platform wrapping others
  * that no standalone configuration can boot, with that reason, since `init`
- * refuses it. Any other failure of the bundle is not this exception's
- * business and keeps its own message.
+ * refuses it. The bundle's exception is not chained: the console renders
+ * every previous exception too, and would print the advice replaced here.
+ * Any other failure of the bundle is not this exception's business and keeps
+ * its own message.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -47,7 +49,7 @@ final class ProviderBridgeException extends RuntimeException
                 'The "%s" platform wraps other platforms through %s that only a Symfony application defines, so the standalone binary cannot run it. Configure the platform it wraps directly, or run the audit through the Symfony bundle.',
                 $platform,
                 $serviceNeeded,
-            ), previous: $runtimeException);
+            ));
         }
 
         $provider = \in_array($platform, InstanceKeyedPlatforms::NAMES, true) ? \sprintf('%s.<instance>', $platform) : $platform;
@@ -57,6 +59,6 @@ final class ProviderBridgeException extends RuntimeException
             $platform,
             $matches[1],
             $provider,
-        ), previous: $runtimeException);
+        ));
     }
 }

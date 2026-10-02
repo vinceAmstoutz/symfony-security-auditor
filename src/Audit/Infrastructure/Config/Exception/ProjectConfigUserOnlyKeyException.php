@@ -27,6 +27,15 @@ final class ProjectConfigUserOnlyKeyException extends RuntimeException
         ));
     }
 
+    public static function forShortenedTimeout(string $projectConfigFile, string $key): self
+    {
+        return new self(\sprintf(
+            'The project config "%s" sets "%s" to something other than a number of seconds at or above the timeout your user config allows — a repository you audit may give the provider more time, never less.',
+            $projectConfigFile,
+            $key,
+        ));
+    }
+
     public static function forErasedSection(string $projectConfigFile, string $key): self
     {
         return new self(\sprintf(

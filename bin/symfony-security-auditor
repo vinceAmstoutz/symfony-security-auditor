@@ -13,7 +13,7 @@
 declare(strict_types=1);
 
 use Symfony\Component\Console\Output\ConsoleOutput;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\PendingBinarySwapCommitter;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
@@ -33,29 +33,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory
 
 $environment = getenv();
 
-(static function (array $environment): void {
-    try {
-        $bridgeAutoloadFile = StandaloneApplicationFactory::bridgeAutoloadFile($environment);
-    } catch (UnresolvableConfigPathException) {
-        return;
-    }
-
-    if (!is_file($bridgeAutoloadFile)) {
-        return;
-    }
-
-    try {
-        require_once $bridgeAutoloadFile;
-    } catch (RuntimeException $runtimeException) {
-        fwrite(\STDERR, \sprintf(
-            'The provider bridge under "%s" cannot be loaded by this binary: %s'.\PHP_EOL.'Run "init --provider=<platform>" again to rebuild it for the bundled PHP.'.\PHP_EOL,
-            \dirname($bridgeAutoloadFile, 2),
-            $runtimeException->getMessage(),
-        ));
-
-        return;
-    }
-})($environment);
+$bridgeTreeWarning = StandaloneApplicationFactory::loadBridgeTree($environment, BundledAiPlatformVersion::detect());
+if (null !== $bridgeTreeWarning) {
+    fwrite(\STDERR, $bridgeTreeWarning.\PHP_EOL);
+}
 
 $runningBinaryPath = \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) ? $_SERVER['SCRIPT_FILENAME'] : '';
 

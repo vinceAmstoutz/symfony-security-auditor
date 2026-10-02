@@ -1333,4 +1333,165 @@ final class StandaloneConfigLoaderTest extends TestCase
         self::assertNull($this->loader($this->configHome.'/absent.yaml')->load()->projectConfigFile);
         self::assertNull($this->loader()->load()->projectConfigFile);
     }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_the_http_timeout_is_a_setting_of_the_binary_not_of_the_audit(): void
+    {
+        $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\nhttp_timeout: 1800\nmodel: llama3.2\n");
+
+        $standaloneConfig = $this->loader()->load();
+
+        self::assertSame([1800.0, ['model' => 'llama3.2']], [$standaloneConfig->httpTimeout, $standaloneConfig->auditConfig]);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_configuration_setting_no_http_timeout_waits_ten_minutes(): void
+    {
+        $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\n");
+
+        self::assertSame(600.0, $this->loader()->load()->httpTimeout);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_project_config_may_give_the_provider_more_time(): void
+    {
+        $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\nhttp_timeout: 900\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "http_timeout: 1800\n");
+
+        self::assertSame(1800.0, $this->loader($projectConfigFile)->load()->httpTimeout);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_project_config_may_not_give_the_provider_less_time(): void
+    {
+        $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "http_timeout: 5\n");
+
+        $this->expectException(ProjectConfigUserOnlyKeyException::class);
+        $this->expectExceptionMessage(\sprintf('The project config "%s" sets "http_timeout"', $projectConfigFile));
+
+        $this->loader($projectConfigFile)->load();
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_project_config_setting_no_http_timeout_keeps_the_user_one(): void
+    {
+        $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\nhttp_timeout: 1200\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "fail_on: high\n");
+
+        self::assertSame(1200.0, $this->loader($projectConfigFile)->load()->httpTimeout);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_an_http_timeout_that_is_no_number_of_seconds_is_refused(): void
+    {
+        $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\nhttp_timeout: soon\n");
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage(\sprintf('Config file "%s/symfony-security-auditor/config.yaml" sets "http_timeout"', $this->configHome));
+
+        $this->loader()->load();
+    }
+
+    public function test_it_names_the_configured_provider_without_resolving_its_credential(): void
+    {
+        $this->writeConfig("provider: generic.my_gateway\nplatform:\n  generic:\n    my_gateway:\n      base_url: '%env(GATEWAY_URL)%'\n      api_key: '%env(GATEWAY_TOKEN)%'\n");
+
+        self::assertSame('generic.my_gateway', $this->loader()->configuredProvider());
+    }
+
+    #[DataProvider('configurationsNamingNoProvider')]
+    public function test_it_names_no_provider_the_user_config_does_not_select(string $yaml): void
+    {
+        $this->writeConfig($yaml);
+
+        self::assertNull($this->loader()->configuredProvider());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function configurationsNamingNoProvider(): iterable
+    {
+        yield 'a single platform, selected implicitly' => ["platform:\n  anthropic:\n    api_key: sk-test\n"];
+        yield 'an empty selector' => ["provider: ''\nplatform:\n  anthropic:\n    api_key: sk-test\n"];
+        yield 'a selector that is not text' => ["provider: [anthropic]\nplatform:\n  anthropic:\n    api_key: sk-test\n"];
+        yield 'a file that is not valid YAML' => ["provider: [anthropic\n"];
+    }
+
+    public function test_it_names_no_provider_without_a_configuration_directory(): void
+    {
+        $standaloneConfigLoader = new StandaloneConfigLoader(new XdgConfigPathResolver(null, null, null), new StandalonePlatformConfigResolver());
+
+        self::assertNull($standaloneConfigLoader->configuredProvider());
+    }
 }

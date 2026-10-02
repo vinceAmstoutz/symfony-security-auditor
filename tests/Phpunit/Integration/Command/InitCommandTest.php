@@ -91,19 +91,6 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_strips_invalid_characters_when_deriving_the_api_key_variable_from_the_provider(): void
-    {
-        $commandTester = $this->commandTester();
-        $commandTester->setInputs(['my-ai', 'my-model', '', '']);
-
-        $commandTester->execute([]);
-
-        self::assertSame(
-            ['provider' => 'my-ai', 'platform' => ['my-ai' => ['api_key' => '%env(MYAI_API_KEY)%']], 'model' => 'my-model'],
-            Yaml::parseFile($this->configFile()),
-        );
-    }
-
     public function test_it_folds_a_bridge_package_slug_to_the_platform_config_key(): void
     {
         $commandTester = $this->commandTester();
@@ -212,6 +199,20 @@ final class InitCommandTest extends TestCase
             ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
             Yaml::parseFile($this->configFile()),
         );
+    }
+
+    public function test_it_rebuilds_the_bridge_of_a_configured_machine_under_no_interaction_when_forced(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "provider: ollama\nplatform:\n    ollama: { endpoint: 'http://localhost:11434' }\nmodel: llama3.2\n");
+
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'ollama', '--endpoint' => 'http://localhost:11434', '--model' => 'llama3.2', '--force' => true],
+            ['interactive' => false],
+        );
+
+        self::assertSame([['ollama', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
     }
 
     public function test_it_skips_the_overwrite_confirmation_when_forced(): void
@@ -1147,8 +1148,8 @@ final class InitCommandTest extends TestCase
     public static function consoleMarkupCases(): iterable
     {
         yield 'a model naming an unknown colour' => [['--provider' => 'openai', '--model' => 'a<fg=nope>model', '--env-var' => 'TOKEN'], 'a<fg=nope>model'];
-        yield 'a provider naming an unknown colour' => [['--provider' => 'x<fg=nope>y', '--model' => 'our-model', '--env-var' => 'TOKEN'], 'x<fg=nope>y'];
-        yield 'a provider holding a known tag is not swallowed' => [['--provider' => 'x<info>y', '--model' => 'our-model', '--env-var' => 'TOKEN'], 'x<info>y'];
+        yield 'a provider naming an unknown colour' => [['--provider' => 'generic.x<fg=nope>y', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'], 'generic.x<fg=nope>y'];
+        yield 'a provider holding a known tag is not swallowed' => [['--provider' => 'generic.x<info>y', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'], 'generic.x<info>y'];
     }
 
     public function test_it_says_the_bridge_is_downloading_before_the_wait(): void
@@ -1589,6 +1590,122 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringNotContainsString('or leave it empty to keep the default', $this->unwrappedDisplay($commandTester));
+    }
+
+    #[DataProvider('platformsTheBundleDoesNotDeclare')]
+    public function test_it_refuses_a_platform_the_bundled_ai_bundle_does_not_declare(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => $provider, '--model' => 'llama-4-scout'], ['interactive' => false]);
+
+        self::assertSame(
+            [Command::INVALID, [], false],
+            [$exitCode, $this->recordingBridgeInstaller->installations, is_file($this->configFile())],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function platformsTheBundleDoesNotDeclare(): iterable
+    {
+        yield 'meta, which symfony/ai-bundle 0.14 dropped' => ['meta'];
+        yield 'a misspelled platform' => ['antropic'];
+        yield 'an undeclared platform named with an instance' => ['meta.prod'];
+    }
+
+    public function test_it_names_the_platforms_it_knows_when_refusing_one_the_bundle_does_not_declare(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'meta', '--model' => 'llama-4-scout'], ['interactive' => false]);
+
+        self::assertStringContainsString(
+            '"meta" is not a platform the bundled symfony/ai-bundle declares, so nothing was written and no bridge was installed. Pick one of albert, amazeeai, anthropic,',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('handWrittenPlatformsNamingAnUnusableInstance')]
+    public function test_a_hand_written_platform_refuses_an_instance_the_written_path_refuses(array $options, string $refusal): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute([...$options, '--model' => 'our-model'], ['interactive' => false]);
+
+        self::assertSame(
+            [Command::INVALID, [], true],
+            [$exitCode, $this->recordingBridgeInstaller->installations, str_contains($this->unwrappedDisplay($commandTester), $refusal)],
+            $commandTester->getDisplay(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function handWrittenPlatformsNamingAnUnusableInstance(): iterable
+    {
+        yield 'an instance YAML reads back as a list entry' => [['--provider' => 'azure.0'], 'uses an instance name the config file cannot be read back with'];
+        yield 'an instance the container reads as a parameter' => [['--provider' => 'azure.%gw%'], 'would be read as a container parameter'];
+        yield 'an instance no service can be named after' => [['--provider' => "azure.o'brien"], 'a character a service name cannot contain'];
+        yield 'an instance on a platform taking a single block' => [['--provider' => 'lmstudio.x'], 'takes a single connection block and names no instance'];
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('handWrittenPlatformsGivenTwoThingsToRefuse')]
+    public function test_a_hand_written_platform_names_what_comes_first_when_two_things_are_refused(array $options, string $refusal, string $laterRefusal): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute($options, ['interactive' => false]);
+
+        self::assertSame(
+            [true, false],
+            [str_contains($this->unwrappedDisplay($commandTester), $refusal), str_contains($this->unwrappedDisplay($commandTester), $laterRefusal)],
+            $commandTester->getDisplay(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string, string}>
+     */
+    public static function handWrittenPlatformsGivenTwoThingsToRefuse(): iterable
+    {
+        yield 'the instance before the model' => [['--provider' => 'azure.0', '--model' => "caf\xE9"], 'cannot be read back with', 'The model must be valid UTF-8 text.'];
+        yield 'the model before the variable name' => [['--provider' => 'azure.prod', '--model' => "caf\xE9", '--env-var' => 'NOT-A-NAME'], 'The model must be valid UTF-8 text.', 'is not a valid environment variable name'];
+    }
+
+    public function test_a_hand_written_platform_refuses_a_key_pasted_as_the_variable_name_without_echoing_it(): void
+    {
+        $pastedKey = 'sk-ant-api03-PASTEDKEYPASTEDKEYPASTEDKEY1234';
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => $pastedKey], ['interactive' => false]);
+
+        self::assertSame(
+            [Command::INVALID, [], false, true],
+            [
+                $exitCode,
+                $this->recordingBridgeInstaller->installations,
+                str_contains($commandTester->getDisplay(), $pastedKey),
+                str_contains($this->unwrappedDisplay($commandTester), 'is not a valid environment variable name'),
+            ],
+        );
+    }
+
+    public function test_a_hand_written_platform_still_accepts_a_valid_variable_name(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => ' AZURE_API_KEY '], ['interactive' => false]);
+
+        self::assertSame([['azure.prod', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
     }
 
     private function commandTester(): CommandTester
