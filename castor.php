@@ -205,6 +205,9 @@ function runCodeQualityTools(bool $fixMode = false): void
     io()->section('Install script tests');
     run('sh tests/Shell/install_script_test.sh');
 
+    io()->section('Pull request check tests');
+    run('sh tests/Shell/pull_request_check_test.sh');
+
     io()->section('PHPUnit');
     run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml --coverage-xml=build/coverage/coverage-xml --log-junit=build/coverage/junit.xml');
 
