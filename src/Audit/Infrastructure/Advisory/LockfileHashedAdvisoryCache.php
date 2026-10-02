@@ -20,6 +20,7 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\UnsafeAdvisoryCacheWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 
 use function Symfony\Component\String\u;
 
@@ -191,8 +192,13 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
         }
     }
 
+    /**
+     * The configured `cache.dir`, this cache's parent, is the trusted root:
+     * it and the directories above it are taken as configured, while a
+     * symlinked `advisory/` or anything planted below it is refused.
+     */
     private function isUnsafePath(string $path): bool
     {
-        return is_link($path) || is_link(\dirname($path));
+        return SymlinkGuard::isThroughSymlink($path, \dirname($this->cacheDir));
     }
 }

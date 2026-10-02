@@ -22,9 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * Resolves the latest released version through the shared self-update machinery,
  * throttling the network call to at most once per `throttleSeconds` by caching
  * the answer. The GitHub call only ever happens when the cache is missing or
- * stale; a failed call falls back to the last cached answer (or no notice) and
- * still refreshes the throttle window, so the check is silent when offline and
- * never blocks a run more than once a day.
+ * stale and the store can record the new throttle window; a failed call falls
+ * back to the last cached answer (or no notice) and still refreshes that
+ * window, so the check is silent when offline and never blocks a run more than
+ * once a day.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -69,12 +70,23 @@ final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvaila
         return $this->refreshedLatestVersion($currentVersion, $cachedState);
     }
 
+    /**
+     * The throttle window is claimed before the lookup: a store that cannot
+     * record it (an unwritable or unresolvable cache directory) would
+     * otherwise send every single command to GitHub, so the lookup is skipped
+     * and the last known answer stands.
+     */
     private function refreshedLatestVersion(string $currentVersion, ?UpdateCheckState $updateCheckState): string
     {
+        $knownVersion = $updateCheckState->latestVersion ?? $currentVersion;
+        if (!$this->updateCheckStore->write(new UpdateCheckState($this->clock->now(), $knownVersion))) {
+            return $knownVersion;
+        }
+
         try {
             $latestVersion = $this->selfUpdater->run($currentVersion, true)->latestVersion;
         } catch (SelfUpdateFailedException|UnsupportedSelfUpdatePlatformException) {
-            $latestVersion = $updateCheckState->latestVersion ?? $currentVersion;
+            return $knownVersion;
         }
 
         $this->updateCheckStore->write(new UpdateCheckState($this->clock->now(), $latestVersion));

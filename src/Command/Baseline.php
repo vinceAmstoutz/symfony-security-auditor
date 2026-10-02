@@ -19,6 +19,7 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
@@ -187,7 +188,7 @@ final readonly class Baseline implements BaselineInterface
      */
     private function assertSafeToWrite(string $path): void
     {
-        if (is_link($path) || is_link(\dirname($path))) {
+        if (SymlinkGuard::isThroughSymlink($path)) {
             throw UnsafeBaselineWriteException::forSymlinkedPath($path);
         }
     }

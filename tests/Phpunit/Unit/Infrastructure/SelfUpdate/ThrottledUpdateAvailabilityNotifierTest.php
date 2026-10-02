@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Throttl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate\Fixture\FakeSelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate\Fixture\InMemoryUpdateCheckStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate\Fixture\NonPersistingUpdateCheckStore;
 
 final class ThrottledUpdateAvailabilityNotifierTest extends TestCase
 {
@@ -153,6 +154,41 @@ final class ThrottledUpdateAvailabilityNotifierTest extends TestCase
         $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
 
         self::assertSame(self::EXPECTED_NOTICE, $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0'));
+    }
+
+    public function test_it_skips_the_lookup_when_the_throttle_window_cannot_be_recorded(): void
+    {
+        $fakeSelfUpdater = new FakeSelfUpdater('2.0.0');
+        $nonPersistingUpdateCheckStore = new NonPersistingUpdateCheckStore();
+        $mockClock = new MockClock('2026-01-01 00:00:00');
+
+        (new ThrottledUpdateAvailabilityNotifier($fakeSelfUpdater, $nonPersistingUpdateCheckStore, $mockClock))->availableUpdateNotice('1.0.0');
+        (new ThrottledUpdateAvailabilityNotifier($fakeSelfUpdater, $nonPersistingUpdateCheckStore, $mockClock))->availableUpdateNotice('1.0.0');
+
+        self::assertSame(0, $fakeSelfUpdater->calls);
+    }
+
+    public function test_it_still_serves_a_stale_cached_version_when_the_throttle_window_cannot_be_recorded(): void
+    {
+        $mockClock = new MockClock('2026-01-01 00:00:00');
+        $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier(
+            new FakeSelfUpdater('3.0.0'),
+            new NonPersistingUpdateCheckStore(new UpdateCheckState($mockClock->now()->modify('-2 days'), '2.0.0')),
+            $mockClock,
+        );
+
+        self::assertSame(self::EXPECTED_NOTICE, $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0'));
+    }
+
+    public function test_it_reports_no_notice_when_nothing_is_cached_and_the_throttle_window_cannot_be_recorded(): void
+    {
+        $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier(
+            new FakeSelfUpdater('2.0.0'),
+            new NonPersistingUpdateCheckStore(),
+            new MockClock('2026-01-01 00:00:00'),
+        );
+
+        self::assertNull($throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0'));
     }
 
     public function test_it_serves_the_cached_version_just_under_the_daily_throttle_window(): void

@@ -259,6 +259,30 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function test_a_download_it_cannot_discard_keeps_the_failure_that_rejected_it(): void
+    {
+        $filesystem = new class extends Filesystem {
+            /**
+             * @param string|iterable<mixed> $files
+             */
+            #[Override]
+            public function remove(string|iterable $files): void
+            {
+                throw new IOException('removal refused');
+            }
+        };
+        $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'), $this->binaryPath, $filesystem);
+
+        $this->expectException(SelfUpdateFailedException::class);
+        $this->expectExceptionMessage('Checksum verification failed');
+
+        $selfUpdater->run('1.0.0', false);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function test_it_rejects_a_download_that_vanishes_before_it_can_be_hashed(): void
     {
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW'), vanishAfterDownload: true));
@@ -285,6 +309,33 @@ final class SelfUpdaterTest extends TestCase
         $this->expectExceptionMessage('not writable');
 
         $selfUpdater->run('1.0.0', false);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_refuses_to_update_a_writable_binary_whose_directory_is_not_writable(): void
+    {
+        $filesystem = new class extends Filesystem {
+            #[Override]
+            public function tempnam(string $dir, string $prefix, string $suffix = ''): string
+            {
+                throw new IOException('A temporary file could not be created: Permission denied');
+            }
+        };
+        $fakeReleaseClient = $this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW'));
+        $selfUpdater = $this->selfUpdater($fakeReleaseClient, $this->binaryPath, $filesystem);
+
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessage(\sprintf('The directory "%s" holding the binary is not writable (A temporary file could not be created: Permission denied)', $this->workingDirectory));
+
+            $selfUpdater->run('1.0.0', false);
+        } finally {
+            self::assertSame(1, $fakeReleaseClient->requests, 'Only the latest-version lookup may reach the network before the refusal.');
+            self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+        }
     }
 
     /**
@@ -361,11 +412,47 @@ final class SelfUpdaterTest extends TestCase
 
         try {
             $this->expectException(SelfUpdateFailedException::class);
+            $this->expectExceptionMessageMatches('/: rename refused$/');
 
             $this->pendingBinarySwap->commit();
         } finally {
             self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('/\.download$/')->ignoreDotFiles(false));
         }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_a_download_it_cannot_discard_after_a_failed_swap_is_named_in_the_same_error(): void
+    {
+        $filesystem = new class extends Filesystem {
+            #[Override]
+            public function rename(string $origin, string $target, bool $overwrite = false): void
+            {
+                throw new IOException('rename refused');
+            }
+
+            /**
+             * @param string|iterable<mixed> $files
+             */
+            #[Override]
+            public function remove(string|iterable $files): void
+            {
+                throw new IOException('removal refused');
+            }
+        };
+        $payload = 'NEW';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem)->run('1.0.0', false);
+
+        $this->expectException(SelfUpdateFailedException::class);
+        $this->expectExceptionMessageMatches(\sprintf(
+            '#^Failed to replace the binary at "%s": rename refused\. The downloaded update at "%s/[^"]+\.download" could not be removed either \(removal refused\); delete it by hand\.$#',
+            preg_quote($this->binaryPath, '#'),
+            preg_quote($this->workingDirectory, '#'),
+        ));
+
+        $this->pendingBinarySwap->commit();
     }
 
     /**

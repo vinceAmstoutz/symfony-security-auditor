@@ -17,7 +17,7 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckStoreInterface;
 
-final class InMemoryUpdateCheckStore implements UpdateCheckStoreInterface
+final readonly class NonPersistingUpdateCheckStore implements UpdateCheckStoreInterface
 {
     public function __construct(
         private ?UpdateCheckState $updateCheckState = null,
@@ -32,14 +32,9 @@ final class InMemoryUpdateCheckStore implements UpdateCheckStoreInterface
     #[Override]
     public function write(UpdateCheckState $updateCheckState): bool
     {
-        $this->updateCheckState = $updateCheckState;
-
-        return true;
+        return false;
     }
 
     #[Override]
-    public function clear(): void
-    {
-        $this->updateCheckState = null;
-    }
+    public function clear(): void {}
 }

@@ -32,9 +32,11 @@ final class InMemoryUpdateCheckStore implements UpdateCheckStoreInterface
     }
 
     #[Override]
-    public function write(UpdateCheckState $updateCheckState): void
+    public function write(UpdateCheckState $updateCheckState): bool
     {
         $this->updateCheckState = $updateCheckState;
+
+        return true;
     }
 
     #[Override]

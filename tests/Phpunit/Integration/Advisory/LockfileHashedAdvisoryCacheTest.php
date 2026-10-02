@@ -684,6 +684,81 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry aged exactly the TTL must be treated as expired, not served from cache');
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_it_refuses_its_own_directory_below_the_cache_root_when_that_is_a_symlink(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $base = sys_get_temp_dir().'/advisory_cache_symlinked_self_'.uniqid('', true);
+        mkdir($base.'/elsewhere', recursive: true);
+        mkdir($base.'/cache');
+        symlink($base.'/elsewhere', $base.'/cache/advisory');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache($recordingComposerAuditRunner, $base.'/cache/advisory', new Filesystem(), new NullLogger(), new NativeClock());
+
+        try {
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            self::assertSame(2, $recordingComposerAuditRunner->callCount);
+            self::assertSame(['.', '..'], scandir($base.'/elsewhere'));
+        } finally {
+            (new Filesystem())->remove($base);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_a_relative_cache_directory_is_read_against_the_working_directory(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $base = sys_get_temp_dir().'/advisory_cache_relative_'.uniqid('', true);
+        mkdir($base);
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        chdir($base);
+        try {
+            $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache($recordingComposerAuditRunner, 'var/cache/advisory', new Filesystem(), new NullLogger(), new NativeClock());
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            self::assertSame(1, $recordingComposerAuditRunner->callCount);
+        } finally {
+            chdir($workingDirectory);
+            (new Filesystem())->remove($base);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_it_still_caches_when_a_directory_above_the_cache_is_a_symlink(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $base = sys_get_temp_dir().'/advisory_cache_symlinked_parent_'.uniqid('', true);
+        mkdir($base.'/real', recursive: true);
+        symlink($base.'/real', $base.'/link');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache($recordingComposerAuditRunner, $base.'/link/cache', new Filesystem(), new NullLogger(), new NativeClock());
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        chdir($base);
+        try {
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            self::assertSame(1, $recordingComposerAuditRunner->callCount);
+        } finally {
+            chdir($workingDirectory);
+            (new Filesystem())->remove($base);
+        }
+    }
+
     #[Override]
     protected function setUp(): void
     {

@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 
 use function Symfony\Component\String\u;
 
@@ -140,11 +141,15 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
      * `Filesystem::readFile()` also transparently follows a symlink, so the
      * same pre-planted symlink that would otherwise corrupt a write turns an
      * ordinary cache read into an arbitrary-file read whose content is
-     * trusted as a real, previously-computed verdict.
+     * trusted as a real, previously-computed verdict. The configured
+     * `cache.dir`, this cache's parent, is the trusted root: it and the
+     * directories above it are taken as configured, so a symlinked `var/` or
+     * `~/.cache` does not turn the cache off, while a symlinked `reviewer/`
+     * or anything planted below it is still refused.
      */
     private function isSymlinkedPath(string $path): bool
     {
-        return is_link($path) || is_link(\dirname($path));
+        return SymlinkGuard::isThroughSymlink($path, \dirname($this->cacheDir));
     }
 
     /**
