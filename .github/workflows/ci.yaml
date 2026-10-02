@@ -163,6 +163,9 @@ jobs:
       - name: Install script tests
         run: sh tests/Shell/install_script_test.sh
 
+      - name: Pull request check tests
+        run: sh tests/Shell/pull_request_check_test.sh
+
   zizmor:
     name: zizmor (GitHub Actions security scan)
     runs-on: ubuntu-latest

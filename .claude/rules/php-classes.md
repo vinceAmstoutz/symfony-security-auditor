@@ -7,32 +7,22 @@ paths:
 
 ## Class Declaration
 
-Every class **must** be declared `final readonly`. The only permitted opt-outs
-are documented **context carriers**:
+Every class **must** be declared `final readonly`. The only permitted opt-outs are documented **context carriers**:
 
 - `Audit\Domain\Model\AuditContext` — pipeline state accumulated across stages.
-- `Command\AuditCommandInput` and `Command\InitCommandInput` — Symfony Console
-  MapInput requires public mutable properties with property-level defaults;
-  promoted readonly constructor params are invisible to its reflection.
+- `Command\AuditCommandInput` and `Command\InitCommandInput` — Symfony Console MapInput requires public mutable properties with property-level defaults; promoted readonly constructor params are invisible to its reflection.
 
-Each opt-out site declares the reason in a leading code comment and cites this
-rule. Anything outside that list must be `final readonly`. If inheritance feels
-needed, introduce an interface instead. The `final`-or-`abstract` requirement is
-enforced by the custom `FinalRule` (`tools/PHPStan/FinalRule.php`).
+Each opt-out site declares the reason in a leading code comment and cites this rule. Anything outside that list must be `final readonly`. If inheritance feels needed, introduce an interface instead. The `final`-or-`abstract` requirement is enforced by the custom `FinalRule` (`tools/PHPStan/FinalRule.php`).
 
 ## Interfaces & SOLID
 
-Every collaborator that crosses a layer or could plausibly have an alternative
-implementation **must** be typed against an interface, not a concrete class.
-Follow SOLID strictly:
+Every collaborator that crosses a layer or could plausibly have an alternative implementation **must** be typed against an interface, not a concrete class. Follow SOLID strictly:
 
 - **S**RP — see "Single Responsibility" below.
-- **O**CP — extend behavior via new implementations of an interface, not by
-  modifying existing classes.
+- **O**CP — extend behavior via new implementations of an interface, not by modifying existing classes.
 - **L**SP — implementations must be substitutable without breaking callers.
 - **I**SP — split fat interfaces; consumers depend only on methods they use.
-- **D**IP — Application/Domain depend on interfaces; Infrastructure provides the
-  implementations (wired in `config/services.php`).
+- **D**IP — Application/Domain depend on interfaces; Infrastructure provides the implementations (wired in `config/services.php`).
 
 See also: [[ddd-layers]], [[llm-seam]].
 
@@ -40,109 +30,54 @@ See also: [[ddd-layers]], [[llm-seam]].
 
 Each file does exactly one thing. **No exceptions.**
 
-The canonical split lives under `src/Command/`: `AuditCommand` delegates only —
-input mapping/validation goes to `AuditCommandInput`, user-facing messaging to
-`AuditPresenter`, report persistence to `ReportWriter`, exit-code mapping to
-`AuditExitCodeResolver`. Replicate this pattern: thin orchestrator + dedicated
-collaborators, each behind an interface.
+The canonical split lives under `src/Command/`: `AuditCommand` delegates only — input mapping/validation goes to `AuditCommandInput`, user-facing messaging to `AuditPresenter`, report persistence to `ReportWriter`, exit-code mapping to `AuditExitCodeResolver`. Replicate this pattern: thin orchestrator + dedicated collaborators, each behind an interface.
 
-When you touch a file that bundles responsibilities, extract them into new
-classes rather than adding more. One class/interface/trait per file is enforced
-by Symplify's `ForbiddenMultipleClassLikeInOneFileRule`; test doubles and
-fixtures live in their own files under a sibling `Fixture/` namespace, never
-inlined after the test class.
+When you touch a file that bundles responsibilities, extract them into new classes rather than adding more. One class/interface/trait per file is enforced by Symplify's `ForbiddenMultipleClassLikeInOneFileRule`; test doubles and fixtures live in their own files under a sibling `Fixture/` namespace, never inlined after the test class.
 
 ## Constructor & Method Parameters
 
-Cap every method and constructor at **5 parameters** — enforced by the custom
-`MaxParameterCountRule` (`tools/PHPStan/MaxParameterCountRule.php`). When a
-signature would exceed it, group related parameters into an immutable
-value/context object (a `Context` or config VO), never by merging helpers or
-relaxing the cap. See memory `[[feedback_context_object_over_param_threading]]`.
+Cap every method and constructor at **5 parameters** — enforced by the custom `MaxParameterCountRule` (`tools/PHPStan/MaxParameterCountRule.php`). When a signature would exceed it, group related parameters into an immutable value/context object (a `Context` or config VO), never by merging helpers or relaxing the cap. See memory `[[feedback_context_object_over_param_threading]]`.
 
-- **All-promoted constructor** (every parameter promoted) is exempt — it _is_
-  the value object (e.g. the per-finding `Vulnerability` storage ctor).
-- **`@deprecated` methods** are exempt — they are scheduled for removal and
-  their replacement already satisfies the cap.
-- **Public, BC-frozen factories** that exceed the cap are not edited in place
-  (that would be a `MAJOR` break). Instead add an `of()`-style value-object
-  factory (`Vulnerability::of()`, `SymfonyMapping::of()`, `LLMResponse::of()`),
-  mark the wide `create()` `@deprecated`, and have it delegate to `of()`. The
-  new VOs live in the layer that owns the model (see [[ddd-layers]]).
+- **All-promoted constructor** (every parameter promoted) is exempt — it _is_ the value object (e.g. the per-finding `Vulnerability` storage ctor).
+- **`@deprecated` methods** are exempt — they are scheduled for removal and their replacement already satisfies the cap.
+- **Public, BC-frozen factories** that exceed the cap are not edited in place (that would be a `MAJOR` break). Instead add an `of()`-style value-object factory (`Vulnerability::of()`, `SymfonyMapping::of()`, `LLMResponse::of()`), mark the wide `create()` `@deprecated`, and have it delegate to `of()`. The new VOs live in the layer that owns the model (see [[ddd-layers]]).
 
 ## Custom Exceptions
 
-Never throw raw `\RuntimeException`, `\InvalidArgumentException`,
-`\LogicException`, or plain `\Exception` from production code. Every thrown
-exception is a domain-meaningful failure and **must** be a project-defined
-class.
+Never throw raw `\RuntimeException`, `\InvalidArgumentException`, `\LogicException`, or plain `\Exception` from production code. Every thrown exception is a domain-meaningful failure and **must** be a project-defined class.
 
-- Define one custom exception per failure mode, named after the failure (e.g.
-  `MalformedLLMResponseException`, `AuditConfigurationException`,
-  `ToolNotRegisteredException`).
-- Group them under a per-layer namespace: `Audit\Domain\Exception\…`,
-  `Audit\Application\Exception\…`, `Audit\Infrastructure\<Adapter>\Exception\…`,
-  `Command\Exception\…`.
-- Each custom exception extends the closest matching SPL exception
-  (`\RuntimeException`, `\InvalidArgumentException`, …) so callers can still
-  rely on standard catch hierarchies if they prefer.
-- Provide named factory constructors
-  (`MalformedLLMResponseException::forNonJsonContent($preview)`) that build a
-  precise message at the call site — callers should not assemble error strings.
-- `catch` clauses target the **custom** type when possible, never the SPL type,
-  so failure semantics remain visible at the catch site.
-- Re-throwing third-party exceptions is allowed only when wrapping them into a
-  custom exception via `previous`:
-  `throw MalformedLLMResponseException::fromJsonException($e);`.
+- Define one custom exception per failure mode, named after the failure (e.g. `MalformedLLMResponseException`, `AuditConfigurationException`, `ToolNotRegisteredException`).
+- Group them under a per-layer namespace: `Audit\Domain\Exception\…`, `Audit\Application\Exception\…`, `Audit\Infrastructure\<Adapter>\Exception\…`, `Command\Exception\…`.
+- Each custom exception extends the closest matching SPL exception (`\RuntimeException`, `\InvalidArgumentException`, …) so callers can still rely on standard catch hierarchies if they prefer.
+- Provide named factory constructors (`MalformedLLMResponseException::forNonJsonContent($preview)`) that build a precise message at the call site — callers should not assemble error strings.
+- `catch` clauses target the **custom** type when possible, never the SPL type, so failure semantics remain visible at the catch site.
+- Re-throwing third-party exceptions is allowed only when wrapping them into a custom exception via `previous`: `throw MalformedLLMResponseException::fromJsonException($e);`.
 
-Built-in throwables that are **not** authored by us (`\JsonException`,
-`\ValueError`, `\TypeError`, `\Throwable` in broad catches) are fine to consume
-— the rule applies to what we _throw_, not what we _catch_.
+Built-in throwables that are **not** authored by us (`\JsonException`, `\ValueError`, `\TypeError`, `\Throwable` in broad catches) are fine to consume — the rule applies to what we _throw_, not what we _catch_.
 
 ### Never Swallow Errors
 
-A caught error must be handled, not silenced — enforced by two custom PHPStan
-rules in `tools/PHPStan/`:
+A caught error must be handled, not silenced — enforced by two custom PHPStan rules in `tools/PHPStan/`:
 
-- `NoEmptyCatchRule` — an empty (or comment-only) `catch` block is forbidden;
-  handle the exception or at least log it.
-- `NoSilencingErrorHandlerRule` — a `set_error_handler()` callback that only
-  `return true` silently swallows every error; capture or convert it instead, or
-  remove the suppression.
+- `NoEmptyCatchRule` — an empty (or comment-only) `catch` block is forbidden; handle the exception or at least log it.
+- `NoSilencingErrorHandlerRule` — a `set_error_handler()` callback that only `return true` silently swallows every error; capture or convert it instead, or remove the suppression.
 
 ## Symfony Components First
 
 Prefer Symfony components over hand-rolled or raw PHP equivalents:
 
-- `symfony/string` — string manipulation (no `str_*` chains, no manual slug/case
-  logic)
-- `symfony/finder` — filesystem traversal (no `scandir`, `glob`, raw
-  `RecursiveDirectoryIterator`)
-- `symfony/serializer` — (de)serialization (no manual `json_decode` → array
-  shuffling for structured payloads)
-- `symfony/filesystem`, `symfony/process`, `symfony/console`,
-  `symfony/validator`, `symfony/uid`, etc. — use when applicable.
+- `symfony/string` — string manipulation (no `str_*` chains, no manual slug/case logic)
+- `symfony/finder` — filesystem traversal (no `scandir`, `glob`, raw `RecursiveDirectoryIterator`)
+- `symfony/serializer` — (de)serialization (no manual `json_decode` → array shuffling for structured payloads)
+- `symfony/filesystem`, `symfony/process`, `symfony/console`, `symfony/validator`, `symfony/uid`, etc. — use when applicable.
 
-Reach for plain PHP only when no Symfony component fits or when the component
-would add a dependency disproportionate to the need — and justify it in the PR
-description.
+Reach for plain PHP only when no Symfony component fits or when the component would add a dependency disproportionate to the need — and justify it in the PR description.
 
 ### Domain-layer exception
 
-This rule applies to the **Application, Infrastructure, and Command** layers
-only. The **Domain layer** (`src/Audit/Domain/`) is pure PHP by mandate (see
-[[ddd-layers]]: _"No Symfony, no `symfony/ai`, no I/O"_) and therefore keeps
-native functions — `str_ends_with`, `str_contains`, `trim`, `is_dir`, … — even
-where a Symfony component would otherwise be preferred. Do **not** import
-`symfony/string`, `symfony/filesystem`, or any other Symfony component into a
-Domain class; the layer boundary wins over the components-first preference.
+This rule applies to the **Application, Infrastructure, and Command** layers only. The **Domain layer** (`src/Audit/Domain/`) is pure PHP by mandate (see [[ddd-layers]]: _"No Symfony, no `symfony/ai`, no I/O"_) and therefore keeps native functions — `str_ends_with`, `str_contains`, `trim`, `is_dir`, … — even where a Symfony component would otherwise be preferred. Do **not** import `symfony/string`, `symfony/filesystem`, or any other Symfony component into a Domain class; the layer boundary wins over the components-first preference.
 
 Concretely:
 
-- `symfony/string` (`u()` / `b()`) is used freely in Application /
-  Infrastructure / Command, but never in `src/Audit/Domain/`.
-- A directory-vs-file predicate (`is_dir` / `is_file`) has no
-  `symfony/filesystem` equivalent (`Filesystem::exists()` cannot distinguish the
-  two), so those calls stay native at the scanning boundary; use
-  `Filesystem::exists()` only where mere existence — not the file type — is the
-  actual question.
+- `symfony/string` (`u()` / `b()`) is used freely in Application / Infrastructure / Command, but never in `src/Audit/Domain/`.
+- A directory-vs-file predicate (`is_dir` / `is_file`) has no `symfony/filesystem` equivalent (`Filesystem::exists()` cannot distinguish the two), so those calls stay native at the scanning boundary; use `Filesystem::exists()` only where mere existence — not the file type — is the actual question.
