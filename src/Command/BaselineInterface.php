@@ -45,12 +45,15 @@ interface BaselineInterface
     public function feedback(string $path): ReviewerFeedback;
 
     /**
-     * @param list<array<array-key, mixed>|string> $entries accepted-finding entries; each
-     *                                                      carries at least a `fingerprint`
-     *                                                      plus human-readable metadata
-     *                                                      (`type`, `file`, `title`,
-     *                                                      `added_at`) — or, for a legacy
-     *                                                      entry, the bare fingerprint string
+     * @param list<array<array-key, mixed>|string> $entries     accepted-finding entries; each
+     *                                                          carries at least a `fingerprint`
+     *                                                          plus human-readable metadata
+     *                                                          (`type`, `file`, `title`,
+     *                                                          `added_at`) — or, for a legacy
+     *                                                          entry, the bare fingerprint string
+     * @param ?string                              $projectPath the audited project, whose directories are walked for a
+     *                                                          symlink like the working directory's; null when the
+     *                                                          baseline belongs to no audit run
      */
-    public function save(string $path, array $entries): void;
+    public function save(string $path, array $entries, ?string $projectPath = null): void;
 }

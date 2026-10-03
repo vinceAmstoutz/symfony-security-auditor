@@ -60,6 +60,18 @@ final readonly class SymlinkGuard
     }
 
     /**
+     * The audited checkout is as untrusted below its root as below the
+     * working directory, so a path into it given from outside the working
+     * directory has every directory between the project root and the file
+     * checked too, not only its own directory.
+     */
+    public static function isThroughSymlinkIntoProject(string $path, ?string $projectRoot): bool
+    {
+        return self::isThroughSymlink($path)
+            || (null !== $projectRoot && self::isThroughSymlink($path, $projectRoot));
+    }
+
+    /**
      * Walks the directory prefixes of the path as written rather than as
      * canonicalized: the kernel reads `build/link/../report.sarif` through
      * `build/link` before it climbs back up, so collapsing the `..` first

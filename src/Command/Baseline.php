@@ -159,9 +159,9 @@ final readonly class Baseline implements BaselineInterface
      * @throws UnsafeBaselineWriteException
      */
     #[Override]
-    public function save(string $path, array $entries): void
+    public function save(string $path, array $entries, ?string $projectPath = null): void
     {
-        $this->assertSafeToWrite($path);
+        $this->assertSafeToWrite($path, $projectPath);
 
         try {
             $this->filesystem->dumpFile(
@@ -182,13 +182,13 @@ final readonly class Baseline implements BaselineInterface
      * PR would let the audit overwrite an arbitrary file the CI runner can
      * reach. Mirrors the guard already applied to the filesystem
      * attacker/reviewer/advisory caches, the standalone config writer, and
-     * the report writer.
+     * the report writer, and walks the audited project below its root as well.
      *
      * @throws UnsafeBaselineWriteException
      */
-    private function assertSafeToWrite(string $path): void
+    private function assertSafeToWrite(string $path, ?string $projectPath): void
     {
-        if (SymlinkGuard::isThroughSymlink($path)) {
+        if (SymlinkGuard::isThroughSymlinkIntoProject($path, $projectPath)) {
             throw UnsafeBaselineWriteException::forSymlinkedPath($path);
         }
     }
