@@ -24,7 +24,7 @@ final readonly class ReportDiff
      * @param list<DiffFinding> $newFindings        present in the current report, absent from the previous one
      * @param list<DiffFinding> $fixedFindings      present in the previous report, absent from the current one
      * @param list<DiffFinding> $persistingFindings present in both reports
-     * @param list<DiffFinding> $unverifiedFindings present in the previous report, absent from the current one — whose file the current run could not fully analyze, so nothing says they are fixed
+     * @param list<DiffFinding> $unverifiedFindings present in the previous report, absent from the current one — whose file the current run could not fully analyze or never looked at, so nothing says they are fixed
      */
     public function __construct(
         public array $newFindings,

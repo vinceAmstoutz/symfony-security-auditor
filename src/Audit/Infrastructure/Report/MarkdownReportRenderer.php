@@ -52,9 +52,9 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
             ),
             '',
             \sprintf(
-                '**Risk level:** %s (score %d) · **Findings:** %d · **Files scanned:** %d',
-                $auditReport->riskLevel(),
-                $auditReport->riskScore(),
+                '**Risk level:** %s (%s) · **Findings:** %d · **Files scanned:** %d',
+                RiskHeadline::riskLevel($auditReport),
+                RiskHeadline::scoreDetail($auditReport, 'score'),
                 $auditReport->totalVulnerabilities(),
                 $auditReport->filesScanned(),
             ),

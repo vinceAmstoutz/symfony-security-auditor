@@ -61,6 +61,21 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
+    public function test_a_cost_estimate_never_reads_as_a_complete_audit(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase(['files' => [$this->makeProjectFile('a.php', '<?php')]]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertFalse($auditReport->isComplete());
+        self::assertTrue($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_per_file_token_estimates_are_summed_via_addition(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([

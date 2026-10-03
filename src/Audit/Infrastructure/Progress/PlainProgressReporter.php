@@ -80,7 +80,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     private function chunkDoneLine(array $context): string
     {
         return \sprintf(
-            '  ✓ chunk %d/%d done%s',
+            'errored' === ProgressContext::string($context, 'status') ? '  ✗ chunk %d/%d failed%s' : '  ✓ chunk %d/%d done%s',
             ProgressContext::int($context, 'chunk'),
             ProgressContext::int($context, 'total_chunks'),
             ProgressContext::durationSuffix($context, 'elapsed_seconds'),
@@ -132,16 +132,30 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     {
         return \sprintf(
             '  [%s] %s — %s:%d',
-            true === ($context['accepted'] ?? null) ? 'VALIDATED' : 'REJECTED',
+            $this->verdictLabel($context),
             ProgressContext::string($context, 'type'),
             TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }
 
+    /**
+     * A review that reached no verdict is a failure, never a rejection.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function verdictLabel(array $context): string
+    {
+        if (ProgressContext::reviewReachedNoVerdict($context)) {
+            return 'REVIEW-FAILED';
+        }
+
+        return true === ($context['accepted'] ?? null) ? 'VALIDATED' : 'REJECTED';
+    }
+
     /** @param array<string, mixed> $context */
     private function reviewSummaryLine(array $context): string
     {
-        return \sprintf('  %d validated, %d rejected', ProgressContext::int($context, 'accepted'), ProgressContext::int($context, 'rejected'));
+        return \sprintf('  %s', ProgressContext::reviewTally($context));
     }
 }

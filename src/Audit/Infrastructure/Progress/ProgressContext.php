@@ -22,6 +22,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
  */
 final readonly class ProgressContext
 {
+    private const array NO_VERDICT_REVIEW_STATUSES = ['errored', 'aborted'];
+
     /** @param array<string, mixed> $context */
     public static function int(array $context, string $key): int
     {
@@ -55,5 +57,31 @@ final readonly class ProgressContext
         }
 
         return \sprintf(' (%ds)', (int) round($value));
+    }
+
+    /**
+     * Whether a `review.finding.reviewed` event reports a review that reached
+     * no verdict — its call failed, or an abort stopped it — rather than a
+     * finding the reviewer validated or rejected.
+     *
+     * @param array<string, mixed> $context
+     */
+    public static function reviewReachedNoVerdict(array $context): bool
+    {
+        return \in_array(self::string($context, 'status'), self::NO_VERDICT_REVIEW_STATUSES, true);
+    }
+
+    /**
+     * The tally of a `review.completed` event: the findings validated and
+     * rejected, then how many reviews failed when some did.
+     *
+     * @param array<string, mixed> $context
+     */
+    public static function reviewTally(array $context): string
+    {
+        $tally = \sprintf('%d validated, %d rejected', self::int($context, 'accepted'), self::int($context, 'rejected'));
+        $failed = self::int($context, 'failed');
+
+        return 0 === $failed ? $tally : \sprintf('%s, %d failed', $tally, $failed);
     }
 }

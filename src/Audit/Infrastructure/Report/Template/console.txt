@@ -13,7 +13,7 @@
   Cost    : ${{cost}} ({{costRateLabel}})
 
 ──────────────────────────────────────────────────────────────────────
-  RISK LEVEL: {{riskLevel}}  (Score: {{riskScore}})
+  RISK LEVEL: {{riskLevel}}  ({{riskDetail}})
 ──────────────────────────────────────────────────────────────────────
 
 {{body}}

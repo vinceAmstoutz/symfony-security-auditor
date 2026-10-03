@@ -144,7 +144,7 @@ final class DiffPresenterTest extends TestCase
 
         self::assertStringContainsString('Unverified (1)', $output);
         self::assertStringContainsString('[HIGH] sql_injection — SQL Injection (src/Foo.php)', $output);
-        self::assertStringContainsString('could not fully analyze their files — not shown as fixed', $output);
+        self::assertStringContainsString('did not fully analyze their files, or never looked at them — not shown as fixed', $output);
         self::assertStringContainsString('Summary: 0 new, 0 fixed, 1 unverified, 0 persisting.', $output);
     }
 

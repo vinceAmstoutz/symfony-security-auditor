@@ -1787,6 +1787,106 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
+     * A review that failed reached no verdict: telling the attacker the
+     * reviewer rejected that finding would stop it from ever reporting it
+     * again, and the reviewer from getting another chance at it.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_finding_whose_review_failed_is_not_passed_back_as_rejected(): void
+    {
+        $recordingAttackerAgent = new RecordingAttackerAgent([
+            $this->findingTitled('KeepMe', 'src/Accepted.php'),
+            $this->findingTitled('DropMe', 'src/Rejected.php'),
+            $this->findingTitled('FailMe', 'src/Failed.php'),
+        ]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturnCallback(
+            fn (string $system, string $user): LLMResponse => match (true) {
+                str_contains($user, 'KeepMe') => $this->reviewerAcceptResponse(),
+                str_contains($user, 'FailMe') => throw new RuntimeException('Connection reset by peer'),
+                default => $this->reviewerRejectResponse(),
+            },
+        );
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
+
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping());
+
+        self::assertSame(['src/Rejected.php'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $recordingAttackerAgent->lastRejectedFindings));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_review_tally_counts_a_review_that_failed_as_failed_not_rejected(): void
+    {
+        $recordingAttackerAgent = new RecordingAttackerAgent([
+            $this->findingTitled('KeepMe', 'src/Accepted.php'),
+            $this->findingTitled('DropMe', 'src/Rejected.php'),
+            $this->findingTitled('FailMe', 'src/Failed.php'),
+        ]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturnCallback(
+            fn (string $system, string $user): LLMResponse => match (true) {
+                str_contains($user, 'KeepMe') => $this->reviewerAcceptResponse(),
+                str_contains($user, 'FailMe') => throw new RuntimeException('Connection reset by peer'),
+                default => $this->reviewerRejectResponse(),
+            },
+        );
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), $recordingProgressReporter);
+
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping());
+
+        self::assertSame(
+            ['accepted' => 1, 'rejected' => 1, 'failed' => 1],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'review.completed' === $event[0],
+            ))[0][1],
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function findingTitled(string $title, string $filePath): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
+            new CodeLocation($filePath, 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
+        );
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
@@ -1979,7 +2079,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($this->makeContextWithMapping());
 
         self::assertSame(
-            [['review.completed', ['accepted' => 1, 'rejected' => 1]]],
+            [['review.completed', ['accepted' => 1, 'rejected' => 1, 'failed' => 0]]],
             array_values(array_filter(
                 $recordingProgressReporter->events,
                 static fn (array $event): bool => 'review.completed' === $event[0],

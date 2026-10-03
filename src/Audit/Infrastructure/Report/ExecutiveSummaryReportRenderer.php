@@ -58,8 +58,8 @@ final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInt
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{duration}}' => \sprintf('%ss', number_format($auditReport->durationSeconds(), 1, '.', '')),
             '{{auditId}}' => $auditReport->auditId(),
-            '{{riskLevel}}' => $auditReport->riskLevel(),
-            '{{riskScore}}' => $executiveSummary->riskScore,
+            '{{riskLevel}}' => RiskHeadline::riskLevel($auditReport),
+            '{{riskDetail}}' => RiskHeadline::scoreDetail($auditReport, 'Score:'),
             '{{businessImpact}}' => $this->wrapped($this->businessImpact($executiveSummary, null === $notice)),
             '{{body}}' => $this->body($executiveSummary, $notice),
         ]);

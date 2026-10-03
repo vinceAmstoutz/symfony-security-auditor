@@ -214,6 +214,8 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
             self::assertSame('Audit aborted: token budget exceeded (5000 / 100 tokens)', $auditAbortedByBudgetException->getMessage());
             self::assertSame(1, $auditAbortedByBudgetException->partialReport()->filesScanned());
             self::assertSame(0, $auditAbortedByBudgetException->partialReport()->totalVulnerabilities());
+            self::assertSame(['src/App.php'], $auditAbortedByBudgetException->partialReport()->unanalyzedFiles());
+            self::assertFalse($auditAbortedByBudgetException->partialReport()->isComplete());
         }
     }
 
@@ -244,6 +246,8 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
             self::assertSame('LLM call failed with non-transient error: model retired', $auditAbortedByProviderException->getMessage());
             self::assertSame(1, $auditAbortedByProviderException->partialReport()->filesScanned());
             self::assertSame(0, $auditAbortedByProviderException->partialReport()->totalVulnerabilities());
+            self::assertSame(['src/App.php'], $auditAbortedByProviderException->partialReport()->unanalyzedFiles());
+            self::assertFalse($auditAbortedByProviderException->partialReport()->isComplete());
         }
     }
 

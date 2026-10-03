@@ -93,27 +93,19 @@ final readonly class ReportWriter implements ReportWriterInterface
 
         $this->assertSafeToWrite($outputFile, $projectPath);
 
+        if (WritableFilePath::namesADirectory($outputFile)) {
+            throw ReportWriteFailedException::forDirectoryPath($outputFile);
+        }
+
         try {
             $this->filesystem->mkdir(\dirname($outputFile));
         } catch (IOException $ioException) {
             throw ReportWriteFailedException::forUncreatableDirectory($outputFile, $ioException);
         }
 
-        if (!$this->canBeWritten($outputFile)) {
+        if (!WritableFilePath::canBeWritten($outputFile)) {
             throw ReportWriteFailedException::forUnwritablePath($outputFile);
         }
-    }
-
-    /**
-     * The directories are created up front — `dumpFile()` would create them
-     * anyway — so what remains to check is what `dumpFile()` needs: a writable
-     * directory in every case (it writes a temporary file beside the target
-     * and renames it), plus a destination that is not a directory and, when
-     * it already exists, is writable itself.
-     */
-    private function canBeWritten(string $outputFile): bool
-    {
-        return is_writable(\dirname($outputFile)) && (!file_exists($outputFile) || (!is_dir($outputFile) && is_writable($outputFile)));
     }
 
     /**

@@ -41,4 +41,36 @@ final class ProgressContextTest extends TestCase
     {
         self::assertSame('', ProgressContext::durationSuffix([], 'elapsed_seconds'));
     }
+
+    /** @param array<string, mixed> $context */
+    #[DataProvider('reviewOutcomes')]
+    public function test_it_tells_a_review_that_reached_no_verdict_from_a_verdict(array $context, bool $expected): void
+    {
+        self::assertSame($expected, ProgressContext::reviewReachedNoVerdict($context));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, bool}> */
+    public static function reviewOutcomes(): iterable
+    {
+        yield 'a review whose call failed' => [['accepted' => false, 'status' => 'errored'], true];
+        yield 'a review an abort cut short' => [['accepted' => false, 'status' => 'aborted'], true];
+        yield 'a rejection' => [['accepted' => false, 'status' => 'rejected'], false];
+        yield 'a validation' => [['accepted' => true, 'status' => 'validated'], false];
+        yield 'an event that names no status' => [['accepted' => false], false];
+    }
+
+    /** @param array<string, mixed> $context */
+    #[DataProvider('reviewTallies')]
+    public function test_the_review_tally_names_the_reviews_that_failed_only_when_some_did(array $context, string $expected): void
+    {
+        self::assertSame($expected, ProgressContext::reviewTally($context));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string}> */
+    public static function reviewTallies(): iterable
+    {
+        yield 'every review reached a verdict' => [['accepted' => 2, 'rejected' => 1, 'failed' => 0], '2 validated, 1 rejected'];
+        yield 'an event that counts no failure' => [['accepted' => 2, 'rejected' => 1], '2 validated, 1 rejected'];
+        yield 'some reviews failed' => [['accepted' => 1, 'rejected' => 1, 'failed' => 2], '1 validated, 1 rejected, 2 failed'];
+    }
 }

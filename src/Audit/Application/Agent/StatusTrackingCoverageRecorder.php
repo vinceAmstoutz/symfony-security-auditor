@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
@@ -72,6 +73,26 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface
     public function drainFoundVulnerabilities(): array
     {
         return $this->coverageRecorder->drainFoundVulnerabilities();
+    }
+
+    /**
+     * How the attacker left a chunk: `analyzed` when its last word on every
+     * file is that it analyzed the file or served it from its cache, `errored`
+     * otherwise.
+     *
+     * @param list<ProjectFile> $chunk
+     */
+    public function chunkStatus(array $chunk): string
+    {
+        $analyzed = array_flip($this->analyzedFiles());
+
+        foreach ($chunk as $projectFile) {
+            if (!\array_key_exists($projectFile->relativePath(), $analyzed)) {
+                return 'errored';
+            }
+        }
+
+        return 'analyzed';
     }
 
     /**

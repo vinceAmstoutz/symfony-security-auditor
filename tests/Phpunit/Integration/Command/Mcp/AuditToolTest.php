@@ -19,12 +19,29 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\PartlyFailedPipeline;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\SingleFileAuditPipeline;
 
 final class AuditToolTest extends TestCase
 {
@@ -48,7 +65,7 @@ final class AuditToolTest extends TestCase
      */
     public function test_it_audits_the_given_path_and_returns_the_rendered_json_report(): void
     {
-        $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer(), $this->auditedProjectPathHolder());
+        $auditTool = $this->auditTool();
 
         $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
 
@@ -64,7 +81,7 @@ final class AuditToolTest extends TestCase
         $renderer = self::createStub(ReportRendererInterface::class);
         $renderer->method('render')->willReturn('RENDERED-REPORT');
 
-        $auditTool = new AuditTool($this->runAuditUseCase(), $renderer, $this->auditedProjectPathHolder());
+        $auditTool = $this->auditTool(reportRenderer: $renderer);
 
         self::assertSame('RENDERED-REPORT', $auditTool->audit($this->projectPath));
     }
@@ -83,7 +100,7 @@ final class AuditToolTest extends TestCase
     public function test_it_sets_the_audited_project_path_holder_before_running_the_use_case(): void
     {
         $auditedProjectPathHolder = $this->auditedProjectPathHolder();
-        $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer(), $auditedProjectPathHolder);
+        $auditTool = $this->auditTool(auditedProjectPathHolder: $auditedProjectPathHolder);
 
         $auditTool->audit($this->projectPath);
 
@@ -103,7 +120,7 @@ final class AuditToolTest extends TestCase
      */
     public function test_it_rejects_a_non_absolute_path(): void
     {
-        $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer(), $this->auditedProjectPathHolder());
+        $auditTool = $this->auditTool();
 
         try {
             $auditTool->audit('relative/path');
@@ -127,20 +144,205 @@ final class AuditToolTest extends TestCase
     public function test_it_canonicalizes_the_path_before_setting_the_holder_and_running(): void
     {
         $auditedProjectPathHolder = $this->auditedProjectPathHolder();
-        $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer(), $auditedProjectPathHolder);
+        $auditTool = $this->auditTool(auditedProjectPathHolder: $auditedProjectPathHolder);
 
         $auditTool->audit($this->projectPath.'/nested/..');
 
         self::assertSame($this->projectPath, $auditedProjectPathHolder->path());
     }
 
-    private function runAuditUseCase(): RunAuditUseCase
+    /**
+     * The `audit:run` command answers a run whose scan found no file with exit
+     * `1`: nothing was examined, so there is no verdict to return. The tool
+     * refuses it the same way instead of answering grade A.
+     */
+    public function test_it_refuses_a_verdict_on_a_project_where_the_scan_found_no_file(): void
     {
-        return new RunAuditUseCase(self::createStub(PipelineInterface::class), new NullLogger());
+        $auditTool = $this->auditTool(pipeline: self::createStub(PipelineInterface::class));
+
+        try {
+            $auditTool->audit($this->projectPath);
+            self::fail('A run that found no file must not return a report.');
+        } catch (ToolCallException $toolCallException) {
+            self::assertStringContainsString('has no verdict: the scan found no file to audit', $toolCallException->getMessage());
+            self::assertInstanceOf(AuditWithoutVerdictException::class, $toolCallException->getPrevious());
+        }
+    }
+
+    public function test_it_refuses_a_verdict_when_no_file_could_be_analyzed(): void
+    {
+        $auditTool = $this->auditTool(pipeline: new SingleFileAuditPipeline('errored'));
+
+        try {
+            $auditTool->audit($this->projectPath);
+            self::fail('A run that analyzed no file must not return a report.');
+        } catch (ToolCallException $toolCallException) {
+            self::assertSame(
+                \sprintf('The audit of "%s" has no verdict: none of its 1 file(s) could be analyzed (a scan or LLM call failed, or the run stopped before reaching them). The server log names the cause.', $this->projectPath),
+                $toolCallException->getMessage(),
+            );
+        }
+    }
+
+    /**
+     * @throws ToolCallException
+     */
+    public function test_it_reports_a_run_that_analyzed_some_of_its_files_as_incomplete(): void
+    {
+        $report = json_decode($this->auditTool(pipeline: new PartlyFailedPipeline())->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($report);
+        self::assertFalse($report['complete']);
+    }
+
+    /**
+     * @throws ToolCallException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_returns_the_finding_of_a_run_that_analyzed_no_file_as_an_incomplete_report(): void
+    {
+        $auditTool = $this->auditTool(pipeline: new SingleFileAuditPipeline('errored', $this->validatedFinding(VulnerabilityType::SQL_INJECTION)));
+
+        $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($report);
+        self::assertFalse($report['complete']);
+        self::assertSame(1, $report['total_vulnerabilities']);
+    }
+
+    /**
+     * @throws ToolCallException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_leaves_out_the_finding_types_the_configuration_mutes(): void
+    {
+        $auditTool = $this->auditTool(
+            pipeline: new SingleFileAuditPipeline('analyzed', $this->validatedFinding(VulnerabilityType::SQL_INJECTION)),
+            findingTypeFilter: new FindingTypeFilter([], [VulnerabilityType::SQL_INJECTION->value]),
+        );
+
+        $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($report);
+        self::assertSame(0, $report['total_vulnerabilities']);
+    }
+
+    /**
+     * @throws ToolCallException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_suppresses_the_findings_the_configured_baseline_accepts(): void
+    {
+        $vulnerability = $this->validatedFinding(VulnerabilityType::SQL_INJECTION);
+        $auditTool = $this->auditTool(
+            pipeline: new SingleFileAuditPipeline('analyzed', $vulnerability, $this->validatedFinding(VulnerabilityType::SSRF)),
+            configuredBaseline: $this->baselineAccepting($vulnerability, 'The id is cast to int upstream.'),
+        );
+
+        $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($report);
+        self::assertSame(['ssrf'], array_column(\is_array($report['vulnerabilities']) ? $report['vulnerabilities'] : [], 'type'));
+    }
+
+    /**
+     * @throws ToolCallException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_findings_the_configured_baseline_accepts_skip_the_reviewer(): void
+    {
+        $vulnerability = $this->validatedFinding(VulnerabilityType::SQL_INJECTION);
+        $singleFileAuditPipeline = new SingleFileAuditPipeline('analyzed');
+
+        $this->auditTool(pipeline: $singleFileAuditPipeline, configuredBaseline: $this->baselineAccepting($vulnerability, 'The id is cast to int upstream.'))->audit($this->projectPath);
+
+        self::assertSame([$vulnerability->fingerprint()], $singleFileAuditPipeline->acceptedFingerprints);
+    }
+
+    /**
+     * @throws ToolCallException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_hands_the_configured_baseline_reasons_to_the_reviewer(): void
+    {
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $vulnerability = $this->validatedFinding(VulnerabilityType::SQL_INJECTION);
+
+        $auditTool = new AuditTool(
+            new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()),
+            new JsonReportRenderer(),
+            $this->auditedProjectPathHolder(),
+            new BaselineProcessor(new Baseline(), $this->baselineAccepting($vulnerability, 'The id is cast to int upstream.')),
+            new FindingTypeFilter(),
+            $reviewerFeedbackHolder,
+        );
+
+        $auditTool->audit($this->projectPath);
+
+        self::assertSame(
+            ['The id is cast to int upstream.'],
+            array_map(static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason, $reviewerFeedbackHolder->feedback()->entries),
+        );
+    }
+
+    private function auditTool(
+        ?PipelineInterface $pipeline = null,
+        ?ReportRendererInterface $reportRenderer = null,
+        ?AuditedProjectPathHolder $auditedProjectPathHolder = null,
+        ?FindingTypeFilter $findingTypeFilter = null,
+        ?string $configuredBaseline = null,
+    ): AuditTool {
+        return new AuditTool(
+            new RunAuditUseCase($pipeline ?? new SingleFileAuditPipeline(), new NullLogger()),
+            $reportRenderer ?? new JsonReportRenderer(),
+            $auditedProjectPathHolder ?? $this->auditedProjectPathHolder(),
+            new BaselineProcessor(new Baseline(), $configuredBaseline),
+            $findingTypeFilter ?? new FindingTypeFilter(),
+            new ReviewerFeedbackHolder(),
+        );
     }
 
     private function auditedProjectPathHolder(): AuditedProjectPathHolder
     {
         return new AuditedProjectPathHolder('/default/project/dir');
+    }
+
+    private function baselineAccepting(Vulnerability $vulnerability, string $reason): string
+    {
+        $baselineFile = $this->projectPath.'/.security-baseline.json';
+        (new Filesystem())->dumpFile($baselineFile, json_encode([[
+            'fingerprint' => $vulnerability->fingerprint(),
+            'type' => $vulnerability->type()->value,
+            'file' => $vulnerability->filePath(),
+            'title' => $vulnerability->title(),
+            'reason' => $reason,
+        ]], \JSON_THROW_ON_ERROR));
+
+        return $baselineFile;
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function validatedFinding(VulnerabilityType $vulnerabilityType): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification($vulnerabilityType, VulnerabilitySeverity::HIGH, \sprintf('A %s finding', $vulnerabilityType->value), 0.9),
+            new CodeLocation(SingleFileAuditPipeline::FILE, 3, 5),
+            new VulnerabilityNarrative('Description', 'Vector', 'Proof', 'Fix'),
+            '$code',
+        )->withReviewerValidation(true);
     }
 }

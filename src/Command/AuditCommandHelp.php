@@ -46,12 +46,14 @@ final readonly class AuditCommandHelp
         Exit codes (the failure threshold is configurable via <info>audit.fail_on</info> / <info>--fail-on</info>, default <info>critical</info>;
         <info>--min-score</info> adds a second, independent gate — the audit fails when either one trips):
           <info>0</info>  audit completed; risk level is below the fail-on threshold and the score is at or above --min-score
-          <info>1</info>  audit completed with risk level at or above the fail-on threshold, or a score below --min-score, or the audit itself failed
+          <info>1</info>  audit completed with risk level at or above the fail-on threshold, or a score below --min-score, or the audit itself failed,
+                or the run reached no verdict (its scan found no file, or it analyzed none and found nothing)
           <info>2</info>  audit budget could not be honored: it aborted mid-run because the configured token or cost budget was
                 exceeded (partial report still emitted), or it never started because an unpriced model makes the cost
                 budget unenforceable and the run was declined or non-interactive (no report emitted in that case)
           <info>3</info>  <info>--fail-on-incomplete</info> is set and some file could not be fully analyzed (a tripped gate still exits 1);
-                without the option such a run keeps the code its gates earn and prints a warning
+                without the option, a run that analyzed some of its files or holds a finding keeps the code its gates earn
+                and prints a warning
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
         and costs a few cents to a few dollars depending on the selected model. Configure

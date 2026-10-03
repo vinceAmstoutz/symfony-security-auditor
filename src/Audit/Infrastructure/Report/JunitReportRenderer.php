@@ -21,7 +21,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
  * Renders an audit report as JUnit XML — one failed test case per validated
- * finding — for CI test-report panels such as GitLab merge-request widgets.
+ * finding — for CI test-report panels such as GitLab merge-request widgets. An
+ * audit that could not analyze every file adds an errored "Audit completeness"
+ * test case naming those files, so a panel never reads it as a clean run.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -34,6 +36,8 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
      */
     private const string ILLEGAL_XML_CHARACTERS = '/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u';
 
+    private const string SUITE_NAME = 'symfony-security-auditor';
+
     #[Override]
     public function format(): string
     {
@@ -44,6 +48,8 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
     public function render(AuditReport $auditReport): string
     {
         $vulnerabilities = $auditReport->vulnerabilities();
+        $notice = IncompleteAuditNotice::for($auditReport);
+        $errors = null === $notice ? 0 : 1;
 
         $domDocument = new DOMDocument('1.0', 'UTF-8');
         $domDocument->formatOutput = true;
@@ -52,17 +58,44 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
         $domDocument->appendChild($domElement);
 
         $testsuite = $domDocument->createElement('testsuite');
-        $testsuite->setAttribute('name', 'symfony-security-auditor');
-        $testsuite->setAttribute('tests', (string) \count($vulnerabilities));
+        $testsuite->setAttribute('name', self::SUITE_NAME);
+        $testsuite->setAttribute('tests', (string) (\count($vulnerabilities) + $errors));
         $testsuite->setAttribute('failures', (string) \count($vulnerabilities));
+        $testsuite->setAttribute('errors', (string) $errors);
 
         $domElement->appendChild($testsuite);
+
+        if (null !== $notice) {
+            $testsuite->appendChild($this->completenessTestCase($domDocument, $notice, $auditReport->unanalyzedFiles()));
+        }
 
         foreach ($vulnerabilities as $vulnerability) {
             $testsuite->appendChild($this->testCase($domDocument, $vulnerability));
         }
 
         return (string) $domDocument->saveXML();
+    }
+
+    /**
+     * @param list<string> $unanalyzedFiles
+     */
+    private function completenessTestCase(DOMDocument $domDocument, string $notice, array $unanalyzedFiles): DOMElement
+    {
+        $domElement = $domDocument->createElement('testcase');
+        $domElement->setAttribute('classname', self::SUITE_NAME);
+        $domElement->setAttribute('name', 'Audit completeness');
+
+        $error = $domDocument->createElement('error');
+        $error->setAttribute('type', 'incomplete');
+        $error->setAttribute('message', $notice);
+        $error->appendChild($domDocument->createTextNode(
+            [] === $unanalyzedFiles
+                ? $notice
+                : implode("\n", ['Files not fully analyzed:', ...array_map($this->stripIllegalXmlCharacters(...), $unanalyzedFiles)]),
+        ));
+        $domElement->appendChild($error);
+
+        return $domElement;
     }
 
     private function testCase(DOMDocument $domDocument, Vulnerability $vulnerability): DOMElement

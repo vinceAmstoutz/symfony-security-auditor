@@ -41,7 +41,7 @@ final readonly class BaselineCommand
         SymfonyStyle $symfonyStyle,
         #[Argument(description: 'Path to a JSON report produced by audit:run --format=json.', name: 'report')] string $report,
         #[Argument(description: 'Baseline file to create or update.', name: 'baseline')] string $baseline = '.security-baseline.json',
-        #[Option(description: 'Drop baseline entries whose findings no longer appear in the report.', name: 'prune')] bool $prune = false,
+        #[Option(description: 'Drop baseline entries whose findings no longer appear in the report, keeping those whose file the report did not analyze.', name: 'prune')] bool $prune = false,
         #[Option(description: 'Ask a reason for each newly accepted finding; reasoned entries teach the reviewer the mitigating control.', name: 'annotate')] bool $annotate = false,
     ): int {
         try {

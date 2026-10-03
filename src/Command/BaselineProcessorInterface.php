@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface BaselineProcessorInterface
@@ -26,6 +28,17 @@ interface BaselineProcessorInterface
      * neither is set.
      */
     public function feedback(?string $cliBaseline): ReviewerFeedback;
+
+    /**
+     * Refuses a path a baseline could never be generated to, before the audit
+     * that would fill it spends anything.
+     *
+     * @param string $projectPath the audited project, whose directories are walked for a symlink like the working directory's
+     *
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function assertWritable(string $path, string $projectPath): void;
 
     /**
      * Writes the report's finding fingerprints to a baseline file and returns

@@ -316,7 +316,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
-        if (Command::FAILURE === $exitCode) {
+        if (Command::FAILURE === $exitCode && !$auditReport->hasNoVerdict()) {
             $totalVulnerabilities = $auditReport->totalVulnerabilities();
             $symfonyStyle->caution(\sprintf(
                 'Audit failed a configured gate. Risk: %s. Score: %d/100. %d %s found.',
@@ -350,12 +350,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        $summary = \sprintf(
-            'Audit incomplete: %d file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
-            \count($auditReport->unanalyzedFiles()),
-            $auditReport->riskLevel(),
-            $auditReport->totalVulnerabilities(),
-        );
+        $summary = $this->incompleteSummary($auditReport);
 
         if (ExitCode::Incomplete->value === $exitCode) {
             $symfonyStyle->error(\sprintf('%s The run fails because --fail-on-incomplete is set.', $summary));
@@ -363,7 +358,47 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
+        if (ExitCode::Failure->value === $exitCode && $auditReport->hasNoVerdict()) {
+            $symfonyStyle->error(\sprintf('%s A run with no verdict cannot pass, so it fails.', $summary));
+
+            return;
+        }
+
         $symfonyStyle->warning(ExitCode::Success->value === $exitCode ? \sprintf('%s Pass --fail-on-incomplete to fail the run when this happens.', $summary) : $summary);
+    }
+
+    /**
+     * A run with no verdict — no file analyzed, nothing found — states no
+     * risk level: a SAFE there would vouch for code nobody read.
+     */
+    private function incompleteSummary(AuditReport $auditReport): string
+    {
+        if ($auditReport->hasNoVerdict()) {
+            return \sprintf(
+                'Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict. Vulnerabilities: %d.',
+                $auditReport->filesScanned(),
+                $auditReport->totalVulnerabilities(),
+            );
+        }
+
+        return \sprintf(
+            'Audit incomplete: %d file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
+            \count($auditReport->unanalyzedFiles()),
+            $auditReport->riskLevel(),
+            $auditReport->totalVulnerabilities(),
+        );
+    }
+
+    #[Override]
+    public function baselineKept(SymfonyStyle $symfonyStyle, string $path, AuditReport $auditReport): void
+    {
+        $symfonyStyle->error(\sprintf(
+            '%s The baseline at %s was left as it was: a run with no verdict cannot replace the accepted findings, so it fails.',
+            0 === $auditReport->filesDiscovered()
+                ? 'The scan found no file to audit, so the run has no verdict.'
+                : \sprintf('Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict.', $auditReport->filesScanned()),
+            $path,
+        ));
     }
 
     #[Override]

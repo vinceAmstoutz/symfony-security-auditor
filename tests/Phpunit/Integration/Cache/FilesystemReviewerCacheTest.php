@@ -130,6 +130,30 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
+     * The feedback section of the reviewer prompt changed in 1.21, so a verdict
+     * cached under feedback is keyed under a new feedback version: those runs
+     * review their findings once more, while a run without feedback — whose
+     * prompt did not change — keeps its cache.
+     *
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_key_folds_the_feedback_under_its_own_version(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $digest = (new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/Foo.php', 'Accepted', 'accepted risk')]))->digest();
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0code\0feedback-v2-".$digest);
+
+        $this->cacheWithFeedback('accepted risk')->store($vulnerability, 'code', ['accepted' => true]);
+
+        self::assertFileExists(\sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey));
+    }
+
+    /**
      * @throws InvalidCacheConfigurationException
      */
     private function cacheWithFeedback(string $reason): FilesystemReviewerCache

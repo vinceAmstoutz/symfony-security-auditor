@@ -28,4 +28,19 @@ final class AuditCommandHelpTest extends TestCase
     {
         self::assertStringContainsString('partial report still emitted', AuditCommandHelp::HELP);
     }
+
+    public function test_exit_code_one_documentation_covers_a_run_with_no_verdict(): void
+    {
+        self::assertStringContainsString('or the run reached no verdict (its scan found no file, or it analyzed none and found nothing)', $this->flattened());
+    }
+
+    public function test_exit_code_three_documentation_does_not_claim_a_run_with_no_verdict_passes_without_the_option(): void
+    {
+        self::assertStringContainsString('without the option, a run that analyzed some of its files or holds a finding keeps the code its gates earn and prints a warning', $this->flattened());
+    }
+
+    private function flattened(): string
+    {
+        return (string) preg_replace('/\s+/', ' ', strip_tags(AuditCommandHelp::HELP));
+    }
 }

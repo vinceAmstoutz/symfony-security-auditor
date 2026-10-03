@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 
 /**
  * Compares two decoded JSON audit reports by finding fingerprint.
@@ -35,7 +34,7 @@ final readonly class ReportDiffer implements ReportDifferInterface
         $previousFindings = $this->indexByFingerprint($loadedReport->findings);
         $currentFindings = $this->indexByFingerprint($currentReport->findings);
 
-        [$fixed, $unverified] = $this->partitionByAnalysis($this->only($previousFindings, $currentFindings), $currentReport->unanalyzedFiles);
+        [$fixed, $unverified] = $this->partitionByAnalysis($this->only($previousFindings, $currentFindings), $currentReport);
 
         return new ReportDiff(
             $this->only($currentFindings, $previousFindings),
@@ -47,30 +46,25 @@ final readonly class ReportDiffer implements ReportDifferInterface
 
     /**
      * A finding that disappeared from a file the current run never finished
-     * analyzing is not fixed — nobody looked — so it is kept apart from the
-     * ones whose file was analyzed and came back clean. A finding holds the
-     * path the attacker echoed, and so do the reviewer's entries in the
-     * ledger, so a leading `./` is dropped on both sides before they are
-     * compared.
+     * analyzing, or never looked at, is not fixed — nobody looked — so it is
+     * kept apart from the ones whose file was analyzed and came back clean.
      *
      * @param list<DiffFinding> $disappeared
-     * @param list<string>      $unanalyzedFiles
      *
      * @return array{list<DiffFinding>, list<DiffFinding>}
      */
-    private function partitionByAnalysis(array $disappeared, array $unanalyzedFiles): array
+    private function partitionByAnalysis(array $disappeared, LoadedReport $loadedReport): array
     {
-        $unanalyzed = array_flip(array_map(EchoedFilePath::normalize(...), $unanalyzedFiles));
         $fixed = [];
         $unverified = [];
         foreach ($disappeared as $finding) {
-            if (\array_key_exists(EchoedFilePath::normalize($finding->file), $unanalyzed)) {
-                $unverified[] = $finding;
+            if ($loadedReport->vouchesForAbsenceIn($finding->file)) {
+                $fixed[] = $finding;
 
                 continue;
             }
 
-            $fixed[] = $finding;
+            $unverified[] = $finding;
         }
 
         return [$fixed, $unverified];
