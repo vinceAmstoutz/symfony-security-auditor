@@ -26,6 +26,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInt
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class IngestionStage implements StageInterface
 {
+    private const string SECRET_SCRUBBING = 'secret_scrubbing';
+
     public function __construct(
         private ProjectFileScannerInterface $projectFileScanner,
         private LoggerInterface $logger,
@@ -64,6 +66,7 @@ final readonly class IngestionStage implements StageInterface
 
         $auditContext->setProjectFiles($files);
         $auditContext->setMappingFiles($scannedFiles);
+        $this->recordWithheldFiles($files, $auditContext);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
             array_map(static fn (ProjectFile $projectFile): int => $projectFile->linesCount(), $files),
@@ -73,6 +76,24 @@ final readonly class IngestionStage implements StageInterface
             'files' => \count($files),
             'lines' => $auditContext->getMeta('ingestion.total_lines'),
         ]);
+    }
+
+    /**
+     * The secret scrubber hands over a file it could not vouch for as a
+     * placeholder, so nothing in it can be analyzed: the file is recorded as
+     * errored, which marks the report incomplete instead of letting the
+     * blanked-out file pass as a clean one.
+     *
+     * @param list<ProjectFile> $files
+     */
+    private function recordWithheldFiles(array $files, AuditContext $auditContext): void
+    {
+        foreach ($files as $file) {
+            if ($file->isWithheld()) {
+                $auditContext->recordCoverage(self::SECRET_SCRUBBING, $file->relativePath(), 'errored');
+                $this->logger->warning('Secret scrubbing could not scan a file, so its content was withheld and the file is not analyzed', ['file' => $file->relativePath()]);
+            }
+        }
     }
 
     /**

@@ -310,6 +310,26 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_save_refuses_a_path_into_the_audited_project_through_a_symlinked_directory_above_its_parent(): void
+    {
+        $outsideDir = sys_get_temp_dir().'/baseline_symlink_security_'.uniqid('', true);
+        $this->filesystem->mkdir($outsideDir.'/baselines');
+        symlink($outsideDir, $this->tmpDir.'/security');
+
+        try {
+            $this->expectException(UnsafeBaselineWriteException::class);
+
+            (new Baseline($this->filesystem))->save($this->tmpDir.'/security/baselines/baseline.json', [$this->entry('SSA-AAA')], $this->tmpDir);
+        } finally {
+            self::assertSame([], glob($outsideDir.'/baselines/*'));
+            $this->filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
      */
     public function test_feedback_is_empty_for_a_missing_file(): void
     {

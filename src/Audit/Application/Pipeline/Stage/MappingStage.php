@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProductionAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
@@ -184,7 +185,7 @@ final readonly class MappingStage implements StageInterface
         $firewallRules = [];
 
         foreach ($files as $file) {
-            if (!$file->isConfiguration()) {
+            if (!$this->isLoadedInProduction($file)) {
                 continue;
             }
 
@@ -194,6 +195,21 @@ final readonly class MappingStage implements StageInterface
         }
 
         return [$routeAccessMap, $firewallRules];
+    }
+
+    /**
+     * A rule in configuration the production application never loads protects
+     * no route, so a parser that knows which files the application loads has
+     * the final word; any other parser reads every configuration file.
+     */
+    private function isLoadedInProduction(ProjectFile $projectFile): bool
+    {
+        if (!$projectFile->isConfiguration()) {
+            return false;
+        }
+
+        return !$this->securityConfigParser instanceof ProductionAwareSecurityConfigParserInterface
+            || $this->securityConfigParser->isLoadedInProduction($projectFile->relativePath());
     }
 
     /**

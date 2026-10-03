@@ -35,8 +35,10 @@ interface ReportWriterInterface
      * Refuses an output path the report could not be saved to, before the
      * audit spends anything on it.
      *
+     * @param string $projectPath the audited project, whose directories are walked for a symlink like the working directory's
+     *
      * @throws UnsafeReportWriteException
      * @throws ReportWriteFailedException
      */
-    public function assertWritable(?string $outputFile): void;
+    public function assertWritable(?string $outputFile, string $projectPath): void;
 }

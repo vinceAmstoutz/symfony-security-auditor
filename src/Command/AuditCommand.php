@@ -115,7 +115,7 @@ final readonly class AuditCommand
         try {
             try {
                 $auditCommandInput->assertNoConflictingOptions();
-                $this->reportWriter->assertWritable($auditCommandInput->reportFile());
+                $this->reportWriter->assertWritable($auditCommandInput->reportFile(), $projectPath);
 
                 if ($auditCommandInput->showScanned) {
                     $this->showScannedFiles($displayStyle, $projectPath, $scanPaths, $auditCommandInput->since);
