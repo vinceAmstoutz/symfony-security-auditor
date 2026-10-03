@@ -20,6 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
@@ -152,6 +153,34 @@ final readonly class Baseline implements BaselineInterface
         $attackerFingerprint = $entry['attacker_fingerprint'] ?? null;
 
         return \is_string($attackerFingerprint) ? $attackerFingerprint : null;
+    }
+
+    /**
+     * A symlink on the way — below the working directory or below the audited
+     * project's root — a path naming a directory, a directory that cannot be
+     * created or one the file cannot be written into.
+     *
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    #[Override]
+    public function assertWritable(string $path, string $projectPath): void
+    {
+        $this->assertSafeToWrite($path, $projectPath);
+
+        if (WritableFilePath::namesADirectory($path)) {
+            throw BaselineWriteFailedException::forDirectoryPath($path);
+        }
+
+        try {
+            $this->filesystem->mkdir(\dirname($path));
+        } catch (IOException $ioException) {
+            throw BaselineWriteFailedException::forUncreatableDirectory($path, $ioException);
+        }
+
+        if (!WritableFilePath::canBeWritten($path)) {
+            throw BaselineWriteFailedException::forUnwritablePath($path);
+        }
     }
 
     /**

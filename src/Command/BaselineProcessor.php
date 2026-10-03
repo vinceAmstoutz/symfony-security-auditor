@@ -19,6 +19,8 @@ use Symfony\Component\Clock\Clock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 /**
  * Generates and applies the accepted-finding baseline: resolves the effective
@@ -34,6 +36,16 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
         private ?string $configuredBaseline = null,
         private ClockInterface $clock = new Clock(),
     ) {}
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    #[Override]
+    public function assertWritable(string $path, string $projectPath): void
+    {
+        $this->baseline->assertWritable($path, $projectPath);
+    }
 
     #[Override]
     public function generate(AuditReport $auditReport, string $path): int

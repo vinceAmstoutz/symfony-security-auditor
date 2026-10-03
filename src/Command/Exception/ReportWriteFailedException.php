@@ -24,6 +24,11 @@ final class ReportWriteFailedException extends RuntimeException
         return new self(\sprintf('The report cannot be written to "%s": choose an --output path that is a writable file or lies under a writable directory, before the audit spends anything.', $path));
     }
 
+    public static function forDirectoryPath(string $path): self
+    {
+        return new self(\sprintf('The report cannot be written to "%s": the path ends with a directory separator, so it names a directory. Give --output a file path before the audit spends anything.', $path));
+    }
+
     public static function forUncreatableDirectory(string $path, IOException $ioException): self
     {
         return new self(\sprintf('The report cannot be written to "%s", its directory could not be created (%s): choose another --output path before the audit spends anything.', $path, $ioException->getMessage()), previous: $ioException);

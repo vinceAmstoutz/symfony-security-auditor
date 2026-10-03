@@ -14,11 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
@@ -456,6 +458,101 @@ final class BaselineTest extends TestCase
         $baselineEntry = new BaselineEntry('SSA-SAME', 'SSA-SAME', 'SSA-SAME');
 
         self::assertSame(['SSA-SAME'], $baselineEntry->fingerprints());
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_accepts_a_new_file_under_directories_that_do_not_exist_yet(): void
+    {
+        $path = $this->tmpDir.'/build/baselines/baseline.json';
+
+        (new Baseline($this->filesystem))->assertWritable($path, $this->tmpDir);
+
+        self::assertDirectoryExists($this->tmpDir.'/build/baselines');
+        self::assertFileDoesNotExist($path);
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_symlinked_baseline_file(): void
+    {
+        symlink($this->tmpDir.'/elsewhere.json', $this->tmpDir.'/baseline.json');
+
+        $this->expectException(UnsafeBaselineWriteException::class);
+
+        (new Baseline($this->filesystem))->assertWritable($this->tmpDir.'/baseline.json', $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_path_into_the_audited_project_through_a_symlinked_directory_above_its_parent(): void
+    {
+        $outsideDir = sys_get_temp_dir().'/baseline_preflight_symlink_security_'.uniqid('', true);
+        $this->filesystem->mkdir($outsideDir);
+        symlink($outsideDir, $this->tmpDir.'/security');
+
+        try {
+            $this->expectException(UnsafeBaselineWriteException::class);
+
+            (new Baseline($this->filesystem))->assertWritable($this->tmpDir.'/security/baselines/baseline.json', $this->tmpDir);
+        } finally {
+            self::assertDirectoryDoesNotExist($outsideDir.'/baselines');
+            $this->filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    #[DataProvider('directorySeparators')]
+    public function test_assert_writable_refuses_a_path_that_names_a_directory(string $separator): void
+    {
+        $this->expectException(BaselineWriteFailedException::class);
+        $this->expectExceptionMessage('names a directory');
+
+        (new Baseline($this->filesystem))->assertWritable($this->tmpDir.'/baselines'.$separator, $this->tmpDir);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function directorySeparators(): iterable
+    {
+        yield 'a trailing slash' => ['/'];
+        yield 'a trailing backslash' => ['\\'];
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_path_beneath_a_regular_file(): void
+    {
+        $this->filesystem->dumpFile($this->tmpDir.'/blocking', 'x');
+
+        $this->expectException(BaselineWriteFailedException::class);
+        $this->expectExceptionMessage('its directory could not be created');
+
+        (new Baseline($this->filesystem))->assertWritable($this->tmpDir.'/blocking/baseline.json', $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_directory_as_the_baseline_file(): void
+    {
+        $this->expectException(BaselineWriteFailedException::class);
+        $this->expectExceptionMessage('choose a --generate-baseline path that is a writable file');
+
+        (new Baseline($this->filesystem))->assertWritable($this->tmpDir, $this->tmpDir);
     }
 
     /**

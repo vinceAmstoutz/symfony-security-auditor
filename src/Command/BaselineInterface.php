@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface BaselineInterface
@@ -43,6 +45,17 @@ interface BaselineInterface
      * malformed file throws.
      */
     public function feedback(string $path): ReviewerFeedback;
+
+    /**
+     * Refuses a path the baseline could never be saved to, before an audit
+     * spends anything on it.
+     *
+     * @param string $projectPath the audited project, whose directories are walked for a symlink like the working directory's
+     *
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function assertWritable(string $path, string $projectPath): void;
 
     /**
      * @param list<array<array-key, mixed>|string> $entries     accepted-finding entries; each

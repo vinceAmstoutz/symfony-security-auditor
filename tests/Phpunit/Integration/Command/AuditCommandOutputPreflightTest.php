@@ -94,6 +94,69 @@ final class AuditCommandOutputPreflightTest extends TestCase
         self::assertStringContainsString('symlink', $commandTester->getDisplay());
     }
 
+    public function test_an_output_path_naming_a_directory_aborts_before_the_pipeline_runs(): void
+    {
+        $commandTester = $this->makeCommandTester();
+
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+            '--output' => $this->fixtureDir.'/reports/',
+        ]);
+
+        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertStringContainsString('names a directory', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
+    public function test_a_symlinked_baseline_path_aborts_before_the_pipeline_runs(): void
+    {
+        symlink($this->fixtureDir.'/elsewhere.json', $this->fixtureDir.'/.security-baseline.json');
+        $commandTester = $this->makeCommandTester();
+
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $this->fixtureDir.'/.security-baseline.json',
+        ]);
+
+        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertStringContainsString('Refusing to write baseline through symlinked path', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
+    public function test_a_baseline_path_through_a_symlinked_directory_of_the_project_aborts_before_the_pipeline_runs(): void
+    {
+        $filesystem = new Filesystem();
+        $outsideDir = sys_get_temp_dir().'/audit_cmd_output_preflight_outside_'.uniqid('', true);
+        $filesystem->mkdir($outsideDir);
+        symlink($outsideDir, $this->fixtureDir.'/security');
+        $commandTester = $this->makeCommandTester();
+
+        try {
+            $exitCode = $commandTester->execute([
+                'project-path' => $this->fixtureDir,
+                '--generate-baseline' => $this->fixtureDir.'/security/baselines/baseline.json',
+            ]);
+
+            self::assertSame(ExitCode::Failure->value, $exitCode);
+            self::assertStringContainsString('Refusing to write baseline through symlinked path', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+            self::assertDirectoryDoesNotExist($outsideDir.'/baselines');
+        } finally {
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    public function test_a_baseline_path_naming_a_directory_aborts_before_the_pipeline_runs(): void
+    {
+        $commandTester = $this->makeCommandTester();
+
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $this->fixtureDir.'/baselines/',
+        ]);
+
+        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertStringContainsString('before the audit spends anything', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
     private function makeCommandTester(): CommandTester
     {
         $pipeline = $this->createMock(PipelineInterface::class);
