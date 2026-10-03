@@ -56,6 +56,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     /** @var list<Vulnerability> */
     private array $baselineSkippedFindings = [];
 
+    private bool $costEstimate = false;
+
     private DateTimeImmutable $startedAt;
 
     /**
@@ -183,6 +185,21 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     public function scanPaths(): array
     {
         return $this->scanPaths;
+    }
+
+    /**
+     * Marks the run as a cost estimate: a `--dry-run` reads the files in scope
+     * to price the audit and analyzes none of them, so its report can never
+     * read as complete.
+     */
+    public function markAsCostEstimate(): void
+    {
+        $this->costEstimate = true;
+    }
+
+    public function isCostEstimate(): bool
+    {
+        return $this->costEstimate;
     }
 
     public function isCacheBypassed(): bool

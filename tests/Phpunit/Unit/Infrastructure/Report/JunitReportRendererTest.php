@@ -144,10 +144,11 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
-    public function test_the_completeness_error_of_a_run_that_made_no_llm_call_states_the_notice(): void
+    public function test_the_completeness_error_of_a_cost_estimate_states_the_notice(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->markAsCostEstimate();
 
         $error = $this->decodeJunit(AuditReport::fromContext($auditContext))->getElementsByTagName('error')->item(0);
 

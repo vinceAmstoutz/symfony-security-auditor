@@ -24,10 +24,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface
  * Test fake — bypasses the attacker/reviewer loop entirely and hands the
  * command a single, already-validated finding, so tests can exercise
  * baseline/report wiring without depending on the dual-agent loop's own
- * baseline-skip behavior. It records the finding's own file as scanned and
- * analyzed, since it stands in for a pipeline whose ingestion stage and attacker
- * ran — a report that discovered or analyzed no file at all carries no verdict
- * and fails the exit-code gate.
+ * baseline-skip behavior. It records the finding's own file as scanned, since it
+ * stands in for a pipeline whose ingestion stage ran — a report that discovered
+ * no file at all carries no verdict and fails the exit-code gate.
  *
  * @internal scoped to AuditCommand baseline/SARIF integration tests
  */
@@ -46,7 +45,6 @@ final readonly class FixedFindingPipeline implements PipelineInterface
         $auditContext->setProjectFiles([
             ProjectFile::create($this->vulnerability->filePath(), $this->vulnerability->filePath(), '<?php'),
         ]);
-        $auditContext->recordCoverage('attacker', $this->vulnerability->filePath(), 'analyzed');
         $auditContext->addVulnerability($this->vulnerability);
     }
 }

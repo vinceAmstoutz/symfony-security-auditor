@@ -77,7 +77,7 @@ final class IncompleteAuditNoticeTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
-    public function test_it_says_no_file_was_analyzed_when_no_llm_call_was_made(): void
+    public function test_it_says_no_file_was_analyzed_by_a_cost_estimate(): void
     {
         $auditContext = AuditContext::forProject(sys_get_temp_dir());
         $auditContext->setProjectFiles([
@@ -85,9 +85,10 @@ final class IncompleteAuditNoticeTest extends TestCase
             ProjectFile::create('src/B.php', 'src/B.php', '<?php'),
             ProjectFile::create('src/C.php', 'src/C.php', '<?php'),
         ]);
+        $auditContext->markAsCostEstimate();
 
         self::assertSame(
-            'Audit incomplete: none of the 3 file(s) in scope was analyzed, because no LLM call was made or the run stopped before its first one, so this report cannot vouch that the project is free of vulnerabilities.',
+            'Audit incomplete: none of the 3 file(s) in scope was analyzed, because a dry run makes no LLM call, so this report cannot vouch that the project is free of vulnerabilities.',
             IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)),
         );
     }

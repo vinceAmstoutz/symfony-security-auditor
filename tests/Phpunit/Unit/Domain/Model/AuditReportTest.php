@@ -947,12 +947,43 @@ final class AuditReportTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
-    public function test_a_report_whose_files_the_attacker_never_reached_is_not_complete(): void
+    public function test_a_pipeline_that_records_no_coverage_keeps_a_complete_report(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
 
-        self::assertFalse(AuditReport::fromContext($auditContext)->isComplete());
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertTrue($auditReport->isComplete());
+        self::assertFalse($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_cost_estimate_of_the_files_in_scope_never_reads_as_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->markAsCostEstimate();
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertFalse($auditReport->isComplete());
+        self::assertTrue($auditReport->hasNoVerdict());
+        self::assertSame([], $auditReport->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_cost_estimate_with_no_file_in_scope_has_nothing_left_unanalyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->markAsCostEstimate();
+
+        self::assertTrue(AuditReport::fromContext($auditContext)->isComplete());
     }
 
     /**
@@ -994,7 +1025,7 @@ final class AuditReportTest extends TestCase
     public static function noVerdictCases(): iterable
     {
         yield 'every call failed' => [[['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'aborted']], true];
-        yield 'no call was made' => [[], true];
+        yield 'a pipeline that records no coverage' => [[], false];
         yield 'one file analyzed, the other failed' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/B.php', 'errored']], false];
         yield 'one file served from the cache, the other failed' => [[['attacker', 'src/A.php', 'cached'], ['attacker', 'src/B.php', 'errored']], false];
         yield 'a file analyzed before a later iteration failed on it' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'errored']], false];

@@ -63,6 +63,7 @@ final readonly class AuditReport
                 new DateTimeImmutable(),
                 \count($auditContext->projectFiles()),
                 \count($auditContext->mappingFiles()),
+                $auditContext->isCostEstimate(),
             ),
             $auditContext->coverage(),
             $auditCost,
@@ -144,14 +145,15 @@ final readonly class AuditReport
     }
 
     /**
-     * Whether every file in scope was analyzed: no stage left one unfinished,
-     * and the attacker ran at all — a dry run makes no LLM call, so it never
-     * does, and neither does a run stopped before its first one. A `--since`
-     * run whose diff left no file to analyze has nothing left unfinished.
+     * Whether every file in scope was analyzed: no stage left one unfinished —
+     * a run stopped before its first LLM call records its files as aborted —
+     * and the report is not a cost estimate of files it never analyzed. A
+     * `--since` run whose diff left no file to analyze has nothing left
+     * unfinished, and neither has a host pipeline that records no coverage.
      */
     public function isComplete(): bool
     {
-        return [] === $this->unanalyzedFiles() && !$this->attackerNeverRan();
+        return [] === $this->unanalyzedFiles() && !$this->estimatesFilesItNeverAnalyzed();
     }
 
     /**
@@ -167,14 +169,9 @@ final readonly class AuditReport
         return !$this->isComplete() && [] === $this->vulnerabilities && [] === AnalyzedFiles::in($this->coverage);
     }
 
-    private function attackerNeverRan(): bool
+    private function estimatesFilesItNeverAnalyzed(): bool
     {
-        $attackerEntries = array_filter(
-            $this->coverage,
-            static fn (array $entry): bool => AgentRole::Attacker->value === $entry['stage'],
-        );
-
-        return $this->reportIdentity->filesScanned > 0 && [] === $attackerEntries;
+        return $this->reportIdentity->costEstimate && $this->reportIdentity->filesScanned > 0;
     }
 
     /** @return list<Vulnerability> */

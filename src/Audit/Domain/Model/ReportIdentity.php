@@ -22,7 +22,7 @@ use DateTimeImmutable;
  * audited. They differ only for a `--since` run, where the diff narrows the
  * second — so `filesDiscovered === 0` means the scan itself came up empty and
  * no verdict was reached, which is not the same as a diff run finding nothing
- * changed.
+ * changed. `costEstimate` marks a `--dry-run`, which analyzes no file.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -35,6 +35,7 @@ final readonly class ReportIdentity
         public DateTimeImmutable $completedAt,
         public int $filesScanned,
         public int $filesDiscovered,
+        public bool $costEstimate = false,
     ) {}
 
     public function durationSeconds(): float
