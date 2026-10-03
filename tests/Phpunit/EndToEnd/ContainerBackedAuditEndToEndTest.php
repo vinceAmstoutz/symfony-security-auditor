@@ -47,9 +47,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ConnectionCutAfterToolAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAuditPlatform;
@@ -249,6 +251,18 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $report = $this->decode($this->runAudit(['model' => 'gpt-4o'], 'json', UnauthorizedAuditPlatform::class));
 
         self::assertFalse($report['complete']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_concurrent_attacker_whose_retries_ran_out_after_a_tool_ran_aborts_the_run_like_the_sequential_one(): void
+    {
+        $commandTester = new CommandTester($this->auditCommand($this->boot(
+            ['model' => 'gpt-4o', 'profile' => 'fast', 'audit' => ['retry' => ['max_attempts' => 2, 'initial_delay_ms' => 1, 'jitter_ratio' => 0.0]]],
+            ConnectionCutAfterToolAuditPlatform::class,
+        )));
+
+        self::assertSame(ExitCode::Failure->value, $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => 'json']));
     }
 
     /** @return iterable<string, array{array<string, mixed>}> */

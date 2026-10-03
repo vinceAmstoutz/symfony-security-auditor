@@ -24,8 +24,10 @@ use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 
 /**
  * Extracts token usage, tool calls, text, and the provider finish reason from
@@ -53,14 +55,42 @@ final readonly class PlatformResultExtractor
             return [0, 0, 0, 0];
         }
 
-        $inputTokens = $tokenUsage->getPromptTokens() ?? 0;
-        $outputTokens = $tokenUsage->getCompletionTokens() ?? 0;
-        $cacheReadTokens = $tokenUsage->getCacheReadTokens() ?? 0;
-        $cacheCreationTokens = $tokenUsage->getCacheCreationTokens() ?? 0;
+        [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->tokenCounts($tokenUsage);
         $this->assertNonNegative($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
         $this->tokenUsageRecorder?->record($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
 
         return [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
+    }
+
+    /**
+     * The usage a provider reported in the raw answer of a call its bridge
+     * failed to convert, read with that bridge's own extractor — a failed
+     * conversion attaches no `token_usage` metadata. Null when the answer
+     * reports none, cannot be read, or reports a negative count. Nothing is
+     * recorded here: the caller books the failed call.
+     */
+    public function extractBilledUsage(DeferredResult $deferredResult): ?TokenUsageSnapshot
+    {
+        try {
+            $tokenUsage = $deferredResult->getResultConverter()->getTokenUsageExtractor()?->extract($deferredResult->getRawResult());
+
+            return $tokenUsage instanceof TokenUsageInterface ? TokenUsageSnapshot::of(...$this->tokenCounts($tokenUsage)) : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array{0: int, 1: int, 2: int, 3: int}
+     */
+    private function tokenCounts(TokenUsageInterface $tokenUsage): array
+    {
+        return [
+            $tokenUsage->getPromptTokens() ?? 0,
+            $tokenUsage->getCompletionTokens() ?? 0,
+            $tokenUsage->getCacheReadTokens() ?? 0,
+            $tokenUsage->getCacheCreationTokens() ?? 0,
+        ];
     }
 
     /**

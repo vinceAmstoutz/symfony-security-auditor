@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture;
 
 use Override;
 use RuntimeException;
@@ -21,11 +21,16 @@ use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\ResultConverterInterface;
 use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 
-final class ThrowingConverter implements ResultConverterInterface
+/**
+ * Test fake: a bridge converter that fails on every answer it is handed, the
+ * way a real one does when the raw answer holds something it cannot turn into
+ * a result.
+ */
+final readonly class FailingResultConverter implements ResultConverterInterface
 {
     public function __construct(
-        private readonly RuntimeException $runtimeException,
-        private readonly ?TokenUsageExtractorInterface $tokenUsageExtractor = null,
+        private RuntimeException $runtimeException,
+        private ?TokenUsageExtractorInterface $tokenUsageExtractor = null,
     ) {}
 
     #[Override]

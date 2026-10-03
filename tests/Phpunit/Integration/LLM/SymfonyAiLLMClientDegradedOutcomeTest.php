@@ -22,9 +22,11 @@ use Symfony\AI\Platform\Exception\BadRequestException;
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
+use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
 use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
+use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
@@ -82,6 +84,8 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
 
     private const string BOOKED_DEBUG = 'An answer the provider delivered as an error is booked at its estimated input tokens, since the provider bills the request it accepted';
 
+    private const string AZURE_FILTERED = "The response was filtered due to the prompt triggering Azure OpenAI's content management policy.";
+
     /**
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -122,6 +126,79 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
         self::assertSame('content-filter', $llmResponse->stopReason());
         self::assertTrue($llmResponse->isDegraded());
         self::assertSame(1, $scriptedTokenUsagePlatform->invocations);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_answers_the_generic_bridge_reporting_a_content_filter_finish_reason_as_an_error_as_a_content_filter_response(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([
+            new DeferredResult(new ThrowingConverter(new PlatformRuntimeException('Unsupported finish reason "content_filter".')), new InMemoryRawResult(), []),
+        ]);
+
+        $llmResponse = $this->client($scriptedDeferredPlatform, new NullLogger())->complete('sys', 'usr');
+
+        self::assertSame('content-filter', $llmResponse->stopReason());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_answers_a_prompt_the_content_filter_refused_with_an_http_400_as_a_content_filter_response(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->contentFilterRefusal()]);
+
+        $llmResponse = $this->client($scriptedDeferredPlatform, new NullLogger())->complete('sys', 'usr');
+
+        self::assertSame('content-filter', $llmResponse->stopReason());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_batch_with_tools_answers_a_prompt_the_content_filter_refused_with_an_http_400_as_a_content_filter_response(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->contentFilterRefusal()]);
+
+        $responses = $this->client($scriptedDeferredPlatform, new NullLogger())->completeBatchWithTools([['system' => 's', 'user' => 'u', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 2, 3);
+
+        self::assertSame('content-filter', $responses[0]->stopReason());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_complete_batch_answers_a_prompt_the_content_filter_refused_with_an_http_400_as_a_content_filter_response(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->contentFilterRefusal()]);
+
+        $responses = $this->client($scriptedDeferredPlatform, new NullLogger())->completeBatch([['system' => 's', 'user' => 'u']], 2);
+
+        self::assertSame('content-filter', $responses[0]->stopReason());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
     }
 
     /**
@@ -708,6 +785,15 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
         return new SymfonyAiLLMClient(
             new PlatformBinding($platform, 'm', new NullLogger()),
             platformResilienceConfig: new PlatformResilienceConfig(sleeper: new FakeSleeper(), rateLimiter: $fakeRateLimiter),
+        );
+    }
+
+    private function contentFilterRefusal(): DeferredResult
+    {
+        return new DeferredResult(
+            new ThrowingConverter(new BadRequestException(self::AZURE_FILTERED)),
+            new InMemoryRawResult(['error' => ['message' => self::AZURE_FILTERED, 'type' => null, 'param' => 'prompt', 'code' => 'content_filter', 'status' => 400]]),
+            [],
         );
     }
 

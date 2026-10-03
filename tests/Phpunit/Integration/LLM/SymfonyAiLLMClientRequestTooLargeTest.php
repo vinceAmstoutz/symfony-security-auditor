@@ -74,6 +74,8 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
 
     private const string CONCURRENT_OUTGROWN_WARNING = 'Concurrent tool-using conversation outgrew the model input limit after tool results were appended; it ends as an empty response and keeps the tool results already recorded';
 
+    private const string GATEWAY_REFUSAL = 'The provider refused the request as too large (HTTP 413): Syntax error for "https://gw.example.com/v1/chat/completions".';
+
     /**
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -96,6 +98,69 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
         self::assertInstanceOf(LLMRequestTooLargeException::class, $caught);
         self::assertSame('The model cannot fit the request: '.self::PROMPT_TOO_LONG, $caught->getMessage());
         self::assertSame(1, $scriptedTokenUsagePlatform->invocations);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_surfaces_a_gateway_413_whose_body_the_bridge_could_not_decode_as_a_prompt_the_model_cannot_fit(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayPayloadTooLarge()]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($scriptedDeferredPlatform, 'm', new NullLogger()), platformResilienceConfig: new PlatformResilienceConfig(sleeper: new FakeSleeper()));
+
+        $caught = null;
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+        } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
+            $caught = $llmRequestTooLargeException;
+        }
+
+        self::assertInstanceOf(LLMRequestTooLargeException::class, $caught);
+        self::assertSame('The model cannot fit the request: '.self::GATEWAY_REFUSAL, $caught->getMessage());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_batch_with_tools_answers_a_gateway_413_with_a_request_too_large_response(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayPayloadTooLarge()]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($scriptedDeferredPlatform, 'm', new NullLogger()), platformResilienceConfig: new PlatformResilienceConfig(sleeper: new FakeSleeper()));
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([['system' => 's', 'user' => 'u', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 2, 3);
+
+        self::assertTrue($responses[0]->isRequestTooLarge());
+        self::assertSame(self::GATEWAY_REFUSAL, $responses[0]->content());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_batch_answers_a_gateway_413_with_a_request_too_large_response(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayPayloadTooLarge()]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($scriptedDeferredPlatform, 'm', new NullLogger()), platformResilienceConfig: new PlatformResilienceConfig(sleeper: new FakeSleeper()));
+
+        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
+
+        self::assertTrue($responses[0]->isRequestTooLarge());
+        self::assertSame(self::GATEWAY_REFUSAL, $responses[0]->content());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
     }
 
     /**
@@ -315,9 +380,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
     {
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([
             new RuntimeException('HTTP 503 Service Unavailable'),
-            new RuntimeException('HTTP 503 Service Unavailable'),
-            new RuntimeException('HTTP 503 Service Unavailable'),
-            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 401 Unauthorized'),
             new BadRequestException(self::PROMPT_TOO_LONG),
         ], []);
         $symfonyAiLLMClient = $this->client($scriptedTokenUsagePlatform, new NullLogger());
@@ -325,7 +388,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
         $responses = $symfonyAiLLMClient->completeBatchWithTools([['system' => 's', 'user' => 'u', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 2, 3);
 
         self::assertTrue($responses[0]->isRequestTooLarge());
-        self::assertSame(5, $scriptedTokenUsagePlatform->invocations);
+        self::assertSame(3, $scriptedTokenUsagePlatform->invocations);
     }
 
     /**
@@ -426,6 +489,14 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
             ['Cancelled a request still in flight; its estimated input tokens are booked as spent since the provider bills a request it accepted', ['estimated_input_tokens' => 10]],
             $messageCollectingLogger->records,
         );
+    }
+
+    private function gatewayPayloadTooLarge(): DeferredResult
+    {
+        $payloadTooLarge = self::createStub(ResponseInterface::class);
+        $payloadTooLarge->method('getStatusCode')->willReturn(413);
+
+        return new DeferredResult(new ThrowingConverter(new RuntimeException('Syntax error for "https://gw.example.com/v1/chat/completions".')), new RawHttpResult($payloadTooLarge), []);
     }
 
     private function tokenEstimatorByLength(): TokenEstimatorInterface

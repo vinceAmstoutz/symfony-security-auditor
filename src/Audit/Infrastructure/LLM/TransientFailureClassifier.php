@@ -19,12 +19,15 @@ use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 
 use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class TransientFailureClassifier
 {
+    private const string MALFORMED_TOOL_CALL_STOP_REASON = 'malformed_tool_call';
+
     /** @var list<string> */
     private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504', '529'];
 
@@ -48,11 +51,21 @@ final readonly class TransientFailureClassifier
         'connection refused',
         'connection aborted',
         'network is unreachable',
+    ];
+
+    /** @var list<string> */
+    private const array CONNECTION_CUT_HINTS = [
         'unexpected eof while reading',
         'eof occurred in violation of protocol',
+        'ssl_error_syscall',
         'recv failure',
+        'failure when receiving data from the peer',
         'failed sending data to the peer',
         'curl error 18',
+        'transfer closed with',
+        'transferred a partial file',
+        'was not closed cleanly',
+        'framing layer',
         'empty reply from server',
         'broken pipe',
         'connection closed by peer',
@@ -92,6 +105,8 @@ final readonly class TransientFailureClassifier
         'max_model_len',
         'exceed context limit',
         'exceeds the available context size',
+        'payload too large',
+        'request entity too large',
     ];
 
     /** @var list<string> */
@@ -99,6 +114,17 @@ final readonly class TransientFailureClassifier
         'too many requests',
         'rate limit',
         'rate_limit',
+    ];
+
+    /** @var list<string> */
+    private const array OUTPUT_LIMIT_HINTS = [
+        'unsupported finish reason "max_tokens"',
+    ];
+
+    /** @var list<string> */
+    private const array CONTENT_FILTER_HINTS = [
+        'unsupported finish reason "content_filter"',
+        'incomplete (content_filter)',
     ];
 
     /** @var list<string> */
@@ -118,7 +144,7 @@ final readonly class TransientFailureClassifier
             return true;
         }
 
-        if ($this->isRateLimit($throwable)) {
+        if ($this->isRateLimit($throwable) || $this->isConnectionCut($throwable)) {
             return true;
         }
 
@@ -139,15 +165,31 @@ final readonly class TransientFailureClassifier
      * The stop reason `LLMResponse` gives the same outcome when a provider
      * delivers it as a response rather than a failure: the model answered, but
      * with nothing usable — cut off by the output limit, withheld by a content
-     * filter, or empty. Null for any other failure.
+     * filter, or empty. A bridge reports the first two as a typed exception or
+     * as a plain one naming the provider's own reason (the generic bridge's
+     * `Unsupported finish reason "content_filter".`, the Responses API's
+     * `response is incomplete (content_filter)`, Cohere's `Unsupported finish
+     * reason "MAX_TOKENS".`), and an answer it failed to convert can only
+     * show it in its raw answer (`UnconvertedAnswerException`). That raw
+     * answer has the last word: a request it shows refused as too large was
+     * never answered, whatever the bridge made of the body that came with the
+     * refusal (`Response does not contain choices.`). Null for any other
+     * failure.
      */
     public function degradedStopReason(Throwable $throwable): ?string
     {
-        if ($this->hasInChain($throwable, MaxOutputTokensException::class)) {
+        $unconvertedAnswerException = $this->firstInChain($throwable, UnconvertedAnswerException::class);
+        if ($unconvertedAnswerException instanceof UnconvertedAnswerException) {
+            return $unconvertedAnswerException->stopReason;
+        }
+
+        $joined = $this->joinMessages($throwable);
+
+        if ($this->hasInChain($throwable, MaxOutputTokensException::class) || u($joined)->containsAny(self::OUTPUT_LIMIT_HINTS)) {
             return 'length';
         }
 
-        if ($this->hasInChain($throwable, ContentFilterException::class)) {
+        if ($this->hasInChain($throwable, ContentFilterException::class) || u($joined)->containsAny(self::CONTENT_FILTER_HINTS)) {
             return 'content-filter';
         }
 
@@ -155,13 +197,16 @@ final readonly class TransientFailureClassifier
     }
 
     /**
-     * A degraded answer is one the provider took in and answered, so its
-     * input counts against the rate window as it does against the budget; any
-     * other failure released nothing the window has to hold.
+     * Why a call that failed was still billed: the provider took the request
+     * in and answered it, with nothing usable (the degraded stop reason) or
+     * with a tool call whose arguments are not valid JSON
+     * (`malformed_tool_call`). Null for a failure it never answered, which
+     * spent nothing the budget or the rate window has to hold.
      */
-    public function inputTokensTakenIn(Throwable $throwable, int $estimatedInputTokens): int
+    public function billedStopReason(Throwable $throwable): ?string
     {
-        return null !== $this->degradedStopReason($throwable) ? $estimatedInputTokens : 0;
+        return $this->degradedStopReason($throwable)
+            ?? ($this->hasInChain($throwable, MalformedToolCallException::class) ? self::MALFORMED_TOOL_CALL_STOP_REASON : null);
     }
 
     /**
@@ -184,21 +229,23 @@ final readonly class TransientFailureClassifier
      * `maximum context length` / `context_length_exceeded`, Mistral's `too
      * large for model`, Gemini's `exceeds the maximum number of tokens`,
      * Bedrock's `Input is too long`, llama.cpp's `exceeds the available context
-     * size`, or an HTTP 413). Retrying the same prompt cannot succeed, but a
+     * size`, or an HTTP 413 — a gateway's `Payload Too Large`, or the 413
+     * status `UnconvertedAnswerException` read from an answer the bridge
+     * could not decode). Retrying the same prompt cannot succeed, but a
      * smaller one can — so callers split the work instead of retrying or
      * aborting. A 413 inside a rate-limit answer is a token count, not a
-     * status.
+     * status, and so is one in a connection cut off mid-response.
      */
     public function isRequestTooLarge(Throwable $throwable): bool
     {
-        if ($this->hasInChain($throwable, ExceedContextSizeException::class)) {
+        if ($this->hasInChain($throwable, ExceedContextSizeException::class) || true === $this->firstInChain($throwable, UnconvertedAnswerException::class)?->refusedAsTooLarge) {
             return true;
         }
 
         $joined = $this->joinMessages($throwable);
 
         return u($joined)->containsAny(self::REQUEST_TOO_LARGE_HINTS)
-            || (!$this->isRateLimit($throwable) && $this->containsStatusCode($joined, self::REQUEST_TOO_LARGE_STATUS_CODES));
+            || (!$this->isRateLimit($throwable) && !$this->isConnectionCut($throwable) && $this->containsStatusCode($joined, self::REQUEST_TOO_LARGE_STATUS_CODES));
     }
 
     /**
@@ -218,20 +265,44 @@ final readonly class TransientFailureClassifier
     }
 
     /**
+     * The peer hung up while the response was being read — in curl's wording
+     * as symfony/http-client relays it, `Transfer closed with 512 bytes
+     * remaining to read for "https://…".` and the like. No HTTP status came
+     * back, so a byte count, an HTTP/2 stream id or the URL in that message is
+     * never a status code, and it is retried before any is looked for.
+     */
+    private function isConnectionCut(Throwable $throwable): bool
+    {
+        return u($this->joinMessages($throwable))->containsAny(self::CONNECTION_CUT_HINTS);
+    }
+
+    /**
      * @param class-string<Throwable> $exceptionClass
      */
     private function hasInChain(Throwable $throwable, string $exceptionClass): bool
     {
+        return $this->firstInChain($throwable, $exceptionClass) instanceof Throwable;
+    }
+
+    /**
+     * @template T of Throwable
+     *
+     * @param class-string<T> $exceptionClass
+     *
+     * @return T|null
+     */
+    private function firstInChain(Throwable $throwable, string $exceptionClass): ?Throwable
+    {
         $current = $throwable;
         while ($current instanceof Throwable) {
             if ($current instanceof $exceptionClass) {
-                return true;
+                return $current;
             }
 
             $current = $current->getPrevious();
         }
 
-        return false;
+        return null;
     }
 
     private function joinMessages(Throwable $throwable): string
