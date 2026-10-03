@@ -636,15 +636,16 @@ final class ReportDifferTest extends TestCase
     public static function reportsThatCannotSayTheFileIsGone(): iterable
     {
         $fullScope = ['since' => null, 'paths' => []];
+        $anotherFileAnalyzed = ['stage' => 'attacker', 'file' => 'src/Other.php', 'status' => 'analyzed'];
 
         yield 'an incomplete run' => [['complete' => false, 'scope' => $fullScope]];
         yield 'a report that does not say it is complete' => [['scope' => $fullScope]];
         yield 'a complete flag that is not a boolean' => [['complete' => 'yes', 'scope' => $fullScope]];
         yield 'a --since run' => [['complete' => true, 'scope' => ['since' => 'main', 'paths' => []]]];
         yield 'a file outside the --path scope' => [['complete' => true, 'scope' => ['since' => null, 'paths' => ['src/Controller']]]];
-        yield 'a file the lean pre-scan skipped' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'skipped']]]];
-        yield 'a file the ledger lists under the path the attacker echoed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => './src/Foo.php', 'status' => 'skipped']]]];
-        yield 'a file a host stage listed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'secret_scrubbing', 'file' => 'src/Foo.php', 'status' => 'analyzed']]]];
+        yield 'a file the lean pre-scan skipped' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'skipped'], $anotherFileAnalyzed]]];
+        yield 'a file the ledger lists under the path the attacker echoed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => './src/Foo.php', 'status' => 'skipped'], $anotherFileAnalyzed]]];
+        yield 'a file a host stage listed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'secret_scrubbing', 'file' => 'src/Foo.php', 'status' => 'analyzed'], $anotherFileAnalyzed]]];
         yield 'a report written before the scope existed' => [['complete' => true]];
         yield 'a scope that is not an object' => [['complete' => true, 'scope' => 'everything']];
         yield 'a scope that does not say whether it ran with --since' => [['complete' => true, 'scope' => ['paths' => []]]];
