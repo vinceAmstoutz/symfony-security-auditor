@@ -479,6 +479,26 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_a_list_of_line_ranges_after_the_json_does_not_replace_it(): void
+    {
+        $llmResponse = LLMResponse::of('[{"title": "SQL injection"}] Ranges: [[12, 14]]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        self::assertSame([['title' => 'SQL injection']], $llmResponse->parseJson());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_list_holding_an_empty_object_after_the_json_does_not_replace_it(): void
+    {
+        $llmResponse = LLMResponse::of('[{"title": "SQL injection"}] Template: [{}]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        self::assertSame([['title' => 'SQL injection']], $llmResponse->parseJson());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_takes_the_last_json_block_that_decodes_when_prose_brackets_follow_it(): void
     {
         $content = 'Quoted: {"accepted": false}. Verdict: {"accepted": true} — see contents[locale] for the sink.';

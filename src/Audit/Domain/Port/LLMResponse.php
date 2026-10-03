@@ -287,15 +287,20 @@ final readonly class LLMResponse
     }
 
     /**
-     * An object, or a list holding an object or an array. An empty list or a
-     * list of scalars is what prose brackets decode to — `[1]` citing a
-     * source, `[ ]` in a checklist — so it never outranks an earlier block.
+     * An object, or a list holding one. Anything else is what prose brackets
+     * decode to — `[1]` citing a source, `[ ]` in a checklist, `[[12, 14]]`
+     * listing line ranges — so it never outranks an earlier block.
      *
      * @param array<mixed> $decoded
      */
     private function canStandForTheAnswer(array $decoded): bool
     {
-        return !array_is_list($decoded) || [] !== array_filter($decoded, \is_array(...));
+        return !array_is_list($decoded) || [] !== array_filter($decoded, $this->isObject(...));
+    }
+
+    private function isObject(mixed $element): bool
+    {
+        return \is_array($element) && !array_is_list($element);
     }
 
     /**
