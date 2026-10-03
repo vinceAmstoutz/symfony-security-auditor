@@ -72,13 +72,15 @@ final class AttackerAnalysisRequestTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_with_files_and_findings_preserves_rejected_findings(): void
+    public function test_with_files_and_candidate_findings_preserves_previous_and_rejected_findings(): void
     {
+        $previous = [$this->makeVulnerability()];
         $rejected = [$this->makeVulnerability()];
-        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), true, [], $rejected);
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), true, $previous, $rejected);
 
-        $derived = $attackerAnalysisRequest->withFilesAndFindings([], []);
+        $derived = $attackerAnalysisRequest->withFilesAndCandidateFindings([], []);
 
+        self::assertSame($previous, $derived->previousFindings);
         self::assertSame($rejected, $derived->rejectedFindings);
     }
 
@@ -108,7 +110,7 @@ final class AttackerAnalysisRequestTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_with_files_and_findings_replaces_both_and_preserves_mapping_and_bypass(): void
+    public function test_with_files_and_candidate_findings_replaces_both_and_preserves_mapping_and_bypass(): void
     {
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $attackerAnalysisRequest = new AttackerAnalysisRequest(
@@ -119,13 +121,20 @@ final class AttackerAnalysisRequestTest extends TestCase
         );
 
         $newFiles = [ProjectFile::create('src/B.php', '/app/src/B.php', '<?php')];
-        $newFindings = [$this->makeVulnerability()];
-        $derived = $attackerAnalysisRequest->withFilesAndFindings($newFiles, $newFindings);
+        $candidates = [$this->makeVulnerability()];
+        $derived = $attackerAnalysisRequest->withFilesAndCandidateFindings($newFiles, $candidates);
 
         self::assertSame($newFiles, $derived->files);
-        self::assertSame($newFindings, $derived->previousFindings);
+        self::assertSame($candidates, $derived->candidateFindings);
         self::assertSame($symfonyMapping, $derived->symfonyMapping);
         self::assertTrue($derived->bypassCache);
+    }
+
+    public function test_candidate_findings_default_to_empty(): void
+    {
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        self::assertSame([], $attackerAnalysisRequest->candidateFindings);
     }
 
     /**

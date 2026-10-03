@@ -17,6 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
@@ -36,8 +37,13 @@ final readonly class ReviewerCoverageRecorder
         ProgressReporterInterface $progressReporter,
     ): void {
         $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), $status);
+        if ('rejected' === $status && $coverageRecorder instanceof RejectedFindingRecorderInterface) {
+            $coverageRecorder->recordRejectedFinding($vulnerability);
+        }
+
         $progressReporter->report(ProgressEvent::ReviewFindingReviewed->value, [
             'accepted' => 'validated' === $status,
+            'status' => $status,
             'type' => $vulnerability->type()->value,
             'file' => $vulnerability->filePath(),
             'line' => $vulnerability->lineStart(),

@@ -45,6 +45,23 @@ final readonly class ConversationState
         public int $estimatedInputTokens,
     ) {}
 
+    /**
+     * Whether every conversation of a window has its answer, so another round
+     * would dispatch nothing.
+     *
+     * @param array<int, self> $states
+     */
+    public static function allAnswered(array $states): bool
+    {
+        foreach ($states as $state) {
+            if (!$state->response instanceof LLMResponse) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public function withRecordedTokens(int $input, int $output, int $cacheRead, int $cacheCreation): self
     {
         return new self(

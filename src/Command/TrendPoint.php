@@ -15,9 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
  * One report's place in a trend: its total finding count plus how many
- * findings appeared and disappeared since the report before it. The first
- * report of a trend has no predecessor, so its `newCount` and `fixedCount`
- * are null.
+ * findings appeared and disappeared since the report before it — and how many
+ * disappeared from files this report could not fully analyze, which says
+ * nothing about them. The first report of a trend has no predecessor, so its
+ * `newCount`, `fixedCount` and `unverifiedCount` are null.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -28,10 +29,11 @@ final readonly class TrendPoint
         public int $totalCount,
         public ?int $newCount,
         public ?int $fixedCount,
+        public ?int $unverifiedCount = null,
     ) {}
 
     /**
-     * @return array{report: string, total: int, new: int|null, fixed: int|null}
+     * @return array{report: string, total: int, new: int|null, fixed: int|null, unverified: int|null}
      */
     public function toArray(): array
     {
@@ -40,6 +42,7 @@ final readonly class TrendPoint
             'total' => $this->totalCount,
             'new' => $this->newCount,
             'fixed' => $this->fixedCount,
+            'unverified' => $this->unverifiedCount,
         ];
     }
 }

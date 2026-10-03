@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
@@ -25,7 +26,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
  * Reviews findings one at a time via the JSON response path, optionally with
- * the investigation tool registry. Cache hits short-circuit the LLM.
+ * the investigation tool registry. Cache hits short-circuit the LLM. A finding
+ * the model cannot review with its whole file in the prompt is recorded as
+ * errored and the review goes on with the next one.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -110,6 +113,8 @@ final readonly class SequentialReviewAnalyzer
             $this->reviewOutcomeRecorder->recordUnreached($vulnerability, 'aborted', $coverageRecorder);
 
             throw $budgetExceededException;
+        } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
+            return $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $llmRequestTooLargeException, $coverageRecorder);
         } catch (LLMProviderException $llmProviderException) {
             $this->reviewOutcomeRecorder->recordUnreached($vulnerability, 'errored', $coverageRecorder);
 

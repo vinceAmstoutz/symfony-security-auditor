@@ -49,12 +49,26 @@ final readonly class ScanPathFilter
 
         $filtered = [];
         foreach ($files as $file) {
-            if (self::matchesAnyPrefix($file, $normalized)) {
+            if (self::matchesAnyPrefix($file->relativePath(), $normalized)) {
                 $filtered[] = $file;
             }
         }
 
         return $filtered;
+    }
+
+    /**
+     * Whether a file at `$relativePath` lies under any of the scan paths, by
+     * the same rule {@see apply()} keeps files by — so a report's recorded
+     * scope reads back exactly as its scan applied it.
+     *
+     * @param list<string> $scanPaths empty list covers every file
+     */
+    public static function includes(string $relativePath, array $scanPaths): bool
+    {
+        $normalized = self::normalizePrefixes($scanPaths);
+
+        return [] === $normalized || self::matchesAnyPrefix($relativePath, $normalized);
     }
 
     /**
@@ -96,9 +110,9 @@ final readonly class ScanPathFilter
     /**
      * @param list<string> $prefixes
      */
-    private static function matchesAnyPrefix(ProjectFile $projectFile, array $prefixes): bool
+    private static function matchesAnyPrefix(string $relativePath, array $prefixes): bool
     {
-        $relative = u($projectFile->relativePath())->replace('\\', '/')->toString();
+        $relative = u($relativePath)->replace('\\', '/')->toString();
         foreach ($prefixes as $prefix) {
             if ($relative === $prefix || u($relative)->startsWith(\sprintf('%s/', $prefix))) {
                 return true;

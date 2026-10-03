@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 
 use function Symfony\Component\String\u;
 
@@ -45,6 +46,13 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
      * or the applied-review semantics change in a way that should re-run review.
      */
     public const int CACHE_VERSION = 1;
+
+    /**
+     * Version of the feedback part of the key, bumped when the way the reviewer
+     * prompt presents feedback changes: only the verdicts cached under feedback
+     * are then reviewed again, while every feedback-free verdict stays valid.
+     */
+    private const string FEEDBACK_KEY_VERSION = 'v2';
 
     /**
      * @throws InvalidCacheConfigurationException
@@ -140,11 +148,15 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
      * `Filesystem::readFile()` also transparently follows a symlink, so the
      * same pre-planted symlink that would otherwise corrupt a write turns an
      * ordinary cache read into an arbitrary-file read whose content is
-     * trusted as a real, previously-computed verdict.
+     * trusted as a real, previously-computed verdict. The configured
+     * `cache.dir`, this cache's parent, is the trusted root: it and the
+     * directories above it are taken as configured, so a symlinked `var/` or
+     * `~/.cache` does not turn the cache off, while a symlinked `reviewer/`
+     * or anything planted below it is still refused.
      */
     private function isSymlinkedPath(string $path): bool
     {
-        return is_link($path) || is_link(\dirname($path));
+        return SymlinkGuard::isThroughSymlink($path, \dirname($this->cacheDir));
     }
 
     /**
@@ -184,7 +196,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         // An empty-feedback digest is the empty string, keeping pre-feedback cache entries valid.
         $feedbackDigest = $this->reviewerFeedbackProvider->feedback()->digest();
         if ('' !== $feedbackDigest) {
-            $signature = \sprintf("%s\0feedback-%s", $signature, $feedbackDigest);
+            $signature = \sprintf("%s\0feedback-%s-%s", $signature, self::FEEDBACK_KEY_VERSION, $feedbackDigest);
         }
 
         return hash('sha256', $signature);

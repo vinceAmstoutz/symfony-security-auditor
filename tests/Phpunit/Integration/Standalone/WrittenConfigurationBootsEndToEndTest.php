@@ -1,0 +1,169 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
+
+use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use PHPUnit\Framework\TestCase;
+use Symfony\AI\Platform\Bridge\Generic\Factory;
+use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
+
+/**
+ * Every "init wrote a config the next run cannot build" defect on this branch
+ * was caught by a person, not by the suite: each rule class is pinned by
+ * hard-coded booleans, and nothing fed what the writer produces back through
+ * the loader and the container that has to boot it. This closes that loop, so
+ * the next such defect fails here rather than on someone's machine.
+ */
+final class WrittenConfigurationBootsEndToEndTest extends TestCase
+{
+    private string $home;
+
+    private string $cacheDir;
+
+    #[Override]
+    protected function setUp(): void
+    {
+        $this->home = sys_get_temp_dir().'/ssa-boot-'.bin2hex(random_bytes(6));
+        $this->cacheDir = $this->home.'/cache';
+    }
+
+    #[Override]
+    protected function tearDown(): void
+    {
+        (new Filesystem())->remove($this->home);
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MalformedProjectConfigException
+     * @throws MissingBundleExtensionException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws StandaloneConfigWriteException
+     * @throws UnknownPlatformProviderException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnresolvableConfigPathException
+     * @throws UnsafeStandaloneConfigWriteException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('providersInitCanWrite')]
+    #[RunInSeparateProcess]
+    public function test_the_configuration_init_writes_boots_a_platform(string $typed, ?string $baseUrl, ?string $endpoint, ?string $apiKeyVariable): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->home.'/config', $this->cacheDir, $this->home);
+        $provider = (new ProviderKeyNormalizer())->normalize($typed);
+
+        (new YamlStandaloneConfigWriter())->write(
+            $xdgConfigPathResolver->configFile(),
+            (new StandaloneConfigFactory())->create($provider, 'our-model', $apiKeyVariable, $baseUrl, $endpoint),
+        );
+
+        $standaloneConfig = (new StandaloneConfigLoader(
+            $xdgConfigPathResolver,
+            new StandalonePlatformConfigResolver(['GATEWAY_TOKEN' => 'a-token']),
+        ))->load();
+
+        self::assertInstanceOf(
+            PlatformInterface::class,
+            (new StandaloneContainerFactory())->create($standaloneConfig, $this->cacheDir)->get(PlatformInterface::class),
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MalformedProjectConfigException
+     * @throws MissingBundleExtensionException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws StandaloneConfigWriteException
+     * @throws UnknownPlatformProviderException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnresolvableConfigPathException
+     * @throws UnsafeStandaloneConfigWriteException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[RunInSeparateProcess]
+    public function test_a_percent_encoded_base_url_init_writes_reaches_the_platform_as_typed(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->home.'/config', $this->cacheDir, $this->home);
+
+        (new YamlStandaloneConfigWriter())->write(
+            $xdgConfigPathResolver->configFile(),
+            (new StandaloneConfigFactory())->create('generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example/v1%2Fx%3Fy'),
+        );
+
+        $standaloneConfig = (new StandaloneConfigLoader(
+            $xdgConfigPathResolver,
+            new StandalonePlatformConfigResolver(['GATEWAY_TOKEN' => 'a-token']),
+        ))->load();
+        $platform = (new StandaloneContainerFactory())->create($standaloneConfig, $this->cacheDir)->get(PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+        $platform->getModelCatalog();
+
+        self::assertSame('https://gw.example/v1%2Fx%3Fy', Factory::$lastBaseUrl);
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null, string|null, string|null}>
+     */
+    public static function providersInitCanWrite(): iterable
+    {
+        yield 'an instance-keyed platform' => ['generic.my_gateway', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'an instance that folds a hyphen' => ['generic.my-gateway', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'a numbered instance' => ['generic.42', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'an instance whose case is preserved' => ['generic.myGateway', 'http://localhost', null, 'GATEWAY_TOKEN'];
+        yield 'a platform that takes a single connection block' => ['ollama', null, null, 'GATEWAY_TOKEN'];
+        yield 'a local install, reached at its endpoint and authenticating nobody' => ['ollama', null, 'http://localhost:11434', null];
+        yield 'a local install that still carries a cloud token' => ['ollama', null, 'https://ollama.com', 'GATEWAY_TOKEN'];
+    }
+}

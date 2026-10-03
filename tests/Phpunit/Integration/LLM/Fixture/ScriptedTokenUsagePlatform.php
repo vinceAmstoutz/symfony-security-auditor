@@ -28,23 +28,30 @@ use Symfony\AI\Platform\TokenUsage\TokenUsage;
 final class ScriptedTokenUsagePlatform implements PlatformInterface
 {
     /**
-     * @param list<ResultInterface> $results
-     * @param list<TokenUsage>      $tokenUsages
+     * @param list<ResultInterface|RuntimeException> $results     a RuntimeException entry is thrown by that invocation
+     * @param list<TokenUsage>                       $tokenUsages
      */
     public function __construct(
         private array $results,
         private array $tokenUsages,
     ) {}
 
+    public int $invocations = 0;
+
     #[Override]
     public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
     {
+        ++$this->invocations;
         $result = array_shift($this->results);
+        $tokenUsage = array_shift($this->tokenUsages);
+        if ($result instanceof RuntimeException) {
+            throw $result;
+        }
+
         if (!$result instanceof ResultInterface) {
             throw new RuntimeException('ScriptedTokenUsagePlatform invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
         }
 
-        $tokenUsage = array_shift($this->tokenUsages);
         $deferredResult = new DeferredResult(
             new PlainConverter($result),
             new InMemoryRawResult(['text' => ''], [], (object) []),

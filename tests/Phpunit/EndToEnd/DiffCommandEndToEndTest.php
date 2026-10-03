@@ -119,6 +119,9 @@ final class DiffCommandEndToEndTest extends TestCase
         $persistingFinding = $this->finding('SQL Injection', 'src/Repo1.php');
         $fixedFinding = $this->finding('Hardcoded Secret', 'src/Config1.php');
         $newFinding = $this->finding('Cross-Site Scripting', 'src/View1.php');
+        foreach ([$persistingFinding, $fixedFinding, $newFinding] as $finding) {
+            $this->filesystem->dumpFile($this->fixtureDir.'/'.$finding['file_path'], '<?php');
+        }
 
         $previousReport = $this->runAuditAndCapture('previous.json', [$persistingFinding, $fixedFinding]);
         $currentReport = $this->runAuditAndCapture('current.json', [$persistingFinding, $newFinding]);

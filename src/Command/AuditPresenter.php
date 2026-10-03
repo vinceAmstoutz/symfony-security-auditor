@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -33,6 +34,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     public function __construct(
         private PricingProviderInterface $pricingProvider,
         private ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
+        private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
     ) {}
 
     #[Override]
@@ -137,7 +139,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
         if ('' !== $cost->primaryModel()) {
             $lines = [];
-            $lines[] = \sprintf('Model : %s', $cost->primaryModel());
+            $lines[] = \sprintf('Model : %s', OutputFormatter::escape($cost->primaryModel()));
             $lines[] = \sprintf(
                 'Tokens: %s in / %s out (total: %s)',
                 number_format($cost->inputTokens()),
@@ -150,7 +152,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                 $lines[] = \sprintf(
                     '  %-8s (%s): $%s — %s in / %s out',
                     $role,
-                    $entry['model'],
+                    OutputFormatter::escape($entry['model']),
                     number_format($entry['estimated_cost_usd'], 4, '.', ''),
                     number_format($entry['input_tokens']),
                     number_format($entry['output_tokens']),
@@ -251,11 +253,12 @@ final readonly class AuditPresenter implements AuditPresenterInterface
      * override. `OutputFormatter::escape()` neutralises `<`/`>` markup but not
      * those characters, so the path is first collapsed to a single line and
      * stripped of control/bidi characters — a crafted filename cannot forge a
-     * fake listing entry or spoof the terminal.
+     * fake listing entry or spoof the terminal — and a legacy `##[command]`
+     * in it is defused for a CI runner's log.
      */
     private function sanitizePathForListing(string $relativePath): string
     {
-        return OutputFormatter::escape(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($relativePath, 'UTF-8')));
+        return OutputFormatter::escape(WorkflowCommandText::inLine(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($relativePath, 'UTF-8'))));
     }
 
     /**
@@ -307,13 +310,13 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             ? $throwable->getMessage()
             : \sprintf('Unexpected error: %s', $throwable->getMessage());
 
-        $symfonyStyle->error($message);
+        $symfonyStyle->error($this->workflowCommandNeutralizer->message($message));
     }
 
     #[Override]
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
-        if (Command::FAILURE === $exitCode) {
+        if (Command::FAILURE === $exitCode && !$auditReport->hasNoVerdict()) {
             $totalVulnerabilities = $auditReport->totalVulnerabilities();
             $symfonyStyle->caution(\sprintf(
                 'Audit failed a configured gate. Risk: %s. Score: %d/100. %d %s found.',
@@ -322,6 +325,13 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                 $totalVulnerabilities,
                 1 === $totalVulnerabilities ? 'vulnerability' : 'vulnerabilities',
             ));
+            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode);
+
+            return;
+        }
+
+        if (!$auditReport->isComplete()) {
+            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode);
 
             return;
         }
@@ -330,6 +340,64 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             'Audit complete. Risk: %s | Vulnerabilities: %d',
             $auditReport->riskLevel(),
             $auditReport->totalVulnerabilities(),
+        ));
+    }
+
+    #[Override]
+    public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
+    {
+        if ($auditReport->isComplete()) {
+            return;
+        }
+
+        $summary = $this->incompleteSummary($auditReport);
+
+        if (ExitCode::Incomplete->value === $exitCode) {
+            $symfonyStyle->error(\sprintf('%s The run fails because --fail-on-incomplete is set.', $summary));
+
+            return;
+        }
+
+        if (ExitCode::Failure->value === $exitCode && $auditReport->hasNoVerdict()) {
+            $symfonyStyle->error(\sprintf('%s A run with no verdict cannot pass, so it fails.', $summary));
+
+            return;
+        }
+
+        $symfonyStyle->warning(ExitCode::Success->value === $exitCode ? \sprintf('%s Pass --fail-on-incomplete to fail the run when this happens.', $summary) : $summary);
+    }
+
+    /**
+     * A run with no verdict — no file analyzed, nothing found — states no
+     * risk level: a SAFE there would vouch for code nobody read.
+     */
+    private function incompleteSummary(AuditReport $auditReport): string
+    {
+        if ($auditReport->hasNoVerdict()) {
+            return \sprintf(
+                'Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict. Vulnerabilities: %d.',
+                $auditReport->filesScanned(),
+                $auditReport->totalVulnerabilities(),
+            );
+        }
+
+        return \sprintf(
+            'Audit incomplete: %d file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
+            \count($auditReport->unanalyzedFiles()),
+            $auditReport->riskLevel(),
+            $auditReport->totalVulnerabilities(),
+        );
+    }
+
+    #[Override]
+    public function baselineKept(SymfonyStyle $symfonyStyle, string $path, AuditReport $auditReport): void
+    {
+        $symfonyStyle->error(\sprintf(
+            '%s The baseline at %s was left as it was: a run with no verdict cannot replace the accepted findings, so it fails.',
+            0 === $auditReport->filesDiscovered()
+                ? 'The scan found no file to audit, so the run has no verdict.'
+                : \sprintf('Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict.', $auditReport->filesScanned()),
+            $path,
         ));
     }
 

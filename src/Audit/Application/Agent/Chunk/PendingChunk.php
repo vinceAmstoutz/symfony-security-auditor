@@ -17,8 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
  * One cache-miss chunk awaiting a dispatched batch call: the files it covers,
- * the cache coordinates its findings are stored under, the collection session
- * the `record_vulnerability` calls land in, and the rendered prompts.
+ * its assembled context — the rendered prompts and the cache coordinates its
+ * findings are stored under — and the collection session the
+ * `record_vulnerability` calls land in.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -29,10 +30,7 @@ final readonly class PendingChunk
      */
     public function __construct(
         public array $chunk,
-        public string $contextKey,
-        public bool $cacheable,
+        public ChunkContext $chunkContext,
         public StructuredVulnerabilityCollectionSession $session,
-        public string $systemPrompt,
-        public string $userMessage,
     ) {}
 }

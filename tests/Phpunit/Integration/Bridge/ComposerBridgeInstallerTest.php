@@ -21,10 +21,39 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 
 final class ComposerBridgeInstallerTest extends TestCase
 {
+    private const string AI_BUNDLE_CLASS = __DIR__.'/../../../../vendor/symfony/ai-bundle/src/AiBundle.php';
+
+    private const string UNTOUCHED_SYMLINK_TARGET = '{"name":"not the manifest"}
+';
+
+    private const string PINNED_MANIFEST = '{
+    "config": {
+        "platform": {
+            "php": "8.3.99"
+        }
+    }
+}
+';
+
+    private const string PINNED_MANIFEST_WITH_PLATFORM_RELEASE = '{
+    "config": {
+        "platform": {
+            "php": "8.3.99"
+        }
+    },
+    "require": {
+        "symfony/ai-platform": "v0.14.1"
+    }
+}
+';
+
     private string $targetDirectory;
+
+    private string $outsideTarget;
 
     private Filesystem $filesystem;
 
@@ -33,12 +62,13 @@ final class ComposerBridgeInstallerTest extends TestCase
     {
         $this->filesystem = new Filesystem();
         $this->targetDirectory = sys_get_temp_dir().'/ssa-bridge-'.bin2hex(random_bytes(6));
+        $this->outsideTarget = sys_get_temp_dir().'/ssa-bridge-symlink-target-'.bin2hex(random_bytes(6));
     }
 
     #[Override]
     protected function tearDown(): void
     {
-        $this->filesystem->remove($this->targetDirectory);
+        $this->filesystem->remove([$this->targetDirectory, $this->outsideTarget]);
     }
 
     /**
@@ -48,9 +78,7 @@ final class ComposerBridgeInstallerTest extends TestCase
     {
         (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess(), platformPhpVersion: '8.3.99'))->install('anthropic', $this->targetDirectory);
 
-        $manifest = file_get_contents($this->targetDirectory.'/composer.json');
-        self::assertNotFalse($manifest);
-        self::assertSame(['config' => ['platform' => ['php' => '8.3.99']]], json_decode($manifest, true, flags: \JSON_THROW_ON_ERROR));
+        self::assertStringEqualsFile($this->targetDirectory.'/composer.json', self::PINNED_MANIFEST);
     }
 
     /**
@@ -69,31 +97,110 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_refuses_to_write_through_a_dangling_symlinked_manifest_path(): void
+    public function test_it_refuses_to_write_through_a_symlinked_manifest_path(): void
     {
         $this->filesystem->mkdir($this->targetDirectory);
-        $outsideTarget = sys_get_temp_dir().'/ssa-bridge-symlink-target-'.bin2hex(random_bytes(6));
-        symlink($outsideTarget, $this->targetDirectory.'/composer.json');
+        $this->filesystem->dumpFile($this->outsideTarget, self::UNTOUCHED_SYMLINK_TARGET);
+        symlink($this->outsideTarget, $this->targetDirectory.'/composer.json');
 
         try {
             $this->expectException(BridgeInstallationFailedException::class);
 
             (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
         } finally {
-            self::assertFileDoesNotExist($outsideTarget);
+            self::assertStringEqualsFile($this->outsideTarget, self::UNTOUCHED_SYMLINK_TARGET);
         }
     }
 
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_preserves_an_existing_composer_manifest(): void
+    public function test_it_pins_the_bridge_tree_to_the_bundled_ai_platform_release(): void
+    {
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory) use (&$captured): Process {
+            $captured[] = [$package, $aiPlatformPin];
+
+            return new Process(['true']);
+        }, platformPhpVersion: '8.3.99', aiPlatformPin: 'v0.14.1');
+
+        $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
+
+        self::assertStringEqualsFile($this->targetDirectory.'/composer.json', self::PINNED_MANIFEST_WITH_PLATFORM_RELEASE);
+        self::assertSame([['symfony/ai-anthropic-platform', 'v0.14.1']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_keeps_the_other_keys_of_an_existing_manifest_while_refreshing_its_pins(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"name":"acme/app","config":{"platform":{"php":"8.1.0"},"sort-packages":true},"require":{"symfony/ai-platform":"v0.13.0","acme/extra":"^1.0"}}');
+
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess(), platformPhpVersion: '8.3.99', aiPlatformPin: 'v0.14.1'))->install('anthropic', $this->targetDirectory);
+
+        self::assertSame(
+            [
+                'name' => 'acme/app',
+                'config' => ['platform' => ['php' => '8.3.99'], 'sort-packages' => true],
+                'require' => ['symfony/ai-platform' => 'v0.14.1', 'acme/extra' => '^1.0'],
+            ],
+            json_decode((string) file_get_contents($this->targetDirectory.'/composer.json'), true),
+        );
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_adds_the_php_pin_to_a_manifest_written_before_it_existed(): void
     {
         $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"name":"acme/app"}');
 
-        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess(), platformPhpVersion: '8.3.99'))->install('anthropic', $this->targetDirectory);
 
-        self::assertSame('{"name":"acme/app"}', file_get_contents($this->targetDirectory.'/composer.json'));
+        self::assertSame(
+            ['name' => 'acme/app', 'config' => ['platform' => ['php' => '8.3.99']]],
+            json_decode((string) file_get_contents($this->targetDirectory.'/composer.json'), true),
+        );
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_refuses_a_manifest_it_cannot_read(): void
+    {
+        $this->filesystem->mkdir($this->targetDirectory.'/composer.json');
+
+        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessage('File is a directory');
+
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_refuses_a_manifest_it_cannot_parse(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{not json');
+
+        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessage('composer.json');
+
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_refuses_a_manifest_that_is_not_a_json_object(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '"just a string"');
+
+        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessage('not a JSON object');
+
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
     }
 
     /**
@@ -103,15 +210,102 @@ final class ComposerBridgeInstallerTest extends TestCase
     public function test_it_requires_the_provider_specific_bridge_package(string $provider, string $expectedPackage): void
     {
         $captured = [];
-        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, string $targetDirectory) use (&$captured): Process {
-            $captured[] = $package;
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory) use (&$captured): Process {
+            $captured[] = [$package, $aiPlatformPin];
 
             return new Process(['true']);
         });
 
         $composerBridgeInstaller->install($provider, $this->targetDirectory);
 
-        self::assertSame([$expectedPackage], $captured);
+        self::assertSame([[$expectedPackage, null]], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_requires_every_bridge_it_is_given_in_a_single_composer_run(): void
+    {
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use (&$captured): Process {
+            $captured[] = [[$package, ...$morePackages], $aiPlatformPin];
+
+            return new Process(['true']);
+        }, aiPlatformPin: 'v0.14.1');
+
+        $composerBridgeInstaller->install('bedrock.prod', $this->targetDirectory, 'generic');
+
+        self::assertSame([[['symfony/ai-bedrock-platform', 'symfony/ai-generic-platform'], 'v0.14.1']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_requires_every_bridge_the_manifest_already_holds_in_the_same_composer_run(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->targetDirectory.'/composer.json',
+            '{"require":{"symfony/ai-ollama-platform":"^0.12","symfony/ai-open-ai-platform":"^0.12","symfony/ai-platform":"v0.13.0","acme/extra":"^1.0"}}',
+        );
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use (&$captured): Process {
+            $captured[] = [$package, ...$morePackages];
+
+            return new Process(['true']);
+        }, aiPlatformPin: 'v0.14.1');
+
+        $composerBridgeInstaller->install('ollama', $this->targetDirectory);
+
+        self::assertSame([['symfony/ai-ollama-platform', 'symfony/ai-open-ai-platform']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_leaves_a_requirement_that_names_no_package_to_composer(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"require":{"0":"^1.0","symfony/ai-gemini-platform":"^0.13"}}');
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use (&$captured): Process {
+            $captured[] = [$package, ...$morePackages];
+
+            return new Process(['true']);
+        });
+
+        $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
+
+        self::assertSame([['symfony/ai-anthropic-platform', 'symfony/ai-gemini-platform']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_names_a_bridge_once_however_many_reasons_it_has_to_be_required(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"require":{"symfony/ai-generic-platform":"^0.13","symfony/ai-bedrock-platform":"^0.13"}}');
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use (&$captured): Process {
+            $captured[] = [$package, ...$morePackages];
+
+            return new Process(['true']);
+        });
+
+        $composerBridgeInstaller->install('bedrock.prod', $this->targetDirectory, 'generic');
+
+        self::assertSame([['symfony/ai-bedrock-platform', 'symfony/ai-generic-platform']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_a_failed_run_names_every_bridge_it_was_installing(): void
+    {
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process => new Process(['false']));
+
+        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessage('"symfony/ai-bedrock-platform", "symfony/ai-generic-platform"');
+
+        $composerBridgeInstaller->install('bedrock', $this->targetDirectory, 'generic');
     }
 
     /**
@@ -119,10 +313,47 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     public static function providerPackageCases(): iterable
     {
+        yield 'minimax hyphenates as mini-max' => ['minimax', 'symfony/ai-mini-max-platform'];
+        yield 'lmstudio hyphenates as lm-studio' => ['lmstudio', 'symfony/ai-lm-studio-platform'];
+        yield 'openrouter hyphenates as open-router' => ['openrouter', 'symfony/ai-open-router-platform'];
+        yield 'dockermodelrunner hyphenates as docker-model-runner' => ['dockermodelrunner', 'symfony/ai-docker-model-runner-platform'];
+        yield 'transformersphp hyphenates as transformers-php' => ['transformersphp', 'symfony/ai-transformers-php-platform'];
         yield 'verbatim slug' => ['gemini', 'symfony/ai-gemini-platform'];
         yield 'openai maps to the hyphenated open-ai package' => ['openai', 'symfony/ai-open-ai-platform'];
         yield 'deepseek maps to the hyphenated deep-seek package' => ['deepseek', 'symfony/ai-deep-seek-platform'];
         yield 'vertexai maps to the hyphenated vertex-ai package' => ['vertexai', 'symfony/ai-vertex-ai-platform'];
+        yield 'an instance-keyed provider installs the bridge of its platform' => ['generic.my_gateway', 'symfony/ai-generic-platform'];
+        yield 'an instance-keyed provider still honours the slug overrides' => ['openresponses.my_gateway', 'symfony/ai-open-responses-platform'];
+    }
+
+    public function test_every_platform_resolves_to_the_bridge_package_the_bundle_requires(): void
+    {
+        preg_match_all(
+            '/if \(\x27([a-z]+)\x27 === \$type\) \{\s+if \(!ContainerBuilder::willBeAvailable\(\x27(symfony\/ai-[a-z-]+-platform)\x27/',
+            (string) file_get_contents(self::AI_BUNDLE_CLASS),
+            $matches,
+            \PREG_SET_ORDER,
+        );
+
+        $required = [];
+        $resolved = [];
+        foreach ($matches as [, $platform, $package]) {
+            $required[$platform] = $package;
+            $resolved[$platform] = ComposerBridgeInstaller::packageFor($platform);
+        }
+
+        self::assertArrayHasKey('anthropic', $required);
+        self::assertSame($required, $resolved);
+    }
+
+    public function test_every_slug_override_is_its_config_key_with_hyphens_inserted(): void
+    {
+        $slugs = ComposerBridgeInstaller::PACKAGE_SLUG_OVERRIDES;
+
+        self::assertSame(
+            array_keys($slugs),
+            array_map(static fn (string $slug): string => str_replace('-', '', $slug), array_values($slugs)),
+        );
     }
 
     /**
@@ -130,7 +361,7 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     public function test_it_throws_when_the_install_process_fails(): void
     {
-        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, string $targetDirectory): Process => new Process(['false']));
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => new Process(['false']));
 
         $this->expectException(BridgeInstallationFailedException::class);
         $this->expectExceptionMessage('symfony/ai-anthropic-platform');
@@ -143,7 +374,7 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     public function test_the_failure_message_carries_the_composer_error_output(): void
     {
-        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, string $targetDirectory): Process => Process::fromShellCommandline('echo "network unreachable" 1>&2; exit 1'));
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => Process::fromShellCommandline('echo "network unreachable" 1>&2; exit 1'));
 
         $this->expectException(BridgeInstallationFailedException::class);
         $this->expectExceptionMessage('network unreachable');
@@ -157,7 +388,7 @@ final class ComposerBridgeInstallerTest extends TestCase
     public function test_it_throws_when_composer_cannot_be_started(): void
     {
         $unlaunchableWorkingDirectory = $this->targetDirectory.'/missing-'.bin2hex(random_bytes(4));
-        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, string $targetDirectory): Process => new Process(['true'], $unlaunchableWorkingDirectory));
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => new Process(['true'], $unlaunchableWorkingDirectory));
 
         $this->expectException(BridgeInstallationFailedException::class);
         $this->expectExceptionMessage('composer');
@@ -170,22 +401,65 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     public function test_default_process_builder_uses_composer_require_in_the_target_directory(): void
     {
-        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-anthropic-platform', '/data/bridges');
+        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-anthropic-platform', 'v0.14.1', '/data/bridges');
 
         $commandLine = $process->getCommandLine();
         self::assertStringContainsString("'composer'", $commandLine);
         self::assertStringContainsString("'require'", $commandLine);
-        self::assertStringContainsString("'symfony/ai-anthropic-platform'", $commandLine);
+        self::assertStringContainsString("'symfony/ai-anthropic-platform' 'symfony/ai-platform:v0.14.1'", $commandLine);
         self::assertStringContainsString("'--working-dir=/data/bridges'", $commandLine);
         self::assertStringContainsString("'--no-interaction'", $commandLine);
         self::assertNull($process->getTimeout());
     }
 
     /**
-     * @return Closure(string, string): Process
+     * @return Closure(string, ?string, string): Process
      */
     private function succeedingProcess(): Closure
     {
-        return static fn (string $package, string $targetDirectory): Process => new Process(['true']);
+        return static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => new Process(['true']);
+    }
+
+    public function test_default_process_builder_requires_every_package_before_the_platform_pin(): void
+    {
+        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-bedrock-platform', 'v0.14.1', '/data/bridges', 'symfony/ai-generic-platform');
+
+        self::assertStringContainsString("'require' 'symfony/ai-bedrock-platform' 'symfony/ai-generic-platform' 'symfony/ai-platform:v0.14.1'", $process->getCommandLine());
+    }
+
+    public function test_default_process_builder_lets_what_the_bridges_depend_on_move_with_them(): void
+    {
+        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-open-ai-platform', 'v0.14.1', '/data/bridges');
+
+        self::assertStringContainsString("'symfony/ai-platform:v0.14.1' '--with-dependencies' '--working-dir=/data/bridges'", $process->getCommandLine());
+    }
+
+    public function test_default_process_builder_names_no_platform_pin_when_there_is_none(): void
+    {
+        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-anthropic-platform', null, '/data/bridges');
+
+        self::assertStringContainsString("'require' 'symfony/ai-anthropic-platform' '--with-dependencies' '--working-dir=/data/bridges'", $process->getCommandLine());
+    }
+
+    #[DataProvider('providerPackageCases')]
+    public function test_platform_for_slug_reverses_package_for(string $provider, string $expectedPackage): void
+    {
+        $slug = substr($expectedPackage, \strlen('symfony/ai-'), -\strlen('-platform'));
+
+        self::assertSame(ProviderKey::of($provider)->platform, ComposerBridgeInstaller::platformForSlug($slug));
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_preserves_an_empty_json_object_in_an_existing_manifest(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"name":"acme/app","config":{"allow-plugins":{}}}');
+
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess(), platformPhpVersion: '8.3.99'))->install('anthropic', $this->targetDirectory);
+
+        $written = (string) file_get_contents($this->targetDirectory.'/composer.json');
+        self::assertStringContainsString('"allow-plugins": {}', $written);
+        self::assertStringNotContainsString('"allow-plugins": []', $written);
     }
 }

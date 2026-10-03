@@ -18,17 +18,32 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
+use WeakMap;
 
 /**
  * Derives the `ChunkContext` cache key everything that isn't the chunk's own
- * file content contributes to: the marker/rejected/previous preambles
- * {@see ChunkContextFactory} renders, plus a fingerprint of the mapping's
- * access-control data. Stateless — every input arrives as a parameter.
+ * file content contributes to: the marker/rejected/previous/candidate
+ * preambles {@see ChunkContextFactory} renders, plus a fingerprint of the
+ * mapping's access-control data. Every chunk of a request shares the
+ * request's mapping, so its fingerprint is computed once per mapping instance
+ * and remembered in a `WeakMap` that lets go of it with the mapping.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ChunkContextKeyDeriver
 {
+    /**
+     * The fingerprint of every mapping this deriver has seen, dropped with it.
+     *
+     * @var WeakMap<SymfonyMapping, string>
+     */
+    private WeakMap $weakMap;
+
+    public function __construct()
+    {
+        $this->weakMap = new WeakMap();
+    }
+
     /**
      * Hashing each input individually before joining fixes each to 64 hex
      * characters, which can never contain the raw-text join's own separator —
@@ -43,17 +58,22 @@ final readonly class ChunkContextKeyDeriver
      * `StaticPreScannerInterface` implementation (a documented extension
      * point) starts flagging a file differently on an unchanged content hash.
      * The mapping fingerprint serves the same purpose for the access-control
-     * data {@see self::mappingFingerprint()} folds in.
+     * data {@see self::mappingFingerprint()} folds in. The candidate preamble
+     * only exists in an escalation deep pass, so it joins the key only when it
+     * is there: every other chunk keeps the key earlier releases derived, and
+     * their cache entries still hit.
      */
-    public function derive(string $markerPreamble, string $rejectedPreamble, string $previousPreamble, SymfonyMapping $symfonyMapping): string
+    public function derive(string $markerPreamble, string $rejectedPreamble, string $previousPreamble, string $candidatePreamble, SymfonyMapping $symfonyMapping): string
     {
         $mappingFingerprint = $this->mappingFingerprint($symfonyMapping);
 
-        if ('' === $markerPreamble && '' === $rejectedPreamble && '' === $previousPreamble && '' === $mappingFingerprint) {
+        if ('' === $markerPreamble && '' === $rejectedPreamble && '' === $previousPreamble && '' === $candidatePreamble && '' === $mappingFingerprint) {
             return '';
         }
 
-        return hash('sha256', hash('sha256', $markerPreamble).hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble).hash('sha256', $mappingFingerprint));
+        $candidateHash = '' === $candidatePreamble ? '' : hash('sha256', $candidatePreamble);
+
+        return hash('sha256', hash('sha256', $markerPreamble).hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble).$candidateHash.hash('sha256', $mappingFingerprint));
     }
 
     /**
@@ -76,6 +96,15 @@ final readonly class ChunkContextKeyDeriver
      * genuinely different, shorter entries.
      */
     private function mappingFingerprint(SymfonyMapping $symfonyMapping): string
+    {
+        if (!$this->weakMap->offsetExists($symfonyMapping)) {
+            $this->weakMap[$symfonyMapping] = $this->computeMappingFingerprint($symfonyMapping);
+        }
+
+        return $this->weakMap[$symfonyMapping];
+    }
+
+    private function computeMappingFingerprint(SymfonyMapping $symfonyMapping): string
     {
         $applicationSecurityMap = $symfonyMapping->toApplicationSecurityMap();
 

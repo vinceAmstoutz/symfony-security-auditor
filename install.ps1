@@ -32,6 +32,8 @@ function Resolve-Asset {
 }
 
 function Get-Asset([string]$Url, [string]$OutFile) {
+    # Windows PowerShell 5.1 redraws the progress bar per received chunk, which slows Invoke-WebRequest downloads many times over.
+    $ProgressPreference = 'SilentlyContinue'
     Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
 }
 

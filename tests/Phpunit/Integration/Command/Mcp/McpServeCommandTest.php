@@ -20,14 +20,20 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\FailingMcpTransportFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\PreloadedStdioTransportFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\SingleFileAuditPipeline;
 
 final class McpServeCommandTest extends TestCase
 {
@@ -35,9 +41,13 @@ final class McpServeCommandTest extends TestCase
 
     private PreloadedStdioTransportFactory $preloadedStdioTransportFactory;
 
+    private string|false $displayErrors;
+
     #[Override]
     protected function setUp(): void
     {
+        $this->displayErrors = \ini_get('display_errors');
+        ini_set('display_errors', '1');
         $this->projectPath = sys_get_temp_dir().'/ssa-mcp-cmd-'.bin2hex(random_bytes(6));
         (new Filesystem())->mkdir($this->projectPath);
         $this->preloadedStdioTransportFactory = new PreloadedStdioTransportFactory([
@@ -50,6 +60,7 @@ final class McpServeCommandTest extends TestCase
     #[Override]
     protected function tearDown(): void
     {
+        ini_set('display_errors', $this->displayErrors);
         (new Filesystem())->remove($this->projectPath);
     }
 
@@ -67,13 +78,40 @@ final class McpServeCommandTest extends TestCase
         self::assertStringContainsString('AUDIT-', $output);
     }
 
-    private function command(): McpServeCommand
+    public function test_it_displays_php_errors_on_stderr_so_they_never_reach_the_protocol_stream(): void
+    {
+        (new CommandTester($this->command()))->execute([]);
+
+        self::assertSame('stderr', $this->preloadedStdioTransportFactory->displayErrorsWhileServing);
+    }
+
+    public function test_it_restores_the_error_display_once_the_server_stops(): void
+    {
+        (new CommandTester($this->command()))->execute([]);
+
+        self::assertSame('1', \ini_get('display_errors'));
+    }
+
+    public function test_it_restores_the_error_display_when_the_server_fails(): void
+    {
+        $commandTester = new CommandTester($this->command(new FailingMcpTransportFactory()));
+
+        try {
+            $this->expectExceptionMessage(FailingMcpTransportFactory::FAILURE);
+
+            $commandTester->execute([]);
+        } finally {
+            self::assertSame('1', \ini_get('display_errors'));
+        }
+    }
+
+    private function command(?McpTransportFactoryInterface $mcpTransportFactory = null): McpServeCommand
     {
         $mcpServerFactory = new McpServerFactory(
-            new AuditTool(new RunAuditUseCase(self::createStub(PipelineInterface::class), new NullLogger()), new JsonReportRenderer(), new AuditedProjectPathHolder('/default/project/dir')),
+            new AuditTool(new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()), new JsonReportRenderer(), new AuditedProjectPathHolder('/default/project/dir'), new BaselineProcessor(new Baseline()), new FindingTypeFilter(), new ReviewerFeedbackHolder()),
             new ReportPackage(),
         );
 
-        return new McpServeCommand($mcpServerFactory, $this->preloadedStdioTransportFactory);
+        return new McpServeCommand($mcpServerFactory, $mcpTransportFactory ?? $this->preloadedStdioTransportFactory);
     }
 }

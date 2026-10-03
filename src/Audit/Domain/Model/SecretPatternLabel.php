@@ -31,5 +31,17 @@ enum SecretPatternLabel: string
     case BasicAuthorization = 'basic_authorization';
     case OpenAiApiKey = 'openai_api_key';
     case SlackWebhookUrl = 'slack_webhook_url';
+    case GitlabToken = 'gitlab_token';
+    case HuggingFaceToken = 'huggingface_token';
+    case NpmToken = 'npm_token';
+    case SendgridApiKey = 'sendgrid_api_key';
+    case PypiToken = 'pypi_token';
+    case DiscordWebhookUrl = 'discord_webhook_url';
+    case XmlParameter = 'xml_parameter';
     case Unscannable = 'unscannable';
+
+    public function placeholder(): string
+    {
+        return \sprintf('***REDACTED:%s***', $this->value);
+    }
 }

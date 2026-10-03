@@ -63,6 +63,9 @@ final readonly class AuditReport
                 new DateTimeImmutable(),
                 \count($auditContext->projectFiles()),
                 \count($auditContext->mappingFiles()),
+                $auditContext->isCostEstimate(),
+                $auditContext->diffSinceRef(),
+                $auditContext->scanPaths(),
             ),
             $auditContext->coverage(),
             $auditCost,
@@ -129,6 +132,48 @@ final readonly class AuditReport
     public function coverage(): array
     {
         return $this->coverage;
+    }
+
+    /**
+     * Files some stage set out to analyze and never finished — see
+     * {@see UnanalyzedFiles}. A finding can hide in any of them, so a report
+     * listing one cannot vouch for the absence of vulnerabilities.
+     *
+     * @return list<string>
+     */
+    public function unanalyzedFiles(): array
+    {
+        return UnanalyzedFiles::in($this->coverage);
+    }
+
+    /**
+     * Whether every file in scope was analyzed: no stage left one unfinished —
+     * a run stopped before its first LLM call records its files as aborted —
+     * and the report is not a cost estimate of files it never analyzed. A
+     * `--since` run whose diff left no file to analyze has nothing left
+     * unfinished, and neither has a host pipeline that records no coverage.
+     */
+    public function isComplete(): bool
+    {
+        return [] === $this->unanalyzedFiles() && !$this->estimatesFilesItNeverAnalyzed();
+    }
+
+    /**
+     * Whether the run reached no verdict: it analyzed none of the files it had
+     * to — every attacker call failed or was cut short, or none was made — and
+     * holds no finding. A SAFE there would vouch for code nobody read. A run
+     * that holds a finding is a partial run even when it analyzed no file in
+     * full: a response cut short keeps the findings it recorded, while its
+     * chunk is recorded as errored.
+     */
+    public function hasNoVerdict(): bool
+    {
+        return !$this->isComplete() && [] === $this->vulnerabilities && [] === AnalyzedFiles::in($this->coverage);
+    }
+
+    private function estimatesFilesItNeverAnalyzed(): bool
+    {
+        return $this->reportIdentity->costEstimate && $this->reportIdentity->filesScanned > 0;
     }
 
     /** @return list<Vulnerability> */
@@ -299,6 +344,7 @@ final readonly class AuditReport
             'completed_at' => $this->reportIdentity->completedAt->format(DateTimeInterface::ATOM),
             'duration_seconds' => $this->durationSeconds(),
             'files_scanned' => $this->reportIdentity->filesScanned,
+            'complete' => $this->isComplete(),
             'risk_score' => $this->riskScore(),
             'risk_level' => $this->riskLevel(),
             'score' => $this->normalizedScore(),
@@ -310,6 +356,10 @@ final readonly class AuditReport
                 $this->vulnerabilities,
             ),
             'cost' => $this->auditCost->toArray(),
+            'scope' => [
+                'since' => $this->reportIdentity->diffSinceRef,
+                'paths' => $this->reportIdentity->scanPaths,
+            ],
             'coverage' => $this->coverage,
         ];
     }

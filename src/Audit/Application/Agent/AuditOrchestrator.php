@@ -86,7 +86,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             $previousFindings = array_values($auditContext->validatedVulnerabilities());
             $rejectedFindings = $this->rejectedFindings($auditContext);
-            $rawFindings = $this->analyzeWithRecovery($mapping, $files, $previousFindings, $rejectedFindings, $auditContext);
+            $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
+            $rawFindings = $this->analyzeWithRecovery($mapping, $files, $knownFindings, $rejectedFindings, $auditContext);
             $filtered = $this->filterByConfidence($rawFindings);
 
             if ([] === $filtered) {
@@ -123,9 +124,14 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 $reviewed,
                 static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(),
             ));
+            $rejectedCount = \count(array_filter(
+                $reviewed,
+                static fn (Vulnerability $vulnerability): bool => self::wasRejected($vulnerability, $auditContext),
+            ));
             $this->progressReporter->report(ProgressEvent::ReviewCompleted->value, [
                 'accepted' => $acceptedCount,
-                'rejected' => \count($reviewed) - $acceptedCount,
+                'rejected' => $rejectedCount,
+                'failed' => \count($reviewed) - $acceptedCount - $rejectedCount,
             ]);
 
             $this->logger->info('Iteration complete', [
@@ -214,8 +220,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     /**
      * Gives raw attacker candidates found before a mid-run abort a chance to
      * reach the report: filters and reviews them exactly like a completed
-     * iteration would. A further abort from this review attempt is swallowed
-     * after persisting whatever verdicts it managed to reach, so the
+     * iteration would. After a budget abort the reviewer refuses to call the
+     * provider, so only cached verdicts can still be served; a provider abort
+     * leaves it free to try. A further abort from this review attempt is
+     * swallowed after persisting whatever verdicts it managed to reach, so the
      * caller-visible exception is always the original attacker abort.
      *
      * @param list<Vulnerability> $rawFindings
@@ -250,6 +258,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * Findings the reviewer has already rejected in earlier iterations. Fed back
      * to the attacker so it stops re-reporting them — that would otherwise burn
      * tool-call and reviewer budget on findings the deduplication step discards.
+     * A finding whose review failed reached no verdict, so it is left out: the
+     * attacker may report it again and the reviewer get another chance at it.
      *
      * @return list<Vulnerability>
      */
@@ -257,8 +267,17 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     {
         return array_values(array_filter(
             $auditContext->vulnerabilities(),
-            static fn (Vulnerability $vulnerability): bool => !$vulnerability->isReviewerValidated(),
+            static fn (Vulnerability $vulnerability): bool => self::wasRejected($vulnerability, $auditContext),
         ));
+    }
+
+    /**
+     * A finding the reviewer rejected — a verdict it reached, unlike a review
+     * that failed and reached none.
+     */
+    private static function wasRejected(Vulnerability $vulnerability, AuditContext $auditContext): bool
+    {
+        return !$vulnerability->isReviewerValidated() && $auditContext->wasRejectedByReviewer($vulnerability);
     }
 
     /**
@@ -271,7 +290,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * `$auditContext` (via `consumeBaselineCredit()`) rather than being
      * recomputed here, so it is shared — and spent at most once — across
      * every iteration of this method's own attacker/reviewer loop, not just
-     * within a single call.
+     * within a single call. A finding the attacker re-reports after its
+     * credit was spent (the same fingerprint at overlapping lines) is the
+     * skipped finding itself, not a second occurrence, so it stays skipped
+     * without a credit rather than being reviewed and reported.
      *
      * @param list<Vulnerability> $findings
      *
@@ -281,7 +303,12 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     {
         $remaining = [];
         foreach ($findings as $finding) {
+            if ($this->isReReportedBaselineSkip($finding, $auditContext)) {
+                continue;
+            }
+
             if ($auditContext->consumeBaselineCredit($finding->fingerprint())) {
+                $auditContext->recordBaselineSkippedFinding($finding);
                 $this->recordBaselineSkip($finding, $auditContext);
 
                 continue;
@@ -291,6 +318,19 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         }
 
         return $remaining;
+    }
+
+    private function isReReportedBaselineSkip(Vulnerability $vulnerability, AuditContext $auditContext): bool
+    {
+        foreach ($auditContext->baselineSkippedFindings() as $skippedFinding) {
+            if ($skippedFinding->fingerprint() === $vulnerability->fingerprint()
+                && $this->linesOverlap($skippedFinding->lineStart(), $skippedFinding->lineEnd(), $vulnerability->lineStart(), $vulnerability->lineEnd())
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function recordBaselineSkip(Vulnerability $vulnerability, AuditContext $auditContext): void

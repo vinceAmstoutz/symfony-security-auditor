@@ -57,8 +57,12 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
 
     private function headline(AuditReport $auditReport): string
     {
+        if ($auditReport->hasNoVerdict()) {
+            return '## Security audit: incomplete (no file was analyzed)';
+        }
+
         return \sprintf(
-            '## Security audit: %s (%d/100)',
+            $auditReport->isComplete() ? '## Security audit: %s (%d/100)' : '## Security audit: incomplete (%s, %d/100 on the files analyzed)',
             $auditReport->grade()->value,
             $auditReport->normalizedScore(),
         );
@@ -68,7 +72,7 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
     {
         return \sprintf(
             '**Risk level:** %s · **Findings:** %d · **Files scanned:** %d · **Duration:** %ss',
-            $auditReport->riskLevel(),
+            RiskHeadline::riskLevel($auditReport),
             $auditReport->totalVulnerabilities(),
             $auditReport->filesScanned(),
             number_format($auditReport->durationSeconds(), 1, '.', ''),
@@ -80,14 +84,17 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
      */
     private function findings(AuditReport $auditReport): array
     {
+        $notice = IncompleteAuditNotice::for($auditReport);
+        $warning = null === $notice ? [] : [\sprintf('> ⚠️ **%s**', $notice)];
         $vulnerabilities = $auditReport->vulnerabilities();
         if ([] === $vulnerabilities) {
-            return ['✅ No validated vulnerabilities found.'];
+            return [] === $warning ? ['✅ No validated vulnerabilities found.'] : $warning;
         }
 
         $shown = \array_slice($vulnerabilities, 0, self::MAX_ROWS);
 
         return [
+            ...$warning,
             $this->table($shown),
             ...$this->truncationNote(\count($shown), \count($vulnerabilities)),
         ];

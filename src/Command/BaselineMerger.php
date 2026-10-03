@@ -21,7 +21,9 @@ use Symfony\Component\Clock\Clock;
  * Merges a JSON report's findings into a baseline file without re-running
  * the audit: existing entries are preserved verbatim — hand-written keys
  * such as `reason` survive — and only findings not yet covered by an entry
- * are appended.
+ * are appended. A prune drops only the entries whose finding the report
+ * shows gone: an entry whose file the report did not analyze is kept, the
+ * way `audit:diff` keeps such a finding apart as unverified.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -36,12 +38,12 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     #[Override]
     public function plan(string $reportPath, string $baselinePath, bool $prune): BaselineMergePlan
     {
-        $findings = $this->reportFindingsLoader->load($reportPath);
+        $loadedReport = $this->reportFindingsLoader->load($reportPath);
         $entries = $this->baseline->entries($baselinePath);
 
-        [$keptEntries, $prunedCount] = $prune ? $this->pruned($entries, $findings) : [$entries, 0];
+        [$keptEntries, $prunedCount] = $prune ? $this->pruned($entries, $loadedReport) : [$entries, 0];
 
-        return new BaselineMergePlan($keptEntries, $this->notCovered($findings, $keptEntries), $prunedCount);
+        return new BaselineMergePlan($keptEntries, $this->notCovered($loadedReport->findings, $keptEntries), $prunedCount);
     }
 
     #[Override]
@@ -61,29 +63,42 @@ final readonly class BaselineMerger implements BaselineMergerInterface
 
     /**
      * @param list<BaselineEntry> $entries
-     * @param list<DiffFinding>   $findings
      *
      * @return array{list<BaselineEntry>, int}
      */
-    private function pruned(array $entries, array $findings): array
+    private function pruned(array $entries, LoadedReport $loadedReport): array
     {
-        $remaining = $this->fingerprintCounts($findings);
+        $remaining = $this->fingerprintCounts($loadedReport->findings);
         $keptEntries = [];
         $prunedCount = 0;
 
         foreach ($entries as $entry) {
             $coveringFingerprint = $this->coveringFingerprint($remaining, $entry);
-            if (null === $coveringFingerprint) {
+            if (null !== $coveringFingerprint) {
+                --$remaining[$coveringFingerprint];
+            }
+
+            if (null === $coveringFingerprint && $this->reportVouchesForItsAbsence($entry, $loadedReport)) {
                 ++$prunedCount;
 
                 continue;
             }
 
-            --$remaining[$coveringFingerprint];
             $keptEntries[] = $entry;
         }
 
         return [$keptEntries, $prunedCount];
+    }
+
+    /**
+     * An entry that names no file cannot be placed, so the report is trusted
+     * as it always was.
+     */
+    private function reportVouchesForItsAbsence(BaselineEntry $baselineEntry, LoadedReport $loadedReport): bool
+    {
+        $file = $baselineEntry->file();
+
+        return null === $file || $loadedReport->vouchesForAbsenceIn($file);
     }
 
     /**

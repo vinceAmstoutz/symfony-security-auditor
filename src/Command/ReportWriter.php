@@ -19,6 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
@@ -35,6 +36,7 @@ final readonly class ReportWriter implements ReportWriterInterface
     public function __construct(
         iterable $renderers,
         private Filesystem $filesystem,
+        private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
     ) {
         $indexed = [];
         foreach ($renderers as $renderer) {
@@ -57,21 +59,64 @@ final readonly class ReportWriter implements ReportWriterInterface
         $content = $this->renderContent($outputFormat, $auditReport, $baselinedFingerprints);
 
         if (null === $outputFile) {
-            // OUTPUT_RAW: no renderer emits real Symfony tags, so a finding's own `<...>` text must never reach the console formatter.
-            $symfonyStyle->writeln($content, OutputInterface::OUTPUT_RAW);
+            $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
 
             return;
         }
 
-        $this->assertSafeToWrite($outputFile);
-
         try {
+            $this->assertSafeToWrite($outputFile, $auditReport->projectPath());
             $this->filesystem->dumpFile($outputFile, $content);
+        } catch (UnsafeReportWriteException $unsafeReportWriteException) {
+            $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
+
+            throw $unsafeReportWriteException;
         } catch (IOException $ioException) {
+            $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
+
             throw ReportWriteFailedException::fromIOException($outputFile, $ioException);
         }
 
         $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    #[Override]
+    public function assertWritable(?string $outputFile, string $projectPath): void
+    {
+        if (null === $outputFile) {
+            return;
+        }
+
+        $this->assertSafeToWrite($outputFile, $projectPath);
+
+        if (WritableFilePath::namesADirectory($outputFile)) {
+            throw ReportWriteFailedException::forDirectoryPath($outputFile);
+        }
+
+        try {
+            $this->filesystem->mkdir(\dirname($outputFile));
+        } catch (IOException $ioException) {
+            throw ReportWriteFailedException::forUncreatableDirectory($outputFile, $ioException);
+        }
+
+        if (!WritableFilePath::canBeWritten($outputFile)) {
+            throw ReportWriteFailedException::forUnwritablePath($outputFile);
+        }
+    }
+
+    /**
+     * A report reaches the console when no `--output` was given, and also
+     * when its file cannot be written: the audit already ran and paid for
+     * it, so it goes to the console instead of vanishing with the exception.
+     */
+    private function keepOnConsole(SymfonyStyle $symfonyStyle, OutputFormat $outputFormat, string $content): void
+    {
+        // OUTPUT_RAW: no renderer emits real Symfony tags, so a finding's own `<...>` text must never reach the console formatter.
+        $symfonyStyle->writeln($this->workflowCommandNeutralizer->report($outputFormat, $content), OutputInterface::OUTPUT_RAW);
     }
 
     /**
@@ -80,13 +125,14 @@ final readonly class ReportWriter implements ReportWriterInterface
      * (e.g. `report.sarif`, `gl-sast-report.sarif`) committed as a symlink by
      * a malicious PR would let the audit overwrite an arbitrary file the CI
      * runner can reach. Mirrors the guard already applied to the filesystem
-     * attacker/reviewer/advisory caches and the standalone config writer.
+     * attacker/reviewer/advisory caches and the standalone config writer, and
+     * walks the audited project below its root as well.
      *
      * @throws UnsafeReportWriteException
      */
-    private function assertSafeToWrite(string $path): void
+    private function assertSafeToWrite(string $path, string $projectPath): void
     {
-        if (is_link($path) || is_link(\dirname($path))) {
+        if (SymlinkGuard::isThroughSymlinkIntoProject($path, $projectPath)) {
             throw UnsafeReportWriteException::forSymlinkedPath($path);
         }
     }

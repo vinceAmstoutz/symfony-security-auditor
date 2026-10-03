@@ -39,7 +39,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
     public function render(AuditReport $auditReport): string
     {
         $cost = $auditReport->cost();
-        $riskLevel = $auditReport->riskLevel();
+        $riskLevel = RiskHeadline::riskLevel($auditReport);
 
         return strtr($this->templateLoader->load('report.html'), [
             '{{auditId}}' => $this->escape($auditReport->auditId()),
@@ -55,7 +55,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{costRateLabel}}' => $this->escape($cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model'),
             '{{riskLevel}}' => $this->escape($riskLevel),
             '{{riskLevelClass}}' => $this->escape(strtolower($riskLevel)),
-            '{{riskScore}}' => $auditReport->riskScore(),
+            '{{riskDetail}}' => $this->escape(RiskHeadline::scoreDetail($auditReport, 'score')),
             '{{summary}}' => $this->summary($auditReport),
             '{{charts}}' => $this->charts($auditReport),
             '{{body}}' => $this->body($auditReport),
@@ -106,6 +106,12 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
 
     private function summary(AuditReport $auditReport): string
     {
+        $notice = IncompleteAuditNotice::for($auditReport);
+
+        if (null !== $notice) {
+            return \sprintf('<p class="incomplete">⚠️ %s</p>', $this->escape($notice));
+        }
+
         return 0 === $auditReport->totalVulnerabilities()
             ? '<p class="safe">No validated vulnerabilities found.</p>'
             : '';

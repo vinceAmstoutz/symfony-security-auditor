@@ -18,18 +18,43 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\Console\Input\StringInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ConnectionCutAfterToolAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAuditPlatform;
 
 /**
  * Boots the real bundle through a Symfony kernel and drives `audit:run` from
@@ -58,6 +83,55 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
             $this->snapshot('default-audit.json'),
             $this->normalizeJsonReport($report),
         );
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_json_report_printed_on_a_github_actions_runner_stays_the_same_document(): void
+    {
+        putenv('GITHUB_ACTIONS=true');
+
+        $report = $this->runAudit(['model' => 'gpt-4o'], 'json');
+
+        self::assertSame($this->snapshot('default-audit.json'), $this->normalizeJsonReport($report));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsupportedOutputFormatException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_the_wired_report_writer_and_presenter_defuse_workflow_commands_on_a_github_actions_runner(): void
+    {
+        putenv('GITHUB_ACTIONS=true');
+        $testContainer = $this->boot(['model' => 'gpt-4o'])->getContainer()->get('test.service_container');
+        self::assertInstanceOf(TestContainer::class, $testContainer);
+        $reportWriter = $testContainer->get(ReportWriterInterface::class);
+        self::assertInstanceOf(ReportWriterInterface::class, $reportWriter);
+        $auditPresenter = $testContainer->get(AuditPresenterInterface::class);
+        self::assertInstanceOf(AuditPresenterInterface::class, $auditPresenter);
+        $auditContext = AuditContext::forProject($this->fixtureDir);
+        $auditContext->addVulnerability(Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Finding', 0.9),
+            new CodeLocation('src/A.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', "echo ok\n::stop-commands::pwned", 'fix'),
+            'code',
+        )->withReviewerValidation(true));
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $reportWriter->write(AuditReport::fromContext($auditContext), OutputFormat::Console, null, $symfonyStyle);
+        $auditPresenter->error($symfonyStyle, new RuntimeException('src/a ::error::x.php'));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString(':\\:stop-commands::pwned', $display);
+        self::assertStringContainsString('src/a :\\:error:\\:x.php', $display);
     }
 
     #[RunInSeparateProcess]
@@ -168,6 +242,27 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $report = $this->decode($this->runAudit(['model' => 'gpt-4o', ...$config], 'json', MalformedResponseAuditPlatform::class));
 
         self::assertSame(0, $report['total_vulnerabilities']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_report_written_after_the_provider_rejected_the_run_declares_itself_incomplete(): void
+    {
+        $report = $this->decode($this->runAudit(['model' => 'gpt-4o'], 'json', UnauthorizedAuditPlatform::class));
+
+        self::assertFalse($report['complete']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_concurrent_attacker_whose_retries_ran_out_after_a_tool_ran_aborts_the_run_like_the_sequential_one(): void
+    {
+        $commandTester = new CommandTester($this->auditCommand($this->boot(
+            ['model' => 'gpt-4o', 'profile' => 'fast', 'audit' => ['retry' => ['max_attempts' => 2, 'initial_delay_ms' => 1, 'jitter_ratio' => 0.0]]],
+            ConnectionCutAfterToolAuditPlatform::class,
+        )));
+
+        self::assertSame(ExitCode::Failure->value, $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => 'json']));
     }
 
     /** @return iterable<string, array{array<string, mixed>}> */

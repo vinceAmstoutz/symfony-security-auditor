@@ -17,8 +17,9 @@ use DateTimeImmutable;
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRecorderInterface;
 
-final class AuditContext implements CoverageRecorderInterface
+final class AuditContext implements CoverageRecorderInterface, RejectedFindingRecorderInterface
 {
     /** @var list<ProjectFile> */
     private array $projectFiles = [];
@@ -43,11 +44,19 @@ final class AuditContext implements CoverageRecorderInterface
     /** @var list<Vulnerability> */
     private array $pendingFoundVulnerabilities = [];
 
+    /** @var array<string, true> keyed by vulnerability id */
+    private array $rejectedFindingIds = [];
+
     /** @var ?array<string, int> */
     private ?array $remainingBaselineBudget = null;
 
     /** @var list<string> */
     private array $consumedBaselineFingerprints = [];
+
+    /** @var list<Vulnerability> */
+    private array $baselineSkippedFindings = [];
+
+    private bool $costEstimate = false;
 
     private DateTimeImmutable $startedAt;
 
@@ -136,6 +145,22 @@ final class AuditContext implements CoverageRecorderInterface
         return $this->consumedBaselineFingerprints;
     }
 
+    /**
+     * Remembers a finding whose baseline credit was spent before review, so
+     * a later iteration that re-reports it is skipped again instead of being
+     * reviewed against an already-exhausted budget.
+     */
+    public function recordBaselineSkippedFinding(Vulnerability $vulnerability): void
+    {
+        $this->baselineSkippedFindings[] = $vulnerability;
+    }
+
+    /** @return list<Vulnerability> */
+    public function baselineSkippedFindings(): array
+    {
+        return $this->baselineSkippedFindings;
+    }
+
     public function diffSinceRef(): ?string
     {
         return $this->diffSinceRef;
@@ -160,6 +185,21 @@ final class AuditContext implements CoverageRecorderInterface
     public function scanPaths(): array
     {
         return $this->scanPaths;
+    }
+
+    /**
+     * Marks the run as a cost estimate: a `--dry-run` reads the files in scope
+     * to price the audit and analyzes none of them, so its report can never
+     * read as complete.
+     */
+    public function markAsCostEstimate(): void
+    {
+        $this->costEstimate = true;
+    }
+
+    public function isCostEstimate(): bool
+    {
+        return $this->costEstimate;
     }
 
     public function isCacheBypassed(): bool
@@ -292,6 +332,21 @@ final class AuditContext implements CoverageRecorderInterface
     public function recordReviewedFinding(Vulnerability $vulnerability): void
     {
         $this->pendingReviewedFindings[] = $vulnerability;
+    }
+
+    #[Override]
+    public function recordRejectedFinding(Vulnerability $vulnerability): void
+    {
+        $this->rejectedFindingIds[$vulnerability->id()] = true;
+    }
+
+    /**
+     * Whether the reviewer rejected this finding — reached that verdict, as
+     * opposed to a review that failed and reached none.
+     */
+    public function wasRejectedByReviewer(Vulnerability $vulnerability): bool
+    {
+        return \array_key_exists($vulnerability->id(), $this->rejectedFindingIds);
     }
 
     #[Override]

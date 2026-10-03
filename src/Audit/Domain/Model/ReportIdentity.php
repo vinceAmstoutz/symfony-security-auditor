@@ -22,12 +22,16 @@ use DateTimeImmutable;
  * audited. They differ only for a `--since` run, where the diff narrows the
  * second — so `filesDiscovered === 0` means the scan itself came up empty and
  * no verdict was reached, which is not the same as a diff run finding nothing
- * changed.
+ * changed. `costEstimate` marks a `--dry-run`, which analyzes no file.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ReportIdentity
 {
+    /**
+     * @param ?string      $diffSinceRef the git ref a `--since` run diffed against; null for a run over the whole history
+     * @param list<string> $scanPaths    the `--path` scopes the scan was restricted to; empty for the whole project
+     */
     public function __construct(
         public string $auditId,
         public string $projectPath,
@@ -35,6 +39,9 @@ final readonly class ReportIdentity
         public DateTimeImmutable $completedAt,
         public int $filesScanned,
         public int $filesDiscovered,
+        public bool $costEstimate = false,
+        public ?string $diffSinceRef = null,
+        public array $scanPaths = [],
     ) {}
 
     public function durationSeconds(): float

@@ -28,8 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCost
 final readonly class AuditCost
 {
     /**
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>                                                       $byRole
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float}> $byModel
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>                                                                                     $byRole
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float, billed_models?: list<string>}> $byModel
      */
     private function __construct(
         private int $inputTokens,
@@ -155,11 +155,13 @@ final readonly class AuditCost
 
     /**
      * A real run records the model of every call but not the agent that made
-     * it, so per-model is the finest attribution it can offer. Applied
+     * it, so per-model is the finest attribution it can offer; `billed_models`
+     * names the models a configured model's calls were billed as, which a
+     * gateway or an alias can make differ from it. Applied
      * copy-on-write rather than through `of()`, which is already at the
      * project's five-parameter ceiling.
      *
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float}> $byModel keyed by model name
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float, billed_models?: list<string>}> $byModel keyed by model name
      */
     public function withUsageByModel(array $byModel): self
     {
@@ -191,6 +193,7 @@ final readonly class AuditCost
                     'cache_read_tokens' => $usage['cache_read_tokens'] ?? 0,
                     'cache_creation_tokens' => $usage['cache_creation_tokens'] ?? 0,
                     'estimated_cost_usd' => round($usage['estimated_cost_usd'], 6),
+                    'billed_models' => $usage['billed_models'] ?? [],
                 ],
                 $this->byModel,
             ),

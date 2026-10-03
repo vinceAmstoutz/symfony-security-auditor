@@ -17,6 +17,7 @@ use Override;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
@@ -54,14 +55,19 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
     /** @var list<int> */
     public array $rejectedFindingsCountPerCall = [];
 
+    /** @var list<Vulnerability> */
+    public array $lastCandidateFindings = [];
+
     /**
      * @param list<Vulnerability> $returnFindings         findings returned on every call
      * @param list<Vulnerability> $hiddenRecordedFindings findings recorded via the coverage recorder but omitted from the returned list
+     * @param ?string             $coverageStatus         when set, the attacker status recorded for every file it is given
      */
     public function __construct(
         private readonly array $returnFindings = [],
         private readonly ?Throwable $throwable = null,
         private readonly array $hiddenRecordedFindings = [],
+        private readonly ?string $coverageStatus = null,
     ) {}
 
     #[Override]
@@ -73,6 +79,13 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
         $this->previousFindingsCountPerCall[] = \count($attackerAnalysisRequest->previousFindings);
         $this->lastRejectedFindings = $attackerAnalysisRequest->rejectedFindings;
         $this->rejectedFindingsCountPerCall[] = \count($attackerAnalysisRequest->rejectedFindings);
+        $this->lastCandidateFindings = $attackerAnalysisRequest->candidateFindings;
+
+        foreach ($attackerAnalysisRequest->files as $projectFile) {
+            if (null !== $this->coverageStatus) {
+                $coverageRecorder->recordCoverage(AgentRole::Attacker->value, $projectFile->relativePath(), $this->coverageStatus);
+            }
+        }
 
         foreach ([...$this->returnFindings, ...$this->hiddenRecordedFindings] as $returnFinding) {
             $coverageRecorder->recordFoundVulnerability($returnFinding);

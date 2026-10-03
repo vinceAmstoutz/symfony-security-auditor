@@ -17,7 +17,9 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -54,16 +56,26 @@ final class EnvironmentDoctorTest extends TestCase
 
     public function test_it_reports_every_check_green_when_the_environment_is_ready(): void
     {
-        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\nmodel: 'gpt-4'\n");
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test-0123456789abcdefghij'\nmodel: 'gpt-4'\n");
         $this->installBridge();
 
         $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
 
         self::assertEquals([
-            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.'),
+            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a).'),
             new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
         ], \array_slice($results, 0, 3));
+    }
+
+    public function test_it_reports_a_platform_that_needs_no_api_key(): void
+    {
+        $this->writeConfig("platform:\n    ollama:\n        host_url: 'http://localhost:11434'\nmodel: 'llama3'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
+
+        self::assertSame('Config resolves; the configured platform needs no API key.', $results[0]->detail);
     }
 
     public function test_it_reports_the_bundled_pricing_catalog_version(): void
@@ -211,6 +223,54 @@ final class EnvironmentDoctorTest extends TestCase
         );
     }
 
+    public function test_it_requires_no_key_of_a_platform_the_provider_does_not_select(): void
+    {
+        $this->writeConfig("provider: generic.my_gateway\nplatform:\n    generic:\n        my_gateway:\n            base_url: 'https://gw.example'\n            api_key: '%env(GW_TOKEN)%'\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        $results = $this->doctorWith($this->resolver(), ['GW_TOKEN' => 'gw-0123456789abcdefghijklmn'], true)->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: gw-012…klmn (SHA256:28c119d571da66f6).'),
+            $results[0],
+        );
+    }
+
+    public function test_it_reports_an_unset_variable_behind_a_plain_setting_under_configuration_not_api_key(): void
+    {
+        $this->writeConfig("provider: generic.my_gateway\nplatform:\n    generic:\n        my_gateway:\n            base_url: '%env(GATEWAY_URL)%'\n            api_key: '%env(GW_TOKEN)%'\n");
+
+        $results = $this->doctorWith($this->resolver(), ['GW_TOKEN' => 'gw-token'], true)->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, MissingEnvironmentVariableException::forSetting('GATEWAY_URL')->getMessage()),
+            $results[0],
+        );
+    }
+
+    public function test_it_fails_the_api_key_check_when_the_referenced_credential_file_cannot_be_read(): void
+    {
+        $missingCredentialFile = \sprintf('%s/absent-api-key', $this->configHome);
+        $this->writeConfig("platform:\n    openai:\n        api_key: '%env(file:OPENAI_API_KEY_FILE)%'\n");
+
+        $results = $this->doctorWith($this->resolver(), ['OPENAI_API_KEY_FILE' => $missingCredentialFile], true)->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('API key', DoctorCheckStatus::Failure, UnreadableCredentialFileException::forVariable('OPENAI_API_KEY_FILE', $missingCredentialFile)->getMessage()),
+            $results[0],
+        );
+    }
+
+    public function test_it_fails_the_configuration_check_when_a_placeholder_applies_an_env_processor(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: '%env(trim:OPENAI_API_KEY)%'\n");
+
+        $results = $this->doctorWith($this->resolver(), ['OPENAI_API_KEY' => 'sk-test'], true)->diagnose();
+
+        self::assertSame('Configuration', $results[0]->label);
+        self::assertSame(DoctorCheckStatus::Failure, $results[0]->status);
+        self::assertStringContainsString('The placeholder "%env(trim:OPENAI_API_KEY)%" applies an env processor', $results[0]->detail);
+    }
+
     public function test_it_fails_the_configuration_check_when_the_config_file_is_malformed(): void
     {
         $this->writeConfig("platform: [a, b\n");
@@ -248,6 +308,20 @@ final class EnvironmentDoctorTest extends TestCase
         self::assertStringContainsString('must not be able to point the scanner at paths of its choosing', $results[0]->detail);
     }
 
+    public function test_it_fails_the_configuration_check_when_the_audited_project_declares_a_user_only_key(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        (new Filesystem())->dumpFile($projectConfigFile, "privacy:\n    allow_external_llm: true\n");
+
+        $results = $this->doctorWith($this->resolver(), [], true, projectConfigFile: $projectConfigFile)->diagnose();
+
+        self::assertSame('Configuration', $results[0]->label);
+        self::assertSame(DoctorCheckStatus::Failure, $results[0]->status);
+        self::assertStringContainsString('privacy', $results[0]->detail);
+        self::assertStringContainsString($projectConfigFile, $results[0]->detail);
+    }
+
     public function test_it_fails_the_configuration_and_bridge_checks_when_the_home_directory_is_unresolvable(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, null);
@@ -266,9 +340,49 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
 
         self::assertEquals(
-            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init" to download it.'),
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init --provider=<platform>" to download it.'),
             $results[1],
         );
+    }
+
+    public function test_it_fails_the_bridge_check_when_the_bridge_tree_holds_another_ai_platform_release(): void
+    {
+        $this->writeConfig("provider: ollama\nplatform:\n    ollama:\n        endpoint: 'http://localhost:11434'\n");
+        $this->installBridge('v0.12.0');
+
+        $results = $this->doctorBundling('v0.14.1')->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult(
+                'Provider bridge',
+                DoctorCheckStatus::Failure,
+                \sprintf('Installed, but the audit cannot start with it: %s', StaleBridgeTreeException::forTree($this->dataHome.'/symfony-security-auditor', 'v0.12.0', 'v0.14.1', 'ollama')->getMessage()),
+            ),
+            $results[1],
+        );
+    }
+
+    public function test_it_fails_the_bridge_check_on_a_bridge_tree_holding_another_release_even_while_the_configuration_does_not_resolve(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+        $this->installBridge('v0.13.0');
+
+        $results = $this->doctorBundling('v0.14.1')->diagnose();
+
+        self::assertSame(
+            [DoctorCheckStatus::Failure, DoctorCheckStatus::Failure, true],
+            [$results[0]->status, $results[1]->status, str_contains($results[1]->detail, 'init --provider=openai --force')],
+        );
+    }
+
+    public function test_it_boots_the_audit_with_a_bridge_tree_holding_the_bundled_release(): void
+    {
+        $this->writeConfig("provider: ollama\nplatform:\n    ollama:\n        endpoint: 'http://localhost:11434'\n");
+        $this->installBridge('v0.14.1');
+
+        $results = $this->doctorBundling('v0.14.1')->diagnose();
+
+        self::assertEquals(new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'), $results[1]);
     }
 
     public function test_it_warns_when_composer_is_not_available(): void
@@ -314,8 +428,31 @@ final class EnvironmentDoctorTest extends TestCase
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $yaml);
     }
 
-    private function installBridge(): void
+    private function installBridge(?string $aiPlatformRelease = null): void
     {
         (new Filesystem())->dumpFile($this->dataHome.'/symfony-security-auditor/vendor/autoload.php', "<?php\n");
+
+        if (null !== $aiPlatformRelease) {
+            (new Filesystem())->dumpFile(
+                $this->dataHome.'/symfony-security-auditor/vendor/composer/installed.php',
+                \sprintf("<?php return %s;\n", var_export(['versions' => ['symfony/ai-platform' => ['pretty_version' => $aiPlatformRelease]]], true)),
+            );
+        }
+    }
+
+    private function doctorBundling(string $bundledAiPlatformVersion): EnvironmentDoctor
+    {
+        $xdgConfigPathResolver = $this->resolver();
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+
+        return new EnvironmentDoctor(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            $composerAvailabilityChecker,
+            self::createStub(AuditPreflightInterface::class),
+            new ModelsDevPricingProvider(new NullLogger()),
+            bundledAiPlatformVersion: $bundledAiPlatformVersion,
+        );
     }
 }

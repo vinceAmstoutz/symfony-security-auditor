@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ServingPlatformPricingProviderInterface;
 
 use function Symfony\Component\String\u;
 
@@ -58,6 +59,25 @@ final readonly class CostCalculator
         $cacheCreationCost = ($cacheCreationTokens / self::TOKENS_PER_MILLION) * $this->cacheCreationPrice($model);
 
         return $inputCost + $outputCost + $cacheReadCost + $cacheCreationCost;
+    }
+
+    /**
+     * The model a call is billed as: the one the provider reports serving it
+     * when the pricing source prices it at the serving platform's own rate,
+     * the configured one otherwise, so a gateway answering under an id no
+     * catalog lists still prices the call and another provider's listing of
+     * the reported id never sets its price.
+     */
+    public function billedModel(string $configuredModel, ?string $reportedModel): string
+    {
+        return null !== $reportedModel && $this->pricesReportedModel($reportedModel) ? $reportedModel : $configuredModel;
+    }
+
+    private function pricesReportedModel(string $reportedModel): bool
+    {
+        return $this->pricingProvider instanceof ServingPlatformPricingProviderInterface
+            ? $this->pricingProvider->hasServingPlatformPrice($reportedModel)
+            : $this->pricingProvider->hasModel($reportedModel);
     }
 
     private function cacheReadPrice(string $model): float

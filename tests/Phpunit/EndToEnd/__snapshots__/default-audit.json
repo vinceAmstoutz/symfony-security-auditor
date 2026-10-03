@@ -5,6 +5,7 @@
     "completed_at": "TIMESTAMP",
     "duration_seconds": "DURATION",
     "files_scanned": 3,
+    "complete": true,
     "risk_score": 10,
     "risk_level": "LOW",
     "score": 90,
@@ -62,9 +63,16 @@
                 "output_tokens": 0,
                 "cache_read_tokens": 0,
                 "cache_creation_tokens": 0,
-                "estimated_cost_usd": 0.0
+                "estimated_cost_usd": 0.0,
+                "billed_models": [
+                    "gpt-4o"
+                ]
             }
         }
+    },
+    "scope": {
+        "since": null,
+        "paths": []
     },
     "coverage": [
         {

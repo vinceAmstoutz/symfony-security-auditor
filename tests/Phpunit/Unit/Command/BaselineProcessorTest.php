@@ -31,8 +31,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassif
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 final class BaselineProcessorTest extends TestCase
 {
@@ -49,6 +52,46 @@ final class BaselineProcessorTest extends TestCase
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_walks_the_audited_project_for_a_symlinked_directory(): void
+    {
+        $filesystem = new Filesystem();
+        $outsideDir = sys_get_temp_dir().'/baseline_processor_preflight_symlink_'.uniqid('', true);
+        $filesystem->mkdir($outsideDir);
+        symlink($outsideDir, $this->tmpDir.'/security');
+
+        try {
+            $this->expectException(UnsafeBaselineWriteException::class);
+
+            (new BaselineProcessor(new Baseline($filesystem)))->assertWritable($this->tmpDir.'/security/baselines/baseline.json', $this->tmpDir);
+        } finally {
+            self::assertDirectoryDoesNotExist($outsideDir.'/baselines');
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_path_the_baseline_could_never_be_saved_to(): void
+    {
+        $tmpDir = sys_get_temp_dir().'/baseline_processor_writable_'.uniqid('', true);
+        mkdir($tmpDir);
+        symlink($tmpDir.'/elsewhere.json', $tmpDir.'/baseline.json');
+
+        try {
+            $this->expectException(UnsafeBaselineWriteException::class);
+
+            (new BaselineProcessor(new Baseline()))->assertWritable($tmpDir.'/baseline.json', $tmpDir);
+        } finally {
+            (new Filesystem())->remove($tmpDir);
+        }
     }
 
     /**
@@ -81,6 +124,29 @@ final class BaselineProcessorTest extends TestCase
         $count = $baselineProcessor->generate($auditReport, '/out/baseline.json');
 
         self::assertSame(2, $count);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_generate_refuses_a_baseline_path_into_the_audited_project_through_a_symlinked_directory(): void
+    {
+        $filesystem = new Filesystem();
+        $outsideDir = sys_get_temp_dir().'/baseline_processor_symlink_'.uniqid('', true);
+        $filesystem->mkdir($outsideDir.'/baselines');
+        symlink($outsideDir, $this->tmpDir.'/security');
+
+        try {
+            $this->expectException(UnsafeBaselineWriteException::class);
+
+            (new BaselineProcessor(new Baseline($filesystem)))->generate($this->makeReport($this->makeVuln('src/A.php')), $this->tmpDir.'/security/baselines/baseline.json');
+        } finally {
+            self::assertSame([], glob($outsideDir.'/baselines/*'));
+            $filesystem->remove($outsideDir);
+        }
     }
 
     /**

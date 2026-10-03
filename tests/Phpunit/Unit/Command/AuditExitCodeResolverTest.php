@@ -156,6 +156,61 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
+    #[DataProvider('failOnIncompleteSettings')]
+    public function test_it_fails_a_run_that_analyzed_none_of_its_files(bool $failOnIncomplete): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/Failed.php', $this->tmpDir.'/src/Failed.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/Failed.php', 'errored');
+
+        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve(AuditReport::fromContext($auditContext), RiskLevel::Critical, null, $failOnIncomplete));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('partialRunExitCodes')]
+    public function test_a_run_that_analyzed_no_file_yet_holds_a_finding_keeps_the_exit_code_of_a_partial_run(bool $failOnIncomplete, int $expectedExitCode): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/Failed.php', $this->tmpDir.'/src/Failed.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/Failed.php', 'errored');
+        $auditContext->addVulnerability(Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW, 'Kept from a response cut short', 0.9),
+            new CodeLocation('src/Failed.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+            '$q',
+        )->withReviewerValidation(true));
+
+        self::assertSame($expectedExitCode, $this->auditExitCodeResolver->resolve(AuditReport::fromContext($auditContext), RiskLevel::Critical, null, $failOnIncomplete));
+    }
+
+    /**
+     * @return iterable<string, array{bool, int}>
+     */
+    public static function partialRunExitCodes(): iterable
+    {
+        yield 'by default' => [false, Command::SUCCESS];
+        yield 'under --fail-on-incomplete' => [true, 3];
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function failOnIncompleteSettings(): iterable
+    {
+        yield 'by default' => [false];
+        yield 'under --fail-on-incomplete' => [true];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_passes_a_diff_run_whose_reference_left_no_changed_file_to_audit(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -174,10 +229,63 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function reportWith(int $criticalFindings): AuditReport
+    public function test_an_incomplete_report_fails_with_its_own_code_when_asked_to(): void
+    {
+        self::assertSame(3, $this->auditExitCodeResolver->resolve($this->reportWith(0, incomplete: true), RiskLevel::Critical, null, true));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_incomplete_report_passes_when_not_asked_to_fail(): void
+    {
+        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve($this->reportWith(0, incomplete: true), RiskLevel::Critical));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_complete_report_passes_when_asked_to_fail_on_an_incomplete_one(): void
+    {
+        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve($this->reportWith(0), RiskLevel::Critical, null, true));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_tripped_gate_keeps_its_code_on_an_incomplete_report(): void
+    {
+        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve($this->reportWith(5, incomplete: true), RiskLevel::Critical, null, true));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function reportWith(int $criticalFindings, bool $incomplete = false): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setProjectFiles([ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php'),
+            ProjectFile::create('src/Failed.php', $this->tmpDir.'/src/Failed.php', '<?php'),
+        ]);
+        $auditContext->recordCoverage('attacker', 'src/Audited.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/Failed.php', $incomplete ? 'errored' : 'analyzed');
         for ($i = 1; $i <= $criticalFindings; ++$i) {
             $auditContext->addVulnerability(
                 Vulnerability::of(

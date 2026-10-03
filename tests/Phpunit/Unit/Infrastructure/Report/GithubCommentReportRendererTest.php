@@ -80,6 +80,70 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_grades_the_finding_kept_from_an_audit_that_analyzed_no_file_as_partial(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile($this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL)));
+
+        self::assertStringContainsString('## Security audit: incomplete (B, 90/100 on the files analyzed)', $output);
+        self::assertStringNotContainsString('UNKNOWN', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_gives_no_grade_to_an_audit_that_analyzed_no_file(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile());
+
+        self::assertStringContainsString("## Security audit: incomplete (no file was analyzed)\n\n**Risk level:** UNKNOWN · ", $output);
+        self::assertStringNotContainsString('SAFE', $output);
+        self::assertStringNotContainsString('100/100', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_never_calls_an_incomplete_audit_clean(): void
+    {
+        self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_headlines_an_incomplete_audit_as_such_rather_than_by_its_grade(): void
+    {
+        self::assertStringContainsString("## Security audit: incomplete (A, 100/100 on the files analyzed)\n\n", $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_says_an_audit_without_findings_did_not_finish(): void
+    {
+        self::assertStringContainsString('> ⚠️ **Audit incomplete: 2 file(s)', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_warns_above_the_findings_of_an_audit_that_did_not_finish(): void
+    {
+        self::assertStringContainsString(
+            "free of vulnerabilities.**\n\n| Severity | Finding |",
+            $this->renderer->render($this->makeIncompleteReport($this->makeValidatedVuln())),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      */
     public function test_render_reports_a_clean_project_instead_of_an_empty_table(): void
     {

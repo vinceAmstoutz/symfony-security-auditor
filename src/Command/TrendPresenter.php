@@ -57,15 +57,7 @@ final readonly class TrendPresenter implements TrendPresenterInterface
             $symfonyStyle->writeln($this->pointLine($index + 1, $trendPoint), OutputInterface::OUTPUT_RAW);
         }
 
-        $first = $points[0];
-        $last = $points[\count($points) - 1];
-        $symfonyStyle->writeln(\sprintf(
-            'Summary: %d → %d findings (%+d) across %d reports.',
-            $first->totalCount,
-            $last->totalCount,
-            $last->totalCount - $first->totalCount,
-            \count($points),
-        ));
+        $symfonyStyle->writeln(\sprintf('Summary: %s', $reportTrend->summary()));
     }
 
     private function pointLine(int $position, TrendPoint $trendPoint): string
@@ -76,7 +68,11 @@ final readonly class TrendPresenter implements TrendPresenterInterface
             return $line;
         }
 
-        return \sprintf('%s (%d new, %d fixed)', $line, $trendPoint->newCount, $trendPoint->fixedCount);
+        $unverified = null !== $trendPoint->unverifiedCount && 0 !== $trendPoint->unverifiedCount
+            ? \sprintf(', %d unverified', $trendPoint->unverifiedCount)
+            : '';
+
+        return \sprintf('%s (%d new, %d fixed%s)', $line, $trendPoint->newCount, $trendPoint->fixedCount, $unverified);
     }
 
     /**

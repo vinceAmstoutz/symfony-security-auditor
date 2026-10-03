@@ -25,14 +25,25 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\NullCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
@@ -52,15 +63,21 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Running
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ThrottledUpdateAvailabilityNotifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthRemoveCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -73,6 +90,9 @@ final readonly class StandaloneApplicationFactory
 
     private const string UPDATE_CHECK_OPT_OUT_VARIABLE = 'SSA_NO_UPDATE_CHECK';
 
+    /**
+     * @param array<string, string> $environment
+     */
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -83,6 +103,9 @@ final readonly class StandaloneApplicationFactory
         private string $pathEnvironment = '',
         private ?UpdateAvailabilityConsoleListener $updateAvailabilityConsoleListener = null,
         private PendingBinarySwap $pendingBinarySwap = new PendingBinarySwap(),
+        private CredentialStoreInterface $credentialStore = new NullCredentialStore(),
+        private array $environment = [],
+        private ?string $bundledAiPlatformVersion = null,
     ) {}
 
     /**
@@ -103,15 +126,17 @@ final readonly class StandaloneApplicationFactory
         $resolvedBinaryPath = $runningBinaryPath ?? '';
         $pathEnvironment = $environment['PATH'] ?? '';
         $pendingBinarySwap = new PendingBinarySwap();
+        $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
+        $bundledAiPlatformVersion = BundledAiPlatformVersion::detect();
 
         return new self(
             new StandaloneConfigLoader(
                 $xdgConfigPathResolver,
-                new StandalonePlatformConfigResolver($environment),
+                new StandalonePlatformConfigResolver($environment, credentialStore: $filesystemCredentialStore),
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
-            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder()),
+            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder(), aiPlatformPin: $bundledAiPlatformVersion),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
@@ -122,6 +147,9 @@ final readonly class StandaloneApplicationFactory
                 $pendingBinarySwap,
             ),
             pendingBinarySwap: $pendingBinarySwap,
+            credentialStore: $filesystemCredentialStore,
+            environment: $environment,
+            bundledAiPlatformVersion: $bundledAiPlatformVersion,
         );
     }
 
@@ -134,27 +162,54 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * `$PWD` is a shell export that is absent on Windows and in cron/CI
-     * contexts; the process working directory is always available.
-     *
      * @param array<string, string> $environment
      */
     public static function projectConfigFile(array $environment): ?string
     {
-        $pwd = $environment['PWD'] ?? '';
-        $workingDirectory = '' !== $pwd ? $pwd : self::processWorkingDirectory();
+        $workingDirectory = self::workingDirectoryFor($environment);
 
         return null !== $workingDirectory ? \sprintf('%s/%s', $workingDirectory, self::PROJECT_CONFIG_FILENAME) : null;
     }
 
     /**
-     * @param array<string, string> $environment
+     * `$PWD` keeps the spelling the shell shows (symlinks unresolved), but it
+     * is a shell export: absent on Windows and under cron, and stale under a
+     * launcher that inherited it from another directory — an MCP client, a
+     * `Process`, a task runner. It is trusted only while it names the process
+     * working directory, which is always available and wins otherwise.
      *
-     * @throws UnresolvableConfigPathException
+     * @param array<string, string> $environment
      */
-    public static function bridgeAutoloadFile(array $environment): string
+    private static function workingDirectoryFor(array $environment): ?string
     {
-        return \sprintf('%s/vendor/autoload.php', self::resolverFromEnvironment($environment)->dataDir());
+        $pwd = $environment['PWD'] ?? '';
+        $processWorkingDirectory = self::processWorkingDirectory();
+        if ('' === $pwd || null === $processWorkingDirectory) {
+            return '' !== $pwd ? $pwd : $processWorkingDirectory;
+        }
+
+        $resolvedPwd = realpath($pwd);
+
+        return false !== $resolvedPwd && $resolvedPwd === realpath($processWorkingDirectory) ? $pwd : $processWorkingDirectory;
+    }
+
+    /**
+     * Registers the provider bridges `init` installed before anything else
+     * autoloads, unless they would shadow the bundled `symfony/ai-platform`.
+     * Returns the warning to print when they are there but cannot be loaded.
+     *
+     * @param array<string, string> $environment
+     * @param ?string               $bundledAiPlatformVersion the release this binary bundles ({@see BundledAiPlatformVersion::detect()}), read before the tree registers its own
+     */
+    public static function loadBridgeTree(array $environment, ?string $bundledAiPlatformVersion): ?string
+    {
+        try {
+            $dataDir = self::resolverFromEnvironment($environment)->dataDir();
+        } catch (UnresolvableConfigPathException) {
+            return null;
+        }
+
+        return (new BridgeTreeLoader())->load(new BridgeTree($dataDir, $bundledAiPlatformVersion));
     }
 
     public function create(): StandaloneApplication
@@ -163,7 +218,11 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->initCommand());
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
+        $standaloneApplication->addCommand(new AuthSetCommand($this->credentialStore, $this->configuredCredentialVariable()));
+        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
+        $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
+        $standaloneApplication->addCommand($this->lazyMcpServeCommand($standaloneApplication));
         $this->registerUpdateAvailabilityNotice($standaloneApplication);
 
         return $standaloneApplication;
@@ -191,7 +250,13 @@ final readonly class StandaloneApplicationFactory
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->bridgeInstaller,
+            $this->credentialStore,
         );
+    }
+
+    private function configuredCredentialVariable(): ConfiguredCredentialVariable
+    {
+        return new ConfiguredCredentialVariable($this->xdgConfigPathResolver);
     }
 
     private function selfUpdateCommand(): SelfUpdateCommand
@@ -313,6 +378,7 @@ final readonly class StandaloneApplicationFactory
                     $this->standaloneConsoleCommandFactory,
                 ),
                 new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
+                bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
             ),
         );
     }
@@ -338,45 +404,118 @@ final readonly class StandaloneApplicationFactory
             [AuditCommand::ALIAS],
             AuditCommand::DESCRIPTION,
             false,
-            fn (): Command => $this->loadAuditCommand($standaloneApplication->needsProviderCredentials()),
+            fn (): Command => $standaloneApplication->describesCommandsOnly()
+                ? $this->standaloneConsoleCommandFactory->describe(AuditCommand::class)
+                : $this->loadAuditCommand($standaloneApplication->needsProviderCredentials()),
         );
     }
 
     /**
      * @throws UnresolvableConfigPathException
+     * @throws StaleBridgeTreeException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      * @throws UnresolvableAuditCommandException
      * @throws MalformedProjectConfigException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
      */
     private function loadAuditCommand(bool $credentialsRequired): Command
     {
         return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired));
     }
 
+    private function lazyMcpServeCommand(StandaloneApplication $standaloneApplication): LazyCommand
+    {
+        return new LazyCommand(
+            McpServeCommand::NAME,
+            [],
+            McpServeCommand::DESCRIPTION,
+            false,
+            fn (): Command => $standaloneApplication->describesCommandsOnly()
+                ? $this->standaloneConsoleCommandFactory->describe(McpServeCommand::class)
+                : $this->loadMcpServeCommand(),
+        );
+    }
+
     /**
      * @throws UnresolvableConfigPathException
+     * @throws StaleBridgeTreeException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     * @throws UnresolvableMcpServeCommandException
+     * @throws MalformedProjectConfigException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    private function loadMcpServeCommand(): Command
+    {
+        return $this->standaloneConsoleCommandFactory->createMcpServer($this->buildContainer(true));
+    }
+
+    /**
+     * A bridge tree the entry point left unloaded for holding another
+     * `symfony/ai-platform` is refused before anything else: whatever the
+     * configuration says, no audit could run on it.
+     *
+     * @throws UnresolvableConfigPathException
+     * @throws StaleBridgeTreeException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      * @throws MalformedProjectConfigException
      * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      * @throws ProjectConfigPlatformOverrideException
      * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
      */
     private function buildContainer(bool $credentialsRequired): ContainerBuilder
     {
+        $this->assertBridgeTreeLoadable();
+
         return $this->standaloneContainerFactory->create(
             $this->standaloneConfigLoader->load($credentialsRequired),
             $this->xdgConfigPathResolver->cacheDir(),
         );
+    }
+
+    /**
+     * Without a data directory there is no bridge tree to hold anything.
+     *
+     * @throws StaleBridgeTreeException
+     */
+    private function assertBridgeTreeLoadable(): void
+    {
+        try {
+            $dataDir = $this->xdgConfigPathResolver->dataDir();
+        } catch (UnresolvableConfigPathException) {
+            return;
+        }
+
+        (new BridgeTree($dataDir, $this->bundledAiPlatformVersion))->assertLoadable($this->standaloneConfigLoader->configuredProvider());
     }
 }

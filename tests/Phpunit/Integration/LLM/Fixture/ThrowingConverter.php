@@ -23,7 +23,10 @@ use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 
 final class ThrowingConverter implements ResultConverterInterface
 {
-    public function __construct(private readonly RuntimeException $runtimeException) {}
+    public function __construct(
+        private readonly RuntimeException $runtimeException,
+        private readonly ?TokenUsageExtractorInterface $tokenUsageExtractor = null,
+    ) {}
 
     #[Override]
     public function supports(Model $model): bool
@@ -40,6 +43,6 @@ final class ThrowingConverter implements ResultConverterInterface
     #[Override]
     public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
     {
-        return null;
+        return $this->tokenUsageExtractor;
     }
 }

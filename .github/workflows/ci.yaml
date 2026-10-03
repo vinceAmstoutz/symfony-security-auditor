@@ -163,6 +163,9 @@ jobs:
       - name: Install script tests
         run: sh tests/Shell/install_script_test.sh
 
+      - name: Pull request check tests
+        run: sh tests/Shell/pull_request_check_test.sh
+
   zizmor:
     name: zizmor (GitHub Actions security scan)
     runs-on: ubuntu-latest
@@ -177,7 +180,7 @@ jobs:
           persist-credentials: false
 
       - name: Run zizmor
-        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
 
   tests:
     name: Tests + Mutation (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony }})
@@ -227,7 +230,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.php == '8.3' && matrix.symfony == '^7.4'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: build/coverage/clover.xml
           token: ${{ secrets.CODECOV_TOKEN }}

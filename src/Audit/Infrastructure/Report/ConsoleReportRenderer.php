@@ -50,19 +50,21 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
             '{{cost}}' => number_format($cost->estimatedCostUsd(), 4, '.', ''),
             '{{costRateLabel}}' => $cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model',
-            '{{riskLevel}}' => $auditReport->riskLevel(),
-            '{{riskScore}}' => $auditReport->riskScore(),
+            '{{riskLevel}}' => RiskHeadline::riskLevel($auditReport),
+            '{{riskDetail}}' => RiskHeadline::scoreDetail($auditReport, 'Score:'),
             '{{body}}' => $this->body($auditReport),
         ]);
     }
 
     private function body(AuditReport $auditReport): string
     {
+        $warning = $this->incompleteWarning($auditReport);
+
         if (0 === $auditReport->totalVulnerabilities()) {
-            return "  ✅  No validated vulnerabilities found.\n";
+            return [] === $warning ? "  ✅  No validated vulnerabilities found.\n" : \sprintf("%s\n", $warning[0]);
         }
 
-        $lines = ['  SUMMARY BY SEVERITY'];
+        $lines = [...$warning, '  SUMMARY BY SEVERITY'];
 
         foreach (VulnerabilitySeverity::cases() as $severity) {
             $count = \count($auditReport->vulnerabilitiesBySeverity($severity));
@@ -81,6 +83,16 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function incompleteWarning(AuditReport $auditReport): array
+    {
+        $notice = IncompleteAuditNotice::for($auditReport);
+
+        return null === $notice ? [] : [\sprintf('  ⚠️  %s', $notice), ''];
     }
 
     private function vulnerability(Vulnerability $vulnerability): string

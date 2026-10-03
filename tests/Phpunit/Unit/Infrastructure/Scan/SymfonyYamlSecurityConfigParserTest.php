@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
@@ -276,6 +277,72 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
             YAML);
 
         self::assertSame(['^/metrics' => ['ROLE_MONITOR']], $accessControl);
+    }
+
+    #[DataProvider('nonProductionEnvironmentCases')]
+    public function test_it_ignores_access_control_the_production_kernel_never_loads(string $environment): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<YAML
+            security:
+                access_control:
+                    - { path: ^/profile, roles: ROLE_USER }
+            when@{$environment}:
+                security:
+                    access_control:
+                        - { path: ^/admin, roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertSame(['^/profile' => ['ROLE_USER']], $accessControl);
+    }
+
+    #[DataProvider('nonProductionEnvironmentCases')]
+    public function test_it_ignores_firewalls_the_production_kernel_never_loads(string $environment): void
+    {
+        $firewallRules = $this->symfonyYamlSecurityConfigParser->parseFirewallRules(<<<YAML
+            security:
+                firewalls:
+                    main:
+                        pattern: ^/
+            when@{$environment}:
+                security:
+                    firewalls:
+                        admin:
+                            pattern: ^/admin
+                            security: false
+            YAML);
+
+        self::assertSame(['^/'], $firewallRules);
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function nonProductionEnvironmentCases(): iterable
+    {
+        yield 'test' => ['test'];
+        yield 'dev' => ['dev'];
+        yield 'staging' => ['staging'];
+    }
+
+    #[DataProvider('configurationFileCases')]
+    public function test_it_tells_which_configuration_files_the_production_kernel_loads(string $relativePath, bool $loaded): void
+    {
+        self::assertSame($loaded, $this->symfonyYamlSecurityConfigParser->isLoadedInProduction($relativePath));
+    }
+
+    /** @return iterable<string, array{0: string, 1: bool}> */
+    public static function configurationFileCases(): iterable
+    {
+        yield 'the security package' => ['config/packages/security.yaml', true];
+        yield 'the security package with a yml extension' => ['config/packages/security.yml', true];
+        yield 'a production package' => ['config/packages/prod/security.yaml', true];
+        yield 'a nested production package' => ['config/packages/prod/security/firewalls.yaml', true];
+        yield 'a test package' => ['config/packages/test/security.yaml', false];
+        yield 'a development package' => ['config/packages/dev/security.yaml', false];
+        yield 'a file no kernel imports' => ['config/legacy/access.yaml', false];
+        yield 'a security file outside the packages' => ['config/security.yaml', false];
+        yield 'another package' => ['config/packages/framework.yaml', false];
+        yield 'a security package below another directory' => ['src/config/packages/security.yaml', false];
+        yield 'a distributed security package' => ['config/packages/security.yaml.dist', false];
+        yield 'an xml production package' => ['config/packages/prod/security.xml', false];
     }
 
     public function test_it_keys_route_based_entries_by_route_name(): void

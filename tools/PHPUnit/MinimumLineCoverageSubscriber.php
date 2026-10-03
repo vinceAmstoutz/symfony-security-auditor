@@ -19,6 +19,8 @@ use PHPUnit\Event\Application\FinishedSubscriber;
 
 final readonly class MinimumLineCoverageSubscriber implements FinishedSubscriber
 {
+    private const int MAXIMUM_REPORTED_LINES = 40;
+
     public function __construct(
         private ?string $cloverPath,
         private float $minimumCoverage,
@@ -46,11 +48,39 @@ final readonly class MinimumLineCoverageSubscriber implements FinishedSubscriber
 
         if ($percentage + 1.0e-9 < $this->minimumCoverage) {
             fwrite(\STDERR, \sprintf('%s[coverage] %.2f%% (%d/%d) is below the required %.2f%%.%s', \PHP_EOL, $percentage, $covered, $statements, $this->minimumCoverage, \PHP_EOL));
+            fwrite(\STDERR, $this->uncoveredDetail($report));
 
             exit(1);
         }
 
         fwrite(\STDOUT, \sprintf('%s[coverage] %.2f%% (%d/%d) meets the %.2f%% threshold.%s', \PHP_EOL, $percentage, $covered, $statements, $this->minimumCoverage, \PHP_EOL));
+    }
+
+    /**
+     * A percentage says a gate failed; the lines say why. Long lists are
+     * truncated so one badly-covered file cannot bury the rest of the log.
+     */
+    private function uncoveredDetail(string $report): string
+    {
+        $uncovered = UncoveredLines::in($report);
+        if ([] === $uncovered) {
+            return \sprintf('[coverage] the Clover report lists no uncovered statement — the shortfall is outside line coverage.%s', \PHP_EOL);
+        }
+
+        $shown = \array_slice($uncovered, 0, self::MAXIMUM_REPORTED_LINES);
+        $detail = \sprintf('[coverage] never executed:%s', \PHP_EOL);
+        foreach ($shown as $line) {
+            $detail .= \sprintf('  %s%s', $line, \PHP_EOL);
+        }
+
+        return $detail.$this->truncationNotice(\count($uncovered));
+    }
+
+    private function truncationNotice(int $total): string
+    {
+        return $total > self::MAXIMUM_REPORTED_LINES
+            ? \sprintf('  … and %d more%s', $total - self::MAXIMUM_REPORTED_LINES, \PHP_EOL)
+            : '';
     }
 
     private function readMetric(string $metricsTag, string $attribute): int

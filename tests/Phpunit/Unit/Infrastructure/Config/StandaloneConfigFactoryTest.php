@@ -13,16 +13,157 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 
 final class StandaloneConfigFactoryTest extends TestCase
 {
-    public function test_it_builds_the_rootless_config_with_an_env_referenced_api_key(): void
+    /**
+     * @param array<string, mixed> $expected
+     */
+    #[DataProvider('configCases')]
+    public function test_it_builds_the_rootless_config(string $provider, ?string $apiKeyVariable, ?string $baseUrl, ?string $endpoint, array $expected): void
     {
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
-            (new StandaloneConfigFactory())->create('openai', 'gpt-5.4', 'OPENAI_API_KEY'),
+            $expected,
+            (new StandaloneConfigFactory())->create($provider, 'gpt-5.4', $apiKeyVariable, $baseUrl, $endpoint),
         );
+    }
+
+    /**
+     * @param array<string, string> $expectedConnection
+     */
+    #[DataProvider('bedrockCases')]
+    public function test_it_writes_bedrock_on_the_mantle_route_serving_the_model(string $model, ?string $apiKeyVariable, array $expectedConnection): void
+    {
+        self::assertSame(
+            ['bedrock' => ['prod' => $expectedConnection]],
+            (new StandaloneConfigFactory())->create('bedrock.prod', $model, $apiKeyVariable)['platform'],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null, array<string, string>}>
+     */
+    public static function bedrockCases(): iterable
+    {
+        yield 'an anthropic model on messages' => ['anthropic.claude-opus-4-8', 'BEDROCK_API_KEY', ['api' => 'messages', 'api_key' => '%env(BEDROCK_API_KEY)%']];
+        yield 'an open-weight model on completions' => ['openai.gpt-oss-120b', 'BEDROCK_API_KEY', ['api' => 'completions', 'api_key' => '%env(BEDROCK_API_KEY)%']];
+        yield 'signed with aws credentials rather than a key' => ['anthropic.claude-opus-4-8', null, ['api' => 'messages']];
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null, string|null, string|null, array<string, mixed>}>
+     */
+    public static function configCases(): iterable
+    {
+        yield 'a flat platform holds the connection directly' => [
+            'openai',
+            'API_TOKEN',
+            null,
+            null,
+            [
+                'provider' => 'openai',
+                'platform' => ['openai' => ['api_key' => '%env(API_TOKEN)%']],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'an instance-keyed platform nests it under the instance' => [
+            'openresponses.my_gateway',
+            'API_TOKEN',
+            'https://gw.example',
+            null,
+            [
+                'provider' => 'openresponses.my_gateway',
+                'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'a percent-encoded base url and endpoint are escaped for the container' => [
+            'openresponses.my_gateway',
+            'API_TOKEN',
+            'https://gw.example/v1%2Fx%3Fy',
+            null,
+            [
+                'provider' => 'openresponses.my_gateway',
+                'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy', 'api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'a percent-encoded endpoint is escaped for the container' => [
+            'ollama',
+            null,
+            null,
+            'http://localhost:11434/a%2Fb%3Fc',
+            [
+                'provider' => 'ollama',
+                'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434/a%%2Fb%%3Fc']],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'a base url read from the environment is left for the resolver' => [
+            'generic.my_gateway',
+            'API_TOKEN',
+            '%env(GATEWAY_URL)%',
+            null,
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => '%env(GATEWAY_URL)%', 'api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'an instance-keyed platform keeps the nesting without a base url' => [
+            'generic.my_gateway',
+            'API_TOKEN',
+            null,
+            null,
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['api_key' => '%env(API_TOKEN)%']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'a platform reached at an endpoint keeps its credential' => [
+            'ollama',
+            'OLLAMA_API_KEY',
+            null,
+            'https://ollama.com',
+            [
+                'provider' => 'ollama',
+                'platform' => ['ollama' => ['endpoint' => 'https://ollama.com', 'api_key' => '%env(OLLAMA_API_KEY)%']],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'a local install is written without a credential at all' => [
+            'ollama',
+            null,
+            null,
+            'http://localhost:11434',
+            [
+                'provider' => 'ollama',
+                'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']],
+                'model' => 'gpt-5.4',
+            ],
+        ];
+
+        yield 'omitting the credential leaves the base url untouched' => [
+            'generic.my_gateway',
+            null,
+            'https://gw.example',
+            null,
+            [
+                'provider' => 'generic.my_gateway',
+                'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example']]],
+                'model' => 'gpt-5.4',
+            ],
+        ];
     }
 }

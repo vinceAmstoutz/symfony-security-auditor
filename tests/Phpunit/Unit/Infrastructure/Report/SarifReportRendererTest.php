@@ -81,6 +81,28 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_records_a_complete_audit_as_a_successful_invocation(): void
+    {
+        self::assertSame([['executionSuccessful' => true]], $this->invocationsOf($this->makeReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_records_an_incomplete_audit_as_a_failed_invocation_and_says_why(): void
+    {
+        self::assertSame(
+            [[
+                'executionSuccessful' => false,
+                'toolExecutionNotifications' => [['level' => 'error', 'message' => ['text' => 'Audit incomplete: 2 file(s) could not be fully analyzed (a scan or LLM call failed, or the run was aborted), so this report cannot vouch that the project is free of vulnerabilities.']]],
+            ]],
+            $this->invocationsOf($this->makeIncompleteReport()),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_version_is_2_1_0(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -746,6 +768,25 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         $this->assertSarifShape($decoded);
 
         return $decoded;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function invocationsOf(AuditReport $auditReport): array
+    {
+        $decoded = json_decode($this->renderer->render($auditReport), true);
+        $this->assertInvocationsShape($decoded);
+
+        return $decoded['runs'][0]['invocations'];
+    }
+
+    /**
+     * @phpstan-assert array{runs: list<array{invocations: list<array<string, mixed>>}>} $value
+     */
+    private function assertInvocationsShape(mixed $value): void
+    {
+        self::assertIsArray($value);
     }
 
     /**

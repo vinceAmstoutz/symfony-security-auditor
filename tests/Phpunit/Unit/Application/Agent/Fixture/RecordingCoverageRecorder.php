@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixt
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRecorderInterface;
 
 /**
  * Test fake: a real coverage recorder that keeps everything it is told in
@@ -24,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * without mocking the port. Drain semantics mirror the production recorder
  * (return-and-clear).
  */
-final class RecordingCoverageRecorder implements CoverageRecorderInterface
+final class RecordingCoverageRecorder implements CoverageRecorderInterface, RejectedFindingRecorderInterface
 {
     /** @var list<array{stage: string, filePath: string, status: string}> */
     public array $coverage = [];
@@ -34,6 +35,9 @@ final class RecordingCoverageRecorder implements CoverageRecorderInterface
 
     /** @var list<Vulnerability> */
     public array $found = [];
+
+    /** @var list<Vulnerability> */
+    public array $rejected = [];
 
     #[Override]
     public function recordCoverage(string $stage, string $filePath, string $status): void
@@ -45,6 +49,12 @@ final class RecordingCoverageRecorder implements CoverageRecorderInterface
     public function recordReviewedFinding(Vulnerability $vulnerability): void
     {
         $this->reviewed[] = $vulnerability;
+    }
+
+    #[Override]
+    public function recordRejectedFinding(Vulnerability $vulnerability): void
+    {
+        $this->rejected[] = $vulnerability;
     }
 
     #[Override]

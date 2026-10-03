@@ -130,6 +130,30 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
+     * The feedback section of the reviewer prompt changed in 1.21, so a verdict
+     * cached under feedback is keyed under a new feedback version: those runs
+     * review their findings once more, while a run without feedback — whose
+     * prompt did not change — keeps its cache.
+     *
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_key_folds_the_feedback_under_its_own_version(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $digest = (new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/Foo.php', 'Accepted', 'accepted risk')]))->digest();
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0code\0feedback-v2-".$digest);
+
+        $this->cacheWithFeedback('accepted risk')->store($vulnerability, 'code', ['accepted' => true]);
+
+        self::assertFileExists(\sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey));
+    }
+
+    /**
      * @throws InvalidCacheConfigurationException
      */
     private function cacheWithFeedback(string $reason): FilesystemReviewerCache
@@ -773,6 +797,58 @@ final class FilesystemReviewerCacheTest extends TestCase
             $vulnerableCode,
             $detectedAt,
         );
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_still_caches_when_a_directory_above_the_cache_is_a_symlink(): void
+    {
+        $base = sys_get_temp_dir().'/reviewer_cache_symlinked_parent_'.uniqid('', true);
+        mkdir($base.'/real', recursive: true);
+        symlink($base.'/real', $base.'/link');
+        $filesystemReviewerCache = new FilesystemReviewerCache($base.'/link/cache', new Filesystem(), new NullLogger());
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        chdir($base);
+        try {
+            $filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+            self::assertSame(['accepted' => true], $filesystemReviewerCache->get($vulnerability, 'code'));
+        } finally {
+            chdir($workingDirectory);
+            (new Filesystem())->remove($base);
+        }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_refuses_its_own_directory_below_the_cache_root_when_that_is_a_symlink(): void
+    {
+        $base = sys_get_temp_dir().'/reviewer_cache_symlinked_self_'.uniqid('', true);
+        mkdir($base.'/elsewhere', recursive: true);
+        mkdir($base.'/cache');
+        symlink($base.'/elsewhere', $base.'/cache/reviewer');
+        $filesystemReviewerCache = new FilesystemReviewerCache($base.'/cache/reviewer', new Filesystem(), new NullLogger());
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        try {
+            $filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+            self::assertSame(['.', '..'], scandir($base.'/elsewhere'));
+            self::assertNull($filesystemReviewerCache->get($vulnerability, 'code'));
+        } finally {
+            (new Filesystem())->remove($base);
+        }
     }
 
     /**

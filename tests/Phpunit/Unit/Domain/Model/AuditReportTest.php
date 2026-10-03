@@ -18,11 +18,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SecurityGrade;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -500,6 +502,58 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_it_names_each_file_a_stage_never_finished_analyzing_once(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/Errored.php', 'errored');
+        $auditContext->recordCoverage('attacker', 'src/Aborted.php', 'aborted');
+        $auditContext->recordCoverage('reviewer', 'src/Errored.php', 'errored');
+        $auditContext->recordCoverage('attacker', 'src/Skipped.php', 'skipped');
+        $auditContext->recordCoverage('attacker', 'src/Cached.php', 'cached');
+        $auditContext->recordCoverage('reviewer', 'src/Rejected.php', 'rejected');
+        $auditContext->recordCoverage('reviewer', 'src/Analyzed.php', 'validated');
+
+        self::assertSame(['src/Errored.php', 'src/Aborted.php'], AuditReport::fromContext($auditContext)->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    #[DataProvider('completenessCases')]
+    public function test_it_is_complete_only_when_every_file_was_analyzed(string $status, bool $expected): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', $status);
+
+        self::assertSame($expected, AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function completenessCases(): iterable
+    {
+        yield 'an analyzed file' => ['analyzed', true];
+        yield 'a file the lean filter skipped on purpose' => ['skipped', true];
+        yield 'a file whose call failed' => ['errored', false];
+        yield 'a file an abort never reached' => ['aborted', false];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_report_array_says_whether_the_audit_is_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        self::assertFalse(AuditReport::fromContext($auditContext)->toArray()['complete']);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_report_coverage_is_empty_when_context_recorded_nothing(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -835,5 +889,200 @@ final class AuditReportTest extends TestCase
             new VulnerabilityNarrative('Test vulnerability', 'Inject', "' OR 1=1", 'Fix it'),
             '$query',
         );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_file_the_attacker_finished_on_a_later_iteration_counts_as_analyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame([], $auditReport->unanalyzedFiles());
+        self::assertTrue($auditReport->isComplete());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_file_served_from_cache_after_a_failed_iteration_counts_as_analyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'aborted');
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'cached');
+
+        self::assertTrue(AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_file_the_attacker_failed_on_a_later_iteration_counts_as_unanalyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        self::assertSame(['src/A.php'], AuditReport::fromContext($auditContext)->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_reviewer_failure_counts_however_a_later_review_of_the_same_file_went(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
+        $auditContext->recordCoverage('reviewer', 'src/A.php', 'errored');
+        $auditContext->recordCoverage('reviewer', 'src/A.php', 'validated');
+
+        self::assertSame(['src/A.php'], AuditReport::fromContext($auditContext)->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_pipeline_that_records_no_coverage_keeps_a_complete_report(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertTrue($auditReport->isComplete());
+        self::assertFalse($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_cost_estimate_of_the_files_in_scope_never_reads_as_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->markAsCostEstimate();
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertFalse($auditReport->isComplete());
+        self::assertTrue($auditReport->hasNoVerdict());
+        self::assertSame([], $auditReport->unanalyzedFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_cost_estimate_with_no_file_in_scope_has_nothing_left_unanalyzed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->markAsCostEstimate();
+
+        self::assertTrue(AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_diff_run_that_left_no_file_to_analyze_stays_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setMappingFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+
+        self::assertTrue(AuditReport::fromContext($auditContext)->isComplete());
+    }
+
+    /**
+     * @param list<array{string, string, string}> $coverage
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('noVerdictCases')]
+    public function test_it_knows_when_the_run_reached_no_verdict(array $coverage, bool $expected): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php'),
+            ProjectFile::create('src/B.php', $this->tmpDir.'/src/B.php', '<?php'),
+        ]);
+        foreach ($coverage as [$stage, $file, $status]) {
+            $auditContext->recordCoverage($stage, $file, $status);
+        }
+
+        self::assertSame($expected, AuditReport::fromContext($auditContext)->hasNoVerdict());
+    }
+
+    /**
+     * @return iterable<string, array{list<array{string, string, string}>, bool}>
+     */
+    public static function noVerdictCases(): iterable
+    {
+        yield 'every call failed' => [[['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'aborted']], true];
+        yield 'a pipeline that records no coverage' => [[], false];
+        yield 'one file analyzed, the other failed' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/B.php', 'errored']], false];
+        yield 'one file served from the cache, the other failed' => [[['attacker', 'src/A.php', 'cached'], ['attacker', 'src/B.php', 'errored']], false];
+        yield 'a file analyzed before a later iteration failed on it' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'errored']], false];
+        yield 'every file analyzed' => [[['attacker', 'src/A.php', 'analyzed'], ['attacker', 'src/B.php', 'analyzed']], false];
+        yield 'every file left out by the lean filter' => [[['attacker', 'src/A.php', 'skipped'], ['attacker', 'src/B.php', 'skipped']], false];
+        yield 'lean filter left one out, the other failed' => [[['attacker', 'src/A.php', 'skipped'], ['attacker', 'src/B.php', 'errored']], true];
+        yield 'only another stage claims to have analyzed a file' => [[['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'errored'], ['reviewer', 'src/A.php', 'analyzed']], true];
+    }
+
+    /**
+     * A response cut short keeps the findings it recorded while its chunk is
+     * recorded as errored, so a run can hold a finding without having fully
+     * analyzed any file: that is a partial run, never one without a verdict.
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_run_that_analyzed_no_file_yet_holds_a_finding_has_a_verdict(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+        $auditContext->addVulnerability(Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Kept from a response cut short', 0.9),
+            new CodeLocation('src/A.php', 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            '$code',
+        )->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertFalse($auditReport->isComplete());
+        self::assertFalse($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @param list<string> $scanPaths
+     *
+     * @throws InvalidAuditContextException
+     */
+    #[DataProvider('runScopes')]
+    public function test_the_array_form_records_the_scope_of_the_run(array $scanPaths, ?string $diffSinceRef): void
+    {
+        $toArray = AuditReport::fromContext(AuditContext::forProject($this->tmpDir, $scanPaths, diffSinceRef: $diffSinceRef))->toArray();
+
+        self::assertSame(['since' => $diffSinceRef, 'paths' => $scanPaths], $toArray['scope']);
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, ?string}>
+     */
+    public static function runScopes(): iterable
+    {
+        yield 'the whole project over its whole history' => [[], null];
+        yield 'two --path scopes since a git ref' => [['src/Controller', 'config'], 'origin/main'];
     }
 }

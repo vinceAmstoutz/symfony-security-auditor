@@ -12,7 +12,9 @@
 
 declare(strict_types=1);
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use Symfony\Component\Console\Output\ConsoleOutput;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\PendingBinarySwapCommitter;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 (static function (): void {
@@ -31,25 +33,23 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory
 
 $environment = getenv();
 
-(static function (array $environment): void {
-    try {
-        $bridgeAutoloadFile = StandaloneApplicationFactory::bridgeAutoloadFile($environment);
-    } catch (UnresolvableConfigPathException) {
-        return;
-    }
-
-    if (is_file($bridgeAutoloadFile)) {
-        require_once $bridgeAutoloadFile;
-    }
-})($environment);
+$bridgeTreeWarning = StandaloneApplicationFactory::loadBridgeTree($environment, BundledAiPlatformVersion::detect());
+if (null !== $bridgeTreeWarning) {
+    fwrite(\STDERR, $bridgeTreeWarning.\PHP_EOL);
+}
 
 $runningBinaryPath = \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) ? $_SERVER['SCRIPT_FILENAME'] : '';
 
 $standaloneApplicationFactory = StandaloneApplicationFactory::fromEnvironment($environment, $runningBinaryPath);
+$pendingBinarySwapCommitter = new PendingBinarySwapCommitter($standaloneApplicationFactory->pendingBinarySwap());
+$swapErrorOutput = (new ConsoleOutput())->getErrorOutput();
 
 // Committed at shutdown, past the last autoload from the archive being replaced.
-register_shutdown_function(static function () use ($standaloneApplicationFactory): void {
-    $standaloneApplicationFactory->pendingBinarySwap()->commit();
+register_shutdown_function(static function () use ($pendingBinarySwapCommitter, $swapErrorOutput): void {
+    $exitCode = $pendingBinarySwapCommitter->commit($swapErrorOutput);
+    if (0 !== $exitCode) {
+        exit($exitCode);
+    }
 });
 
 exit($standaloneApplicationFactory->create()->run());

@@ -121,6 +121,8 @@ final readonly class EstimateAuditCostUseCase
         $this->logger->info('Estimating audit cost (dry-run)', ['project' => $projectPath, 'scan_paths' => $scanPaths]);
 
         $auditContext = AuditContext::forProject($projectPath, $scanPaths, diffSinceRef: $diffSinceRef);
+        $auditContext->markAsCostEstimate();
+
         $files = $this->filterByScanPaths($this->projectFileScanner->scan($projectPath), $scanPaths);
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             $files = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);

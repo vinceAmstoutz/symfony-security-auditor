@@ -32,7 +32,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsolePr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
@@ -115,6 +117,7 @@ final readonly class AuditCommand
         try {
             try {
                 $auditCommandInput->assertNoConflictingOptions();
+                $this->assertOutputsWritable($auditCommandInput, $projectPath);
 
                 if ($auditCommandInput->showScanned) {
                     $this->showScannedFiles($displayStyle, $projectPath, $scanPaths, $auditCommandInput->since);
@@ -151,6 +154,24 @@ final readonly class AuditCommand
             $this->auditPresenter->error($displayStyle, $throwable);
 
             return ExitCode::Failure->value;
+        }
+    }
+
+    /**
+     * Refuses a report or baseline path the run could never save to, before
+     * the audit spends anything on it.
+     *
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    private function assertOutputsWritable(AuditCommandInput $auditCommandInput, string $projectPath): void
+    {
+        $this->reportWriter->assertWritable($auditCommandInput->reportFile(), $projectPath);
+
+        if (null !== $auditCommandInput->generateBaseline) {
+            $this->baselineProcessor->assertWritable($auditCommandInput->generateBaseline, $projectPath);
         }
     }
 
@@ -250,6 +271,11 @@ final readonly class AuditCommand
     }
 
     /**
+     * The report is written whatever becomes of the baseline: the audit has
+     * already run and paid for it. A run with no verdict writes no baseline —
+     * its empty result would replace every accepted finding and its reason —
+     * and fails.
+     *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
      * @throws ReportWriteFailedException
@@ -260,14 +286,28 @@ final readonly class AuditCommand
         AuditReport $auditReport,
         string $generateBaseline,
     ): int {
-        $fingerprintCount = $this->baselineProcessor->generate($auditReport, $generateBaseline);
-        $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+        if ($this->auditExitCodeResolver->hasNoVerdict($auditReport)) {
+            $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+            $this->auditPresenter->baselineKept($this->displayStyle($symfonyStyle, $auditCommandInput), $generateBaseline, $auditReport);
+
+            return ExitCode::Failure->value;
+        }
+
+        try {
+            $fingerprintCount = $this->baselineProcessor->generate($auditReport, $generateBaseline);
+        } finally {
+            $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+        }
+
+        $exitCode = $auditCommandInput->failOnIncomplete && !$auditReport->isComplete() ? ExitCode::Incomplete->value : ExitCode::Success->value;
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
             $this->auditPresenter->baselineGenerated($symfonyStyle, $generateBaseline, $fingerprintCount);
         }
 
-        return ExitCode::Success->value;
+        $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $auditReport, $exitCode);
+
+        return $exitCode;
     }
 
     /**
@@ -289,11 +329,16 @@ final readonly class AuditCommand
             $baselineResult->report,
             $auditCommandInput->failOn ?? $this->riskLevel,
             $auditCommandInput->minScore,
+            $auditCommandInput->failOnIncomplete,
         );
 
-        if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->result($symfonyStyle, $baselineResult->report, $exitCode);
+        if ($auditCommandInput->isMachineReadableToStdout()) {
+            $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $baselineResult->report, $exitCode);
+
+            return $exitCode;
         }
+
+        $this->auditPresenter->result($symfonyStyle, $baselineResult->report, $exitCode);
 
         return $exitCode;
     }
@@ -301,11 +346,11 @@ final readonly class AuditCommand
     /**
      * A budget abort gets its own dedicated exit code (partial report still
      * emitted, but the run stopped on purpose); every other abort cause
-     * shares the generic failure code.
+     * shares the generic failure code. A partial report that cannot be saved
+     * is kept on the console by the writer, and the abort still says why it
+     * stopped and keeps its code.
      *
      * @throws UnsupportedOutputFormatException
-     * @throws UnsafeReportWriteException
-     * @throws ReportWriteFailedException
      */
     private function handleAbort(
         SymfonyStyle $symfonyStyle,
@@ -315,15 +360,21 @@ final readonly class AuditCommand
         $auditReport = $this->findingTypeFilter->apply($auditAbortedException->partialReport());
         $baselineResult = $this->baselineProcessor->apply($auditReport, $auditCommandInput->baseline);
         $reportToWrite = OutputFormat::Sarif === $auditCommandInput->format ? $auditReport : $baselineResult->report;
+        $displayStyle = $this->displayStyle($symfonyStyle, $auditCommandInput);
 
-        $this->reportWriter->write(
-            $reportToWrite,
-            $auditCommandInput->format,
-            $auditCommandInput->output,
-            $symfonyStyle,
-            $baselineResult->acceptedFingerprints,
-        );
-        $this->auditPresenter->error($this->displayStyle($symfonyStyle, $auditCommandInput), $auditAbortedException);
+        try {
+            $this->reportWriter->write(
+                $reportToWrite,
+                $auditCommandInput->format,
+                $auditCommandInput->output,
+                $symfonyStyle,
+                $baselineResult->acceptedFingerprints,
+            );
+        } catch (ReportWriteFailedException|UnsafeReportWriteException $reportWriteException) {
+            $this->auditPresenter->error($displayStyle, $reportWriteException);
+        }
+
+        $this->auditPresenter->error($displayStyle, $auditAbortedException);
 
         return $auditAbortedException instanceof AuditAbortedByBudgetException ? ExitCode::BudgetAborted->value : ExitCode::Failure->value;
     }
