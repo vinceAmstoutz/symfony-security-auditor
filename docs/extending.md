@@ -57,6 +57,7 @@ _Since 1.21_, the auditor reads two things from your client beyond the answer it
 
 - **Stop reasons.** `LLMResponse::isDegraded()` treats an answer with one of these stop reasons as cut short: `length` (the output token limit), `content-filter` (a content filter withheld it), `max_tool_iterations` (a tool loop stopped at its cap), `empty_content` (no content at all) and `request_too_large` (see below). A degraded answer is never cached, and the files or findings it covered are recorded as errored, so the next run retries them. Normalise the provider's raw `finish_reason` to these values — OpenAI's `content_filter` is `content-filter`, Anthropic's `max_tokens` is `length` — since any other value counts as a complete answer.
 - **A prompt the model cannot fit.** When the provider refuses a prompt as larger than the model's window (`context_length_exceeded`, HTTP `413`), throw `Audit\Domain\Exception\LLMRequestTooLargeException` from `complete()` or `completeWithTools()` — `LLMRequestTooLargeException::fromProviderRejection($previous)` wraps the provider's error. The attacker then splits the chunk in two and analyzes each half, and the reviewer records that finding as errored or splits its batch; any other `LLMProviderException` aborts the audit. A `BatchCapableLLMClientInterface` client cannot throw for one request of a batch, so it answers that request with an `LLMResponse` whose stop reason is `request_too_large` and whose content carries the refusal.
+- **Transient failures.** `audit.retry` drives the bundled `symfony/ai` client only. A custom client retries what it can recover from — a `429`, a `5xx`, a connection cut off mid-response — itself, and throws an `LLMProviderException` only once that fails, since that ends the audit.
 
 ### Implementation
 
@@ -95,6 +96,7 @@ final class AcmeLlmClient implements LLMClientInterface
                 throw LLMRequestTooLargeException::fromProviderRejection($clientException);
             }
 
+            // Retry a 429 with backoff before giving up: see "Transient failures" above.
             throw new LLMProviderException($clientException->getMessage(), previous: $clientException);
         }
 
