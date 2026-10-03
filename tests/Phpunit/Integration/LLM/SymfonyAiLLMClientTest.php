@@ -81,6 +81,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeRateL
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\InvocationOptionsCapture;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\MessageCollectingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\PlatformInvocationLog;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedTokenUsagePlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
@@ -1756,11 +1757,14 @@ final class SymfonyAiLLMClientTest extends TestCase
                 ++$this->invocations;
 
                 if (1 === $this->invocations) {
-                    return new DeferredResult(
+                    $toolCallResult = new DeferredResult(
                         new PlainConverter(new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])])),
                         new InMemoryRawResult(['text' => ''], [], (object) []),
                         $options,
                     );
+                    $toolCallResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 120, completionTokens: 30));
+
+                    return $toolCallResult;
                 }
 
                 if (2 === $this->invocations) {
@@ -1783,9 +1787,10 @@ final class SymfonyAiLLMClientTest extends TestCase
                 return new FallbackModelCatalog();
             }
         };
+        $messageCollectingLogger = new MessageCollectingLogger();
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new PlatformBinding($platform, 'm', new NullLogger()),
+            new PlatformBinding($platform, 'm', $messageCollectingLogger),
             platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder()),
         );
 
@@ -1795,6 +1800,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertSame('empty_content', $responses[0]->stopReason());
         self::assertSame('', $responses[0]->content());
+        self::assertContains(['Concurrent tool-using conversation failed after tool execution; keeping recorded tool results', ['input_tokens' => 120, 'output_tokens' => 30]], $messageCollectingLogger->records);
     }
 
     /**
