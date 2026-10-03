@@ -16,12 +16,16 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Symfony\AI\Platform\Exception\BadRequestException;
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
+use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
 use Symfony\AI\Platform\Exception\ServerException;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
 final class TransientFailureClassifierTest extends TestCase
@@ -72,6 +76,40 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'empty_reply_from_server' => [new RuntimeException('Empty reply from server')];
         yield 'broken_pipe' => [new RuntimeException('Broken pipe')];
         yield 'connection_closed_by_peer' => [new RuntimeException('Connection closed by peer')];
+        yield 'symfony_transfer_closed_with_bytes_remaining' => [self::transportFailure('Transfer closed with 1234 bytes remaining to read')];
+        yield 'symfony_transfer_closed_with_outstanding_read_data' => [self::transportFailure('Transfer closed with outstanding read data remaining')];
+        yield 'symfony_transferred_a_partial_file' => [self::transportFailure('Transferred a partial file')];
+        yield 'symfony_openssl_1_1_eof' => [self::transportFailure('OpenSSL SSL_read: SSL_ERROR_SYSCALL, errno 0')];
+        yield 'symfony_libressl_reset' => [self::transportFailure('LibreSSL SSL_read: SSL_ERROR_SYSCALL, errno 54')];
+        yield 'symfony_http2_stream_not_closed_cleanly' => [self::transportFailure('HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)')];
+        yield 'symfony_http2_framing_layer' => [self::transportFailure('Error in the HTTP2 framing layer')];
+        yield 'symfony_http2_stream_framing_layer' => [self::transportFailure('Stream error in the HTTP/2 framing layer')];
+        yield 'symfony_failure_when_receiving_data' => [self::transportFailure('Failure when receiving data from the peer')];
+        yield 'symfony_openssl_3_unexpected_eof' => [self::transportFailure('OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0')];
+        yield 'symfony_recv_failure' => [self::transportFailure('Recv failure: Connection reset by peer')];
+        yield 'symfony_failed_sending_data' => [self::transportFailure('Failed sending data to the peer')];
+        yield 'symfony_empty_reply_from_server' => [self::transportFailure('Empty reply from server')];
+        yield 'symfony_send_failure_broken_pipe' => [self::transportFailure('Send failure: Broken pipe')];
+    }
+
+    #[DataProvider('connectionCutCarryingAStatusLikeTokenCases')]
+    public function test_a_connection_cut_off_mid_response_is_retried_whatever_number_or_word_its_message_carries(Throwable $throwable): void
+    {
+        self::assertTrue((new TransientFailureClassifier())->isTransient($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function connectionCutCarryingAStatusLikeTokenCases(): iterable
+    {
+        yield 'byte_count_equal_to_a_non_transient_status' => [self::transportFailure('Transfer closed with 404 bytes remaining to read')];
+        yield 'http2_stream_id_equal_to_a_non_transient_status' => [self::transportFailure('HTTP/2 stream 401 was not closed cleanly: INTERNAL_ERROR (err 2)')];
+        yield 'url_path_segment_equal_to_a_non_transient_status' => [new TransportException('OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0 for "https://gw.example.com/403/v1/chat/completions".')];
+        yield 'url_host_carrying_a_non_transient_word' => [new TransportException('Recv failure: Connection reset by peer for "https://authentication-gw.example.com/v1/chat/completions".')];
+    }
+
+    private static function transportFailure(string $curlError): TransportException
+    {
+        return new TransportException(\sprintf('%s for "https://gw.example.com/v1/chat/completions".', $curlError));
     }
 
     #[DataProvider('nonTransientCases')]
@@ -149,6 +187,9 @@ final class TransientFailureClassifierTest extends TestCase
             new RuntimeException('connection reset', previous: new RuntimeException('HTTP 401')),
         ];
         yield 'content_filter_is_not_retried' => [new ContentFilterException('Blocked by the safety system')];
+        yield 'symfony_client_error_status' => [new RuntimeException('HTTP 401 returned for "https://gw.example.com/v1/chat/completions".')];
+        yield 'symfony_untrusted_certificate' => [self::transportFailure('SSL certificate problem: unable to get local issuer certificate')];
+        yield 'symfony_tls_alert_while_reading' => [self::transportFailure('OpenSSL SSL_read: error:0A000412:SSL routines::sslv3 alert bad certificate, errno 0')];
     }
 
     #[DataProvider('degradedStopReasonCases')]
@@ -169,6 +210,34 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'empty_content' => [new RuntimeException('Response does not contain any content.'), 'empty_content'];
         yield 'transient_failure' => [new RuntimeException('HTTP 503 Service Unavailable'), null];
         yield 'malformed_tool_call' => [new MalformedToolCallException('bad arguments'), null];
+        yield 'generic_bridge_unsupported_content_filter_finish_reason' => [new PlatformRuntimeException('Unsupported finish reason "content_filter".'), 'content-filter'];
+        yield 'responses_api_incomplete_for_the_content_filter' => [new PlatformRuntimeException('Responses API response is incomplete (content_filter) and contains no content.'), 'content-filter'];
+        yield 'cohere_unsupported_max_tokens_finish_reason' => [new PlatformRuntimeException('Unsupported finish reason "MAX_TOKENS".'), 'length'];
+        yield 'unsupported_finish_reason_that_cuts_nothing_short' => [new PlatformRuntimeException('Unsupported finish reason "ERROR".'), null];
+        yield 'responses_api_incomplete_for_another_reason' => [new PlatformRuntimeException('Responses API response is incomplete (unknown) and contains no content.'), null];
+        yield 'answer_its_raw_answer_shows_filtered' => [UnconvertedAnswerException::cutShort(new BadRequestException('The response was filtered'), 'content-filter'), 'content-filter'];
+        yield 'answer_its_raw_answer_shows_cut_off_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length')), 'length'];
+        yield 'request_its_raw_answer_shows_refused_as_too_large' => [UnconvertedAnswerException::refusedAsTooLarge(new RuntimeException('Syntax error')), null];
+        yield 'request_refused_as_too_large_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain choices.')), null];
+        yield 'request_refused_as_too_large_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain any content.'))), null];
+    }
+
+    #[DataProvider('billedStopReasonCases')]
+    public function test_it_names_why_a_failed_call_the_provider_answered_was_still_billed(Throwable $throwable, ?string $expectedStopReason): void
+    {
+        self::assertSame($expectedStopReason, (new TransientFailureClassifier())->billedStopReason($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable, ?string}> */
+    public static function billedStopReasonCases(): iterable
+    {
+        yield 'answer_cut_off_by_the_output_limit' => [new MaxOutputTokensException('cut off'), 'length'];
+        yield 'answer_withheld_by_a_content_filter' => [new ContentFilterException('blocked'), 'content-filter'];
+        yield 'tool_call_with_malformed_arguments' => [new MalformedToolCallException('bad arguments'), 'malformed_tool_call'];
+        yield 'wrapped_tool_call_with_malformed_arguments' => [new RuntimeException('call failed', previous: new MalformedToolCallException('bad arguments')), 'malformed_tool_call'];
+        yield 'tool_call_its_raw_answer_shows_cut_off' => [UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length'), 'length'];
+        yield 'failure_the_provider_never_answered' => [new RuntimeException('HTTP 503 Service Unavailable'), null];
+        yield 'request_refused_as_too_large_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain choices.')), null];
     }
 
     #[DataProvider('emptyContentCases')]
@@ -226,6 +295,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'request_too_large_phrase' => [new RuntimeException('Request too large')];
         yield 'too_many_tokens' => [new RuntimeException('Too many tokens in the request')];
         yield 'http_413' => [new RuntimeException('HTTP 413 Payload Too Large')];
+        yield 'http2_413_without_a_reason_phrase' => [new RuntimeException('HTTP/2 413  returned for "https://gw.example.com/v1/chat/completions".')];
         yield 'wrapped_prompt_too_long' => [
             new RuntimeException(
                 'LLM call failed',
@@ -240,6 +310,9 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'wrapped_typed_exceed_context_size' => [
             new RuntimeException('LLM call failed', previous: new ExceedContextSizeException('overflow')),
         ];
+        yield 'generic_bridge_relaying_a_gateway_413_body' => [new PlatformRuntimeException('Error "-"-- (-): "Payload too large".')];
+        yield 'gateway_413_reason_phrase' => [new RuntimeException('Request Entity Too Large')];
+        yield 'gateway_413_its_raw_answer_shows' => [UnconvertedAnswerException::refusedAsTooLarge(new RuntimeException('Syntax error for "https://gw.example.com/v1/chat/completions".'))];
     }
 
     #[DataProvider('notRequestTooLargeCases')]
@@ -257,5 +330,14 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'unauthorized_401' => [new RuntimeException('HTTP 401 Unauthorized')];
         yield 'request_id_embedding_413' => [new RuntimeException('HTTP 500 Internal Server Error (request id req-413-abc)')];
         yield 'rate_limit_quoting_a_413_token_count' => [new RuntimeException('HTTP 429 Too Many Requests: Rate limit reached on tokens per min. Limit 30000, Used 29800, Requested 413.')];
+        yield 'connection_cut_with_413_bytes_remaining' => [self::transportFailure('Transfer closed with 413 bytes remaining to read')];
+        yield 'connection_cut_on_http2_stream_413' => [self::transportFailure('HTTP/2 stream 413 was not closed cleanly: INTERNAL_ERROR (err 2)')];
+    }
+
+    public function test_it_does_not_mistake_an_answer_its_raw_answer_shows_was_cut_short_for_a_request_the_model_cannot_fit(): void
+    {
+        $unconvertedAnswerException = UnconvertedAnswerException::cutShort(new BadRequestException('The response was filtered'), 'content-filter');
+
+        self::assertFalse((new TransientFailureClassifier())->isRequestTooLarge($unconvertedAnswerException));
     }
 }

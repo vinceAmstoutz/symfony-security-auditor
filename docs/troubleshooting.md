@@ -248,6 +248,8 @@ The files of one chunk add up to more than the model's input window (the default
 Attacker chunk exceeds the model input limit; it is split in two and each half analyzed on its own
 ```
 
+A gateway in front of the model can refuse the request body before the model sees it — nginx's `client_max_body_size` (1 MB by default), an AI gateway's payload limit. It answers HTTP `413`, often with an HTML page the provider bridge cannot decode (`Syntax error`) or a JSON body it reads as an empty answer (`Response does not contain choices.` for Kong's `{"message":"Request size limit exceeded"}`); the auditor reads the status, splits the chunk the same way and books no spend for the refused request. Raising that limit above the largest prompt avoids the split.
+
 A single file that does not fit on its own is recorded as errored and listed under `Audit incomplete: N file(s) could not be fully analyzed`:
 
 ```text
@@ -278,16 +280,18 @@ The reviewer handles a prompt it cannot fit the same way: a batch of findings (`
 Reviewer batch exceeds the model input limit; it is split in two and each half reviewed on its own
 ```
 
-### `OpenSSL SSL_read: … unexpected eof while reading` / `cURL error 56`
+### `OpenSSL SSL_read: … unexpected eof while reading` / `Transfer closed with … bytes remaining to read` / `cURL error 56`
 
 The peer closed the connection while the response was still being read. `error:0A000126` is `SSL_R_UNEXPECTED_EOF_WHILE_READING` and `errno 0` means no OS-level error — the endpoint hung up without a TLS `close_notify`. This is a transport truncation, so it is classified as transient and the LLM call is retried on a fresh connection (`audit.retry.max_attempts`, default `3`).
+
+Depending on the TLS library and the protocol, curl words the same cut differently, and every wording is retried the same way: `Transfer closed with 512 bytes remaining to read`, `Transfer closed with outstanding read data remaining`, `Failure when receiving data from the peer`, `OpenSSL SSL_read: SSL_ERROR_SYSCALL, errno 0` (OpenSSL 1.1, LibreSSL), `HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)` and `Error in the HTTP2 framing layer`.
 
 Self-hosted endpoints and proxied APIs produce it most often, in two ways:
 
 - **Stale keep-alive reuse.** Auditor calls are slow and far apart, so the idle gap exceeds the endpoint's or your reverse proxy's `keepalive_timeout`. The server drops the socket; the HTTP client takes the dead one from its pool for the next call. Raise `keepalive_timeout` above the longest gap between calls, and `proxy_read_timeout` / `proxy_send_timeout` above the longest generation time.
 - **More concurrent connections than the endpoint serves.** The `fast` profile opens up to four attacker and four reviewer calls (`audit.attacker_max_concurrent` / `audit.reviewer_max_concurrent`). A local model server with a small worker pool drops the excess. Set both to `1`; `balanced` and `thorough` already default to `1`.
 
-When every retry fails, the run still aborts with exit `1` and the report says it is incomplete (#378). Running again resumes from the cache (`cache.enabled`, on by default), so only the failed chunks are retried. Streaming, which should remove the problem at its source, is tracked in #379.
+When every retry fails, the run still aborts with exit `1` and the report says it is incomplete (#378). That holds with any `audit.attacker_max_concurrent` or `audit.reviewer_max_concurrent`; in the concurrent path the `LLM call failed after N attempts` message counts the first, concurrent dispatch as an attempt too. Running again resumes from the cache (`cache.enabled`, on by default), so only the failed chunks are retried. Streaming, which should remove the problem at its source, is tracked in #379.
 
 ### `Idle timeout reached for "…"` / HTTP `499` in the gateway log
 
@@ -339,7 +343,7 @@ The model returned blank or non-JSON output. The chunk is skipped automatically 
 - Model refused the prompt — try a different model (some smaller open-weight models refuse "hacking" prompts).
 - Network timeout — retry; check the provider's status page.
 
-The parser tolerates prose wrapped around a balanced JSON block (the model sometimes ignores the "Return ONLY the JSON array" instruction when tools are enabled); a residual `JsonException: Syntax error` therefore means the response contains no recoverable JSON at all, not just chatty prose.
+The parser tolerates prose wrapped around a balanced JSON block (the model sometimes ignores the "Return ONLY the JSON array" instruction when tools are enabled); when the prose carries several, it takes the last one at the top level that decodes to an object or to a list holding one — the answer that follows the model's reasoning, never JSON it quoted along the way nor a bracket in the prose after it (`[1]` citing a source, `[ ]` in a checklist) — and a JSON array cut off before its closing bracket still gives its first complete object. A JSON object the model writes after its answer, such as a `{"total": 1}` summary, still replaces it: when a JSON-path run loses findings that way, switch back to the default structured collection (`audit.structured_collection: true`, `audit.reviewer_structured_collection: true`). A residual `JsonException: Syntax error` therefore means the response contains no recoverable JSON at all, not just chatty prose.
 
 This error only arises with `audit.structured_collection: false`. In the default (`true`) mode, findings come in via `record_vulnerability` tool calls that the provider validates against the schema, so there is no JSON parsing on the agent side and no `JsonException` can be raised. Switching to the default is the simplest fix when the model repeatedly produces unparseable prose.
 
@@ -360,9 +364,10 @@ When raising the cap, raise `audit.rate_limit.output_tokens_per_minute` proporti
 
 When the provider reports why generation stopped (`symfony/ai` ≥ 0.11 exposes a normalized finish reason), the auditor logs an explicit `LLM response was truncated by the output token limit` warning — no output-token forensics needed. A `LLM response was suppressed by the provider content filter` warning likewise flags responses the provider filtered out.
 
-Some provider bridges report the same two outcomes as an error rather than a finish reason. They are handled identically — the call is not retried, and the file or finding it covered is recorded as errored — and the request is booked at its estimated input tokens against `audit.budget`, the report's token totals and the rate-limit window, since the provider bills it. The entries that report it carry its `stop_reason` (`length` or `content-filter`): a `debug` entry for the booking, and the warning of the path that ran the call where it logs one:
+Some provider bridges report the same two outcomes as an error rather than a finish reason: a typed `symfony/ai` exception, a plain one naming the provider's reason (`Unsupported finish reason "content_filter".`, `Responses API response is incomplete (content_filter) and contains no content.`, Cohere's `Unsupported finish reason "MAX_TOKENS".`), or — for a prompt Azure's content filter caught — an HTTP 400 whose `error.code` is `content_filter`. They are handled identically — the call is not retried, and the file or finding it covered is recorded as errored — and the request is booked against `audit.budget`, the report's token totals and the rate-limit window at the usage the provider reported in its answer, or at its estimated input tokens when the answer reports none, since the provider bills it. A tool call the output token limit cut off mid-way through its arguments, which the bridges report as malformed tool-call arguments, is one of these `length` answers and is not retried either; arguments the model finished but garbled are retried, and each attempt is booked the same way under `stop_reason: malformed_tool_call`. The entries that report it carry its `stop_reason` (`length` or `content-filter`): a `debug` entry for the booking, and the warning of the path that ran the call where it logs one:
 
 ```text
+An answer the provider delivered as an error is booked at the usage it reported, since the provider bills the request it accepted
 An answer the provider delivered as an error is booked at its estimated input tokens, since the provider bills the request it accepted
 LLM returned a response with no content blocks
 Tool-using loop ended with empty content response

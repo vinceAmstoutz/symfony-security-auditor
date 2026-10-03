@@ -26,11 +26,25 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
  */
 final class TransientLLMFailureException extends LLMProviderException
 {
+    public function __construct(
+        string $message,
+        private readonly Throwable $throwable,
+        public readonly int $attempts,
+    ) {
+        parent::__construct($message, previous: $throwable);
+    }
+
     public static function afterExhaustedAttempts(int $attempts, Throwable $throwable): self
     {
-        return new self(
-            \sprintf('LLM call failed after %d attempts: %s', $attempts, $throwable->getMessage()),
-            previous: $throwable,
-        );
+        return new self(\sprintf('LLM call failed after %d attempts: %s', $attempts, $throwable->getMessage()), $throwable, $attempts);
+    }
+
+    /**
+     * The same exhausted failure, counting the attempt that failed before the
+     * retries began — the request a concurrent window dispatched first.
+     */
+    public function afterOneMoreAttempt(): self
+    {
+        return self::afterExhaustedAttempts($this->attempts + 1, $this->throwable);
     }
 }

@@ -49,7 +49,15 @@ LLMResponse::of(
 
 > The legacy `LLMResponse::create(content, inputTokens, outputTokens, model, stopReason)` factory is **deprecated since 1.13** and removed in the next `MAJOR`; use `of()` in new code.
 
-Key read methods: `content()`, `parseJson(): array` (strips a markdown fence wrapping the whole answer, then JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
+Key read methods: `content()`, `stopReason()`, `parseJson(): array` (strips a markdown fence wrapping the whole answer, then JSON-decodes; when prose surrounds several JSON blocks it takes the last one at the top level that decodes to an object or to a list holding one), `isEmpty(): bool`, `totalTokens(): int`, and, _since 1.21_, `isDegraded(): bool` (the answer was cut short, see below), `isRequestTooLarge(): bool` (a batch client's refusal of a prompt too large for the model) and `reportedModel(): ?string`, set with `withReportedModel()` (the model the provider says answered, which a gateway can pick on its own).
+
+### Contract
+
+_Since 1.21_, the auditor reads two things from your client beyond the answer itself:
+
+- **Stop reasons.** `LLMResponse::isDegraded()` treats an answer with one of these stop reasons as cut short: `length` (the output token limit), `content-filter` (a content filter withheld it), `max_tool_iterations` (a tool loop stopped at its cap), `empty_content` (no content at all) and `request_too_large` (see below). A degraded answer is never cached, and the files or findings it covered are recorded as errored, so the next run retries them. Normalise the provider's raw `finish_reason` to these values — OpenAI's `content_filter` is `content-filter`, Anthropic's `max_tokens` is `length` — since any other value counts as a complete answer.
+- **A prompt the model cannot fit.** When the provider refuses a prompt as larger than the model's window (`context_length_exceeded`, HTTP `413`), throw `Audit\Domain\Exception\LLMRequestTooLargeException` from `complete()` or `completeWithTools()` — `LLMRequestTooLargeException::fromProviderRejection($previous)` wraps the provider's error. The attacker then splits the chunk in two and analyzes each half, and the reviewer records that finding as errored or splits its batch; any other `LLMProviderException` aborts the audit. A `BatchCapableLLMClientInterface` client cannot throw for one request of a batch, so it answers that request with an `LLMResponse` whose stop reason is `request_too_large` and whose content carries the refusal.
+- **Transient failures.** `audit.retry` drives the bundled `symfony/ai` client only. A custom client retries what it can recover from — a `429`, a `5xx`, a connection cut off mid-response — itself, and throws an `LLMProviderException` only once that fails, since that ends the audit.
 
 ### Implementation
 
@@ -57,6 +65,9 @@ Key read methods: `content()`, `parseJson(): array` (strips a markdown fence wra
 // src/Llm/AcmeLlmClient.php
 namespace App\Llm;
 
+use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -71,22 +82,31 @@ final class AcmeLlmClient implements LLMClientInterface
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
     {
-        $response = $this->http->request('POST', 'https://api.acme.ai/v1/complete', [
-            'headers' => ['Authorization' => 'Bearer ' . $this->apiKey],
-            'json' => [
-                'system' => $systemPrompt,
-                'user'   => $userMessage,
-                'model'  => $this->model(),
-            ],
-        ])->toArray();
+        try {
+            $body = $this->http->request('POST', 'https://api.acme.ai/v1/complete', [
+                'headers' => ['Authorization' => 'Bearer ' . $this->apiKey],
+                'json' => [
+                    'system' => $systemPrompt,
+                    'user'   => $userMessage,
+                    'model'  => $this->model(),
+                ],
+            ])->toArray();
+        } catch (ClientExceptionInterface $clientException) {
+            if (413 === $clientException->getResponse()->getStatusCode()) {
+                throw LLMRequestTooLargeException::fromProviderRejection($clientException);
+            }
+
+            // Retry a 429 with backoff before giving up: see "Transient failures" above.
+            throw new LLMProviderException($clientException->getMessage(), previous: $clientException);
+        }
 
         return LLMResponse::of(
-            content:    $response['choices'][0]['text'],
+            content:    $body['choices'][0]['text'],
             model:      $this->model(),
-            stopReason: $response['choices'][0]['finish_reason'],
+            stopReason: $this->stopReason($body['choices'][0]['finish_reason']),
             tokenUsageSnapshot: TokenUsageSnapshot::of(
-                inputTokens:  $response['usage']['prompt_tokens'],
-                outputTokens: $response['usage']['completion_tokens'],
+                inputTokens:  $body['usage']['prompt_tokens'],
+                outputTokens: $body['usage']['completion_tokens'],
             ),
         );
     }
@@ -104,6 +124,15 @@ final class AcmeLlmClient implements LLMClientInterface
     public function model(): string
     {
         return 'acme-secure-v2';
+    }
+
+    private function stopReason(string $finishReason): string
+    {
+        return match ($finishReason) {
+            'content_filter' => 'content-filter',
+            'max_tokens' => 'length',
+            default => $finishReason,
+        };
     }
 }
 ```

@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
  * Dispatches every request in a concurrency window via the platform WITHOUT
@@ -61,6 +62,7 @@ final readonly class BatchWindowResolver
         private TransientFailureClassifier $transientFailureClassifier,
         private InFlightRequestCanceller $inFlightRequestCanceller,
         private DegradedAnswerBooker $degradedAnswerBooker,
+        private ConversionFailureExplainer $conversionFailureExplainer,
     ) {}
 
     /**
@@ -195,6 +197,7 @@ final readonly class BatchWindowResolver
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
     private function resolveOne(DispatchedRequest $dispatchedRequest, LLMRequest $llmRequest): LLMResponse
     {
@@ -227,11 +230,12 @@ final readonly class BatchWindowResolver
 
             return $llmResponse;
         } catch (Throwable $throwable) {
+            $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
             if (!$reconciled) {
-                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($throwable, $dispatchedRequest->estimatedInputTokens), 0);
+                $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $dispatchedRequest->estimatedInputTokens);
             }
 
-            return $this->recoverFailedResolution($throwable, $llmRequest, $dispatchedRequest->estimatedInputTokens);
+            return $this->recoverFailedResolution($failure, $llmRequest);
         }
     }
 
@@ -242,14 +246,12 @@ final readonly class BatchWindowResolver
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
-     * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
-    private function recoverFailedResolution(Throwable $throwable, LLMRequest $llmRequest, int $estimatedInputTokens): LLMResponse
+    private function recoverFailedResolution(Throwable $throwable, LLMRequest $llmRequest): LLMResponse
     {
         $degradedStopReason = $this->transientFailureClassifier->degradedStopReason($throwable);
         if (null !== $degradedStopReason) {
-            $this->degradedAnswerBooker->book($estimatedInputTokens, $degradedStopReason);
-
             return LLMResponse::of('', $this->model, $degradedStopReason, TokenUsageSnapshot::of(0, 0));
         }
 
@@ -263,8 +265,13 @@ final readonly class BatchWindowResolver
     }
 
     /**
+     * The fresh call that stands in for a request whose dispatch or
+     * resolution failed. That request was an attempt too, so a retry that
+     * runs out counts it, as the concurrent tool-using window does.
+     *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws TransientLLMFailureException
      */
     private function completeOrRefuse(LLMRequest $llmRequest): LLMResponse
     {
@@ -272,6 +279,8 @@ final readonly class BatchWindowResolver
             return $this->llmClient->complete($llmRequest->system, $llmRequest->user);
         } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
             return $this->tooLargeResponse($llmRequestTooLargeException);
+        } catch (TransientLLMFailureException $transientLLMFailureException) {
+            throw $transientLLMFailureException->afterOneMoreAttempt();
         }
     }
 

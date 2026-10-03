@@ -19,6 +19,10 @@ use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
@@ -33,7 +37,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Retr
  * Invokes the platform behind the rate limiter with transient-failure retry:
  * empty-content and non-transient failures are classified into the matching
  * custom exception, rate-limit failures honor the server's Retry-After hint,
- * and other transient failures back off per the retry policy.
+ * and other transient failures back off per the retry policy. Every failed
+ * attempt is booked first, so one the provider answered and billed is on the
+ * books whether it is retried or not, and no retry goes out once that spend
+ * has run past the budget. The caller checks the budget before the first
+ * attempt.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -48,6 +56,9 @@ final readonly class RetryingPlatformInvoker
         private TransientFailureClassifier $transientFailureClassifier,
         private SleeperInterface $sleeper,
         private RetryAfterHeaderParser $retryAfterHeaderParser,
+        private ConversionFailureExplainer $conversionFailureExplainer,
+        private DegradedAnswerBooker $degradedAnswerBooker,
+        private ?BudgetTracker $budgetTracker,
     ) {}
 
     /**
@@ -59,6 +70,9 @@ final readonly class RetryingPlatformInvoker
      * @throws LLMRequestTooLargeException
      * @throws NonTransientLLMFailureException
      * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws BudgetExceededException
      */
     public function invoke(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
@@ -70,6 +84,7 @@ final readonly class RetryingPlatformInvoker
         $attempt = 1;
         while (true) {
             $this->rateLimiter->acquire($estimatedInputTokens);
+            $deferredResult = null;
 
             try {
                 $deferredResult = $platform->invoke($this->model, $messageBag, $options);
@@ -77,14 +92,16 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
-                $this->rateLimiter->record($this->transientFailureClassifier->inputTokensTakenIn($throwable, $estimatedInputTokens), 0);
-                $this->rethrowWhenNonTransient($throwable);
+                $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
+                $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $estimatedInputTokens);
+                $this->rethrowWhenNonTransient($failure);
 
                 if ($attempt >= $maxAttempts) {
-                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
+                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $failure);
                 }
 
-                $this->backOffBeforeNextAttempt($throwable, $attempt, $maxAttempts);
+                $this->budgetTracker?->assertWithinBudget();
+                $this->backOffBeforeNextAttempt($failure, $attempt, $maxAttempts);
                 ++$attempt;
             }
         }
