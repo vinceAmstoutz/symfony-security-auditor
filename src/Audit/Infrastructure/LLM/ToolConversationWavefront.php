@@ -310,8 +310,6 @@ final readonly class ToolConversationWavefront
 
         try {
             return $this->processDeferredResult($conversationState, $dispatched, $toolLLMRequest);
-        } catch (BudgetExceededException $budgetExceededException) {
-            throw $budgetExceededException;
         } catch (Throwable $throwable) {
             return $this->recoverFailedInvocation($conversationState, $throwable, $toolLLMRequest, $maxToolIterations);
         }
@@ -416,8 +414,9 @@ final readonly class ToolConversationWavefront
 
     /**
      * The retried answer, or the state the conversation ends in when the
-     * retry itself fails. A sibling advanced earlier in the round may have
-     * spent the budget, so it is checked before the retry is dispatched.
+     * retry itself fails. The conversation's own answer, or a sibling advanced
+     * earlier in the round, may have spent the budget, so it is checked before
+     * the retry is dispatched.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
