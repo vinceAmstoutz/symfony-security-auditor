@@ -178,8 +178,13 @@ final readonly class LLMResponse
     }
 
     /**
-     * Walks every `[`/`{` position outside JSON string literals and returns the
-     * first balanced block that decodes as JSON, or `null` when none do.
+     * Takes the last balanced block at the top level of the answer that
+     * decodes as JSON: a model that reasons before its verdict may quote JSON
+     * — from the audited code, say — that must not stand for the verdict that
+     * follows it. When no top-level block decodes, as when the output limit
+     * cut an array off before its closing bracket, the first balanced block
+     * anywhere that decodes is taken (the first complete object of that
+     * array), or `null` when none do.
      *
      * When the content itself spans a single balanced block (`[ ... ]` or
      * `{ ... }` with no surrounding prose), the top-level `json_decode` has
@@ -196,26 +201,91 @@ final readonly class LLMResponse
             return null;
         }
 
-        $trackStringLiterals = $this->hasBalancedQuotes($content);
+        $openerPositions = $this->openerPositions($content, $this->hasBalancedQuotes($content));
 
-        $length = \strlen($content);
+        return $this->lastDecodedBlock($this->topLevelBlocks($content, $openerPositions))
+            ?? $this->firstDecodedBlock($content, $openerPositions);
+    }
+
+    /**
+     * The position of every `[`/`{` outside a JSON string, in order.
+     *
+     * @return list<int>
+     */
+    private function openerPositions(string $content, bool $trackStringLiterals): array
+    {
+        $positions = [];
         $state = ['inString' => false, 'escape' => false];
 
-        for ($i = 0; $i < $length; ++$i) {
-            $char = $content[$i];
+        foreach (str_split($content) as $position => $char) {
             $next = $this->advanceIfTrackingStringLiterals($trackStringLiterals, $char, $state);
             $state = ['inString' => $next['inString'], 'escape' => $next['escape']];
 
-            if ($next['consumed']) {
+            if (!$next['consumed'] && $this->isOpener($char)) {
+                $positions[] = $position;
+            }
+        }
+
+        return $positions;
+    }
+
+    /**
+     * The balanced blocks those openers start outside any other block, in
+     * order. An opener that never closes holds the rest of the answer, so the
+     * scan stops there.
+     *
+     * @param list<int> $openerPositions
+     *
+     * @return list<string>
+     */
+    private function topLevelBlocks(string $content, array $openerPositions): array
+    {
+        $blocks = [];
+        $resumeAt = 0;
+
+        foreach ($openerPositions as $openerPosition) {
+            if ($openerPosition < $resumeAt) {
                 continue;
             }
 
-            $candidate = $this->decodeOpenerCandidate($content, $i, $char);
-            if (null === $candidate) {
-                continue;
+            $block = $this->balancedBlockOpenedAt($content, $openerPosition);
+            if (null === $block) {
+                break;
             }
 
-            return $candidate;
+            $blocks[] = $block;
+            $resumeAt = $openerPosition + \strlen($block);
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * @param list<string> $blocks
+     */
+    private function lastDecodedBlock(array $blocks): mixed
+    {
+        foreach (array_reverse($blocks) as $block) {
+            $decoded = $this->decodeBlock($block);
+            if (null !== $decoded) {
+                return $decoded;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<int> $openerPositions
+     */
+    private function firstDecodedBlock(string $content, array $openerPositions): mixed
+    {
+        foreach ($openerPositions as $openerPosition) {
+            $block = $this->balancedBlockOpenedAt($content, $openerPosition);
+            $decoded = null === $block ? null : $this->decodeBlock($block);
+            if (null !== $decoded) {
+                return $decoded;
+            }
         }
 
         return null;
@@ -243,7 +313,7 @@ final readonly class LLMResponse
 
     /**
      * An unescaped double-quote toggles "inside a string" on and off as
-     * `recoverDecodedJsonBlock` scans for the first genuine `[`/`{` opener —
+     * `recoverDecodedJsonBlock` scans for genuine `[`/`{` openers —
      * meant to skip a bracket embedded in a quoted prose phrase (see
      * `test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array`).
      * That toggle only makes sense when every quote in the content is
@@ -269,13 +339,16 @@ final readonly class LLMResponse
         return !$inString;
     }
 
-    private function decodeOpenerCandidate(string $content, int $start, string $char): mixed
+    private function isOpener(string $char): bool
     {
-        return match ($char) {
-            '[' => $this->tryDecodeBalancedBlock($content, $start, '[', ']'),
-            '{' => $this->tryDecodeBalancedBlock($content, $start, '{', '}'),
-            default => null,
-        };
+        return '[' === $char || '{' === $char;
+    }
+
+    private function balancedBlockOpenedAt(string $content, int $start): ?string
+    {
+        return '[' === $content[$start]
+            ? $this->scanBalancedBlockFrom($content, $start, '[', ']')
+            : $this->scanBalancedBlockFrom($content, $start, '{', '}');
     }
 
     /**
@@ -327,17 +400,11 @@ final readonly class LLMResponse
     }
 
     /**
-     * Scans a balanced block starting at `$start` and attempts to JSON-decode it.
-     * Returns the decoded value on success, or `null` when scanning hits EOF or
-     * decoding fails — the caller iterates to the next opener candidate.
+     * The decoded block, or `null` when it does not decode — the caller moves
+     * on to the next candidate.
      */
-    private function tryDecodeBalancedBlock(string $content, int $start, string $open, string $close): mixed
+    private function decodeBlock(string $block): mixed
     {
-        $block = $this->scanBalancedBlockFrom($content, $start, $open, $close);
-        if (null === $block) {
-            return null;
-        }
-
         try {
             return json_decode($block, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
         } catch (JsonException) {
