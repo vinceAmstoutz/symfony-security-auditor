@@ -218,6 +218,8 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'answer_its_raw_answer_shows_filtered' => [UnconvertedAnswerException::cutShort(new BadRequestException('The response was filtered'), 'content-filter'), 'content-filter'];
         yield 'answer_its_raw_answer_shows_cut_off_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length')), 'length'];
         yield 'request_its_raw_answer_shows_refused_as_too_large' => [UnconvertedAnswerException::refusedAsTooLarge(new RuntimeException('Syntax error')), null];
+        yield 'request_refused_as_too_large_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain choices.')), null];
+        yield 'request_refused_as_too_large_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain any content.'))), null];
     }
 
     #[DataProvider('billedStopReasonCases')]
@@ -235,6 +237,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'wrapped_tool_call_with_malformed_arguments' => [new RuntimeException('call failed', previous: new MalformedToolCallException('bad arguments')), 'malformed_tool_call'];
         yield 'tool_call_its_raw_answer_shows_cut_off' => [UnconvertedAnswerException::cutShort(new MalformedToolCallException('bad arguments'), 'length'), 'length'];
         yield 'failure_the_provider_never_answered' => [new RuntimeException('HTTP 503 Service Unavailable'), null];
+        yield 'request_refused_as_too_large_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain choices.')), null];
     }
 
     #[DataProvider('emptyContentCases')]

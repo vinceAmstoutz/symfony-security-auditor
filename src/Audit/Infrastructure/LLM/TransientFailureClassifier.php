@@ -170,14 +170,17 @@ final readonly class TransientFailureClassifier
      * `Unsupported finish reason "content_filter".`, the Responses API's
      * `response is incomplete (content_filter)`, Cohere's `Unsupported finish
      * reason "MAX_TOKENS".`), and an answer it failed to convert can only
-     * show it in its raw answer (`UnconvertedAnswerException`). Null for any
-     * other failure.
+     * show it in its raw answer (`UnconvertedAnswerException`). That raw
+     * answer has the last word: a request it shows refused as too large was
+     * never answered, whatever the bridge made of the body that came with the
+     * refusal (`Response does not contain choices.`). Null for any other
+     * failure.
      */
     public function degradedStopReason(Throwable $throwable): ?string
     {
-        $rawStopReason = $this->firstInChain($throwable, UnconvertedAnswerException::class)?->stopReason;
-        if (null !== $rawStopReason) {
-            return $rawStopReason;
+        $unconvertedAnswerException = $this->firstInChain($throwable, UnconvertedAnswerException::class);
+        if ($unconvertedAnswerException instanceof UnconvertedAnswerException) {
+            return $unconvertedAnswerException->stopReason;
         }
 
         $joined = $this->joinMessages($throwable);

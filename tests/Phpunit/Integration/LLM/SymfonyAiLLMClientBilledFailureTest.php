@@ -23,8 +23,10 @@ use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
+use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\StructuredVulnerabilityCollectionSession;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
@@ -35,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
@@ -241,6 +244,113 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         self::assertSame('content-filter', $llmResponses[0]->stopReason());
         self::assertSame(1250, $this->budgetTracker->tokensUsed());
         self::assertSame([[1200, 50]], $this->fakeRateLimiter->recorded);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_surfaces_a_gateway_413_whose_json_body_reads_as_an_empty_answer_as_too_large_without_booking_it(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusalWithAJsonBody()]);
+
+        $refused = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->complete('sys', 'user');
+        } catch (LLMRequestTooLargeException) {
+            $refused = true;
+        }
+
+        self::assertTrue($refused);
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+        $this->assertNothingWasBooked();
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_with_tools_surfaces_a_gateway_413_whose_json_body_reads_as_an_empty_answer_as_too_large_without_booking_it(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusalWithAJsonBody()]);
+
+        $refused = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->completeWithTools('sys', 'user', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
+        } catch (LLMRequestTooLargeException) {
+            $refused = true;
+        }
+
+        self::assertTrue($refused);
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+        $this->assertNothingWasBooked();
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_complete_batch_with_tools_answers_a_gateway_413_whose_json_body_reads_as_an_empty_answer_as_too_large_without_booking_it(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusalWithAJsonBody()]);
+
+        $llmResponses = $this->client($scriptedDeferredPlatform)->completeBatchWithTools([['system' => 'sys', 'user' => 'user', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 2, 3);
+
+        self::assertTrue($llmResponses[0]->isRequestTooLarge());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+        $this->assertNothingWasBooked();
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_complete_batch_answers_a_gateway_413_whose_json_body_reads_as_an_empty_answer_as_too_large_without_booking_it(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusalWithAJsonBody()]);
+
+        $llmResponses = $this->client($scriptedDeferredPlatform)->completeBatch([['system' => 'sys', 'user' => 'user']], 2);
+
+        self::assertTrue($llmResponses[0]->isRequestTooLarge());
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+        $this->assertNothingWasBooked();
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    private function assertNothingWasBooked(): void
+    {
+        self::assertSame(0, $this->budgetTracker->tokensUsed());
+        self::assertSame(0, $this->tokenUsageRecorder->snapshot()->inputTokens());
+        self::assertSame([[0, 0]], $this->fakeRateLimiter->recorded);
+    }
+
+    private function gatewayRefusalWithAJsonBody(): DeferredResult
+    {
+        $payloadTooLarge = self::createStub(ResponseInterface::class);
+        $payloadTooLarge->method('getStatusCode')->willReturn(413);
+        $payloadTooLarge->method('toArray')->willReturn(['message' => 'Request size limit exceeded']);
+
+        return new DeferredResult(new ThrowingConverter(new PlatformRuntimeException('Response does not contain choices.')), new RawHttpResult($payloadTooLarge), []);
     }
 
     private function toolCallCutOffByTheOutputLimit(): DeferredResult
