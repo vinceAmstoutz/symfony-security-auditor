@@ -387,7 +387,7 @@ Some file was never fully analyzed: its LLM call failed even after the retries i
 
 The `coverage` array names, for each file, the stage that failed. For an LLM failure, read the `LLM call failed` warnings in the log for the cause, fix it (see [LLM & Provider Errors](#llm--provider-errors)), and run again. A withheld file is one a `scan.secret_scrubbing.additional_patterns` entry could not evaluate (a catastrophic-backtracking regex, a `/u` pattern meeting invalid UTF-8), or, with the PCRE JIT disabled, a single quoted value of several hundred kilobytes: fix the pattern, or read the file yourself. With `cache.enabled`, the files that were analyzed are served from the cache.
 
-When **no** file could be analyzed and nothing was found, the run has no verdict: it exits `1` whatever the gates say, and the reports read `RISK LEVEL: UNKNOWN (no file was analyzed)` instead of a SAFE result. When only some files failed, or the run still holds a finding, the risk level and grade cover only the files analyzed, and the reports say so.
+When **no** file could be analyzed and nothing was found, the run has no verdict: it exits `1` whatever the gates say, and the reports read `RISK LEVEL: UNKNOWN  (no file was analyzed)` on the console — `UNKNOWN (no file was analyzed)` in Markdown and HTML — instead of a SAFE result. When only some files failed, or the run still holds a finding, the risk level and grade cover only the files analyzed, and the reports say so.
 
 ### Report has zero vulnerabilities but I know there are some
 
