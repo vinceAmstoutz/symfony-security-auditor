@@ -149,7 +149,7 @@ jobs:
           fetch-depth: 0 # full history so `since` can diff against the base branch
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -173,7 +173,7 @@ Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (_s
 ```yaml
       - name: Symfony Security Audit
         id: audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -189,7 +189,7 @@ Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (_s
 
 ```yaml
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -352,7 +352,7 @@ permissions:
 # …
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required by comment-pr
@@ -376,7 +376,7 @@ It needs a JSON report to read the grade from (`format: json` plus a non-empty `
 
 ```yaml
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:

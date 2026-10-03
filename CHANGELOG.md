@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.21.0] — 2026-10-03 — Gateway
+
+A release about reaching the model you actually run, and never mistaking a partial audit for a clean one. `init` now configures any OpenAI-compatible AI gateway, a local Ollama, AWS Bedrock and the new platforms of `symfony/ai` 0.14, keeps the API key for you (`auth:set`), and installs the bridge even for a platform whose block you finish by hand; the standalone binary also serves the auditor over MCP. A run that could not analyze every file now says so in every report format and in the GitHub Action, `--fail-on-incomplete` turns that into a failing exit code, a run that analyzed nothing has no verdict, and an answer cut short, a connection cut off mid-response or a chunk too large for the model is recovered instead of ending the audit. The audited repository's own configuration can no longer weaken the run, and the secret scrubber redacts more credential shapes while no longer hiding the code an audit has to read.
+
 ### Added
 
 - **`--fail-on-incomplete` fails a run that could not analyze every file, and such a run now always says so.** An audit that ran to its end with some file not fully analyzed — a scan or LLM call failed for it — exited with the code its gates earned and said nothing about it, so a partial report passed CI. `audit:run --fail-on-incomplete` now exits with the new code `3` for such a run (a tripped `--fail-on` or `--min-score` gate still exits `1`, as does a run with no verdict — see "A report never calls an aborted or partly failed audit clean" under Fixed — and an aborted run keeps `1` or `2`), including under `--generate-baseline`. Without the option, the run prints an `Audit incomplete: N file(s) could not be fully analyzed …` warning — naming the option when no gate failed the run — on stderr when the report goes to stdout (`AuditPresenter::incompleteRunNotice()`). The GitHub Action gains a `fail-on-incomplete` input, a `complete` output read from a JSON or SARIF report, and a warning annotation when the report is incomplete, the input is off and the run exited `0`.
@@ -1229,6 +1233,7 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Default model is `claude-opus-4-7`. Change via `model:`, `attacker_model:`, or `reviewer_model:`.
 - Register bundle in `dev` and `test` environments only (per `config/bundles.php` guidance in the README).
 
+[1.21.0]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.21.0
 [1.20.1]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.1
 [1.20.0]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.0
 [1.19.1]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.19.1
