@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\StatusTrackingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
@@ -62,6 +65,34 @@ final class StatusTrackingCoverageRecorderTest extends TestCase
         $statusTrackingCoverageRecorder->recordCoverage('reviewer', 'src/Reviewed.php', 'analyzed');
 
         self::assertSame(['src/Analyzed.php', 'src/Cached.php'], $statusTrackingCoverageRecorder->analyzedFiles());
+    }
+
+    /**
+     * @param list<string> $files
+     *
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('chunkOutcomes')]
+    public function test_it_says_how_the_attacker_left_a_chunk(array $files, string $expectedStatus): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Cached.php', 'cached');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Errored.php', 'errored');
+
+        $chunk = array_map(static fn (string $file): ProjectFile => ProjectFile::create($file, $file, '<?php'), $files);
+
+        self::assertSame($expectedStatus, $statusTrackingCoverageRecorder->chunkStatus($chunk));
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, string}>
+     */
+    public static function chunkOutcomes(): iterable
+    {
+        yield 'every file analyzed or served from the cache' => [['src/Analyzed.php', 'src/Cached.php'], 'analyzed'];
+        yield 'a file whose call failed' => [['src/Analyzed.php', 'src/Errored.php'], 'errored'];
+        yield 'a file the attacker never reached' => [['src/Analyzed.php', 'src/Unreached.php'], 'errored'];
     }
 
     /**

@@ -33,7 +33,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
  * stage.completed advances it, and pipeline.completed finishes it. The audit
  * narrative is printed as lines above the bar: audit.started (attack-surface
  * overview), attacker.finding.recorded (each finding as it is flagged),
- * attacker.chunk.completed (each chunk with its elapsed time), review.skipped
+ * attacker.chunk.completed (each chunk with its elapsed time, marked as
+ * failed when the attacker left it errored), review.skipped
  * (acknowledges a zero-finding pass so the reviewer step doesn't read as
  * having silently disappeared), and review.completed (the reviewer tally).
  * Unhandled events are ignored. The non-decorated counterpart is
@@ -125,9 +126,8 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     private function onReviewCompleted(array $context): void
     {
         $this->writeAboveBar(\sprintf(
-            '<fg=green>  ✓ Reviewed: %d validated, %d rejected</>',
-            ProgressContext::int($context, 'accepted'),
-            ProgressContext::int($context, 'rejected'),
+            0 === ProgressContext::int($context, 'failed') ? '<fg=green>  ✓ Reviewed: %s</>' : '<fg=red>  ✗ Reviewed: %s</>',
+            ProgressContext::reviewTally($context),
         ));
     }
 
@@ -188,7 +188,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         }
 
         $this->writeAboveBar(\sprintf(
-            '<fg=green>  ✓ chunk %d/%d analyzed%s</>',
+            'errored' === ProgressContext::string($context, 'status') ? '<fg=red>  ✗ chunk %d/%d failed%s</>' : '<fg=green>  ✓ chunk %d/%d analyzed%s</>',
             $chunk,
             $totalChunks,
             ProgressContext::durationSuffix($context, 'elapsed_seconds'),
@@ -242,18 +242,34 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     {
         ++$this->reviewedCount;
 
-        $accepted = true === ($context['accepted'] ?? null);
+        [$verdict, $color] = $this->verdictMark($context);
 
         $line = \sprintf(
             '  ⚖ %s %s — %s:%d',
-            $accepted ? '✓ validated' : '✗ rejected',
+            $verdict,
             ProgressContext::string($context, 'type'),
             OutputFormatter::escape(TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file'))),
             ProgressContext::int($context, 'line'),
         );
 
-        $this->writeAboveBar(\sprintf('<fg=%s>%s</>', $accepted ? 'green' : 'yellow', $line));
+        $this->writeAboveBar(\sprintf('<fg=%s>%s</>', $color, $line));
         $this->updateMessage(\sprintf('reviewing %d/%d', $this->reviewedCount, $this->reviewTotal));
+    }
+
+    /**
+     * A review that reached no verdict is a failure, never a rejection.
+     *
+     * @param array<string, mixed> $context
+     *
+     * @return array{string, string} the verdict text and its color
+     */
+    private function verdictMark(array $context): array
+    {
+        if (ProgressContext::reviewReachedNoVerdict($context)) {
+            return ['✗ review failed', 'red'];
+        }
+
+        return true === ($context['accepted'] ?? null) ? ['✓ validated', 'green'] : ['✗ rejected', 'yellow'];
     }
 
     private function updateMessage(string $detail = ''): void

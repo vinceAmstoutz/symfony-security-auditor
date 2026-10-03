@@ -54,6 +54,25 @@ final class ExecutiveSummaryReportRendererTest extends AbstractReportRendererTes
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_an_incomplete_report_states_its_risk_as_covering_only_the_files_analyzed(): void
+    {
+        self::assertStringContainsString('RISK LEVEL: SAFE  (Score: 0, on the files analyzed)', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_report_that_analyzed_no_file_states_no_risk_level(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile());
+
+        self::assertStringContainsString('RISK LEVEL: UNKNOWN  (no file was analyzed)', $output);
+        self::assertStringNotContainsString('SAFE', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_an_incomplete_report_never_states_that_nothing_was_found(): void
     {
         self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));

@@ -181,7 +181,7 @@ final class ReportTrendAnalyzerTest extends TestCase
     {
         $unverifiable = $this->vulnerability('SQL Injection', 'src/Repository/B.php');
         $first = $this->writeReport('first.json', [$this->vulnerability('CSRF Missing', 'src/Controller/A.php'), $unverifiable]);
-        $second = $this->writeIncompleteReport('second.json', [], ['src/Repository/B.php']);
+        $second = $this->writeIncompleteReport('second.json', [], ['src/Repository/B.php'], ['src/Controller/A.php']);
 
         $reportTrend = $this->reportTrendAnalyzer->analyze([$first, $second]);
 
@@ -190,13 +190,38 @@ final class ReportTrendAnalyzerTest extends TestCase
     }
 
     /**
+     * @throws InsufficientTrendReportsException
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_a_finding_whose_file_a_complete_full_run_no_longer_lists_counts_as_fixed(): void
+    {
+        $first = $this->writeReport('first.json', [$this->vulnerability('SQL Injection', 'src/Repository/Deleted.php')]);
+        $second = $this->tmpDir.'/second.json';
+        $this->filesystem->dumpFile($second, json_encode([
+            'complete' => true,
+            'scope' => ['since' => null, 'paths' => []],
+            'vulnerabilities' => [],
+            'coverage' => [['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'analyzed']],
+        ], \JSON_THROW_ON_ERROR));
+
+        $reportTrend = $this->reportTrendAnalyzer->analyze([$first, $second]);
+
+        self::assertSame(['report' => $second, 'total' => 0, 'new' => 0, 'fixed' => 1, 'unverified' => 0], $reportTrend->points[1]->toArray());
+    }
+
+    /**
      * @param list<array<string, string>> $vulnerabilities
      * @param list<string>                $unanalyzedFiles
+     * @param list<string>                $analyzedFiles
      */
-    private function writeIncompleteReport(string $filename, array $vulnerabilities, array $unanalyzedFiles): string
+    private function writeIncompleteReport(string $filename, array $vulnerabilities, array $unanalyzedFiles, array $analyzedFiles): string
     {
         $path = $this->tmpDir.'/'.$filename;
-        $coverage = array_map(static fn (string $file): array => ['stage' => 'attacker', 'file' => $file, 'status' => 'errored'], $unanalyzedFiles);
+        $coverage = [
+            ...array_map(static fn (string $file): array => ['stage' => 'attacker', 'file' => $file, 'status' => 'analyzed'], $analyzedFiles),
+            ...array_map(static fn (string $file): array => ['stage' => 'attacker', 'file' => $file, 'status' => 'errored'], $unanalyzedFiles),
+        ];
         $this->filesystem->dumpFile($path, json_encode(['complete' => false, 'vulnerabilities' => $vulnerabilities, 'coverage' => $coverage], \JSON_THROW_ON_ERROR));
 
         return $path;

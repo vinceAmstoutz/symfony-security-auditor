@@ -158,6 +158,26 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('✓ chunk 1/3 analyzed (47s)', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_marks_a_chunk_whose_analysis_failed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored']);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('✗ chunk 2/3 failed (12s)', $rendered);
+        self::assertStringNotContainsString('✓ chunk', $rendered);
+    }
+
+    public function test_it_marks_an_analyzed_chunk_as_analyzed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 0.0, 'status' => 'analyzed']);
+
+        self::assertStringContainsString('✓ chunk 2/3 analyzed', $this->bufferedOutput->fetch());
+    }
+
     public function test_it_omits_the_duration_for_a_sub_second_chunk_completion(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
@@ -337,9 +357,9 @@ final class ConsoleProgressReporterTest extends TestCase
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
         $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
-        $this->consoleProgressReporter->report('review.completed', ['accepted' => 3, 'rejected' => 1]);
+        $this->consoleProgressReporter->report('review.completed', ['accepted' => 3, 'rejected' => 1, 'failed' => 0]);
 
-        self::assertStringContainsString('3 validated, 1 rejected', $this->bufferedOutput->fetch());
+        self::assertStringContainsString('✓ Reviewed: 3 validated, 1 rejected', $this->bufferedOutput->fetch());
     }
 
     public function test_finding_events_before_pipeline_started_are_no_ops(): void
@@ -482,6 +502,18 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('⚖ ✗ rejected sql_injection — src/X.php:40', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_streams_a_review_that_reached_no_verdict_as_failed_never_as_rejected(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 2]);
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'status' => 'errored', 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 40]);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('⚖ ✗ review failed sql_injection — src/X.php:40', $rendered);
+        self::assertStringNotContainsString('rejected', $rendered);
+    }
+
     public function test_it_counts_reviewed_findings_in_the_bar_message(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
@@ -553,6 +585,44 @@ final class ConsoleProgressReporterTest extends TestCase
         $consoleProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
 
         self::assertStringContainsString("\033[33m", $bufferedOutput->fetch());
+    }
+
+    public function test_it_colors_a_review_that_reached_no_verdict_red_in_a_decorated_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('review.started', ['findings' => 1]);
+        $consoleProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'status' => 'aborted', 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringContainsString("\033[31m", $rendered);
+        self::assertStringNotContainsString("\033[33m", $rendered);
+    }
+
+    public function test_the_review_summary_counts_the_reviews_that_failed_and_is_marked_as_a_failure(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.completed', ['accepted' => 1, 'rejected' => 1, 'failed' => 2]);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('✗ Reviewed: 1 validated, 1 rejected, 2 failed', $rendered);
+        self::assertStringNotContainsString('✓ Reviewed', $rendered);
+    }
+
+    public function test_it_colors_a_review_summary_with_failed_reviews_red_in_a_decorated_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('review.completed', ['accepted' => 1, 'rejected' => 0, 'failed' => 1]);
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringContainsString("\033[31m", $rendered);
+        self::assertStringNotContainsString("\033[32m", $rendered);
     }
 
     #[Override]

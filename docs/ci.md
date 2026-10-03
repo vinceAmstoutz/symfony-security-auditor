@@ -168,7 +168,7 @@ Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`), `projec
 
 Keep `output`, `baseline` and `generate-baseline` inside `working-directory`, or give an absolute path outside the checkout such as `${{ runner.temp }}/report.sarif`. A report or baseline write refuses a symlink on any directory between the working directory and the file, and on any directory between the audited project's root and the file, but trusts every directory above both: with a sub-directory `working-directory`, a path climbing out of it (`../build/reports/report.sarif`) passes through directories the checked-out repository controls, where a committed symlink could redirect the write.
 
-Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (`true` or `false` when `format` is `json` or `sarif` and the report went to a file), and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter). A run that could not fully analyze every file raises a warning annotation — when `format` is `json` or `sarif` and the report went to a file, the cases where `complete` is populated — unless `fail-on-incomplete` is set, in which case it fails the job instead.
+Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (`true` or `false` when `format` is `json` or `sarif` and the report went to a file), and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter). When `complete` is `false`, those three cover only the files the run analyzed, so read them together with `complete`. A run that could not fully analyze every file yet exited `0` raises a warning annotation naming `fail-on-incomplete` — when `format` is `json` or `sarif` and the report went to a file, the cases where `complete` is populated; set `fail-on-incomplete` to fail the job instead. A run that exited `1` or `2` already fails the job, and one that analyzed no file and found nothing exits `1` whatever the inputs (_since 1.21_).
 
 ```yaml
       - name: Symfony Security Audit
@@ -402,7 +402,7 @@ Then point shields.io at the committed file:
 ![Security audit](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/main/.github/security-auditor-badge.json)
 ```
 
-The grade maps to a badge color: `A` brightgreen, `B` green, `C` yellow, `D` orange, `F` red.
+The grade maps to a badge color: `A` brightgreen, `B` green, `C` yellow, `D` orange, `F` red. _Since 1.21_, a run that could not fully analyze every file (`complete` is `false`) writes a lightgrey `incomplete` badge instead: its grade covers only the files it analyzed, so it cannot stand for the whole project.
 
 ### JSON report as artifact
 
@@ -471,7 +471,7 @@ security_audit_junit:
       junit: junit-security.xml
 ```
 
-Each finding appears as a failed test case named `<title> (<file>:<line>)`, grouped under its vulnerability type.
+Each finding appears as a failed test case named `<title> (<file>:<line>)`, grouped under its vulnerability type. _Since 1.21_, a run that could not fully analyze every file also adds an errored `Audit completeness` test case whose message is the `Audit incomplete: …` notice and whose body lists the files left unanalyzed, so the widget never shows such a run as an empty, passing suite.
 
 ### JSON artifact only (no dashboard)
 

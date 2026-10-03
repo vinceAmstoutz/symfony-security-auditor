@@ -1171,6 +1171,52 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_a_dry_run_json_report_never_claims_the_audit_complete(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--dry-run' => true, '--format' => 'json'], ['capture_stderr_separately' => true]);
+
+        $decoded = json_decode($commandTester->getDisplay(), true);
+        self::assertIsArray($decoded);
+        self::assertFalse($decoded['complete'] ?? null);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_dry_run_console_report_never_reads_clean(): void
+    {
+        $this->createProjectDir();
+        $reportFile = $this->fixtureDir.'/dry-run.txt';
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--dry-run' => true, '--output' => $reportFile]);
+
+        $report = (string) file_get_contents($reportFile);
+        self::assertStringContainsString('Audit incomplete: none of the 1 file(s) in scope was analyzed', $report);
+        self::assertStringNotContainsString('No validated vulnerabilities found', $report);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_run_whose_every_llm_call_failed_fails_with_no_verdict(): void
+    {
+        $this->createProjectDir();
+        $failingAttacker = self::createStub(LLMClientInterface::class);
+        $failingAttacker->method('complete')->willThrowException(new RuntimeException('Connection reset by peer'));
+
+        $commandTester = $this->makeCommandTesterWithLLM($failingAttacker, self::createStub(LLMClientInterface::class));
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['project-path' => $this->fixtureDir]));
+        self::assertStringContainsString('none of the 1 file(s) in scope could be analyzed, so the run has no verdict', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_model_warning_is_emitted_on_stderr_for_machine_readable_output(): void
     {
         $this->createProjectDir();

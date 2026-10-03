@@ -19,7 +19,9 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
@@ -32,6 +34,12 @@ use function Symfony\Component\String\u;
  */
 final readonly class Baseline implements BaselineInterface
 {
+    private const int MAX_FEEDBACK_TYPE_LENGTH = 64;
+
+    private const int MAX_FEEDBACK_FILE_LENGTH = 512;
+
+    private const int MAX_FEEDBACK_TITLE_LENGTH = 300;
+
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
     ) {}
@@ -114,6 +122,12 @@ final readonly class Baseline implements BaselineInterface
         return $decoded;
     }
 
+    /**
+     * The baseline is part of the audited repository, so a pull request
+     * controls every field of an entry, and each one reaches the reviewer's
+     * system prompt: each is capped — the reason at the reviewer's own
+     * triage-memory cap.
+     */
     private function feedbackOf(mixed $entry): ?AcceptedFindingFeedback
     {
         if (!\is_array($entry)) {
@@ -126,11 +140,20 @@ final readonly class Baseline implements BaselineInterface
         }
 
         return new AcceptedFindingFeedback(
-            $this->stringField($entry, 'type'),
-            $this->stringField($entry, 'file'),
-            $this->stringField($entry, 'title'),
-            $reason,
+            $this->capped($this->stringField($entry, 'type'), self::MAX_FEEDBACK_TYPE_LENGTH),
+            $this->capped($this->stringField($entry, 'file'), self::MAX_FEEDBACK_FILE_LENGTH),
+            $this->capped($this->stringField($entry, 'title'), self::MAX_FEEDBACK_TITLE_LENGTH),
+            $this->capped($reason, FilesystemTriageMemoryStore::MAX_REASON_LENGTH),
         );
+    }
+
+    /**
+     * Counts code points: a run of combining marks inflates a single grapheme
+     * cluster without bound, never a code point count.
+     */
+    private function capped(string $value, int $maxCodePoints): string
+    {
+        return mb_substr($value, 0, $maxCodePoints, 'UTF-8');
     }
 
     /**
@@ -152,6 +175,34 @@ final readonly class Baseline implements BaselineInterface
         $attackerFingerprint = $entry['attacker_fingerprint'] ?? null;
 
         return \is_string($attackerFingerprint) ? $attackerFingerprint : null;
+    }
+
+    /**
+     * A symlink on the way — below the working directory or below the audited
+     * project's root — a path naming a directory, a directory that cannot be
+     * created or one the file cannot be written into.
+     *
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    #[Override]
+    public function assertWritable(string $path, string $projectPath): void
+    {
+        $this->assertSafeToWrite($path, $projectPath);
+
+        if (WritableFilePath::namesADirectory($path)) {
+            throw BaselineWriteFailedException::forDirectoryPath($path);
+        }
+
+        try {
+            $this->filesystem->mkdir(\dirname($path));
+        } catch (IOException $ioException) {
+            throw BaselineWriteFailedException::forUncreatableDirectory($path, $ioException);
+        }
+
+        if (!WritableFilePath::canBeWritten($path)) {
+            throw BaselineWriteFailedException::forUnwritablePath($path);
+        }
     }
 
     /**

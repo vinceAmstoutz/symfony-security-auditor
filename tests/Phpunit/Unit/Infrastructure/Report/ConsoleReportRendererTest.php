@@ -234,6 +234,39 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_states_the_risk_of_an_audit_that_did_not_finish_as_covering_only_the_files_analyzed(): void
+    {
+        self::assertStringContainsString('RISK LEVEL: SAFE  (Score: 0, on the files analyzed)', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_states_the_risk_of_a_finding_kept_from_an_audit_that_analyzed_no_file(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile($this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL)));
+
+        self::assertStringContainsString('RISK LEVEL: LOW  (Score: 10, on the files analyzed)', $output);
+        self::assertStringNotContainsString('UNKNOWN', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_states_no_risk_level_for_an_audit_that_analyzed_no_file(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile());
+
+        self::assertStringContainsString('RISK LEVEL: UNKNOWN  (no file was analyzed)', $output);
+        self::assertStringNotContainsString('SAFE', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_never_calls_an_incomplete_audit_clean(): void
     {
         $output = $this->renderer->render($this->makeIncompleteReport());

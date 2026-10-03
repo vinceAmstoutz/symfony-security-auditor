@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
+use JsonException;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -24,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
@@ -41,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\NothingAnalyzedPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\PartlyFailedPipeline;
 
 /**
@@ -134,18 +137,62 @@ final class AuditCommandIncompleteRunTest extends TestCase
         self::assertStringContainsString(self::FAILING, $this->flattened($commandTester->getDisplay()));
     }
 
+    /**
+     * @throws JsonException
+     */
+    public function test_a_run_with_no_verdict_leaves_the_existing_baseline_untouched_and_fails(): void
+    {
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        $baseline = json_encode([[
+            'fingerprint' => 'SSA-0123456789AB',
+            'type' => 'sql_injection',
+            'file' => 'src/Failed.php',
+            'title' => 'Accepted query',
+            'added_at' => '2026-01-01T00:00:00+00:00',
+            'reason' => 'Parameters are bound by the repository',
+        ]], \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR);
+        file_put_contents($baselineFile, $baseline);
+        $reportFile = $this->fixtureDir.'/report.json';
+        $commandTester = $this->commandTester(new NothingAnalyzedPipeline());
+
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+            '--format' => 'json',
+            '--output' => $reportFile,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringEqualsFile($baselineFile, $baseline);
+        self::assertFileExists($reportFile);
+        self::assertStringContainsString(
+            \sprintf('Audit incomplete: none of the 1 file(s) in scope could be analyzed, so the run has no verdict. The baseline at %s was left as it was: a run with no verdict cannot replace the accepted findings, so it fails.', $baselineFile),
+            $this->flattened($commandTester->getDisplay()),
+        );
+    }
+
+    public function test_a_run_whose_scan_found_no_file_writes_no_baseline_and_fails(): void
+    {
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        $commandTester = $this->commandTester(self::createStub(PipelineInterface::class));
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['project-path' => $this->fixtureDir, '--generate-baseline' => $baselineFile]));
+        self::assertFileDoesNotExist($baselineFile);
+        self::assertStringContainsString('The scan found no file to audit, so the run has no verdict.', $this->flattened($commandTester->getDisplay()));
+    }
+
     private function flattened(string $output): string
     {
         return (string) preg_replace('/\s+/', ' ', $output);
     }
 
-    private function commandTester(): CommandTester
+    private function commandTester(PipelineInterface $pipeline = new PartlyFailedPipeline()): CommandTester
     {
         $modelsDevPricingProvider = new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/../UseCase/Fixture/pricing-catalog.json');
         $projectFileScanner = new ProjectFileScanner(new NullLogger());
 
         return new CommandTester(new AuditCommand(
-            new RunAuditUseCase(new PartlyFailedPipeline(), new NullLogger()),
+            new RunAuditUseCase($pipeline, new NullLogger()),
             new ReportWriter([new ConsoleReportRenderer(), new JsonReportRenderer()], new Filesystem()),
             new AuditExitCodeResolver(),
             new AuditPresenter($modelsDevPricingProvider),

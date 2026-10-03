@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -51,7 +52,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_an_accepted_verdict_reports_the_finding_as_reviewed(): void
     {
-        $progressReporter = $this->expectingReviewedEvent(true);
+        $progressReporter = $this->expectingReviewedEvent(true, 'validated');
 
         $vulnerability = $this->recorder($progressReporter)->recordVerdict($this->vulnerability(), ['accepted' => true], new NullCoverageRecorder());
 
@@ -65,7 +66,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_a_rejected_verdict_reports_the_finding_as_reviewed(): void
     {
-        $progressReporter = $this->expectingReviewedEvent(false);
+        $progressReporter = $this->expectingReviewedEvent(false, 'rejected');
 
         $vulnerability = $this->recorder($progressReporter)->recordVerdict($this->vulnerability(), ['accepted' => false], new NullCoverageRecorder());
 
@@ -79,7 +80,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_a_finding_without_any_verdict_still_reports_as_reviewed(): void
     {
-        $progressReporter = $this->expectingReviewedEvent(false);
+        $progressReporter = $this->expectingReviewedEvent(false, 'rejected');
 
         $vulnerability = $this->recorder($progressReporter)->recordVerdict($this->vulnerability(), null, new NullCoverageRecorder());
 
@@ -93,11 +94,68 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_an_errored_review_still_reports_the_finding_as_reviewed(): void
     {
-        $progressReporter = $this->expectingReviewedEvent(false);
+        $progressReporter = $this->expectingReviewedEvent(false, 'errored');
 
         $vulnerability = $this->recorder($progressReporter)->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), new NullCoverageRecorder());
 
         self::assertFalse($vulnerability->isReviewerValidated());
+    }
+
+    /**
+     * @param array<string, mixed>|null $verdict
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('rejectingVerdicts')]
+    public function test_a_rejection_is_recorded_as_one(?array $verdict): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), $verdict, $recordingCoverageRecorder);
+
+        self::assertSame(['T'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->rejected));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>|null}>
+     */
+    public static function rejectingVerdicts(): iterable
+    {
+        yield 'an explicit rejection' => [['accepted' => false]];
+        yield 'no verdict at all' => [null];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_acceptance_is_not_recorded_as_a_rejection(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), ['accepted' => true], $recordingCoverageRecorder);
+
+        self::assertSame([], $recordingCoverageRecorder->rejected);
+    }
+
+    /**
+     * A failed review reached no verdict, so the finding must not be fed back
+     * to the attacker as one the reviewer dismissed.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_failed_review_is_not_recorded_as_a_rejection(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), $recordingCoverageRecorder);
+
+        self::assertSame([], $recordingCoverageRecorder->rejected);
     }
 
     /**
@@ -127,7 +185,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
         $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
         $structuredReviewCollectionSession->toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
 
-        $progressReporter = $this->expectingReviewedEvent(true);
+        $progressReporter = $this->expectingReviewedEvent(true, 'validated');
         $result = $this->recorder($progressReporter)->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, new NullCoverageRecorder());
 
         self::assertNotNull($result);
@@ -363,12 +421,12 @@ final class ReviewOutcomeRecorderTest extends TestCase
         $reviewOutcomeRecorder->recordVerdict($this->vulnerability(), null, new NullCoverageRecorder());
     }
 
-    private function expectingReviewedEvent(bool $accepted): ProgressReporterInterface
+    private function expectingReviewedEvent(bool $accepted, string $status): ProgressReporterInterface
     {
         $progressReporter = $this->createMock(ProgressReporterInterface::class);
         $progressReporter->expects(self::once())->method('report')->with(
             'review.finding.reviewed',
-            ['accepted' => $accepted, 'type' => 'sql_injection', 'file' => 'src/A.php', 'line' => 18],
+            ['accepted' => $accepted, 'status' => $status, 'type' => 'sql_injection', 'file' => 'src/A.php', 'line' => 18],
         );
 
         return $progressReporter;

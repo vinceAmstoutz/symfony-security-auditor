@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -627,6 +628,41 @@ final class ReportWriterTest extends TestCase
         $this->expectExceptionMessage('before the audit spends anything');
 
         $this->reportWriter->assertWritable($blockingFile.'/report.json', $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    #[DataProvider('directorySeparators')]
+    public function test_assert_writable_refuses_a_path_that_names_a_directory(string $separator): void
+    {
+        $this->expectException(ReportWriteFailedException::class);
+        $this->expectExceptionMessage('names a directory');
+
+        $this->reportWriter->assertWritable($this->tmpDir.'/reports'.$separator, $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_accepts_a_path_that_is_not_utf_8(): void
+    {
+        $outputFile = $this->tmpDir."/r\xFF.json";
+
+        $this->reportWriter->assertWritable($outputFile, $this->tmpDir);
+
+        self::assertFileDoesNotExist($outputFile);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function directorySeparators(): iterable
+    {
+        yield 'a trailing slash' => ['/'];
+        yield 'a trailing backslash' => ['\\'];
     }
 
     /**

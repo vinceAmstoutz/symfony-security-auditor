@@ -757,6 +757,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(RunAuditUseCase::class),
             service(JsonReportRenderer::class),
             service(AuditedProjectPathHolder::class),
+            service(BaselineProcessorInterface::class),
+            service(FindingTypeFilterInterface::class),
+            service(ReviewerFeedbackHolder::class),
         ]);
 
     $defaultsConfigurator->set(McpServerFactory::class)

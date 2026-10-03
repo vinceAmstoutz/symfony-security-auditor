@@ -1171,8 +1171,8 @@ final class ReviewerAgentTest extends TestCase
             static fn (array $event): bool => 'review.finding.reviewed' === $event[0],
         ));
         self::assertCount(2, $reviewedEvents);
-        self::assertSame(['accepted' => true, 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1], $reviewedEvents[0][1]);
-        self::assertSame(['accepted' => false, 'type' => 'broken_access_control', 'file' => 'src/B.php', 'line' => 1], $reviewedEvents[1][1]);
+        self::assertSame(['accepted' => true, 'status' => 'validated', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1], $reviewedEvents[0][1]);
+        self::assertSame(['accepted' => false, 'status' => 'rejected', 'type' => 'broken_access_control', 'file' => 'src/B.php', 'line' => 1], $reviewedEvents[1][1]);
     }
 
     /**
@@ -1212,7 +1212,7 @@ final class ReviewerAgentTest extends TestCase
             $recordingProgressReporter->events,
             static fn (array $event): bool => 'review.finding.reviewed' === $event[0],
         ));
-        self::assertSame([['accepted' => false, 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]], array_column($reviewedEvents, 1));
+        self::assertSame([['accepted' => false, 'status' => 'errored', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]], array_column($reviewedEvents, 1));
     }
 
     /**

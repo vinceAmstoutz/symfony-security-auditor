@@ -16,16 +16,25 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\AI\Platform\Exception\BadRequestException;
 use Symfony\AI\Platform\FinishReason\FinishReason;
 use Symfony\AI\Platform\FinishReason\FinishReasonCase;
 use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
+use Symfony\AI\Platform\Result\RawHttpResult;
+use Symfony\AI\Platform\Result\RawResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResultExtractor;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\FailingResultConverter;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\ReportedUsageExtractor;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\UnreadableResponse;
 
 final class PlatformResultExtractorTest extends TestCase
 {
@@ -80,6 +89,41 @@ final class PlatformResultExtractorTest extends TestCase
         $deferredResult->getMetadata()->add('token_usage', $tokenUsage);
 
         return $deferredResult;
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_reads_the_usage_a_provider_reported_in_an_answer_its_bridge_failed_to_convert(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platformResultExtractor = new PlatformResultExtractor($tokenUsageRecorder);
+
+        $billedUsage = $platformResultExtractor->extractBilledUsage(self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), new TokenUsage(promptTokens: 10, completionTokens: 5, cacheCreationTokens: 2, cacheReadTokens: 3)));
+
+        self::assertInstanceOf(TokenUsageSnapshot::class, $billedUsage);
+        self::assertSame([10, 5, 3, 2], [$billedUsage->inputTokens(), $billedUsage->outputTokens(), $billedUsage->cacheReadTokens(), $billedUsage->cacheCreationTokens()]);
+        self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+    }
+
+    #[DataProvider('answersReportingNoBilledUsageCases')]
+    public function test_it_reads_no_billed_usage_from_an_answer_that_reports_none_it_can_trust(DeferredResult $deferredResult): void
+    {
+        self::assertNull((new PlatformResultExtractor(null))->extractBilledUsage($deferredResult));
+    }
+
+    /** @return iterable<string, array{DeferredResult}> */
+    public static function answersReportingNoBilledUsageCases(): iterable
+    {
+        yield 'a bridge with no usage extractor' => [new DeferredResult(new FailingResultConverter(new BadRequestException('Bad Request')), new InMemoryRawResult(['usage' => []]))];
+        yield 'an answer without a usage entry' => [self::unconvertedAnswer(new InMemoryRawResult(['error' => ['message' => 'Bad Request']]), new TokenUsage(promptTokens: 10, completionTokens: 5))];
+        yield 'an answer reporting a negative count' => [self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), new TokenUsage(promptTokens: -1, completionTokens: 5))];
+        yield 'an answer that cannot be read' => [self::unconvertedAnswer(new RawHttpResult(new UnreadableResponse()), new TokenUsage(promptTokens: 10, completionTokens: 5))];
+    }
+
+    private static function unconvertedAnswer(RawResultInterface $rawResult, TokenUsage $tokenUsage): DeferredResult
+    {
+        return new DeferredResult(new FailingResultConverter(new BadRequestException('Bad Request'), new ReportedUsageExtractor($tokenUsage)), $rawResult);
     }
 
     #[DataProvider('reportedModelCases')]

@@ -18,13 +18,17 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\PreloadedStdioTransportFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\SingleFileAuditPipeline;
 
 final class McpServerFactoryTest extends TestCase
 {
@@ -75,7 +79,7 @@ final class McpServerFactoryTest extends TestCase
     private function converse(): string
     {
         $server = (new McpServerFactory(
-            new AuditTool(new RunAuditUseCase(self::createStub(PipelineInterface::class), new NullLogger()), new JsonReportRenderer(), new AuditedProjectPathHolder('/default/project/dir')),
+            new AuditTool(new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()), new JsonReportRenderer(), new AuditedProjectPathHolder('/default/project/dir'), new BaselineProcessor(new Baseline()), new FindingTypeFilter(), new ReviewerFeedbackHolder()),
             new ReportPackage(),
         ))->create();
 

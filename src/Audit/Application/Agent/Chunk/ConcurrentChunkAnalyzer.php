@@ -18,6 +18,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\StatusTrackingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
@@ -75,6 +76,7 @@ final readonly class ConcurrentChunkAnalyzer
     public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex, ?ToolRegistry $toolRegistry = null): array
     {
         $totalChunks = \count($chunks);
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder($coverageRecorder);
 
         /** @var array<int, VulnerabilityHydrationResult> $cachedResults */
         $cachedResults = [];
@@ -85,10 +87,10 @@ final readonly class ConcurrentChunkAnalyzer
 
             $chunkContext = $this->chunkContextFactory->create($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $this->attackerChunkCache->isContextAware());
 
-            $cached = $this->servedCachedResult($chunk, $chunkContext, $coverageRecorder);
+            $cached = $this->servedCachedResult($chunk, $chunkContext, $statusTrackingCoverageRecorder);
             if ($cached instanceof VulnerabilityHydrationResult) {
                 $cachedResults[$index] = $cached;
-                $this->recordFoundVulnerabilities($cached, $coverageRecorder);
+                $this->recordFoundVulnerabilities($cached, $statusTrackingCoverageRecorder);
 
                 continue;
             }
@@ -96,9 +98,9 @@ final readonly class ConcurrentChunkAnalyzer
             $pending[$index] = $this->buildPendingChunk($chunk, $chunkContext, $toolRegistry);
         }
 
-        $dispatchedResults = $this->dispatchInWindows($pending, new ChunkAnalysisScope($attackerAnalysisRequest, $riskMarkerIndex, $toolRegistry), $coverageRecorder);
+        $dispatchedResults = $this->dispatchInWindows($pending, new ChunkAnalysisScope($attackerAnalysisRequest, $riskMarkerIndex, $toolRegistry), $statusTrackingCoverageRecorder);
 
-        return $this->aggregate($chunks, $cachedResults, $dispatchedResults);
+        return $this->aggregate($chunks, $cachedResults, $dispatchedResults, $statusTrackingCoverageRecorder);
     }
 
     private function reportChunkStarted(int $index, int $totalChunks): void
@@ -147,7 +149,7 @@ final readonly class ConcurrentChunkAnalyzer
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}
      */
-    private function aggregate(array $chunks, array $cachedResults, array $dispatchedResults): array
+    private function aggregate(array $chunks, array $cachedResults, array $dispatchedResults, StatusTrackingCoverageRecorder $statusTrackingCoverageRecorder): array
     {
         $totalChunks = \count($chunks);
         $allVulnerabilities = [];
@@ -156,7 +158,7 @@ final readonly class ConcurrentChunkAnalyzer
         foreach (array_keys($chunks) as $index) {
             $chunkResult = $chunkResults[$index];
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
-            $this->reportChunkCompleted($index, $totalChunks);
+            $this->reportChunkCompleted($index, $totalChunks, $statusTrackingCoverageRecorder->chunkStatus($chunks[$index]));
             array_push($allVulnerabilities, ...$chunkResult->vulnerabilities());
             $totalDropsByReason = $this->mergeDrops($totalDropsByReason, $chunkResult->dropsByReason());
         }
@@ -164,12 +166,13 @@ final readonly class ConcurrentChunkAnalyzer
         return [$allVulnerabilities, $totalDropsByReason];
     }
 
-    private function reportChunkCompleted(int $index, int $totalChunks): void
+    private function reportChunkCompleted(int $index, int $totalChunks, string $status): void
     {
         $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
             'chunk' => $index + 1,
             'total_chunks' => $totalChunks,
             'elapsed_seconds' => 0.0,
+            'status' => $status,
         ]);
     }
 

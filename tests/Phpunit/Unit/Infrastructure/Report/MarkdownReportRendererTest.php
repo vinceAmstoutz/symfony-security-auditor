@@ -145,6 +145,25 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_states_the_risk_of_an_audit_that_did_not_finish_as_covering_only_the_files_analyzed(): void
+    {
+        self::assertStringContainsString('**Risk level:** SAFE (score 0, on the files analyzed) · ', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_states_no_risk_level_for_an_audit_that_analyzed_no_file(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile());
+
+        self::assertStringContainsString('**Risk level:** UNKNOWN (no file was analyzed) · ', $output);
+        self::assertStringNotContainsString('SAFE', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_never_calls_an_incomplete_audit_clean(): void
     {
         self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));

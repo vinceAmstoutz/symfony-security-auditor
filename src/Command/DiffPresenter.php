@@ -68,7 +68,7 @@ final readonly class DiffPresenter implements DiffPresenterInterface
         }
 
         $this->section($symfonyStyle, 'Unverified', $findings);
-        $symfonyStyle->writeln('  (absent from the current report, whose run could not fully analyze their files — not shown as fixed)');
+        $symfonyStyle->writeln('  (absent from the current report, whose run did not fully analyze their files, or never looked at them — not shown as fixed)');
     }
 
     /**

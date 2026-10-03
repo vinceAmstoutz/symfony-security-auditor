@@ -40,7 +40,7 @@ src/
 ├── Audit/
 │   ├── Domain/          # Pure PHP — no framework, no I/O
 │   │   ├── Model/       # Value objects and enums
-│   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, NullCoverageRecorder
+│   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, RejectedFindingRecorderInterface, NullCoverageRecorder
 │   │   └── Port/        # Cross-layer ports — LLMClientInterface,
 │   │       │              BatchCapableLLMClientInterface,
 │   │       │              ToolBatchCapableLLMClientInterface, LLMResponse,
@@ -74,8 +74,9 @@ src/
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop,
 │       │                  BatchWindowResolver, ToolConversationWavefront, InFlightRequestCanceller,
-│       │                  DegradedAnswerBooker, DispatchedRequest, PlatformResultExtractor,
-│       │                  PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator),
+│       │                  DegradedAnswerBooker, ConversionFailureExplainer, DispatchedRequest,
+│       │                  PlatformResultExtractor, PlatformOptionsFactory, PlatformToolsMapper,
+│       │                  PromptTokenEstimator),
 │       │                  RetryPolicy, TransientFailureClassifier,
 │       │                  TokenEstimator/{ProviderTokenEstimatorInterface, ResolvingTokenEstimator,
 │       │                  CharacterRatioCounter, AnthropicTokenEstimator, OpenAiTokenEstimator,
@@ -414,17 +415,17 @@ Adapter implementing `LLMClientInterface`. Wraps `Symfony\AI\Agent\AgentInterfac
 
 Token usage (input, output tokens) is read from the platform response via `symfony/ai`'s `TokenUsageInterface` and forwarded to the shared `TokenUsageRecorder` so `RunAuditUseCase` can attribute cumulative usage to the final `AuditReport`. `BudgetTracker` receives the same counts to enforce `audit.budget.*` limits; it throws `BudgetExceededException` when a limit is breached, triggering a clean abort with exit code `2`.
 
-Jittered exponential backoff is applied by the surrounding `RetryPolicy`; transient failures (HTTP 429, 5xx) are retried up to `audit.retry.max_attempts` times. Non-transient failures (auth, validation errors) are classified by `TransientFailureClassifier` and propagate immediately. Eager resolution of the `DeferredResult` (forcing `getResult()` before the retry wrapper exits) ensures errors emitted by `symfony/http-client`'s lazy body read surface inside the retry loop instead of escaping later in `complete()` / `completeWithTools()`.
+Jittered exponential backoff is applied by the surrounding `RetryPolicy`; transient failures (HTTP 429, 5xx) are retried up to `audit.retry.max_attempts` times, and no retry goes out once a billed attempt (a tool call whose arguments came back garbled) has spent the budget. Non-transient failures (auth, validation errors) are classified by `TransientFailureClassifier` and propagate immediately. Eager resolution of the `DeferredResult` (forcing `getResult()` before the retry wrapper exits) ensures errors emitted by `symfony/http-client`'s lazy body read surface inside the retry loop instead of escaping later in `complete()` / `completeWithTools()`.
 
 Around each invocation, `RateLimiterInterface` (default `NullRateLimiter`, opt-in `TokenBucketRateLimiter`) gates outbound calls proactively: `acquire($estimatedInputTokens)` blocks until the next request fits inside the configured per-minute windows, `record($in, $out)` reconciles the estimate with actuals once the call completes, and `pauseUntil($at)` propagates a server-issued `Retry-After` (parsed by `RetryAfterHeaderParser` from `Symfony\AI\Platform\Exception\RateLimitExceededException::getRetryAfter()`) so concurrent chunks share the freeze instead of stampeding the provider.
 
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no code changes — only `ai.yaml` configuration.
 
-The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `InFlightRequestCanceller` (cancels and books the requests a failed window leaves open), `DegradedAnswerBooker` (books an answer a provider delivered as an error at its estimated input tokens), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
+The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `InFlightRequestCanceller` (cancels and books the requests a failed window leaves open), `DegradedAnswerBooker` (books every failed call the provider answered — a degraded answer or a malformed tool call — at the usage it reported, else at its estimated input tokens), `ConversionFailureExplainer` (reads the raw answer of a conversion that failed for what the bridge's exception lost: Azure's HTTP 400 `content_filter`, a tool call the output limit cut off, or a gateway's HTTP 413), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
 
 ### `LLMResponse`
 
-Thin value object wrapping the raw string content. Key method: `parseJson()` strips a markdown code fence that models sometimes wrap the whole answer in — never one quoted inside a JSON string — then JSON-decodes. Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded value is not an array. `isEmpty()` checks for blank content.
+Thin value object wrapping the raw string content. Key method: `parseJson()` strips a markdown code fence that models sometimes wrap the whole answer in — never one quoted inside a JSON string — then JSON-decodes; when prose surrounds the JSON, it takes the last block at the top level of the answer that decodes to an object or to a list holding one, so JSON the model quotes before its answer never stands for it, and neither does a bracket in the prose after it (`[1]`, `[ ]`, `[]`); a JSON object written after the answer still does. Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded value is not an array. `isEmpty()` checks for blank content.
 
 ### `ProjectFileScanner`
 
@@ -538,7 +539,7 @@ Console command `audit:run` (alias `audit`). Arguments and options:
 
 Input mapping and resolution live in `AuditCommandInput`; output writing in `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
-Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold (default `critical`, so SAFE/LOW/MEDIUM/HIGH) and any `--min-score` is met; `1` when it is at or above the threshold, the normalized score is below `--min-score`, the scan discovered no file to audit at all, the path was invalid, or the audit itself failed; `2` when the budget could not be honored — either aborted mid-run with a partial report still emitted, or never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable; `3` when `--fail-on-incomplete` is set, no gate tripped, and some file could not be fully analyzed. The canonical table lives in [`docs/configuration.md`](configuration.md#exit-codes).
+Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold (default `critical`, so SAFE/LOW/MEDIUM/HIGH) and any `--min-score` is met; `1` when it is at or above the threshold, the normalized score is below `--min-score`, the scan discovered no file to audit at all, no file in scope could be analyzed and nothing was found, the path was invalid, or the audit itself failed; `2` when the budget could not be honored — either aborted mid-run with a partial report still emitted, or never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable; `3` when `--fail-on-incomplete` is set, no gate tripped, and some file could not be fully analyzed. The canonical table lives in [`docs/configuration.md`](configuration.md#exit-codes).
 
 ## Extension Points
 

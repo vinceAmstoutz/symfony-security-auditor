@@ -8,7 +8,7 @@
   Audit ID: {{auditId}}
 
 ──────────────────────────────────────────────────────────────────────
-  RISK LEVEL: {{riskLevel}}  (Score: {{riskScore}})
+  RISK LEVEL: {{riskLevel}}  ({{riskDetail}})
 ──────────────────────────────────────────────────────────────────────
 
   {{businessImpact}}

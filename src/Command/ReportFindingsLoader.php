@@ -17,6 +17,7 @@ use JsonException;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AnalyzedFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\UnanalyzedFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
@@ -29,7 +30,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadable
  * {@see Vulnerability::fingerprintOf()} uses, so it never drifts from the
  * canonical identity. The report's `coverage` ledger, when it carries one,
  * names the files the run could not fully analyze the same way
- * {@see UnanalyzedFiles} reads it for the run itself.
+ * {@see UnanalyzedFiles} reads it for the run itself, and the files its
+ * attacker analyzed the way {@see AnalyzedFiles} does; its `scope` says where a
+ * complete run looked.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -55,7 +58,35 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
             ++$index;
         }
 
-        return new LoadedReport($findings, $this->unanalyzedFilesIn($decoded));
+        $coverage = $this->coverageIn($decoded);
+
+        return new LoadedReport(
+            $findings,
+            UnanalyzedFiles::in($coverage ?? []),
+            null === $coverage ? null : AnalyzedFiles::in($coverage),
+            array_column($coverage ?? [], 'file'),
+            $this->completeRunScanPathsIn($decoded),
+        );
+    }
+
+    /**
+     * The `--path` scopes of a run that can say a file it never listed is
+     * gone: it reported itself complete and recorded a `scope` that ran over
+     * the whole history, with no `--since`. Null otherwise — including for a
+     * report written before the scope existed.
+     *
+     * @param array<array-key, mixed> $decoded
+     *
+     * @return list<string>|null
+     */
+    private function completeRunScanPathsIn(array $decoded): ?array
+    {
+        $scope = $decoded['scope'] ?? null;
+        if (true !== ($decoded['complete'] ?? null) || !\is_array($scope) || !\array_key_exists('since', $scope) || null !== $scope['since'] || !\is_array($scope['paths'] ?? null)) {
+            return null;
+        }
+
+        return array_values(array_filter($scope['paths'], \is_string(...)));
     }
 
     /**
@@ -107,18 +138,18 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
     }
 
     /**
-     * A report written before the ledger existed, or one whose entries do not
-     * have the expected shape, simply names no such file.
+     * The report's coverage ledger: null for a report written before the
+     * ledger existed. An entry without the expected shape names no file.
      *
      * @param array<array-key, mixed> $decoded
      *
-     * @return list<string>
+     * @return list<array{stage: string, file: string, status: string}>|null
      */
-    private function unanalyzedFilesIn(array $decoded): array
+    private function coverageIn(array $decoded): ?array
     {
         $coverage = $decoded['coverage'] ?? null;
         if (!\is_array($coverage)) {
-            return [];
+            return null;
         }
 
         $entries = [];
@@ -128,7 +159,7 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
             }
         }
 
-        return UnanalyzedFiles::in($entries);
+        return $entries;
     }
 
     /**

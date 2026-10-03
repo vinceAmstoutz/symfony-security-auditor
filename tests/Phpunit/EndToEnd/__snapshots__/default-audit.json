@@ -70,6 +70,10 @@
             }
         }
     },
+    "scope": {
+        "since": null,
+        "paths": []
+    },
     "coverage": [
         {
             "stage": "attacker",

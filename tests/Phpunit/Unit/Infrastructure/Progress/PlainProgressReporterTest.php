@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progress;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
@@ -67,6 +68,20 @@ final class PlainProgressReporterTest extends TestCase
         $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 3, 'elapsed_seconds' => 47.0]);
 
         self::assertSame("  ✓ chunk 1/3 done (47s)\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_marks_a_chunk_whose_analysis_failed(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored']);
+
+        self::assertSame("  ✗ chunk 2/3 failed (12s)\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_marks_an_analyzed_chunk_as_done(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 0.0, 'status' => 'analyzed']);
+
+        self::assertSame("  ✓ chunk 2/3 done\n", $this->bufferedOutput->fetch());
     }
 
     public function test_it_omits_duration_for_a_sub_second_chunk_completion(): void
@@ -254,6 +269,35 @@ final class PlainProgressReporterTest extends TestCase
         $this->plainProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 40]);
 
         self::assertSame("  [REJECTED] sql_injection — src/X.php:40\n", $this->bufferedOutput->fetch());
+    }
+
+    #[DataProvider('statusesOfAReviewThatReachedNoVerdict')]
+    public function test_it_marks_a_review_that_reached_no_verdict_as_failed_never_as_rejected(string $status): void
+    {
+        $this->plainProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'status' => $status, 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 40]);
+
+        self::assertSame("  [REVIEW-FAILED] sql_injection — src/X.php:40\n", $this->bufferedOutput->fetch());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function statusesOfAReviewThatReachedNoVerdict(): iterable
+    {
+        yield 'a review whose call failed' => ['errored'];
+        yield 'a review an abort cut short' => ['aborted'];
+    }
+
+    public function test_it_still_prints_a_rejection_that_names_its_status_as_rejected(): void
+    {
+        $this->plainProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'status' => 'rejected', 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 40]);
+
+        self::assertSame("  [REJECTED] sql_injection — src/X.php:40\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_the_review_summary_counts_the_reviews_that_failed(): void
+    {
+        $this->plainProgressReporter->report('review.completed', ['accepted' => 1, 'rejected' => 1, 'failed' => 2]);
+
+        self::assertSame("  1 validated, 1 rejected, 2 failed\n", $this->bufferedOutput->fetch());
     }
 
     public function test_it_never_emits_carriage_returns(): void

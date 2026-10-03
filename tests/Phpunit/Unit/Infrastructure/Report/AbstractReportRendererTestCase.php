@@ -67,6 +67,19 @@ abstract class AbstractReportRendererTestCase extends TestCase
     protected function makeIncompleteReport(Vulnerability ...$vulnerabilities): AuditReport
     {
         $auditContext = $this->buildContext(...$vulnerabilities);
+        $auditContext->recordCoverage('attacker', 'src/Controller/Analyzed.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/Controller/Failed.php', 'errored');
+        $auditContext->recordCoverage('attacker', 'src/Controller/Unreached.php', 'aborted');
+
+        return AuditReport::fromContext($auditContext);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    protected function makeReportThatAnalyzedNoFile(Vulnerability ...$vulnerabilities): AuditReport
+    {
+        $auditContext = $this->buildContext(...$vulnerabilities);
         $auditContext->recordCoverage('attacker', 'src/Controller/Failed.php', 'errored');
         $auditContext->recordCoverage('attacker', 'src/Controller/Unreached.php', 'aborted');
 

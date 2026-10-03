@@ -139,6 +139,20 @@ final class TrendPresenterTest extends TestCase
         self::assertStringContainsString('2. current.json — 1 findings (0 new, 1 fixed, 1 unverified)', $bufferedOutput->fetch());
     }
 
+    public function test_the_summary_says_how_many_findings_went_unverified_rather_than_fixed(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->trendPresenter->present($symfonyStyle, new ReportTrend([
+            new TrendPoint('first.json', 5, null, null),
+            new TrendPoint('second.json', 2, 0, 0, 3),
+            new TrendPoint('third.json', 3, 1, 0, 0),
+        ]), TrendOutputFormat::Console);
+
+        self::assertStringContainsString('Summary: 5 → 3 findings (-2) across 3 reports, 3 unverified rather than fixed.', $bufferedOutput->fetch());
+    }
+
     public function test_a_later_report_line_stays_as_it_was_when_every_disappearance_is_verified(): void
     {
         $bufferedOutput = new BufferedOutput();
