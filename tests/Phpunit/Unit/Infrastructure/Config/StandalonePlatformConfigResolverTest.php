@@ -480,10 +480,31 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_reports_a_credential_that_is_neither_exported_nor_stored(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('run "auth:set" to store the key on this machine');
+        $this->expectExceptionMessage('run "auth:set --env-var=ANTHROPIC_API_KEY" to store the key on this machine');
 
         (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore()))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_without_a_provider_the_advice_names_the_missing_variable_rather_than_the_first_one_configured(): void
+    {
+        try {
+            (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => 'sk-ant-exported'], credentialStore: new InMemoryCredentialStore()))
+                ->resolve(['platform' => [
+                    'anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%'],
+                    'openai' => ['api_key' => '%env(OPENAI_API_KEY)%'],
+                ]]);
+            self::fail('Without a provider, every configured key must resolve.');
+        } catch (MissingEnvironmentVariableException $missingEnvironmentVariableException) {
+            self::assertStringContainsString('run "auth:set --env-var=OPENAI_API_KEY" to store the key on this machine', $missingEnvironmentVariableException->getMessage());
+            self::assertStringContainsString('run "auth:status --env-var=OPENAI_API_KEY" to see what is currently resolved', $missingEnvironmentVariableException->getMessage());
+        }
     }
 
     /**
