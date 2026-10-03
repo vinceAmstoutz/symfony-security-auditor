@@ -103,6 +103,44 @@ final class StagesTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_ingestion_stage_records_a_file_the_secret_scrubber_withheld_as_errored(): void
+    {
+        $scanner = self::createStub(ProjectFileScannerInterface::class);
+        $scanner->method('scan')->willReturn([
+            ProjectFile::create('src/Clean.php', '/app/src/Clean.php', '<?php'),
+            ProjectFile::create('src/Withheld.php', '/app/src/Withheld.php', "***REDACTED:unscannable***\n\n"),
+        ]);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        (new IngestionStage($scanner, new NullLogger()))->process($auditContext);
+
+        self::assertSame([['stage' => 'secret_scrubbing', 'file' => 'src/Withheld.php', 'status' => 'errored']], $auditContext->coverage());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_ingestion_stage_warns_which_file_the_secret_scrubber_withheld(): void
+    {
+        $bufferingLogger = new BufferingLogger();
+        $scanner = self::createStub(ProjectFileScannerInterface::class);
+        $scanner->method('scan')->willReturn([
+            ProjectFile::create('src/Withheld.php', '/app/src/Withheld.php', '***REDACTED:unscannable***'),
+        ]);
+
+        (new IngestionStage($scanner, $bufferingLogger))->process(AuditContext::forProject($this->tmpDir));
+
+        self::assertContains(
+            ['warning', 'Secret scrubbing could not scan a file, so its content was withheld and the file is not analyzed', ['file' => 'src/Withheld.php']],
+            $bufferingLogger->cleanLogs(),
+        );
+    }
+
+    /**
      * @throws InvalidAuditContextException
      */
     public function test_ingestion_stage_handles_empty_scan_result(): void

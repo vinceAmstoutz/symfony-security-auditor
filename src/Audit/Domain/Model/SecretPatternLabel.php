@@ -36,5 +36,12 @@ enum SecretPatternLabel: string
     case NpmToken = 'npm_token';
     case SendgridApiKey = 'sendgrid_api_key';
     case PypiToken = 'pypi_token';
+    case DiscordWebhookUrl = 'discord_webhook_url';
+    case XmlParameter = 'xml_parameter';
     case Unscannable = 'unscannable';
+
+    public function placeholder(): string
+    {
+        return \sprintf('***REDACTED:%s***', $this->value);
+    }
 }

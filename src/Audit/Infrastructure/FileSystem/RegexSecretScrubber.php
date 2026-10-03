@@ -25,10 +25,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  *
  * The pattern set covers common high-signal leaks: cloud provider keys, version-control
  * tokens, payment processor keys, generic credential assignments, JWT-shaped tokens,
- * PEM-encoded private keys, env-style token assignments, connection-string URIs with
+ * PEM-encoded private keys and PGP private key blocks, env-style token assignments,
+ * Symfony `env(NAME)` parameter defaults and XML `<parameter>` values, PHP `define()`
+ * constants, connection-string URIs with
  * embedded credentials (e.g. `postgres://user:pass@host`), `Authorization: Bearer` and
  * `Authorization: Basic` headers,
- * OpenAI-style `sk-`/`sk-proj-` keys, Slack incoming webhook URLs, and GitLab, Hugging Face,
+ * OpenAI-style `sk-`/`sk-proj-` keys, Slack and Discord webhook URLs, and GitLab, Hugging Face,
  * npm, SendGrid and PyPI tokens. Each match is replaced
  * with `***REDACTED:<label>***` so downstream prompt builders can still emit a coherent
  * file context without exposing the secret to the LLM.
@@ -42,7 +44,9 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      * `DBPASS`, `PGPASSWORD`) names a credential as surely as its underscored
      * spelling; the qualifier list keeps `MONKEY`, `TURKEY` or `COMPASS` out.
      */
-    private const string GLUED_ENV_CREDENTIAL_KEY = '(?:API|APP|AUTH|ACCESS|SECRET|PRIVATE|CLIENT|MASTER|ACCOUNT|SIGNING|ENCRYPTION|JWT|OAUTH|SESSION|REFRESH|BEARER|PASS|DB|DATABASE|ROOT|ADMIN|USER|MYSQL|POSTGRES|PG|MONGO|REDIS|SMTP|MAIL|FTP|SSH)+(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|PASS)';
+    private const string GLUED_ENV_CREDENTIAL_KEY = '(?:API|APP|AUTH|ACCESS|SECRET|PRIVATE|CLIENT|MASTER|ACCOUNT|SIGNING|ENCRYPTION|JWT|OAUTH|SESSION|REFRESH|BEARER|PASS|DB|DATABASE|ROOT|ADMIN|USER|MYSQL|POSTGRES|PG|MONGO|REDIS|SMTP|MAIL|FTP|SSH){1,4}(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|PASS)';
+
+    private const string PRIVATE_KEY_LABEL = '(?:(?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY|PGP PRIVATE KEY BLOCK)';
 
     /**
      * A quoted fragment joined to a variable or a call: `'" . $pass . "'`.
@@ -60,7 +64,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private const string PHP_EXPRESSION = '/^(?:\$[A-Za-z_]\w*(?:[;,]?$|->|\?->|::|\[)|(?:self|static|parent)::[A-Z_][A-Z0-9_]*[;,]?$|[A-Z]\w*::[A-Z_][A-Z0-9_]*[;,]$|(?:\\\\?[a-z_]\w*|(?:self|static|parent|[A-Z]\w*)::[A-Za-z_]\w*)\((?:(?:[\'"$]|[a-z_]\w*\().*[,;()]|.*[;,])$)/';
 
-    private const string INLINE_CREDENTIAL_KEY = '(?:password|passwd|pwd|passphrase|(?<![a-z])pass(?![_-])|secret|credentials|api[_-]?key|api[_-]?token|api[_-]?secret|access[_-]?token|access[_-]?key|auth[_-]?token|auth[_-]?key|client[_-]?secret|private[_-]?key|account[_-]?key|secret[_-]?key|app[_-]?key|app[_-]?secret|master[_-]?key|signing[_-]?key|encryption[_-]?key|session[_-]?secret|jwt[_-]?secret|refresh[_-]?token|bearer[_-]?token|(?:db|database|root|admin|user|mysql|postgres|pg|mongo|redis|smtp|mail|ftp|ssh)[_-]?pass(?:word|wd)?)';
+    private const string INLINE_CREDENTIAL_KEY = '(?:password|passwd|pwd|passphrase|(?<![a-z])pass(?![_-])|(?<![\w?&-])token(?![\w-])|secret|credentials|api[_-]?key|api[_-]?token|api[_-]?secret|access[_-]?token|access[_-]?key|auth[_-]?token|auth[_-]?key|client[_-]?secret|private[_-]?key|account[_-]?key|secret[_-]?key|app[_-]?key|app[_-]?secret|master[_-]?key|signing[_-]?key|encryption[_-]?key|session[_-]?secret|jwt[_-]?secret|refresh[_-]?token|bearer[_-]?token|(?:db|database|root|admin|user|mysql|postgres|pg|mongo|redis|smtp|mail|ftp|ssh)[_-]?pass(?:word|wd)?)';
 
     /**
      * @var array<string, string>
@@ -99,12 +103,22 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      * value runs to `(?!\2)[^\n]` rather than excluding both quote characters,
      * so a value quoted with one type may hold the other — "don't" inside
      * double quotes — without the closing-quote backreference stopping there.
+     * A repeated group costs the engine a stack frame per repetition, so the
+     * segments of a key are bounded (`{0,8}`, `{1,4}`) and the further words
+     * of an unquoted value are one character run: a single line repeating
+     * `_a` would otherwise exhaust the JIT stack and withhold the whole file.
+     * A private key with no end marker after it ends the search, since no
+     * later key can have one either, and a URL scheme is at most 32
+     * characters, so neither rescans the rest of the file from every header
+     * or word boundary.
      *
      * @return array<string, string> map of pattern label => PCRE pattern. Labels are stable
      *                               and appear in the redaction placeholder.
      */
     private function defaultPatterns(): array
     {
+        $envCredentialName = $this->envCredentialName();
+
         return [
             SecretPatternLabel::AwsAccessKey->value => '/\bAKIA[0-9A-Z]{16}\b/',
             SecretPatternLabel::GithubToken->value => '/\b(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_\w{22,255})\b/',
@@ -112,21 +126,32 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::SlackToken->value => '/\b(?:xox[abprs]-[A-Za-z0-9-]{10,72}|xapp-[0-9]-[A-Za-z0-9-]{10,120})\b/',
             SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}(?![0-9A-Za-z_\-])/',
             SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
-            SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/',
-            SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
-            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:(?:TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|KEY|DSN)(?:_[A-Z0-9]+)*|%s(?:_[A-Z0-9]+)*|PASS|PW))\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\2)[^\n])*+\2|\S+)/m', self::GLUED_ENV_CREDENTIAL_KEY),
-            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+)*["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i', self::INLINE_CREDENTIAL_KEY),
-            SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+)*["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', self::INLINE_CREDENTIAL_KEY),
+            SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
+            SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+@~i',
+            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)%s)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\2)[^\n])*+\2|\S+)/m', $envCredentialName),
+            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=])|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \tA-Za-z0-9]*[A-Za-z0-9])?))/i', self::INLINE_CREDENTIAL_KEY, $envCredentialName),
+            SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', self::INLINE_CREDENTIAL_KEY),
+            SecretPatternLabel::XmlParameter->value => \sprintf('~(<parameter\b[^>]{0,256}?\bkey=(["\'])[^"\'<>]{0,256}?%s[^"\'<>]{0,256}?\2[^>]{0,256}>)(?!\*\*\*REDACTED:)([^<\n]{4,})(?=</parameter>)~i', self::INLINE_CREDENTIAL_KEY),
             SecretPatternLabel::BearerToken->value => '/\bBearer\s+[A-Za-z0-9\-_.]{20,4096}\b/i',
             SecretPatternLabel::BasicAuthorization->value => '~\b((?:proxy-)?authorization\b["\']?\s*(?::|=>|=)\s*["\']?basic\s+)[A-Za-z0-9+/=_\-]{8,4096}~i',
             SecretPatternLabel::OpenAiApiKey->value => '/\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,200}\b/',
             SecretPatternLabel::SlackWebhookUrl->value => '~\bhttps://hooks\.slack\.com/services/[A-Za-z0-9]+/[A-Za-z0-9]+/[A-Za-z0-9]+\b~',
+            SecretPatternLabel::DiscordWebhookUrl->value => '~\bhttps://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/(?:v\d+/)?webhooks/\d+/[A-Za-z0-9_\-]+~',
             SecretPatternLabel::GitlabToken->value => '/\bgl(?:pat|ptt|rt|dt|ft|oas|soat|cbt|imt|agent)-[A-Za-z0-9_\-]{20,}/',
             SecretPatternLabel::HuggingFaceToken->value => '/\bhf_[A-Za-z0-9]{30,}\b/',
             SecretPatternLabel::NpmToken->value => '/\bnpm_[A-Za-z0-9]{36}\b/',
             SecretPatternLabel::SendgridApiKey->value => '/\bSG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}/',
             SecretPatternLabel::PypiToken->value => '/\bpypi-Ag[A-Za-z0-9_\-]{50,}/',
         ];
+    }
+
+    /**
+     * An environment variable named as a credential: `DB_PASSWORD`,
+     * `STRIPE_SECRET_KEY`, `PGPASSWORD`, `MAILER_DSN`.
+     */
+    private function envCredentialName(): string
+    {
+        return \sprintf('(?:[A-Z][A-Z0-9]*_){0,8}(?:(?:TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|KEY|DSN)(?:_[A-Z0-9]+){0,8}|%s(?:_[A-Z0-9]+){0,8}|PASS|PW)', self::GLUED_ENV_CREDENTIAL_KEY);
     }
 
     #[Override]
@@ -136,6 +161,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             $result = match (SecretPatternLabel::tryFrom($label)) {
                 SecretPatternLabel::InlineAssignment => preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content),
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
+                SecretPatternLabel::XmlParameter => preg_replace_callback($pattern, $this->redactXmlParameter(...), $content),
                 SecretPatternLabel::PemPrivateKey => preg_replace_callback($pattern, $this->redactPreservingLineCount(...), $content),
                 default => preg_replace($pattern, $this->replacementFor($label), $content),
             };
@@ -226,6 +252,18 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     }
 
     /**
+     * @param array<int|string, string> $match
+     */
+    private function redactXmlParameter(array $match): string
+    {
+        if ($this->isConfigPlaceholder($match[3] ?? '')) {
+            return $match[0];
+        }
+
+        return \sprintf('%s%s', $match[1], SecretPatternLabel::XmlParameter->placeholder());
+    }
+
+    /**
      * Replaces a multi-line match (the PEM key block) with a single placeholder
      * line followed by enough blank lines to keep the file's total line count
      * unchanged — otherwise every subsequent line number the attacker/reviewer
@@ -240,7 +278,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
 
     private function placeholderPreservingLineCount(SecretPatternLabel $secretPatternLabel, string $replaced): string
     {
-        return \sprintf('***REDACTED:%s***%s', $secretPatternLabel->value, str_repeat("\n", substr_count($replaced, "\n")));
+        return \sprintf('%s%s', $secretPatternLabel->placeholder(), str_repeat("\n", substr_count($replaced, "\n")));
     }
 
     /**
