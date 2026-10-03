@@ -34,6 +34,12 @@ use function Symfony\Component\String\u;
  */
 final readonly class Baseline implements BaselineInterface
 {
+    private const int MAX_FEEDBACK_TYPE_LENGTH = 64;
+
+    private const int MAX_FEEDBACK_FILE_LENGTH = 512;
+
+    private const int MAX_FEEDBACK_TITLE_LENGTH = 300;
+
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
     ) {}
@@ -118,8 +124,9 @@ final readonly class Baseline implements BaselineInterface
 
     /**
      * The baseline is part of the audited repository, so a pull request
-     * controls every reason, and each one reaches the reviewer's system
-     * prompt: it is capped the way the reviewer's own triage memory is.
+     * controls every field of an entry, and each one reaches the reviewer's
+     * system prompt: each is capped — the reason at the reviewer's own
+     * triage-memory cap.
      */
     private function feedbackOf(mixed $entry): ?AcceptedFindingFeedback
     {
@@ -133,11 +140,20 @@ final readonly class Baseline implements BaselineInterface
         }
 
         return new AcceptedFindingFeedback(
-            $this->stringField($entry, 'type'),
-            $this->stringField($entry, 'file'),
-            $this->stringField($entry, 'title'),
-            u($reason)->truncate(FilesystemTriageMemoryStore::MAX_REASON_LENGTH)->toString(),
+            $this->capped($this->stringField($entry, 'type'), self::MAX_FEEDBACK_TYPE_LENGTH),
+            $this->capped($this->stringField($entry, 'file'), self::MAX_FEEDBACK_FILE_LENGTH),
+            $this->capped($this->stringField($entry, 'title'), self::MAX_FEEDBACK_TITLE_LENGTH),
+            $this->capped($reason, FilesystemTriageMemoryStore::MAX_REASON_LENGTH),
         );
+    }
+
+    /**
+     * Counts code points: a run of combining marks inflates a single grapheme
+     * cluster without bound, never a code point count.
+     */
+    private function capped(string $value, int $maxCodePoints): string
+    {
+        return mb_substr($value, 0, $maxCodePoints, 'UTF-8');
     }
 
     /**

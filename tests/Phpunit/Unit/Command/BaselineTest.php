@@ -482,6 +482,35 @@ final class BaselineTest extends TestCase
     }
 
     /**
+     * Every field of a baseline entry is free text a pull request controls, and
+     * every one reaches the reviewer's system prompt, so each is capped — by
+     * code points, which a run of combining marks cannot inflate the way it
+     * inflates a grapheme cluster.
+     *
+     * @throws MalformedBaselineFileException
+     */
+    public function test_feedback_caps_every_field_by_code_points(): void
+    {
+        $graphemeOfManyCodePoints = 'a'.str_repeat("\u{0301}", 200);
+        $path = $this->tmpDir.'/baseline.json';
+        $this->filesystem->dumpFile($path, json_encode([[
+            ...$this->entry('SSA-AAA'),
+            'type' => str_repeat('t', 100),
+            'file' => str_repeat('f', 1_000),
+            'title' => str_repeat('T', 20_000),
+            'reason' => str_repeat($graphemeOfManyCodePoints, 6_000),
+        ]], \JSON_THROW_ON_ERROR));
+
+        $acceptedFindingFeedback = (new Baseline($this->filesystem))->feedback($path)->entries[0];
+
+        self::assertSame(str_repeat('t', 64), $acceptedFindingFeedback->type);
+        self::assertSame(str_repeat('f', 512), $acceptedFindingFeedback->file);
+        self::assertSame(str_repeat('T', 300), $acceptedFindingFeedback->title);
+        self::assertSame(FilesystemTriageMemoryStore::MAX_REASON_LENGTH, mb_strlen($acceptedFindingFeedback->reason));
+        self::assertStringStartsWith($graphemeOfManyCodePoints, $acceptedFindingFeedback->reason);
+    }
+
+    /**
      * @throws UnsafeBaselineWriteException
      * @throws BaselineWriteFailedException
      */
