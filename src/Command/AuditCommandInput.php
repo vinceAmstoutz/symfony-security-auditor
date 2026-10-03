@@ -71,7 +71,7 @@ final class AuditCommandInput
     #[Option(description: 'Minimum normalized score (0-100) below which the command exits 1. Independent of --fail-on: the audit fails when either gate trips. Omit to gate on the risk level alone.', name: 'min-score')]
     public ?int $minScore = null;
 
-    #[Option(description: 'Exit 3 when some file could not be fully analyzed (an LLM call still failed after its retries), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning.', name: 'fail-on-incomplete')]
+    #[Option(description: 'Exit 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning.', name: 'fail-on-incomplete')]
     public bool $failOnIncomplete = false;
 
     /**

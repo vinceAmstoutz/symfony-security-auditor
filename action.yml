@@ -44,7 +44,7 @@ inputs:
     required: false
     default: ""
   fail-on-incomplete:
-    description: Whether the audit exits 3 when some file could not be fully analyzed (an LLM call still failed after its retries), so a partial report cannot pass the job. A tripped fail-on or min-score gate still exits 1. Left false, such a run only raises a warning annotation (when format is json or sarif and output is a file).
+    description: Whether the audit exits 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass the job. A tripped fail-on or min-score gate still exits 1. Left false, such a run only raises a warning annotation (when format is json or sarif and output is a file).
     required: false
     default: "false"
   comment-pr:
