@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
  * Dispatches every request in a concurrency window via the platform WITHOUT
@@ -196,6 +197,7 @@ final readonly class BatchWindowResolver
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws TransientLLMFailureException
      */
     private function resolveOne(DispatchedRequest $dispatchedRequest, LLMRequest $llmRequest): LLMResponse
     {
@@ -244,6 +246,7 @@ final readonly class BatchWindowResolver
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws TransientLLMFailureException
      */
     private function recoverFailedResolution(Throwable $throwable, LLMRequest $llmRequest): LLMResponse
     {
@@ -262,8 +265,13 @@ final readonly class BatchWindowResolver
     }
 
     /**
+     * The fresh call that stands in for a request whose dispatch or
+     * resolution failed. That request was an attempt too, so a retry that
+     * runs out counts it, as the concurrent tool-using window does.
+     *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws TransientLLMFailureException
      */
     private function completeOrRefuse(LLMRequest $llmRequest): LLMResponse
     {
@@ -271,6 +279,8 @@ final readonly class BatchWindowResolver
             return $this->llmClient->complete($llmRequest->system, $llmRequest->user);
         } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
             return $this->tooLargeResponse($llmRequestTooLargeException);
+        } catch (TransientLLMFailureException $transientLLMFailureException) {
+            throw $transientLLMFailureException->afterOneMoreAttempt();
         }
     }
 

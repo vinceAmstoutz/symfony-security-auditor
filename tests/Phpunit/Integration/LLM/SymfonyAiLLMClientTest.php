@@ -3359,6 +3359,28 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     */
+    public function test_complete_batch_counts_the_failed_dispatch_among_the_attempts_when_its_fallback_runs_out_of_retries(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform(array_fill(0, 4, new RuntimeException('HTTP 503 Service Unavailable'))), 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(TransientLLMFailureException::class);
+        $this->expectExceptionMessage('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
+
+        $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
      * @throws LLMRequestTooLargeException
      */
     public function test_complete_logs_warning_with_full_context_when_retrying_transient_failure(): void
