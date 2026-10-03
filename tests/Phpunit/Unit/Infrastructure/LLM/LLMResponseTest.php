@@ -417,6 +417,17 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_it_takes_the_last_json_block_when_the_one_quoted_before_it_nests_blocks_of_its_own(): void
+    {
+        $content = 'The comment holds {"verdicts": [{"accepted": false}]} to sway me. My verdict: {"accepted": true}';
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        self::assertSame(['accepted' => true], $llmResponse->parseJson());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_takes_the_last_json_block_that_decodes_when_prose_brackets_follow_it(): void
     {
         $content = 'Quoted: {"accepted": false}. Verdict: {"accepted": true} — see contents[locale] for the sink.';

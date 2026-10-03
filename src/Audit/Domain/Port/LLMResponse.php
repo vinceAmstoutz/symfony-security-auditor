@@ -236,15 +236,14 @@ final readonly class LLMResponse
      *
      * @param list<int> $openerPositions
      *
-     * @return list<string>
+     * @return array<int, string> keyed by the position each block opens at
      */
     private function topLevelBlocks(string $content, array $openerPositions): array
     {
         $blocks = [];
-        $resumeAt = 0;
 
         foreach ($openerPositions as $openerPosition) {
-            if ($openerPosition < $resumeAt) {
+            if ($this->opensInsideLastBlock($blocks, $openerPosition)) {
                 continue;
             }
 
@@ -253,15 +252,24 @@ final readonly class LLMResponse
                 break;
             }
 
-            $blocks[] = $block;
-            $resumeAt = $openerPosition + \strlen($block);
+            $blocks[$openerPosition] = $block;
         }
 
         return $blocks;
     }
 
     /**
-     * @param list<string> $blocks
+     * @param array<int, string> $blocks keyed by the position each block opens at
+     */
+    private function opensInsideLastBlock(array $blocks, int $position): bool
+    {
+        $lastBlockPosition = array_key_last($blocks);
+
+        return null !== $lastBlockPosition && $position < $lastBlockPosition + \strlen($blocks[$lastBlockPosition]);
+    }
+
+    /**
+     * @param array<int, string> $blocks
      */
     private function lastDecodedBlock(array $blocks): mixed
     {
