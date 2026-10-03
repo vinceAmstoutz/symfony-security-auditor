@@ -571,6 +571,19 @@ final class BaselineTest extends TestCase
     }
 
     /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_accepts_a_path_that_is_not_utf_8(): void
+    {
+        $path = $this->tmpDir."/b\xFF.json";
+
+        (new Baseline($this->filesystem))->assertWritable($path, $this->tmpDir);
+
+        self::assertFileDoesNotExist($path);
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function directorySeparators(): iterable

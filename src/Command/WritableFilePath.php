@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
-use function Symfony\Component\String\u;
-
 /**
  * What `Filesystem::dumpFile()` needs to save a file at a path, checked by the
  * report and baseline writers before an audit spends anything on the file.
@@ -27,11 +25,12 @@ final readonly class WritableFilePath
      * A path ending with a separator names a directory, yet `dirname()` drops
      * that separator, so every directory check passes and only the write
      * itself fails — once the audit has run. Both separators count, as they do
-     * for `Symfony\Component\Filesystem\Path`.
+     * for `Symfony\Component\Filesystem\Path`. The bytes are compared as
+     * they are: a path need not be valid UTF-8.
      */
     public static function namesADirectory(string $path): bool
     {
-        return u($path)->endsWith(['/', '\\']);
+        return str_ends_with($path, '/') || str_ends_with($path, '\\');
     }
 
     /**

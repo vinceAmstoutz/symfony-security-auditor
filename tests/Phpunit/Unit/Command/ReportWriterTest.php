@@ -644,6 +644,19 @@ final class ReportWriterTest extends TestCase
     }
 
     /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_accepts_a_path_that_is_not_utf_8(): void
+    {
+        $outputFile = $this->tmpDir."/r\xFF.json";
+
+        $this->reportWriter->assertWritable($outputFile, $this->tmpDir);
+
+        self::assertFileDoesNotExist($outputFile);
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function directorySeparators(): iterable
