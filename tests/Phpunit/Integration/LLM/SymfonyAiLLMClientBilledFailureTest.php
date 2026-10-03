@@ -128,6 +128,7 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         self::assertSame([50000, 4096], [$this->tokenUsageRecorder->snapshot()->inputTokens(), $this->tokenUsageRecorder->snapshot()->outputTokens()]);
         self::assertSame([[50000, 4096]], $this->fakeRateLimiter->recorded);
         self::assertContains([self::REPORTED_USAGE_DEBUG, ['stop_reason' => 'length', 'input_tokens' => 50000, 'output_tokens' => 4096]], $this->messageCollectingLogger->records);
+        self::assertNotContains(self::ESTIMATED_INPUT_DEBUG, array_column($this->messageCollectingLogger->records, 0));
     }
 
     /**

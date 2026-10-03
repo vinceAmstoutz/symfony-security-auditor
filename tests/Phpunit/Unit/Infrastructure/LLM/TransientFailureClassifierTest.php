@@ -292,6 +292,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'request_too_large_phrase' => [new RuntimeException('Request too large')];
         yield 'too_many_tokens' => [new RuntimeException('Too many tokens in the request')];
         yield 'http_413' => [new RuntimeException('HTTP 413 Payload Too Large')];
+        yield 'http2_413_without_a_reason_phrase' => [new RuntimeException('HTTP/2 413  returned for "https://gw.example.com/v1/chat/completions".')];
         yield 'wrapped_prompt_too_long' => [
             new RuntimeException(
                 'LLM call failed',
@@ -328,5 +329,12 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'rate_limit_quoting_a_413_token_count' => [new RuntimeException('HTTP 429 Too Many Requests: Rate limit reached on tokens per min. Limit 30000, Used 29800, Requested 413.')];
         yield 'connection_cut_with_413_bytes_remaining' => [self::transportFailure('Transfer closed with 413 bytes remaining to read')];
         yield 'connection_cut_on_http2_stream_413' => [self::transportFailure('HTTP/2 stream 413 was not closed cleanly: INTERNAL_ERROR (err 2)')];
+    }
+
+    public function test_it_does_not_mistake_an_answer_its_raw_answer_shows_was_cut_short_for_a_request_the_model_cannot_fit(): void
+    {
+        $unconvertedAnswerException = UnconvertedAnswerException::cutShort(new BadRequestException('The response was filtered'), 'content-filter');
+
+        self::assertFalse((new TransientFailureClassifier())->isRequestTooLarge($unconvertedAnswerException));
     }
 }
