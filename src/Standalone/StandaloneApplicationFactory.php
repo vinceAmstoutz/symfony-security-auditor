@@ -25,8 +25,10 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
@@ -103,6 +105,7 @@ final readonly class StandaloneApplicationFactory
         private PendingBinarySwap $pendingBinarySwap = new PendingBinarySwap(),
         private CredentialStoreInterface $credentialStore = new NullCredentialStore(),
         private array $environment = [],
+        private ?string $bundledAiPlatformVersion = null,
     ) {}
 
     /**
@@ -124,6 +127,7 @@ final readonly class StandaloneApplicationFactory
         $pathEnvironment = $environment['PATH'] ?? '';
         $pendingBinarySwap = new PendingBinarySwap();
         $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
+        $bundledAiPlatformVersion = BundledAiPlatformVersion::detect();
 
         return new self(
             new StandaloneConfigLoader(
@@ -132,7 +136,7 @@ final readonly class StandaloneApplicationFactory
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
-            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder(), aiPlatformPin: BundledAiPlatformVersion::detect()),
+            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder(), aiPlatformPin: $bundledAiPlatformVersion),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
@@ -145,6 +149,7 @@ final readonly class StandaloneApplicationFactory
             pendingBinarySwap: $pendingBinarySwap,
             credentialStore: $filesystemCredentialStore,
             environment: $environment,
+            bundledAiPlatformVersion: $bundledAiPlatformVersion,
         );
     }
 
@@ -189,13 +194,22 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * @param array<string, string> $environment
+     * Registers the provider bridges `init` installed before anything else
+     * autoloads, unless they would shadow the bundled `symfony/ai-platform`.
+     * Returns the warning to print when they are there but cannot be loaded.
      *
-     * @throws UnresolvableConfigPathException
+     * @param array<string, string> $environment
+     * @param ?string               $bundledAiPlatformVersion the release this binary bundles ({@see BundledAiPlatformVersion::detect()}), read before the tree registers its own
      */
-    public static function bridgeAutoloadFile(array $environment): string
+    public static function loadBridgeTree(array $environment, ?string $bundledAiPlatformVersion): ?string
     {
-        return \sprintf('%s/vendor/autoload.php', self::resolverFromEnvironment($environment)->dataDir());
+        try {
+            $dataDir = self::resolverFromEnvironment($environment)->dataDir();
+        } catch (UnresolvableConfigPathException) {
+            return null;
+        }
+
+        return (new BridgeTreeLoader())->load(new BridgeTree($dataDir, $bundledAiPlatformVersion));
     }
 
     public function create(): StandaloneApplication
@@ -364,6 +378,7 @@ final readonly class StandaloneApplicationFactory
                     $this->standaloneConsoleCommandFactory,
                 ),
                 new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
+                bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
             ),
         );
     }
@@ -397,6 +412,7 @@ final readonly class StandaloneApplicationFactory
 
     /**
      * @throws UnresolvableConfigPathException
+     * @throws StaleBridgeTreeException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
@@ -433,6 +449,7 @@ final readonly class StandaloneApplicationFactory
 
     /**
      * @throws UnresolvableConfigPathException
+     * @throws StaleBridgeTreeException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
@@ -455,7 +472,12 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
+     * A bridge tree the entry point left unloaded for holding another
+     * `symfony/ai-platform` is refused before anything else: whatever the
+     * configuration says, no audit could run on it.
+     *
      * @throws UnresolvableConfigPathException
+     * @throws StaleBridgeTreeException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws UnreadableCredentialFileException
@@ -473,9 +495,27 @@ final readonly class StandaloneApplicationFactory
      */
     private function buildContainer(bool $credentialsRequired): ContainerBuilder
     {
+        $this->assertBridgeTreeLoadable();
+
         return $this->standaloneContainerFactory->create(
             $this->standaloneConfigLoader->load($credentialsRequired),
             $this->xdgConfigPathResolver->cacheDir(),
         );
+    }
+
+    /**
+     * Without a data directory there is no bridge tree to hold anything.
+     *
+     * @throws StaleBridgeTreeException
+     */
+    private function assertBridgeTreeLoadable(): void
+    {
+        try {
+            $dataDir = $this->xdgConfigPathResolver->dataDir();
+        } catch (UnresolvableConfigPathException) {
+            return;
+        }
+
+        (new BridgeTree($dataDir, $this->bundledAiPlatformVersion))->assertLoadable($this->standaloneConfigLoader->configuredProvider());
     }
 }

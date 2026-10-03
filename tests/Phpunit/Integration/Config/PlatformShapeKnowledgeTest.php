@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CompoundPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\DeclaredPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatformBlock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatforms;
@@ -25,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 
 /**
- * `BaseUrlPlatforms`, `CompoundPlatforms`, `EndpointPlatforms`, `HandWrittenPlatforms`, `InstanceKeyedPlatforms` and
+ * `BaseUrlPlatforms`, `CompoundPlatforms`, `DeclaredPlatforms`, `EndpointPlatforms`, `HandWrittenPlatforms`, `InstanceKeyedPlatforms` and
  * `OptionalApiKeyPlatforms` restate what `symfony/ai-bundle`
  * declares about each platform's connection block. A bundle upgrade that adds a
  * platform, or gives an existing one a `base_url`, would otherwise leave them
@@ -37,10 +38,28 @@ final class PlatformShapeKnowledgeTest extends TestCase
 {
     private const string PLATFORM_CONFIG_GLOB = __DIR__.'/../../../../vendor/symfony/ai-bundle/config/platform';
 
+    private const string BUNDLE_OPTIONS = __DIR__.'/../../../../vendor/symfony/ai-bundle/config/options.php';
+
     /**
      * @var list<string>
      */
     private const array ENDPOINTS_DEFAULTED_BY_THE_BRIDGE = ['together'];
+
+    /**
+     * The platforms `ai.platform` accepts are the ones the bundle's options
+     * import, not every file that happens to sit in `config/platform`.
+     */
+    public function test_every_platform_the_bundle_declares_is_named(): void
+    {
+        preg_match_all('/\$import\(\x27platform\/([a-z]+)\x27\)/', (string) file_get_contents(self::BUNDLE_OPTIONS), $matches);
+
+        self::assertSame(DeclaredPlatforms::NAMES, $matches[1]);
+    }
+
+    public function test_every_platform_the_bundle_declares_has_its_definition_beside_it(): void
+    {
+        self::assertSame(DeclaredPlatforms::NAMES, $this->platformNames());
+    }
 
     public function test_every_platform_declaring_a_base_url_is_named(): void
     {

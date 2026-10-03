@@ -31,7 +31,12 @@ final class InitCommandHelpTest extends TestCase
 
     public function test_it_warns_that_a_base_url_is_the_origin_only(): void
     {
-        self::assertStringContainsString('do not include a trailing <info>/v1</info>', InitCommandHelp::HELP);
+        self::assertStringContainsString('A <info>--base-url</info>, and the <info>--endpoint</info> of ollama or together, is the origin only: the bridge appends its own path, so do not include a trailing <info>/v1</info>.', InitCommandHelp::HELP);
+    }
+
+    public function test_it_says_which_endpoints_carry_their_api_version_path(): void
+    {
+        self::assertStringContainsString('deepgram, elevenlabs, minimax and venice take the endpoint with its API version path, the way their defaults spell it', InitCommandHelp::HELP);
     }
 
     public function test_it_shows_an_instance_keyed_invocation(): void

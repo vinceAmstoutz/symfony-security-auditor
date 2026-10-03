@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
@@ -38,7 +40,8 @@ use function Symfony\Component\String\b;
  * (file present, valid, provider selected, API-key variable set), the provider
  * bridge is installed *and actually boots the audit for the configured
  * provider* (a leftover bridge from a previously configured provider passes a
- * file-existence check but not a boot), and `composer` is reachable — the
+ * file-existence check but not a boot, and a tree built for another
+ * `symfony/ai-platform` is not even loaded), and `composer` is reachable — the
  * prerequisites for a successful audit run. The boot probe is skipped while
  * the configuration check fails, so a config problem is reported once, by the
  * check that owns it.
@@ -47,8 +50,15 @@ use function Symfony\Component\String\b;
  */
 final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
 {
-    private const string BRIDGE_AUTOLOAD_RELATIVE_PATH = 'vendor/autoload.php';
+    private const string CONFIGURATION_CHECK = 'Configuration';
 
+    private const string API_KEY_CHECK = 'API key';
+
+    private const string BRIDGE_CHECK = 'Provider bridge';
+
+    /**
+     * @param ?string $bundledAiPlatformVersion the `symfony/ai-platform` release the binary bundles, which the bridge tree must hold too
+     */
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -56,6 +66,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private AuditPreflightInterface $auditPreflight,
         private ModelsDevPricingProvider $modelsDevPricingProvider,
         private string $pricingCatalogPackage = ModelsDevPricingProvider::CATALOG_PACKAGE,
+        private ?string $bundledAiPlatformVersion = null,
     ) {}
 
     /**
@@ -79,16 +90,18 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         try {
             $standaloneConfig = $this->standaloneConfigLoader->load();
         } catch (MissingPlatformException) {
-            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, 'No provider is configured — run "init".');
-        } catch (MissingEnvironmentVariableException|UnreadableCredentialFileException|UnreadableCredentialStoreException $credentialResolutionFailure) {
-            return new DoctorCheckResult('API key', DoctorCheckStatus::Failure, $credentialResolutionFailure->getMessage());
+            return new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Failure, 'No provider is configured — run "init".');
+        } catch (MissingEnvironmentVariableException $missingEnvironmentVariableException) {
+            return new DoctorCheckResult($missingEnvironmentVariableException->concernsCredential ? self::API_KEY_CHECK : self::CONFIGURATION_CHECK, DoctorCheckStatus::Failure, $missingEnvironmentVariableException->getMessage());
+        } catch (UnreadableCredentialFileException|UnreadableCredentialStoreException $credentialResolutionFailure) {
+            return new DoctorCheckResult(self::API_KEY_CHECK, DoctorCheckStatus::Failure, $credentialResolutionFailure->getMessage());
         } catch (MalformedProjectConfigException|ProjectConfigPlatformOverrideException|ProjectConfigScanOverrideException|ProjectConfigUserOnlyKeyException|UnsupportedEnvPlaceholderException $configurationFailure) {
-            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $configurationFailure->getMessage());
+            return new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Failure, $configurationFailure->getMessage());
         } catch (UnresolvableConfigPathException $unresolvableConfigPathException) {
-            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
+            return new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
         }
 
-        return new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, $this->resolvedConfigurationDetail($standaloneConfig));
+        return new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Ok, $this->resolvedConfigurationDetail($standaloneConfig));
     }
 
     /**
@@ -108,24 +121,44 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     private function bridgeCheck(bool $configurationResolves): DoctorCheckResult
     {
         try {
-            $bridgeAutoloadFile = \sprintf('%s/%s', $this->xdgConfigPathResolver->dataDir(), self::BRIDGE_AUTOLOAD_RELATIVE_PATH);
+            $bridgeTree = new BridgeTree($this->xdgConfigPathResolver->dataDir(), $this->bundledAiPlatformVersion);
         } catch (UnresolvableConfigPathException $unresolvableConfigPathException) {
-            return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
+            return new DoctorCheckResult(self::BRIDGE_CHECK, DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
         }
 
-        if (!is_file($bridgeAutoloadFile)) {
-            return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init --provider=<platform>" to download it.');
+        if (!$bridgeTree->isInstalled()) {
+            return new DoctorCheckResult(self::BRIDGE_CHECK, DoctorCheckStatus::Failure, 'Not installed — run "init --provider=<platform>" to download it.');
         }
 
+        return $this->staleBridgeTreeCheck($bridgeTree) ?? $this->bootCheck($configurationResolves);
+    }
+
+    /**
+     * Reported whether or not the configuration resolves: the binary leaves
+     * such a tree unloaded, so no configuration fix would make it boot.
+     */
+    private function staleBridgeTreeCheck(BridgeTree $bridgeTree): ?DoctorCheckResult
+    {
+        try {
+            $bridgeTree->assertLoadable($this->standaloneConfigLoader->configuredProvider());
+        } catch (StaleBridgeTreeException $staleBridgeTreeException) {
+            return new DoctorCheckResult(self::BRIDGE_CHECK, DoctorCheckStatus::Failure, $this->bootFailureDetail($staleBridgeTreeException->getMessage()));
+        }
+
+        return null;
+    }
+
+    private function bootCheck(bool $configurationResolves): DoctorCheckResult
+    {
         if (!$configurationResolves) {
-            return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed.');
+            return new DoctorCheckResult(self::BRIDGE_CHECK, DoctorCheckStatus::Ok, 'Installed.');
         }
 
         $failureReason = $this->auditPreflight->failureReason();
 
         return null === $failureReason
-            ? new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.')
-            : new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, $this->bootFailureDetail($failureReason));
+            ? new DoctorCheckResult(self::BRIDGE_CHECK, DoctorCheckStatus::Ok, 'Installed and the audit boots with it.')
+            : new DoctorCheckResult(self::BRIDGE_CHECK, DoctorCheckStatus::Failure, $this->bootFailureDetail($failureReason));
     }
 
     /**

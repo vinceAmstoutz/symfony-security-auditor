@@ -165,6 +165,10 @@ final readonly class InitCommand
     /**
      * A platform whose block `init` cannot write still gets its bridge and
      * the block to complete; either way the provider is not taken further.
+     * What that path is given is checked before the bridge is installed, the
+     * way the written path checks it, so a refused instance name never reaches
+     * the printed block and a key pasted into `--env-var` never reaches the
+     * command line echoed under an install failure.
      *
      * @throws UnresolvableConfigPathException
      * @throws BridgeInstallationFailedException
@@ -178,8 +182,9 @@ final readonly class InitCommand
         }
 
         $model = null === $initCommandInput->model ? self::MODEL_PLACEHOLDER : b($initCommandInput->model)->trim()->toString();
+        $envVar = null === $initCommandInput->envVar ? null : b($initCommandInput->envVar)->trim()->toString();
 
-        if ($this->refused($symfonyStyle, InitRefusal::forModelText($model))) {
+        if ($this->refused($symfonyStyle, InitRefusal::forNamedInstance($providerKey, $provider) ?? InitRefusal::forModelText($model) ?? InitRefusal::forEnvironmentVariable($envVar))) {
             return true;
         }
 

@@ -87,7 +87,9 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->register('event_dispatcher', EventDispatcher::class)->setPublic(true);
         $containerBuilder->register('logger', NullLogger::class);
         $containerBuilder->register(ClockInterface::class, NativeClock::class);
-        $containerBuilder->register('http_client', HttpClientInterface::class)->setFactory([HttpClient::class, 'create']);
+        $containerBuilder->register('http_client', HttpClientInterface::class)
+            ->setFactory([HttpClient::class, 'create'])
+            ->setArguments([['timeout' => $standaloneConfig->httpTimeout, 'max_duration' => 0]]);
 
         try {
             $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);

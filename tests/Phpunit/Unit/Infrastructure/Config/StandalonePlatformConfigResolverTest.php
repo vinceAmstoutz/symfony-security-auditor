@@ -480,10 +480,31 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_reports_a_credential_that_is_neither_exported_nor_stored(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('run "auth:set" to store the key on this machine');
+        $this->expectExceptionMessage('run "auth:set --env-var=ANTHROPIC_API_KEY" to store the key on this machine');
 
         (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore()))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_without_a_provider_the_advice_names_the_missing_variable_rather_than_the_first_one_configured(): void
+    {
+        try {
+            (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => 'sk-ant-exported'], credentialStore: new InMemoryCredentialStore()))
+                ->resolve(['platform' => [
+                    'anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%'],
+                    'openai' => ['api_key' => '%env(OPENAI_API_KEY)%'],
+                ]]);
+            self::fail('Without a provider, every configured key must resolve.');
+        } catch (MissingEnvironmentVariableException $missingEnvironmentVariableException) {
+            self::assertStringContainsString('run "auth:set --env-var=OPENAI_API_KEY" to store the key on this machine', $missingEnvironmentVariableException->getMessage());
+            self::assertStringContainsString('run "auth:status --env-var=OPENAI_API_KEY" to see what is currently resolved', $missingEnvironmentVariableException->getMessage());
+        }
     }
 
     /**
@@ -520,6 +541,184 @@ final class StandalonePlatformConfigResolverTest extends TestCase
 
         (new StandalonePlatformConfigResolver(['LLM_API_KEY' => 'sk-from-env']))
             ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(LLM_BASE_URL)%', 'api_key' => '%env(LLM_API_KEY)%']]]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_platform_the_provider_does_not_select_needs_none_of_its_settings(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['GW_TOKEN' => 'gw-secret']))->resolve([
+            'provider' => 'generic.my_gateway',
+            'platform' => [
+                'openai' => ['api_key' => '%env(OPENAI_API_KEY)%'],
+                'generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GW_TOKEN)%']],
+                'ollama' => ['endpoint' => '%env(OLLAMA_URL)%'],
+            ],
+        ]);
+
+        self::assertSame(
+            ['platform' => [
+                'openai' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL],
+                'generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => 'gw-secret']],
+                'ollama' => ['endpoint' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL],
+            ]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_an_instance_the_provider_does_not_select_needs_none_of_its_settings(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['TOKEN_B' => 'secret-b']))->resolve([
+            'provider' => 'generic.b',
+            'platform' => ['generic' => [
+                'a' => ['base_url' => '%env(URL_A)%', 'api_key' => '%env(TOKEN_A)%'],
+                'b' => ['base_url' => 'https://b.example', 'api_key' => '%env(TOKEN_B)%'],
+            ]],
+        ]);
+
+        self::assertSame(
+            ['platform' => ['generic' => [
+                'a' => ['base_url' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL, 'api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL],
+                'b' => ['base_url' => 'https://b.example', 'api_key' => 'secret-b'],
+            ]]],
+            $standalonePlatformConfig->toAiConfig(),
+        );
+    }
+
+    /**
+     * @param array<array-key, mixed> $platform
+     *
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('selectedConnectionsMissingTheirKey')]
+    public function test_the_key_of_the_connection_the_provider_selects_is_still_required(string $provider, array $platform, string $expectedVariable): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage(\sprintf('"%s"', $expectedVariable));
+
+        (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => 'sk-anthropic', 'TOKEN_A' => 'secret-a']))->resolve(['provider' => $provider, 'platform' => $platform]);
+    }
+
+    /**
+     * @return iterable<string, array{string, array<array-key, mixed>, string}>
+     */
+    public static function selectedConnectionsMissingTheirKey(): iterable
+    {
+        yield 'a flat platform' => ['openai', ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%'], 'openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'OPENAI_API_KEY'];
+        yield 'an instance' => ['generic.b', ['generic' => ['a' => ['api_key' => '%env(TOKEN_A)%'], 'b' => ['api_key' => '%env(TOKEN_B)%']]], 'TOKEN_B'];
+        yield 'an instance named by a number' => ['generic.7', ['generic' => [7 => ['api_key' => '%env(TOKEN_7)%']]], 'TOKEN_7'];
+    }
+
+    /**
+     * @param array<array-key, mixed> $platform
+     * @param array<array-key, mixed> $expected
+     *
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('providersSelectingNoConnection')]
+    public function test_a_provider_selecting_no_connection_requires_no_key(string $provider, array $platform, array $expected): void
+    {
+        self::assertSame($expected, (new StandalonePlatformConfigResolver())->resolve(['provider' => $provider, 'platform' => $platform])->platform);
+    }
+
+    /**
+     * @return iterable<string, array{string, array<array-key, mixed>, array<array-key, mixed>}>
+     */
+    public static function providersSelectingNoConnection(): iterable
+    {
+        yield 'an instance of a platform whose block holds none' => [
+            'anthropic.prod',
+            ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']],
+            ['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]],
+        ];
+        yield 'an instance of a platform whose block is not a map' => [
+            'generic.gw',
+            ['generic' => '%env(GENERIC_BLOCK)%'],
+            ['generic' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL],
+        ];
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_platform_the_provider_does_not_select_is_never_looked_up_in_the_credential_store(): void
+    {
+        $credentialStore = $this->createMock(CredentialStoreInterface::class);
+        $credentialStore->expects(self::once())->method('read')->with('GW_TOKEN')->willReturn('gw-stored');
+
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver([], credentialStore: $credentialStore))->resolve([
+            'provider' => 'generic.my_gateway',
+            'platform' => [
+                'openai' => ['api_key' => '%env(OPENAI_API_KEY)%'],
+                'generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GW_TOKEN)%']],
+            ],
+        ]);
+
+        self::assertSame(
+            ['openai' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL], 'generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => 'gw-stored']]],
+            $standalonePlatformConfig->platform,
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_platform_the_provider_does_not_select_still_refuses_a_placeholder_no_run_could_resolve(): void
+    {
+        $this->expectException(UnsupportedEnvPlaceholderException::class);
+
+        (new StandalonePlatformConfigResolver(['GW_TOKEN' => 'gw-secret']))->resolve([
+            'provider' => 'generic.my_gateway',
+            'platform' => [
+                'openai' => ['api_key' => '%env(trim:OPENAI_API_KEY)%'],
+                'generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GW_TOKEN)%']],
+            ],
+        ]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_run_that_needs_no_credential_needs_none_from_the_selected_platform_either(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())->resolve(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']]],
+            false,
+        );
+
+        self::assertSame(['platform' => ['openai' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]], $standalonePlatformConfig->toAiConfig());
     }
 
     /**

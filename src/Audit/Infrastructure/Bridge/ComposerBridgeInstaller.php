@@ -66,6 +66,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     private const string PLATFORM_PACKAGE = 'symfony/ai-platform';
 
+    private const string BRIDGE_PACKAGE_PATTERN = '#^symfony/ai-.+-platform$#';
+
     /**
      * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::defaultProcessBuilder() in production); tests inject a stub
      * @param string                                               $platformPhpVersion the PHP version the bridge tree must resolve for — defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
@@ -80,8 +82,11 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     /**
      * The pin is named on the command line as well as in the manifest:
-     * composer then moves an already installed newer `symfony/ai-platform`
-     * back to it, where the manifest pin alone would only report a conflict.
+     * composer then moves an already installed `symfony/ai-platform` of
+     * another release to it, where the manifest pin alone would only report
+     * a conflict. `--with-dependencies` lets what those bridges pulled in
+     * move with them — `symfony/ai-open-responses-platform` under the OpenAI
+     * bridge — which composer would otherwise hold at its locked release.
      *
      * @return Closure(string, ?string, string, string...): Process
      */
@@ -90,7 +95,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process {
             $packages = [$package, ...$morePackages];
             $required = null === $aiPlatformPin ? $packages : [...$packages, \sprintf('%s:%s', self::PLATFORM_PACKAGE, $aiPlatformPin)];
-            $process = new Process(['composer', 'require', ...$required, \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction']);
+            $process = new Process(['composer', 'require', ...$required, '--with-dependencies', \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction']);
             $process->setTimeout(null);
 
             return $process;
@@ -99,17 +104,21 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     /**
      * Every bridge goes into one `composer require`, so a platform that also
-     * needs another's bridge resolves the tree once rather than twice.
+     * needs another's bridge resolves the tree once rather than twice. So
+     * does every bridge the manifest already requires — a second one fetched
+     * by hand to switch providers included: left out, it stays locked to the
+     * `symfony/ai-platform` release it was resolved with, and the pin cannot
+     * move.
      *
      * @throws BridgeInstallationFailedException
      */
     #[Override]
     public function install(string $provider, string $targetDirectory, string ...$moreProviders): void
     {
-        $this->ensureComposerProject($targetDirectory);
+        $requiredBridges = $this->ensureComposerProject($targetDirectory);
 
         $package = self::packageFor($provider);
-        $morePackages = array_map(self::packageFor(...), $moreProviders);
+        $morePackages = array_diff(array_unique([...array_map(self::packageFor(...), $moreProviders), ...$requiredBridges]), [$package]);
         $process = ($this->processBuilder)($package, $this->aiPlatformPin, $targetDirectory, ...$morePackages);
         $packageNames = implode('", "', [$package, ...$morePackages]);
 
@@ -145,20 +154,43 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
+     * @return list<string> the bridge packages the manifest already required
+     *
      * @throws BridgeInstallationFailedException
      */
-    private function ensureComposerProject(string $targetDirectory): void
+    private function ensureComposerProject(string $targetDirectory): array
     {
         $manifest = \sprintf('%s/%s', $targetDirectory, self::MANIFEST_FILENAME);
         $this->assertSafeToWrite($manifest, $targetDirectory);
 
-        $contents = $this->pinnedManifest($this->existingManifest($manifest));
+        $existingManifest = $this->existingManifest($manifest);
+        $requiredBridges = $this->requiredBridges($existingManifest);
+        $contents = $this->pinnedManifest($existingManifest);
 
         try {
             $this->filesystem->dumpFile($manifest, $contents);
         } catch (IOException $ioException) {
             throw BridgeInstallationFailedException::forManifestWriteFailure($targetDirectory, $ioException);
         }
+
+        return $requiredBridges;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function requiredBridges(stdClass $manifest): array
+    {
+        $require = ($manifest->require ?? null) instanceof stdClass ? get_object_vars($manifest->require) : [];
+
+        $bridges = [];
+        foreach (array_keys($require) as $package) {
+            if (\is_string($package) && 1 === preg_match(self::BRIDGE_PACKAGE_PATTERN, $package)) {
+                $bridges[] = $package;
+            }
+        }
+
+        return $bridges;
     }
 
     /**
