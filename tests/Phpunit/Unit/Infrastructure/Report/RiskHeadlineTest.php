@@ -40,19 +40,20 @@ final class RiskHeadlineTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('runs')]
-    public function test_it_states_the_risk_level_only_for_a_run_that_analyzed_a_file(array $attackerStatuses, string $expectedRiskLevel): void
+    public function test_it_states_the_risk_level_of_every_run_that_reached_a_verdict(array $attackerStatuses, bool $holdsAFinding, string $expectedRiskLevel): void
     {
-        self::assertSame($expectedRiskLevel, RiskHeadline::riskLevel($this->reportWithOneFinding($attackerStatuses)));
+        self::assertSame($expectedRiskLevel, RiskHeadline::riskLevel($this->report($attackerStatuses, $holdsAFinding)));
     }
 
     /**
-     * @return iterable<string, array{list<string>, string}>
+     * @return iterable<string, array{list<string>, bool, string}>
      */
     public static function runs(): iterable
     {
-        yield 'a complete run' => [['analyzed'], 'LOW'];
-        yield 'a partly failed run' => [['analyzed', 'errored'], 'LOW'];
-        yield 'a run that analyzed no file' => [['errored', 'aborted'], 'UNKNOWN'];
+        yield 'a complete run' => [['analyzed'], true, 'LOW'];
+        yield 'a partly failed run' => [['analyzed', 'errored'], true, 'LOW'];
+        yield 'a run that analyzed no file yet holds a finding' => [['errored', 'aborted'], true, 'LOW'];
+        yield 'a run that analyzed no file and found nothing' => [['errored', 'aborted'], false, 'UNKNOWN'];
     }
 
     /**
@@ -64,19 +65,20 @@ final class RiskHeadlineTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('scoreDetails')]
-    public function test_it_qualifies_the_score_by_what_the_run_analyzed(array $attackerStatuses, string $expectedScoreDetail): void
+    public function test_it_qualifies_the_score_by_what_the_run_analyzed(array $attackerStatuses, bool $holdsAFinding, string $expectedScoreDetail): void
     {
-        self::assertSame($expectedScoreDetail, RiskHeadline::scoreDetail($this->reportWithOneFinding($attackerStatuses), 'Score:'));
+        self::assertSame($expectedScoreDetail, RiskHeadline::scoreDetail($this->report($attackerStatuses, $holdsAFinding), 'Score:'));
     }
 
     /**
-     * @return iterable<string, array{list<string>, string}>
+     * @return iterable<string, array{list<string>, bool, string}>
      */
     public static function scoreDetails(): iterable
     {
-        yield 'a complete run' => [['analyzed'], 'Score: 10'];
-        yield 'a partly failed run' => [['analyzed', 'errored'], 'Score: 10, on the files analyzed'];
-        yield 'a run that analyzed no file' => [['errored', 'aborted'], 'no file was analyzed'];
+        yield 'a complete run' => [['analyzed'], true, 'Score: 10'];
+        yield 'a partly failed run' => [['analyzed', 'errored'], true, 'Score: 10, on the files analyzed'];
+        yield 'a run that analyzed no file yet holds a finding' => [['errored', 'aborted'], true, 'Score: 10, on the files analyzed'];
+        yield 'a run that analyzed no file and found nothing' => [['errored', 'aborted'], false, 'no file was analyzed'];
     }
 
     /**
@@ -87,19 +89,21 @@ final class RiskHeadlineTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function reportWithOneFinding(array $attackerStatuses): AuditReport
+    private function report(array $attackerStatuses, bool $holdsAFinding): AuditReport
     {
         $auditContext = AuditContext::forProject(sys_get_temp_dir());
         foreach ($attackerStatuses as $index => $status) {
             $auditContext->recordCoverage('attacker', \sprintf('src/File%d.php', $index), $status);
         }
 
-        $auditContext->addVulnerability(Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Recovered finding', 0.9),
-            new CodeLocation('src/File0.php', 1, 2),
-            new VulnerabilityNarrative('Description', 'Vector', 'Proof', 'Fix'),
-            '$code',
-        )->withReviewerValidation(true));
+        if ($holdsAFinding) {
+            $auditContext->addVulnerability(Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Recovered finding', 0.9),
+                new CodeLocation('src/File0.php', 1, 2),
+                new VulnerabilityNarrative('Description', 'Vector', 'Proof', 'Fix'),
+                '$code',
+            )->withReviewerValidation(true));
+        }
 
         return AuditReport::fromContext($auditContext);
     }

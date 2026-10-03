@@ -167,6 +167,38 @@ final class AuditExitCodeResolverTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('partialRunExitCodes')]
+    public function test_a_run_that_analyzed_no_file_yet_holds_a_finding_keeps_the_exit_code_of_a_partial_run(bool $failOnIncomplete, int $expectedExitCode): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/Failed.php', $this->tmpDir.'/src/Failed.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/Failed.php', 'errored');
+        $auditContext->addVulnerability(Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW, 'Kept from a response cut short', 0.9),
+            new CodeLocation('src/Failed.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+            '$q',
+        )->withReviewerValidation(true));
+
+        self::assertSame($expectedExitCode, $this->auditExitCodeResolver->resolve(AuditReport::fromContext($auditContext), RiskLevel::Critical, null, $failOnIncomplete));
+    }
+
+    /**
+     * @return iterable<string, array{bool, int}>
+     */
+    public static function partialRunExitCodes(): iterable
+    {
+        yield 'by default' => [false, Command::SUCCESS];
+        yield 'under --fail-on-incomplete' => [true, 3];
+    }
+
+    /**
      * @return iterable<string, array{bool}>
      */
     public static function failOnIncompleteSettings(): iterable

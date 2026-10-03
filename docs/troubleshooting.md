@@ -208,7 +208,7 @@ Exit code `1` is also used for:
 
 - Invalid `project-path` argument.
 - The scan discovered no file to audit at all — a mistyped path, a `scan.included_paths` entry matching nothing, or an over-narrow `--path` — fails rather than reporting a hollow SAFE result. A `--since` run that finds no _changed_ files still exits `0`.
-- No file in scope could be analyzed — a scan or LLM call failed for each of them, or the run stopped before reaching them — so the run has no verdict (_since 1.21_). The command says `Audit incomplete: none of the N file(s) in scope could be analyzed`; see [`Audit incomplete`](#audit-incomplete-n-files-could-not-be-fully-analyzed) for the cause.
+- No file in scope could be analyzed — a scan or LLM call failed for each of them, or the run stopped before reaching them — and nothing was found, so the run has no verdict (_since 1.21_). The command says `Audit incomplete: none of the N file(s) in scope could be analyzed`; see [`Audit incomplete`](#audit-incomplete-n-files-could-not-be-fully-analyzed) for the cause.
 - The normalized score fell below `--min-score`, if set.
 - Unhandled exception during pipeline execution (check stderr).
 - Validator errors on the input (e.g. `--format` set to a value it does not support — see [Configuration → Options](configuration.md#options)).
@@ -387,7 +387,7 @@ Some file was never fully analyzed: its LLM call failed even after the retries i
 
 The `coverage` array names, for each file, the stage that failed. For an LLM failure, read the `LLM call failed` warnings in the log for the cause, fix it (see [LLM & Provider Errors](#llm--provider-errors)), and run again. A withheld file is one a `scan.secret_scrubbing.additional_patterns` entry could not evaluate (a catastrophic-backtracking regex, a `/u` pattern meeting invalid UTF-8), or, with the PCRE JIT disabled, a single quoted value of several hundred kilobytes: fix the pattern, or read the file yourself. With `cache.enabled`, the files that were analyzed are served from the cache.
 
-When **no** file could be analyzed, the run has no verdict: it exits `1` whatever the gates say, and the reports read `RISK LEVEL: UNKNOWN (no file was analyzed)` instead of a SAFE result. When only some files failed, the risk level and grade cover only the files analyzed, and the reports say so.
+When **no** file could be analyzed and nothing was found, the run has no verdict: it exits `1` whatever the gates say, and the reports read `RISK LEVEL: UNKNOWN (no file was analyzed)` instead of a SAFE result. When only some files failed, or the run still holds a finding, the risk level and grade cover only the files analyzed, and the reports say so.
 
 ### Report has zero vulnerabilities but I know there are some
 

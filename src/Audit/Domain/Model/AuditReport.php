@@ -155,14 +155,16 @@ final readonly class AuditReport
     }
 
     /**
-     * Whether the run analyzed none of the files it had to: every attacker call
-     * failed or was cut short, or none was made. Such a report carries no
-     * verdict, whatever its risk level and grade read — a SAFE there vouches
-     * for code nobody read.
+     * Whether the run reached no verdict: it analyzed none of the files it had
+     * to — every attacker call failed or was cut short, or none was made — and
+     * holds no finding. A SAFE there would vouch for code nobody read. A run
+     * that holds a finding is a partial run even when it analyzed no file in
+     * full: a response cut short keeps the findings it recorded, while its
+     * chunk is recorded as errored.
      */
-    public function analyzedNoFile(): bool
+    public function hasNoVerdict(): bool
     {
-        return !$this->isComplete() && [] === AnalyzedFiles::in($this->coverage);
+        return !$this->isComplete() && [] === $this->vulnerabilities && [] === AnalyzedFiles::in($this->coverage);
     }
 
     private function attackerNeverRan(): bool

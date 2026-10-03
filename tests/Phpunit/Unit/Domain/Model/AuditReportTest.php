@@ -973,8 +973,8 @@ final class AuditReportTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
-    #[DataProvider('analyzedNoFileCases')]
-    public function test_it_knows_when_the_run_analyzed_none_of_its_files(array $coverage, bool $expected): void
+    #[DataProvider('noVerdictCases')]
+    public function test_it_knows_when_the_run_reached_no_verdict(array $coverage, bool $expected): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
@@ -985,13 +985,13 @@ final class AuditReportTest extends TestCase
             $auditContext->recordCoverage($stage, $file, $status);
         }
 
-        self::assertSame($expected, AuditReport::fromContext($auditContext)->analyzedNoFile());
+        self::assertSame($expected, AuditReport::fromContext($auditContext)->hasNoVerdict());
     }
 
     /**
      * @return iterable<string, array{list<array{string, string, string}>, bool}>
      */
-    public static function analyzedNoFileCases(): iterable
+    public static function noVerdictCases(): iterable
     {
         yield 'every call failed' => [[['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'aborted']], true];
         yield 'no call was made' => [[], true];
@@ -1002,5 +1002,34 @@ final class AuditReportTest extends TestCase
         yield 'every file left out by the lean filter' => [[['attacker', 'src/A.php', 'skipped'], ['attacker', 'src/B.php', 'skipped']], false];
         yield 'lean filter left one out, the other failed' => [[['attacker', 'src/A.php', 'skipped'], ['attacker', 'src/B.php', 'errored']], true];
         yield 'only another stage claims to have analyzed a file' => [[['attacker', 'src/A.php', 'errored'], ['attacker', 'src/B.php', 'errored'], ['reviewer', 'src/A.php', 'analyzed']], true];
+    }
+
+    /**
+     * A response cut short keeps the findings it recorded while its chunk is
+     * recorded as errored, so a run can hold a finding without having fully
+     * analyzed any file: that is a partial run, never one without a verdict.
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_run_that_analyzed_no_file_yet_holds_a_finding_has_a_verdict(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+        $auditContext->addVulnerability(Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Kept from a response cut short', 0.9),
+            new CodeLocation('src/A.php', 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            '$code',
+        )->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertFalse($auditReport->isComplete());
+        self::assertFalse($auditReport->hasNoVerdict());
     }
 }

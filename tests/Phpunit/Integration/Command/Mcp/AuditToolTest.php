@@ -201,6 +201,23 @@ final class AuditToolTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_it_returns_the_finding_of_a_run_that_analyzed_no_file_as_an_incomplete_report(): void
+    {
+        $auditTool = $this->auditTool(pipeline: new SingleFileAuditPipeline('errored', $this->validatedFinding(VulnerabilityType::SQL_INJECTION)));
+
+        $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($report);
+        self::assertFalse($report['complete']);
+        self::assertSame(1, $report['total_vulnerabilities']);
+    }
+
+    /**
+     * @throws ToolCallException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_it_leaves_out_the_finding_types_the_configuration_mutes(): void
     {
         $auditTool = $this->auditTool(

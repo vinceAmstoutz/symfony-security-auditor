@@ -21,8 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
  * A run whose scan discovered no file at all reports SAFE, 100/100 and grade A,
  * because there was nothing to find — so a mistyped project path or a
  * `scan.included_paths` entry that matches nothing would pass any gate. The
- * same holds for a run that analyzed none of its files, every LLM call having
- * failed. Neither is a verdict, so both fail regardless of the thresholds. A
+ * same holds for a run that analyzed none of its files and found nothing.
+ * Neither is a verdict, so both fail regardless of the thresholds. A
  * `--since` run whose diff left nothing changed still passes: there the scan
  * did find files.
  *
@@ -49,7 +49,7 @@ final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInter
 
     private function hasNoVerdict(AuditReport $auditReport): bool
     {
-        return 0 === $auditReport->filesDiscovered() || $auditReport->analyzedNoFile();
+        return 0 === $auditReport->filesDiscovered() || $auditReport->hasNoVerdict();
     }
 
     private function scoreIsBelow(AuditReport $auditReport, ?int $minimumScore): bool

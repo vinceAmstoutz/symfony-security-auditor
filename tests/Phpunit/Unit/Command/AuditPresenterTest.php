@@ -317,6 +317,33 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_result_for_a_run_that_analyzed_no_file_yet_holds_a_finding_reads_as_a_partial_run(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+        $auditContext->addVulnerability(Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW, 'Kept from a response cut short', 0.9),
+            new CodeLocation('src/A.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+            '$q',
+        )->withReviewerValidation(true));
+        $bufferedOutput = new BufferedOutput();
+
+        $this->auditPresenter->result(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), Command::SUCCESS);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('[WARNING] Audit incomplete: 1 file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: SAFE | Vulnerabilities: 1.', $flattened);
+        self::assertStringNotContainsString('no verdict', $flattened);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      */
     public function test_the_notice_for_a_baseline_run_that_analyzed_no_file_names_the_flag(): void
     {

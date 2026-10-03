@@ -316,7 +316,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
-        if (Command::FAILURE === $exitCode && !$auditReport->analyzedNoFile()) {
+        if (Command::FAILURE === $exitCode && !$auditReport->hasNoVerdict()) {
             $totalVulnerabilities = $auditReport->totalVulnerabilities();
             $symfonyStyle->caution(\sprintf(
                 'Audit failed a configured gate. Risk: %s. Score: %d/100. %d %s found.',
@@ -358,7 +358,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        if (ExitCode::Failure->value === $exitCode && $auditReport->analyzedNoFile()) {
+        if (ExitCode::Failure->value === $exitCode && $auditReport->hasNoVerdict()) {
             $symfonyStyle->error(\sprintf('%s A run with no verdict cannot pass, so it fails.', $summary));
 
             return;
@@ -368,12 +368,12 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     /**
-     * A run that analyzed no file states no risk level: a SAFE there would
-     * vouch for code nobody read.
+     * A run with no verdict — no file analyzed, nothing found — states no
+     * risk level: a SAFE there would vouch for code nobody read.
      */
     private function incompleteSummary(AuditReport $auditReport): string
     {
-        if ($auditReport->analyzedNoFile()) {
+        if ($auditReport->hasNoVerdict()) {
             return \sprintf(
                 'Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict. Vulnerabilities: %d.',
                 $auditReport->filesScanned(),

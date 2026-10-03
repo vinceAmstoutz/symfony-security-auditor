@@ -18,8 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 /**
  * How a human-facing report states its risk verdict: as is for a complete run,
  * qualified as covering only the files analyzed for an incomplete one, and not
- * at all for a run that analyzed no file — a SAFE there would vouch for code
- * nobody read. Machine-readable formats keep their fields and carry `complete`.
+ * at all for a run with no verdict, which analyzed no file and found nothing —
+ * a SAFE there would vouch for code nobody read. Machine-readable formats keep
+ * their fields and carry `complete`.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -29,7 +30,7 @@ final readonly class RiskHeadline
 
     public static function riskLevel(AuditReport $auditReport): string
     {
-        return $auditReport->analyzedNoFile() ? self::UNKNOWN_RISK_LEVEL : $auditReport->riskLevel();
+        return $auditReport->hasNoVerdict() ? self::UNKNOWN_RISK_LEVEL : $auditReport->riskLevel();
     }
 
     /**
@@ -38,7 +39,7 @@ final readonly class RiskHeadline
      */
     public static function scoreDetail(AuditReport $auditReport, string $scoreLabel): string
     {
-        if ($auditReport->analyzedNoFile()) {
+        if ($auditReport->hasNoVerdict()) {
             return 'no file was analyzed';
         }
 

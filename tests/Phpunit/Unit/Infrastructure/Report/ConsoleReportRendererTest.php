@@ -241,6 +241,20 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_states_the_risk_of_a_finding_kept_from_an_audit_that_analyzed_no_file(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile($this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL)));
+
+        self::assertStringContainsString('RISK LEVEL: LOW  (Score: 10, on the files analyzed)', $output);
+        self::assertStringNotContainsString('UNKNOWN', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      */
     public function test_render_states_no_risk_level_for_an_audit_that_analyzed_no_file(): void
     {

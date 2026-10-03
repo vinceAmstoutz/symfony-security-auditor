@@ -93,7 +93,8 @@ final readonly class AuditTool
 
     /**
      * `audit:run` fails a run whose scan found no file, or that analyzed none
-     * of its files: a SAFE report there vouches for code nobody read.
+     * of its files and found nothing: a SAFE report there vouches for code
+     * nobody read. A run that holds a finding returns its incomplete report.
      *
      * @throws AuditWithoutVerdictException
      */
@@ -103,7 +104,7 @@ final readonly class AuditTool
             throw AuditWithoutVerdictException::forNoFileDiscovered($auditReport->projectPath());
         }
 
-        if ($auditReport->analyzedNoFile()) {
+        if ($auditReport->hasNoVerdict()) {
             throw AuditWithoutVerdictException::forNoFileAnalyzed($auditReport->projectPath(), $auditReport->filesScanned());
         }
     }
