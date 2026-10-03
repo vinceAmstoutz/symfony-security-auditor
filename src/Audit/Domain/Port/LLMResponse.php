@@ -179,12 +179,15 @@ final readonly class LLMResponse
 
     /**
      * Takes the last balanced block at the top level of the answer that
-     * decodes as JSON: a model that reasons before its verdict may quote JSON
-     * — from the audited code, say — that must not stand for the verdict that
-     * follows it. When no top-level block decodes, as when the output limit
-     * cut an array off before its closing bracket, the first balanced block
-     * anywhere that decodes is taken (the first complete object of that
-     * array), or `null` when none do.
+     * decodes to an object or to a list holding one: a model that reasons
+     * before its verdict may quote JSON — from the audited code, say — that
+     * must not stand for the verdict that follows it, and a bracket in the
+     * prose after its answer must not either. When no top-level block
+     * qualifies, as when the output limit cut an array off before its closing
+     * bracket, the first balanced block anywhere that decodes is taken (the
+     * first complete object of that array), or `null` when none do. A JSON
+     * object written after the answer still stands for it: nothing here knows
+     * the shape the caller expects.
      *
      * When the content itself spans a single balanced block (`[ ... ]` or
      * `{ ... }` with no surrounding prose), the top-level `json_decode` has
@@ -275,12 +278,24 @@ final readonly class LLMResponse
     {
         foreach (array_reverse($blocks) as $block) {
             $decoded = $this->decodeBlock($block);
-            if (null !== $decoded) {
+            if (\is_array($decoded) && $this->canStandForTheAnswer($decoded)) {
                 return $decoded;
             }
         }
 
         return null;
+    }
+
+    /**
+     * An object, or a list holding an object or an array. An empty list or a
+     * list of scalars is what prose brackets decode to — `[1]` citing a
+     * source, `[ ]` in a checklist — so it never outranks an earlier block.
+     *
+     * @param array<mixed> $decoded
+     */
+    private function canStandForTheAnswer(array $decoded): bool
+    {
+        return !array_is_list($decoded) || [] !== array_filter($decoded, \is_array(...));
     }
 
     /**

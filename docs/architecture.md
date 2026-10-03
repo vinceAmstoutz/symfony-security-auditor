@@ -425,7 +425,7 @@ The client itself is a facade over collaborators it builds at construction time,
 
 ### `LLMResponse`
 
-Thin value object wrapping the raw string content. Key method: `parseJson()` strips a markdown code fence that models sometimes wrap the whole answer in — never one quoted inside a JSON string — then JSON-decodes; when prose surrounds the JSON, it takes the last block at the top level of the answer that decodes, so JSON the model quotes before its answer never stands for it. Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded value is not an array. `isEmpty()` checks for blank content.
+Thin value object wrapping the raw string content. Key method: `parseJson()` strips a markdown code fence that models sometimes wrap the whole answer in — never one quoted inside a JSON string — then JSON-decodes; when prose surrounds the JSON, it takes the last block at the top level of the answer that decodes to an object or to a list holding one, so JSON the model quotes before its answer never stands for it, and neither does a bracket in the prose after it (`[1]`, `[ ]`, `[]`); a JSON object written after the answer still does. Throws `\JsonException` on invalid JSON, `\RuntimeException` when the decoded value is not an array. `isEmpty()` checks for blank content.
 
 ### `ProjectFileScanner`
 

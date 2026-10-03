@@ -49,7 +49,7 @@ LLMResponse::of(
 
 > The legacy `LLMResponse::create(content, inputTokens, outputTokens, model, stopReason)` factory is **deprecated since 1.13** and removed in the next `MAJOR`; use `of()` in new code.
 
-Key read methods: `content()`, `stopReason()`, `parseJson(): array` (strips a markdown fence wrapping the whole answer, then JSON-decodes; when prose surrounds several JSON blocks it takes the last one at the top level), `isEmpty(): bool`, `totalTokens(): int`, and, _since 1.21_, `isDegraded(): bool` (the answer was cut short, see below), `isRequestTooLarge(): bool` (a batch client's refusal of a prompt too large for the model) and `reportedModel(): ?string`, set with `withReportedModel()` (the model the provider says answered, which a gateway can pick on its own).
+Key read methods: `content()`, `stopReason()`, `parseJson(): array` (strips a markdown fence wrapping the whole answer, then JSON-decodes; when prose surrounds several JSON blocks it takes the last one at the top level that decodes to an object or to a list holding one), `isEmpty(): bool`, `totalTokens(): int`, and, _since 1.21_, `isDegraded(): bool` (the answer was cut short, see below), `isRequestTooLarge(): bool` (a batch client's refusal of a prompt too large for the model) and `reportedModel(): ?string`, set with `withReportedModel()` (the model the provider says answered, which a gateway can pick on its own).
 
 ### Contract
 
