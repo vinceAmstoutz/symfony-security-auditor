@@ -545,7 +545,7 @@ The environment coming first is what keeps containers, CI and per-run secret-man
 
 ### Storing the key on this machine
 
-Standalone only. `init` offers it at the end of setup, and `auth:set` does it at any time:
+Standalone only, _since 1.21_. `init` offers it at the end of setup, and `auth:set` does it at any time:
 
 ```bash
 symfony-security-auditor auth:set
@@ -586,7 +586,7 @@ Windows has no POSIX permission bits — `fileperms()` reports the same mode for
 
 ### Reading the key from a file
 
-`%env(file:VAR)%` reads the file whose **path** `VAR` holds, rather than the variable's own value:
+`%env(file:VAR)%` reads the file whose **path** `VAR` holds, rather than the variable's own value — in the standalone binary _since 1.21_; a Symfony application gets it from Symfony's own `file:` env processor:
 
 ```yaml
 platform:
@@ -819,7 +819,7 @@ A run whose scan discovered **no file at all** exits `1` rather than reporting S
 
 ### `audit:diff` — comparing two reports
 
-Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A finding that disappeared from a file the later run could not fully analyze (its `coverage` ledger says the file `errored` or was `aborted`, so the report carries `complete: false`) is **Unverified** rather than fixed: nobody looked, so nothing says it is gone. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title` — and one written before the coverage ledger existed simply has no unverified findings.
+Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A finding that disappeared from a file the later run could not fully analyze (its `coverage` ledger says the file `errored` or was `aborted`, so the report carries `complete: false`) is **Unverified** rather than fixed (_since 1.21_): nobody looked, so nothing says it is gone. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title` — and one written before the coverage ledger existed simply has no unverified findings.
 
 ```bash
 bin/console audit:diff previous.json current.json
@@ -902,7 +902,7 @@ Exit codes: `0` on success, `1` if the report is missing or malformed, the basel
 
 Starts a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, exposing the auditor as MCP **tools** so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can run an audit on demand. The server is built on the official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC on stdin/stdout, so the command prints nothing else to stdout: while it runs, PHP notices and warnings are displayed on stderr whatever `display_errors` says, so a stray one cannot corrupt the protocol stream.
 
-It is available both ways the auditor ships:
+It is available both ways the auditor ships, the standalone binary _since 1.21_:
 
 ```bash
 symfony-security-auditor mcp:serve   # standalone binary, reads your user-level config.yaml
@@ -978,9 +978,9 @@ Standalone only. Writes `config.yaml` and downloads the provider bridge it needs
 | `--provider` | `anthropic` | Any platform the bundled `symfony/ai-bundle` declares; any other — `meta`, which 0.14 dropped, or a misspelling — is refused with exit code `2` before anything is installed, listing the ones it declares. A platform configured per instance takes it too, e.g. `generic.my_gateway`. |
 | `--model` | `claude-opus-4-8` | Used for every provider, not derived from one — set it for anything other than Anthropic. |
 | `--env-var` | `<PLATFORM>_API_KEY` | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead. |
-| `--base-url` | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
-| `--endpoint` | prompted when required | The connection URL under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. For `ollama` and `together` it is the origin; `deepgram`, `elevenlabs`, `minimax` and `venice` take it with the API version path their default carries (`https://api.deepgram.com/v1/`), since the bridge appends only the route. Rejected for any other platform. |
-| `--no-api-key` | off | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`bedrock`, `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`). |
+| `--base-url` | prompted when required | _Since 1.21._ The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
+| `--endpoint` | prompted when required | _Since 1.21._ The connection URL under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. For `ollama` and `together` it is the origin; `deepgram`, `elevenlabs`, `minimax` and `venice` take it with the API version path their default carries (`https://api.deepgram.com/v1/`), since the bridge appends only the route. Rejected for any other platform. |
+| `--no-api-key` | off | _Since 1.21._ Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`bedrock`, `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`). |
 | `--force` | off | Overwrite an existing configuration without asking. |
 
 ```bash

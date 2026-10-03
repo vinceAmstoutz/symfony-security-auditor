@@ -319,6 +319,10 @@ Profiles (`fast` / `balanced` / `thorough`), split-model, concurrency, caching, 
 | Ollama (local) | `symfony/ai-ollama-platform` | _(none)_ |
 | Albert (French gov) | `symfony/ai-albert-platform` | `ALBERT_API_KEY` plus a `base_url` |
 | amazee.ai | `symfony/ai-amazee-ai-platform` | `AMAZEEAI_API_KEY` plus a `base_url` |
+| Fireworks AI | `symfony/ai-fireworks-platform` | `FIREWORKS_API_KEY` |
+| Together AI | `symfony/ai-together-platform` | `TOGETHER_API_KEY` |
+| Venice AI | `symfony/ai-venice-platform` | `VENICE_API_KEY` |
+| Eden AI | `symfony/ai-eden-ai-platform` | `EDENAI_API_KEY` |
 | Generic (AI gateway) | `symfony/ai-generic-platform` | depends on the gateway |
 
 Swapping providers requires only a `config/packages/ai.yaml` change — no PHP edits.

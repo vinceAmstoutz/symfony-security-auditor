@@ -51,7 +51,7 @@ bin/castor up
 
 Run Infection **through `bin/castor lint`**, never as a bare `bin/infection`. The task's PHPUnit step emits the `--coverage-clover`/`--coverage-xml`/`--log-junit` set that its Infection step then reuses via `--coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100`, matching `.github/workflows/ci.yaml`; invoking `bin/infection` with ad-hoc flags has twice reported a green 100% MSI on a commit CI then rejected. Note that a single green run is still not proof of CI parity: Infection rewrites `phpunit.dist.xml` to force `executionOrder="defects,random"` while disabling result caching, so test order is effectively random per invocation — see #275.
 
-Commit messages are validated separately in CI via [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see [Commit Messages](#commit-messages).
+Commit messages are validated separately in CI via [commitlint](https://commitlint.js.org/) (`commitlint.config.mjs`) — see [Commit Messages](#commit-messages).
 
 ## Project Structure
 
