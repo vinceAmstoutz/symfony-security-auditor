@@ -870,7 +870,7 @@ When some finding disappeared from a file a later run could not analyze, the sum
 | ---------- | ----- | --------- | ------------------------------------------- |
 | `--format` | `-f`  | `console` | Output format: `console`, `json`, or `html` |
 
-With `--format=json` the trend is emitted as a `points` array — one entry per report with `report`, `total`, `new`, `fixed`, and `unverified` keys (`new`, `fixed`, and `unverified` are `null` on the first point, which has no predecessor to compare against). `unverified` counts the findings that disappeared from files the report's run could not fully analyze — they are neither fixed nor part of its total, and the console line mentions them only when there are some.
+With `--format=json` the trend is emitted as a `points` array — one entry per report with `report`, `total`, `new`, `fixed`, and `unverified` (_since 1.21_) keys (`new`, `fixed`, and `unverified` are `null` on the first point, which has no predecessor to compare against). `unverified` counts the findings that disappeared from files the report's run could not fully analyze — they are neither fixed nor part of its total, and the console line mentions them only when there are some.
 
 With `--format=html` the trend is emitted as a single self-contained HTML page (no external assets, light and dark mode): an SVG line chart of finding totals over the report series plus a table of per-report new/fixed/unverified deltas, under the same summary sentence as the console — redirect stdout to publish it as a dashboard:
 
