@@ -380,9 +380,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
     {
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([
             new RuntimeException('HTTP 503 Service Unavailable'),
-            new RuntimeException('HTTP 503 Service Unavailable'),
-            new RuntimeException('HTTP 503 Service Unavailable'),
-            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 401 Unauthorized'),
             new BadRequestException(self::PROMPT_TOO_LONG),
         ], []);
         $symfonyAiLLMClient = $this->client($scriptedTokenUsagePlatform, new NullLogger());
@@ -390,7 +388,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
         $responses = $symfonyAiLLMClient->completeBatchWithTools([['system' => 's', 'user' => 'u', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 2, 3);
 
         self::assertTrue($responses[0]->isRequestTooLarge());
-        self::assertSame(5, $scriptedTokenUsagePlatform->invocations);
+        self::assertSame(3, $scriptedTokenUsagePlatform->invocations);
     }
 
     /**

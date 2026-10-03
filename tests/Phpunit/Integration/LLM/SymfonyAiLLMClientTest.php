@@ -1551,7 +1551,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NegativeTokenCountException
      * @throws TransientLLMFailureException
      */
-    public function test_complete_batch_with_tools_finalizes_as_empty_content_when_failing_after_tools_ran(): void
+    public function test_complete_batch_with_tools_aborts_like_the_sequential_path_when_the_retry_after_a_tool_ran_is_exhausted(): void
     {
         $toolCalls = 0;
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd', static function (array $arguments) use (&$toolCalls): string {
@@ -1560,16 +1560,6 @@ final class SymfonyAiLLMClientTest extends TestCase
             return 'ok';
         })], new NullLogger());
 
-        /** @var list<array{string, array<string, mixed>}> $warnings */
-        $warnings = [];
-        $logger = self::createStub(LoggerInterface::class);
-        $logger->method('debug');
-        $logger->method('warning')->willReturnCallback(
-            static function (string $msg, array $ctx = []) use (&$warnings): void {
-                $warnings[] = [$msg, $ctx];
-            },
-        );
-
         $platform = $this->flakyPlatform([
             new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])]),
             new RuntimeException('HTTP 503 Service Unavailable'),
@@ -1577,25 +1567,22 @@ final class SymfonyAiLLMClientTest extends TestCase
         ]);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new PlatformBinding($platform, 'm', $logger),
+            new PlatformBinding($platform, 'm', new NullLogger()),
             platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 1))),
         );
 
-        $responses = $symfonyAiLLMClient->completeBatchWithTools([
-            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
-        ], 4, 3);
+        $caught = null;
+        try {
+            $symfonyAiLLMClient->completeBatchWithTools([
+                ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+            ], 4, 3);
+        } catch (TransientLLMFailureException $transientllmFailureException) {
+            $caught = $transientllmFailureException;
+        }
 
-        self::assertSame('empty_content', $responses[0]->stopReason());
-        self::assertSame('', $responses[0]->content());
+        self::assertInstanceOf(TransientLLMFailureException::class, $caught);
+        self::assertSame('LLM call failed after 2 attempts: HTTP 503 Service Unavailable', $caught->getMessage());
         self::assertSame(1, $toolCalls);
-
-        $failureLogs = array_values(array_filter(
-            $warnings,
-            static fn (array $entry): bool => 'Concurrent tool-using conversation failed after tool execution; keeping recorded tool results' === $entry[0],
-        ));
-        self::assertCount(1, $failureLogs);
-        self::assertArrayHasKey('input_tokens', $failureLogs[0][1]);
-        self::assertArrayHasKey('output_tokens', $failureLogs[0][1]);
     }
 
     /**
@@ -3343,7 +3330,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws NegativeTokenCountException
      * @throws InvalidToolRegistryException
      */
-    public function test_complete_batch_with_tools_lets_a_transient_failure_the_restart_also_hits_escape(): void
+    public function test_complete_batch_with_tools_aborts_without_a_restart_and_counts_every_attempt_when_the_retry_before_any_tool_ran_is_exhausted(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             new PlatformBinding($this->flakyPlatform(array_fill(0, 10, new RuntimeException('HTTP 503 Service Unavailable'))), 'm', new NullLogger()),
@@ -3351,7 +3338,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(TransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed after 3 attempts');
+        $this->expectExceptionMessage('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
 
         $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's', 'user' => 'u', 'tools' => new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger())],

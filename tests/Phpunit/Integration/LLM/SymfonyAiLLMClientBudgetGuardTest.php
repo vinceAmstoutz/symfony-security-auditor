@@ -271,7 +271,7 @@ final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
     {
         $messageCollectingLogger = new MessageCollectingLogger();
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform(
-            [new RuntimeException('HTTP 503 Service Unavailable'), new TextResult('sibling'), new RuntimeException('HTTP 503 Service Unavailable'), new TextResult('restarted')],
+            [new RuntimeException('HTTP 503 Service Unavailable'), new TextResult('sibling'), new RuntimeException('HTTP 401 Unauthorized'), new TextResult('restarted')],
             [new TokenUsage(), $this->fiveHundredTokens(), new TokenUsage(), $this->fiveHundredTokens()],
         );
         $symfonyAiLLMClient = $this->clientWithoutRetries($scriptedTokenUsagePlatform, $this->tokenBudget(), $messageCollectingLogger);
@@ -321,6 +321,36 @@ final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
         self::assertSame(\sprintf(self::BUDGET_EXCEEDED_MESSAGE_FORMAT, 500), $message);
         self::assertSame([], $structuredVulnerabilityCollectionSession->drain());
         self::assertSame(1, $scriptedTokenUsagePlatform->invocations);
+    }
+
+    /**
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_batch_with_tools_refuses_to_retry_a_conversation_once_a_sibling_spent_the_budget(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform(
+            [new TextResult('spends the budget'), new RuntimeException('HTTP 503 Service Unavailable'), new TextResult('retried after the budget was spent')],
+            [$this->fiveHundredTokens(), new TokenUsage(), $this->fiveHundredTokens()],
+        );
+        $symfonyAiLLMClient = $this->clientWithoutRetries($scriptedTokenUsagePlatform, $this->tokenBudget(), new MessageCollectingLogger());
+
+        $aborted = false;
+        try {
+            $symfonyAiLLMClient->completeBatchWithTools([
+                ['system' => 's', 'user' => 'u', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry],
+                ['system' => 's', 'user' => 'u', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry],
+            ], 4, 1);
+        } catch (BudgetExceededException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(2, $scriptedTokenUsagePlatform->invocations);
     }
 
     /**

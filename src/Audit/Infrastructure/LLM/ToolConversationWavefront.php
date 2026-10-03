@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
  * Runs every tool-using conversation in a concurrency window as a wavefront:
@@ -46,15 +47,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
  * per-round invocations overlap on the wire. Any dispatch or resolution
  * failure first retries the same conversation through
  * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
- * sequential path uses. Once that retry gives up, a conversation that hasn't
- * run a tool yet always falls back to the proven sequential
- * completeWithTools() path (full restart) — safe to retry from scratch
- * regardless of why the retry failed. One that already ran a tool cannot
- * restart without executing it twice, so it finalizes as an empty
- * `empty_content` response instead — unless the retry's own failure was
- * classified non-transient, which is rethrown instead of masked, per the LLM
- * seam's contract that non-transient provider failures must never be
- * swallowed into a false-negative SAFE result.
+ * sequential path uses — once the budget allows another call. When every
+ * attempt of that retry fails transiently, the audit aborts as it does on the
+ * sequential path, under an attempt count that includes the dispatch. When the
+ * retry fails otherwise, a conversation that hasn't run a tool yet falls back
+ * to the proven sequential completeWithTools() path (full restart). One that
+ * already ran a tool cannot restart without executing it twice: a failure
+ * classified non-transient is rethrown instead of masked, per the LLM seam's
+ * contract that non-transient provider failures must never be swallowed into
+ * a false-negative SAFE result, and anything else finalizes it as an empty
+ * `empty_content` response.
  *
  * An answer with nothing usable in it — empty, cut off by the output limit or
  * withheld by a content filter — is never retried or restarted either: the
@@ -97,6 +99,7 @@ final readonly class ToolConversationWavefront
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      * @throws NegativeTokenCountException
      */
     public function resolveToolWindow(array $window, int $maxToolIterations): array
@@ -153,6 +156,7 @@ final readonly class ToolConversationWavefront
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      * @throws NegativeTokenCountException
      */
     private function runWavefrontRound(PlatformInterface $platform, array $states, array $window, int $maxToolIterations): array
@@ -220,6 +224,7 @@ final readonly class ToolConversationWavefront
      *
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      * @throws NegativeTokenCountException
      */
     private function advanceDispatched(array $states, array $dispatched, array $window, int $maxToolIterations): array
@@ -292,6 +297,7 @@ final readonly class ToolConversationWavefront
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      * @throws NegativeTokenCountException
      */
     private function advanceConversation(ConversationState $conversationState, DeferredResult|Throwable $dispatched, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
@@ -318,6 +324,7 @@ final readonly class ToolConversationWavefront
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      * @throws NegativeTokenCountException
      */
     private function recoverFailedInvocation(ConversationState $conversationState, Throwable $throwable, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
@@ -379,20 +386,17 @@ final readonly class ToolConversationWavefront
 
     /**
      * Retries a failed dispatch/resolution through the same
-     * classify-then-retry-or-fail seam the sequential path uses. Falls back to
-     * `abortConversation()` once that retry itself fails — which restarts
-     * from scratch via completeWithTools() for a conversation that hasn't run
-     * a tool yet, or finalizes as `empty_content` for one that has (it cannot
-     * restart without executing that tool a second time). Two exceptions: a
-     * tool-ran conversation whose retry failure is classified non-transient
-     * is rethrown rather than finalized, since a restart can't happen and
-     * masking the failure would produce a false-negative SAFE result; and a
-     * retry the model refuses as too large ends the conversation without the
-     * restart, which would only send the same prompt a third time.
+     * classify-then-retry-or-fail seam the sequential path uses. A retry whose
+     * attempts all fail transiently aborts the audit, as the sequential path
+     * does, counting the dispatch that failed first. A retry that fails
+     * otherwise goes to `abortConversation()`, and a retry the model refuses
+     * as too large ends the conversation without the restart, which would
+     * only send the same prompt a third time.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     private function retryOrAbortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
     {
@@ -412,27 +416,28 @@ final readonly class ToolConversationWavefront
 
     /**
      * The retried answer, or the state the conversation ends in when the
-     * retry itself fails.
+     * retry itself fails. A sibling advanced earlier in the round may have
+     * spent the budget, so it is checked before the retry is dispatched.
      *
+     * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
      */
     private function retryInvocation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): DeferredResult|ConversationState
     {
+        $this->budgetTracker?->assertWithinBudget();
+
         try {
             return $this->retryingPlatformInvoker->invoke($conversationState->bag, $conversationState->options, $conversationState->estimatedInputTokens);
         } catch (EmptyLLMResponseException $emptyLLMResponseException) {
             return $this->endDegradedConversation($conversationState, $emptyLLMResponseException, $emptyLLMResponseException->stopReason);
         } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
             return $this->endOversizedConversation($conversationState, $llmRequestTooLargeException);
-        } catch (NonTransientLLMFailureException $nonTransientLLMFailureException) {
-            if ($conversationState->toolsRan) {
-                throw $nonTransientLLMFailureException;
-            }
-
-            return $this->abortConversation($conversationState, $toolLLMRequest, $maxToolIterations);
-        } catch (Throwable) {
-            return $this->abortConversation($conversationState, $toolLLMRequest, $maxToolIterations);
+        } catch (TransientLLMFailureException $transientLLMFailureException) {
+            throw $transientLLMFailureException->afterOneMoreAttempt();
+        } catch (Throwable $throwable) {
+            return $this->abortConversation($conversationState, $toolLLMRequest, $maxToolIterations, $throwable);
         }
     }
 
@@ -454,9 +459,17 @@ final readonly class ToolConversationWavefront
     }
 
     /**
+     * A conversation that cannot go on. Before any tool ran it restarts from
+     * scratch through completeWithTools(). After one ran it cannot restart
+     * without executing that tool a second time: a failure classified
+     * non-transient is rethrown, since finalizing it would mask a failure that
+     * repeats on every call behind a false-negative SAFE result, and anything
+     * else ends the conversation as `empty_content`, keeping what it recorded.
+     *
      * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
-    private function abortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
+    private function abortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations, ?Throwable $throwable = null): ConversationState
     {
         if (!$conversationState->toolsRan) {
             try {
@@ -464,6 +477,10 @@ final readonly class ToolConversationWavefront
             } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
                 return $this->endOversizedConversation($conversationState, $llmRequestTooLargeException);
             }
+        }
+
+        if ($throwable instanceof NonTransientLLMFailureException) {
+            throw $throwable;
         }
 
         $this->logger->warning('Concurrent tool-using conversation failed after tool execution; keeping recorded tool results', [
