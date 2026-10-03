@@ -65,7 +65,7 @@ final readonly class ReportWriter implements ReportWriterInterface
         }
 
         try {
-            $this->assertSafeToWrite($outputFile);
+            $this->assertSafeToWrite($outputFile, $auditReport->projectPath());
             $this->filesystem->dumpFile($outputFile, $content);
         } catch (UnsafeReportWriteException $unsafeReportWriteException) {
             $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
@@ -85,13 +85,13 @@ final readonly class ReportWriter implements ReportWriterInterface
      * @throws ReportWriteFailedException
      */
     #[Override]
-    public function assertWritable(?string $outputFile): void
+    public function assertWritable(?string $outputFile, string $projectPath): void
     {
         if (null === $outputFile) {
             return;
         }
 
-        $this->assertSafeToWrite($outputFile);
+        $this->assertSafeToWrite($outputFile, $projectPath);
 
         try {
             $this->filesystem->mkdir(\dirname($outputFile));
@@ -133,13 +133,14 @@ final readonly class ReportWriter implements ReportWriterInterface
      * (e.g. `report.sarif`, `gl-sast-report.sarif`) committed as a symlink by
      * a malicious PR would let the audit overwrite an arbitrary file the CI
      * runner can reach. Mirrors the guard already applied to the filesystem
-     * attacker/reviewer/advisory caches and the standalone config writer.
+     * attacker/reviewer/advisory caches and the standalone config writer, and
+     * walks the audited project below its root as well.
      *
      * @throws UnsafeReportWriteException
      */
-    private function assertSafeToWrite(string $path): void
+    private function assertSafeToWrite(string $path, string $projectPath): void
     {
-        if (SymlinkGuard::isThroughSymlink($path)) {
+        if (SymlinkGuard::isThroughSymlinkIntoProject($path, $projectPath)) {
             throw UnsafeReportWriteException::forSymlinkedPath($path);
         }
     }

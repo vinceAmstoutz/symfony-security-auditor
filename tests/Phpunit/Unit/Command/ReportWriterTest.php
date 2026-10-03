@@ -539,7 +539,7 @@ final class ReportWriterTest extends TestCase
     {
         $outputFile = $this->tmpDir.'/build/reports/report.json';
 
-        $this->reportWriter->assertWritable($outputFile);
+        $this->reportWriter->assertWritable($outputFile, $this->tmpDir);
 
         self::assertDirectoryExists($this->tmpDir.'/build/reports');
         self::assertFileDoesNotExist($outputFile);
@@ -554,7 +554,7 @@ final class ReportWriterTest extends TestCase
         $outputFile = $this->tmpDir.'/report.json';
         $this->filesystem->dumpFile($outputFile, 'previous run');
 
-        $this->reportWriter->assertWritable($outputFile);
+        $this->reportWriter->assertWritable($outputFile, $this->tmpDir);
 
         self::assertStringEqualsFile($outputFile, 'previous run');
     }
@@ -569,7 +569,49 @@ final class ReportWriterTest extends TestCase
 
         $this->expectException(UnsafeReportWriteException::class);
 
-        $this->reportWriter->assertWritable($this->tmpDir.'/report.json');
+        $this->reportWriter->assertWritable($this->tmpDir.'/report.json', $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_writing_refuses_a_path_into_the_audited_project_through_a_symlinked_directory_above_its_parent(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $outsideDir = sys_get_temp_dir().'/report_writer_symlink_build_'.uniqid('', true);
+        $this->filesystem->mkdir($outsideDir.'/reports');
+        symlink($outsideDir, $this->tmpDir.'/build');
+
+        try {
+            $this->expectException(UnsafeReportWriteException::class);
+
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $this->tmpDir.'/build/reports/report.json', $symfonyStyle);
+        } finally {
+            self::assertSame([], glob($outsideDir.'/reports/*'));
+            $this->filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_refuses_a_path_into_the_audited_project_through_a_symlinked_directory_above_its_parent(): void
+    {
+        $outsideDir = sys_get_temp_dir().'/report_writer_symlink_build_'.uniqid('', true);
+        $this->filesystem->mkdir($outsideDir.'/reports');
+        symlink($outsideDir, $this->tmpDir.'/build');
+
+        try {
+            $this->expectException(UnsafeReportWriteException::class);
+
+            $this->reportWriter->assertWritable($this->tmpDir.'/build/reports/report.json', $this->tmpDir);
+        } finally {
+            $this->filesystem->remove($outsideDir);
+        }
     }
 
     /**
@@ -584,7 +626,7 @@ final class ReportWriterTest extends TestCase
         $this->expectException(ReportWriteFailedException::class);
         $this->expectExceptionMessage('before the audit spends anything');
 
-        $this->reportWriter->assertWritable($blockingFile.'/report.json');
+        $this->reportWriter->assertWritable($blockingFile.'/report.json', $this->tmpDir);
     }
 
     /**
@@ -595,6 +637,6 @@ final class ReportWriterTest extends TestCase
     {
         $this->expectException(ReportWriteFailedException::class);
 
-        $this->reportWriter->assertWritable($this->tmpDir);
+        $this->reportWriter->assertWritable($this->tmpDir, $this->tmpDir);
     }
 }

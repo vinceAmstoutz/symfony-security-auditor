@@ -39,7 +39,7 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     public function generate(AuditReport $auditReport, string $path): int
     {
         $entries = $this->entriesFor($auditReport);
-        $this->baseline->save($path, $entries);
+        $this->baseline->save($path, $entries, $auditReport->projectPath());
 
         return \count($entries);
     }

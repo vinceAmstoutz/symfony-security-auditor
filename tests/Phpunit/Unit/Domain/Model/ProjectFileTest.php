@@ -1407,4 +1407,23 @@ final class ProjectFileTest extends TestCase
 
         self::assertFalse($projectFile->isService());
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('withheldContentCases')]
+    public function test_is_withheld_tells_content_the_secret_scrubber_withheld_from_any_other(string $content, bool $withheld): void
+    {
+        self::assertSame($withheld, ProjectFile::create('src/A.php', '/app/src/A.php', $content)->isWithheld());
+    }
+
+    /** @return iterable<string, array{0: string, 1: bool}> */
+    public static function withheldContentCases(): iterable
+    {
+        yield 'the placeholder alone' => ['***REDACTED:unscannable***', true];
+        yield 'the placeholder padded to the line count' => ["***REDACTED:unscannable***\n\n\n", true];
+        yield 'code quoting the placeholder' => ["<?php\n\$x = '***REDACTED:unscannable***';\n", false];
+        yield 'the placeholder followed by code' => ["***REDACTED:unscannable***\n<?php", false];
+        yield 'another redaction placeholder' => ['***REDACTED:pem_private_key***', false];
+    }
 }
