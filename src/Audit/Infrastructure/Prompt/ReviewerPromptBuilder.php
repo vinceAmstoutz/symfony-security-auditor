@@ -35,7 +35,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
      * previously-cached verdicts. Bump whenever the decision-rules text
      * changes in a way expected to alter accept/reject outcomes.
      */
-    public const int PROMPT_VERSION = 4;
+    public const int PROMPT_VERSION = 3;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = false;
 
