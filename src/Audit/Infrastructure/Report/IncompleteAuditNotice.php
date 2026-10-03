@@ -36,6 +36,6 @@ final readonly class IncompleteAuditNotice
 
         return 0 === $unanalyzed
             ? \sprintf('Audit incomplete: none of the %d file(s) in scope was analyzed, because no LLM call was made or the run stopped before its first one, so this report cannot vouch that the project is free of vulnerabilities.', $auditReport->filesScanned())
-            : \sprintf('Audit incomplete: %d file(s) could not be fully analyzed because an LLM call failed or the run was aborted, so this report cannot vouch that the project is free of vulnerabilities.', $unanalyzed);
+            : \sprintf('Audit incomplete: %d file(s) could not be fully analyzed (a scan or LLM call failed, or the run was aborted), so this report cannot vouch that the project is free of vulnerabilities.', $unanalyzed);
     }
 }

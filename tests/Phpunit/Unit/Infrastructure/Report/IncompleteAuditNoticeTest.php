@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
@@ -33,6 +34,32 @@ final class IncompleteAuditNoticeTest extends TestCase
         $auditContext->recordCoverage('attacker', 'src/B.php', 'aborted');
 
         self::assertStringStartsWith('Audit incomplete: 2 file(s) could not be fully analyzed', (string) IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    #[DataProvider('causesOfAnUnanalyzedFile')]
+    public function test_its_reason_holds_whatever_left_the_file_unanalyzed(string $stage, string $status): void
+    {
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $auditContext->recordCoverage($stage, 'src/A.php', $status);
+
+        self::assertSame(
+            'Audit incomplete: 1 file(s) could not be fully analyzed (a scan or LLM call failed, or the run was aborted), so this report cannot vouch that the project is free of vulnerabilities.',
+            IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function causesOfAnUnanalyzedFile(): iterable
+    {
+        yield 'an attacker call that failed' => ['attacker', 'errored'];
+        yield 'an abort before the attacker reached the file' => ['attacker', 'aborted'];
+        yield 'a reviewer call that failed' => ['reviewer', 'errored'];
+        yield 'a scan that could not read the file' => ['secret_scrubbing', 'errored'];
     }
 
     /**

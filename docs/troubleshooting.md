@@ -192,7 +192,7 @@ Exit code `1` is also used for:
 
 - Invalid `project-path` argument.
 - The scan discovered no file to audit at all — a mistyped path, a `scan.included_paths` entry matching nothing, or an over-narrow `--path` — fails rather than reporting a hollow SAFE result. A `--since` run that finds no _changed_ files still exits `0`.
-- No file in scope could be analyzed: every LLM call failed even after its retries, so the run has no verdict (_since 1.21_). The command says `Audit incomplete: none of the N file(s) in scope could be analyzed`; see [`Audit incomplete`](#audit-incomplete-n-files-could-not-be-fully-analyzed) for the cause.
+- No file in scope could be analyzed — a scan or LLM call failed for each of them, or the run stopped before reaching them — so the run has no verdict (_since 1.21_). The command says `Audit incomplete: none of the N file(s) in scope could be analyzed`; see [`Audit incomplete`](#audit-incomplete-n-files-could-not-be-fully-analyzed) for the cause.
 - The normalized score fell below `--min-score`, if set.
 - Unhandled exception during pipeline execution (check stderr).
 - Validator errors on the input (e.g. `--format` set to a value it does not support — see [Configuration → Options](configuration.md#options)).

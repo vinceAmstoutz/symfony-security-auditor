@@ -25,6 +25,6 @@ final class AuditWithoutVerdictException extends RuntimeException
 
     public static function forNoFileAnalyzed(string $projectPath, int $fileCount): self
     {
-        return new self(\sprintf('The audit of "%s" has no verdict: none of its %d file(s) could be analyzed, because every LLM call failed. The server log names the cause.', $projectPath, $fileCount));
+        return new self(\sprintf('The audit of "%s" has no verdict: none of its %d file(s) could be analyzed (a scan or LLM call failed, or the run stopped before reaching them). The server log names the cause.', $projectPath, $fileCount));
     }
 }

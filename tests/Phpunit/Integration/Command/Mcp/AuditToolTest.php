@@ -177,7 +177,10 @@ final class AuditToolTest extends TestCase
             $auditTool->audit($this->projectPath);
             self::fail('A run that analyzed no file must not return a report.');
         } catch (ToolCallException $toolCallException) {
-            self::assertStringContainsString('has no verdict: none of its 1 file(s) could be analyzed', $toolCallException->getMessage());
+            self::assertSame(
+                \sprintf('The audit of "%s" has no verdict: none of its 1 file(s) could be analyzed (a scan or LLM call failed, or the run stopped before reaching them). The server log names the cause.', $this->projectPath),
+                $toolCallException->getMessage(),
+            );
         }
     }
 
