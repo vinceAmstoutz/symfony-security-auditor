@@ -354,6 +354,37 @@ final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_batch_with_tools_aborts_on_the_budget_a_retried_answer_spent_after_a_tool_ran(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform(
+            [new ToolCallResult([new ToolCall('call-1', 'record_vulnerability', $this->finding())]), new RuntimeException('HTTP 503 Service Unavailable'), new TextResult('retried answer that spends the budget')],
+            [new TokenUsage(), new TokenUsage(), $this->fiveHundredTokens()],
+        );
+        $messageCollectingLogger = new MessageCollectingLogger();
+        $symfonyAiLLMClient = $this->clientWithoutRetries($scriptedTokenUsagePlatform, $this->tokenBudget(), $messageCollectingLogger);
+
+        $aborted = false;
+        try {
+            $symfonyAiLLMClient->completeBatchWithTools([
+                ['system' => 's', 'user' => 'u', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry],
+            ], 4, 3);
+        } catch (BudgetExceededException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(3, $scriptedTokenUsagePlatform->invocations);
+        self::assertNotContains('Concurrent tool-using conversation failed after tool execution; keeping recorded tool results', array_column($messageCollectingLogger->records, 0));
+    }
+
+    /**
      * A client whose budget is already spent, over a platform scripted with no
      * answer at all: a call that reaches it fails the test with the fixture's
      * own "invoked more times than scripted" error instead of the expected
