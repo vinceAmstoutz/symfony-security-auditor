@@ -144,10 +144,10 @@ Prettier and Markdown lint both run via Docker (`tmknom/prettier`, `davidanson/m
 - Prettier handles **formatting**: one line per paragraph and list item, never hard-wrapped, plus table layout and list/fence style. `bin/castor lint:fix` joins a hand-wrapped paragraph back into one line.
 - markdownlint handles **semantics** (heading hierarchy, broken anchors, missing image alt text).
 
-**Commit messages are linted separately** in CI via [commitlint](https://commitlint.js.org/) (Conventional Commits). Config: [`commitlint.config.js`](commitlint.config.js). Run locally:
+**Commit messages are linted separately** in CI via [commitlint](https://commitlint.js.org/) (Conventional Commits). Config: [`commitlint.config.mjs`](commitlint.config.mjs). Run locally:
 
 ```bash
-npx --yes @commitlint/cli --from=origin/main --to=HEAD --config commitlint.config.js
+npx --yes @commitlint/cli --from=origin/main --to=HEAD --config commitlint.config.mjs
 ```
 
 **No silent suppressions allowed.** PHPStan `@phpstan-ignore*`, baseline files, Rector skips, `@codeCoverageIgnore`, `markTestSkipped` used to dodge failures — all forbidden. If a tool flags something, fix the code. Genuine false positives require a PR-description justification and a linked tracking issue.

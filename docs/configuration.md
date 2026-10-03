@@ -545,7 +545,7 @@ The environment coming first is what keeps containers, CI and per-run secret-man
 
 ### Storing the key on this machine
 
-Standalone only. `init` offers it at the end of setup, and `auth:set` does it at any time:
+Standalone only, _since 1.21_. `init` offers it at the end of setup, and `auth:set` does it at any time:
 
 ```bash
 symfony-security-auditor auth:set
@@ -586,7 +586,7 @@ Windows has no POSIX permission bits — `fileperms()` reports the same mode for
 
 ### Reading the key from a file
 
-`%env(file:VAR)%` reads the file whose **path** `VAR` holds, rather than the variable's own value:
+`%env(file:VAR)%` reads the file whose **path** `VAR` holds, rather than the variable's own value — in the standalone binary _since 1.21_; a Symfony application gets it from Symfony's own `file:` env processor:
 
 ```yaml
 platform:
@@ -821,7 +821,7 @@ _Since 1.21_, the same holds for a run that ran to its end without analyzing **a
 
 ### `audit:diff` — comparing two reports
 
-Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A finding that disappeared from a file the later run could not fully analyze (its `coverage` ledger says the file `errored` or was `aborted`, so the report carries `complete: false`) is **Unverified** rather than fixed: nobody looked, so nothing says it is gone. _Since 1.21_, the same holds for a file the later run never looked at — one the lean pre-scan skipped, one outside its `--since` or `--path` scope: a finding counts as fixed only when the later report's ledger says the attacker analyzed its file, or served it from its cache — or when its file is gone: the later report is complete (`complete: true`), ran over the whole history (its `scope.since` is `null`), its `scope.paths` hold the file, and its ledger never lists the file, as for a file deleted since. A file the ledger lists as `skipped`, `errored` or `aborted` stays unverified, as does one outside the scope, and a report written before the `scope` key existed relies on its ledger alone. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title` — and one written before the coverage ledger existed simply has no unverified findings.
+Compares two JSON reports produced by `audit:run --format=json` and classifies every finding by its stable `fingerprint` (the same per-finding identity used by baseline suppression): findings only in the later report are **New**, findings only in the earlier report are **Fixed**, and findings in both are **Persisting**. A finding that disappeared from a file the later run could not fully analyze (its `coverage` ledger says the file `errored` or was `aborted`, so the report carries `complete: false`) is **Unverified** rather than fixed (_since 1.21_): nobody looked, so nothing says it is gone. The same holds for a file the later run never looked at — one the lean pre-scan skipped, one outside its `--since` or `--path` scope: a finding counts as fixed only when the later report's ledger says the attacker analyzed its file, or served it from its cache — or when its file is gone: the later report is complete (`complete: true`), analyzed at least one file, ran over the whole history (its `scope.since` is `null`), its `scope.paths` hold the file, and its ledger never lists the file, as for a file deleted since. The scan records nothing for a file it leaves out — one larger than `scan.max_file_size_kb`, matched by a `.gitignore` while `scan.respect_gitignore` is on, outside `scan.included_paths`, a symlink or an unreadable file — so a finding in such a file counts as fixed too. A file the ledger lists as `skipped`, `errored` or `aborted` stays unverified, as does one outside the scope, and a report written before the `scope` key existed relies on its ledger alone. A report generated before the `fingerprint` key existed is still accepted — the fingerprint is recomputed from `type`, `file`, and `title` — and one written before the coverage ledger existed simply has no unverified findings.
 
 ```bash
 bin/console audit:diff previous.json current.json
@@ -870,7 +870,7 @@ When some finding disappeared from a file a later run could not analyze, the sum
 | ---------- | ----- | --------- | ------------------------------------------- |
 | `--format` | `-f`  | `console` | Output format: `console`, `json`, or `html` |
 
-With `--format=json` the trend is emitted as a `points` array — one entry per report with `report`, `total`, `new`, `fixed`, and `unverified` keys (`new`, `fixed`, and `unverified` are `null` on the first point, which has no predecessor to compare against). `unverified` counts the findings that disappeared from files the report's run could not fully analyze — they are neither fixed nor part of its total, and the console line mentions them only when there are some.
+With `--format=json` the trend is emitted as a `points` array — one entry per report with `report`, `total`, `new`, `fixed`, and `unverified` (_since 1.21_) keys (`new`, `fixed`, and `unverified` are `null` on the first point, which has no predecessor to compare against). `unverified` counts the findings that disappeared from files the report's run could not fully analyze or never looked at, by the rule [`audit:diff`](#auditdiff--comparing-two-reports) applies — they are neither fixed nor part of its total, and the console line mentions them only when there are some.
 
 With `--format=html` the trend is emitted as a single self-contained HTML page (no external assets, light and dark mode): an SVG line chart of finding totals over the report series plus a table of per-report new/fixed/unverified deltas, under the same summary sentence as the console — redirect stdout to publish it as a dashboard:
 
@@ -895,7 +895,7 @@ bin/console audit:baseline report.json .security-baseline.json --prune --annotat
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--prune` | off | Drop baseline entries whose findings no longer appear in the report. _Since 1.21_, an entry whose file the report did not analyze — its run failed on the file, or never looked at it — is kept with its reason, the way `audit:diff` calls such a finding unverified rather than fixed; an entry whose file a complete run over its whole scope no longer lists — a deleted file — is pruned. |
+| `--prune` | off | Drop baseline entries whose findings no longer appear in the report. _Since 1.21_, an entry whose file the report did not analyze — its run failed on the file, or never looked at it — is kept with its reason, the way `audit:diff` calls such a finding unverified rather than fixed; an entry whose file a complete run that analyzed at least one file no longer lists anywhere in its scope — a deleted file, or one the scan now leaves out (see [`audit:diff`](#auditdiff--comparing-two-reports)) — is pruned. |
 | `--annotate` | off | Ask a reason for each newly accepted finding; reasoned entries teach the reviewer. |
 
 Each appended entry carries `fingerprint`, `type`, `file`, `title`, `added_at`, and — when `--annotate` supplied one — `reason`. Matching is count-aware, the same rule the audit itself applies: each entry accepts one occurrence, so a finding duplicated beyond its accepted count registers as new again. Entries whose `attacker_fingerprint` matches a report finding count as covering it.
@@ -906,7 +906,7 @@ Exit codes: `0` on success, `1` if the report is missing or malformed, the basel
 
 Starts a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, exposing the auditor as MCP **tools** so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can run an audit on demand. The server is built on the official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC on stdin/stdout, so the command prints nothing else to stdout: while it runs, PHP notices and warnings are displayed on stderr whatever `display_errors` says, so a stray one cannot corrupt the protocol stream.
 
-It is available both ways the auditor ships:
+It is available both ways the auditor ships, the standalone binary _since 1.21_:
 
 ```bash
 symfony-security-auditor mcp:serve   # standalone binary, reads your user-level config.yaml
@@ -982,9 +982,9 @@ Standalone only. Writes `config.yaml` and downloads the provider bridge it needs
 | `--provider` | `anthropic` | Any platform the bundled `symfony/ai-bundle` declares; any other — `meta`, which 0.14 dropped, or a misspelling — is refused with exit code `2` before anything is installed, listing the ones it declares. A platform configured per instance takes it too, e.g. `generic.my_gateway`. |
 | `--model` | `claude-opus-4-8` | Used for every provider, not derived from one — set it for anything other than Anthropic. |
 | `--env-var` | `<PLATFORM>_API_KEY` | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead. |
-| `--base-url` | prompted when required | The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
-| `--endpoint` | prompted when required | The connection URL under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. For `ollama` and `together` it is the origin; `deepgram`, `elevenlabs`, `minimax` and `venice` take it with the API version path their default carries (`https://api.deepgram.com/v1/`), since the bridge appends only the route. Rejected for any other platform. |
-| `--no-api-key` | off | Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`bedrock`, `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`). |
+| `--base-url` | prompted when required | _Since 1.21._ The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
+| `--endpoint` | prompted when required | _Since 1.21._ The connection URL under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. For `ollama` and `together` it is the origin; `deepgram`, `elevenlabs`, `minimax` and `venice` take it with the API version path their default carries (`https://api.deepgram.com/v1/`), since the bridge appends only the route. Rejected for any other platform. |
+| `--no-api-key` | off | _Since 1.21._ Write no `api_key` at all, for the platforms whose key the bundle leaves optional (`bedrock`, `deepgram`, `elevenlabs`, `generic`, `ollama`, `openresponses`). |
 | `--force` | off | Overwrite an existing configuration without asking. |
 
 ```bash

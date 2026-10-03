@@ -59,30 +59,34 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
         }
 
         $coverage = $this->coverageIn($decoded);
+        $analyzedFiles = null === $coverage ? null : AnalyzedFiles::in($coverage);
 
         return new LoadedReport(
             $findings,
             UnanalyzedFiles::in($coverage ?? []),
-            null === $coverage ? null : AnalyzedFiles::in($coverage),
+            $analyzedFiles,
             array_column($coverage ?? [], 'file'),
-            $this->completeRunScanPathsIn($decoded),
+            $this->completeRunScanPathsIn($decoded, $analyzedFiles ?? []),
         );
     }
 
     /**
      * The `--path` scopes of a run that can say a file it never listed is
-     * gone: it reported itself complete and recorded a `scope` that ran over
-     * the whole history, with no `--since`. Null otherwise — including for a
-     * report written before the scope existed.
+     * gone: it reported itself complete, analyzed at least one file, and
+     * recorded a `scope` that ran over the whole history, with no `--since`.
+     * Null otherwise — including for a report written before the scope
+     * existed, and for a run whose scan found nothing to analyze, which says
+     * nothing about the files it never saw.
      *
      * @param array<array-key, mixed> $decoded
+     * @param list<string>            $analyzedFiles
      *
      * @return list<string>|null
      */
-    private function completeRunScanPathsIn(array $decoded): ?array
+    private function completeRunScanPathsIn(array $decoded, array $analyzedFiles): ?array
     {
         $scope = $decoded['scope'] ?? null;
-        if (true !== ($decoded['complete'] ?? null) || !\is_array($scope) || !\array_key_exists('since', $scope) || null !== $scope['since'] || !\is_array($scope['paths'] ?? null)) {
+        if (true !== ($decoded['complete'] ?? null) || [] === $analyzedFiles || !\is_array($scope) || !\array_key_exists('since', $scope) || null !== $scope['since'] || !\is_array($scope['paths'] ?? null)) {
             return null;
         }
 

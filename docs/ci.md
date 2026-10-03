@@ -149,7 +149,7 @@ jobs:
           fetch-depth: 0 # full history so `since` can diff against the base branch
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -164,16 +164,16 @@ jobs:
           sarif_file: report.sarif
 ```
 
-Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`), `project-path` (default `.`), `format` (`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`, default `sarif`), `output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`, `fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score floor, 0-100 — independent of `fail-on`, either gate failing fails the audit), `fail-on-incomplete` (default `false`; `true` makes a run that could not fully analyze every file exit `3`), `comment-pr` (default `false`), `update-badge` (default `false`), `badge-path` (default `.github/security-auditor-badge.json`), `extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`, ignored in standalone mode), and `working-directory` (default `.`). Set `setup-php: false` / `install-dependencies: false` when your job has already done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
+Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`), `project-path` (default `.`), `format` (`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`, default `sarif`), `output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`, `fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score floor, 0-100 — independent of `fail-on`, either gate failing fails the audit), `fail-on-incomplete` (_since 1.21_; default `false`; `true` makes a run that could not fully analyze every file exit `3`), `comment-pr` (default `false`), `update-badge` (default `false`), `badge-path` (default `.github/security-auditor-badge.json`), `extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`, ignored in standalone mode), and `working-directory` (default `.`). Set `setup-php: false` / `install-dependencies: false` when your job has already done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
 Keep `output`, `baseline` and `generate-baseline` inside `working-directory`, or give an absolute path outside the checkout such as `${{ runner.temp }}/report.sarif`. A report or baseline write refuses a symlink on any directory between the working directory and the file, and on any directory between the audited project's root and the file, but trusts every directory above both: with a sub-directory `working-directory`, a path climbing out of it (`../build/reports/report.sarif`) passes through directories the checked-out repository controls, where a committed symlink could redirect the write.
 
-Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (`true` or `false` when `format` is `json` or `sarif` and the report went to a file), and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter). When `complete` is `false`, those three cover only the files the run analyzed, so read them together with `complete`. A run that could not fully analyze every file yet exited `0` raises a warning annotation naming `fail-on-incomplete` — when `format` is `json` or `sarif` and the report went to a file, the cases where `complete` is populated; set `fail-on-incomplete` to fail the job instead. A run that exited `1` or `2` already fails the job, and one that analyzed no file and found nothing exits `1` whatever the inputs (_since 1.21_).
+Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (_since 1.21_; `true` or `false` when `format` is `json` or `sarif` and the report went to a file), and — only when `format: json` — `findings-count`, `highest-severity` (the report's aggregate `risk_level`) and `grade` (its `A`-`F` letter). When `complete` is `false`, those three cover only the files the run analyzed, so read them together with `complete`. A run that could not fully analyze every file yet exited `0` raises a warning annotation naming `fail-on-incomplete` — when `format` is `json` or `sarif` and the report went to a file, the cases where `complete` is populated; set `fail-on-incomplete` to fail the job instead. A run that exited `1` or `2` already fails the job, and one that analyzed no file and found nothing exits `1` whatever the inputs (_since 1.21_).
 
 ```yaml
       - name: Symfony Security Audit
         id: audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -189,7 +189,7 @@ Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (`t
 
 ```yaml
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -352,7 +352,7 @@ permissions:
 # …
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required by comment-pr
@@ -376,7 +376,7 @@ It needs a JSON report to read the grade from (`format: json` plus a non-empty `
 
 ```yaml
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.20.1
+        uses: vinceamstoutz/symfony-security-auditor@1.21.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:

@@ -285,7 +285,7 @@ The second snippet is the shape Claude Desktop, Cursor, Windsurf and Gemini CLI 
 - **Nine output formats** — `console`, `executive` (stakeholder summary: risk level, business impact, severity/type/hotspot distributions, no per-finding detail), `json`, `sarif` (GitHub Code Scanning / GitLab Security Dashboard), `html` (self-contained, shareable), `markdown` (PR-friendly), `junit` (CI test-report panels), `github` (inline PR annotations, no SARIF upload step), and `github-comment` (PR comment headlined by the grade and score, self-updating on rerun). Baseline suppression: `--generate-baseline` accepts known findings, `--baseline` drops them from the report and exit code so only new findings fail CI; `--min-score` gates on the normalized score independently of `--fail-on`.
 - **Callable from your AI assistant** — `mcp:serve` exposes the audit as an MCP tool to Claude Code, Claude Desktop, Cursor, VS Code and any other MCP client, from the binary or the bundle (see [Use it from your AI assistant](#use-it-from-your-ai-assistant-mcp)).
 - **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them.
-- **CI-ready** — a reusable [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.20.1`) plus GitLab CI templates, with SARIF upload to Code Scanning and an optional shields.io badge tracking the report's letter grade. See [CI Integration](docs/ci.md).
+- **CI-ready** — a reusable [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.21.0`) plus GitLab CI templates, with SARIF upload to Code Scanning and an optional shields.io badge tracking the report's letter grade. See [CI Integration](docs/ci.md).
 - **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let you plug in custom providers, agents, stages, advisory feeds, or report formats; project-specific attacker skills need only configuration, no PHP.
 - **Bundle or standalone** — install as a Symfony bundle, or run it like PHPStan/Psalm from a single self-contained binary configured once at the user level to audit any project with zero footprint, kept current with `self-update` and preflighted with `doctor` (see [Standalone tool](#standalone-tool-binary)).
 
@@ -319,6 +319,10 @@ Profiles (`fast` / `balanced` / `thorough`), split-model, concurrency, caching, 
 | Ollama (local) | `symfony/ai-ollama-platform` | _(none)_ |
 | Albert (French gov) | `symfony/ai-albert-platform` | `ALBERT_API_KEY` plus a `base_url` |
 | amazee.ai | `symfony/ai-amazee-ai-platform` | `AMAZEEAI_API_KEY` plus a `base_url` |
+| Fireworks AI | `symfony/ai-fireworks-platform` | `FIREWORKS_API_KEY` |
+| Together AI | `symfony/ai-together-platform` | `TOGETHER_API_KEY` |
+| Venice AI | `symfony/ai-venice-platform` | `VENICE_API_KEY` |
+| Eden AI | `symfony/ai-eden-ai-platform` | `EDENAI_API_KEY` |
 | Generic (AI gateway) | `symfony/ai-generic-platform` | depends on the gateway |
 
 Swapping providers requires only a `config/packages/ai.yaml` change — no PHP edits.

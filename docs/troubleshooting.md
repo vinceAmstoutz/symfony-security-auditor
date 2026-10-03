@@ -477,7 +477,7 @@ symfony/ai platform.
 
 Fix the model identifier if it is a typo. If the name is correct but missing from the catalog, the token counts in the report are still accurate — only the USD figure is unavailable. Run `composer update symfony/models-dev` to pull a fresher catalog, or alias your own `PricingProviderInterface` implementation to supply prices (see [Extending](extending.md)).
 
-**Standalone binary:** `composer update` does not apply — there is no user-facing `vendor/` or `composer.json`; the catalog is baked into the binary at release-build time from whatever `symfony/models-dev` version that release's CI resolved. The only way to get a newer catalog is `self-update` to a newer release, and even that only carries whatever was current when that release was built — there is no way to refresh the catalog independently of a release yet.
+**Standalone binary:** `composer update` does not apply — there is no user-facing `vendor/` or `composer.json`; the binary carries the `symfony/models-dev` catalog its release was built with. Run `self-update` to refresh it: even when the binary is already the latest release, it downloads the current catalog into the cache directory, and later runs price from that copy (`doctor`'s `Pricing catalog` check names it). `self-update --check` and a configuration with `privacy.offline_only: true` leave the catalog as it is.
 
 ## Cache Issues
 
