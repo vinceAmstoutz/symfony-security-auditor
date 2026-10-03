@@ -43,6 +43,7 @@ final readonly class ReviewerCoverageRecorder
 
         $progressReporter->report(ProgressEvent::ReviewFindingReviewed->value, [
             'accepted' => 'validated' === $status,
+            'status' => $status,
             'type' => $vulnerability->type()->value,
             'file' => $vulnerability->filePath(),
             'line' => $vulnerability->lineStart(),

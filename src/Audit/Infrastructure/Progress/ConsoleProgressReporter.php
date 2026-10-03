@@ -126,9 +126,8 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     private function onReviewCompleted(array $context): void
     {
         $this->writeAboveBar(\sprintf(
-            '<fg=green>  ✓ Reviewed: %d validated, %d rejected</>',
-            ProgressContext::int($context, 'accepted'),
-            ProgressContext::int($context, 'rejected'),
+            0 === ProgressContext::int($context, 'failed') ? '<fg=green>  ✓ Reviewed: %s</>' : '<fg=red>  ✗ Reviewed: %s</>',
+            ProgressContext::reviewTally($context),
         ));
     }
 
@@ -243,18 +242,34 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     {
         ++$this->reviewedCount;
 
-        $accepted = true === ($context['accepted'] ?? null);
+        [$verdict, $color] = $this->verdictMark($context);
 
         $line = \sprintf(
             '  ⚖ %s %s — %s:%d',
-            $accepted ? '✓ validated' : '✗ rejected',
+            $verdict,
             ProgressContext::string($context, 'type'),
             OutputFormatter::escape(TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file'))),
             ProgressContext::int($context, 'line'),
         );
 
-        $this->writeAboveBar(\sprintf('<fg=%s>%s</>', $accepted ? 'green' : 'yellow', $line));
+        $this->writeAboveBar(\sprintf('<fg=%s>%s</>', $color, $line));
         $this->updateMessage(\sprintf('reviewing %d/%d', $this->reviewedCount, $this->reviewTotal));
+    }
+
+    /**
+     * A review that reached no verdict is a failure, never a rejection.
+     *
+     * @param array<string, mixed> $context
+     *
+     * @return array{string, string} the verdict text and its color
+     */
+    private function verdictMark(array $context): array
+    {
+        if (ProgressContext::reviewReachedNoVerdict($context)) {
+            return ['✗ review failed', 'red'];
+        }
+
+        return true === ($context['accepted'] ?? null) ? ['✓ validated', 'green'] : ['✗ rejected', 'yellow'];
     }
 
     private function updateMessage(string $detail = ''): void

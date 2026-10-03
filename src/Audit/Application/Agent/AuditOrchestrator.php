@@ -124,9 +124,14 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 $reviewed,
                 static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(),
             ));
+            $rejectedCount = \count(array_filter(
+                $reviewed,
+                static fn (Vulnerability $vulnerability): bool => self::wasRejected($vulnerability, $auditContext),
+            ));
             $this->progressReporter->report(ProgressEvent::ReviewCompleted->value, [
                 'accepted' => $acceptedCount,
-                'rejected' => \count($reviewed) - $acceptedCount,
+                'rejected' => $rejectedCount,
+                'failed' => \count($reviewed) - $acceptedCount - $rejectedCount,
             ]);
 
             $this->logger->info('Iteration complete', [
@@ -262,8 +267,17 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     {
         return array_values(array_filter(
             $auditContext->vulnerabilities(),
-            static fn (Vulnerability $vulnerability): bool => !$vulnerability->isReviewerValidated() && $auditContext->wasRejectedByReviewer($vulnerability),
+            static fn (Vulnerability $vulnerability): bool => self::wasRejected($vulnerability, $auditContext),
         ));
+    }
+
+    /**
+     * A finding the reviewer rejected — a verdict it reached, unlike a review
+     * that failed and reached none.
+     */
+    private static function wasRejected(Vulnerability $vulnerability, AuditContext $auditContext): bool
+    {
+        return !$vulnerability->isReviewerValidated() && $auditContext->wasRejectedByReviewer($vulnerability);
     }
 
     /**
