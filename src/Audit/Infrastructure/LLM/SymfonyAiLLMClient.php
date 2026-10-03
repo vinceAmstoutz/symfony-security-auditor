@@ -117,6 +117,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformResilienceConfig->retryAfterHeaderParser,
             $conversionFailureExplainer,
             $degradedAnswerBooker,
+            $platformAccountingConfig->budgetTracker,
         );
         $this->emptyLLMResponseFactory = new EmptyLLMResponseFactory();
 

@@ -25,6 +25,8 @@ use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\TextResult;
+use Symfony\AI\Platform\Result\ToolCall;
+use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\StructuredVulnerabilityCollectionSession;
@@ -247,6 +249,58 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_with_tools_does_not_retry_a_garbled_tool_call_whose_billed_attempt_spent_the_budget(): void
+    {
+        $this->budgetTracker = new BudgetTracker(AuditBudget::forTokens(50_000), new CostCalculator($this->freePricing()));
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->garbledToolCall(60_000, 2_000), $this->garbledToolCall(60_000, 2_000), $this->garbledToolCall(60_000, 2_000)]);
+
+        $aborted = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->completeWithTools('sys', 'user', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
+        } catch (BudgetExceededException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+        self::assertSame(62_000, $this->budgetTracker->tokensUsed());
+    }
+
+    /**
+     * @throws InvalidAuditBudgetException
+     * @throws MissingAiPlatformException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_complete_batch_with_tools_aborts_on_the_budget_a_garbled_retry_spent_after_a_tool_ran(): void
+    {
+        $this->budgetTracker = new BudgetTracker(AuditBudget::forTokens(50_000), new CostCalculator($this->freePricing()));
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->toolCallRecordingAFinding(), $this->garbledToolCall(), $this->garbledToolCall(60_000, 2_000), $this->garbledToolCall(60_000, 2_000)]);
+
+        $aborted = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->completeBatchWithTools([['system' => 'sys', 'user' => 'user', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 2, 3);
+        } catch (BudgetExceededException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(3, $scriptedDeferredPlatform->invocations);
+        self::assertNotContains('Concurrent tool-using conversation failed after tool execution; keeping recorded tool results', array_column($this->messageCollectingLogger->records, 0));
+    }
+
+    /**
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws LLMProviderException
@@ -353,6 +407,24 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         return new DeferredResult(new ThrowingConverter(new PlatformRuntimeException('Response does not contain choices.')), new RawHttpResult($payloadTooLarge), []);
     }
 
+    private function toolCallRecordingAFinding(): DeferredResult
+    {
+        return new DeferredResult(new PlainConverter(new ToolCallResult([new ToolCall('call-1', 'record_vulnerability', [
+            'type' => 'sql_injection',
+            'severity' => 'high',
+            'title' => 'SQL injection',
+            'description' => 'desc',
+            'file_path' => 'src/A.php',
+            'line_start' => 1,
+            'line_end' => 2,
+            'vulnerable_code' => 'x',
+            'attack_vector' => 'x',
+            'proof' => 'x',
+            'remediation' => 'x',
+            'confidence' => 0.9,
+        ])])), new InMemoryRawResult(), []);
+    }
+
     private function toolCallCutOffByTheOutputLimit(): DeferredResult
     {
         return new DeferredResult(
@@ -362,11 +434,11 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         );
     }
 
-    private function garbledToolCall(): DeferredResult
+    private function garbledToolCall(int $promptTokens = 300, int $completionTokens = 40): DeferredResult
     {
         return new DeferredResult(
             new ThrowingConverter(new MalformedToolCallException(self::MALFORMED_ARGUMENTS), new RawUsageExtractor()),
-            new InMemoryRawResult($this->chatCompletion('tool_calls', "{'type': 'sql_injection'}", 300, 40)),
+            new InMemoryRawResult($this->chatCompletion('tool_calls', "{'type': 'sql_injection'}", $promptTokens, $completionTokens)),
             [],
         );
     }

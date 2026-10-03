@@ -416,7 +416,9 @@ final readonly class ToolConversationWavefront
      * The retried answer, or the state the conversation ends in when the
      * retry itself fails. The conversation's own answer, or a sibling advanced
      * earlier in the round, may have spent the budget, so it is checked before
-     * the retry is dispatched.
+     * the retry is dispatched; a retry whose billed attempts spend it aborts
+     * on the budget too, rather than ending the conversation as one that
+     * failed.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -435,6 +437,8 @@ final readonly class ToolConversationWavefront
             return $this->endOversizedConversation($conversationState, $llmRequestTooLargeException);
         } catch (TransientLLMFailureException $transientLLMFailureException) {
             throw $transientLLMFailureException->afterOneMoreAttempt();
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
         } catch (Throwable $throwable) {
             return $this->abortConversation($conversationState, $toolLLMRequest, $maxToolIterations, $throwable);
         }

@@ -183,6 +183,7 @@ final readonly class SequentialToolLoop
      * @throws InvalidRetryConfigurationException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws BudgetExceededException
      */
     private function invokeOrEndConversation(MessageBag $messageBag, array $options, int $estimatedInputTokens, int $iteration, TokenUsageSnapshot $tokenUsageSnapshot): DeferredResult|LLMResponse
     {

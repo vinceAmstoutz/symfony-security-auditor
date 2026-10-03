@@ -19,6 +19,8 @@ use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
@@ -37,7 +39,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Retr
  * custom exception, rate-limit failures honor the server's Retry-After hint,
  * and other transient failures back off per the retry policy. Every failed
  * attempt is booked first, so one the provider answered and billed is on the
- * books whether it is retried or not.
+ * books whether it is retried or not, and no retry goes out once that spend
+ * has run past the budget. The caller checks the budget before the first
+ * attempt.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -54,6 +58,7 @@ final readonly class RetryingPlatformInvoker
         private RetryAfterHeaderParser $retryAfterHeaderParser,
         private ConversionFailureExplainer $conversionFailureExplainer,
         private DegradedAnswerBooker $degradedAnswerBooker,
+        private ?BudgetTracker $budgetTracker,
     ) {}
 
     /**
@@ -67,6 +72,7 @@ final readonly class RetryingPlatformInvoker
      * @throws InvalidRetryConfigurationException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
+     * @throws BudgetExceededException
      */
     public function invoke(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
@@ -94,6 +100,7 @@ final readonly class RetryingPlatformInvoker
                     throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $failure);
                 }
 
+                $this->budgetTracker?->assertWithinBudget();
                 $this->backOffBeforeNextAttempt($failure, $attempt, $maxAttempts);
                 ++$attempt;
             }
