@@ -47,7 +47,8 @@ final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInter
         return $failOnIncomplete && !$auditReport->isComplete() ? ExitCode::Incomplete->value : ExitCode::Success->value;
     }
 
-    private function hasNoVerdict(AuditReport $auditReport): bool
+    #[Override]
+    public function hasNoVerdict(AuditReport $auditReport): bool
     {
         return 0 === $auditReport->filesDiscovered() || $auditReport->hasNoVerdict();
     }

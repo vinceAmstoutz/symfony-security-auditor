@@ -272,7 +272,9 @@ final readonly class AuditCommand
 
     /**
      * The report is written whatever becomes of the baseline: the audit has
-     * already run and paid for it.
+     * already run and paid for it. A run with no verdict writes no baseline —
+     * its empty result would replace every accepted finding and its reason —
+     * and fails.
      *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
@@ -284,6 +286,13 @@ final readonly class AuditCommand
         AuditReport $auditReport,
         string $generateBaseline,
     ): int {
+        if ($this->auditExitCodeResolver->hasNoVerdict($auditReport)) {
+            $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+            $this->auditPresenter->baselineKept($this->displayStyle($symfonyStyle, $auditCommandInput), $generateBaseline, $auditReport);
+
+            return ExitCode::Failure->value;
+        }
+
         try {
             $fingerprintCount = $this->baselineProcessor->generate($auditReport, $generateBaseline);
         } finally {

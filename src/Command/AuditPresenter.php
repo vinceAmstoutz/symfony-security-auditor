@@ -390,6 +390,18 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     #[Override]
+    public function baselineKept(SymfonyStyle $symfonyStyle, string $path, AuditReport $auditReport): void
+    {
+        $symfonyStyle->error(\sprintf(
+            '%s The baseline at %s was left as it was: a run with no verdict cannot replace the accepted findings, so it fails.',
+            0 === $auditReport->filesDiscovered()
+                ? 'The scan found no file to audit, so the run has no verdict.'
+                : \sprintf('Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict.', $auditReport->filesScanned()),
+            $path,
+        ));
+    }
+
+    #[Override]
     public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void
     {
         $symfonyStyle->success(\sprintf(

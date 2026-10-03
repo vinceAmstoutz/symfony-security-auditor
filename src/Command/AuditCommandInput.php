@@ -62,7 +62,7 @@ final class AuditCommandInput
     #[Option(description: 'Baseline file of accepted-finding fingerprints. Findings whose fingerprint is listed are suppressed from the report and excluded from the exit code. Overrides the audit.baseline config key. A missing file suppresses nothing.', name: 'baseline')]
     public ?string $baseline = null;
 
-    #[Option(description: 'Run the audit, then write every current finding fingerprint to the given file as a baseline and exit 0 without failing on findings (3 under --fail-on-incomplete when some file could not be fully analyzed). Use this to accept the current findings so future runs only report new ones.', name: 'generate-baseline')]
+    #[Option(description: 'Run the audit, then write every current finding fingerprint to the given file as a baseline and exit 0 without failing on findings (3 under --fail-on-incomplete when some file could not be fully analyzed; a run with no verdict writes no baseline and exits 1). Use this to accept the current findings so future runs only report new ones.', name: 'generate-baseline')]
     public ?string $generateBaseline = null;
 
     #[Option(description: 'Minimum aggregate risk level (safe|low|medium|high|critical) that makes the command exit 1. Overrides the audit.fail_on config key for this run. Defaults to the configured value (critical) when omitted.', name: 'fail-on')]

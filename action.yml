@@ -28,7 +28,7 @@ inputs:
     required: false
     default: ""
   generate-baseline:
-    description: If set to a path, run the audit, write the current findings to that baseline file, and exit 0 (3 under fail-on-incomplete when some file could not be fully analyzed).
+    description: If set to a path, run the audit, write the current findings to that baseline file, and exit 0 (3 under fail-on-incomplete when some file could not be fully analyzed). A run with no verdict — its scan found no file, or it analyzed none and found nothing — leaves the file untouched and exits 1.
     required: false
     default: ""
   since:

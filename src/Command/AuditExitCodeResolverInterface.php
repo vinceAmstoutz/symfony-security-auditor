@@ -28,4 +28,10 @@ interface AuditExitCodeResolverInterface
      *                               still decides first
      */
     public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null, bool $failOnIncomplete = false): int;
+
+    /**
+     * Whether the run reached no verdict: its scan found no file, or it
+     * analyzed none of its files and found nothing.
+     */
+    public function hasNoVerdict(AuditReport $auditReport): bool;
 }

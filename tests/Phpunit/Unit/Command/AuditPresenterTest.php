@@ -357,6 +357,37 @@ final class AuditPresenterTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_kept_baseline_says_the_run_analyzed_none_of_its_files(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->auditPresenter->baselineKept(new SymfonyStyle(new StringInput(''), $bufferedOutput), '.security-baseline.json', $this->reportThatAnalyzedNoFile());
+
+        self::assertStringContainsString(
+            '[ERROR] Audit incomplete: none of the 2 file(s) in scope could be analyzed, so the run has no verdict. The baseline at .security-baseline.json was left as it was: a run with no verdict cannot replace the accepted findings, so it fails.',
+            preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '',
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_kept_baseline_says_the_scan_found_no_file(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->auditPresenter->baselineKept(new SymfonyStyle(new StringInput(''), $bufferedOutput), '.security-baseline.json', AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        self::assertStringContainsString(
+            '[ERROR] The scan found no file to audit, so the run has no verdict. The baseline at .security-baseline.json was left as it was: a run with no verdict cannot replace the accepted findings, so it fails.',
+            preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '',
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      */
     public function test_the_incomplete_run_notice_stays_silent_for_a_complete_audit(): void
     {
