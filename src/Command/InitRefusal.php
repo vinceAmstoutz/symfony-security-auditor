@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BedrockMant
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CompoundPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyInstanceName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\DeclaredPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EnvironmentVariableName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EnvPlaceholder;
@@ -94,6 +95,10 @@ final readonly class InitRefusal
     {
         if ('' === $providerKey->platform) {
             return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
+        }
+
+        if (!DeclaredPlatforms::declares($providerKey)) {
+            return \sprintf('"%s" is not a platform the bundled symfony/ai-bundle declares, so nothing was written and no bridge was installed. Pick one of %s.', $provider, implode(', ', DeclaredPlatforms::initShapes()));
         }
 
         return self::forCompoundPlatform($providerKey, $provider)
@@ -177,6 +182,16 @@ final readonly class InitRefusal
             return \sprintf('"%1$s" is configured per instance, so it needs an instance name: use "%1$s.<instance>", for example "%1$s.my_gateway".', $provider);
         }
 
+        return self::forNamedInstance($providerKey, $provider);
+    }
+
+    /**
+     * Also asked of a platform whose block `init` prints rather than writes,
+     * before its bridge is installed: the block names the instance as given,
+     * or, for a platform taking a single block, quietly drops it.
+     */
+    public static function forNamedInstance(ProviderKey $providerKey, string $provider): ?string
+    {
         if (InstanceKeyedPlatforms::rejectsAnInstance($providerKey)) {
             return \sprintf('"%s" takes a single connection block and names no instance, so drop the instance and use "%s".', $provider, $providerKey->platform);
         }

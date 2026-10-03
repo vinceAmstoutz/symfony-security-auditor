@@ -48,14 +48,27 @@ final readonly class BundledAiPlatformVersion
     }
 
     /**
-     * @param array<string, mixed> $installed
+     * The `symfony/ai-platform` version a vendor tree's installed-package data
+     * records, whatever its form — a bridge tree's included.
+     *
+     * @param array<array-key, mixed> $installed
      */
-    private static function releaseVersionIn(array $installed): ?string
+    public static function recordedIn(array $installed): ?string
     {
         $versions = $installed['versions'] ?? null;
         $package = \is_array($versions) ? ($versions[self::PACKAGE] ?? null) : null;
         $version = \is_array($package) ? ($package['pretty_version'] ?? null) : null;
 
-        return \is_string($version) && 1 === preg_match(self::RELEASE_PATTERN, $version) ? $version : null;
+        return \is_string($version) ? $version : null;
+    }
+
+    /**
+     * @param array<string, mixed> $installed
+     */
+    private static function releaseVersionIn(array $installed): ?string
+    {
+        $version = self::recordedIn($installed);
+
+        return null !== $version && 1 === preg_match(self::RELEASE_PATTERN, $version) ? $version : null;
     }
 }

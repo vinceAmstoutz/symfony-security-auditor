@@ -241,6 +241,63 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
+    public function test_it_requires_every_bridge_the_manifest_already_holds_in_the_same_composer_run(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->targetDirectory.'/composer.json',
+            '{"require":{"symfony/ai-ollama-platform":"^0.12","symfony/ai-open-ai-platform":"^0.12","symfony/ai-platform":"v0.13.0","acme/extra":"^1.0"}}',
+        );
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use (&$captured): Process {
+            $captured[] = [$package, ...$morePackages];
+
+            return new Process(['true']);
+        }, aiPlatformPin: 'v0.14.1');
+
+        $composerBridgeInstaller->install('ollama', $this->targetDirectory);
+
+        self::assertSame([['symfony/ai-ollama-platform', 'symfony/ai-open-ai-platform']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_leaves_a_requirement_that_names_no_package_to_composer(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"require":{"0":"^1.0","symfony/ai-gemini-platform":"^0.13"}}');
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use (&$captured): Process {
+            $captured[] = [$package, ...$morePackages];
+
+            return new Process(['true']);
+        });
+
+        $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
+
+        self::assertSame([['symfony/ai-anthropic-platform', 'symfony/ai-gemini-platform']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_names_a_bridge_once_however_many_reasons_it_has_to_be_required(): void
+    {
+        $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"require":{"symfony/ai-generic-platform":"^0.13","symfony/ai-bedrock-platform":"^0.13"}}');
+        $captured = [];
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use (&$captured): Process {
+            $captured[] = [$package, ...$morePackages];
+
+            return new Process(['true']);
+        });
+
+        $composerBridgeInstaller->install('bedrock.prod', $this->targetDirectory, 'generic');
+
+        self::assertSame([['symfony/ai-bedrock-platform', 'symfony/ai-generic-platform']], $captured);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_a_failed_run_names_every_bridge_it_was_installing(): void
     {
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process => new Process(['false']));
@@ -370,11 +427,18 @@ final class ComposerBridgeInstallerTest extends TestCase
         self::assertStringContainsString("'require' 'symfony/ai-bedrock-platform' 'symfony/ai-generic-platform' 'symfony/ai-platform:v0.14.1'", $process->getCommandLine());
     }
 
+    public function test_default_process_builder_lets_what_the_bridges_depend_on_move_with_them(): void
+    {
+        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-open-ai-platform', 'v0.14.1', '/data/bridges');
+
+        self::assertStringContainsString("'symfony/ai-platform:v0.14.1' '--with-dependencies' '--working-dir=/data/bridges'", $process->getCommandLine());
+    }
+
     public function test_default_process_builder_names_no_platform_pin_when_there_is_none(): void
     {
         $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-anthropic-platform', null, '/data/bridges');
 
-        self::assertStringContainsString("'require' 'symfony/ai-anthropic-platform' '--working-dir=/data/bridges'", $process->getCommandLine());
+        self::assertStringContainsString("'require' 'symfony/ai-anthropic-platform' '--with-dependencies' '--working-dir=/data/bridges'", $process->getCommandLine());
     }
 
     #[DataProvider('providerPackageCases')]

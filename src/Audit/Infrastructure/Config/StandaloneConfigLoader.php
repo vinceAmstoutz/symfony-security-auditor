@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
-use Symfony\Component\Yaml\Exception\ParseException;
-use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -51,6 +49,7 @@ final readonly class StandaloneConfigLoader
         private StandalonePlatformConfigResolver $standalonePlatformConfigResolver,
         private ?string $projectConfigFile = null,
         private ProjectConfigValueGuard $projectConfigValueGuard = new ProjectConfigValueGuard(),
+        private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
     ) {}
 
     /**
@@ -67,13 +66,47 @@ final readonly class StandaloneConfigLoader
      */
     public function load(bool $credentialsRequired = true): StandaloneConfig
     {
-        $userConfig = $this->read($this->xdgConfigPathResolver->configFile());
-        $rawConfig = $this->merge($userConfig, $this->readProjectConfig($userConfig));
+        $userConfigFile = $this->xdgConfigPathResolver->configFile();
+        $userConfig = $this->standaloneConfigFileReader->read($userConfigFile);
+        $userTimeout = HttpTimeout::in($userConfig, $userConfigFile);
+        $projectConfig = $this->readProjectConfig($userConfig);
+        $rawConfig = $this->merge($userConfig, $projectConfig);
 
         $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig, $credentialsRequired);
-        $auditConfig = array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS));
+        $auditConfig = array_diff_key($rawConfig, array_flip([...self::PLATFORM_KEYS, HttpTimeout::KEY]));
 
-        return new StandaloneConfig($auditConfig, $standalonePlatformConfig, $this->existingProjectConfigFile());
+        return new StandaloneConfig(
+            $auditConfig,
+            $standalonePlatformConfig,
+            $this->existingProjectConfigFile(),
+            $this->projectTimeout($projectConfig, $userTimeout) ?? $userTimeout,
+        );
+    }
+
+    /**
+     * The `provider:` the user config selects, read without resolving
+     * anything, for a message that has to name it whether or not the
+     * configuration loads. Only the user config may select one.
+     */
+    public function configuredProvider(): ?string
+    {
+        try {
+            $provider = $this->standaloneConfigFileReader->read($this->xdgConfigPathResolver->configFile())['provider'] ?? null;
+        } catch (UnresolvableConfigPathException|MalformedProjectConfigException) {
+            return null;
+        }
+
+        return \is_string($provider) && '' !== $provider ? $provider : null;
+    }
+
+    /**
+     * @param array<array-key, mixed> $projectConfig
+     *
+     * @throws ProjectConfigUserOnlyKeyException
+     */
+    private function projectTimeout(array $projectConfig, float $userTimeout): ?float
+    {
+        return null !== $this->projectConfigFile ? HttpTimeout::raisedBy($projectConfig, $userTimeout, $this->projectConfigFile) : null;
     }
 
     private function existingProjectConfigFile(): ?string
@@ -136,7 +169,7 @@ final readonly class StandaloneConfigLoader
             throw MalformedProjectConfigException::forSymlink($this->projectConfigFile);
         }
 
-        $projectConfig = $this->read($this->projectConfigFile);
+        $projectConfig = $this->standaloneConfigFileReader->read($this->projectConfigFile);
         $this->projectConfigValueGuard->assertPlainKeys($this->projectConfigFile, $projectConfig);
         $connectionKeys = array_values(array_intersect(self::PLATFORM_KEYS, array_keys($projectConfig)));
 
@@ -292,59 +325,5 @@ final readonly class StandaloneConfigLoader
         }
 
         throw ProjectConfigScanOverrideException::forKeys($projectConfigFile, array_map(static fn (string $key): string => \sprintf('scan.%s', $key), $scanKeys));
-    }
-
-    /**
-     * @return array<array-key, mixed>
-     *
-     * @throws MalformedProjectConfigException
-     */
-    private function read(string $configFile): array
-    {
-        if (!is_file($configFile)) {
-            return [];
-        }
-
-        try {
-            $parsed = Yaml::parseFile($configFile);
-        } catch (ParseException $parseException) {
-            throw MalformedProjectConfigException::fromParseException($configFile, $parseException);
-        }
-
-        return \is_array($parsed) ? $this->foldHyphenatedKeys($parsed) : [];
-    }
-
-    /**
-     * `symfony/config` reads `secret-scrubbing` as `secret_scrubbing` when it
-     * normalizes the tree, after the guards above ran on the raw keys; folding
-     * the same way first keeps a hyphenated spelling from slipping past them.
-     * A key is also quoted back by every refusal, so its control characters
-     * are escaped here: a repository's config cannot send escape sequences,
-     * eight-bit ones included, to the terminal through a key no valid config
-     * uses.
-     *
-     * @param array<array-key, mixed> $config
-     *
-     * @return array<array-key, mixed>
-     */
-    private function foldHyphenatedKeys(array $config): array
-    {
-        $folded = [];
-        foreach ($config as $key => $value) {
-            $folded[\is_string($key) ? $this->foldedKey($key, $config) : $key] = \is_array($value) ? $this->foldHyphenatedKeys($value) : $value;
-        }
-
-        return $folded;
-    }
-
-    /**
-     * @param array<array-key, mixed> $siblings
-     */
-    private function foldedKey(string $key, array $siblings): string
-    {
-        $underscored = str_replace('-', '_', $key);
-        $foldedKey = str_contains($key, '-') && !str_contains($key, '_') && !\array_key_exists($underscored, $siblings) ? $underscored : $key;
-
-        return TerminalText::escaped($foldedKey);
     }
 }

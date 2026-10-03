@@ -19,11 +19,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LazyCommand;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\ApplicationTester;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ModelsDevCatalogRefresher;
@@ -34,6 +38,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory
 
 final class StandaloneApplicationFactoryTest extends TestCase
 {
+    private const string BUNDLED_RELEASE = 'v0.14.1';
+
     private string $configHome;
 
     private string $cacheHome;
@@ -346,15 +352,103 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertFalse($standaloneApplication->get('audit:run')->isHidden());
     }
 
-    /**
-     * @throws UnresolvableConfigPathException
-     */
-    public function test_it_resolves_the_bridge_autoload_file_under_the_data_directory(): void
+    public function test_it_loads_the_bridge_tree_under_the_data_directory(): void
     {
-        self::assertSame(
-            '/xdg/data/symfony-security-auditor/vendor/autoload.php',
-            StandaloneApplicationFactory::bridgeAutoloadFile(['XDG_DATA_HOME' => '/xdg/data']),
+        $dataHome = $this->bridgeTreeHome("touch(__DIR__.'/loaded');", self::BUNDLED_RELEASE);
+
+        $warning = StandaloneApplicationFactory::loadBridgeTree(['XDG_DATA_HOME' => $dataHome], self::BUNDLED_RELEASE);
+
+        self::assertSame([null, true], [$warning, is_file($dataHome.'/symfony-security-auditor/vendor/loaded')]);
+    }
+
+    public function test_it_leaves_a_bridge_tree_built_for_another_ai_platform_release_unloaded(): void
+    {
+        $dataHome = $this->bridgeTreeHome("touch(__DIR__.'/loaded');", 'v0.12.0');
+
+        $warning = StandaloneApplicationFactory::loadBridgeTree(['XDG_DATA_HOME' => $dataHome], self::BUNDLED_RELEASE);
+
+        self::assertSame([null, false], [$warning, is_file($dataHome.'/symfony-security-auditor/vendor/loaded')]);
+    }
+
+    public function test_it_names_the_data_directory_of_a_bridge_tree_it_cannot_load(): void
+    {
+        $dataHome = $this->bridgeTreeHome("throw new RuntimeException('Composer detected issues in your platform.');", self::BUNDLED_RELEASE);
+
+        self::assertStringStartsWith(
+            \sprintf('The provider bridge under "%s/symfony-security-auditor" cannot be loaded by this binary: Composer detected issues in your platform.', $dataHome),
+            (string) StandaloneApplicationFactory::loadBridgeTree(['XDG_DATA_HOME' => $dataHome], self::BUNDLED_RELEASE),
         );
+    }
+
+    public function test_there_is_no_bridge_tree_to_load_without_a_data_directory(): void
+    {
+        self::assertNull(StandaloneApplicationFactory::loadBridgeTree([], self::BUNDLED_RELEASE));
+    }
+
+    #[DataProvider('commandsNeedingTheBridgeTree')]
+    public function test_a_command_needing_a_bridge_tree_built_for_another_ai_platform_release_says_how_to_rebuild_it(string $commandName): void
+    {
+        $dataHome = $this->bridgeTreeHome('', 'v0.12.0');
+        $this->writeConfig("provider: ollama\nplatform:\n    ollama:\n        endpoint: 'http://localhost:11434'\nmodel: llama3.2\n");
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, $this->cacheHome, null, $dataHome);
+        $lazyCommand = (new StandaloneApplicationFactory(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            self::createStub(BridgeInstallerInterface::class),
+            bundledAiPlatformVersion: self::BUNDLED_RELEASE,
+        ))->create()->find($commandName);
+        self::assertInstanceOf(LazyCommand::class, $lazyCommand);
+
+        $this->expectException(StaleBridgeTreeException::class);
+        $this->expectExceptionMessageMatches('/symfony\/ai-platform v0\.12\.0, but this binary bundles v0\.14\.1: .* "symfony-security-auditor init --provider=ollama --force"/');
+
+        $lazyCommand->getCommand();
+    }
+
+    public function test_doctor_fails_on_a_bridge_tree_built_for_another_ai_platform_release(): void
+    {
+        $dataHome = $this->bridgeTreeHome('', 'v0.12.0');
+        $this->writeConfig("provider: ollama\nplatform:\n    ollama:\n        endpoint: 'http://localhost:11434'\nmodel: llama3.2\n");
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, $this->cacheHome, null, $dataHome);
+        $standaloneApplication = (new StandaloneApplicationFactory(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            self::createStub(BridgeInstallerInterface::class),
+            bundledAiPlatformVersion: self::BUNDLED_RELEASE,
+        ))->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $statusCode = $applicationTester->run(['command' => 'doctor']);
+
+        self::assertSame(
+            [Command::FAILURE, true],
+            [$statusCode, str_contains((string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()), 'was installed for symfony/ai-platform v0.12.0, but this binary bundles v0.14.1')],
+            $applicationTester->getDisplay(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function commandsNeedingTheBridgeTree(): iterable
+    {
+        yield 'audit' => [AuditCommand::ALIAS];
+        yield 'mcp:serve' => [McpServeCommand::NAME];
+    }
+
+    private function bridgeTreeHome(string $autoloaderBody, string $aiPlatformRelease): string
+    {
+        $dataHome = $this->cacheHome.'/data';
+        $filesystem = new Filesystem();
+        $filesystem->dumpFile($dataHome.'/symfony-security-auditor/vendor/autoload.php', \sprintf("<?php\n\n%s\n", $autoloaderBody));
+        $filesystem->dumpFile(
+            $dataHome.'/symfony-security-auditor/vendor/composer/installed.php',
+            \sprintf("<?php return %s;\n", var_export(['versions' => ['symfony/ai-platform' => ['pretty_version' => $aiPlatformRelease]]], true)),
+        );
+
+        return $dataHome;
     }
 
     public function test_it_keeps_the_shells_spelling_of_the_working_directory_when_pwd_names_it(): void

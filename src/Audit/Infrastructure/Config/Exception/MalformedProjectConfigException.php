@@ -34,6 +34,16 @@ final class MalformedProjectConfigException extends RuntimeException
         return new self(WorkflowCommandText::inWrappedMessage(TerminalText::escaped(\sprintf('Config file "%s" is not valid YAML: %s', $configFile, $parseException->getMessage()))));
     }
 
+    public static function forHttpTimeout(string $configFile, string $key): self
+    {
+        return new self(TerminalText::escaped(\sprintf('Config file "%s" sets "%s" to something other than a number of seconds above zero. Give how long a request may wait for the provider to send anything, for example 600.', $configFile, $key)));
+    }
+
+    public static function forOversizedConfig(string $configFile, int $valueLimit): self
+    {
+        return new self(TerminalText::escaped(\sprintf('Config file "%s" holds %d values or more once its YAML aliases are expanded, far more than any configuration needs, so it was not read any further. Remove the aliases that repeat whole sections, or write the values out.', $configFile, $valueLimit)));
+    }
+
     /**
      * Refused before the file is read: a link committed in the audited
      * repository could point at any file of the user's, and a parse error
