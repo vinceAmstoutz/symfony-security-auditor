@@ -64,6 +64,8 @@ _Since 1.21_, the auditor reads two things from your client beyond the answer it
 // src/Llm/AcmeLlmClient.php
 namespace App\Llm;
 
+use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -79,20 +81,22 @@ final class AcmeLlmClient implements LLMClientInterface
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
     {
-        $response = $this->http->request('POST', 'https://api.acme.ai/v1/complete', [
-            'headers' => ['Authorization' => 'Bearer ' . $this->apiKey],
-            'json' => [
-                'system' => $systemPrompt,
-                'user'   => $userMessage,
-                'model'  => $this->model(),
-            ],
-        ]);
+        try {
+            $body = $this->http->request('POST', 'https://api.acme.ai/v1/complete', [
+                'headers' => ['Authorization' => 'Bearer ' . $this->apiKey],
+                'json' => [
+                    'system' => $systemPrompt,
+                    'user'   => $userMessage,
+                    'model'  => $this->model(),
+                ],
+            ])->toArray();
+        } catch (ClientExceptionInterface $clientException) {
+            if (413 === $clientException->getResponse()->getStatusCode()) {
+                throw LLMRequestTooLargeException::fromProviderRejection($clientException);
+            }
 
-        if (413 === $response->getStatusCode()) {
-            throw new LLMRequestTooLargeException('Acme refused the prompt as too large: ' . $response->getContent(false));
+            throw new LLMProviderException($clientException->getMessage(), previous: $clientException);
         }
-
-        $body = $response->toArray();
 
         return LLMResponse::of(
             content:    $body['choices'][0]['text'],
