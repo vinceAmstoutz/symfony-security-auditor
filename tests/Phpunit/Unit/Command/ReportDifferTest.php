@@ -649,6 +649,8 @@ final class ReportDifferTest extends TestCase
         yield 'a scope that is not an object' => [['complete' => true, 'scope' => 'everything']];
         yield 'a scope that does not say whether it ran with --since' => [['complete' => true, 'scope' => ['paths' => []]]];
         yield 'a scope whose paths are not a list' => [['complete' => true, 'scope' => ['since' => null, 'paths' => 'src']]];
+        yield 'a run whose scan found no file' => [['complete' => true, 'files_scanned' => 0, 'scope' => $fullScope, 'coverage' => []]];
+        yield 'a run that analyzed no file' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => 'src/Other.php', 'status' => 'skipped']]]];
     }
 
     /**
