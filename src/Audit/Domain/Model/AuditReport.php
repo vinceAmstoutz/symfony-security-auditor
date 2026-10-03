@@ -64,6 +64,8 @@ final readonly class AuditReport
                 \count($auditContext->projectFiles()),
                 \count($auditContext->mappingFiles()),
                 $auditContext->isCostEstimate(),
+                $auditContext->diffSinceRef(),
+                $auditContext->scanPaths(),
             ),
             $auditContext->coverage(),
             $auditCost,
@@ -354,6 +356,10 @@ final readonly class AuditReport
                 $this->vulnerabilities,
             ),
             'cost' => $this->auditCost->toArray(),
+            'scope' => [
+                'since' => $this->reportIdentity->diffSinceRef,
+                'paths' => $this->reportIdentity->scanPaths,
+            ],
             'coverage' => $this->coverage,
         ];
     }

@@ -28,6 +28,10 @@ use DateTimeImmutable;
  */
 final readonly class ReportIdentity
 {
+    /**
+     * @param ?string      $diffSinceRef the git ref a `--since` run diffed against; null for a run over the whole history
+     * @param list<string> $scanPaths    the `--path` scopes the scan was restricted to; empty for the whole project
+     */
     public function __construct(
         public string $auditId,
         public string $projectPath,
@@ -36,6 +40,8 @@ final readonly class ReportIdentity
         public int $filesScanned,
         public int $filesDiscovered,
         public bool $costEstimate = false,
+        public ?string $diffSinceRef = null,
+        public array $scanPaths = [],
     ) {}
 
     public function durationSeconds(): float

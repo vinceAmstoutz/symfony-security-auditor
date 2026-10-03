@@ -31,7 +31,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadable
  * canonical identity. The report's `coverage` ledger, when it carries one,
  * names the files the run could not fully analyze the same way
  * {@see UnanalyzedFiles} reads it for the run itself, and the files its
- * attacker analyzed the way {@see AnalyzedFiles} does.
+ * attacker analyzed the way {@see AnalyzedFiles} does; its `scope` says where a
+ * complete run looked.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -63,7 +64,29 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
             $findings,
             UnanalyzedFiles::in($coverage ?? []),
             null === $coverage ? null : AnalyzedFiles::in($coverage),
+            array_column($coverage ?? [], 'file'),
+            $this->completeRunScanPathsIn($decoded),
         );
+    }
+
+    /**
+     * The `--path` scopes of a run that can say a file it never listed is
+     * gone: it reported itself complete and recorded a `scope` that ran over
+     * the whole history, with no `--since`. Null otherwise — including for a
+     * report written before the scope existed.
+     *
+     * @param array<array-key, mixed> $decoded
+     *
+     * @return list<string>|null
+     */
+    private function completeRunScanPathsIn(array $decoded): ?array
+    {
+        $scope = $decoded['scope'] ?? null;
+        if (true !== ($decoded['complete'] ?? null) || !\is_array($scope) || !\array_key_exists('since', $scope) || null !== $scope['since'] || !\is_array($scope['paths'] ?? null)) {
+            return null;
+        }
+
+        return array_values(array_filter($scope['paths'], \is_string(...)));
     }
 
     /**

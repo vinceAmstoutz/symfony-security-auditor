@@ -1063,4 +1063,26 @@ final class AuditReportTest extends TestCase
         self::assertFalse($auditReport->isComplete());
         self::assertFalse($auditReport->hasNoVerdict());
     }
+
+    /**
+     * @param list<string> $scanPaths
+     *
+     * @throws InvalidAuditContextException
+     */
+    #[DataProvider('runScopes')]
+    public function test_the_array_form_records_the_scope_of_the_run(array $scanPaths, ?string $diffSinceRef): void
+    {
+        $toArray = AuditReport::fromContext(AuditContext::forProject($this->tmpDir, $scanPaths, diffSinceRef: $diffSinceRef))->toArray();
+
+        self::assertSame(['since' => $diffSinceRef, 'paths' => $scanPaths], $toArray['scope']);
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, ?string}>
+     */
+    public static function runScopes(): iterable
+    {
+        yield 'the whole project over its whole history' => [[], null];
+        yield 'two --path scopes since a git ref' => [['src/Controller', 'config'], 'origin/main'];
+    }
 }

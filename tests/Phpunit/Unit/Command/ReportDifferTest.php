@@ -581,6 +581,94 @@ final class ReportDifferTest extends TestCase
     }
 
     /**
+     * A file a complete run over the whole history never listed, inside the
+     * scope it scanned, is gone: deleted, or no longer in the scan. A finding
+     * that disappeared with it is fixed.
+     *
+     * @param array<string, mixed> $scope
+     *
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    #[DataProvider('scopesHoldingTheFile')]
+    public function test_diff_calls_a_finding_fixed_when_a_complete_run_over_its_scope_no_longer_lists_its_file(array $scope): void
+    {
+        $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
+        $current = $this->writeScopedReport('current.json', ['complete' => true, 'scope' => $scope]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertSame([], $reportDiff->unverifiedFindings);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function scopesHoldingTheFile(): iterable
+    {
+        yield 'the whole project' => [['since' => null, 'paths' => []]];
+        yield 'a --path the file lives under' => [['since' => null, 'paths' => ['src']]];
+        yield 'a --path list holding an entry that is not a string' => [['since' => null, 'paths' => [42, 'src']]];
+    }
+
+    /**
+     * @param array<string, mixed> $report
+     *
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    #[DataProvider('reportsThatCannotSayTheFileIsGone')]
+    public function test_diff_keeps_a_finding_apart_when_the_current_report_cannot_say_its_file_is_gone(array $report): void
+    {
+        $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
+        $current = $this->writeScopedReport('current.json', $report);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertCount(1, $reportDiff->unverifiedFindings);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function reportsThatCannotSayTheFileIsGone(): iterable
+    {
+        $fullScope = ['since' => null, 'paths' => []];
+
+        yield 'an incomplete run' => [['complete' => false, 'scope' => $fullScope]];
+        yield 'a report that does not say it is complete' => [['scope' => $fullScope]];
+        yield 'a complete flag that is not a boolean' => [['complete' => 'yes', 'scope' => $fullScope]];
+        yield 'a --since run' => [['complete' => true, 'scope' => ['since' => 'main', 'paths' => []]]];
+        yield 'a file outside the --path scope' => [['complete' => true, 'scope' => ['since' => null, 'paths' => ['src/Controller']]]];
+        yield 'a file the lean pre-scan skipped' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'skipped']]]];
+        yield 'a file the ledger lists under the path the attacker echoed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => './src/Foo.php', 'status' => 'skipped']]]];
+        yield 'a file a host stage listed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'secret_scrubbing', 'file' => 'src/Foo.php', 'status' => 'analyzed']]]];
+        yield 'a report written before the scope existed' => [['complete' => true]];
+        yield 'a scope that is not an object' => [['complete' => true, 'scope' => 'everything']];
+        yield 'a scope that does not say whether it ran with --since' => [['complete' => true, 'scope' => ['paths' => []]]];
+        yield 'a scope whose paths are not a list' => [['complete' => true, 'scope' => ['since' => null, 'paths' => 'src']]];
+    }
+
+    /**
+     * @param array<string, mixed> $report the report's `complete`, `scope` and
+     *                                     `coverage` keys; the coverage lists
+     *                                     another, analyzed file by default
+     */
+    private function writeScopedReport(string $filename, array $report): string
+    {
+        $path = $this->tmpDir.'/'.$filename;
+        $this->filesystem->dumpFile($path, json_encode([
+            'vulnerabilities' => [],
+            'coverage' => [['stage' => 'attacker', 'file' => 'src/Other.php', 'status' => 'analyzed']],
+            ...$report,
+        ], \JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    /**
      * @param list<array<string, string>> $vulnerabilities
      */
     private function writeReportWithCoverage(string $filename, array $vulnerabilities, mixed $coverage): string

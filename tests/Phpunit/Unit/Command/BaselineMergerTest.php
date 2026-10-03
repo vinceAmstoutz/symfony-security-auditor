@@ -268,6 +268,28 @@ final class BaselineMergerTest extends TestCase
      * @throws MalformedReportFileException
      * @throws ReportFileNotReadableException
      */
+    public function test_prune_drops_an_entry_whose_file_a_complete_full_run_no_longer_lists(): void
+    {
+        $report = $this->tmpDir.'/report.json';
+        $this->filesystem->dumpFile($report, json_encode([
+            'complete' => true,
+            'scope' => ['since' => null, 'paths' => []],
+            'vulnerabilities' => [],
+            'coverage' => [['stage' => 'attacker', 'file' => 'src/Ok.php', 'status' => 'analyzed']],
+        ], \JSON_THROW_ON_ERROR));
+        $baseline = $this->writeBaseline([$this->baselineEntry('SQL Injection')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(1, $baselineMergePlan->prunedCount);
+        self::assertSame([], $baselineMergePlan->keptEntries);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
     public function test_prune_drops_a_legacy_entry_it_cannot_place_in_a_file(): void
     {
         $report = $this->writeReportWithCoverage([], [['stage' => 'attacker', 'file' => 'src/Ok.php', 'status' => 'analyzed']]);

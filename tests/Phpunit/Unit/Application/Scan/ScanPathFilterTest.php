@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
@@ -20,6 +21,28 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 final class ScanPathFilterTest extends TestCase
 {
+    /**
+     * @param list<string> $scanPaths
+     */
+    #[DataProvider('scopes')]
+    public function test_it_says_whether_a_path_lies_in_the_scope_the_scan_applied(string $relativePath, array $scanPaths, bool $expected): void
+    {
+        self::assertSame($expected, ScanPathFilter::includes($relativePath, $scanPaths));
+    }
+
+    /**
+     * @return iterable<string, array{string, list<string>, bool}>
+     */
+    public static function scopes(): iterable
+    {
+        yield 'the whole project' => ['src/A.php', [], true];
+        yield 'a file below a scan path' => ['apps/api/src/A.php', ['apps/api'], true];
+        yield 'a file equal to a scan path' => ['src/A.php', ['./src/A.php'], true];
+        yield 'a file that only shares a prefix' => ['apps/api-shared/A.php', ['apps/api'], false];
+        yield 'a file outside every scan path' => ['tests/A.php', ['src', 'config/'], false];
+        yield 'a blank scan path' => ['tests/A.php', ['  '], true];
+    }
+
     /**
      * @throws InvalidProjectFileException
      */
