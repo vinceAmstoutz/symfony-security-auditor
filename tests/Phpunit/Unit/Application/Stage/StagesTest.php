@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Stage;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -63,6 +64,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\SymfonyMappingContextRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
@@ -524,6 +526,92 @@ final class StagesTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
+    public function test_mapping_stage_reads_access_control_only_from_configuration_the_production_kernel_loads(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', "security:\n    access_control:\n        - { path: ^/profile, roles: ROLE_USER }\n"),
+            ProjectFile::create('config/legacy/access.yaml', '/app/config/legacy/access.yaml', "access_control:\n    - { path: ^/admin, roles: ROLE_ADMIN }\n"),
+            ProjectFile::create('config/packages/test/security.yaml', '/app/config/packages/test/security.yaml', "security:\n    access_control:\n        - { path: ^/internal, roles: ROLE_ADMIN }\n"),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        self::assertSame(['^/profile' => ['ROLE_USER']], $auditContext->mapping()?->routeAccessMap());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_hands_the_security_config_parser_configuration_files_only(): void
+    {
+        $securityConfigParser = self::createStub(SecurityConfigParserInterface::class);
+        $securityConfigParser->method('parseAccessControl')->willReturnCallback(static fn (string $configContent): array => [$configContent => ['ROLE_ANY']]);
+        $securityConfigParser->method('parseFirewallRules')->willReturn([]);
+
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), $securityConfigParser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Controller/HomeController.php', '/app/src/Controller/HomeController.php', '<?php class HomeController {}'),
+            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', 'security: ~'),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        self::assertSame(['security: ~' => ['ROLE_ANY']], $auditContext->mapping()?->routeAccessMap());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('accessControlTheProductionKernelNeverLoadsCases')]
+    public function test_a_route_guarded_only_by_access_control_production_never_loads_lacks_an_access_check(string $relativePath, string $securityYaml): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new PhpParserControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Controller/AdminUserController.php', '/app/src/Controller/AdminUserController.php', <<<'PHP'
+                <?php
+
+                namespace App\Controller;
+
+                use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+                use Symfony\Component\HttpFoundation\Response;
+                use Symfony\Component\Routing\Attribute\Route;
+
+                final class AdminUserController extends AbstractController
+                {
+                    #[Route('/admin/users/{id}/delete', methods: ['POST'])]
+                    public function delete(int $id): Response
+                    {
+                        return $this->redirect('/admin/users');
+                    }
+                }
+                PHP),
+            ProjectFile::create($relativePath, '/app/'.$relativePath, $securityYaml),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertStringContainsString('- POST /admin/users/{id}/delete — src/Controller/AdminUserController.php::delete — LACKS_ACCESS_CHECK', SymfonyMappingContextRenderer::renderRouteAccessControlMap($mapping));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function accessControlTheProductionKernelNeverLoadsCases(): iterable
+    {
+        yield 'a file no kernel imports' => ['config/legacy/access.yaml', "access_control:\n    - { path: ^/admin, roles: ROLE_ADMIN }\n"];
+        yield 'the test block of the security package' => ['config/packages/security.yaml', "security:\n    access_control:\n        - { path: ^/profile, roles: ROLE_USER }\nwhen@test:\n    security:\n        access_control:\n            - { path: ^/admin, roles: ROLE_ADMIN }\n"];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_extracts_security_config(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -540,7 +628,7 @@ final class StagesTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
-            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $securityYaml),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $securityYaml),
         ]);
 
         $mappingStage->process($auditContext);
@@ -1004,8 +1092,8 @@ final class StagesTest extends TestCase
 
         $auditContext->setProjectFiles([
             ProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
-            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $security1),
-            ProjectFile::create('config/security_admin.yaml', '/app/config/security_admin.yaml', $security2),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $security1),
+            ProjectFile::create('config/packages/prod/security.yaml', '/app/config/packages/prod/security.yaml', $security2),
         ]);
 
         $mappingStage->process($auditContext);
@@ -1030,8 +1118,8 @@ final class StagesTest extends TestCase
         $config2 = "access_control:\n    - path: ^/api\n      roles: ROLE_USER\n";
 
         $auditContext->setProjectFiles([
-            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $config1),
-            ProjectFile::create('config/routes.yaml', '/app/config/routes.yaml', $config2),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $config1),
+            ProjectFile::create('config/packages/prod/security.yaml', '/app/config/packages/prod/security.yaml', $config2),
         ]);
 
         $mappingStage->process($auditContext);
@@ -1057,7 +1145,7 @@ final class StagesTest extends TestCase
 
         $auditContext->setProjectFiles([
             ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $config1),
-            ProjectFile::create('config/packages/dev/security.yaml', '/app/config/packages/dev/security.yaml', $config2),
+            ProjectFile::create('config/packages/prod/security.yaml', '/app/config/packages/prod/security.yaml', $config2),
         ]);
 
         $mappingStage->process($auditContext);
@@ -1122,7 +1210,7 @@ final class StagesTest extends TestCase
         $content = "security:\n    firewalls:\n        main:\n            pattern: ^/api  \n";
 
         $auditContext->setProjectFiles([
-            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $content),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $content),
         ]);
 
         $mappingStage->process($auditContext);
@@ -1186,7 +1274,7 @@ final class StagesTest extends TestCase
         $content = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n    - path: ^/api\n      roles: ROLE_USER\n";
 
         $auditContext->setProjectFiles([
-            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $content),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $content),
         ]);
 
         $mappingStage->process($auditContext);
@@ -1211,7 +1299,7 @@ final class StagesTest extends TestCase
         $content = "access_control:\n    - path: ^/admin   \n      roles: ROLE_ADMIN\n";
 
         $auditContext->setProjectFiles([
-            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $content),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $content),
         ]);
 
         $mappingStage->process($auditContext);
@@ -1234,7 +1322,7 @@ final class StagesTest extends TestCase
         $content = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN, ROLE_SUPER\n";
 
         $auditContext->setProjectFiles([
-            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $content),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $content),
         ]);
 
         $mappingStage->process($auditContext);

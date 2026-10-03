@@ -34,6 +34,17 @@ final class SymfonyMappingContextRendererTest extends TestCase
         self::assertStringContainsString('COVERED_BY access_control[ROLE_FROM_PATH]', SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping));
     }
 
+    public function test_a_route_covered_only_by_yaml_is_never_ruled_out_as_broken_access_control(): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: ['^/admin' => ['ROLE_ADMIN']], routeAccessControls: [$routeAccessControl]),
+        );
+
+        self::assertStringNotContainsString('do NOT report', SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping));
+    }
+
     public function test_a_method_incompatible_rule_is_skipped_so_a_later_matching_rule_still_covers_the_route(): void
     {
         $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
