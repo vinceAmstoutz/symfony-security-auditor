@@ -247,6 +247,17 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_it_skips_a_trailing_quoted_string_with_escaped_bracket_after_the_real_array(): void
+    {
+        $content = 'first [1,2] then note "a \[9,9] b" end';
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        self::assertSame([1, 2], $llmResponse->parseJson());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_recovers_json_after_an_unpaired_leading_quote(): void
     {
         $content = '"5 then [1,2]';
