@@ -51,5 +51,18 @@ interface AuditPresenterInterface
 
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void;
 
+    /**
+     * Says so when the report could not analyze every file — and nothing
+     * otherwise. `result()` prints it itself; a run that shows no result — its
+     * report went to stdout, or it generated a baseline — calls it directly.
+     */
+    public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void;
+
     public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void;
+
+    /**
+     * Says that a run with no verdict left the baseline at `$path` as it was,
+     * and why the run has none.
+     */
+    public function baselineKept(SymfonyStyle $symfonyStyle, string $path, AuditReport $auditReport): void;
 }

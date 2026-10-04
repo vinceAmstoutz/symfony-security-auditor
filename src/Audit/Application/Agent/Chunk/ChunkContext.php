@@ -15,7 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 /**
  * The fully-assembled attacker prompt for a single chunk, plus the cache key
- * and cacheability derived from the cross-iteration context.
+ * and cacheability derived from the cross-iteration context, and the bytes
+ * of file content the prompt carries — after code slicing, so it may be less
+ * than the files hold.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -26,5 +28,6 @@ final readonly class ChunkContext
         public string $userMessage,
         public string $contextKey,
         public bool $cacheable,
+        public int $promptedFileBytes,
     ) {}
 }

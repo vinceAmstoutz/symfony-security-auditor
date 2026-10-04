@@ -1,5 +1,10 @@
 name: Release
 
+# A dispatched run would otherwise display as a bare "Release" in the Actions
+# list, indistinguishable from every other one; a release-event run already
+# shows the release name, so mirror that.
+run-name: ${{ inputs.release_name || github.event.release.name || inputs.tag || github.ref_name }}
+
 on:
   release:
     types:
@@ -24,6 +29,14 @@ on:
         required: false
         type: boolean
         default: false
+      release_name:
+        description:
+          "Display name for this run, e.g. \"1.20.1 - Herald\". Set by Auto
+          Release from the changelog codename; leave empty on a manual repair
+          and the run is named after the tag."
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -193,12 +206,11 @@ jobs:
           # PHP core extensions (date, …) that `spc download`/`build` reject as
           # non-buildable packages; drop them, then append zlib for the
           # GZ-compressed PHAR wrapper (box.json `compression: GZ`).
-          # `uri` is unbuildable for the mirror-image reason: the root `ext-uri`
-          # requirement is satisfied by league/uri-polyfill's `provide`, which
-          # spc does not read, and the 8.3 target has no uri extension to
-          # compile — so it must be dropped too. Unpinning spc past 2.8.5 makes
-          # this entry redundant, not wrong: `uri` is an internal extension on
-          # spc main.
+          # `uri` is unbuildable for the mirror-image reason: spc lists it
+          # because league/uri-polyfill declares `provide: ext-uri`, and the
+          # 8.3 target has no uri extension to compile — so it must be dropped
+          # too. Unpinning spc past 2.8.5 makes this entry redundant, not
+          # wrong: `uri` is an internal extension on spc main.
           raw="$(./spc dump-extensions . --format=text)"
           filtered="$(printf '%s' "$raw" | tr ',' '\n' \
             | grep -vxE 'core|standard|date|hash|json|pcre|spl|reflection|random|uri|zlib' \
@@ -284,8 +296,8 @@ jobs:
         with:
           name: ${{ matrix.asset }}
 
-      - name: Attach the binary and checksum to the release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+      - name: Attach the binary and checksum to the release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           # A release event carries its own tag context; a workflow_dispatch
           # rebuild does not, so target the tag explicitly (the input on
@@ -316,8 +328,8 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
 
-      - name: Attach the installers and config schema to the release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+      - name: Attach the installers and config schema to the release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           draft: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_draft }}

@@ -26,4 +26,6 @@ enum ExitCode: int
     case Failure = 1;
 
     case BudgetAborted = 2;
+
+    case Incomplete = 3;
 }

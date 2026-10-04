@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle;
 
+use Closure;
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Test\InMemoryPlatform;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -26,6 +28,7 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
@@ -73,6 +76,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemRe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
@@ -144,6 +148,18 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o'], registerPlatform: false);
 
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
+    }
+
+    public function test_bundle_registers_the_pass_publishing_the_platform_pricing_reads(): void
+    {
+        $containerBuilder = new ContainerBuilder();
+
+        (new SymfonySecurityAuditorBundle())->build($containerBuilder);
+
+        self::assertCount(1, array_filter(
+            $containerBuilder->getCompilerPassConfig()->getBeforeOptimizationPasses(),
+            static fn (CompilerPassInterface $compilerPass): bool => $compilerPass instanceof PricingPlatformPass,
+        ));
     }
 
     public function test_bundle_default_model_is_claude_opus_4_8(): void
@@ -948,6 +964,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_bundle_boots_in_a_host_application_that_registers_no_clock(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'cache' => ['enabled' => true],
+            'audit' => ['rate_limit' => ['requests_per_minute' => 50]],
+        ], hostRegistersClock: false);
+
+        self::assertInstanceOf(LockfileHashedAdvisoryCache::class, $this->getPrivateService($kernel, ComposerAuditRunnerInterface::class));
+        self::assertInstanceOf(TokenBucketRateLimiter::class, $this->getPrivateService($kernel, RateLimiterInterface::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_bundle_wires_attacker_agent(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -1667,26 +1697,45 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     /**
      * @param array<string, mixed> $bundleConfig
      */
-    private function boot(array $bundleConfig, bool $registerPlatform = true): Kernel
+    private function boot(array $bundleConfig, bool $registerPlatform = true, bool $hostRegistersClock = true): Kernel
     {
         $tmpDir = $this->tmpDir;
-        $kernel = new class('test', true, $tmpDir, $bundleConfig, $registerPlatform) extends Kernel {
+        $configureHost = static function (ContainerBuilder $containerBuilder) use ($registerPlatform, $hostRegistersClock): void {
+            if ($registerPlatform) {
+                $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
+                    ->setArguments(['stub-response'])
+                    ->setPublic(true);
+            }
+
+            if (!$hostRegistersClock) {
+                $containerBuilder->addCompilerPass(new class implements CompilerPassInterface {
+                    #[Override]
+                    public function process(ContainerBuilder $container): void
+                    {
+                        $container->removeAlias(ClockInterface::class);
+                    }
+                });
+            }
+        };
+        $kernel = new class('test', true, $tmpDir, $bundleConfig, $configureHost) extends Kernel {
             /** @var array<string, mixed> */
             private array $bundleConfig;
 
             private string $tmpDir;
 
-            private bool $registerPlatform;
+            /** @var Closure(ContainerBuilder): void */
+            private Closure $configureHost;
 
             /**
-             * @param array<string, mixed> $bundleConfig
+             * @param array<string, mixed>            $bundleConfig
+             * @param Closure(ContainerBuilder): void $configureHost
              */
-            public function __construct(string $environment, bool $debug, string $tmpDir, array $bundleConfig, bool $registerPlatform)
+            public function __construct(string $environment, bool $debug, string $tmpDir, array $bundleConfig, Closure $configureHost)
             {
                 parent::__construct($environment, $debug);
                 $this->tmpDir = $tmpDir;
                 $this->bundleConfig = $bundleConfig;
-                $this->registerPlatform = $registerPlatform;
+                $this->configureHost = $configureHost;
             }
 
             /**
@@ -1703,8 +1752,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             public function registerContainerConfiguration(LoaderInterface $loader): void
             {
                 $bundleConfig = $this->bundleConfig;
-                $registerPlatform = $this->registerPlatform;
-                $loader->load(static function (ContainerBuilder $containerBuilder) use ($bundleConfig, $registerPlatform): void {
+                $loader->load(static function (ContainerBuilder $containerBuilder) use ($bundleConfig): void {
                     $containerBuilder->loadFromExtension('framework', [
                         'secret' => 'test',
                         'http_method_override' => false,
@@ -1714,13 +1762,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
                         'php_errors' => ['log' => true],
                     ]);
                     $containerBuilder->loadFromExtension('symfony_security_auditor', $bundleConfig);
-
-                    if ($registerPlatform) {
-                        $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
-                            ->setArguments(['stub-response'])
-                            ->setPublic(true);
-                    }
                 });
+                $loader->load($this->configureHost);
             }
 
             #[Override]

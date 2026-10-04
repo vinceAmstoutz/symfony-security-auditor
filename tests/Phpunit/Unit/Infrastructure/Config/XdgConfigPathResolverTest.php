@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
+use Closure;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -216,13 +218,44 @@ final class XdgConfigPathResolverTest extends TestCase
     }
 
     /**
+     * @param Closure(XdgConfigPathResolver): string $directory
+     *
      * @throws UnresolvableConfigPathException
      */
-    public function test_it_ignores_a_relative_application_home_override(): void
+    #[DataProvider('directoriesUnderTheApplicationHome')]
+    public function test_it_refuses_a_relative_application_home_override_rather_than_silently_ignoring_it(Closure $directory): void
     {
-        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev', null, 'relative/dir');
+        $this->expectException(UnresolvableConfigPathException::class);
+        $this->expectExceptionMessage('SYMFONY_SECURITY_AUDITOR_HOME is set to "relative/dir", which is not an absolute path.');
 
-        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+        $directory(new XdgConfigPathResolver('/xdg/config', '/xdg/cache', '/home/dev', '/xdg/data', 'relative/dir'));
+    }
+
+    /**
+     * @return iterable<string, array{Closure(XdgConfigPathResolver): string}>
+     */
+    public static function directoriesUnderTheApplicationHome(): iterable
+    {
+        yield 'the config file' => [static fn (XdgConfigPathResolver $xdgConfigPathResolver): string => $xdgConfigPathResolver->configFile()];
+        yield 'the credentials file' => [static fn (XdgConfigPathResolver $xdgConfigPathResolver): string => $xdgConfigPathResolver->credentialsFile()];
+        yield 'the cache directory' => [static fn (XdgConfigPathResolver $xdgConfigPathResolver): string => $xdgConfigPathResolver->cacheDir()];
+        yield 'the bridge directory' => [static fn (XdgConfigPathResolver $xdgConfigPathResolver): string => $xdgConfigPathResolver->dataDir()];
+    }
+
+    #[DataProvider('applicationHomeRefusals')]
+    public function test_it_names_the_refusal_of_an_application_home_override_it_cannot_use(?string $applicationHome, ?string $expected): void
+    {
+        self::assertSame($expected, (new XdgConfigPathResolver(null, null, '/home/dev', null, $applicationHome))->applicationHomeRefusal());
+    }
+
+    /**
+     * @return iterable<string, array{string|null, string|null}>
+     */
+    public static function applicationHomeRefusals(): iterable
+    {
+        yield 'no override' => [null, null];
+        yield 'an absolute override' => ['/srv/auditor', null];
+        yield 'a relative override' => ['relative/dir', 'Cannot resolve the user configuration directory: SYMFONY_SECURITY_AUDITOR_HOME is set to "relative/dir", which is not an absolute path. Resolved against the directory the command runs in, it would put the config, the credentials and the cache inside whatever project is being audited. Set SYMFONY_SECURITY_AUDITOR_HOME to an absolute path, or unset it.'];
     }
 
     /**
@@ -236,5 +269,56 @@ final class XdgConfigPathResolverTest extends TestCase
         ], 'Linux');
 
         self::assertSame('/app/.ssa/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_keeps_credentials_beside_the_configuration(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev');
+
+        self::assertSame('/xdg/config/symfony-security-auditor/credentials.json', $xdgConfigPathResolver->credentialsFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_falls_back_to_the_home_directory_for_credentials(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, '/home/dev');
+
+        self::assertSame('/home/dev/.config/symfony-security-auditor/credentials.json', $xdgConfigPathResolver->credentialsFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_cannot_place_credentials_without_a_home(): void
+    {
+        $this->expectException(UnresolvableConfigPathException::class);
+
+        (new XdgConfigPathResolver(null, null, null))->credentialsFile();
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_treats_a_relative_home_as_unset(): void
+    {
+        $this->expectException(UnresolvableConfigPathException::class);
+        $this->expectExceptionMessage('nor $HOME holds an absolute path');
+
+        (new XdgConfigPathResolver(null, null, 'home/dev'))->configFile();
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_an_absolute_xdg_variable_still_wins_over_a_relative_home(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, 'home/dev');
+
+        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
     }
 }

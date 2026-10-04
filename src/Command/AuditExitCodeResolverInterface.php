@@ -20,9 +20,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 interface AuditExitCodeResolverInterface
 {
     /**
-     * @param ?int $minimumScore normalized-score floor; `null` leaves the risk
-     *                           level as the only gate. The audit fails when
-     *                           either gate trips.
+     * @param ?int $minimumScore     normalized-score floor; `null` leaves the risk
+     *                               level as the only gate. The audit fails when
+     *                               either gate trips.
+     * @param bool $failOnIncomplete whether a report that could not analyze every
+     *                               file fails the run on its own; a tripped gate
+     *                               still decides first
      */
-    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null): int;
+    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null, bool $failOnIncomplete = false): int;
+
+    /**
+     * Whether the run reached no verdict: its scan found no file, or it
+     * analyzed none of its files and found nothing.
+     */
+    public function hasNoVerdict(AuditReport $auditReport): bool;
 }

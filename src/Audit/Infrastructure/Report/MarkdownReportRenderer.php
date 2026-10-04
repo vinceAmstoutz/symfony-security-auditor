@@ -46,15 +46,15 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
                 '**Tokens:** %s in / %s out · **Model:** %s · **Cost:** $%s (%s)',
                 number_format($cost->inputTokens()),
                 number_format($cost->outputTokens()),
-                '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
+                '' === $cost->primaryModel() ? 'unknown model' : MarkdownTextEscaper::fences($cost->primaryModel()),
                 number_format($cost->estimatedCostUsd(), 4, '.', ''),
                 $cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model',
             ),
             '',
             \sprintf(
-                '**Risk level:** %s (score %d) · **Findings:** %d · **Files scanned:** %d',
-                $auditReport->riskLevel(),
-                $auditReport->riskScore(),
+                '**Risk level:** %s (%s) · **Findings:** %d · **Files scanned:** %d',
+                RiskHeadline::riskLevel($auditReport),
+                RiskHeadline::scoreDetail($auditReport, 'score'),
                 $auditReport->totalVulnerabilities(),
                 $auditReport->filesScanned(),
             ),
@@ -69,11 +69,13 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
 
     private function body(AuditReport $auditReport): string
     {
+        $warning = $this->incompleteWarning($auditReport);
+
         if (0 === $auditReport->totalVulnerabilities()) {
-            return '✅ No validated vulnerabilities found.';
+            return [] === $warning ? '✅ No validated vulnerabilities found.' : $warning[0];
         }
 
-        $lines = ['## Summary by severity', '', '| Severity | Count |', '| --- | --- |'];
+        $lines = [...$warning, '## Summary by severity', '', '| Severity | Count |', '| --- | --- |'];
 
         foreach (VulnerabilitySeverity::cases() as $severity) {
             $count = \count($auditReport->vulnerabilitiesBySeverity($severity));
@@ -91,6 +93,16 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function incompleteWarning(AuditReport $auditReport): array
+    {
+        $notice = IncompleteAuditNotice::for($auditReport);
+
+        return null === $notice ? [] : [\sprintf('> ⚠️ **%s**', $notice), ''];
     }
 
     private function vulnerability(Vulnerability $vulnerability): string

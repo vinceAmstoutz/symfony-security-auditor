@@ -20,10 +20,14 @@ final readonly class StandaloneConfig
 {
     /**
      * @param array<array-key, mixed> $auditConfig
+     * @param ?string                 $projectConfigFile the project config layered over the user config, when the working directory had one
+     * @param float                   $httpTimeout       the seconds a request to the provider may wait for it to send anything ({@see HttpTimeout})
      */
     public function __construct(
         public array $auditConfig,
         public StandalonePlatformConfig $platform,
+        public ?string $projectConfigFile = null,
+        public float $httpTimeout = HttpTimeout::DEFAULT_SECONDS,
     ) {}
 
     public function offlineOnly(): bool

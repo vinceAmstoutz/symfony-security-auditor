@@ -21,7 +21,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 interface BridgeInstallerInterface
 {
     /**
+     * Installs the bridge of `$provider` together with those of
+     * `$moreProviders`, which a platform may need beside its own.
+     *
      * @throws BridgeInstallationFailedException
      */
-    public function install(string $provider, string $targetDirectory): void;
+    public function install(string $provider, string $targetDirectory, string ...$moreProviders): void;
 }

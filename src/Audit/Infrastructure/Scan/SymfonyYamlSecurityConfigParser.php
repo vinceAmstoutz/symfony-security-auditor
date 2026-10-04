@@ -18,11 +18,13 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProductionAwareSecurityConfigParserInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigParserInterface
+final readonly class SymfonyYamlSecurityConfigParser implements ProductionAwareSecurityConfigParserInterface
 {
+    private const string PRODUCTION_ENVIRONMENT_BLOCK = 'when@prod';
+
     public function __construct(
         private LoggerInterface $logger = new NullLogger(),
     ) {}
@@ -36,6 +38,16 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
         }
 
         return $routeAccessMap;
+    }
+
+    /**
+     * The kernel reads `config/packages/security.yaml` in every environment
+     * and what sits under `config/packages/prod/` in production only.
+     */
+    #[Override]
+    public function isLoadedInProduction(string $relativePath): bool
+    {
+        return 1 === preg_match('~\Aconfig/packages/(?:prod/.+|security)\.ya?ml\z~', $relativePath);
     }
 
     #[Override]
@@ -119,8 +131,9 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
     }
 
     /**
-     * The `security` blocks of the document: the root one plus every
-     * environment-scoped `when@<env>` override. A bare root-level
+     * The `security` blocks of the document the production kernel reads: the
+     * root one plus the `when@prod` override — a `when@test` or `when@dev`
+     * block protects nothing in production. A bare root-level
      * `access_control`/`firewalls` document (an imported partial) also counts
      * as a section.
      *
@@ -167,7 +180,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
             return \is_array($value) ? $this->mapOf($value) : null;
         }
 
-        if (!str_starts_with($key, 'when@')) {
+        if (self::PRODUCTION_ENVIRONMENT_BLOCK !== $key) {
             return null;
         }
 

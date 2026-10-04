@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use JsonException;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\StringInput;
@@ -98,8 +99,84 @@ final class DiffPresenterTest extends TestCase
         self::assertStringNotContainsString("\u{202E}", $output);
     }
 
+    public function test_console_output_defuses_a_legacy_workflow_command_in_a_finding(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $diffFinding = new DiffFinding('fingerprint', 'sql_injection', 'src/##[warning]Y.php', 't ##[error]X', 'high');
+
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$diffFinding], [], []), DiffOutputFormat::Console);
+
+        $output = $bufferedOutput->fetch();
+        self::assertStringContainsString('t #\\#[error]X', $output);
+        self::assertStringContainsString('src/#\\#[warning]Y.php', $output);
+        self::assertStringNotContainsString('##[', $output);
+    }
+
+    public function test_json_output_defuses_a_legacy_workflow_command_and_keeps_its_meaning(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $diffFinding = new DiffFinding('fingerprint', 'sql_injection', 'src/Foo.php', 't ##[error]X', 'high');
+
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$diffFinding], [], []), DiffOutputFormat::Json);
+
+        $output = $bufferedOutput->fetch();
+        self::assertStringNotContainsString('##[', $output);
+        self::assertStringContainsString('"title": "t ##[error]X"', (string) json_encode(json_decode($output, true), \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
+    }
+
     private function finding(string $severity = 'high'): DiffFinding
     {
         return new DiffFinding('fingerprint', 'sql_injection', 'src/Foo.php', 'SQL Injection', $severity);
+    }
+
+    public function test_it_prints_the_unverified_section_and_counts_it_in_the_summary(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([], [], [], [
+            new DiffFinding('fp-unverified', 'sql_injection', 'src/Foo.php', 'SQL Injection', 'high'),
+        ]), DiffOutputFormat::Console);
+
+        $output = $bufferedOutput->fetch();
+
+        self::assertStringContainsString('Unverified (1)', $output);
+        self::assertStringContainsString('[HIGH] sql_injection — SQL Injection (src/Foo.php)', $output);
+        self::assertStringContainsString('did not fully analyze their files, or never looked at them — not shown as fixed', $output);
+        self::assertStringContainsString('Summary: 0 new, 0 fixed, 1 unverified, 0 persisting.', $output);
+    }
+
+    public function test_it_leaves_the_unverified_section_out_when_every_disappearance_was_verified(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([], [], []), DiffOutputFormat::Console);
+
+        $output = $bufferedOutput->fetch();
+
+        self::assertStringNotContainsString('Unverified', $output);
+        self::assertStringContainsString('Summary: 0 new, 0 fixed, 0 persisting.', $output);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function test_json_format_lists_the_unverified_findings_between_the_fixed_and_persisting_ones(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([], [], [], [
+            new DiffFinding('fp-unverified', 'sql_injection', 'src/Foo.php', 'SQL Injection', 'high'),
+        ]), DiffOutputFormat::Json);
+
+        $decoded = json_decode($bufferedOutput->fetch(), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+        self::assertSame(['new', 'fixed', 'unverified', 'persisting'], array_keys($decoded));
+        self::assertSame([['fingerprint' => 'fp-unverified', 'type' => 'sql_injection', 'file' => 'src/Foo.php', 'title' => 'SQL Injection', 'severity' => 'high']], $decoded['unverified']);
     }
 }

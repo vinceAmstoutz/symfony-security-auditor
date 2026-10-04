@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor;
 
 use JsonException;
 use Override;
-use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Clock\Clock;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -63,6 +63,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewer
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
@@ -92,6 +93,12 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
  */
 final class SymfonySecurityAuditorBundle extends AbstractBundle
 {
+    #[Override]
+    public function build(ContainerBuilder $container): void
+    {
+        $container->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
+    }
+
     #[Override]
     public function configure(DefinitionConfigurator $definition): void
     {
@@ -193,7 +200,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ->private()
             ->args([
                 service(RateLimitConfiguration::class),
-                service(ClockInterface::class),
+                service(Clock::class),
                 service(SleeperInterface::class),
             ]);
         $servicesConfigurator->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);

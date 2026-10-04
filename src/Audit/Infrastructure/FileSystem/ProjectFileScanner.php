@@ -98,12 +98,28 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
 
-        $files = array_merge(
+        $files = $this->inRelativePathOrder(array_merge(
             $this->scanDirectories($directories, $projectPath, $reader),
             $this->scanExplicitFiles($explicitFiles, $projectPath, $reader),
-        );
+        ));
 
         $this->logger->info('Scan complete', ['files' => \count($files)]);
+
+        return $files;
+    }
+
+    /**
+     * A filesystem lists a directory in its own storage order, which differs
+     * between machines; the chunks built from this list, and the prompts and
+     * cache keys built from those, must not.
+     *
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function inRelativePathOrder(array $files): array
+    {
+        usort($files, static fn (ProjectFile $left, ProjectFile $right): int => strcmp($left->relativePath(), $right->relativePath()));
 
         return $files;
     }
@@ -189,24 +205,25 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     }
 
     /**
+     * Containment is decided on real paths, not on spellings: a symlink
+     * committed in the audited repository can point anywhere on the machine,
+     * and a lexical check would call `src/link/` or `src/link/deep/..` part of
+     * the project while the filesystem walks into the link's target.
+     *
      * @return array{0: list<string>, 1: list<string>}
      */
     private function resolveIncludedPaths(string $projectPath): array
     {
-        $canonicalProjectPath = Path::canonicalize($projectPath);
+        $realProjectPath = realpath($projectPath);
+        if (false === $realProjectPath) {
+            return [[], []];
+        }
+
         $directories = [];
         $explicitFiles = [];
         foreach ($this->includedPaths as $includedPath) {
             $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
-            if (is_link($resolved)) {
-                $this->logger->warning('Skipped symlinked included path', ['path' => $resolved]);
-
-                continue;
-            }
-
-            if (!Path::isBasePath($canonicalProjectPath, Path::canonicalize($resolved))) {
-                $this->logger->warning('Skipped included path outside the project root', ['path' => $resolved]);
-
+            if (!$this->isScannable($resolved, $realProjectPath)) {
                 continue;
             }
 
@@ -222,6 +239,30 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         }
 
         return [$directories, $explicitFiles];
+    }
+
+    private function isScannable(string $resolved, string $realProjectPath): bool
+    {
+        if (is_link($resolved)) {
+            $this->logger->warning('Skipped symlinked included path', ['path' => $resolved]);
+
+            return false;
+        }
+
+        $realResolved = realpath($resolved);
+
+        return false !== $realResolved && $this->isInsideProject($resolved, $realResolved, $realProjectPath);
+    }
+
+    private function isInsideProject(string $resolved, string $realResolved, string $realProjectPath): bool
+    {
+        if (Path::isBasePath($realProjectPath, $realResolved)) {
+            return true;
+        }
+
+        $this->logger->warning('Skipped included path outside the project root', ['path' => $resolved]);
+
+        return false;
     }
 
     /**

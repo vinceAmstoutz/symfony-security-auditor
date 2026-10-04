@@ -20,22 +20,37 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 /**
  * A run whose scan discovered no file at all reports SAFE, 100/100 and grade A,
  * because there was nothing to find — so a mistyped project path or a
- * `scan.included_paths` entry that matches nothing would pass any gate. That is
- * not a verdict, so it fails regardless of the thresholds. A `--since` run whose
- * diff left nothing changed still passes: there the scan did find files.
+ * `scan.included_paths` entry that matches nothing would pass any gate. The
+ * same holds for a run that analyzed none of its files and found nothing.
+ * Neither is a verdict, so both fail regardless of the thresholds. A
+ * `--since` run whose diff left nothing changed still passes: there the scan
+ * did find files.
+ *
+ * A report that could not analyze every file fails with its own code only when
+ * asked to: a tripped gate is a finding, so it keeps the stronger answer.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInterface
 {
     #[Override]
-    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null): int
+    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null, bool $failOnIncomplete = false): int
     {
-        $failed = 0 === $auditReport->filesDiscovered()
+        $failed = $this->hasNoVerdict($auditReport)
             || $auditReport->riskLevelEnum()->isAtLeast($riskLevel)
             || $this->scoreIsBelow($auditReport, $minimumScore);
 
-        return $failed ? ExitCode::Failure->value : ExitCode::Success->value;
+        if ($failed) {
+            return ExitCode::Failure->value;
+        }
+
+        return $failOnIncomplete && !$auditReport->isComplete() ? ExitCode::Incomplete->value : ExitCode::Success->value;
+    }
+
+    #[Override]
+    public function hasNoVerdict(AuditReport $auditReport): bool
+    {
+        return 0 === $auditReport->filesDiscovered() || $auditReport->hasNoVerdict();
     }
 
     private function scoreIsBelow(AuditReport $auditReport, ?int $minimumScore): bool

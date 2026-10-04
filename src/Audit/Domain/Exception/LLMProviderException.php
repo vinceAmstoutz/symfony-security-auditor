@@ -27,6 +27,8 @@ use RuntimeException;
  *
  * Not final: Infrastructure-layer subclasses (`NonTransientLLMFailureException`,
  * `TransientLLMFailureException`) extend this exception so agents can catch it at
- * the Domain/Application boundary without importing Infrastructure types.
+ * the Domain/Application boundary without importing Infrastructure types. The
+ * one subclass an agent recovers from is `LLMRequestTooLargeException`: a prompt
+ * the model cannot take in fails only that chunk, which is split and retried.
  */
 class LLMProviderException extends RuntimeException {}

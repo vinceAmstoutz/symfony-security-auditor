@@ -29,7 +29,28 @@ final readonly class ReportTrend
     ) {}
 
     /**
-     * @return array{points: list<array{report: string, total: int, new: int|null, fixed: int|null}>}
+     * The trend in one sentence: the first and last totals with the signed
+     * change, and how many findings disappeared from files a later run could
+     * not analyze — those are unverified, not fixed, whatever the totals say.
+     */
+    public function summary(): string
+    {
+        $first = $this->points[0];
+        $last = $this->points[\count($this->points) - 1];
+        $unverified = array_sum(array_map(static fn (TrendPoint $trendPoint): int => $trendPoint->unverifiedCount ?? 0, $this->points));
+
+        return \sprintf(
+            '%d → %d findings (%+d) across %d reports%s.',
+            $first->totalCount,
+            $last->totalCount,
+            $last->totalCount - $first->totalCount,
+            \count($this->points),
+            0 === $unverified ? '' : \sprintf(', %d unverified rather than fixed', $unverified),
+        );
+    }
+
+    /**
+     * @return array{points: list<array{report: string, total: int, new: int|null, fixed: int|null, unverified: int|null}>}
      */
     public function toArray(): array
     {

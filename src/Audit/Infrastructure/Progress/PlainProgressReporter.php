@@ -17,6 +17,7 @@ use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
@@ -54,9 +55,13 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
         };
     }
 
+    /**
+     * Every line starts with a prefix of ours, but a finding's file or title
+     * may still carry a legacy `##[command]` a CI runner would act on.
+     */
     private function writeln(string $line): void
     {
-        $this->output->writeln($line, OutputInterface::OUTPUT_RAW);
+        $this->output->writeln(WorkflowCommandText::inLine($line), OutputInterface::OUTPUT_RAW);
     }
 
     /** @param array<string, mixed> $context */
@@ -75,7 +80,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     private function chunkDoneLine(array $context): string
     {
         return \sprintf(
-            '  ✓ chunk %d/%d done%s',
+            'errored' === ProgressContext::string($context, 'status') ? '  ✗ chunk %d/%d failed%s' : '  ✓ chunk %d/%d done%s',
             ProgressContext::int($context, 'chunk'),
             ProgressContext::int($context, 'total_chunks'),
             ProgressContext::durationSuffix($context, 'elapsed_seconds'),
@@ -127,16 +132,30 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     {
         return \sprintf(
             '  [%s] %s — %s:%d',
-            true === ($context['accepted'] ?? null) ? 'VALIDATED' : 'REJECTED',
+            $this->verdictLabel($context),
             ProgressContext::string($context, 'type'),
             TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }
 
+    /**
+     * A review that reached no verdict is a failure, never a rejection.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function verdictLabel(array $context): string
+    {
+        if (ProgressContext::reviewReachedNoVerdict($context)) {
+            return 'REVIEW-FAILED';
+        }
+
+        return true === ($context['accepted'] ?? null) ? 'VALIDATED' : 'REJECTED';
+    }
+
     /** @param array<string, mixed> $context */
     private function reviewSummaryLine(array $context): string
     {
-        return \sprintf('  %d validated, %d rejected', ProgressContext::int($context, 'accepted'), ProgressContext::int($context, 'rejected'));
+        return \sprintf('  %s', ProgressContext::reviewTally($context));
     }
 }

@@ -71,6 +71,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
                         ],
                     ],
                     'results' => $results,
+                    'invocations' => [$this->invocation($auditReport)],
                     'properties' => [
                         'input_tokens' => $cost->inputTokens(),
                         'output_tokens' => $cost->outputTokens(),
@@ -83,6 +84,18 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         ];
 
         return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_PRESERVE_ZERO_FRACTION);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function invocation(AuditReport $auditReport): array
+    {
+        $notice = IncompleteAuditNotice::for($auditReport);
+
+        return null === $notice
+            ? ['executionSuccessful' => true]
+            : ['executionSuccessful' => false, 'toolExecutionNotifications' => [['level' => 'error', 'message' => ['text' => $notice]]]];
     }
 
     /**

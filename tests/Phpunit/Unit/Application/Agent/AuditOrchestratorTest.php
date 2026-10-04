@@ -759,6 +759,111 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_it_keeps_skipping_a_baseline_accepted_finding_the_attacker_re_reports_later(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(title: 'Control', lineStart: 50, lineEnd: 55),
+            ]),
+            $this->attackerResponse([
+                $this->vulnPayload(lineStart: 12, lineEnd: 18),
+                $this->vulnPayload(title: 'Second', lineStart: 70, lineEnd: 75),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->expects(self::exactly(2))->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        $titles = array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), array_values($auditContext->vulnerabilities()));
+        sort($titles);
+        self::assertSame(['Control', 'Second'], $titles);
+        self::assertSame([$this->defaultPayloadFingerprint()], $auditContext->consumedBaselineFingerprints());
+        self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_differently_titled_finding_at_the_skipped_lines_still_reaches_the_reviewer(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(title: 'Control', lineStart: 50, lineEnd: 55),
+            ]),
+            $this->attackerResponse([
+                $this->vulnPayload(title: 'Same lines, other finding', lineStart: 10, lineEnd: 15),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        $titles = array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), array_values($auditContext->vulnerabilities()));
+        sort($titles);
+        self::assertSame(['Control', 'Same lines, other finding'], $titles);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_it_tells_the_attacker_about_baseline_skipped_findings_in_later_iterations(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $userMessages = [];
+        $attackerLlm->method('complete')->willReturnCallback(function (string $systemPrompt, string $userMessage) use (&$userMessages): LLMResponse {
+            $userMessages[] = $userMessage;
+
+            return 1 === \count($userMessages)
+                ? $this->attackerResponse([
+                    $this->vulnPayload(lineStart: 10, lineEnd: 15),
+                    $this->vulnPayload(title: 'Control', lineStart: 50, lineEnd: 55),
+                ])
+                : $this->emptyResponse();
+        });
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(2, $userMessages);
+        self::assertStringNotContainsString('FooController.php:10-15', $userMessages[0]);
+        self::assertStringContainsString('## Patterns Already Confirmed in Earlier Iterations', $userMessages[1]);
+        self::assertStringContainsString('src/Controller/FooController.php:10-15', $userMessages[1]);
+        self::assertStringContainsString('src/Controller/FooController.php:50-55', $userMessages[1]);
+    }
+
+    /**
      * `recordBaselineSkip()` only logs/reports the first skip event per
      * fingerprint per run — a genuine second baseline credit for the
      * identical fingerprint (two originally-accepted findings that happen to
@@ -1682,6 +1787,106 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
+     * A review that failed reached no verdict: telling the attacker the
+     * reviewer rejected that finding would stop it from ever reporting it
+     * again, and the reviewer from getting another chance at it.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_finding_whose_review_failed_is_not_passed_back_as_rejected(): void
+    {
+        $recordingAttackerAgent = new RecordingAttackerAgent([
+            $this->findingTitled('KeepMe', 'src/Accepted.php'),
+            $this->findingTitled('DropMe', 'src/Rejected.php'),
+            $this->findingTitled('FailMe', 'src/Failed.php'),
+        ]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturnCallback(
+            fn (string $system, string $user): LLMResponse => match (true) {
+                str_contains($user, 'KeepMe') => $this->reviewerAcceptResponse(),
+                str_contains($user, 'FailMe') => throw new RuntimeException('Connection reset by peer'),
+                default => $this->reviewerRejectResponse(),
+            },
+        );
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
+
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping());
+
+        self::assertSame(['src/Rejected.php'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $recordingAttackerAgent->lastRejectedFindings));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_review_tally_counts_a_review_that_failed_as_failed_not_rejected(): void
+    {
+        $recordingAttackerAgent = new RecordingAttackerAgent([
+            $this->findingTitled('KeepMe', 'src/Accepted.php'),
+            $this->findingTitled('DropMe', 'src/Rejected.php'),
+            $this->findingTitled('FailMe', 'src/Failed.php'),
+        ]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturnCallback(
+            fn (string $system, string $user): LLMResponse => match (true) {
+                str_contains($user, 'KeepMe') => $this->reviewerAcceptResponse(),
+                str_contains($user, 'FailMe') => throw new RuntimeException('Connection reset by peer'),
+                default => $this->reviewerRejectResponse(),
+            },
+        );
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), $recordingProgressReporter);
+
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping());
+
+        self::assertSame(
+            ['accepted' => 1, 'rejected' => 1, 'failed' => 1],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'review.completed' === $event[0],
+            ))[0][1],
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function findingTitled(string $title, string $filePath): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
+            new CodeLocation($filePath, 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
+        );
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
@@ -1874,7 +2079,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($this->makeContextWithMapping());
 
         self::assertSame(
-            [['review.completed', ['accepted' => 1, 'rejected' => 1]]],
+            [['review.completed', ['accepted' => 1, 'rejected' => 1, 'failed' => 0]]],
             array_values(array_filter(
                 $recordingProgressReporter->events,
                 static fn (array $event): bool => 'review.completed' === $event[0],

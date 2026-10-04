@@ -17,6 +17,7 @@ use JsonException;
 use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
@@ -35,21 +36,39 @@ final readonly class DiffPresenter implements DiffPresenterInterface
     {
         if (DiffOutputFormat::Json === $diffOutputFormat) {
             // OUTPUT_RAW keeps markup-lookalike text in finding titles out of the console formatter.
-            $symfonyStyle->writeln(json_encode($reportDiff->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
+            $symfonyStyle->writeln(WorkflowCommandText::inJson(json_encode($reportDiff->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR)), OutputInterface::OUTPUT_RAW);
 
             return;
         }
 
         $this->section($symfonyStyle, 'New', $reportDiff->newFindings);
         $this->section($symfonyStyle, 'Fixed', $reportDiff->fixedFindings);
+        $this->unverifiedSection($symfonyStyle, $reportDiff->unverifiedFindings);
         $this->section($symfonyStyle, 'Persisting', $reportDiff->persistingFindings);
 
         $symfonyStyle->writeln(\sprintf(
-            'Summary: %d new, %d fixed, %d persisting.',
+            'Summary: %d new, %d fixed, %s%d persisting.',
             \count($reportDiff->newFindings),
             \count($reportDiff->fixedFindings),
+            [] === $reportDiff->unverifiedFindings ? '' : \sprintf('%d unverified, ', \count($reportDiff->unverifiedFindings)),
             \count($reportDiff->persistingFindings),
         ));
+    }
+
+    /**
+     * Shown only when the current report could not vouch for a file, so a
+     * comparison of two complete reports reads exactly as it always did.
+     *
+     * @param list<DiffFinding> $findings
+     */
+    private function unverifiedSection(SymfonyStyle $symfonyStyle, array $findings): void
+    {
+        if ([] === $findings) {
+            return;
+        }
+
+        $this->section($symfonyStyle, 'Unverified', $findings);
+        $symfonyStyle->writeln('  (absent from the current report, whose run did not fully analyze their files, or never looked at them — not shown as fixed)');
     }
 
     /**
@@ -83,10 +102,11 @@ final readonly class DiffPresenter implements DiffPresenterInterface
      * the terminal itself, so — exactly as the console audit-report renderer
      * does — each single-line field is collapsed and stripped of
      * control/ANSI/bidi characters so a crafted value cannot forge a fake
-     * `[SEVERITY]` finding line or spoof the terminal.
+     * `[SEVERITY]` finding line or spoof the terminal, and a legacy
+     * `##[command]` in it is defused for a CI runner's log.
      */
     private function sanitize(string $value): string
     {
-        return TerminalTextSanitizer::collapseToSingleLine(mb_scrub($value, 'UTF-8'));
+        return WorkflowCommandText::inLine(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($value, 'UTF-8')));
     }
 }

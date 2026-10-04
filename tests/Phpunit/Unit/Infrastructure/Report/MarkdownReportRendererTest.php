@@ -103,6 +103,16 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_escapes_markup_in_the_primary_model(): void
+    {
+        $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('<details>[claude](https://evil.example)')));
+
+        self::assertStringContainsString('**Model:** &lt;details&gt;\\[claude\\](https://evil.example) ·', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_unknown_model_when_the_primary_model_is_blank(): void
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('')));
@@ -130,6 +140,55 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2')));
 
         self::assertStringContainsString('**Cost:** $0.0000 (no published pricing, or a self-hosted model)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_states_the_risk_of_an_audit_that_did_not_finish_as_covering_only_the_files_analyzed(): void
+    {
+        self::assertStringContainsString('**Risk level:** SAFE (score 0, on the files analyzed) · ', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_states_no_risk_level_for_an_audit_that_analyzed_no_file(): void
+    {
+        $output = $this->renderer->render($this->makeReportThatAnalyzedNoFile());
+
+        self::assertStringContainsString('**Risk level:** UNKNOWN (no file was analyzed) · ', $output);
+        self::assertStringNotContainsString('SAFE', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_never_calls_an_incomplete_audit_clean(): void
+    {
+        self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_says_an_audit_without_findings_did_not_finish(): void
+    {
+        self::assertStringContainsString('> ⚠️ **Audit incomplete: 2 file(s)', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_warns_above_the_findings_of_an_audit_that_did_not_finish(): void
+    {
+        self::assertStringContainsString(
+            "free of vulnerabilities.**\n\n## Summary by severity",
+            $this->renderer->render($this->makeIncompleteReport($this->makeValidatedVuln())),
+        );
     }
 
     /**

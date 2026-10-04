@@ -21,6 +21,16 @@ final readonly class LLMResponse
 {
     private const int JSON_MAX_DEPTH = 512;
 
+    /**
+     * Stop reasons after which the response is not the model's complete
+     * answer: output cut by the token limit, suppressed by a content filter,
+     * a tool loop stopped at its iteration cap, a call that produced no
+     * content at all, or a request the model could not take in.
+     */
+    private const array DEGRADED_STOP_REASONS = ['length', 'content-filter', 'max_tool_iterations', 'empty_content', self::REQUEST_TOO_LARGE_STOP_REASON];
+
+    private const string REQUEST_TOO_LARGE_STOP_REASON = 'request_too_large';
+
     private function __construct(
         private string $content,
         private int $inputTokens,
@@ -29,6 +39,7 @@ final readonly class LLMResponse
         private string $stopReason,
         private int $cacheReadTokens,
         private int $cacheCreationTokens,
+        private ?string $reportedModel = null,
     ) {}
 
     public static function of(
@@ -100,6 +111,30 @@ final readonly class LLMResponse
         return $this->stopReason;
     }
 
+    /**
+     * The same response carrying the model the provider says answered it,
+     * which a gateway or a failover platform may pick on its own. Null when
+     * the provider reports none.
+     */
+    public function withReportedModel(?string $reportedModel): self
+    {
+        return new self(
+            $this->content,
+            $this->inputTokens,
+            $this->outputTokens,
+            $this->model,
+            $this->stopReason,
+            $this->cacheReadTokens,
+            $this->cacheCreationTokens,
+            $reportedModel,
+        );
+    }
+
+    public function reportedModel(): ?string
+    {
+        return $this->reportedModel;
+    }
+
     public function totalTokens(): int
     {
         return $this->inputTokens + $this->outputTokens + $this->cacheReadTokens + $this->cacheCreationTokens;
@@ -117,12 +152,7 @@ final readonly class LLMResponse
      */
     public function parseJson(): array
     {
-        $content = $this->content;
-
-        // Strip markdown fences that LLMs sometimes wrap JSON in
-        $content = (string) preg_replace('/```json\s*/', '', $content);
-        $content = (string) preg_replace('/```\s*/', '', $content);
-        $content = trim($content);
+        $content = $this->withoutWrappingFence($this->content);
 
         try {
             $decoded = json_decode($content, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
@@ -138,8 +168,26 @@ final readonly class LLMResponse
     }
 
     /**
-     * Walks every `[`/`{` position outside JSON string literals and returns the
-     * first balanced block that decodes as JSON, or `null` when none do.
+     * Only a Markdown fence around the whole answer is stripped: the same
+     * backticks inside a JSON string, such as a finding quoting a code block,
+     * are part of the payload.
+     */
+    private function withoutWrappingFence(string $content): string
+    {
+        return trim((string) preg_replace(['/\A\s*```(?:json)?/', '/```\s*\z/'], '', $content));
+    }
+
+    /**
+     * Takes the last balanced block at the top level of the answer that
+     * decodes to an object or to a list holding one: a model that reasons
+     * before its verdict may quote JSON — from the audited code, say — that
+     * must not stand for the verdict that follows it, and a bracket in the
+     * prose after its answer must not either. When no top-level block
+     * qualifies, as when the output limit cut an array off before its closing
+     * bracket, the first balanced block anywhere that decodes is taken (the
+     * first complete object of that array), or `null` when none do. A JSON
+     * object written after the answer still stands for it: nothing here knows
+     * the shape the caller expects.
      *
      * When the content itself spans a single balanced block (`[ ... ]` or
      * `{ ... }` with no surrounding prose), the top-level `json_decode` has
@@ -156,26 +204,116 @@ final readonly class LLMResponse
             return null;
         }
 
-        $trackStringLiterals = $this->hasBalancedQuotes($content);
+        $openerPositions = $this->openerPositions($content, $this->hasBalancedQuotes($content));
 
-        $length = \strlen($content);
+        return $this->lastDecodedBlock($this->topLevelBlocks($content, $openerPositions))
+            ?? $this->firstDecodedBlock($content, $openerPositions);
+    }
+
+    /**
+     * The position of every `[`/`{` outside a JSON string, in order.
+     *
+     * @return list<int>
+     */
+    private function openerPositions(string $content, bool $trackStringLiterals): array
+    {
+        $positions = [];
         $state = ['inString' => false, 'escape' => false];
 
-        for ($i = 0; $i < $length; ++$i) {
-            $char = $content[$i];
+        foreach (str_split($content) as $position => $char) {
             $next = $this->advanceIfTrackingStringLiterals($trackStringLiterals, $char, $state);
             $state = ['inString' => $next['inString'], 'escape' => $next['escape']];
 
-            if ($next['consumed']) {
+            if (!$next['consumed'] && $this->isOpener($char)) {
+                $positions[] = $position;
+            }
+        }
+
+        return $positions;
+    }
+
+    /**
+     * The balanced blocks those openers start outside any other block, in
+     * order. An opener that never closes holds the rest of the answer, so the
+     * scan stops there.
+     *
+     * @param list<int> $openerPositions
+     *
+     * @return array<int, string> keyed by the position each block opens at
+     */
+    private function topLevelBlocks(string $content, array $openerPositions): array
+    {
+        $blocks = [];
+
+        foreach ($openerPositions as $openerPosition) {
+            if ($this->opensInsideLastBlock($blocks, $openerPosition)) {
                 continue;
             }
 
-            $candidate = $this->decodeOpenerCandidate($content, $i, $char);
-            if (null === $candidate) {
-                continue;
+            $block = $this->balancedBlockOpenedAt($content, $openerPosition);
+            if (null === $block) {
+                break;
             }
 
-            return $candidate;
+            $blocks[$openerPosition] = $block;
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * @param array<int, string> $blocks keyed by the position each block opens at
+     */
+    private function opensInsideLastBlock(array $blocks, int $position): bool
+    {
+        $lastBlockPosition = array_key_last($blocks);
+
+        return null !== $lastBlockPosition && $position < $lastBlockPosition + \strlen($blocks[$lastBlockPosition]);
+    }
+
+    /**
+     * @param array<int, string> $blocks
+     */
+    private function lastDecodedBlock(array $blocks): mixed
+    {
+        foreach (array_reverse($blocks) as $block) {
+            $decoded = $this->decodeBlock($block);
+            if (\is_array($decoded) && $this->canStandForTheAnswer($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * An object, or a list holding one. Anything else is what prose brackets
+     * decode to — `[1]` citing a source, `[ ]` in a checklist, `[[12, 14]]`
+     * listing line ranges — so it never outranks an earlier block.
+     *
+     * @param array<mixed> $decoded
+     */
+    private function canStandForTheAnswer(array $decoded): bool
+    {
+        return !array_is_list($decoded) || [] !== array_filter($decoded, $this->isObject(...));
+    }
+
+    private function isObject(mixed $element): bool
+    {
+        return \is_array($element) && !array_is_list($element);
+    }
+
+    /**
+     * @param list<int> $openerPositions
+     */
+    private function firstDecodedBlock(string $content, array $openerPositions): mixed
+    {
+        foreach ($openerPositions as $openerPosition) {
+            $block = $this->balancedBlockOpenedAt($content, $openerPosition);
+            $decoded = null === $block ? null : $this->decodeBlock($block);
+            if (null !== $decoded) {
+                return $decoded;
+            }
         }
 
         return null;
@@ -203,7 +341,7 @@ final readonly class LLMResponse
 
     /**
      * An unescaped double-quote toggles "inside a string" on and off as
-     * `recoverDecodedJsonBlock` scans for the first genuine `[`/`{` opener —
+     * `recoverDecodedJsonBlock` scans for genuine `[`/`{` openers —
      * meant to skip a bracket embedded in a quoted prose phrase (see
      * `test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array`).
      * That toggle only makes sense when every quote in the content is
@@ -229,13 +367,16 @@ final readonly class LLMResponse
         return !$inString;
     }
 
-    private function decodeOpenerCandidate(string $content, int $start, string $char): mixed
+    private function isOpener(string $char): bool
     {
-        return match ($char) {
-            '[' => $this->tryDecodeBalancedBlock($content, $start, '[', ']'),
-            '{' => $this->tryDecodeBalancedBlock($content, $start, '{', '}'),
-            default => null,
-        };
+        return '[' === $char || '{' === $char;
+    }
+
+    private function balancedBlockOpenedAt(string $content, int $start): ?string
+    {
+        return '[' === $content[$start]
+            ? $this->scanBalancedBlockFrom($content, $start, '[', ']')
+            : $this->scanBalancedBlockFrom($content, $start, '{', '}');
     }
 
     /**
@@ -287,17 +428,11 @@ final readonly class LLMResponse
     }
 
     /**
-     * Scans a balanced block starting at `$start` and attempts to JSON-decode it.
-     * Returns the decoded value on success, or `null` when scanning hits EOF or
-     * decoding fails — the caller iterates to the next opener candidate.
+     * The decoded block, or `null` when it does not decode — the caller moves
+     * on to the next candidate.
      */
-    private function tryDecodeBalancedBlock(string $content, int $start, string $open, string $close): mixed
+    private function decodeBlock(string $block): mixed
     {
-        $block = $this->scanBalancedBlockFrom($content, $start, $open, $close);
-        if (null === $block) {
-            return null;
-        }
-
         try {
             return json_decode($block, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
         } catch (JsonException) {
@@ -349,5 +484,27 @@ final readonly class LLMResponse
     public function isEmpty(): bool
     {
         return '' === trim($this->content);
+    }
+
+    /**
+     * Whether the answer was cut short (see `DEGRADED_STOP_REASONS`), in
+     * which case an empty or partial payload is not the model's verdict and
+     * must never be cached or reported as one.
+     */
+    public function isDegraded(): bool
+    {
+        return \in_array($this->stopReason, self::DEGRADED_STOP_REASONS, true);
+    }
+
+    /**
+     * Whether the provider refused the request because the prompt alone
+     * exceeds the model's input window — the content carries the refusal. A
+     * batch client answers this per request where a single call throws, so
+     * the caller can split the work; it is degraded too, so no consumer
+     * counts it as a verdict.
+     */
+    public function isRequestTooLarge(): bool
+    {
+        return self::REQUEST_TOO_LARGE_STOP_REASON === $this->stopReason;
     }
 }

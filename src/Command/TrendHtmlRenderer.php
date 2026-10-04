@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TemplateLoa
 /**
  * Renders a {@see ReportTrend} as a self-contained HTML page: an SVG line
  * chart of finding totals over the report series plus a table of per-report
- * new/fixed deltas.
+ * new/fixed/unverified deltas.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -48,20 +48,12 @@ final readonly class TrendHtmlRenderer implements TrendHtmlRendererInterface
     public function render(ReportTrend $reportTrend): string
     {
         $points = $reportTrend->points;
-        $first = $points[0];
-        $last = $points[\count($points) - 1];
 
         return strtr($this->templateLoader->load('trend.html'), [
             '{{packageName}}' => $this->escape(ReportPackage::NAME),
             '{{packageUrl}}' => $this->escape(ReportPackage::HOMEPAGE_URL),
             '{{reportCount}}' => \count($points),
-            '{{summary}}' => $this->escape(\sprintf(
-                '%d → %d findings (%+d) across %d reports.',
-                $first->totalCount,
-                $last->totalCount,
-                $last->totalCount - $first->totalCount,
-                \count($points),
-            )),
+            '{{summary}}' => $this->escape($reportTrend->summary()),
             '{{chart}}' => $this->chart($points),
             '{{rows}}' => $this->rows($points),
         ]);
@@ -75,12 +67,13 @@ final readonly class TrendHtmlRenderer implements TrendHtmlRendererInterface
         $rows = [];
         foreach ($points as $index => $trendPoint) {
             $rows[] = \sprintf(
-                '<tr><td>%d</td><td>%s</td><td>%d</td><td>%s</td><td>%s</td></tr>',
+                '<tr><td>%d</td><td>%s</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td></tr>',
                 $index + 1,
                 $this->escape($trendPoint->report),
                 $trendPoint->totalCount,
                 $trendPoint->newCount ?? '—',
                 $trendPoint->fixedCount ?? '—',
+                $trendPoint->unverifiedCount ?? '—',
             );
         }
 

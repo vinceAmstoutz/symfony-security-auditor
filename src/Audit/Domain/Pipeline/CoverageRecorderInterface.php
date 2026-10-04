@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
  * Conventional values:
  *   - attacker stage: "analyzed", "cached", "errored"
  *   - reviewer stage: "validated", "rejected", "errored"
+ *   - secret_scrubbing stage: "errored" (the scrubber withheld the file's content)
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

@@ -16,14 +16,27 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 use RuntimeException;
 use Throwable;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/**
+ * The model answered with nothing usable. `$stopReason` names the outcome the
+ * way `LLMResponse` does when a provider reports it as a response instead —
+ * `empty_content`, `length` or `content-filter` — so the caller can hand back
+ * the same degraded response either way.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 final class EmptyLLMResponseException extends RuntimeException
 {
-    public static function from(Throwable $throwable): self
+    public function __construct(string $message, Throwable $previous, public readonly string $stopReason)
+    {
+        parent::__construct($message, previous: $previous);
+    }
+
+    public static function from(Throwable $throwable, string $stopReason = 'empty_content'): self
     {
         return new self(
             \sprintf('LLM returned a response with no content: %s', $throwable->getMessage()),
-            previous: $throwable,
+            $throwable,
+            $stopReason,
         );
     }
 }

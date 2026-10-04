@@ -51,6 +51,27 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
 
     /**
      * @throws InvalidAuditContextException
+     */
+    public function test_render_warns_that_an_audit_without_findings_did_not_finish(): void
+    {
+        self::assertStringStartsWith('::warning title=Audit incomplete::Audit incomplete: 2 file(s)', $this->renderer->render($this->makeIncompleteReport()));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_puts_the_incomplete_warning_on_its_own_line_before_the_findings(): void
+    {
+        $lines = explode("\n", $this->renderer->render($this->makeIncompleteReport($this->makeValidatedVuln())));
+
+        self::assertStringStartsWith('::error ', $lines[1]);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException

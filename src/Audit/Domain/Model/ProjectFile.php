@@ -108,6 +108,16 @@ final readonly class ProjectFile
         return hash('sha256', $this->content);
     }
 
+    /**
+     * Whether the secret scrubber could not vouch for this file and replaced
+     * its content with the line-count-preserving `unscannable` placeholder:
+     * nothing of the file itself is left to analyze.
+     */
+    public function isWithheld(): bool
+    {
+        return SecretPatternLabel::Unscannable->placeholder() === rtrim($this->content, "\n");
+    }
+
     public function isController(): bool
     {
         return ProjectFileType::CONTROLLER === $this->projectFileType;

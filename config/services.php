@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-use Psr\Clock\ClockInterface;
+use Symfony\Component\Clock\Clock;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
@@ -87,6 +87,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -204,6 +205,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizerInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -235,8 +238,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(TokenUsageRecorder::class);
 
+    $containerConfigurator->parameters()->set(PricingPlatformPass::PARAMETER, null);
+
     $defaultsConfigurator->set(ModelsDevPricingProvider::class)
-        ->args([service('logger'), '%kernel.cache_dir%/models-dev.json']);
+        ->args([
+            service('logger'),
+            '%kernel.cache_dir%/models-dev.json',
+            ModelsDevPricingProvider::CATALOG_PACKAGE,
+            param(PricingPlatformPass::PARAMETER),
+        ]);
     $defaultsConfigurator->alias(PricingProviderInterface::class, ModelsDevPricingProvider::class);
 
     $defaultsConfigurator->set(CostCalculator::class)
@@ -381,6 +391,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(GithubAnnotationsReportRenderer::class);
     $defaultsConfigurator->set(GithubCommentReportRenderer::class);
     $defaultsConfigurator->set(ExecutiveSummaryReportRenderer::class);
+
+    $defaultsConfigurator->set(WorkflowCommandNeutralizer::class)
+        ->factory([WorkflowCommandNeutralizer::class, 'fromEnvironment']);
+    $defaultsConfigurator->alias(WorkflowCommandNeutralizerInterface::class, WorkflowCommandNeutralizer::class);
 
     $defaultsConfigurator->set(ReportWriter::class)
         ->args([tagged_iterator('symfony_security_auditor.report_renderer')]);
@@ -577,13 +591,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(InMemoryAdvisoryDatabase::class);
 
+    $defaultsConfigurator->set(Clock::class)->autowire(false);
+
     $defaultsConfigurator->set(LockfileHashedAdvisoryCache::class)
         ->args([
             service(SymfonyProcessComposerAuditRunner::class),
             param('symfony_security_auditor.cache.advisory_dir'),
             service(Filesystem::class),
             service('logger'),
-            service(ClockInterface::class),
+            service(Clock::class),
         ]);
 
     $defaultsConfigurator->set(AuditedProjectPathHolder::class)
@@ -743,6 +759,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(RunAuditUseCase::class),
             service(JsonReportRenderer::class),
             service(AuditedProjectPathHolder::class),
+            service(BaselineProcessorInterface::class),
+            service(FindingTypeFilterInterface::class),
+            service(ReviewerFeedbackHolder::class),
         ]);
 
     $defaultsConfigurator->set(McpServerFactory::class)

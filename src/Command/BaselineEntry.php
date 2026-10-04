@@ -32,6 +32,17 @@ final readonly class BaselineEntry
     ) {}
 
     /**
+     * The file the accepted finding was reported in, when the entry names one:
+     * a legacy entry is a bare fingerprint.
+     */
+    public function file(): ?string
+    {
+        $file = \is_array($this->raw) ? $this->raw['file'] ?? null : null;
+
+        return \is_string($file) ? $file : null;
+    }
+
+    /**
      * A redundant `attacker_fingerprint` equal to its own `fingerprint` must
      * not grant a count-aware budget of 2 credits for what is really just 1
      * accepted occurrence.
