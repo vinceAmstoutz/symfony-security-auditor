@@ -34,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ScanPathOutsideProjectException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
@@ -92,11 +93,31 @@ final readonly class AuditCommand
         $displayStyle = $this->displayStyle($symfonyStyle, $auditCommandInput);
         $this->auditPresenter->header($displayStyle, $projectPath);
 
+        try {
+            $this->assertProjectIsDirectory($projectPath);
+            $scanPaths = ScanPathResolver::resolve($auditCommandInput->scanPaths(), $projectPath);
+        } catch (InvalidAuditContextException|ScanPathOutsideProjectException $exception) {
+            $this->auditPresenter->error($displayStyle, $exception);
+
+            return ExitCode::Failure->value;
+        }
+
         $this->auditPresenter->preflightWarnings($displayStyle, $this->secretScrubbingEnabled, $this->configNotices);
 
-        $scanPaths = $auditCommandInput->scanPaths();
-
         return $this->runAuditFlow($input, $symfonyStyle, $auditCommandInput, $projectPath, $scanPaths);
+    }
+
+    /**
+     * Refuses a project that is not a directory before anything is scanned or
+     * warned about, so the one thing wrong is the one thing printed.
+     *
+     * @throws InvalidAuditContextException
+     */
+    private function assertProjectIsDirectory(string $projectPath): void
+    {
+        if (!is_dir($projectPath)) {
+            throw InvalidAuditContextException::forInvalidProjectPath($projectPath);
+        }
     }
 
     /**
@@ -191,10 +212,15 @@ final readonly class AuditCommand
      */
     private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths, ?string $since): void
     {
-        $this->auditPresenter->scannedFiles(
-            $symfonyStyle,
-            $this->listScannedFilesUseCase->execute($projectPath, $scanPaths, $since),
-        );
+        $projectFiles = $this->listScannedFilesUseCase->execute($projectPath, $scanPaths, $since);
+
+        if ([] === $projectFiles) {
+            $this->auditPresenter->noFilesMatched($symfonyStyle, $projectPath, $scanPaths);
+
+            return;
+        }
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, $projectFiles);
     }
 
     /**
