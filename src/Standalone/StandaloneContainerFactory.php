@@ -13,12 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
-use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\AiBundle\AiBundle;
 use Symfony\AI\Platform\PlatformInterface;
-use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
@@ -86,7 +84,6 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->register('event_dispatcher', EventDispatcher::class)->setPublic(true);
         $containerBuilder->register('logger', NullLogger::class);
-        $containerBuilder->register(ClockInterface::class, NativeClock::class);
         $containerBuilder->register('http_client', HttpClientInterface::class)
             ->setFactory([HttpClient::class, 'create'])
             ->setArguments([['timeout' => $standaloneConfig->httpTimeout, 'max_duration' => 0]]);

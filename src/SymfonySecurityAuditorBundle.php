@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor;
 
 use JsonException;
 use Override;
-use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Clock\Clock;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -200,7 +200,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ->private()
             ->args([
                 service(RateLimitConfiguration::class),
-                service(ClockInterface::class),
+                service(Clock::class),
                 service(SleeperInterface::class),
             ]);
         $servicesConfigurator->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
