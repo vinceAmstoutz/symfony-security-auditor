@@ -45,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -52,6 +53,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPro
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class ConcurrentChunkAnalyzerTest extends TestCase
 {
@@ -352,7 +354,7 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
         return $counts;
     }
 
-    private function makeAnalyzer(ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient, int $maxConcurrent, ?AttackerCacheInterface $attackerCache = null, ?LoggerInterface $logger = null): ConcurrentChunkAnalyzer
+    private function makeAnalyzer(ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient, int $maxConcurrent, ?AttackerCacheInterface $attackerCache = null, ?LoggerInterface $logger = null, ?ProgressReporterInterface $progressReporter = null): ConcurrentChunkAnalyzer
     {
         return new ConcurrentChunkAnalyzer(
             $toolBatchCapableLLMClient,
@@ -360,7 +362,7 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
             new AttackerChunkCache($attackerCache ?? new NullAttackerCache(), $this->vulnerabilityFactory(), new NullLogger()),
             $this->vulnerabilityFactory(),
             $logger ?? new NullLogger(),
-            new NullProgressReporter(),
+            $progressReporter ?? new NullProgressReporter(),
             3,
             new RecordVulnerabilityToolFactory(),
             $maxConcurrent,
@@ -413,6 +415,53 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
             'remediation' => 'x',
             'confidence' => 0.9,
         ];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_window_entry_stopped_at_the_tool_cap_reports_the_cap_as_the_reason_its_chunk_failed(): void
+    {
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatchWithTools')->willReturn([
+            LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
+            LLMResponse::of('', 'm', 'max_tool_iterations', TokenUsageSnapshot::of(1, 1)),
+        ]);
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->makeAnalyzer($llmClient, 4, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFile('src/A.php')], [$this->makeFile('src/B.php')]], $this->request(), new RecordingCoverageRecorder(), new RiskMarkerIndex([]));
+
+        $completed = $recordingProgressReporter->eventsNamed('attacker.chunk.completed');
+        self::assertSame(['analyzed', 'errored'], array_column($completed, 'status'));
+        self::assertArrayNotHasKey('reason', $completed[0]);
+        self::assertSame('tool-call limit reached (audit.max_tool_iterations)', $completed[1]['reason']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_batch_that_failed_reports_its_error_as_the_reason_every_chunk_of_its_window_failed(): void
+    {
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->makeAnalyzer($this->clientFailingOnSecondWindowWith(new RuntimeException("second window\ntore")), 2, progressReporter: $recordingProgressReporter)->analyze(
+            [[$this->makeFile('src/A.php')], [$this->makeFile('src/B.php')], [$this->makeFile('src/C.php')], [$this->makeFile('src/D.php')]],
+            $this->request(),
+            new RecordingCoverageRecorder(),
+            new RiskMarkerIndex([]),
+        );
+
+        $completed = $recordingProgressReporter->eventsNamed('attacker.chunk.completed');
+        self::assertSame(['analyzed', 'analyzed', 'errored', 'errored'], array_column($completed, 'status'));
+        self::assertSame('second window tore', $completed[2]['reason']);
+        self::assertSame('second window tore', $completed[3]['reason']);
     }
 
     /**
