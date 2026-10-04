@@ -196,7 +196,15 @@ VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['al
 
 ### `[ERROR] Project path "/x" is not a valid directory`
 
-The `project-path` argument must point to a directory that exists. Use an absolute path, or omit the argument to default to the current working directory.
+The `project-path` argument must point to a directory that exists. Use an absolute path, or omit the argument to default to the current working directory. A relative one is resolved against the folder you run the command from, so `audit src/Command` run from your home folder looks for `~/src/Command`. _Since 1.22_ the check runs right after the header, before anything is scanned, and fails with exit code `1`.
+
+To audit part of a project, name the project and give the part with `--path`, relative to the project:
+
+```bash
+symfony-security-auditor audit /path/to/project --path src/Command
+```
+
+An absolute `--path` inside the project is accepted, and one outside it is refused. If a scan still lists nothing, the warning names the project and the `--path` values it applied: `No files matched under "/home/me" for --path src/Command.`
 
 ### `[ERROR] Project does not look like a Symfony app`
 

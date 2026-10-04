@@ -196,14 +196,26 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     #[Override]
-    public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void
+    public function noFilesMatched(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths): void
     {
-        if ([] === $projectFiles) {
-            $symfonyStyle->warning('No files matched. Check your included_paths configuration and any --path filters.');
+        $project = $this->sanitizeForWarning($projectPath);
+
+        if ([] === $scanPaths) {
+            $symfonyStyle->warning(\sprintf('No files matched under "%s". Check your included_paths configuration.', $project));
 
             return;
         }
 
+        $symfonyStyle->warning(\sprintf(
+            'No files matched under "%s" for --path %s. Check that each --path is relative to the project root and that your included_paths configuration covers it.',
+            $project,
+            implode(', ', array_map($this->sanitizeForWarning(...), $scanPaths)),
+        ));
+    }
+
+    #[Override]
+    public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void
+    {
         $symfonyStyle->section(\sprintf('Scanned files (%d)', \count($projectFiles)));
 
         foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
@@ -256,6 +268,16 @@ final readonly class AuditPresenter implements AuditPresenterInterface
      * fake listing entry or spoof the terminal — and a legacy `##[command]`
      * in it is defused for a CI runner's log.
      */
+    /**
+     * `SymfonyStyle::warning()` escapes console markup itself, so the text is
+     * only collapsed to one line, stripped of control characters and defused
+     * for a CI runner's log.
+     */
+    private function sanitizeForWarning(string $text): string
+    {
+        return WorkflowCommandText::inLine(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($text, 'UTF-8')));
+    }
+
     private function sanitizePathForListing(string $relativePath): string
     {
         return OutputFormatter::escape(WorkflowCommandText::inLine(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($relativePath, 'UTF-8'))));
