@@ -100,6 +100,7 @@ A release about reaching the model you actually run, and never mistaking a parti
 
 ### Changed
 
+- **The package no longer requires the `uri` extension, which only PHP 8.5 ships.** `composer.json` required `ext-uri`; Composer accepted it on PHP 8.3 and 8.4 because `league/uri-polyfill` provides it, but tools that read the requirement without honoring that `provide` stopped on it — `composer-require-checker` aborted with `Extension "uri" does not exist`. `league/uri-polyfill` still supplies `Uri\Rfc3986\Uri` below PHP 8.5, so nothing changes at runtime, and the release build is unchanged: static-php-cli keeps listing `uri` from the polyfill's `provide`, which `.github/workflows/release.yaml` already drops.
 - **A model's price is resolved once per run.** `ModelsDevPricingProvider` recomputed the catalog lookup — for a provider-qualified id without a serving-platform listing, a sort of every provider key — on every input, output, cache and `hasModel()` query of every call. Lookups are now memoized per model id (5,000 calls: 1,058 ms → 10 ms).
 
 - **A concurrent tool-using window stops as soon as every conversation has its answer.** `ToolConversationWavefront` (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) kept running empty rounds up to `max_tool_iterations` after every conversation had answered; it now ends the window there.
