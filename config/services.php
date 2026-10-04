@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-use Psr\Clock\ClockInterface;
+use Symfony\Component\Clock\Clock;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
@@ -591,13 +591,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(InMemoryAdvisoryDatabase::class);
 
+    $defaultsConfigurator->set(Clock::class)->autowire(false);
+
     $defaultsConfigurator->set(LockfileHashedAdvisoryCache::class)
         ->args([
             service(SymfonyProcessComposerAuditRunner::class),
             param('symfony_security_auditor.cache.advisory_dir'),
             service(Filesystem::class),
             service('logger'),
-            service(ClockInterface::class),
+            service(Clock::class),
         ]);
 
     $defaultsConfigurator->set(AuditedProjectPathHolder::class)
