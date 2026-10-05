@@ -89,7 +89,7 @@ src/
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)
   Integration/       # Wire real classes, no LLM calls
-  EndToEnd/          # Full pipeline, uses stub LLM client
+  EndToEnd/          # Full pipeline, uses stub LLM client; StandaloneAuditFromOutsideProjectEndToEndTest runs the real bin/symfony-security-auditor in a process of its own, from a folder that is not the audited project, to pin how the project argument and `--path` resolve
 tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh; pull_request_check_test.sh — covers .github/scripts/check-pull-request.sh)
 config/services.php  # DI wiring for all bundle services
 docs/
