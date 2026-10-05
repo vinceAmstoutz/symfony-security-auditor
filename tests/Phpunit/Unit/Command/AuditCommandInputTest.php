@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandDefaults;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
@@ -295,6 +296,70 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput = new AuditCommandInput();
 
         self::assertNull($auditCommandInput->failOn);
+    }
+
+    public function test_default_fail_on_incomplete_is_unset_so_the_configuration_can_decide(): void
+    {
+        self::assertNull((new AuditCommandInput())->failOnIncomplete);
+    }
+
+    public function test_the_configured_defaults_fill_what_the_command_line_left_unset(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(80, true, OutputFormat::Sarif, 'audit.sarif'), false);
+
+        self::assertSame(80, $auditCommandInput->minScore);
+        self::assertTrue($auditCommandInput->failsOnIncomplete());
+        self::assertSame(OutputFormat::Sarif, $auditCommandInput->format);
+        self::assertSame('audit.sarif', $auditCommandInput->output);
+    }
+
+    public function test_what_the_command_line_gave_wins_over_the_configured_defaults(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->minScore = 50;
+        $auditCommandInput->failOnIncomplete = false;
+        $auditCommandInput->format = OutputFormat::Markdown;
+        $auditCommandInput->output = 'cli.md';
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(80, true, OutputFormat::Sarif, 'audit.sarif'), true);
+
+        self::assertSame(50, $auditCommandInput->minScore);
+        self::assertFalse($auditCommandInput->failsOnIncomplete());
+        self::assertSame(OutputFormat::Markdown, $auditCommandInput->format);
+        self::assertSame('cli.md', $auditCommandInput->output);
+    }
+
+    public function test_a_format_named_on_the_command_line_wins_even_when_it_is_the_default_one(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->format = OutputFormat::Console;
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json), true);
+
+        self::assertSame(OutputFormat::Console, $auditCommandInput->format);
+    }
+
+    public function test_an_unset_fail_on_incomplete_does_not_fail_the_run_when_nothing_configures_it(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(), false);
+
+        self::assertFalse($auditCommandInput->failsOnIncomplete());
+        self::assertNull($auditCommandInput->minScore);
+        self::assertSame(OutputFormat::Console, $auditCommandInput->format);
+        self::assertNull($auditCommandInput->output);
+    }
+
+    public function test_the_configured_format_decides_whether_the_report_goes_to_stdout(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json), false);
+
+        self::assertTrue($auditCommandInput->isMachineReadableToStdout());
     }
 
     public function test_fail_on_accepts_a_risk_level(): void
