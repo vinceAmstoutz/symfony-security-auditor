@@ -207,7 +207,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         $symfonyStyle->warning(\sprintf(
-            'No files matched under "%s" for --path %s. Check that each --path is relative to the project root and that your included_paths configuration covers it.',
+            'No files matched under "%s" for --path %s. Check that each --path exists in the project, relative to its root, and holds PHP, Twig, YAML or XML files.',
             $project,
             implode(', ', array_map($this->sanitizeForWarning(...), $scanPaths)),
         ));
