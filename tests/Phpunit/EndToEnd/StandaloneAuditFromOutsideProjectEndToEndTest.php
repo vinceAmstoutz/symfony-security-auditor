@@ -186,6 +186,24 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
+    public function test_a_path_wins_over_a_project_config_which_wins_over_the_user_config(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->base.'/config/symfony-security-auditor/config.yaml',
+            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\nmodel: 'gpt-4'\nscan:\n  included_paths:\n    - src/Controller\n",
+        );
+        $this->filesystem->dumpFile($this->elsewhere.'/.symfony-security-auditor.yaml', "scan:\n  included_paths:\n    - src/Entity\n");
+
+        $userConfigAlone = $this->audit([$this->project, '--show-scanned'], $this->base);
+        $projectConfigOverUser = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
+        $flagOverBoth = $this->audit([$this->project, '--path', 'src/Command', '--show-scanned'], $this->elsewhere);
+
+        $this->assertListsExactly(['src/Controller/BlogController.php'], self::displayOf($userConfigAlone));
+        $this->assertListsExactly(['src/Entity/User.php'], self::displayOf($projectConfigOverUser));
+        $this->assertListsExactly(self::COMMAND_FILES, self::displayOf($flagOverBoth));
+    }
+
+    #[MaximumDuration(4000)]
     public function test_without_a_path_the_whole_project_is_in_scope(): void
     {
         $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
