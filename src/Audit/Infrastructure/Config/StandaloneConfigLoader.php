@@ -40,7 +40,7 @@ final readonly class StandaloneConfigLoader
      * in the attacker's system prompt or in the risk markers it is handed, or
      * aim the cache at files it ships.
      */
-    private const array USER_ONLY_PATHS = ['cache', 'privacy', 'audit.custom_skills', 'scan.secret_scrubbing', 'scan.custom_risk_patterns'];
+    private const array USER_ONLY_PATHS = ['cache', 'privacy', 'audit.custom_skills', 'audit.output', 'scan.secret_scrubbing', 'scan.custom_risk_patterns'];
 
     private const array BUDGET_CAPS = ['max_tokens', 'max_cost_usd'];
 

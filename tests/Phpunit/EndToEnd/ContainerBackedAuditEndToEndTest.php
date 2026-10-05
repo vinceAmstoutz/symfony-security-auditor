@@ -347,6 +347,96 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         yield 'a flag that raises the level above the risk' => ['low', 'critical', 0];
     }
 
+    #[DataProvider('minScorePrecedenceCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_min_score_flag_wins_over_the_configured_min_score(int $configured, ?int $flag, int $expectedExitCode): void
+    {
+        $commandTester = new CommandTester($this->auditCommand($this->boot(['model' => 'gpt-4o', 'audit' => ['min_score' => $configured]])));
+        $arguments = ['project-path' => $this->fixtureDir, '--format' => 'json'];
+
+        self::assertSame($expectedExitCode, $commandTester->execute(null === $flag ? $arguments : [...$arguments, '--min-score' => $flag]));
+    }
+
+    /**
+     * @return iterable<string, array{int, ?int, int}>
+     */
+    public static function minScorePrecedenceCases(): iterable
+    {
+        yield 'the configured score alone, above the score of the run' => [95, null, 1];
+        yield 'the configured score alone, below the score of the run' => [50, null, 0];
+        yield 'a flag that lowers the score below the run' => [95, 50, 0];
+        yield 'a flag that raises the score above the run' => [50, 95, 1];
+    }
+
+    /**
+     * @param list<string> $flags
+     */
+    #[DataProvider('failOnIncompletePrecedenceCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_fail_on_incomplete_flag_wins_over_the_configured_setting(bool $configured, array $flags, int $expectedExitCode): void
+    {
+        (new Filesystem())->dumpFile($this->fixtureDir.'/src/Service/Binary.php', "<?php // \xC3\x28\n");
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'scan' => ['secret_scrubbing' => ['enabled' => true, 'additional_patterns' => ['/NEVER_MATCHES/u']]],
+            'audit' => ['fail_on_incomplete' => $configured],
+        ]);
+        $commandTester = new CommandTester($this->auditCommand($kernel));
+
+        $exitCode = $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => 'json', ...array_fill_keys($flags, true)]);
+
+        self::assertFalse($this->decode($commandTester->getDisplay())['complete']);
+        self::assertSame($expectedExitCode, $exitCode);
+    }
+
+    /**
+     * @return iterable<string, array{bool, list<string>, int}>
+     */
+    public static function failOnIncompletePrecedenceCases(): iterable
+    {
+        yield 'configured, no flag' => [true, [], 3];
+        yield 'not configured, no flag' => [false, [], 0];
+        yield 'configured, switched off by the flag' => [true, ['--no-fail-on-incomplete'], 0];
+        yield 'not configured, switched on by the flag' => [false, ['--fail-on-incomplete'], 3];
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_format_flag_wins_over_the_configured_format_even_when_it_names_the_default(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json']]);
+
+        $configured = $this->auditCommandTester($kernel);
+        $configured->execute(['project-path' => $this->fixtureDir]);
+        $overridden = $this->auditCommandTester($kernel);
+        $overridden->execute(['project-path' => $this->fixtureDir, '--format' => 'console']);
+
+        self::assertSame(3, $this->decode($configured->getDisplay())['files_scanned']);
+        self::assertStringContainsString('RISK LEVEL', $overridden->getDisplay());
+        self::assertStringNotContainsString('"files_scanned"', $overridden->getDisplay());
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_an_output_flag_wins_over_the_configured_output(): void
+    {
+        $configuredOutput = $this->fixtureDir.'/configured.json';
+        $flagOutput = $this->fixtureDir.'/flag.json';
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json', 'output' => $configuredOutput]]);
+
+        $this->auditCommandTester($kernel)->execute(['project-path' => $this->fixtureDir, '--output' => $flagOutput]);
+
+        self::assertFileExists($flagOutput);
+        self::assertFileDoesNotExist($configuredOutput);
+
+        $this->auditCommandTester($kernel)->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertFileExists($configuredOutput);
+        self::assertSame(3, $this->decode((string) file_get_contents($configuredOutput))['files_scanned']);
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
     public function test_a_baseline_flag_wins_over_the_configured_baseline(): void

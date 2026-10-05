@@ -182,6 +182,34 @@
               "enum": ["safe", "low", "medium", "high", "critical"],
               "description": "Minimum aggregate risk level that makes audit:run exit 1 (the CI gate). Default: critical (only a CRITICAL risk level fails; planned to become high in the next major). The --fail-on CLI option overrides this."
             },
+            "min_score": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Minimum normalized score (0-100) below which audit:run exits 1, in addition to the fail_on risk gate: the audit fails when either gate trips. Default: null (gates on the risk level alone). The --min-score CLI option overrides this."
+            },
+            "fail_on_incomplete": {
+              "type": "boolean",
+              "description": "When true, audit:run exits 3 if some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass CI; a tripped fail_on or min_score gate still exits 1. Default: false. The --fail-on-incomplete and --no-fail-on-incomplete CLI options override this."
+            },
+            "format": {
+              "enum": [
+                "console",
+                "executive",
+                "json",
+                "sarif",
+                "html",
+                "markdown",
+                "junit",
+                "github",
+                "github-comment"
+              ],
+              "description": "Default report format when --format is not given. The --format CLI option overrides this, even when it names the default. Default: console."
+            },
+            "output": {
+              "type": ["string", "null"],
+              "description": "Default path the report is written to when --output is not given. Default: null (the report is printed). The --output CLI option overrides this. In the standalone binary a project config may not set it."
+            },
             "since_closure": {
               "enum": ["none", "direct"],
               "description": "When a --since diff-mode run is active, whether to widen the audited file set beyond the raw git diff. none audits exactly the changed files. direct additionally pulls in a changed voter's first-degree dependents (controllers guarded by an #[IsGranted] attribute the voter's supports() accepts) from the full project mapping. Default: profile-dependent (balanced/fast: none, thorough: direct)."

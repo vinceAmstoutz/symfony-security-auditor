@@ -91,6 +91,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
@@ -1524,6 +1525,59 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $this->expectException(Throwable::class);
 
         $this->boot(['model' => 'gpt-4o', 'audit' => ['fail_on' => 'severe']]);
+    }
+
+    public function test_bundle_gate_and_report_parameters_default_to_unset(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertNull($containerBuilder->getParameter('symfony_security_auditor.audit.min_score'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.fail_on_incomplete'));
+        self::assertSame('console', $containerBuilder->getParameter('symfony_security_auditor.audit.format'));
+        self::assertNull($containerBuilder->getParameter('symfony_security_auditor.audit.output'));
+    }
+
+    public function test_bundle_exposes_the_configured_gate_and_report_settings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['min_score' => 80, 'fail_on_incomplete' => true, 'format' => 'sarif', 'output' => 'build/audit.sarif']]);
+
+        self::assertSame(80, $containerBuilder->getParameter('symfony_security_auditor.audit.min_score'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.fail_on_incomplete'));
+        self::assertSame('sarif', $containerBuilder->getParameter('symfony_security_auditor.audit.format'));
+        self::assertSame('build/audit.sarif', $containerBuilder->getParameter('symfony_security_auditor.audit.output'));
+    }
+
+    #[DataProvider('outputFormatCases')]
+    public function test_bundle_accepts_every_report_format_the_command_line_does(string $format): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['format' => $format]]);
+
+        self::assertSame($format, $containerBuilder->getParameter('symfony_security_auditor.audit.format'));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function outputFormatCases(): iterable
+    {
+        foreach (OutputFormat::cases() as $outputFormat) {
+            yield $outputFormat->value => [$outputFormat->value];
+        }
+    }
+
+    /** @param array<string, mixed> $audit */
+    #[DataProvider('invalidGateAndReportSettings')]
+    public function test_bundle_rejects_a_gate_or_report_setting_it_cannot_honour(array $audit): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->loadParameters(['model' => 'gpt-4o', 'audit' => $audit]);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function invalidGateAndReportSettings(): iterable
+    {
+        yield 'a negative score' => [['min_score' => -1]];
+        yield 'a score above 100' => [['min_score' => 101]];
+        yield 'a format the command line does not know' => [['format' => 'pdf']];
     }
 
     public function test_bundle_excluded_and_included_types_default_to_empty_lists(): void
