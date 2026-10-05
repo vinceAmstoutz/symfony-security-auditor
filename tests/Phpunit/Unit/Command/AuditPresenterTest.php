@@ -1018,8 +1018,8 @@ final class AuditPresenterTest extends TestCase
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
         self::assertStringContainsString('No files matched under "/work/demo" for --path src/Command, lib.', $flattened);
-        self::assertStringContainsString('relative to the project root', $flattened);
-        self::assertStringContainsString('included_paths', $flattened);
+        self::assertStringContainsString('Check that each --path exists in the project, relative to its root, and holds PHP, Twig, YAML or XML files.', $flattened);
+        self::assertStringNotContainsString('included_paths', $flattened);
         self::assertStringNotContainsString('file(s) in scope', $flattened);
     }
 

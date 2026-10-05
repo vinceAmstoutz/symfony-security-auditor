@@ -46,6 +46,12 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
         'templates/base.html.twig',
     ];
 
+    private const array MONOREPO_FILES = [
+        'apps/api/config/services.yaml',
+        'apps/api/src/ApiController.php',
+        'apps/web/src/WebController.php',
+    ];
+
     private Filesystem $filesystem;
 
     private string $base;
@@ -133,6 +139,50 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
         yield 'with backslashes' => [['--path', 'src\\Command'], self::COMMAND_FILES];
         yield 'with several paths' => [['--path', 'src/Command', '--path', 'src/Entity'], [...self::COMMAND_FILES, 'src/Entity/User.php']];
         yield 'with a single file' => [['--path', 'src/Command/AddUserCommand.php'], ['src/Command/AddUserCommand.php']];
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_path_the_configured_scan_does_not_reach_is_scanned_because_the_flag_wins(): void
+    {
+        $process = $this->audit([$this->project, '--path', 'apps/api', '--show-scanned'], $this->elsewhere);
+
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly(['apps/api/config/services.yaml', 'apps/api/src/ApiController.php'], self::displayOf($process));
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_overlapping_paths_list_each_file_once(): void
+    {
+        $process = $this->audit([$this->project, '--path', 'apps/api', '--path', 'apps/api/src', '--path', 'apps/api', '--show-scanned'], $this->elsewhere);
+
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly(['apps/api/config/services.yaml', 'apps/api/src/ApiController.php'], self::displayOf($process));
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_path_that_is_the_project_root_keeps_the_configured_scope(): void
+    {
+        $process = $this->audit([$this->project, '--path', $this->project, '--show-scanned'], $this->elsewhere);
+
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly([...self::COMMAND_FILES, ...self::OTHER_FILES], self::displayOf($process));
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_path_wins_over_an_included_paths_that_the_user_config_narrowed(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->base.'/config/symfony-security-auditor/config.yaml',
+            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\nmodel: 'gpt-4'\nscan:\n  included_paths:\n    - src/Controller\n",
+        );
+
+        $configured = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
+        $overridden = $this->audit([$this->project, '--path', 'src/Command', '--show-scanned'], $this->elsewhere);
+
+        self::assertSame(0, $configured->getExitCode());
+        self::assertSame(0, $overridden->getExitCode());
+        $this->assertListsExactly(['src/Controller/BlogController.php'], self::displayOf($configured));
+        $this->assertListsExactly(self::COMMAND_FILES, self::displayOf($overridden));
     }
 
     #[MaximumDuration(4000)]
@@ -241,7 +291,7 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
             self::assertStringContainsString($expectedFile, $output);
         }
 
-        foreach (array_diff([...self::COMMAND_FILES, ...self::OTHER_FILES], $expectedFiles) as $excludedFile) {
+        foreach (array_diff([...self::COMMAND_FILES, ...self::OTHER_FILES, ...self::MONOREPO_FILES], $expectedFiles) as $excludedFile) {
             self::assertStringNotContainsString($excludedFile, $output);
         }
 
@@ -275,6 +325,9 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
             'src/Kernel.php' => "<?php\nnamespace App;\nuse Symfony\\Bundle\\FrameworkBundle\\Kernel\\MicroKernelTrait;\nuse Symfony\\Component\\HttpKernel\\Kernel as BaseKernel;\nclass Kernel extends BaseKernel { use MicroKernelTrait; }\n",
             'src/Controller/BlogController.php' => "<?php\nnamespace App\\Controller;\nuse Symfony\\Component\\HttpFoundation\\Response;\nuse Symfony\\Component\\Routing\\Attribute\\Route;\nclass BlogController\n{\n    #[Route('/blog', name: 'blog_index')]\n    public function index(): Response { return new Response('blog'); }\n}\n",
             'src/Entity/User.php' => "<?php\nnamespace App\\Entity;\nclass User { private ?int \$id = null; private string \$username = ''; }\n",
+            'apps/api/config/services.yaml' => "services:\n  _defaults: { autowire: true }\n",
+            'apps/api/src/ApiController.php' => "<?php\nnamespace Api;\nclass ApiController {}\n",
+            'apps/web/src/WebController.php' => "<?php\nnamespace Web;\nclass WebController {}\n",
         ];
 
         foreach (['AddUser', 'DeleteUser', 'ListUsers'] as $command) {

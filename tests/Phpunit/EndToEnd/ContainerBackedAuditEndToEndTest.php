@@ -308,6 +308,25 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
+    public function test_a_path_outside_the_default_scan_surface_is_audited_when_the_flag_names_it(): void
+    {
+        (new Filesystem())->dumpFile(
+            $this->fixtureDir.'/apps/api/src/ApiPurge.php',
+            "<?php\nnamespace Api;\nclass ApiPurge\n{\n    public function __invoke(): int\n    {\n        // SECURITY_AUDITOR_SINK\n        return (int) unserialize(\$_SERVER['argv'][1]);\n    }\n}\n",
+        );
+
+        $commandTester = new CommandTester($this->auditCommand($this->boot(['model' => 'gpt-4o'])));
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['apps/api'], '--format' => 'json']);
+
+        $report = $this->decode($commandTester->getDisplay());
+        self::assertSame(1, $report['files_scanned']);
+        self::assertSame(['since' => null, 'paths' => ['apps/api']], $report['scope']);
+        self::assertSame(['apps/api/src/ApiPurge.php'], $this->analyzedFiles($report));
+        self::assertSame(['apps/api/src/ApiPurge.php'], $this->filesWithFindings($report));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
     public function test_the_same_run_without_a_path_audits_every_directory_of_the_project(): void
     {
         $this->addVulnerableCommand();

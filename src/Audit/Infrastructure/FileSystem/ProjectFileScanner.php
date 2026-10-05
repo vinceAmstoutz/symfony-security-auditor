@@ -21,11 +21,11 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class ProjectFileScanner implements ProjectFileScannerInterface
+final readonly class ProjectFileScanner implements ScopedProjectFileScannerInterface
 {
     /** @var list<string> */
     private const array PHP_EXTENSIONS = ['php'];
@@ -83,29 +83,66 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     #[Override]
     public function scan(string $projectPath): array
     {
+        return $this->scanRoots($projectPath, $this->includedPaths, 'No included paths exist in project', ['included_paths' => $this->includedPaths, 'project_path' => $projectPath]);
+    }
+
+    /**
+     * @param non-empty-list<string> $scanPaths
+     *
+     * @return list<ProjectFile>
+     */
+    #[Override]
+    public function scanWithin(string $projectPath, array $scanPaths): array
+    {
+        return $this->scanRoots($projectPath, $scanPaths, 'No scan paths exist in project', ['scan_paths' => $scanPaths, 'project_path' => $projectPath]);
+    }
+
+    /**
+     * @param list<string>         $roots          project-relative directories and files to scan
+     * @param array<string, mixed> $noRootsContext what the warning says when none of the roots exists
+     *
+     * @return list<ProjectFile>
+     */
+    private function scanRoots(string $projectPath, array $roots, string $noRootsMessage, array $noRootsContext): array
+    {
         $this->logger->info('Scanning project', ['path' => $projectPath]);
 
-        [$directories, $explicitFiles] = $this->resolveIncludedPaths($projectPath);
+        [$directories, $explicitFiles] = $this->resolveRoots($projectPath, $roots);
 
         if ([] === $directories && [] === $explicitFiles) {
-            $this->logger->warning('No included paths exist in project', [
-                'included_paths' => $this->includedPaths,
-                'project_path' => $projectPath,
-            ]);
+            $this->logger->warning($noRootsMessage, $noRootsContext);
 
             return [];
         }
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
 
-        $files = $this->inRelativePathOrder(array_merge(
+        $files = $this->inRelativePathOrder($this->eachFileOnce(array_merge(
             $this->scanDirectories($directories, $projectPath, $reader),
             $this->scanExplicitFiles($explicitFiles, $projectPath, $reader),
-        ));
+        )));
 
         $this->logger->info('Scan complete', ['files' => \count($files)]);
 
         return $files;
+    }
+
+    /**
+     * Paths that overlap — a directory and one inside it, a directory and a
+     * file in it — reach the same file more than once.
+     *
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function eachFileOnce(array $files): array
+    {
+        $byRelativePath = [];
+        foreach ($files as $file) {
+            $byRelativePath[$file->relativePath()] ??= $file;
+        }
+
+        return array_values($byRelativePath);
     }
 
     /**
@@ -210,9 +247,11 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
      * and a lexical check would call `src/link/` or `src/link/deep/..` part of
      * the project while the filesystem walks into the link's target.
      *
+     * @param list<string> $roots
+     *
      * @return array{0: list<string>, 1: list<string>}
      */
-    private function resolveIncludedPaths(string $projectPath): array
+    private function resolveRoots(string $projectPath, array $roots): array
     {
         $realProjectPath = realpath($projectPath);
         if (false === $realProjectPath) {
@@ -221,8 +260,8 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
 
         $directories = [];
         $explicitFiles = [];
-        foreach ($this->includedPaths as $includedPath) {
-            $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
+        foreach ($roots as $root) {
+            $resolved = $projectPath.\DIRECTORY_SEPARATOR.$root;
             if (!$this->isScannable($resolved, $realProjectPath)) {
                 continue;
             }
