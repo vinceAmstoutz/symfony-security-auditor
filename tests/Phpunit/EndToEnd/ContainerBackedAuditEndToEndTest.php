@@ -325,6 +325,77 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         self::assertSame(['apps/api/src/ApiPurge.php'], $this->filesWithFindings($report));
     }
 
+    #[DataProvider('failOnPrecedenceCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_fail_on_flag_wins_over_the_configured_fail_on(string $configured, ?string $flag, int $expectedExitCode): void
+    {
+        $commandTester = new CommandTester($this->auditCommand($this->boot(['model' => 'gpt-4o', 'audit' => ['fail_on' => $configured]])));
+        $arguments = ['project-path' => $this->fixtureDir, '--format' => 'json'];
+
+        self::assertSame($expectedExitCode, $commandTester->execute(null === $flag ? $arguments : [...$arguments, '--fail-on' => $flag]));
+    }
+
+    /**
+     * @return iterable<string, array{string, ?string, int}>
+     */
+    public static function failOnPrecedenceCases(): iterable
+    {
+        yield 'the configured level alone, above the risk' => ['critical', null, 0];
+        yield 'the configured level alone, at the risk' => ['low', null, 1];
+        yield 'a flag that lowers the level below the risk' => ['critical', 'low', 1];
+        yield 'a flag that raises the level above the risk' => ['low', 'critical', 0];
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_baseline_flag_wins_over_the_configured_baseline(): void
+    {
+        $configuredBaseline = $this->fixtureDir.'/configured-baseline.json';
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['baseline' => $configuredBaseline]]);
+        $this->auditCommandTester($kernel)->execute(['project-path' => $this->fixtureDir, '--generate-baseline' => $configuredBaseline, '--format' => 'json']);
+
+        $withTheConfiguredBaseline = $this->decode($this->execute($kernel, 'json'));
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--baseline' => $this->fixtureDir.'/another-baseline.json', '--format' => 'json']);
+        $withTheFlag = $this->decode($commandTester->getDisplay());
+
+        self::assertSame(0, $withTheConfiguredBaseline['total_vulnerabilities']);
+        self::assertSame(1, $withTheFlag['total_vulnerabilities']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_no_cache_flag_wins_over_the_enabled_cache(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
+        $this->execute($kernel, 'json');
+
+        $served = $this->decode($this->execute($kernel, 'json'));
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--no-cache' => true, '--format' => 'json']);
+        $bypassed = $this->decode($commandTester->getDisplay());
+
+        self::assertContains('cached', $this->attackerStatuses($served));
+        self::assertNotContains('cached', $this->attackerStatuses($bypassed));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_path_flag_wins_over_the_configured_included_paths(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'scan' => ['included_paths' => ['src/Service']]]);
+
+        $configured = $this->decode($this->execute($kernel, 'json'));
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['src/Controller'], '--format' => 'json']);
+        $overridden = $this->decode($commandTester->getDisplay());
+
+        self::assertSame(['src/Service/Clean.php'], $this->analyzedFiles($configured));
+        self::assertSame(['src/Controller/AdminController.php'], $this->analyzedFiles($overridden));
+        self::assertSame(['src/Controller/AdminController.php'], $this->filesWithFindings($overridden));
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
     public function test_the_same_run_without_a_path_audits_every_directory_of_the_project(): void
@@ -341,6 +412,28 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     {
         yield 'structured collection (tool calls)' => [[]];
         yield 'json collection (array fallback)' => [['audit' => ['structured_collection' => false, 'reviewer_structured_collection' => false]]];
+    }
+
+    private function auditCommandTester(Kernel $kernel): CommandTester
+    {
+        return new CommandTester($this->auditCommand($kernel));
+    }
+
+    /**
+     * @param array<array-key, mixed> $report
+     *
+     * @return list<string>
+     */
+    private function attackerStatuses(array $report): array
+    {
+        $statuses = [];
+        foreach ($this->entriesOf($report, 'coverage') as $entry) {
+            if ('attacker' === $this->fieldOf($entry, 'stage')) {
+                $statuses[] = $this->fieldOf($entry, 'status');
+            }
+        }
+
+        return $statuses;
     }
 
     private function addVulnerableCommand(): void
