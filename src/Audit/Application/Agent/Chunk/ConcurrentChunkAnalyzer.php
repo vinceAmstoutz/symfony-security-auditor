@@ -397,7 +397,7 @@ final readonly class ConcurrentChunkAnalyzer
         $results = [];
         foreach ($window as $index => $pendingChunk) {
             ChunkCoverageRecorder::record($pendingChunk->chunk, $status, $coverageRecorder);
-            $this->recordDrainedFindings($pendingChunk->session, $coverageRecorder);
+            $this->recordDrainedFindings($pendingChunk, $coverageRecorder);
             $results[$index] = $this->vulnerabilityFactory->fromList([]);
         }
 
@@ -412,9 +412,9 @@ final readonly class ConcurrentChunkAnalyzer
      * candidates found before a mid-run abort. A window that was never
      * dispatched drains empty, which is harmless.
      */
-    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
+    private function recordDrainedFindings(PendingChunk $pendingChunk, CoverageRecorderInterface $coverageRecorder): void
     {
-        $vulnerabilities = $this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities();
+        $vulnerabilities = $this->vulnerabilityFactory->fromList($pendingChunk->session->drain(), $pendingChunk->chunk)->vulnerabilities();
         foreach ($vulnerabilities as $vulnerability) {
             $coverageRecorder->recordFoundVulnerability($vulnerability);
         }
@@ -427,7 +427,7 @@ final readonly class ConcurrentChunkAnalyzer
         $rawData = $pendingChunk->session->drain();
         $this->recordOutcome($pendingChunk, $llmResponse, $rawData, $coverageRecorder);
 
-        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData);
+        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData, $pendingChunk->chunk);
         $this->recordFoundVulnerabilities($vulnerabilityHydrationResult, $coverageRecorder);
 
         return $vulnerabilityHydrationResult;
