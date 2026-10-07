@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
@@ -1571,7 +1572,7 @@ final class StagesTest extends TestCase
     #[Override]
     protected function tearDown(): void
     {
-        $this->rmdirRecursive($this->tmpDir);
+        (new Filesystem())->remove($this->tmpDir);
     }
 
     private function makeOrchestrator(
@@ -1606,32 +1607,5 @@ final class StagesTest extends TestCase
             auditLoopSettings: new AuditLoopSettings(),
             progressReporter: new NullProgressReporter(),
         );
-    }
-
-    private function rmdirRecursive(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-
-        $items = scandir($dir);
-        if (false === $items) {
-            return;
-        }
-
-        foreach ($items as $item) {
-            if ('.' === $item) {
-                continue;
-            }
-
-            if ('..' === $item) {
-                continue;
-            }
-
-            $path = $dir.'/'.$item;
-            is_dir($path) ? $this->rmdirRecursive($path) : unlink($path);
-        }
-
-        rmdir($dir);
     }
 }

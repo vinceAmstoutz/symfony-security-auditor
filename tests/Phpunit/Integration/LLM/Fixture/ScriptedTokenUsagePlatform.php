@@ -23,6 +23,7 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\ResultInterface;
+use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 
 final class ScriptedTokenUsagePlatform implements PlatformInterface
@@ -37,6 +38,20 @@ final class ScriptedTokenUsagePlatform implements PlatformInterface
     ) {}
 
     public int $invocations = 0;
+
+    /**
+     * @param ResultInterface|list<ResultInterface> $results
+     * @param TokenUsage|list<TokenUsage>           $tokenUsages
+     */
+    public static function scripted(
+        ResultInterface|array $results = new TextResult(''),
+        TokenUsage|array $tokenUsages = new TokenUsage(),
+    ): self {
+        return new self(
+            $results instanceof ResultInterface ? [$results] : $results,
+            $tokenUsages instanceof TokenUsage ? [$tokenUsages] : $tokenUsages,
+        );
+    }
 
     #[Override]
     public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult

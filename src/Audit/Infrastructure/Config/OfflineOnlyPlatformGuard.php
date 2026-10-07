@@ -73,13 +73,24 @@ final readonly class OfflineOnlyPlatformGuard
                 continue;
             }
 
-            $url = \is_string($value) ? ContainerParameterSyntax::unescape($value) : null;
-            if (null !== $url && $this->isEndpoint($url)) {
+            $url = $this->endpointIn($value);
+            if (null !== $url) {
                 $urls[] = $url;
             }
         }
 
         return $urls;
+    }
+
+    private function endpointIn(mixed $value): ?string
+    {
+        if (!\is_string($value)) {
+            return null;
+        }
+
+        $url = ContainerParameterSyntax::unescape($value);
+
+        return $this->isEndpoint($url) ? $url : null;
     }
 
     private function isEndpoint(string $value): bool

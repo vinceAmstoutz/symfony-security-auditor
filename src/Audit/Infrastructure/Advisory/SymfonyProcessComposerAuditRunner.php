@@ -65,7 +65,21 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
     {
         $builder = $this->processBuilder ?? self::defaultProcessBuilder();
         $process = $builder($projectPath);
+        $this->execute($process);
 
+        $stdout = $process->getOutput();
+        if (u($stdout)->trim()->isEmpty()) {
+            throw $this->failureWithoutOutput($process, $projectPath);
+        }
+
+        return $stdout;
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    private function execute(Process $process): void
+    {
         try {
             $process->setTimeout($this->timeoutSeconds);
             $process->run();
@@ -74,18 +88,16 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
         } catch (ExceptionInterface $exception) {
             throw AdvisorySourceUnavailableException::forProcessSetupFailure($exception);
         }
+    }
 
-        $stdout = $process->getOutput();
-        if (u($stdout)->trim()->isEmpty()) {
-            if (127 === $process->getExitCode()) {
-                throw AdvisorySourceUnavailableException::forBinaryNotFound(new ProcessFailedException($process));
-            }
-
-            $errorOutput = $process->getErrorOutput();
-
-            throw AdvisorySourceUnavailableException::forFailedProcess($projectPath, '' !== $errorOutput ? $errorOutput : 'empty stdout', $process->isSuccessful() ? null : new ProcessFailedException($process));
+    private function failureWithoutOutput(Process $process, string $projectPath): AdvisorySourceUnavailableException
+    {
+        if (127 === $process->getExitCode()) {
+            return AdvisorySourceUnavailableException::forBinaryNotFound(new ProcessFailedException($process));
         }
 
-        return $stdout;
+        $errorOutput = $process->getErrorOutput();
+
+        return AdvisorySourceUnavailableException::forFailedProcess($projectPath, '' !== $errorOutput ? $errorOutput : 'empty stdout', $process->isSuccessful() ? null : new ProcessFailedException($process));
     }
 }
