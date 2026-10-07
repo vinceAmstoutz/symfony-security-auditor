@@ -21,10 +21,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 /**
  * Adapts the optional {@see ReviewerCacheInterface} for the review strategies:
  * a missing cache or a bypassed run degrades every lookup to a miss, and a
- * null verdict is never persisted. A store failure is caught and logged
- * rather than left to propagate — the caller already has the verdict in hand
- * by the time it stores it, so losing the cache write must never cost the
- * caller the verdict itself.
+ * verdict that judges nothing — none, or one with no `accepted` flag — is
+ * never persisted, since a cache entry replays as the model's own judgement.
+ * A store failure is caught and logged rather than left to propagate — the
+ * caller already has the verdict in hand by the time it stores it, so losing
+ * the cache write must never cost the caller the verdict itself.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -59,7 +60,7 @@ final readonly class ReviewerVerdictCache
      */
     public function store(Vulnerability $vulnerability, string $codeContext, ?array $verdict): void
     {
-        if (null === $verdict || !$this->reviewerCache instanceof ReviewerCacheInterface) {
+        if (null === ($verdict['accepted'] ?? null) || !$this->reviewerCache instanceof ReviewerCacheInterface) {
             return;
         }
 

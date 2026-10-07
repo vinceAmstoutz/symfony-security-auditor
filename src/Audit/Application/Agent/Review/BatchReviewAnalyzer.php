@@ -243,7 +243,7 @@ final readonly class BatchReviewAnalyzer
         }
 
         if ($llmResponse->isEmpty()) {
-            return $this->batchVerdictApplier->rejectBatch($batch, $coverageRecorder);
+            return $this->batchVerdictApplier->recordEmptyAnswer($batch, $coverageRecorder);
         }
 
         /** @var array<int|string, mixed> $rawData */
@@ -330,9 +330,9 @@ final readonly class BatchReviewAnalyzer
     /**
      * A batch member absent from `$rawData` because the conversation was cut
      * off before it was ever considered must not be routed through
-     * {@see BatchVerdictApplier::applyBatchReview()}, which treats a missing
-     * verdict as an implicit rejection — it is marked errored instead, like a
-     * fully-empty drain. `mergeBatchIntoReviewed()` maps this method's return
+     * {@see BatchVerdictApplier::applyBatchReview()}, which warns about a
+     * verdict the model left out — it is marked errored quietly instead, like
+     * a fully-empty drain. `mergeBatchIntoReviewed()` maps this method's return
      * value back to the caller's findings purely by position, so the result
      * is reassembled in `$batch`'s original order rather than concatenating
      * the reviewed and errored groups.
@@ -382,9 +382,9 @@ final readonly class BatchReviewAnalyzer
      * though they were genuinely reached. A batch member with no matching
      * verdict is marked not-reached rather than routed through
      * {@see BatchVerdictApplier::applyBatchReview()}, which would otherwise
-     * treat its absence as an implicit rejection — correct when the model
-     * finished the batch and chose not to flag it, but wrong when the
-     * conversation was cut off before it was ever considered. Falls back to
+     * warn about its absence as a verdict the model left out — right when the
+     * model finished the batch, wrong when the conversation was cut off
+     * before it was ever considered. Falls back to
      * the existing not-reached handling for the whole batch only when
      * nothing was recorded at all.
      *

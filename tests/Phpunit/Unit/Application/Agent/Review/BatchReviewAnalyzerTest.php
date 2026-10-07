@@ -85,7 +85,7 @@ final class BatchReviewAnalyzerTest extends TestCase
         );
     }
 
-    private function analyzer(LLMClientInterface $llmClient, ?ReviewerCacheInterface $reviewerCache = null, ?LoggerInterface $logger = null): BatchReviewAnalyzer
+    private function analyzer(LLMClientInterface $llmClient, ?ReviewerCacheInterface $reviewerCache = null, ?LoggerInterface $logger = null, ?LoggerInterface $applierLogger = null): BatchReviewAnalyzer
     {
         $verdictApplier = new VerdictApplier(new NullLogger());
         $reviewerVerdictCache = new ReviewerVerdictCache($reviewerCache ?? new NullReviewerCache(), new NullLogger());
@@ -93,7 +93,7 @@ final class BatchReviewAnalyzerTest extends TestCase
         return new BatchReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(useStructuredCollection: true),
-            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, new NullLogger(), new NullProgressReporter()),
+            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $applierLogger ?? new NullLogger(), new NullProgressReporter()),
             $reviewerVerdictCache,
             new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, new NullLogger(), new NullProgressReporter()),
             $logger ?? new NullLogger(),
@@ -201,6 +201,63 @@ final class BatchReviewAnalyzerTest extends TestCase
 
         self::assertSame([false, false], array_map(static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(), $reviewed));
         self::assertSame(['errored', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_an_empty_json_batch_answer_that_ended_normally_marks_the_whole_batch_errored_not_rejected_and_not_cached(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(null);
+        $reviewerCache->expects(self::never())->method('store');
+        $applierLogger = $this->createMock(LoggerInterface::class);
+        $applierLogger->expects(self::once())->method('warning')->with('Reviewer batch answer was empty; its findings are recorded as errored and left out of the cache', ['batch_size' => 2]);
+        $applierLogger->expects(self::never())->method('error');
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $reviewed = $this->analyzer($llmClient, $reviewerCache, null, $applierLogger)->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')], [], new ReviewBatchSettings(5, false, false, $recordingCoverageRecorder, null));
+
+        self::assertSame([false, false], array_map(static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(), $reviewed));
+        self::assertSame(['errored', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
+        self::assertSame([], $recordingCoverageRecorder->rejected);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_structured_batch_that_ended_normally_without_a_verdict_for_every_member_records_the_others_errored_not_rejected_and_not_cached(): void
+    {
+        [$first, $second] = [$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($first): LLMResponse {
+            $toolRegistry->execute('record_review', ['id' => $first->id(), 'accepted' => true]);
+
+            return LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1));
+        });
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(null);
+        $reviewerCache->expects(self::once())->method('store')->with($first, self::anything(), self::anything());
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $reviewed = $this->analyzer($llmClient, $reviewerCache)->analyze([$first, $second], [], new ReviewBatchSettings(5, true, false, $recordingCoverageRecorder, null));
+
+        self::assertSame([true, false], array_map(static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(), $reviewed));
+        self::assertSame(['validated', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
+        self::assertSame([], $recordingCoverageRecorder->rejected);
     }
 
     /**

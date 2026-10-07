@@ -84,6 +84,59 @@ final class VerdictApplierTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed>|list<array<string, mixed>> $review
+     */
+    #[DataProvider('payloadsThatHoldAVerdict')]
+    public function test_it_tells_a_payload_that_holds_a_verdict(array $review): void
+    {
+        self::assertTrue((new VerdictApplier(new NullLogger()))->hasVerdict($review));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>|list<array<string, mixed>>}>
+     */
+    public static function payloadsThatHoldAVerdict(): iterable
+    {
+        yield 'an acceptance' => [['accepted' => true]];
+        yield 'an explicit rejection' => [['accepted' => false]];
+        yield 'a stringified rejection' => [['accepted' => 'false']];
+        yield 'a verdict wrapped in a one-element list' => [[['accepted' => false]]];
+    }
+
+    /**
+     * @param array<string, mixed>|list<array<string, mixed>> $review
+     */
+    #[DataProvider('payloadsThatHoldNoVerdict')]
+    public function test_it_tells_a_payload_that_holds_no_verdict(array $review): void
+    {
+        self::assertFalse((new VerdictApplier(new NullLogger()))->hasVerdict($review));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>|list<array<string, mixed>>}>
+     */
+    public static function payloadsThatHoldNoVerdict(): iterable
+    {
+        yield 'an empty payload' => [[]];
+        yield 'notes only' => [['reviewer_notes' => 'not exploitable']];
+        yield 'an accepted flag set to null' => [['accepted' => null]];
+        yield 'notes only wrapped in a one-element list' => [[['reviewer_notes' => 'not exploitable']]];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_applying_a_payload_with_no_accepted_flag_leaves_the_finding_not_validated(): void
+    {
+        $vulnerability = (new VerdictApplier(new NullLogger()))->apply($this->vulnerability(), ['adjusted_severity' => 'critical']);
+
+        self::assertFalse($vulnerability->isReviewerValidated());
+        self::assertSame(VulnerabilitySeverity::HIGH, $vulnerability->severity());
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException

@@ -116,7 +116,7 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      */
-    public function test_only_a_window_member_stopped_at_the_tool_cap_without_a_verdict_is_errored(): void
+    public function test_a_window_member_that_recorded_no_verdict_is_errored_whether_it_hit_the_tool_cap_or_ended_normally(): void
     {
         $vulnerabilities = [$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php'), $this->vulnerabilityAt('src/C.php'), $this->vulnerabilityAt('src/D.php')];
         $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
@@ -155,7 +155,7 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
                 ['stage' => 'reviewer', 'filePath' => 'src/A.php', 'status' => 'validated'],
                 ['stage' => 'reviewer', 'filePath' => 'src/B.php', 'status' => 'errored'],
                 ['stage' => 'reviewer', 'filePath' => 'src/C.php', 'status' => 'validated'],
-                ['stage' => 'reviewer', 'filePath' => 'src/D.php', 'status' => 'rejected'],
+                ['stage' => 'reviewer', 'filePath' => 'src/D.php', 'status' => 'errored'],
             ],
             $recordingCoverageRecorder->coverage,
         );

@@ -1173,7 +1173,7 @@ final class ReviewerAgentTest extends TestCase
         ));
         self::assertCount(2, $reviewedEvents);
         self::assertSame(['accepted' => true, 'status' => 'validated', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1], $reviewedEvents[0][1]);
-        self::assertSame(['accepted' => false, 'status' => 'rejected', 'type' => 'broken_access_control', 'file' => 'src/B.php', 'line' => 1], $reviewedEvents[1][1]);
+        self::assertSame(['accepted' => false, 'status' => 'errored', 'type' => 'broken_access_control', 'file' => 'src/B.php', 'line' => 1], $reviewedEvents[1][1]);
     }
 
     /**
@@ -1492,7 +1492,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_batch_mode_rejects_all_when_response_is_empty(): void
+    public function test_batch_mode_records_all_errored_when_response_is_empty(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
         $b = $this->makeVulnerabilityAt('src/B.php');
@@ -1521,8 +1521,8 @@ final class ReviewerAgentTest extends TestCase
         self::assertFalse($result[1]->isReviewerValidated());
         self::assertSame(
             [
-                ['stage' => 'reviewer', 'file' => 'src/A.php', 'status' => 'rejected'],
-                ['stage' => 'reviewer', 'file' => 'src/B.php', 'status' => 'rejected'],
+                ['stage' => 'reviewer', 'file' => 'src/A.php', 'status' => 'errored'],
+                ['stage' => 'reviewer', 'file' => 'src/B.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
         );
@@ -1585,7 +1585,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_batch_mode_records_coverage_rejected_for_vulnerabilities_missing_from_response(): void
+    public function test_batch_mode_records_coverage_errored_for_vulnerabilities_missing_from_response(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
         $b = $this->makeVulnerabilityAt('src/B.php');
@@ -1617,7 +1617,7 @@ final class ReviewerAgentTest extends TestCase
         self::assertSame(
             [
                 ['stage' => 'reviewer', 'file' => 'src/A.php', 'status' => 'validated'],
-                ['stage' => 'reviewer', 'file' => 'src/B.php', 'status' => 'rejected'],
+                ['stage' => 'reviewer', 'file' => 'src/B.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
         );
@@ -2099,7 +2099,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_it_records_coverage_rejected_when_reviewer_returns_empty_response(): void
+    public function test_it_records_coverage_errored_when_reviewer_returns_empty_response(): void
     {
         $vulnerability = $this->makeVulnerability();
 
@@ -2114,7 +2114,7 @@ final class ReviewerAgentTest extends TestCase
         $reviewerAgent->review([$vulnerability], [], $auditContext);
 
         self::assertSame(
-            [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'rejected']],
+            [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'errored']],
             $auditContext->coverage(),
         );
     }
@@ -4535,7 +4535,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_batched_review_cache_miss_stores_both_a_matched_and_an_implicitly_rejected_finding(): void
+    public function test_batched_review_cache_miss_stores_the_matched_finding_and_leaves_the_unjudged_one_out_of_the_cache(): void
     {
         $matched = $this->makeVulnerabilityAt('src/Matched.php');
         $unmatched = $this->makeVulnerabilityAt('src/Unmatched.php');
@@ -4570,8 +4570,7 @@ final class ReviewerAgentTest extends TestCase
 
         self::assertTrue($result[0]->isReviewerValidated());
         self::assertFalse($result[1]->isReviewerValidated());
-        self::assertSame(['id' => $matched->id(), 'accepted' => true], $storedVerdictsByFile['src/Matched.php']);
-        self::assertSame(['accepted' => false], $storedVerdictsByFile['src/Unmatched.php']);
+        self::assertSame(['src/Matched.php' => ['id' => $matched->id(), 'accepted' => true]], $storedVerdictsByFile);
     }
 
     /**

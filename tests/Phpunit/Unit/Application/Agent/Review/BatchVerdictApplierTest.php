@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchVerdictApplier;
@@ -85,17 +87,117 @@ final class BatchVerdictApplierTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_a_finding_with_no_matching_verdict_is_rejected(): void
+    public function test_a_batch_finding_the_model_gave_no_verdict_for_is_not_cached(): void
+    {
+        $vulnerability = $this->vulnerability(lineStart: 18);
+        $unjudged = $this->vulnerability(lineStart: 40);
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->expects(self::once())
+            ->method('store')
+            ->with($vulnerability, 'judged context', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+        $reviewed = $this->applier($reviewerCache)->applyBatchReview(
+            [$vulnerability, $unjudged],
+            [['id' => $vulnerability->id(), 'accepted' => true]],
+            new NullCoverageRecorder(),
+            [$vulnerability->id() => 'judged context', $unjudged->id() => 'unjudged context'],
+        );
+
+        self::assertTrue($reviewed[0]->isReviewerValidated());
+        self::assertFalse($reviewed[1]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_batch_finding_the_model_gave_no_verdict_for_is_recorded_errored_and_not_reported_as_rejected(): void
+    {
+        $vulnerability = $this->vulnerability(lineStart: 18);
+        $unjudged = $this->vulnerability(lineStart: 40);
+        $recordingCoverageRecorder = $this->recordingCoverageRecorder();
+
+        $reviewed = $this->applier()->applyBatchReview([$vulnerability, $unjudged], [['id' => $vulnerability->id(), 'accepted' => true]], $recordingCoverageRecorder);
+
+        self::assertSame(['validated', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
+        self::assertSame([], $recordingCoverageRecorder->rejected);
+        self::assertSame($reviewed, $recordingCoverageRecorder->reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_empty_answer_records_every_batch_finding_errored_instead_of_matching_scalar_values(): void
+    {
+        $recordingCoverageRecorder = $this->recordingCoverageRecorder();
+
+        $reviewed = $this->applier()->applyBatchReview([$this->vulnerability(), $this->vulnerability(lineStart: 40)], [], $recordingCoverageRecorder);
+
+        self::assertSame(['errored', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
+        self::assertFalse($reviewed[0]->isReviewerValidated());
+        self::assertFalse($reviewed[1]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_warning_for_a_finding_without_a_verdict_names_the_finding(): void
     {
         $vulnerability = $this->vulnerability();
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Reviewer batch answer held no verdict for the finding; it is recorded as errored and left out of the cache',
+            ['vulnerability_id' => $vulnerability->id()],
+        );
+        $batchVerdictApplier = new BatchVerdictApplier(new VerdictApplier(new NullLogger()), new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()), $logger, new NullProgressReporter());
 
-        $reviewed = $this->applier()->applyBatchReview(
+        $reviewed = $batchVerdictApplier->applyBatchReview([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertFalse($reviewed[0]->isReviewerValidated());
+    }
+
+    /**
+     * @param array<string, mixed> $verdictWithoutAcceptedFlag
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('verdictsWithoutAnAcceptedFlag')]
+    public function test_a_batch_verdict_without_an_accepted_flag_is_recorded_errored_and_not_cached(array $verdictWithoutAcceptedFlag): void
+    {
+        $vulnerability = $this->vulnerability();
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->expects(self::never())->method('store');
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::never())->method('record');
+        $recordingCoverageRecorder = $this->recordingCoverageRecorder();
+
+        $reviewed = $this->applier($reviewerCache, $triageMemoryRecorder)->applyBatchReview(
             [$vulnerability],
-            [['id' => 'VULN-does-not-match', 'accepted' => true]],
-            new NullCoverageRecorder(),
+            [['id' => $vulnerability->id(), ...$verdictWithoutAcceptedFlag]],
+            $recordingCoverageRecorder,
+            [$vulnerability->id() => 'context'],
         );
 
         self::assertFalse($reviewed[0]->isReviewerValidated());
+        self::assertSame(['errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
+        self::assertSame([], $recordingCoverageRecorder->rejected);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function verdictsWithoutAnAcceptedFlag(): iterable
+    {
+        yield 'only notes' => [['reviewer_notes' => 'not exploitable']];
+        yield 'an adjusted severity alone' => [['adjusted_severity' => 'low']];
+        yield 'an accepted flag set to null' => [['accepted' => null]];
     }
 
     /**
@@ -103,54 +205,22 @@ final class BatchVerdictApplierTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_an_empty_response_rejects_every_finding_without_matching_scalar_values(): void
+    public function test_an_empty_answer_records_the_whole_batch_errored_and_warns_with_the_batch_size(): void
     {
-        $vulnerability = $this->vulnerability();
-
-        $reviewed = $this->applier()->applyBatchReview([$vulnerability], [], new NullCoverageRecorder());
-
-        self::assertFalse($reviewed[0]->isReviewerValidated());
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_reject_batch_marks_every_finding_as_not_validated(): void
-    {
-        $rejected = $this->applier()->rejectBatch([$this->vulnerability(), $this->vulnerability(title: 'second')], new NullCoverageRecorder());
-
-        self::assertFalse($rejected[0]->isReviewerValidated());
-        self::assertFalse($rejected[1]->isReviewerValidated());
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_reject_batch_records_every_rejected_finding_with_the_coverage_recorder(): void
-    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Reviewer batch answer was empty; its findings are recorded as errored and left out of the cache',
+            ['batch_size' => 2],
+        );
+        $batchVerdictApplier = new BatchVerdictApplier(new VerdictApplier(new NullLogger()), new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()), $logger, new NullProgressReporter());
         $recordingCoverageRecorder = $this->recordingCoverageRecorder();
 
-        $this->applier()->rejectBatch([$this->vulnerability(), $this->vulnerability(title: 'second')], $recordingCoverageRecorder);
+        $errored = $batchVerdictApplier->recordEmptyAnswer([$this->vulnerability(), $this->vulnerability(lineStart: 40)], $recordingCoverageRecorder);
 
-        self::assertCount(2, $recordingCoverageRecorder->reviewed);
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_an_implicit_rejection_records_the_rejected_finding_with_the_coverage_recorder(): void
-    {
-        $recordingCoverageRecorder = $this->recordingCoverageRecorder();
-
-        $this->applier()->applyBatchReview([$this->vulnerability()], [], $recordingCoverageRecorder);
-
-        self::assertCount(1, $recordingCoverageRecorder->reviewed);
+        self::assertFalse($errored[0]->isReviewerValidated());
+        self::assertFalse($errored[1]->isReviewerValidated());
+        self::assertSame(['errored', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
+        self::assertSame($errored, $recordingCoverageRecorder->reviewed);
     }
 
     /**
@@ -175,27 +245,6 @@ final class BatchVerdictApplierTest extends TestCase
         $errored = $this->applier()->recordBatchError([$this->vulnerability()], new RuntimeException('LLM call failed'), new NullCoverageRecorder());
 
         self::assertFalse($errored[0]->isReviewerValidated());
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_a_finding_with_no_matching_verdict_caches_the_implicit_rejection(): void
-    {
-        $vulnerability = $this->vulnerability();
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
-        $reviewerCache->expects(self::once())
-            ->method('store')
-            ->with($vulnerability, 'context', ['accepted' => false]);
-
-        $this->applier($reviewerCache)->applyBatchReview(
-            [$vulnerability],
-            [['id' => 'VULN-does-not-match', 'accepted' => true]],
-            new NullCoverageRecorder(),
-            [$vulnerability->id() => 'context'],
-        );
     }
 
     /**
