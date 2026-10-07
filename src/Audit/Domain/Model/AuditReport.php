@@ -159,14 +159,19 @@ final readonly class AuditReport
     }
 
     /**
-     * Whether the run reached no verdict: it analyzed none of the files it had
-     * to — every attacker call failed or was cut short, or none was made — and
-     * holds no finding. A SAFE there would vouch for code nobody read. A run
-     * that holds a finding is a partial run even when it analyzed no file in
-     * full: a response cut short keeps the findings it recorded, while its
-     * chunk is recorded as errored.
+     * Whether the run reached no verdict: its scan found no file at all, or it
+     * analyzed none of the files it had to — every attacker call failed or was
+     * cut short, or none was made — and holds no finding. A SAFE there would
+     * vouch for code nobody read. A run that holds a finding is a partial run
+     * even when it analyzed no file in full: a response cut short keeps the
+     * findings it recorded, while its chunk is recorded as errored.
      */
     public function hasNoVerdict(): bool
+    {
+        return 0 === $this->reportIdentity->filesDiscovered || $this->analyzedNoFileAndFoundNothing();
+    }
+
+    private function analyzedNoFileAndFoundNothing(): bool
     {
         return !$this->isComplete() && [] === $this->vulnerabilities && [] === AnalyzedFiles::in($this->coverage);
     }

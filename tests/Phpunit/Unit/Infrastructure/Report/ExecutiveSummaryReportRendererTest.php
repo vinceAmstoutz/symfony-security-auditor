@@ -73,6 +73,19 @@ final class ExecutiveSummaryReportRendererTest extends AbstractReportRendererTes
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_a_scan_that_found_no_file_states_no_risk_level(): void
+    {
+        $output = (string) preg_replace('/\s+/', ' ', $this->renderer->render($this->makeReportOfAScanThatFoundNoFile()));
+
+        self::assertStringContainsString('RISK LEVEL: UNKNOWN (no file was analyzed)', $output);
+        self::assertStringContainsString('⚠️ Audit incomplete: the scan found no file to audit, so this report has no verdict', $output);
+        self::assertStringNotContainsString('SAFE', $output);
+        self::assertStringNotContainsString('No validated vulnerabilities found.', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_an_incomplete_report_never_states_that_nothing_was_found(): void
     {
         self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));
