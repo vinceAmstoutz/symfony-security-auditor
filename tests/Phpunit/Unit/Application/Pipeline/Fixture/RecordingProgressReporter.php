@@ -31,4 +31,19 @@ final class RecordingProgressReporter implements ProgressReporterInterface
     {
         $this->events[] = [$event, $context];
     }
+
+    /**
+     * @return list<array<string, mixed>> the context of every event of that name, in order
+     */
+    public function eventsNamed(string $event): array
+    {
+        $contexts = [];
+        foreach ($this->events as [$name, $context]) {
+            if ($event === $name) {
+                $contexts[] = $context;
+            }
+        }
+
+        return $contexts;
+    }
 }

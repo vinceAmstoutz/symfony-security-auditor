@@ -213,7 +213,7 @@ Exit code `1` is also used for:
 - Unhandled exception during pipeline execution (check stderr).
 - Validator errors on the input (e.g. `--format` set to a value it does not support — see [Configuration → Options](configuration.md#options)).
 
-Re-run with `-v` or `-vv` to see the underlying error.
+In a Symfony application, re-run with `-v` or `-vv` to see more of the application log (`warning` entries and above show by default). The standalone binary writes no log, so `-v` adds nothing there: it names why a chunk failed on its `✗ chunk N/M failed` progress line (see [`✗ chunk N/M failed`](#-chunk-nm-failed-on-the-progress-line)) and prints the error that stopped a run.
 
 ## LLM & Provider Errors
 
@@ -386,6 +386,22 @@ Then verify with `ollama list`. The model name in `symfony_security_auditor.yaml
 
 ## Empty / Surprising Reports
 
+### `✗ chunk N/M failed` on the progress line
+
+The attacker's answer for that chunk could not be used, so its files are recorded as errored, left out of the cache and counted in `Audit incomplete: N file(s) could not be fully analyzed`. _Since 1.22_ the line names why; before, it only said `failed`, and the standalone binary — which writes no log — gave no other hint.
+
+| Reason on the line | What happened | What to do |
+| --- | --- | --- |
+| `tool-call limit reached (audit.max_tool_iterations)` | The model kept calling `read_file`, `grep` or `list_files` and never ended its turn within `audit.max_tool_iterations` rounds. | Raise `audit.max_tool_iterations` (try `16`), or set `audit.tools_enabled: false` to scan each chunk in a single call. See the cost note below. |
+| `output token limit reached (max_output_tokens)` | The answer, or a tool call inside it, was cut off by the output limit. | Raise `max_output_tokens` or `attacker_max_output_tokens` (Claude models only). |
+| `answer withheld by the provider content filter` | The provider's filter blocked the answer. | Try another model or deployment; see [`Tool-using loop ended with empty content response`](#tool-using-loop-ended-with-empty-content-response-warnings). |
+| `the model returned no content` | The call ended with nothing usable. | Retry; if it repeats for every chunk, switch model. |
+| `the answer was not valid JSON` | Only with `audit.structured_collection: false`. | See [`LLM response was empty`](#llm-response-was-empty--failed-to-parse--json-response). |
+| `the file is too large for the model input limit` | A single file does not fit the model's input window. | See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
+| an error message | An unexpected failure on that chunk's call; the run went on with the next one. | Read it; in a Symfony application the same text is in the log. |
+
+**Raising `audit.max_tool_iterations` costs more.** A chunk that explores until the cap uses up to twice the rounds at `16`, and each round re-reads the prompt, so call time and cost grow with it; a chunk the model never stops exploring can still hit the new cap. The value is also part of the attacker cache key, so changing it re-analyzes every chunk once: a run after the change bills the whole project again, not only the chunks that failed.
+
 ### `Audit incomplete: N file(s) could not be fully analyzed`
 
 Some file was never fully analyzed: its LLM call failed even after the retries in `audit.retry.*`, an abort (a provider error, a budget cap) stopped the run before reaching it, or secret scrubbing could not scan it and withheld its content (`secret_scrubbing` in the `coverage` array). Every report format says so instead of printing "No validated vulnerabilities found", because a file nobody analyzed can still hold a vulnerability. The JSON report sets `complete: false`, SARIF sets `invocations[0].executionSuccessful: false`, and the `coverage` array in the JSON report lists each file with its `errored` or `aborted` status.
@@ -402,7 +418,7 @@ Diagnostic order:
 2. **Inspect attacker output before review** — temporarily decorate `ReviewerAgent` to log all incoming candidates, including non-validated ones.
 3. **Raise `audit.max_iterations`** to `5` — the loop stops early when no new findings emerge; a stronger pass can surface more.
 4. **Switch to a stronger model** — Claude Opus and GPT-5.6 consistently outperform small models.
-5. **Check the file actually got scanned** — run with `-vv` to see ingested file counts and chunk counts.
+5. **Check the file actually got scanned** — run with `--show-scanned` to list the files in scope (the progress line `Auditing N file(s)` gives the count, and `chunk i/M` the chunks); in a Symfony application, `-vv` also logs the ingested file and chunk counts.
 6. **`scan.respect_gitignore: true`** silently skips files in `.gitignore`. Set to `false` to include them.
 7. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files.
 
