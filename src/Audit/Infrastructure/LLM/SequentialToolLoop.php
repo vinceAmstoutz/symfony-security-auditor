@@ -89,7 +89,7 @@ final readonly class SequentialToolLoop
         $totalCacheReadTokens = 0;
         $totalCacheCreationTokens = 0;
         while ($iteration < $maxToolIterations) {
-            $isFinalRound = FinalRound::announceIn($messageBag, $iteration, $maxToolIterations);
+            $roundsLeft = $maxToolIterations - $iteration;
             $this->budgetTracker?->assertWithinBudget();
             $deferredResult = $this->invokeOrEndConversation($messageBag, $options, $estimatedInputTokens, $iteration, TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens));
             if ($deferredResult instanceof LLMResponse) {
@@ -139,10 +139,10 @@ final readonly class SequentialToolLoop
                 );
             }
 
-            $toolResults = $this->executeToolCalls($messageBag, $toolRegistry, $toolCalls, $iteration);
+            $toolResults = $this->executeToolCalls($messageBag, $toolRegistry, $toolCalls, $iteration, $roundsLeft);
             $estimatedInputTokens += $this->promptTokenEstimator->estimate(...$toolResults);
 
-            if (FinalRound::isConcludedBy($isFinalRound, $toolRegistry, ...$toolCalls)) {
+            if (FinalRound::isConcludedBy($roundsLeft, $toolRegistry, ...$toolCalls)) {
                 return FinalRound::answer($this->model, TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens));
             }
 
@@ -168,14 +168,14 @@ final readonly class SequentialToolLoop
      *
      * @return list<string>
      */
-    private function executeToolCalls(MessageBag $messageBag, ToolRegistry $toolRegistry, array $toolCalls, int $iteration): array
+    private function executeToolCalls(MessageBag $messageBag, ToolRegistry $toolRegistry, array $toolCalls, int $iteration, int $roundsLeft): array
     {
         $messageBag->add(new AssistantMessage(...$toolCalls));
 
         $toolResults = [];
-        foreach ($toolCalls as $toolCall) {
+        foreach ($toolCalls as $position => $toolCall) {
             $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
-            $messageBag->add(new ToolCallMessage($toolCall, new Text($result)));
+            $messageBag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $roundsLeft, $position === array_key_last($toolCalls)))));
             $toolResults[] = $result;
             $this->logger->debug('Tool invoked', [
                 'tool' => $toolCall->getName(),

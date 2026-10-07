@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture;
 
 use Override;
 use Symfony\AI\Platform\Message\MessageBag;
-use Symfony\AI\Platform\Message\UserMessage;
+use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 use Symfony\AI\Platform\PlainConverter;
@@ -30,8 +30,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\FinalRound;
 /**
  * Test double: answers like {@see ScriptedAuditPlatform}, except that the
  * attacker keeps reading files round after round — the way a model does on a
- * chunk it cannot make up its mind about — until the conversation tells it
- * the next round is its last, when it records what it found.
+ * chunk it cannot make up its mind about — until the tool result it was just given tells
+ * it the next round is its last, when it records what it found.
  */
 final readonly class ExploringAuditPlatform implements PlatformInterface
 {
@@ -85,6 +85,6 @@ final readonly class ExploringAuditPlatform implements PlatformInterface
         $messages = $messageBag->getMessages();
         $last = end($messages);
 
-        return $last instanceof UserMessage && FinalRound::NOTICE === $last->asText();
+        return $last instanceof ToolCallMessage && str_contains((string) $last->asText(), FinalRound::NOTICE);
     }
 }

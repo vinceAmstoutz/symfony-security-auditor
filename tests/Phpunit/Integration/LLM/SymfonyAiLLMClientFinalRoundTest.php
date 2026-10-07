@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\AI\Platform\Message\MessageInterface;
+use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\Message\UserMessage;
 use Symfony\AI\Platform\Result\MultiPartResult;
 use Symfony\AI\Platform\Result\ResultInterface;
@@ -179,7 +181,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_only_the_last_request_carries_the_notice_and_it_closes_the_conversation(): void
+    public function test_only_the_tool_result_before_the_last_request_carries_the_notice(): void
     {
         $scriptedResultPlatform = new ScriptedResultPlatform([
             $this->callOf('lookup'),
@@ -189,9 +191,10 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
 
         $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 3);
 
-        self::assertSame('usr', $this->lastText($scriptedResultPlatform, 0));
-        self::assertNotSame(FinalRound::NOTICE, $this->lastText($scriptedResultPlatform, 1));
-        self::assertSame(FinalRound::NOTICE, $this->lastText($scriptedResultPlatform, 2));
+        self::assertSame(
+            ['usr', 'a file', FinalRound::announcedIn('a file')],
+            [$this->lastText($scriptedResultPlatform, 0), $this->lastText($scriptedResultPlatform, 1), $this->lastText($scriptedResultPlatform, 2)],
+        );
     }
 
     /**
@@ -214,9 +217,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
 
         $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 5);
 
-        foreach (array_keys($scriptedResultPlatform->requests) as $request) {
-            self::assertNotSame(FinalRound::NOTICE, $this->lastText($scriptedResultPlatform, $request));
-        }
+        self::assertSame([], $this->requestsCarryingTheNotice($scriptedResultPlatform));
     }
 
     /**
@@ -230,14 +231,40 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_a_single_round_budget_sends_the_notice_with_the_first_request(): void
+    public function test_a_single_round_budget_has_no_tool_result_to_carry_the_notice_yet_a_recording_round_still_concludes(): void
     {
         $scriptedResultPlatform = new ScriptedResultPlatform([$this->callOf('record')]);
 
         $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 1);
 
-        self::assertSame(FinalRound::NOTICE, $this->lastText($scriptedResultPlatform, 0));
-        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame([[], 'end_turn'], [$this->requestsCarryingTheNotice($scriptedResultPlatform), $llmResponse->stopReason()]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_only_the_last_tool_result_of_a_round_with_several_calls_carries_the_notice(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup', 'lookup'),
+            $this->callOf('record'),
+        ]);
+
+        $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 2);
+
+        $results = array_map(
+            static fn (MessageInterface $message): ?string => $message instanceof ToolCallMessage ? $message->asText() : null,
+            \array_slice($scriptedResultPlatform->requests[1], -2),
+        );
+        self::assertSame(['a file', FinalRound::announcedIn('a file')], $results);
     }
 
     /**
@@ -305,7 +332,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws TransientLLMFailureException
      */
-    public function test_a_concurrent_window_sends_the_notice_only_with_the_last_round(): void
+    public function test_a_concurrent_window_carries_the_notice_only_into_the_last_round(): void
     {
         $scriptedResultPlatform = new ScriptedResultPlatform([
             $this->callOf('lookup'),
@@ -319,8 +346,10 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
             ['system' => 's', 'user' => 'second', 'tools' => $this->registry(new ToolCallCounter())],
         ], 4, 2);
 
-        self::assertSame(['first', 'second'], [$this->lastText($scriptedResultPlatform, 0), $this->lastText($scriptedResultPlatform, 1)]);
-        self::assertSame([FinalRound::NOTICE, FinalRound::NOTICE], [$this->lastText($scriptedResultPlatform, 2), $this->lastText($scriptedResultPlatform, 3)]);
+        self::assertSame(
+            ['first', 'second', FinalRound::announcedIn('a file'), FinalRound::announcedIn('a file')],
+            array_map(fn (int $request): ?string => $this->lastText($scriptedResultPlatform, $request), [0, 1, 2, 3]),
+        );
     }
 
     /**
@@ -379,6 +408,25 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
         $messages = $scriptedResultPlatform->requests[$request];
         $message = end($messages);
 
-        return $message instanceof UserMessage ? $message->asText() : null;
+        return $message instanceof UserMessage || $message instanceof ToolCallMessage ? $message->asText() : null;
+    }
+
+    /**
+     * @return list<int> the requests holding the notice in any message
+     */
+    private function requestsCarryingTheNotice(ScriptedResultPlatform $scriptedResultPlatform): array
+    {
+        $carrying = [];
+        foreach ($scriptedResultPlatform->requests as $request => $messages) {
+            foreach ($messages as $message) {
+                if (($message instanceof UserMessage || $message instanceof ToolCallMessage) && str_contains((string) $message->asText(), FinalRound::NOTICE)) {
+                    $carrying[] = $request;
+
+                    break;
+                }
+            }
+        }
+
+        return $carrying;
     }
 }
