@@ -917,7 +917,7 @@ Exposed tools:
 
 | Tool | Arguments | Description |
 | --- | --- | --- |
-| `audit` | `path` (string, req.) | Runs the multi-agent audit on the project directory at `path` (an absolute path) and returns the JSON vulnerability report. It applies the configured `audit.baseline`, `audit.included_types` and `audit.excluded_types` as `audit:run` does, and answers a run with no verdict — the scan found no file, or none of the files could be analyzed — with an error instead of a report (_since 1.21_). |
+| `audit` | `path` (string, req.) | Runs the multi-agent audit on the project directory at `path` (an absolute path) and returns the JSON vulnerability report. It applies the configured `audit.baseline`, `audit.included_types` and `audit.excluded_types` as `audit:run` does, and answers a run with no verdict — the scan found no file, or none of the files could be analyzed — with an error instead of a report (_since 1.21_). It also refuses, before any LLM call, a run whose `audit.budget.max_cost_usd` cannot be enforced because a configured model has no published price: no prompt can accept that risk over MCP, so it answers as `audit:run --no-interaction` does. |
 
 #### Registering it with an MCP client
 
