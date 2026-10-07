@@ -27,12 +27,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
 
 final class SequentialChunkAnalyzerHarness
 {
-    public static function analyzer(LLMClientInterface $llmClient, AttackerCacheInterface $attackerCache, bool $structured, ?LoggerInterface $logger = null): SequentialChunkAnalyzer
+    public static function analyzer(LLMClientInterface $llmClient, AttackerCacheInterface $attackerCache, bool $structured, ?LoggerInterface $logger = null, ?ProgressReporterInterface $progressReporter = null): SequentialChunkAnalyzer
     {
         return new SequentialChunkAnalyzer(
             $llmClient,
@@ -40,7 +41,7 @@ final class SequentialChunkAnalyzerHarness
             new AttackerChunkCache($attackerCache, ChunkAnalysisInputs::vulnerabilityFactory(), new NullLogger()),
             ChunkAnalysisInputs::vulnerabilityFactory(),
             $logger ?? new NullLogger(),
-            new NullProgressReporter(),
+            $progressReporter ?? new NullProgressReporter(),
             3,
             $structured,
             $structured ? new RecordVulnerabilityToolFactory() : null,
