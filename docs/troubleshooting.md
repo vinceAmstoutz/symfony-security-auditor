@@ -88,7 +88,7 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
 
 - Declaring `scan.import_sarif` aborts with `ProjectConfigScanOverrideException` carrying the equivalent message for that key.
 
-`doctor` reports the same message under a failed `Configuration` check. Per-project overrides of audit settings (chunking strategy, `fail_on`, excluded paths, …) are unaffected — move only `platform`/`provider`/`scan.import_sarif` to your user `config.yaml`.
+`doctor` reports the same message under a failed `Configuration` check. Per-project overrides of audit settings (chunking strategy, `fail_on`, scan scope, …) are unaffected — move only `platform`/`provider`/`scan.import_sarif` to your user `config.yaml`.
 
 ### `self-update` fails
 
@@ -196,7 +196,7 @@ VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['al
 
 ### `[ERROR] Project path "/x" is not a valid directory`
 
-The `project-path` argument must point to a directory that exists. Use an absolute path, or omit the argument to default to the current working directory. A relative one is resolved against the folder you run the command from, so `audit src/Command` run from your home folder looks for `~/src/Command`. _Since 1.21.1_ the check runs right after the header, before anything is scanned, and fails with exit code `1`.
+The `project-path` argument must point to a directory that exists. Use an absolute path, or omit the argument to default to the current working directory. A relative one is resolved against the folder you run the command from, so `audit src/Command` run from your home folder looks for `~/src/Command`. _Since 1.22_ the check runs right after the header, before anything is scanned, and fails with exit code `1`.
 
 To audit part of a project, name the project and give the part with `--path`, relative to the project:
 
@@ -396,7 +396,7 @@ Then verify with `ollama list`. The model name in `symfony_security_auditor.yaml
 
 ### `✗ chunk N/M failed` on the progress line
 
-The attacker's answer for that chunk could not be used, so its files are recorded as errored, left out of the cache and counted in `Audit incomplete: N file(s) could not be fully analyzed`. _Since 1.21.1_ the line names why; before, it only said `failed`, and the standalone binary — which writes no log — gave no other hint.
+The attacker's answer for that chunk could not be used, so its files are recorded as errored, left out of the cache and counted in `Audit incomplete: N file(s) could not be fully analyzed`. _Since 1.22_ the line names why; before, it only said `failed`, and the standalone binary — which writes no log — gave no other hint.
 
 | Reason on the line | What happened | What to do |
 | --- | --- | --- |
