@@ -260,6 +260,18 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
+    public function test_a_no_output_flag_prints_the_report_although_the_user_config_writes_it_to_a_file(): void
+    {
+        $this->configureReportInUserConfig();
+
+        $process = $this->audit([$this->project, '--dry-run', '--no-output'], $this->elsewhere);
+
+        self::assertSame(0, $process->getExitCode());
+        self::assertFileDoesNotExist($this->elsewhere.'/configured.json');
+        self::assertArrayHasKey('audit_id', $this->decodedJson($process->getOutput()));
+    }
+
+    #[MaximumDuration(4000)]
     public function test_a_project_config_cannot_choose_where_the_report_is_written(): void
     {
         $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "audit:\n  output: hijacked.json\n");
@@ -376,7 +388,15 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
      */
     private function decodedReport(string $path): array
     {
-        $decoded = json_decode((string) file_get_contents($path), true, 512, \JSON_THROW_ON_ERROR);
+        return $this->decodedJson((string) file_get_contents($path));
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function decodedJson(string $json): array
+    {
+        $decoded = json_decode($json, true, 512, \JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
 
         return $decoded;

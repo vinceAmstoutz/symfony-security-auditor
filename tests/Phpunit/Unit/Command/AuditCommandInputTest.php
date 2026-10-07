@@ -425,4 +425,53 @@ final class AuditCommandInputTest extends TestCase
 
         $auditCommandInput->assertNoConflictingOptions();
     }
+
+    public function test_a_no_output_flag_keeps_the_configured_output_from_applying(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->noOutput = true;
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'), true);
+
+        self::assertNull($auditCommandInput->reportFile());
+    }
+
+    public function test_a_no_output_flag_prints_a_machine_readable_report_to_stdout(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->noOutput = true;
+        $auditCommandInput->format = OutputFormat::Json;
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.json'), true);
+
+        self::assertTrue($auditCommandInput->isMachineReadableToStdout());
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_allows_no_output_alone(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->noOutput = true;
+
+        $auditCommandInput->assertNoConflictingOptions();
+
+        self::assertTrue($auditCommandInput->noOutput);
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_rejects_output_with_no_output(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = 'report.json';
+        $auditCommandInput->noOutput = true;
+
+        $this->expectException(ConflictingCommandOptionsException::class);
+        $this->expectExceptionMessage('--output and --no-output cannot be combined: one writes the report to a file, the other prints it.');
+
+        $auditCommandInput->assertNoConflictingOptions();
+    }
 }
