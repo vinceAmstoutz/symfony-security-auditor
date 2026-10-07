@@ -401,6 +401,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($auditContext);
 
         self::assertContains(['review.skipped', ['reason' => 'all_baseline_accepted']], $recordingProgressReporter->events);
+        self::assertNotContains('review.started', array_column($recordingProgressReporter->events, 0));
     }
 
     /**
@@ -1202,7 +1203,10 @@ final class AuditOrchestratorTest extends TestCase
         ));
 
         self::assertCount(1, $stoppedLogs);
-        self::assertContains(['review.skipped', ['reason' => 'no_new_findings']], $recordingProgressReporter->events);
+        self::assertSame(
+            [['review.skipped', ['reason' => 'no_new_findings']]],
+            array_values(array_filter($recordingProgressReporter->events, static fn (array $event): bool => 'review.skipped' === $event[0])),
+        );
     }
 
     /**
