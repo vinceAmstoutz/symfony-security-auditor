@@ -88,7 +88,7 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
 
 - Declaring `scan.import_sarif` aborts with `ProjectConfigScanOverrideException` carrying the equivalent message for that key.
 
-`doctor` reports the same message under a failed `Configuration` check. Per-project overrides of audit settings (chunking strategy, `fail_on`, excluded paths, …) are unaffected — move only `platform`/`provider`/`scan.import_sarif` to your user `config.yaml`.
+`doctor` reports the same message under a failed `Configuration` check. Per-project overrides of audit settings (chunking strategy, `fail_on`, scan scope, …) are unaffected — move only `platform`/`provider`/`scan.import_sarif` to your user `config.yaml`.
 
 ### `self-update` fails
 
