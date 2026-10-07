@@ -331,7 +331,7 @@ Beyond the seams above, these Domain ports can each be implemented and aliased i
 
 ## 5. Schema-Enforced Collection (`audit.structured_collection`)
 
-By default (`audit.structured_collection: true`), the attacker is given a `record_vulnerability` tool with a strict JSON-Schema input and the prompt instructs it to make one tool call per finding. The provider validates each call against the schema before the agent ever sees it, so bare strings, wrapper objects, and missing required fields are structurally impossible.
+By default (`audit.structured_collection: true`), the attacker is given a `record_vulnerability` tool with a strict JSON-Schema input and the prompt instructs it to make one tool call per finding. The provider validates each call against the schema before the agent ever sees it, so bare strings, wrapper objects, and missing required fields are structurally impossible. A provider that does not enforce the schema gets the same check from the tool (`RequiredArguments`, read from the tool's own `required` list): a call missing a required key is answered with an `Error: …` text to retry from and is never recorded.
 
 Setting `audit.structured_collection: false` falls back to the legacy JSON-array prompt path. The tightened prompt still forbids the common drift shapes (`["dev", "test", {...}]`, `{"vulnerabilities": [...]}`), but enforcement is then prompt-based rather than schema-based — keep this fallback for models without tool-use support or when you specifically want the JSON path.
 
