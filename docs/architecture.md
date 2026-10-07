@@ -75,9 +75,9 @@ src/
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop,
 │       │                  BatchWindowResolver, ToolConversationWavefront, InFlightRequestCanceller,
-│       │                  DegradedAnswerBooker, ConversionFailureExplainer, DispatchedRequest,
-│       │                  PlatformResultExtractor, PlatformOptionsFactory, PlatformToolsMapper,
-│       │                  PromptTokenEstimator),
+│       │                  DegradedAnswerBooker, ToolIterationBooker, ConversionFailureExplainer,
+│       │                  DispatchedRequest, PlatformResultExtractor, PlatformOptionsFactory,
+│       │                  PlatformToolsMapper, PromptTokenEstimator),
 │       │                  RetryPolicy, TransientFailureClassifier,
 │       │                  TokenEstimator/{ProviderTokenEstimatorInterface, ResolvingTokenEstimator,
 │       │                  CharacterRatioCounter, AnthropicTokenEstimator, OpenAiTokenEstimator,
@@ -146,7 +146,7 @@ graph LR
 `deptrac.yaml` splits `Infrastructure` in two. A `SymfonyProfile` layer holds everything that only makes sense for a Symfony application:
 
 - `Infrastructure/Prompt/**` — the prompt builders and the `Skill/` blocks, whose wording names controllers, voters, forms, Twig templates and Doctrine repositories.
-- the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`, `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`, `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and `SymfonyYamlSecurityConfigParser`.
+- the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`, `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`, `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and `SymfonyYamlSecurityConfigParser`, plus the helpers two of them delegate to, `VoterSupportedAttributeCollector` and `AccessControlRequirementReader`.
 - the container-building classes in `Infrastructure/Config/` — `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory` and `ContainerParameterRegistrar`.
 
 The `Infrastructure` layer is then everything under `Infrastructure/` that is _not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain` and `Application` already cannot reach `Infrastructure` at all. So the audit engine, the LLM client, the caches, the report renderers and the scanners stay reusable for a non-Symfony target, while `Command`, the bundle class and the standalone entry point are free to wire the Symfony profile up.
@@ -422,7 +422,7 @@ Around each invocation, `RateLimiterInterface` (default `NullRateLimiter`, opt-i
 
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no code changes — only `ai.yaml` configuration.
 
-The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `InFlightRequestCanceller` (cancels and books the requests a failed window leaves open), `DegradedAnswerBooker` (books every failed call the provider answered — a degraded answer or a malformed tool call — at the usage it reported, else at its estimated input tokens), `ConversionFailureExplainer` (reads the raw answer of a conversion that failed for what the bridge's exception lost: Azure's HTTP 400 `content_filter`, a tool call the output limit cut off, or a gateway's HTTP 413), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
+The client itself is a facade over collaborators it builds at construction time, all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop above), `SequentialToolLoop` (the autonomous tool-using conversation behind `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront` (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling back to the sequential paths on failure), `InFlightRequestCanceller` (cancels and books the requests a failed window leaves open), `DegradedAnswerBooker` (books every failed call the provider answered — a degraded answer or a malformed tool call — at the usage it reported, else at its estimated input tokens), `ToolIterationBooker` (books each answered tool round's usage on the rate-limit window and the budget, for both tool paths), `ConversionFailureExplainer` (reads the raw answer of a conversion that failed for what the bridge's exception lost: Azure's HTTP 400 `content_filter`, a tool call the output limit cut off, or a gateway's HTTP 413), `PlatformResultExtractor` (token usage, tool calls, text, and the provider finish reason — warning when a response was truncated or content-filtered), `PlatformOptionsFactory` (temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` → platform `Tool` schema mapping).
 
 ### `LLMResponse`
 

@@ -100,29 +100,42 @@ final readonly class PlatformToolsMapper
         $normalized = [
             'type' => \is_string($type) ? $type : 'string',
             'description' => \is_string($description) ? $description : '',
+            ...self::normalizeConstraints($spec),
         ];
+
+        return [...$normalized, ...self::normalizeNestedSchema($normalized['type'], $spec)];
+    }
+
+    /**
+     * @param array<array-key, mixed> $spec
+     *
+     * @return array{minimum?: int|float, maximum?: int|float, maxLength?: int, enum?: list<string>}
+     */
+    private static function normalizeConstraints(array $spec): array
+    {
+        $constraints = [];
 
         $minimum = $spec['minimum'] ?? null;
         if (\is_int($minimum) || \is_float($minimum)) {
-            $normalized['minimum'] = $minimum;
+            $constraints['minimum'] = $minimum;
         }
 
         $maximum = $spec['maximum'] ?? null;
         if (\is_int($maximum) || \is_float($maximum)) {
-            $normalized['maximum'] = $maximum;
+            $constraints['maximum'] = $maximum;
         }
 
         $maxLength = $spec['maxLength'] ?? null;
         if (\is_int($maxLength)) {
-            $normalized['maxLength'] = $maxLength;
+            $constraints['maxLength'] = $maxLength;
         }
 
         $enum = $spec['enum'] ?? null;
         if (\is_array($enum)) {
-            $normalized['enum'] = array_values(array_filter($enum, 'is_string'));
+            $constraints['enum'] = array_values(array_filter($enum, 'is_string'));
         }
 
-        return [...$normalized, ...self::normalizeNestedSchema($normalized['type'], $spec)];
+        return $constraints;
     }
 
     /**

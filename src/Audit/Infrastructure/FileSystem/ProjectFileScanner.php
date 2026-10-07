@@ -258,22 +258,45 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
             return [[], []];
         }
 
-        $directories = [];
-        $explicitFiles = [];
+        return $this->partitionDirectoriesAndFiles($this->scannableRoots($projectPath, $realProjectPath, $roots));
+    }
+
+    /**
+     * @param list<string> $roots
+     *
+     * @return list<string>
+     */
+    private function scannableRoots(string $projectPath, string $realProjectPath, array $roots): array
+    {
+        $scannable = [];
         foreach ($roots as $root) {
             $resolved = $projectPath.\DIRECTORY_SEPARATOR.$root;
-            if (!$this->isScannable($resolved, $realProjectPath)) {
+            if ($this->isScannable($resolved, $realProjectPath)) {
+                $scannable[] = $resolved;
+            }
+        }
+
+        return $scannable;
+    }
+
+    /**
+     * @param list<string> $paths
+     *
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private function partitionDirectoriesAndFiles(array $paths): array
+    {
+        $directories = [];
+        $explicitFiles = [];
+        foreach ($paths as $path) {
+            if (is_dir($path)) {
+                $directories[] = $path;
+
                 continue;
             }
 
-            if (is_dir($resolved)) {
-                $directories[] = $resolved;
-
-                continue;
-            }
-
-            if (is_file($resolved)) {
-                $explicitFiles[] = $resolved;
+            if (is_file($path)) {
+                $explicitFiles[] = $path;
             }
         }
 

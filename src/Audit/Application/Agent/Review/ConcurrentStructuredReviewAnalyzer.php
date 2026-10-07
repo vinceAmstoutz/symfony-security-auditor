@@ -164,12 +164,17 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             }
 
             foreach ($indexes as $index) {
-                $vulnerability = $concurrentReviewBatch->vulnerabilities[$index];
-                $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder, $concurrentReviewBatch->codeContextForCache($index));
-                if (!$recovered instanceof Vulnerability) {
-                    $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
-                }
+                $this->recordUnreachedUnlessRecovered($index, $concurrentReviewBatch, $status, $coverageRecorder);
             }
+        }
+    }
+
+    private function recordUnreachedUnlessRecovered(int $index, ConcurrentReviewBatch $concurrentReviewBatch, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        $vulnerability = $concurrentReviewBatch->vulnerabilities[$index];
+        $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder, $concurrentReviewBatch->codeContextForCache($index));
+        if (!$recovered instanceof Vulnerability) {
+            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
         }
     }
 

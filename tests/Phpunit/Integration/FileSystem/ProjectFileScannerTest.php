@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -33,6 +34,8 @@ final class ProjectFileScannerTest extends TestCase
     private const string STRIPE_LIVE_PREFIX = 'sk_live';
 
     private string $tmpDir;
+
+    private Filesystem $filesystem;
 
     private ProjectFileScanner $projectFileScanner;
 
@@ -628,7 +631,7 @@ final class ProjectFileScannerTest extends TestCase
             self::assertIsString($path);
             self::assertStringEndsWith('/src', $path);
         } finally {
-            $this->rmdirRecursive($outsideDir);
+            $this->filesystem->remove($outsideDir);
         }
     }
 
@@ -668,13 +671,14 @@ final class ProjectFileScannerTest extends TestCase
             self::assertIsString($path);
             self::assertStringEndsWith($traversalPath, $path);
         } finally {
-            $this->rmdirRecursive($outsideDir);
+            $this->filesystem->remove($outsideDir);
         }
     }
 
     #[Override]
     protected function setUp(): void
     {
+        $this->filesystem = new Filesystem();
         $this->tmpDir = sys_get_temp_dir().'/scanner_int_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
         $this->projectFileScanner = new ProjectFileScanner(new NullLogger());
@@ -683,34 +687,7 @@ final class ProjectFileScannerTest extends TestCase
     #[Override]
     protected function tearDown(): void
     {
-        $this->rmdirRecursive($this->tmpDir);
-    }
-
-    private function rmdirRecursive(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-
-        $items = scandir($dir);
-        if (false === $items) {
-            return;
-        }
-
-        foreach ($items as $item) {
-            if ('.' === $item) {
-                continue;
-            }
-
-            if ('..' === $item) {
-                continue;
-            }
-
-            $path = $dir.'/'.$item;
-            is_dir($path) ? $this->rmdirRecursive($path) : unlink($path);
-        }
-
-        rmdir($dir);
+        $this->filesystem->remove($this->tmpDir);
     }
 
     public function test_an_included_path_reached_through_a_symlinked_directory_is_skipped_and_logged(): void
@@ -743,7 +720,7 @@ final class ProjectFileScannerTest extends TestCase
 
             self::assertSame(['Skipped included path outside the project root', 'Skipped included path outside the project root'], array_column($warnings, 0));
         } finally {
-            $this->rmdirRecursive($outsideDir);
+            $this->filesystem->remove($outsideDir);
         }
     }
 
@@ -761,7 +738,7 @@ final class ProjectFileScannerTest extends TestCase
         try {
             self::assertSame([], $projectFileScanner->scan($this->tmpDir));
         } finally {
-            $this->rmdirRecursive($outsideDir);
+            $this->filesystem->remove($outsideDir);
         }
     }
 
