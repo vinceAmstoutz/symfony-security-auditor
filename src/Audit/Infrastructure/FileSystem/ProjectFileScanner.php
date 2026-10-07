@@ -313,7 +313,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      */
     private function outermost(array $directories): array
     {
-        $unique = array_values(array_unique(array_map(Path::canonicalize(...), $directories)));
+        $unique = array_unique(array_map(Path::canonicalize(...), $directories));
 
         return array_values(array_filter(
             $unique,

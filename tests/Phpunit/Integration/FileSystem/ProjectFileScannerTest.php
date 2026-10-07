@@ -458,6 +458,21 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame(['src-extra/Extra.php', 'src/App.php'], $paths);
     }
 
+    public function test_a_file_reached_by_two_scan_paths_is_the_first_one_read(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        $reads = 0;
+        $reader = static function (SplFileInfo $splFile) use (&$reads): string {
+            return \sprintf('<?php // read %d', ++$reads);
+        };
+
+        $files = (new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'src/App.php'], fileReader: $reader))->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertStringEndsWith('read 1', $files[0]->content());
+    }
+
     public function test_default_constructor_does_not_respect_gitignore(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
