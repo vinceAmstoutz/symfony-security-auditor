@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **A standalone run no longer misreads a `%` in its cache or working directory as container syntax.** `StandaloneContainerFactory::create()` registered `kernel.cache_dir`, `kernel.build_dir` and `kernel.project_dir` unescaped, though they come from the user's home or XDG directories and `getcwd()`, so the container read any `%` pair in them as syntax: a cache directory `/tmp/%x%/cache` aborted the build with `The parameter "kernel.cache_dir" has a dependency on a non-existent parameter "x"`, `/tmp/a%%b/cache` silently became `/tmp/a%b/cache`, and `/tmp/%env(HOME)%/cache` was replaced by the value of the environment variable. The three parameters are now escaped with `ContainerParameterSyntax::escape()`, so the container reads back the path as written.
+
 ## [1.21.0] — 2026-10-04 — Gateway
 
 A release about reaching the model you actually run, and never mistaking a partial audit for a clean one. `init` now configures any OpenAI-compatible AI gateway, a local Ollama, AWS Bedrock and the new platforms of `symfony/ai` 0.14, keeps the API key for you (`auth:set`), and installs the bridge even for a platform whose block you finish by hand; the standalone binary also serves the auditor over MCP. A run that could not analyze every file now says so in every report format and in the GitHub Action, `--fail-on-incomplete` turns that into a failing exit code, a run that analyzed nothing has no verdict, and an answer cut short, a connection cut off mid-response or a chunk too large for the model is recovered instead of ending the audit. The audited repository's own configuration can no longer weaken the run, and the secret scrubber redacts more credential shapes while no longer hiding the code an audit has to read.
