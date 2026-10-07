@@ -300,7 +300,28 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
             }
         }
 
-        return [$directories, $explicitFiles];
+        return [$this->outermost($directories), $explicitFiles];
+    }
+
+    /**
+     * A directory listed inside another is already walked by it, so it is left
+     * out rather than read and scrubbed a second time.
+     *
+     * @param list<string> $directories
+     *
+     * @return list<string>
+     */
+    private function outermost(array $directories): array
+    {
+        $unique = array_unique(array_map(Path::canonicalize(...), $directories));
+
+        return array_values(array_filter(
+            $unique,
+            static fn (string $directory): bool => [] === array_filter(
+                $unique,
+                static fn (string $other): bool => $other !== $directory && Path::isBasePath($other, $directory),
+            ),
+        ));
     }
 
     private function isScannable(string $resolved, string $realProjectPath): bool

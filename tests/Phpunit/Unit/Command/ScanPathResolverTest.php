@@ -39,6 +39,7 @@ final class ScanPathResolverTest extends TestCase
     {
         yield 'a relative path is kept as given' => [['src/Command'], 'C:/Users/vince/demo', ['src/Command']];
         yield 'no path at all' => [[], '/home/vince/demo', []];
+        yield 'a relative path holding a drive-like segment' => [['src/C:/odd'], '/home/vince/demo', ['src/C:/odd']];
         yield 'an absolute POSIX path inside the project' => [['/home/vince/demo/src/Command'], '/home/vince/demo', ['src/Command']];
         yield 'an absolute Windows path with backslashes' => [['C:\Users\vince\demo\src\Command'], 'C:/Users/vince/demo', ['src/Command']];
         yield 'an absolute Windows path with forward slashes' => [['C:/Users/vince/demo/src/Command'], 'C:/Users/vince/demo', ['src/Command']];

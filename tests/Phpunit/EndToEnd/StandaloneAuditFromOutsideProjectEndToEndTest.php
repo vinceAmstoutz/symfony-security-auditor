@@ -289,6 +289,7 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
             $this->withoutWhitespace(\sprintf('No files matched under "%s" for --path src/Missing.', $this->project)),
             $this->withoutWhitespace($this->displayOf($process)),
         );
+        self::assertStringNotContainsString('file(s)inscope', $this->withoutWhitespace($this->displayOf($process)));
     }
 
     #[MaximumDuration(4000)]

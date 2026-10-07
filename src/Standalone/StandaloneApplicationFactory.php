@@ -173,7 +173,7 @@ final readonly class StandaloneApplicationFactory
         return null !== $workingDirectory ? self::projectConfigFileIn($workingDirectory) : null;
     }
 
-    public static function projectConfigFileIn(string $directory): string
+    private static function projectConfigFileIn(string $directory): string
     {
         return \sprintf('%s/%s', $directory, self::PROJECT_CONFIG_FILENAME);
     }
