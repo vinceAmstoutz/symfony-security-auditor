@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **A SARIF report no longer marks as accepted more findings than the baseline accepts.** `BaselineProcessor` credits an accepted baseline entry once — one entry accepts one finding, so a second finding with the same fingerprint (same type, file and title, at another line) stays in the report and trips the gate — but `SarifReportRenderer::resultFor()` (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`) tested each finding with `in_array()` against the baselined fingerprints, so every finding sharing a listed fingerprint carried the `suppressions` entry and Code Scanning showed a new finding as accepted while `audit:run` exited `1` for it. `SarifReportRenderer::renderWithSuppressions()` now asks `AuditReport::withoutFingerprints()` — the count-aware filter the baseline applies to the other formats — which findings stay standing, and suppresses the others, so the most severe finding of a shared fingerprint takes the credit first in both.
+
 ## [1.21.0] — 2026-10-04 — Gateway
 
 A release about reaching the model you actually run, and never mistaking a partial audit for a clean one. `init` now configures any OpenAI-compatible AI gateway, a local Ollama, AWS Bedrock and the new platforms of `symfony/ai` 0.14, keeps the API key for you (`auth:set`), and installs the bridge even for a platform whose block you finish by hand; the standalone binary also serves the auditor over MCP. A run that could not analyze every file now says so in every report format and in the GitHub Action, `--fail-on-incomplete` turns that into a failing exit code, a run that analyzed nothing has no verdict, and an answer cut short, a connection cut off mid-response or a chunk too large for the model is recovered instead of ending the audit. The audited repository's own configuration can no longer weaken the run, and the secret scrubber redacts more credential shapes while no longer hiding the code an audit has to read.
