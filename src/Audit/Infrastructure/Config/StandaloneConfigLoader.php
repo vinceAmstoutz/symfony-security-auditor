@@ -194,7 +194,7 @@ final readonly class StandaloneConfigLoader
         $this->guardAgainstLoosenedBudget($this->projectConfigFile, $projectConfig, $userConfig);
         $this->projectConfigValueGuard->assertLiteralPlainText($this->projectConfigFile, $projectConfig);
 
-        return $projectConfig;
+        return ProjectConfigPathAnchor::anchored($projectConfig, $this->projectConfigFile);
     }
 
     /**

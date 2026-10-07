@@ -490,6 +490,30 @@ final class StandaloneConfigLoaderTest extends TestCase
         );
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_relative_baseline_of_the_project_config_is_read_from_the_project_not_the_working_directory(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: .security-baseline.json\n");
+
+        self::assertSame(
+            ['baseline' => $this->configHome.'/project/.security-baseline.json'],
+            $this->loader($projectConfigFile)->load()->auditConfig['audit'],
+        );
+    }
+
     private function loader(?string $projectConfigFile = null): StandaloneConfigLoader
     {
         return new StandaloneConfigLoader(
@@ -892,7 +916,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: \"Ärger\\tbaseline.json\"\n");
 
-        self::assertSame(['baseline' => "Ärger\tbaseline.json"], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome."/project/Ärger\tbaseline.json"], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
     }
 
     /**
@@ -1247,7 +1271,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $auditConfig = $this->loader($projectConfigFile)->load()->auditConfig;
 
         self::assertSame('claude-haiku-4-5?temperature=0.2', $auditConfig['model']);
-        self::assertSame(['baseline' => 'baseline?v2.json'], $auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome.'/project/baseline?v2.json'], $auditConfig['audit']);
     }
 
     /**
@@ -1268,7 +1292,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: 'baseline-100%.json'\n");
 
-        self::assertSame(['baseline' => 'baseline-100%.json'], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome.'/project/baseline-100%.json'], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
     }
 
     /**
