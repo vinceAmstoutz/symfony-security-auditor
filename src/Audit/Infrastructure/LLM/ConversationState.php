@@ -14,14 +14,16 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Symfony\AI\Platform\Message\MessageBag;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
- * One tool-using conversation's position in the wavefront: its message bag and
- * platform options, the token counters accumulated across rounds, whether a
- * tool has already run (a conversation that ran one cannot be restarted from
- * scratch), the finalized response once it has one, the running estimate the
- * rate limiter reserves against, and how many rounds it has left, the one in
+ * One tool-using conversation's position: its message bag and platform
+ * options, the token counters accumulated across rounds, whether a tool has
+ * already run (a conversation that ran one cannot be restarted from scratch),
+ * the finalized response once it has one, the running estimate the rate
+ * limiter reserves against, and how many rounds it has left, the one in
  * flight included.
  *
  * Updates are copy-on-write — `$bag` is a mutable collaborator whose contents
@@ -48,6 +50,14 @@ final readonly class ConversationState
     ) {}
 
     /**
+     * @param array<string, mixed> $options
+     */
+    public static function start(MessageBag $messageBag, array $options, int $estimatedInputTokens): self
+    {
+        return new self($messageBag, $options, 0, 0, 0, 0, false, null, $estimatedInputTokens);
+    }
+
+    /**
      * Whether every conversation of a window has its answer, so another round
      * would dispatch nothing.
      *
@@ -72,6 +82,14 @@ final readonly class ConversationState
     public static function enterRound(array $states, int $round, int $maxToolIterations): array
     {
         return array_map(static fn (self $state): self => $state->withRoundsLeft($maxToolIterations - $round), $states);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function tokenUsage(): TokenUsageSnapshot
+    {
+        return TokenUsageSnapshot::of($this->input, $this->output, $this->cacheRead, $this->cacheCreation);
     }
 
     public function withRecordedTokens(int $input, int $output, int $cacheRead, int $cacheCreation): self

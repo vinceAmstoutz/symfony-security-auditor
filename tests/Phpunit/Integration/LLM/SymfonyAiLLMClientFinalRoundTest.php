@@ -416,17 +416,20 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
      */
     private function requestsCarryingTheNotice(ScriptedResultPlatform $scriptedResultPlatform): array
     {
-        $carrying = [];
-        foreach ($scriptedResultPlatform->requests as $request => $messages) {
-            foreach ($messages as $message) {
-                if (($message instanceof UserMessage || $message instanceof ToolCallMessage) && str_contains((string) $message->asText(), FinalRound::NOTICE)) {
-                    $carrying[] = $request;
+        return array_keys(array_filter($scriptedResultPlatform->requests, $this->carriesTheNotice(...)));
+    }
 
-                    break;
-                }
+    /**
+     * @param iterable<object> $messages
+     */
+    private function carriesTheNotice(iterable $messages): bool
+    {
+        foreach ($messages as $message) {
+            if (($message instanceof UserMessage || $message instanceof ToolCallMessage) && str_contains((string) $message->asText(), FinalRound::NOTICE)) {
+                return true;
             }
         }
 
-        return $carrying;
+        return false;
     }
 }

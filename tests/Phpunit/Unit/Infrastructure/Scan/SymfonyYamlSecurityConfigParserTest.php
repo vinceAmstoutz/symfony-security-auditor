@@ -201,7 +201,7 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
      * internally, so `methods: [post]` and `methods: [POST]` are equally
      * valid, semantically-identical YAML. The `methods: ...` marker must be
      * normalized to uppercase here, since
-     * `SymfonyMappingContextRenderer::alternativeCoversMethods()` re-parses
+     * `AccessControlRuleMatcher::alternativeCoversMethods()` re-parses
      * it with an uppercase-only regex to decide route coverage.
      */
     public function test_it_normalizes_lowercase_methods_to_uppercase(): void

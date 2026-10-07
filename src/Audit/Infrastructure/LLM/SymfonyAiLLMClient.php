@@ -120,6 +120,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformAccountingConfig->budgetTracker,
         );
         $this->emptyLLMResponseFactory = new EmptyLLMResponseFactory();
+        $toolIterationBooker = new ToolIterationBooker($platformBinding->model, $this->rateLimiter, $platformAccountingConfig->budgetTracker, $this->platformResultExtractor);
 
         $this->sequentialToolLoop = new SequentialToolLoop(
             $platformBinding->model,
@@ -131,6 +132,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformOptionsFactory,
             $this->promptTokenEstimator,
             $this->emptyLLMResponseFactory,
+            $toolIterationBooker,
         );
 
         $inFlightRequestCanceller = new InFlightRequestCanceller($platformBinding->model, $this->rateLimiter, $platformAccountingConfig->budgetTracker, $platformBinding->logger, $platformAccountingConfig->tokenUsageRecorder);
@@ -166,6 +168,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $inFlightRequestCanceller,
             $degradedAnswerBooker,
             $conversionFailureExplainer,
+            $toolIterationBooker,
         );
     }
 

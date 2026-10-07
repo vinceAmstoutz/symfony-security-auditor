@@ -912,7 +912,7 @@ final class AuditCommandEndToEndTest extends TestCase
     #[Override]
     protected function tearDown(): void
     {
-        $this->rmdirRecursive($this->fixtureDir);
+        (new Filesystem())->remove($this->fixtureDir);
     }
 
     private function createProjectDir(): void
@@ -1679,32 +1679,5 @@ final class AuditCommandEndToEndTest extends TestCase
                 return 'stub';
             }
         };
-    }
-
-    private function rmdirRecursive(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-
-        $items = scandir($dir);
-        if (false === $items) {
-            return;
-        }
-
-        foreach ($items as $item) {
-            if ('.' === $item) {
-                continue;
-            }
-
-            if ('..' === $item) {
-                continue;
-            }
-
-            $path = $dir.'/'.$item;
-            is_dir($path) ? $this->rmdirRecursive($path) : unlink($path);
-        }
-
-        rmdir($dir);
     }
 }

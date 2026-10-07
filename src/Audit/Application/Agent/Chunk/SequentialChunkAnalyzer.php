@@ -96,11 +96,7 @@ final readonly class SequentialChunkAnalyzer
                 throw $llmProviderException;
             }
 
-            foreach ($chunkResult->vulnerabilities() as $vulnerability) {
-                $coverageRecorder->recordFoundVulnerability($vulnerability);
-            }
-
-            ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
+            $this->recordFindings($chunkResult->vulnerabilities(), $coverageRecorder);
             $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
                 'chunk' => $index + 1,
                 'total_chunks' => \count($chunks),
@@ -353,7 +349,14 @@ final readonly class SequentialChunkAnalyzer
      */
     private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
     {
-        $vulnerabilities = $this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities();
+        $this->recordFindings($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities(), $coverageRecorder);
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     */
+    private function recordFindings(array $vulnerabilities, CoverageRecorderInterface $coverageRecorder): void
+    {
         foreach ($vulnerabilities as $vulnerability) {
             $coverageRecorder->recordFoundVulnerability($vulnerability);
         }

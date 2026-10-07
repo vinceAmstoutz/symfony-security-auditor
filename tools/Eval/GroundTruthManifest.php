@@ -67,18 +67,31 @@ final readonly class GroundTruthManifest
     private static function parseFindings(array $findings, string $path): array
     {
         $parsed = [];
-        $index = 0;
-        foreach ($findings as $finding) {
-            $file = \is_array($finding) ? ($finding['file'] ?? null) : null;
-            $type = \is_array($finding) ? ($finding['type'] ?? null) : null;
-            if (!\is_string($file) || '' === $file || !\is_string($type) || '' === $type) {
-                throw InvalidGroundTruthManifestException::forInvalidFinding($path, $index);
-            }
-
-            $parsed[] = new ExpectedFinding($file, $type);
-            ++$index;
+        foreach (array_values($findings) as $index => $finding) {
+            $parsed[] = self::parseFinding($finding, $path, $index);
         }
 
         return $parsed;
+    }
+
+    /**
+     * @throws InvalidGroundTruthManifestException
+     */
+    private static function parseFinding(mixed $finding, string $path, int $index): ExpectedFinding
+    {
+        $file = self::nonEmptyString($finding, 'file');
+        $type = self::nonEmptyString($finding, 'type');
+        if (null === $file || null === $type) {
+            throw InvalidGroundTruthManifestException::forInvalidFinding($path, $index);
+        }
+
+        return new ExpectedFinding($file, $type);
+    }
+
+    private static function nonEmptyString(mixed $finding, string $key): ?string
+    {
+        $value = \is_array($finding) ? ($finding[$key] ?? null) : null;
+
+        return \is_string($value) && '' !== $value ? $value : null;
     }
 }
