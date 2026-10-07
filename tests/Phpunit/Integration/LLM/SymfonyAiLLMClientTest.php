@@ -1405,26 +1405,29 @@ final class SymfonyAiLLMClientTest extends TestCase
             },
         );
 
-        $platform = $this->scriptedPlatform([
-            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
-            new MultiPartResult([new ToolCallResult([new ToolCall('2', 'lookup')])]),
-            new MultiPartResult([new ToolCallResult([new ToolCall('3', 'lookup')])]),
-        ]);
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            [
+                new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
+                new MultiPartResult([new ToolCallResult([new ToolCall('2', 'lookup')])]),
+                new MultiPartResult([new ToolCallResult([new ToolCall('3', 'lookup')])]),
+            ],
+            [new TokenUsage(promptTokens: 10, completionTokens: 3), new TokenUsage(promptTokens: 20, completionTokens: 5)],
+        );
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 2);
 
         self::assertSame('', $llmResponse->content());
         self::assertSame('max_tool_iterations', $llmResponse->stopReason());
-        self::assertSame(0, $llmResponse->inputTokens());
-        self::assertSame(0, $llmResponse->outputTokens());
+        self::assertSame(30, $llmResponse->inputTokens());
+        self::assertSame(8, $llmResponse->outputTokens());
 
         $capLogs = array_values(array_filter(
             $warnings,
             static fn (array $entry): bool => 'Tool-using loop hit iteration cap' === $entry[0],
         ));
         self::assertCount(1, $capLogs);
-        self::assertSame(2, $capLogs[0][1]['max_iterations']);
+        self::assertSame(['max_iterations' => 2, 'input_tokens' => 30, 'output_tokens' => 8], $capLogs[0][1]);
     }
 
     /**
@@ -1483,10 +1486,13 @@ final class SymfonyAiLLMClientTest extends TestCase
             },
         );
 
-        $platform = $this->scriptedPlatform([
-            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
-            new MultiPartResult([new TextResult('finished-12c')]),
-        ]);
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            [
+                new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
+                new MultiPartResult([new TextResult('finished-12c')]),
+            ],
+            [new TokenUsage(promptTokens: 7, completionTokens: 2), new TokenUsage(promptTokens: 11, completionTokens: 4)],
+        );
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
@@ -1497,8 +1503,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         ));
 
         self::assertCount(1, $endedLogs);
-        self::assertSame(1, $endedLogs[0][1]['iterations']);
-        self::assertSame(12, $endedLogs[0][1]['content_length']);
+        self::assertSame(['iterations' => 1, 'content_length' => 12, 'input_tokens' => 18, 'output_tokens' => 6], $endedLogs[0][1]);
     }
 
     /**
