@@ -173,6 +173,19 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     /**
      * @throws NonLocalPlatformEndpointException
      */
+    public function test_a_setting_that_is_not_a_string_is_not_mistaken_for_an_endpoint(): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessage('no local endpoint configured');
+
+        $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
+            new StandalonePlatformConfig(['ollama' => ['timeout' => 30, 'verify' => true, 'proxy' => null]]),
+        );
+    }
+
+    /**
+     * @throws NonLocalPlatformEndpointException
+     */
     public function test_every_endpoint_of_a_provider_must_be_local_not_just_the_first(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
