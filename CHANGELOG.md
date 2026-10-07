@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **A hyphenated `offline-only` or provider instance name in `config.yaml` is now read the way the audit reads it.** `StandaloneApplicationFactory::offlineOnly()` and `ConfiguredCredentialVariable::parsedConfig()` parsed the user config raw with `Yaml::parseFile()`, so they missed the hyphen-to-underscore folding that `StandaloneConfigFileReader` (and `symfony/config`) applies. With `privacy: {offline-only: true}` the audit enforced the offline guard while `self-update` still reached `models.dev` through `ModelsDevCatalogRefresher` instead of `NullPricingCatalogRefresher`; with `provider: generic.my_gw` and a `platform.generic.my-gw` block, `auth:set` and `auth:status` claimed no credential variable was configured although the run worked. Both now read the file through `StandaloneConfigFileReader`, failing closed (offline) or naming no variable on a file it refuses as malformed or oversized, as they did on a YAML parse error.
+
 ## [1.21.0] — 2026-10-04 — Gateway
 
 A release about reaching the model you actually run, and never mistaking a partial audit for a clean one. `init` now configures any OpenAI-compatible AI gateway, a local Ollama, AWS Bedrock and the new platforms of `symfony/ai` 0.14, keeps the API key for you (`auth:set`), and installs the bridge even for a platform whose block you finish by hand; the standalone binary also serves the auditor over MCP. A run that could not analyze every file now says so in every report format and in the GitHub Action, `--fail-on-incomplete` turns that into a failing exit code, a run that analyzed nothing has no verdict, and an answer cut short, a connection cut off mid-response or a chunk too large for the model is recovered instead of ending the audit. The audited repository's own configuration can no longer weaken the run, and the secret scrubber redacts more credential shapes while no longer hiding the code an audit has to read.
