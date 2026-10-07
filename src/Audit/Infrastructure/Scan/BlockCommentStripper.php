@@ -33,14 +33,9 @@ final readonly class BlockCommentStripper
         $kept = '';
         $remaining = $line;
 
-        while (true) {
+        while (null !== $remaining) {
             if ($insideBlockComment) {
-                $closeOffset = strpos($remaining, '*/');
-                if (false === $closeOffset) {
-                    return ['line' => $kept, 'inside_block_comment' => true];
-                }
-
-                $remaining = substr($remaining, $closeOffset + 2);
+                $remaining = $this->textAfterCommentEnd($remaining);
                 $insideBlockComment = false;
 
                 continue;
@@ -55,5 +50,14 @@ final readonly class BlockCommentStripper
             $remaining = substr($remaining, $openOffset + 2);
             $insideBlockComment = true;
         }
+
+        return ['line' => $kept, 'inside_block_comment' => true];
+    }
+
+    private function textAfterCommentEnd(string $text): ?string
+    {
+        $closeOffset = strpos($text, '*/');
+
+        return false === $closeOffset ? null : substr($text, $closeOffset + 2);
     }
 }
