@@ -32,7 +32,7 @@ final readonly class FinalRound
 {
     public const string NOTICE = '[Auditor notice: the next round is your last. Nothing you read or search after this reaches you, so do not call a reading or searching tool again. Record each finding you still hold with the recording tool, or give the final answer the instructions above ask for. With nothing to report, answer without calling a tool.]';
 
-    public static function isLast(int $roundsLeft): bool
+    private static function isLast(int $roundsLeft): bool
     {
         return 1 === $roundsLeft;
     }

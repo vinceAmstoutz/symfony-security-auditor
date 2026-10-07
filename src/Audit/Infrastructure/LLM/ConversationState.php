@@ -140,7 +140,7 @@ final readonly class ConversationState
         );
     }
 
-    public function withRoundsLeft(int $roundsLeft): self
+    private function withRoundsLeft(int $roundsLeft): self
     {
         return new self(
             $this->bag,
