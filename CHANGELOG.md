@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **`init` refuses a provider instance named by an environment placeholder instead of writing a configuration the next run cannot select.** `InitRefusal::forNamedInstance()` tested the instance name with `ContainerParameterSyntax::isAbsentFrom()`, which deliberately lets a whole-value `%env(VAR)%` through for a model or a URL, so `init --provider='generic.%env(X)%'` exited `0` after writing `provider: generic.%env(X)%` and a platform key `'%env(X)%'`, and installing the bridge. An instance name is a key, never a value to substitute, so it is now refused with exit code `2` whenever `ContainerParameterSyntax::holdsReference()` finds a `%...%` pair in it, a whole-value placeholder included; `init` writes nothing and installs no bridge. The model and base URL checks are unchanged.
+
 ## [1.21.0] — 2026-10-04 — Gateway
 
 A release about reaching the model you actually run, and never mistaking a partial audit for a clean one. `init` now configures any OpenAI-compatible AI gateway, a local Ollama, AWS Bedrock and the new platforms of `symfony/ai` 0.14, keeps the API key for you (`auth:set`), and installs the bridge even for a platform whose block you finish by hand; the standalone binary also serves the auditor over MCP. A run that could not analyze every file now says so in every report format and in the GitHub Action, `--fail-on-incomplete` turns that into a failing exit code, a run that analyzed nothing has no verdict, and an answer cut short, a connection cut off mid-response or a chunk too large for the model is recovered instead of ending the audit. The audited repository's own configuration can no longer weaken the run, and the secret scrubber redacts more credential shapes while no longer hiding the code an audit has to read.
