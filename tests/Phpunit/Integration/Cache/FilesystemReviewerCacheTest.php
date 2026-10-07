@@ -34,9 +34,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem\Fixture\AssertsOwnerOnlyAccessTrait;
 
 final class FilesystemReviewerCacheTest extends TestCase
 {
+    use AssertsOwnerOnlyAccessTrait;
+
     private string $cacheDir;
 
     private FilesystemReviewerCache $filesystemReviewerCache;
@@ -849,6 +852,24 @@ final class FilesystemReviewerCacheTest extends TestCase
         } finally {
             (new Filesystem())->remove($base);
         }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_stored_verdict_and_the_directories_made_for_it_are_owner_only(): void
+    {
+        $this->filesystemReviewerCache->store($this->makeVulnerability('src/A.php'), 'code', ['accepted' => true]);
+
+        $entries = glob($this->cacheDir.'/*/*.json');
+        self::assertIsArray($entries);
+        self::assertCount(1, $entries);
+        self::assertOwnerOnlyFile($entries[0]);
+        self::assertOwnerOnlyDirectory(\dirname($entries[0]));
+        self::assertOwnerOnlyDirectory($this->cacheDir);
     }
 
     /**

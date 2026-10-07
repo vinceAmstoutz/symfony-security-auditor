@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\PrivateFileWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 
 use function Symfony\Component\String\u;
@@ -114,8 +115,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
             $path = $this->pathFor($vulnerability, $codeContext);
             $this->assertSafeToWrite($path);
             $encoded = json_encode($review, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
-            $this->filesystem->mkdir(\dirname($path));
-            $this->filesystem->dumpFile($path, $encoded);
+            PrivateFileWriter::write($this->filesystem, $path, $encoded);
             $this->logger->debug('Reviewer cache stored', ['path' => $path]);
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to write reviewer cache entry', [

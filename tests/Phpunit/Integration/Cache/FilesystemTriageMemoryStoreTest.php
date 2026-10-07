@@ -23,9 +23,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedb
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem\Fixture\AssertsOwnerOnlyAccessTrait;
 
 final class FilesystemTriageMemoryStoreTest extends TestCase
 {
+    use AssertsOwnerOnlyAccessTrait;
+
     private const string PROJECT_PATH = '/project/alpha';
 
     private string $directory;
@@ -432,6 +435,17 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
         } finally {
             (new Filesystem())->remove($base);
         }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_the_memory_file_and_the_directory_made_for_it_are_owner_only(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'input is bound via a prepared statement');
+
+        self::assertOwnerOnlyFile($this->memoryPath);
+        self::assertOwnerOnlyDirectory($this->directory);
     }
 
     /**
