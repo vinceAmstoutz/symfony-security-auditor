@@ -27,6 +27,14 @@ final class AdvisorySourceUnavailableException extends RuntimeException
         );
     }
 
+    public static function forUnusableLockfile(string $projectPath, string $reason, ?Throwable $throwable = null): self
+    {
+        return new self(
+            \sprintf('Composer audit cannot use the lockfile of project "%s": %s', $projectPath, $reason),
+            previous: $throwable,
+        );
+    }
+
     public static function forBinaryNotFound(?Throwable $throwable = null): self
     {
         return new self(

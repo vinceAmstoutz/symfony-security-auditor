@@ -79,6 +79,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedPr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\IsolatedComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHasher;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
@@ -596,13 +597,16 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(SymfonyProcessComposerAuditRunner::class);
 
+    $defaultsConfigurator->set(IsolatedComposerAuditRunner::class)
+        ->args([service(SymfonyProcessComposerAuditRunner::class), service(Filesystem::class)]);
+
     $defaultsConfigurator->set(InMemoryAdvisoryDatabase::class);
 
     $defaultsConfigurator->set(Clock::class)->autowire(false);
 
     $defaultsConfigurator->set(LockfileHashedAdvisoryCache::class)
         ->args([
-            service(SymfonyProcessComposerAuditRunner::class),
+            service(IsolatedComposerAuditRunner::class),
             param('symfony_security_auditor.cache.advisory_dir'),
             service(Filesystem::class),
             service('logger'),

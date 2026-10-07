@@ -72,6 +72,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedPr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\IsolatedComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
@@ -790,7 +791,21 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
 
-        self::assertInstanceOf(SymfonyProcessComposerAuditRunner::class, $this->getPrivateService($kernel, ComposerAuditRunnerInterface::class));
+        self::assertInstanceOf(IsolatedComposerAuditRunner::class, $this->getPrivateService($kernel, ComposerAuditRunnerInterface::class));
+    }
+
+    public function test_bundle_runs_composer_audit_outside_the_audited_project_with_or_without_the_advisory_cache(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
+        $withoutCache = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
+
+        $cachedRunner = $containerBuilder->getDefinition(LockfileHashedAdvisoryCache::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $cachedRunner);
+        self::assertSame(IsolatedComposerAuditRunner::class, (string) $cachedRunner);
+        self::assertSame(IsolatedComposerAuditRunner::class, (string) $withoutCache->getAlias(ComposerAuditRunnerInterface::class));
+        $isolatedRunner = $containerBuilder->getDefinition(IsolatedComposerAuditRunner::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $isolatedRunner);
+        self::assertSame(SymfonyProcessComposerAuditRunner::class, (string) $isolatedRunner);
     }
 
     public function test_bundle_reviewer_cache_dir_and_salt_derive_from_cache_dir_and_reviewer_model(): void

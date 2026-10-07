@@ -553,8 +553,9 @@ symfony_security_auditor:
 Causes (each logs a `warning` via `LoggerInterface`, except the deliberate `offline_only` case below):
 
 - **`composer` not in `PATH`** — install Composer 2.4+ on the audit host.
-- **`composer.lock` missing** — run `composer install` first; advisory data comes from the lockfile.
+- **`composer.lock` missing, a symlink or over 8 MiB** — run `composer install` first; advisory data comes from the lockfile, which is copied into a private directory for the audit and refused when it is not a regular file of at most 8 MiB.
 - **Malformed JSON output** — corrupted `composer.lock`. Regenerate it.
+- **Advisories of a private repository missing** — `composer audit` no longer reads the audited project's `composer.json`, so its `repositories` and `auth.json` do not apply; configure them in Composer's global configuration (`COMPOSER_HOME`) of the user running the audit.
 - **Process error** — network failure to Packagist. Retry: a lookup five minutes after a failed `composer audit` runs it again, and so does one after `composer.lock` changes; lookups in between answer with no advisory at once instead of waiting on a `composer audit` that timed out again.
 - **`privacy.offline_only: true`** — the advisory feed is intentionally replaced by an empty in-memory database, so `composer audit` never runs; no warning is logged since this is configured behavior, not a failure.
 
