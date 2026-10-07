@@ -170,13 +170,13 @@ final class StandaloneApplication extends Application
 
     private function definitionWithApplicationOf(Command $command): InputDefinition
     {
-        $applicationDefinition = $this->getDefinition();
+        $inputDefinition = $this->getDefinition();
         $commandDefinition = $command->getNativeDefinition();
 
         return new InputDefinition([
-            ...$applicationDefinition->getArguments(),
+            ...$inputDefinition->getArguments(),
             ...$commandDefinition->getArguments(),
-            ...$applicationDefinition->getOptions(),
+            ...$inputDefinition->getOptions(),
             ...$commandDefinition->getOptions(),
         ]);
     }

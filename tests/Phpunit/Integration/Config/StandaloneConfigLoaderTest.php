@@ -175,11 +175,12 @@ final class StandaloneConfigLoaderTest extends TestCase
         $secondFile = $this->configHome.'/second/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($firstFile, "model: first-model\n");
         $this->filesystem->dumpFile($secondFile, "model: second-model\n");
+
         $standaloneConfigLoader = $this->loader($firstFile);
 
-        $second = $standaloneConfigLoader->withProjectConfigFile($secondFile)->load();
+        $standaloneConfig = $standaloneConfigLoader->withProjectConfigFile($secondFile)->load();
 
-        self::assertSame(['second-model', $secondFile, 'first-model'], [$second->auditConfig['model'], $second->projectConfigFile, $standaloneConfigLoader->load()->auditConfig['model']]);
+        self::assertSame(['second-model', $secondFile, 'first-model'], [$standaloneConfig->auditConfig['model'], $standaloneConfig->projectConfigFile, $standaloneConfigLoader->load()->auditConfig['model']]);
     }
 
     /**

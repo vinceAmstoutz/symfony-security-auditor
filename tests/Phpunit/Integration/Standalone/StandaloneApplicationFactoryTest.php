@@ -390,6 +390,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
             'SSA_NO_UPDATE_CHECK' => '1',
         ])->create();
         $standaloneApplication->setAutoExit(false);
+
         $applicationTester = new ApplicationTester($standaloneApplication);
 
         $statusCode = $applicationTester->run(['command' => AuditCommand::ALIAS, 'project-path' => $projectDirectory]);
