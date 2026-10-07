@@ -101,7 +101,7 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
   download the binary for your platform from the releases page instead.
   ```
 
-- **Cannot reach GitHub** — `SelfUpdateFailedException`: `Failed to download "<url>".` (curl itself failed — offline, DNS, TLS, a redirect off HTTPS, or a response over the size limit: 1 MiB for release metadata, 256 MiB for a download) or `Could not determine the latest released version from "<url>".` (GitHub answered but without a usable `tag_name` — an API outage or rate limit).
+- **Cannot reach GitHub** — `SelfUpdateFailedException`: `Failed to download "<url>".` (curl itself failed — offline, DNS, TLS, a redirect off HTTPS, or a response over the size limit: 1 MiB for release metadata, 256 MiB for a download) or `Could not determine the latest released version from "<url>".` (GitHub answered but without a usable `tag_name` — an API outage or rate limit — or with one that is not a release version: only `X.Y.Z`, an optional pre-release suffix and an optional leading `v` are accepted, so a tag carrying a path, a URL or a control character stops the update before any download URL is built from it).
 - **Checksum mismatch** — the downloaded file is deleted and nothing is replaced; retry, or download the asset manually and verify its `.sha256` yourself:
 
   ```text

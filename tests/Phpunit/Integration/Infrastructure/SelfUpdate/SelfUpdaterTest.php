@@ -490,6 +490,51 @@ final class SelfUpdaterTest extends TestCase
     }
 
     /**
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    #[DataProvider('hostileReleaseTags')]
+    public function test_it_refuses_a_release_tag_that_is_not_a_release_version_before_building_any_url_from_it(string $tagName): void
+    {
+        $fakeReleaseClient = new FakeReleaseClient([self::LATEST_RELEASE_API_URL => json_encode(['tag_name' => $tagName], \JSON_THROW_ON_ERROR)]);
+        $selfUpdater = $this->selfUpdater($fakeReleaseClient);
+
+        try {
+            $selfUpdater->run('1.0.0', false);
+            self::fail('A tag that is not a release version must be refused.');
+        } catch (SelfUpdateFailedException $selfUpdateFailedException) {
+            self::assertSame(\sprintf('Could not determine the latest released version from "%s".', self::LATEST_RELEASE_API_URL), $selfUpdateFailedException->getMessage());
+            self::assertSame(1, $fakeReleaseClient->requests);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function hostileReleaseTags(): iterable
+    {
+        yield 'a path traversal' => ['../../x'];
+        yield 'a version followed by a path traversal' => ['9.9.9/../../evil'];
+        yield 'a version followed by a query' => ['9.9.9?download=1'];
+        yield 'a url' => ['https://evil.test/9.9.9'];
+        yield 'a version followed by a newline' => ["9.9.9\n"];
+        yield 'a version followed by a terminal escape' => ["9.9.9\x1b[31m"];
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_updates_from_a_prerelease_tag(): void
+    {
+        $payload = 'NEW-BINARY';
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('9.9.9-rc.1', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+        $this->pendingBinarySwap->commit();
+
+        self::assertSame('9.9.9-rc.1', $selfUpdateResult->latestVersion);
+        self::assertStringEqualsFile($this->binaryPath, $payload);
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function unresolvableLatestVersionPayloads(): iterable

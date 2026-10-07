@@ -28,7 +28,8 @@ use function Symfony\Component\String\u;
  * stripped — `version_compare()` ranks a raw `v1.2.3` *below* every plain
  * `1.2.3`, which would silently disable update detection if a release were
  * ever tagged with the prefix — while asset URLs keep the tag verbatim, since
- * that is the path the release publishes under.
+ * that is the path the release publishes under. A tag outside `ReleaseTag`'s
+ * grammar is refused before any URL is built from it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -103,7 +104,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
             throw SelfUpdateFailedException::forUnresolvableLatestVersion(self::LATEST_RELEASE_API_URL, $jsonException);
         }
 
-        if (!\is_array($decoded) || !\array_key_exists('tag_name', $decoded) || !\is_string($decoded['tag_name']) || '' === $decoded['tag_name']) {
+        if (!\is_array($decoded) || !\array_key_exists('tag_name', $decoded) || !\is_string($decoded['tag_name']) || !ReleaseTag::isValid($decoded['tag_name'])) {
             throw SelfUpdateFailedException::forUnresolvableLatestVersion(self::LATEST_RELEASE_API_URL);
         }
 
