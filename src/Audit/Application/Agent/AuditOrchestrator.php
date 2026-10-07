@@ -78,81 +78,111 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
         do {
             ++$iteration;
-            $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->auditLoopSettings->maxIterations));
-            $this->progressReporter->report(ProgressEvent::AuditIterationStarted->value, [
-                'iteration' => $iteration,
-                'max_iterations' => $this->auditLoopSettings->maxIterations,
-            ]);
-
-            $previousFindings = array_values($auditContext->validatedVulnerabilities());
-            $rejectedFindings = $this->rejectedFindings($auditContext);
-            $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
-            $rawFindings = $this->analyzeWithRecovery($mapping, $files, $knownFindings, $rejectedFindings, $auditContext);
-            $filtered = $this->filterByConfidence($rawFindings);
-
-            if ([] === $filtered) {
-                $this->logger->info('Attacker found no new findings, stopping');
-                $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'no_new_findings']);
-                break;
-            }
-
-            $reviewCandidates = $this->withoutBaselineAccepted($filtered, $auditContext);
-
-            if ([] === $reviewCandidates) {
-                $this->logger->info('Every remaining finding is baseline-accepted, stopping');
-                $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'all_baseline_accepted']);
-                break;
-            }
-
-            $filtered = $reviewCandidates;
-
-            $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
-                'findings' => \count($filtered),
-            ]);
-
-            try {
-                $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
-            } catch (BudgetExceededException|LLMProviderException $exception) {
-                $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
-
-                throw $exception;
-            }
-
-            $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext);
-
-            $acceptedCount = \count(array_filter(
-                $reviewed,
-                static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(),
-            ));
-            $rejectedCount = \count(array_filter(
-                $reviewed,
-                static fn (Vulnerability $vulnerability): bool => self::wasRejected($vulnerability, $auditContext),
-            ));
-            $this->progressReporter->report(ProgressEvent::ReviewCompleted->value, [
-                'accepted' => $acceptedCount,
-                'rejected' => $rejectedCount,
-                'failed' => \count($reviewed) - $acceptedCount - $rejectedCount,
-            ]);
-
-            $this->logger->info('Iteration complete', [
-                'iteration' => $iteration,
-                'attacker_found' => \count($rawFindings),
-                'reviewer_accepted' => $acceptedCount,
-                'new_unique' => $newFindings,
-                'total' => \count($auditContext->vulnerabilities()),
-                'previous_validated_passed_back' => \count($previousFindings),
-            ]);
-
-            if (0 === $newFindings) {
-                break;
-            }
-        } while ($iteration < $this->auditLoopSettings->maxIterations);
+            $newFindings = $this->runIteration($mapping, $files, $auditContext, $iteration);
+        } while (0 !== $newFindings && $iteration < $this->auditLoopSettings->maxIterations);
 
         $auditContext->setMeta('audit.baseline_skipped', \count($this->skippedFingerprints($auditContext)));
         $auditContext->setMeta('audit.iterations', $iteration);
         $auditContext->setMeta('audit.total_findings', \count($auditContext->vulnerabilities()));
         $auditContext->setMeta('audit.validated', \count($auditContext->validatedVulnerabilities()));
         $auditContext->setMeta('audit.risk_score', $auditContext->riskScore());
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function runIteration(SymfonyMapping $symfonyMapping, array $files, AuditContext $auditContext, int $iteration): int
+    {
+        $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->auditLoopSettings->maxIterations));
+        $this->progressReporter->report(ProgressEvent::AuditIterationStarted->value, [
+            'iteration' => $iteration,
+            'max_iterations' => $this->auditLoopSettings->maxIterations,
+        ]);
+
+        $previousFindings = array_values($auditContext->validatedVulnerabilities());
+        $rejectedFindings = $this->rejectedFindings($auditContext);
+        $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
+        $rawFindings = $this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext);
+        $filtered = $this->filterByConfidence($rawFindings);
+
+        if ([] === $filtered) {
+            $this->logger->info('Attacker found no new findings, stopping');
+            $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'no_new_findings']);
+
+            return 0;
+        }
+
+        $reviewCandidates = $this->withoutBaselineAccepted($filtered, $auditContext);
+
+        if ([] === $reviewCandidates) {
+            $this->logger->info('Every remaining finding is baseline-accepted, stopping');
+            $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'all_baseline_accepted']);
+
+            return 0;
+        }
+
+        $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
+            'findings' => \count($reviewCandidates),
+        ]);
+
+        $reviewed = $this->reviewPersistingOnAbort($reviewCandidates, $files, $auditContext);
+        $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext);
+
+        $acceptedCount = \count(array_filter(
+            $reviewed,
+            static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(),
+        ));
+        $this->reportReviewCompleted($reviewed, $acceptedCount, $auditContext);
+
+        $this->logger->info('Iteration complete', [
+            'iteration' => $iteration,
+            'attacker_found' => \count($rawFindings),
+            'reviewer_accepted' => $acceptedCount,
+            'new_unique' => $newFindings,
+            'total' => \count($auditContext->vulnerabilities()),
+            'previous_validated_passed_back' => \count($previousFindings),
+        ]);
+
+        return $newFindings;
+    }
+
+    /**
+     * @param list<Vulnerability> $findings
+     * @param list<ProjectFile>   $files
+     *
+     * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function reviewPersistingOnAbort(array $findings, array $files, AuditContext $auditContext): array
+    {
+        try {
+            return $this->reviewerAgent->review($findings, $files, $auditContext, $auditContext->isCacheBypassed());
+        } catch (BudgetExceededException|LLMProviderException $exception) {
+            $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param list<Vulnerability> $reviewed
+     */
+    private function reportReviewCompleted(array $reviewed, int $acceptedCount, AuditContext $auditContext): void
+    {
+        $rejectedCount = \count(array_filter(
+            $reviewed,
+            static fn (Vulnerability $vulnerability): bool => self::wasRejected($vulnerability, $auditContext),
+        ));
+        $this->progressReporter->report(ProgressEvent::ReviewCompleted->value, [
+            'accepted' => $acceptedCount,
+            'rejected' => $rejectedCount,
+            'failed' => \count($reviewed) - $acceptedCount - $rejectedCount,
+        ]);
     }
 
     /**
