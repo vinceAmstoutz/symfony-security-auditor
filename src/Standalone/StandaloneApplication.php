@@ -15,8 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
 use Override;
 use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\ExceptionInterface;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -35,8 +38,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
  *
  * Mutable by design — non-readonly because the invocation is captured on the
  * way in and read back later: the command line if something throws, whether
- * the run needs provider credentials when the audit command is built, and
- * whether it only describes the commands it would build.
+ * the run needs provider credentials when the audit command is built, whether
+ * it only describes the commands it would build, and which project it names.
  * See .claude/rules/php-classes.md for the opt-out policy.
  *
  * @internal not part of the BC promise — see docs/versioning.md
@@ -71,6 +74,8 @@ final class StandaloneApplication extends Application
 
     private bool $describing = false;
 
+    private ?InputInterface $input = null;
+
     public function __construct(
         string $name,
         string $version,
@@ -89,6 +94,7 @@ final class StandaloneApplication extends Application
     #[Override]
     public function doRun(InputInterface $input, OutputInterface $output): int
     {
+        $this->input = $input;
         $this->invocation = $input instanceof ArgvInput ? $this->echoable($input) : '';
         $this->reachesNoProvider = $input->hasParameterOption(['--dry-run', '--show-scanned'], true);
         $this->describing = $input->hasParameterOption(['--help', '-h'], true) || $this->namesADescribingCommand($this->getCommandName($input));
@@ -133,6 +139,46 @@ final class StandaloneApplication extends Application
     public function needsProviderCredentials(): bool
     {
         return !$this->reachesNoProvider;
+    }
+
+    /**
+     * The `project-path` the command line gives the audit, read by binding a
+     * copy of it to the command's own definition — the only way to tell that
+     * argument from the value of an option — before the command is built from
+     * the configuration, which is where the audited project's own file has to
+     * be chosen. Null when none is given or the line does not bind, which the
+     * command itself then reports.
+     */
+    public function projectPathGivenTo(Command $command): ?string
+    {
+        if (!$this->input instanceof InputInterface) {
+            return null;
+        }
+
+        $input = clone $this->input;
+
+        try {
+            $input->bind($this->definitionWithApplicationOf($command));
+        } catch (ExceptionInterface) {
+            return null;
+        }
+
+        $projectPath = $input->getArgument('project-path');
+
+        return \is_string($projectPath) && '' !== trim($projectPath) ? $projectPath : null;
+    }
+
+    private function definitionWithApplicationOf(Command $command): InputDefinition
+    {
+        $applicationDefinition = $this->getDefinition();
+        $commandDefinition = $command->getNativeDefinition();
+
+        return new InputDefinition([
+            ...$applicationDefinition->getArguments(),
+            ...$commandDefinition->getArguments(),
+            ...$applicationDefinition->getOptions(),
+            ...$commandDefinition->getOptions(),
+        ]);
     }
 
     /**

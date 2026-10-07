@@ -52,6 +52,17 @@ final readonly class StandaloneConfigLoader
         private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
     ) {}
 
+    public function withProjectConfigFile(?string $projectConfigFile): self
+    {
+        return new self(
+            $this->xdgConfigPathResolver,
+            $this->standalonePlatformConfigResolver,
+            $projectConfigFile,
+            $this->projectConfigValueGuard,
+            $this->standaloneConfigFileReader,
+        );
+    }
+
     /**
      * @throws UnresolvableConfigPathException
      * @throws MissingPlatformException
