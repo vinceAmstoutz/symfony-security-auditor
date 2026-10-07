@@ -350,7 +350,7 @@ flowchart TD
     META --> END
 ```
 
-Duplicate detection: two vulnerabilities are duplicates when their IDs match, or when `filePath`, `type`, and line ranges all overlap.
+Duplicate detection: two vulnerabilities are duplicates when their IDs match, or when `filePath`, `type`, and line ranges all overlap. Duplicates collapse to the better one: a reviewer-validated finding beats any other, then the higher severity wins, then the higher confidence, and a tie keeps the finding seen first. A later verdict never lowers the severity already reported, except that a same-severity `corrected_type` reclassifies the finding.
 
 ### `AttackerAgent`
 

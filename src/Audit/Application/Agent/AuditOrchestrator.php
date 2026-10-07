@@ -226,7 +226,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * it. Draining unconditionally (not only on an abort) also keeps the
      * coverage recorder's buffer from accumulating findings across iterations
      * that a later abort would otherwise re-review as if they were never
-     * persisted.
+     * persisted. Findings sharing an id collapse to the one
+     * {@see FindingPrecedence} keeps.
      *
      * @param list<Vulnerability> $rawFindings
      * @param list<Vulnerability> $recoveredFindings
@@ -235,16 +236,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      */
     private function mergeRecoveredFindings(array $rawFindings, array $recoveredFindings): array
     {
-        $byId = [];
-        foreach ($rawFindings as $rawFinding) {
-            $byId[$rawFinding->id()] = $rawFinding;
-        }
-
-        foreach ($recoveredFindings as $recoveredFinding) {
-            $byId[$recoveredFinding->id()] = $recoveredFinding;
-        }
-
-        return array_values($byId);
+        return FindingPrecedence::collapseById([...$rawFindings, ...$recoveredFindings]);
     }
 
     /**
@@ -430,12 +422,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $newFindings = 0;
 
         foreach ($reviewed as $vulnerability) {
-            if ($this->isDuplicate($vulnerability, $auditContext)) {
-                continue;
+            if ($this->admit($vulnerability, $auditContext)) {
+                $auditContext->addVulnerability($vulnerability);
+                ++$newFindings;
             }
-
-            $auditContext->addVulnerability($vulnerability);
-            ++$newFindings;
         }
 
         return $newFindings;
@@ -444,35 +434,53 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     /**
      * A same-id repeat is a duplicate unless it corrects an earlier verdict —
      * an already-validated entry is sticky against a later spurious rejection
-     * (that never displaces it), but a corrected accept must be allowed to
-     * replace a stale reject, and a later iteration's validated verdict must
-     * be allowed to replace an earlier validated verdict when the severity or
-     * type differs (e.g. a reviewer's `adjusted_severity`/`corrected_type`
-     * applied on re-discovery) — otherwise a genuine correction silently
-     * vanishes from the report and the stale, less-accurate verdict persists.
+     * (that never displaces it), a corrected accept must be allowed to replace
+     * a stale reject, and a later iteration's validated verdict replaces an
+     * earlier validated verdict when it raises the severity or reclassifies the
+     * type (e.g. a reviewer's `adjusted_severity`/`corrected_type` applied on
+     * re-discovery) — a verdict never lowers the severity already reported.
+     *
+     * A finding at a new id that overlaps validated findings of the same file
+     * and type collapses with them: it is admitted only when it outranks every
+     * one of them, and then takes their place.
      */
-    private function isDuplicate(Vulnerability $vulnerability, AuditContext $auditContext): bool
+    private function admit(Vulnerability $vulnerability, AuditContext $auditContext): bool
     {
         $existingById = $auditContext->vulnerabilities()[$vulnerability->id()] ?? null;
         if ($existingById instanceof Vulnerability) {
-            return $this->isSameIdDuplicate($existingById, $vulnerability);
+            return !$this->isSameIdDuplicate($existingById, $vulnerability);
         }
 
-        foreach ($auditContext->validatedVulnerabilities() as $existing) {
-            if ($existing->filePath() === $vulnerability->filePath()
+        $overlapped = $this->overlappingValidated($vulnerability, $auditContext);
+        foreach ($overlapped as $existing) {
+            if (!FindingPrecedence::prevails($vulnerability, $existing)) {
+                return false;
+            }
+        }
+
+        foreach ($overlapped as $existing) {
+            $auditContext->removeVulnerability($existing->id());
+        }
+
+        return true;
+    }
+
+    /**
+     * @return list<Vulnerability>
+     */
+    private function overlappingValidated(Vulnerability $vulnerability, AuditContext $auditContext): array
+    {
+        return array_values(array_filter(
+            $auditContext->validatedVulnerabilities(),
+            fn (Vulnerability $existing): bool => $existing->filePath() === $vulnerability->filePath()
                 && $existing->type() === $vulnerability->type()
                 && $this->linesOverlap(
                     $existing->lineStart(),
                     $existing->lineEnd(),
                     $vulnerability->lineStart(),
                     $vulnerability->lineEnd(),
-                )
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+                ),
+        ));
     }
 
     private function isSameIdDuplicate(Vulnerability $existingById, Vulnerability $vulnerability): bool
@@ -482,11 +490,17 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 return true;
             }
 
-            return $existingById->severity() === $vulnerability->severity()
-                && $existingById->type() === $vulnerability->type();
+            return !FindingPrecedence::prevails($vulnerability, $existingById)
+                && !$this->isReclassification($existingById, $vulnerability);
         }
 
         return !$vulnerability->isReviewerValidated();
+    }
+
+    private function isReclassification(Vulnerability $existingById, Vulnerability $vulnerability): bool
+    {
+        return $existingById->severity() === $vulnerability->severity()
+            && $existingById->type() !== $vulnerability->type();
     }
 
     private function linesOverlap(int $start1, int $end1, int $start2, int $end2): bool
