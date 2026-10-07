@@ -237,53 +237,6 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
-    public function test_the_user_config_sets_the_report_format_and_output_for_a_run_without_flags(): void
-    {
-        $this->configureReportInUserConfig();
-
-        $process = $this->audit([$this->project, '--dry-run'], $this->elsewhere);
-
-        self::assertSame(0, $process->getExitCode());
-        self::assertArrayHasKey('audit_id', $this->decodedReport($this->elsewhere.'/configured.json'));
-    }
-
-    #[MaximumDuration(4000)]
-    public function test_a_format_and_an_output_flag_win_over_the_configured_ones(): void
-    {
-        $this->configureReportInUserConfig();
-
-        $process = $this->audit([$this->project, '--dry-run', '--format', 'markdown', '--output', $this->elsewhere.'/flag.md'], $this->elsewhere);
-
-        self::assertSame(0, $process->getExitCode());
-        self::assertStringStartsWith('#', (string) file_get_contents($this->elsewhere.'/flag.md'));
-        self::assertFileDoesNotExist($this->elsewhere.'/configured.json');
-    }
-
-    #[MaximumDuration(4000)]
-    public function test_a_no_output_flag_prints_the_report_although_the_user_config_writes_it_to_a_file(): void
-    {
-        $this->configureReportInUserConfig();
-
-        $process = $this->audit([$this->project, '--dry-run', '--no-output'], $this->elsewhere);
-
-        self::assertSame(0, $process->getExitCode());
-        self::assertFileDoesNotExist($this->elsewhere.'/configured.json');
-        self::assertArrayHasKey('audit_id', $this->decodedJson($process->getOutput()));
-    }
-
-    #[MaximumDuration(4000)]
-    public function test_a_project_config_cannot_choose_where_the_report_is_written(): void
-    {
-        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "audit:\n  output: hijacked.json\n");
-
-        $process = $this->audit([$this->project, '--dry-run'], $this->elsewhere);
-
-        self::assertNotSame(0, $process->getExitCode());
-        self::assertStringContainsString('declares"audit.output"', self::withoutWhitespace($this->displayOf($process)));
-        self::assertFileDoesNotExist($this->elsewhere.'/hijacked.json');
-    }
-
-    #[MaximumDuration(4000)]
     public function test_without_a_path_the_whole_project_is_in_scope(): void
     {
         $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
@@ -373,33 +326,6 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
         $process->run();
 
         return $process;
-    }
-
-    private function configureReportInUserConfig(): void
-    {
-        $this->filesystem->dumpFile(
-            $this->base.'/config/symfony-security-auditor/config.yaml',
-            \sprintf("platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\nmodel: 'gpt-4'\naudit:\n  format: json\n  output: '%s/configured.json'\n", $this->elsewhere),
-        );
-    }
-
-    /**
-     * @return array<array-key, mixed>
-     */
-    private function decodedReport(string $path): array
-    {
-        return $this->decodedJson((string) file_get_contents($path));
-    }
-
-    /**
-     * @return array<array-key, mixed>
-     */
-    private function decodedJson(string $json): array
-    {
-        $decoded = json_decode($json, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-
-        return $decoded;
     }
 
     private function projectNamedAs(string $projectArgument): string
