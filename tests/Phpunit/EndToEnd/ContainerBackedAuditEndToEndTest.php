@@ -408,12 +408,13 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json']]);
 
-        $configured = $this->auditCommandTester($kernel);
-        $configured->execute(['project-path' => $this->fixtureDir]);
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
         $overridden = $this->auditCommandTester($kernel);
         $overridden->execute(['project-path' => $this->fixtureDir, '--format' => 'console']);
 
-        self::assertSame(3, $this->decode($configured->getDisplay())['files_scanned']);
+        self::assertSame(3, $this->decode($commandTester->getDisplay())['files_scanned']);
         self::assertStringContainsString('RISK LEVEL', $overridden->getDisplay());
         self::assertStringNotContainsString('"files_scanned"', $overridden->getDisplay());
     }
