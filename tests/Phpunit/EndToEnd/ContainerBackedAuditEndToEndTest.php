@@ -475,6 +475,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $withTheConfiguredBaseline = $this->decode($this->execute($kernel, 'json'));
         $commandTester = $this->auditCommandTester($kernel);
         $commandTester->execute(['project-path' => $this->fixtureDir, '--baseline' => $this->fixtureDir.'/another-baseline.json', '--format' => 'json']);
+
         $withTheFlag = $this->decode($commandTester->getDisplay());
 
         self::assertSame(0, $withTheConfiguredBaseline['total_vulnerabilities']);
@@ -491,6 +492,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $served = $this->decode($this->execute($kernel, 'json'));
         $commandTester = $this->auditCommandTester($kernel);
         $commandTester->execute(['project-path' => $this->fixtureDir, '--no-cache' => true, '--format' => 'json']);
+
         $bypassed = $this->decode($commandTester->getDisplay());
 
         self::assertContains('cached', $this->attackerStatuses($served));
@@ -506,6 +508,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $configured = $this->decode($this->execute($kernel, 'json'));
         $commandTester = $this->auditCommandTester($kernel);
         $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['src/Controller'], '--format' => 'json']);
+
         $overridden = $this->decode($commandTester->getDisplay());
 
         self::assertSame(['src/Service/Clean.php'], $this->analyzedFiles($configured));

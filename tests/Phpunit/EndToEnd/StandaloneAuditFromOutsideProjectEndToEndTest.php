@@ -176,12 +176,12 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
             "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\nmodel: 'gpt-4'\nscan:\n  included_paths:\n    - src/Controller\n",
         );
 
-        $configured = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
+        $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
         $overridden = $this->audit([$this->project, '--path', 'src/Command', '--show-scanned'], $this->elsewhere);
 
-        self::assertSame(0, $configured->getExitCode());
+        self::assertSame(0, $process->getExitCode());
         self::assertSame(0, $overridden->getExitCode());
-        $this->assertListsExactly(['src/Controller/BlogController.php'], self::displayOf($configured));
+        $this->assertListsExactly(['src/Controller/BlogController.php'], self::displayOf($process));
         $this->assertListsExactly(self::COMMAND_FILES, self::displayOf($overridden));
     }
 
@@ -193,12 +193,12 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
             "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\nmodel: 'gpt-4'\nscan:\n  included_paths:\n    - src/Controller\n",
         );
 
-        $userConfigAlone = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
+        $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
         $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "scan:\n  included_paths:\n    - src/Entity\n");
         $projectConfigOverUser = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
         $flagOverBoth = $this->audit([$this->project, '--path', 'src/Command', '--show-scanned'], $this->elsewhere);
 
-        $this->assertListsExactly(['src/Controller/BlogController.php'], self::displayOf($userConfigAlone));
+        $this->assertListsExactly(['src/Controller/BlogController.php'], self::displayOf($process));
         $this->assertListsExactly(['src/Entity/User.php'], self::displayOf($projectConfigOverUser));
         $this->assertListsExactly(self::COMMAND_FILES, self::displayOf($flagOverBoth));
     }
@@ -295,13 +295,13 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     #[MaximumDuration(4000)]
     public function test_a_dry_run_scoped_to_a_directory_estimates_less_than_the_whole_project(): void
     {
-        $whole = $this->audit([$this->project, '--dry-run'], $this->elsewhere);
+        $process = $this->audit([$this->project, '--dry-run'], $this->elsewhere);
         $scoped = $this->audit([$this->project, '--path', 'src/Command', '--dry-run'], $this->elsewhere);
 
-        self::assertSame(0, $whole->getExitCode());
+        self::assertSame(0, $process->getExitCode());
         self::assertSame(0, $scoped->getExitCode());
-        self::assertGreaterThan(0, self::estimatedInputTokens($scoped));
-        self::assertLessThan(self::estimatedInputTokens($whole), self::estimatedInputTokens($scoped));
+        self::assertGreaterThan(0, $this->estimatedInputTokens($scoped));
+        self::assertLessThan($this->estimatedInputTokens($process), $this->estimatedInputTokens($scoped));
     }
 
     #[MaximumDuration(4000)]
@@ -309,9 +309,9 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     {
         $process = $this->audit(['src/Command', '--show-scanned'], $this->elsewhere);
 
-        $output = self::withoutWhitespace(self::displayOf($process));
+        $output = $this->withoutWhitespace(self::displayOf($process));
         self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString(self::withoutWhitespace(\sprintf('Project path "%s/src/Command" is not a valid directory', $this->elsewhere)), $output);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Project path "%s/src/Command" is not a valid directory', $this->elsewhere)), $output);
         self::assertStringNotContainsString('Nofilesmatched', $output);
     }
 
@@ -320,9 +320,9 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     {
         $process = $this->audit([$this->project, '--path', $this->base.'/elsewhere', '--show-scanned'], $this->elsewhere);
 
-        $output = self::withoutWhitespace(self::displayOf($process));
+        $output = $this->withoutWhitespace(self::displayOf($process));
         self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString(self::withoutWhitespace(\sprintf('The --path "%s/elsewhere" lies outside the project "%s"', $this->base, $this->project)), $output);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('The --path "%s/elsewhere" lies outside the project "%s"', $this->base, $this->project)), $output);
         self::assertStringContainsString('relativetotheprojectroot', $output);
     }
 
@@ -333,8 +333,8 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
 
         self::assertSame(0, $process->getExitCode());
         self::assertStringContainsString(
-            self::withoutWhitespace(\sprintf('No files matched under "%s" for --path src/Missing.', $this->project)),
-            self::withoutWhitespace(self::displayOf($process)),
+            $this->withoutWhitespace(\sprintf('No files matched under "%s" for --path src/Missing.', $this->project)),
+            $this->withoutWhitespace(self::displayOf($process)),
         );
     }
 
@@ -345,8 +345,8 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
 
         self::assertSame(0, $process->getExitCode());
         self::assertStringContainsString(
-            self::withoutWhitespace(\sprintf('No files matched under "%s" for --path src/Command.', $this->elsewhere)),
-            self::withoutWhitespace(self::displayOf($process)),
+            $this->withoutWhitespace(\sprintf('No files matched under "%s" for --path src/Command.', $this->elsewhere)),
+            $this->withoutWhitespace(self::displayOf($process)),
         );
     }
 
@@ -428,12 +428,12 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
         return $process->getOutput().$process->getErrorOutput();
     }
 
-    private static function withoutWhitespace(string $text): string
+    private function withoutWhitespace(string $text): string
     {
         return preg_replace('/\s+/', '', $text) ?? $text;
     }
 
-    private static function estimatedInputTokens(Process $process): int
+    private function estimatedInputTokens(Process $process): int
     {
         self::assertSame(1, preg_match('/Tokens:\s+([\d,]+) in/', self::displayOf($process), $matches));
 

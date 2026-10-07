@@ -65,10 +65,10 @@ final class ScopedScanTest extends TestCase
      */
     public function test_a_scanner_that_cannot_take_paths_has_its_result_narrowed_to_them(): void
     {
-        $kept = $this->file('apps/api/B.php');
-        $fixedScanner = new FixedScanner([$this->file('src/A.php'), $kept, $this->file('apps/api-shared/C.php')]);
+        $projectFile = $this->file('apps/api/B.php');
+        $fixedScanner = new FixedScanner([$this->file('src/A.php'), $projectFile, $this->file('apps/api-shared/C.php')]);
 
-        self::assertSame([$kept], ScopedScan::files($fixedScanner, '/project', ['apps/api']));
+        self::assertSame([$projectFile], ScopedScan::files($fixedScanner, '/project', ['apps/api']));
     }
 
     /**
