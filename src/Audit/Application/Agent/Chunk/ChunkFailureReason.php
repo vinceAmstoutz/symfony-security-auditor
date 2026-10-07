@@ -43,7 +43,7 @@ final readonly class ChunkFailureReason
 
     public static function fromThrowable(Throwable $throwable): string
     {
-        $message = u($throwable->getMessage())->collapseWhitespace()->truncate(self::MAX_MESSAGE_LENGTH, '…')->toString();
+        $message = u(mb_scrub($throwable->getMessage(), 'UTF-8'))->collapseWhitespace()->truncate(self::MAX_MESSAGE_LENGTH, '…')->toString();
 
         return '' === $message ? $throwable::class : $message;
     }

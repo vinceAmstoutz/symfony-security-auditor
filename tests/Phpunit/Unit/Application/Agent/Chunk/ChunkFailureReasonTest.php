@@ -50,6 +50,11 @@ final class ChunkFailureReasonTest extends TestCase
         self::assertSame(\sprintf('%s…', str_repeat('a', 119)), $reason);
     }
 
+    public function test_a_failure_message_that_is_not_valid_utf8_is_still_named_instead_of_aborting_the_audit(): void
+    {
+        self::assertSame('Connection lost: bad ? byte', ChunkFailureReason::fromThrowable(new RuntimeException("Connection lost: bad \xFF byte")));
+    }
+
     public function test_a_failure_without_a_message_is_named_by_its_class(): void
     {
         self::assertSame(RuntimeException::class, ChunkFailureReason::fromThrowable(new RuntimeException('')));
