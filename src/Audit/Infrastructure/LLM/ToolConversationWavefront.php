@@ -109,6 +109,7 @@ final readonly class ToolConversationWavefront
         $states = $this->initializeConversationStates($window);
 
         for ($round = 0; $round < $maxToolIterations && !ConversationState::allAnswered($states); ++$round) {
+            $states = ConversationState::enterRound($states, $round, $maxToolIterations);
             $states = $this->runWavefrontRound($platform, $states, $window, $maxToolIterations);
         }
 
@@ -446,19 +447,25 @@ final readonly class ToolConversationWavefront
 
     /**
      * @param list<ToolCall> $toolCalls
+     *
+     * @throws InvalidTokenUsageException
      */
     private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolLLMRequest $toolLLMRequest): ConversationState
     {
         $conversationState->bag->add(new AssistantMessage(...$toolCalls));
 
         $toolResults = [];
-        foreach ($toolCalls as $toolCall) {
+        foreach ($toolCalls as $position => $toolCall) {
             $result = $toolLLMRequest->tools->execute($toolCall->getName(), $toolCall->getArguments());
-            $conversationState->bag->add(new ToolCallMessage($toolCall, new Text($result)));
+            $conversationState->bag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $conversationState->roundsLeft, $position === array_key_last($toolCalls)))));
             $toolResults[] = $result;
         }
 
-        return $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+
+        return FinalRound::isConcludedBy($conversationState->roundsLeft, $toolLLMRequest->tools, ...$toolCalls)
+            ? $conversationState->withResponse(FinalRound::answer($this->model, TokenUsageSnapshot::of($conversationState->input, $conversationState->output, $conversationState->cacheRead, $conversationState->cacheCreation)))
+            : $conversationState;
     }
 
     /**

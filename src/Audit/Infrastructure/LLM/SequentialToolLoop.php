@@ -20,6 +20,7 @@ use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\Result\DeferredResult;
+use Symfony\AI\Platform\Result\ToolCall;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -88,6 +89,7 @@ final readonly class SequentialToolLoop
         $totalCacheReadTokens = 0;
         $totalCacheCreationTokens = 0;
         while ($iteration < $maxToolIterations) {
+            $roundsLeft = $maxToolIterations - $iteration;
             $this->budgetTracker?->assertWithinBudget();
             $deferredResult = $this->invokeOrEndConversation($messageBag, $options, $estimatedInputTokens, $iteration, TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens));
             if ($deferredResult instanceof LLMResponse) {
@@ -137,20 +139,12 @@ final readonly class SequentialToolLoop
                 );
             }
 
-            $messageBag->add(new AssistantMessage(...$toolCalls));
-
-            $toolResults = [];
-            foreach ($toolCalls as $toolCall) {
-                $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
-                $messageBag->add(new ToolCallMessage($toolCall, new Text($result)));
-                $toolResults[] = $result;
-                $this->logger->debug('Tool invoked', [
-                    'tool' => $toolCall->getName(),
-                    'iteration' => $iteration + 1,
-                ]);
-            }
-
+            $toolResults = $this->executeToolCalls($messageBag, $toolRegistry, $toolCalls, $iteration, $roundsLeft);
             $estimatedInputTokens += $this->promptTokenEstimator->estimate(...$toolResults);
+
+            if (FinalRound::isConcludedBy($roundsLeft, $toolRegistry, ...$toolCalls)) {
+                return FinalRound::answer($this->model, TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens));
+            }
 
             ++$iteration;
         }
@@ -167,6 +161,29 @@ final readonly class SequentialToolLoop
             'max_tool_iterations',
             TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens),
         );
+    }
+
+    /**
+     * @param list<ToolCall> $toolCalls
+     *
+     * @return list<string>
+     */
+    private function executeToolCalls(MessageBag $messageBag, ToolRegistry $toolRegistry, array $toolCalls, int $iteration, int $roundsLeft): array
+    {
+        $messageBag->add(new AssistantMessage(...$toolCalls));
+
+        $toolResults = [];
+        foreach ($toolCalls as $position => $toolCall) {
+            $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
+            $messageBag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $roundsLeft, $position === array_key_last($toolCalls)))));
+            $toolResults[] = $result;
+            $this->logger->debug('Tool invoked', [
+                'tool' => $toolCall->getName(),
+                'iteration' => $iteration + 1,
+            ]);
+        }
+
+        return $toolResults;
     }
 
     /**

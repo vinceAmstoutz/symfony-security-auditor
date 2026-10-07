@@ -117,7 +117,7 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 - Configuration value objects in `Audit\Domain\Configuration\*` (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
 - Domain exceptions: `LLMProviderException` (signals non-transient platform failure; callers may catch this to detect misconfigured or retired models) and its subclass `LLMRequestTooLargeException` (since 1.21; a prompt the model cannot fit, which a custom `LLMClientInterface` throws to have the chunk split — see [`docs/extending.md`](extending.md#contract))
-- `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
+- `Tool\ToolInterface`, `Tool\RecordingToolInterface` (since 1.22), `Tool\ToolRegistryFactoryInterface`
 - `Pipeline\PipelineInterface`, `Pipeline\StageInterface`, `Pipeline\CoverageRecorderInterface`
 
 ### Domain models and exceptions
