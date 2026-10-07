@@ -26,7 +26,7 @@ final readonly class MarkdownTextEscaper
     {
         $sanitized = TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'));
 
-        return self::setextUnderlines(self::escapeStructuralMarkers($sanitized));
+        return self::setextUnderlines(self::bareAutolinks(self::escapeStructuralMarkers($sanitized)));
     }
 
     /**
@@ -48,6 +48,17 @@ final readonly class MarkdownTextEscaper
             ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]', '&#64;'],
             $backslashesEscaped,
         );
+    }
+
+    /**
+     * GFM turns a bare `scheme://` URL or `www.` address into a live link with
+     * no markup around it, so a finding could render a clickable attacker link.
+     * The colon of `://` and the dot after `www` are entity-encoded the way
+     * `@` is, which also defuses an email address.
+     */
+    private static function bareAutolinks(string $text): string
+    {
+        return preg_replace(['/:(?=\/\/)/', '/(www)\./i'], ['&#58;', '$1&#46;'], $text) ?? $text;
     }
 
     /**

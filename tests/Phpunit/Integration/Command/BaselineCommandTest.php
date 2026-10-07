@@ -157,6 +157,44 @@ final class BaselineCommandTest extends TestCase
         );
     }
 
+    public function test_annotate_prints_console_markup_in_a_finding_as_text(): void
+    {
+        $report = $this->writeReport([[
+            'type' => 'sql_injection',
+            'file' => 'src/<info>Foo</info>.php',
+            'title' => '<error>Boom</error> <href=https://evil.example>click</>',
+            'severity' => 'high',
+            'fingerprint' => 'SSA-0123456789AB',
+        ]]);
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['']);
+        $commandTester->execute(['report' => $report, 'baseline' => $this->tmpDir.'/baseline.json', '--annotate' => true]);
+
+        self::assertStringContainsString(
+            'Reason for accepting "<error>Boom</error> <href=https://evil.example>click</>" in src/<info>Foo</info>.php',
+            $commandTester->getDisplay(),
+        );
+    }
+
+    public function test_annotate_lets_a_finding_title_style_nothing_in_a_decorated_terminal(): void
+    {
+        $report = $this->writeReport([[
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php',
+            'title' => '<fg=red>Boom</>',
+            'severity' => 'high',
+            'fingerprint' => 'SSA-0123456789AB',
+        ]]);
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['']);
+        $commandTester->execute(['report' => $report, 'baseline' => $this->tmpDir.'/baseline.json', '--annotate' => true], ['decorated' => true]);
+
+        self::assertStringContainsString('<fg=red>Boom</>', $commandTester->getDisplay());
+        self::assertStringNotContainsString("\e[31m", $commandTester->getDisplay());
+    }
+
     public function test_an_empty_annotate_answer_skips_the_reason(): void
     {
         $report = $this->writeReport([$this->vulnerability('SQL Injection')]);

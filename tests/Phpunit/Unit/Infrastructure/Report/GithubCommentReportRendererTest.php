@@ -363,7 +363,7 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     {
         $output = $this->renderer->render($this->makeReport($this->titled('[click](https://evil.test)')));
 
-        self::assertStringContainsString('\\[click\\](https://evil.test)', $output);
+        self::assertStringContainsString('\\[click\\](https&#58;//evil.test)', $output);
     }
 
     /**

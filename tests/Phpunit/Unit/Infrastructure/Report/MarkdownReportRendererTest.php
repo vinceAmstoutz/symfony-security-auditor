@@ -107,7 +107,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('<details>[claude](https://evil.example)')));
 
-        self::assertStringContainsString('**Model:** &lt;details&gt;\\[claude\\](https://evil.example) ·', $output);
+        self::assertStringContainsString('**Model:** &lt;details&gt;\\[claude\\](https&#58;//evil.example) ·', $output);
     }
 
     /**
@@ -374,7 +374,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         $output = $this->renderer->render($this->makeReport($vulnerability));
 
         self::assertStringNotContainsString('[here](https://evil.example.com)', $output);
-        self::assertStringContainsString('Click \\[here\\](https://evil.example.com) for the PoC', $output);
+        self::assertStringContainsString('Click \\[here\\](https&#58;//evil.example.com) for the PoC', $output);
     }
 
     /**

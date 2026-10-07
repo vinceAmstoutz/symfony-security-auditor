@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
@@ -74,8 +75,8 @@ final readonly class BaselineCommand
         foreach ($baselineMergePlan->newFindings as $index => $newFinding) {
             $reason = $symfonyStyle->ask(\sprintf(
                 'Reason for accepting "%s" in %s (leave empty to skip)',
-                $this->sanitize($newFinding->title),
-                $this->sanitize($newFinding->file),
+                $this->sanitizedForPrompt($newFinding->title),
+                $this->sanitizedForPrompt($newFinding->file),
             ));
 
             if (\is_string($reason) && !u($reason)->trim()->isEmpty()) {
@@ -96,5 +97,15 @@ final readonly class BaselineCommand
     private function sanitize(string $value): string
     {
         return TerminalTextSanitizer::collapseToSingleLine(mb_scrub($value, 'UTF-8'));
+    }
+
+    /**
+     * A prompt is formatted as console markup, so a `<error>` or `<href=…>`
+     * tag in a finding would restyle or relink what the user reads instead of
+     * showing as text.
+     */
+    private function sanitizedForPrompt(string $value): string
+    {
+        return OutputFormatter::escape($this->sanitize($value));
     }
 }
