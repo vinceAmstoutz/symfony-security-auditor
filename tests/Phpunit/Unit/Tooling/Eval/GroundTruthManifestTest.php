@@ -118,6 +118,17 @@ final class GroundTruthManifestTest extends TestCase
         GroundTruthManifest::fromFile($this->write('{"findings":[{"file":"","type":"sql_injection"}]}'));
     }
 
+    /**
+     * @throws InvalidGroundTruthManifestException
+     */
+    public function test_the_position_of_the_first_invalid_finding_is_reported(): void
+    {
+        $this->expectException(InvalidGroundTruthManifestException::class);
+        $this->expectExceptionMessage('index 1');
+
+        GroundTruthManifest::fromFile($this->write('{"findings":[{"file":"src/A.php","type":"sql_injection"},"not an object"]}'));
+    }
+
     private function write(string $contents): string
     {
         $path = $this->tmpDir.'/ground-truth.json';

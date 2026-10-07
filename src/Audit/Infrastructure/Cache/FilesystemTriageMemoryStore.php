@@ -152,6 +152,16 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
             return [];
         }
 
+        return $this->arrayEntriesOf($decoded);
+    }
+
+    /**
+     * @param array<array-key, mixed> $decoded
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private function arrayEntriesOf(array $decoded): array
+    {
         $entries = [];
         foreach ($decoded as $entry) {
             if (\is_array($entry)) {

@@ -19,17 +19,11 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\ErrorHandler\BufferingLogger;
-use Symfony\Component\Validator\Validation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
@@ -52,12 +46,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\AuditOrchestratorHarness;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
@@ -114,225 +105,6 @@ final class AuditOrchestratorTest extends TestCase
 
         self::assertCount(1, $auditContext->vulnerabilities());
         self::assertCount(1, $auditContext->validatedVulnerabilities());
-    }
-
-    /**
-     * @throws InvalidTokenUsageException
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws LLMProviderException
-     */
-    public function test_it_persists_a_finding_validated_before_a_mid_review_budget_abort(): void
-    {
-        $attackerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $attackerLlm->method('complete')->willReturn($this->attackerResponse([
-            $this->vulnPayload(title: 'v1', lineStart: 10, lineEnd: 15),
-            $this->vulnPayload(title: 'v2', lineStart: 30, lineEnd: 40),
-        ]));
-        $callCount = 0;
-        $reviewerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
-            ++$callCount;
-            if (2 === $callCount) {
-                throw BudgetExceededException::forTokens(500, 100);
-            }
-
-            return $this->reviewerAcceptResponse();
-        });
-
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
-        $auditContext = $this->makeContextWithMapping();
-
-        $budgetExceeded = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException) {
-            $budgetExceeded = true;
-        }
-
-        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
-        self::assertCount(1, $auditContext->vulnerabilities());
-        self::assertCount(1, $auditContext->validatedVulnerabilities());
-        self::assertSame('v1', current($auditContext->validatedVulnerabilities())->title());
-    }
-
-    /**
-     * @throws InvalidTokenUsageException
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws LLMProviderException
-     */
-    public function test_it_reviews_and_persists_a_candidate_found_before_a_mid_attacker_budget_abort(): void
-    {
-        $files = [];
-        for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
-        }
-
-        $attackerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $callCount = 0;
-        $attackerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
-            ++$callCount;
-            if (2 === $callCount) {
-                throw BudgetExceededException::forTokens(500, 100);
-            }
-
-            return $this->attackerResponse([$this->vulnPayload(title: 'v1', filePath: 'src/Service/Service1.php')]);
-        });
-        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
-
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
-        $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setProjectFiles($files);
-        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
-
-        $budgetExceeded = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException) {
-            $budgetExceeded = true;
-        }
-
-        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
-        self::assertCount(1, $auditContext->vulnerabilities());
-        self::assertCount(1, $auditContext->validatedVulnerabilities());
-        self::assertSame('v1', current($auditContext->validatedVulnerabilities())->title());
-    }
-
-    /**
-     * @throws InvalidTokenUsageException
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws LLMProviderException
-     */
-    public function test_it_reports_review_start_before_reviewing_a_candidate_recovered_from_a_mid_attacker_budget_abort(): void
-    {
-        $files = [];
-        for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
-        }
-
-        $attackerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $callCount = 0;
-        $attackerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
-            ++$callCount;
-            if (2 === $callCount) {
-                throw BudgetExceededException::forTokens(500, 100);
-            }
-
-            return $this->attackerResponse([$this->vulnPayload(title: 'v1', filePath: 'src/Service/Service1.php')]);
-        });
-        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
-
-        $recordingProgressReporter = new RecordingProgressReporter();
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['recordingProgressReporter' => $recordingProgressReporter]);
-        $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setProjectFiles($files);
-        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
-
-        $budgetExceeded = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException) {
-            $budgetExceeded = true;
-        }
-
-        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
-
-        $reviewRelatedEvents = array_values(array_filter(
-            $recordingProgressReporter->events,
-            static fn (array $event): bool => \in_array($event[0], ['review.started', 'review.finding.reviewed'], true),
-        ));
-
-        self::assertSame('review.started', $reviewRelatedEvents[0][0]);
-        self::assertSame(1, $reviewRelatedEvents[0][1]['findings']);
-        self::assertSame('review.finding.reviewed', $reviewRelatedEvents[1][0]);
-    }
-
-    /**
-     * @throws InvalidTokenUsageException
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws LLMProviderException
-     */
-    public function test_it_swallows_a_second_abort_while_reviewing_a_recovered_candidate(): void
-    {
-        $files = [];
-        for ($i = 1; $i <= 11; ++$i) {
-            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
-        }
-
-        $attackerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $callCount = 0;
-        $attackerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
-            ++$callCount;
-            if (2 === $callCount) {
-                throw BudgetExceededException::forTokens(500, 100);
-            }
-
-            return $this->attackerResponse([$this->vulnPayload(title: 'v1', filePath: 'src/Service/Service1.php')]);
-        });
-        $reviewerLlm->method('complete')->willThrowException(BudgetExceededException::forTokens(500, 100));
-
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
-        $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->setProjectFiles($files);
-        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
-
-        $budgetExceeded = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException) {
-            $budgetExceeded = true;
-        }
-
-        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow the original attacker abort.');
-        self::assertCount(0, $auditContext->vulnerabilities());
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws InvalidTokenUsageException
-     * @throws BudgetExceededException
-     * @throws LLMProviderException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_it_recovers_a_finding_recorded_by_the_attacker_but_omitted_from_its_return_value(): void
-    {
-        $vulnerability = Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Hidden', 0.9),
-            new CodeLocation('src/A.php', 1, 2),
-            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
-            'c',
-        );
-
-        // Simulates a chunk whose conversation swallowed a generic (non-abort)
-        // Throwable after a partial record_vulnerability success: the finding
-        // reached the coverage recorder, but AttackerAgent::analyze() still
-        // returns normally with it missing from the aggregate list.
-        $recordingAttackerAgent = new RecordingAttackerAgent([], null, [$vulnerability]);
-
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
-        $reviewerAgent = new ReviewerAgent(
-            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
-            new ReviewerModeConfiguration(),
-        );
-
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
-        $auditContext = $this->makeContextWithMapping();
-
-        $auditOrchestrator->orchestrate($auditContext);
-
-        self::assertCount(1, $auditContext->vulnerabilities());
-        self::assertCount(1, $auditContext->validatedVulnerabilities());
-        self::assertSame('Hidden', current($auditContext->validatedVulnerabilities())->title());
     }
 
     /**
@@ -629,6 +401,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($auditContext);
 
         self::assertContains(['review.skipped', ['reason' => 'all_baseline_accepted']], $recordingProgressReporter->events);
+        self::assertNotContains('review.started', array_column($recordingProgressReporter->events, 0));
     }
 
     /**
@@ -1430,7 +1203,10 @@ final class AuditOrchestratorTest extends TestCase
         ));
 
         self::assertCount(1, $stoppedLogs);
-        self::assertContains(['review.skipped', ['reason' => 'no_new_findings']], $recordingProgressReporter->events);
+        self::assertSame(
+            [['review.skipped', ['reason' => 'no_new_findings']]],
+            array_values(array_filter($recordingProgressReporter->events, static fn (array $event): bool => 'review.skipped' === $event[0])),
+        );
     }
 
     /**
@@ -2092,46 +1868,6 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      * @throws InvalidTokenUsageException
-     */
-    public function test_it_persists_a_finding_validated_before_a_mid_review_provider_abort(): void
-    {
-        $attackerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $attackerLlm->method('complete')->willReturn($this->attackerResponse([
-            $this->vulnPayload(title: 'v1', lineStart: 10, lineEnd: 15),
-            $this->vulnPayload(title: 'v2', lineStart: 30, lineEnd: 40),
-        ]));
-        $callCount = 0;
-        $reviewerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
-            ++$callCount;
-            if (2 === $callCount) {
-                throw new LLMProviderException('provider failure');
-            }
-
-            return $this->reviewerAcceptResponse();
-        });
-
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
-        $auditContext = $this->makeContextWithMapping();
-
-        $providerFailed = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (LLMProviderException) {
-            $providerFailed = true;
-        }
-
-        self::assertTrue($providerFailed, 'The orchestrator must rethrow LLMProviderException.');
-        self::assertCount(1, $auditContext->vulnerabilities());
-        self::assertCount(1, $auditContext->validatedVulnerabilities());
-        self::assertSame('v1', current($auditContext->validatedVulnerabilities())->title());
-    }
-
-    /**
-     * @throws BudgetExceededException
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws InvalidTokenUsageException
      * @throws LLMProviderException
      */
     public function test_it_logs_the_exact_confidence_floor_drop_context(): void
@@ -2200,245 +1936,6 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
-     * @throws BudgetExceededException
-     * @throws InvalidAuditContextException
-     * @throws InvalidCodeLocationException
-     * @throws InvalidProjectFileException
-     * @throws InvalidTokenUsageException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_it_reviews_a_candidate_found_before_a_mid_attacker_provider_abort(): void
-    {
-        $vulnerability = Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Recovered', 0.9),
-            new CodeLocation('src/A.php', 1, 2),
-            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
-            'c',
-        );
-        $recordingAttackerAgent = new RecordingAttackerAgent([], new LLMProviderException('provider failure'), [$vulnerability]);
-
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
-        $reviewerAgent = new ReviewerAgent(
-            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
-            new ReviewerModeConfiguration(),
-        );
-
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
-        $auditContext = $this->makeContextWithMapping();
-
-        $providerFailed = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (LLMProviderException) {
-            $providerFailed = true;
-        }
-
-        self::assertTrue($providerFailed, 'The orchestrator must rethrow the attacker LLMProviderException.');
-        self::assertCount(1, $auditContext->vulnerabilities());
-        self::assertCount(1, $auditContext->validatedVulnerabilities());
-        self::assertSame('Recovered', current($auditContext->validatedVulnerabilities())->title());
-    }
-
-    /**
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws LLMProviderException
-     */
-    public function test_it_does_not_report_review_start_when_no_candidate_survives_an_attacker_abort(): void
-    {
-        $recordingAttackerAgent = new RecordingAttackerAgent([], BudgetExceededException::forTokens(500, 100), []);
-
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerAgent = new ReviewerAgent(
-            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
-            new ReviewerModeConfiguration(),
-        );
-
-        $recordingProgressReporter = new RecordingProgressReporter();
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), $recordingProgressReporter);
-        $auditContext = $this->makeContextWithMapping();
-
-        $budgetExceeded = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException) {
-            $budgetExceeded = true;
-        }
-
-        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow the attacker BudgetExceededException.');
-        self::assertSame(
-            [],
-            array_values(array_filter(
-                $recordingProgressReporter->events,
-                static fn (array $event): bool => 'review.started' === $event[0],
-            )),
-        );
-    }
-
-    /**
-     * @throws InvalidAuditContextException
-     * @throws InvalidProjectFileException
-     * @throws LLMProviderException
-     */
-    public function test_it_reports_review_skipped_when_no_candidate_survives_an_attacker_abort(): void
-    {
-        $recordingAttackerAgent = new RecordingAttackerAgent([], BudgetExceededException::forTokens(500, 100), []);
-
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerAgent = new ReviewerAgent(
-            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
-            new ReviewerModeConfiguration(),
-        );
-
-        $recordingProgressReporter = new RecordingProgressReporter();
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), $recordingProgressReporter);
-        $auditContext = $this->makeContextWithMapping();
-
-        $budgetExceeded = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException) {
-            $budgetExceeded = true;
-        }
-
-        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow the attacker BudgetExceededException.');
-        self::assertContains(['review.skipped', ['reason' => 'nothing_recovered']], $recordingProgressReporter->events);
-    }
-
-    /**
-     * @throws InvalidAuditContextException
-     * @throws InvalidCodeLocationException
-     * @throws InvalidProjectFileException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_it_rethrows_the_original_provider_abort_when_the_recovery_review_hits_a_budget_abort(): void
-    {
-        $vulnerability = Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Recovered', 0.9),
-            new CodeLocation('src/A.php', 1, 2),
-            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
-            'c',
-        );
-        $recordingAttackerAgent = new RecordingAttackerAgent([], new LLMProviderException('provider failure'), [$vulnerability]);
-
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm->method('complete')->willThrowException(BudgetExceededException::forTokens(500, 100));
-        $reviewerAgent = new ReviewerAgent(
-            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
-            new ReviewerModeConfiguration(),
-        );
-
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
-        $auditContext = $this->makeContextWithMapping();
-
-        $caught = null;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException|LLMProviderException $exception) {
-            $caught = $exception;
-        }
-
-        self::assertInstanceOf(LLMProviderException::class, $caught);
-    }
-
-    /**
-     * @throws InvalidAuditContextException
-     * @throws InvalidCodeLocationException
-     * @throws InvalidProjectFileException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_it_rethrows_the_original_budget_abort_when_the_recovery_review_hits_a_provider_abort(): void
-    {
-        $vulnerability = Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Recovered', 0.9),
-            new CodeLocation('src/A.php', 1, 2),
-            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
-            'c',
-        );
-        $recordingAttackerAgent = new RecordingAttackerAgent([], BudgetExceededException::forTokens(500, 100), [$vulnerability]);
-
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $reviewerLlm->method('complete')->willThrowException(new LLMProviderException('provider failure'));
-        $reviewerAgent = new ReviewerAgent(
-            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
-            new ReviewerModeConfiguration(),
-        );
-
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
-        $auditContext = $this->makeContextWithMapping();
-
-        $caught = null;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException|LLMProviderException $exception) {
-            $caught = $exception;
-        }
-
-        self::assertInstanceOf(BudgetExceededException::class, $caught);
-    }
-
-    /**
-     * @throws InvalidAuditContextException
-     * @throws InvalidCodeLocationException
-     * @throws InvalidProjectFileException
-     * @throws InvalidTokenUsageException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidVulnerabilityNarrativeException
-     * @throws LLMProviderException
-     */
-    public function test_it_persists_recovered_findings_reviewed_before_a_second_budget_abort(): void
-    {
-        $recordingAttackerAgent = new RecordingAttackerAgent([], BudgetExceededException::forTokens(500, 100), [
-            Vulnerability::of(
-                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'FirstRecovered', 0.9),
-                new CodeLocation('src/First.php', 1, 2),
-                new VulnerabilityNarrative('d', 'a', 'p', 'r'),
-                'c',
-            ),
-            Vulnerability::of(
-                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'SecondRecovered', 0.9),
-                new CodeLocation('src/Second.php', 1, 2),
-                new VulnerabilityNarrative('d', 'a', 'p', 'r'),
-                'c',
-            ),
-        ]);
-
-        $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $callCount = 0;
-        $reviewerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
-            ++$callCount;
-            if (2 === $callCount) {
-                throw BudgetExceededException::forTokens(500, 100);
-            }
-
-            return $this->reviewerAcceptResponse();
-        });
-        $reviewerAgent = new ReviewerAgent(
-            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
-            new ReviewerModeConfiguration(),
-        );
-
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
-        $auditContext = $this->makeContextWithMapping();
-
-        $budgetExceeded = false;
-        try {
-            $auditOrchestrator->orchestrate($auditContext);
-        } catch (BudgetExceededException) {
-            $budgetExceeded = true;
-        }
-
-        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow the original attacker BudgetExceededException.');
-        self::assertCount(1, $auditContext->vulnerabilities());
-        self::assertCount(1, $auditContext->validatedVulnerabilities());
-        self::assertSame('FirstRecovered', current($auditContext->validatedVulnerabilities())->title());
-    }
-
-    /**
      * @param array{
      *     logger?: LoggerInterface,
      *     maxIterations?: int,
@@ -2451,38 +1948,7 @@ final class AuditOrchestratorTest extends TestCase
         LLMClientInterface $reviewerLlm,
         array $overrides = [],
     ): AuditOrchestrator {
-        return new AuditOrchestrator(
-            attackerAgent: new AttackerAgent(
-                new AttackerLlmCollaborators(
-                    $attackerLlm,
-                    new AttackerPromptBuilder(),
-                    new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                    new NullCodeSlicer(),
-                ),
-                new AttackerScanCollaborators(
-                    new NullAttackerCache(),
-                    new NullStaticPreScanner(),
-                    new NullProgressReporter(),
-                ),
-                new AttackerAnalysisSettings(),
-                new NullLogger(),
-            ),
-            reviewerAgent: new ReviewerAgent(
-                new ReviewerAgentCollaborators(
-                    $reviewerLlm,
-                    new ReviewerPromptBuilder(),
-                    new NullLogger(),
-                    progressReporter: $overrides['recordingProgressReporter'] ?? new NullProgressReporter(),
-                ),
-                new ReviewerModeConfiguration(),
-            ),
-            logger: $overrides['logger'] ?? new NullLogger(),
-            auditLoopSettings: new AuditLoopSettings(
-                $overrides['maxIterations'] ?? AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
-                $overrides['minConfidence'] ?? AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
-            ),
-            progressReporter: $overrides['recordingProgressReporter'] ?? new NullProgressReporter(),
-        );
+        return AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm, $overrides);
     }
 
     /** @param list<string> $acceptedFingerprints
@@ -2492,13 +1958,7 @@ final class AuditOrchestratorTest extends TestCase
      */
     private function makeContextWithMapping(array $acceptedFingerprints = []): AuditContext
     {
-        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: $acceptedFingerprints);
-        $auditContext->setProjectFiles([
-            ProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
-        ]);
-        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
-
-        return $auditContext;
+        return AuditOrchestratorHarness::contextWithMapping($this->tmpDir, $acceptedFingerprints);
     }
 
     /**
@@ -2511,20 +1971,7 @@ final class AuditOrchestratorTest extends TestCase
         int $lineEnd = 15,
         string $filePath = 'src/Controller/FooController.php',
     ): array {
-        return [
-            'type' => 'sql_injection',
-            'severity' => 'high',
-            'title' => $title,
-            'description' => 'desc',
-            'file_path' => $filePath,
-            'line_start' => $lineStart,
-            'line_end' => $lineEnd,
-            'vulnerable_code' => '$db->query($input)',
-            'attack_vector' => 'SQL injection',
-            'proof' => "' OR 1=1",
-            'remediation' => 'Use prepared statements',
-            'confidence' => $confidence,
-        ];
+        return AuditOrchestratorHarness::vulnerabilityPayload($title, $confidence, $lineStart, $lineEnd, $filePath);
     }
 
     /** @param list<array<string, mixed>> $vulns
@@ -2533,7 +1980,7 @@ final class AuditOrchestratorTest extends TestCase
      */
     private function attackerResponse(array $vulns): LLMResponse
     {
-        return LLMResponse::of((string) json_encode($vulns), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
+        return AuditOrchestratorHarness::attackerResponse($vulns);
     }
 
     /**
@@ -2549,7 +1996,7 @@ final class AuditOrchestratorTest extends TestCase
      */
     private function reviewerAcceptResponse(): LLMResponse
     {
-        return LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
+        return AuditOrchestratorHarness::reviewerAcceptResponse();
     }
 
     /**
