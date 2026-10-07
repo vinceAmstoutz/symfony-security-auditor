@@ -23,6 +23,7 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -417,6 +418,33 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         self::assertSame(3, $this->decode($commandTester->getDisplay())['files_scanned']);
         self::assertStringContainsString('RISK LEVEL', $overridden->getDisplay());
         self::assertStringNotContainsString('"files_scanned"', $overridden->getDisplay());
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_format_flag_clustered_with_other_flags_wins_over_the_configured_format(): void
+    {
+        $application = new Application();
+        $application->addCommand($this->auditCommand($this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'sarif']])));
+
+        $bufferedOutput = new BufferedOutput();
+
+        $application->find('audit:run')->run(new StringInput(\sprintf('audit:run %s -nf json', escapeshellarg($this->fixtureDir))), $bufferedOutput);
+
+        self::assertSame(3, $this->decode($bufferedOutput->fetch())['files_scanned']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_dry_run_leaves_the_configured_output_alone(): void
+    {
+        $configuredOutput = $this->fixtureDir.'/configured.json';
+        (new Filesystem())->dumpFile($configuredOutput, 'last real report');
+        $commandTester = $this->auditCommandTester($this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json', 'output' => $configuredOutput]]));
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--dry-run' => true]);
+
+        self::assertSame('last real report', file_get_contents($configuredOutput));
     }
 
     #[RunInSeparateProcess]

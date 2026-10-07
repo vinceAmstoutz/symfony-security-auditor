@@ -86,7 +86,7 @@ final class AuditCommandInput
     {
         $this->minScore ??= $auditCommandDefaults->minScore;
         $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
-        $this->output ??= $this->noOutput ? null : $auditCommandDefaults->output;
+        $this->output ??= $this->noOutput || $this->dryRun ? null : $auditCommandDefaults->output;
 
         if (!$formatGiven) {
             $this->format = $auditCommandDefaults->format;

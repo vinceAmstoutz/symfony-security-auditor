@@ -88,7 +88,7 @@ final readonly class AuditCommand
         SymfonyStyle $symfonyStyle,
         #[MapInput] AuditCommandInput $auditCommandInput,
     ): int {
-        $auditCommandInput->applyDefaults($this->auditCommandDefaults, $input->hasParameterOption(['--format', '-f'], true));
+        $auditCommandInput->applyDefaults($this->auditCommandDefaults, GivenFormatOption::in($input));
 
         $projectPath = $auditCommandInput->resolvedProjectPath();
         $this->auditedProjectPathHolder->set($projectPath);

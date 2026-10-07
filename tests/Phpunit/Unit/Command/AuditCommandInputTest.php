@@ -436,6 +436,27 @@ final class AuditCommandInputTest extends TestCase
         self::assertNull($auditCommandInput->reportFile());
     }
 
+    public function test_a_dry_run_does_not_write_its_estimate_over_the_configured_output(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->dryRun = true;
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'), true);
+
+        self::assertNull($auditCommandInput->reportFile());
+    }
+
+    public function test_a_dry_run_still_writes_to_an_output_given_on_the_command_line(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->dryRun = true;
+        $auditCommandInput->output = 'estimate.json';
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'), true);
+
+        self::assertSame('estimate.json', $auditCommandInput->reportFile());
+    }
+
     public function test_a_no_output_flag_prints_a_machine_readable_report_to_stdout(): void
     {
         $auditCommandInput = new AuditCommandInput();
