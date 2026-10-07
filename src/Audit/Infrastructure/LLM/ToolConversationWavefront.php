@@ -109,6 +109,7 @@ final readonly class ToolConversationWavefront
         $states = $this->initializeConversationStates($window);
 
         for ($round = 0; $round < $maxToolIterations && !ConversationState::allAnswered($states); ++$round) {
+            $states = ConversationState::announceFinalRound($states, $round, $maxToolIterations);
             $states = $this->runWavefrontRound($platform, $states, $window, $maxToolIterations);
         }
 
@@ -446,6 +447,8 @@ final readonly class ToolConversationWavefront
 
     /**
      * @param list<ToolCall> $toolCalls
+     *
+     * @throws InvalidTokenUsageException
      */
     private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolLLMRequest $toolLLMRequest): ConversationState
     {
@@ -458,7 +461,11 @@ final readonly class ToolConversationWavefront
             $toolResults[] = $result;
         }
 
-        return $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+
+        return FinalRound::isConcludedBy($conversationState->finalRound, $toolLLMRequest->tools, ...$toolCalls)
+            ? $conversationState->withResponse(FinalRound::answer($this->model, TokenUsageSnapshot::of($conversationState->input, $conversationState->output, $conversationState->cacheRead, $conversationState->cacheCreation)))
+            : $conversationState;
     }
 
     /**

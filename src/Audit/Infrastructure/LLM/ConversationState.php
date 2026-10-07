@@ -20,8 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
  * One tool-using conversation's position in the wavefront: its message bag and
  * platform options, the token counters accumulated across rounds, whether a
  * tool has already run (a conversation that ran one cannot be restarted from
- * scratch), the finalized response once it has one, and the running estimate
- * the rate limiter reserves against.
+ * scratch), the finalized response once it has one, the running estimate the
+ * rate limiter reserves against, and whether it has been told its next round
+ * is its last.
  *
  * Updates are copy-on-write — `$bag` is a mutable collaborator whose contents
  * are appended in place, but every scalar transition returns a new instance.
@@ -43,6 +44,7 @@ final readonly class ConversationState
         public bool $toolsRan,
         public ?LLMResponse $response,
         public int $estimatedInputTokens,
+        public bool $finalRound = false,
     ) {}
 
     /**
@@ -62,6 +64,22 @@ final readonly class ConversationState
         return true;
     }
 
+    /**
+     * Tells every conversation of a window, when `$round` is the last one the
+     * budget allows, that it is — each remembers it was told.
+     *
+     * @param array<int, self> $states
+     *
+     * @return array<int, self>
+     */
+    public static function announceFinalRound(array $states, int $round, int $maxToolIterations): array
+    {
+        return array_map(
+            static fn (self $state): self => FinalRound::announceIn($state->bag, $round, $maxToolIterations) ? $state->withFinalRoundAnnounced() : $state,
+            $states,
+        );
+    }
+
     public function withRecordedTokens(int $input, int $output, int $cacheRead, int $cacheCreation): self
     {
         return new self(
@@ -74,6 +92,7 @@ final readonly class ConversationState
             $this->toolsRan,
             $this->response,
             $this->estimatedInputTokens,
+            $this->finalRound,
         );
     }
 
@@ -89,6 +108,7 @@ final readonly class ConversationState
             $this->toolsRan,
             $llmResponse,
             $this->estimatedInputTokens,
+            $this->finalRound,
         );
     }
 
@@ -104,6 +124,23 @@ final readonly class ConversationState
             true,
             $this->response,
             $this->estimatedInputTokens + $estimatedToolResultTokens,
+            $this->finalRound,
+        );
+    }
+
+    public function withFinalRoundAnnounced(): self
+    {
+        return new self(
+            $this->bag,
+            $this->options,
+            $this->input,
+            $this->output,
+            $this->cacheRead,
+            $this->cacheCreation,
+            $this->toolsRan,
+            $this->response,
+            $this->estimatedInputTokens,
+            true,
         );
     }
 }

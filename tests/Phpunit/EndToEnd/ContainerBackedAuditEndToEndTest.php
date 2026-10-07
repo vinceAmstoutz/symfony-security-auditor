@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ConnectionCutAfterToolAuditPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ExploringAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAuditPlatform;
@@ -242,6 +243,29 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $report = $this->decode($this->runAudit(['model' => 'gpt-4o', ...$config], 'json', MalformedResponseAuditPlatform::class));
 
         self::assertSame(0, $report['total_vulnerabilities']);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('attackerExecutionCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_an_attacker_still_exploring_at_the_tool_cap_is_asked_to_record_and_completes_the_run(array $config): void
+    {
+        $report = $this->decode($this->runAudit(['model' => 'gpt-4o', 'audit' => ['max_tool_iterations' => 2], ...$config], 'json', ExploringAuditPlatform::class));
+
+        self::assertTrue($report['complete']);
+        self::assertSame(1, $report['total_vulnerabilities']);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function attackerExecutionCases(): iterable
+    {
+        yield 'sequential attacker' => [[]];
+        yield 'concurrent attacker' => [['profile' => 'fast']];
     }
 
     #[RunInSeparateProcess]

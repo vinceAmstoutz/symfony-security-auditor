@@ -400,7 +400,7 @@ The attacker's answer for that chunk could not be used, so its files are recorde
 
 | Reason on the line | What happened | What to do |
 | --- | --- | --- |
-| `tool-call limit reached (audit.max_tool_iterations)` | The model kept calling `read_file`, `grep` or `list_files` and never ended its turn within `audit.max_tool_iterations` rounds. | Raise `audit.max_tool_iterations` (try `16`), or set `audit.tools_enabled: false` to scan each chunk in a single call. See the cost note below. |
+| `tool-call limit reached (audit.max_tool_iterations)` | The model kept calling `read_file`, `grep` or `list_files` through `audit.max_tool_iterations` rounds and, _since 1.22_, asked for one more file even when its last round told it no more would come. Before 1.22 every chunk that explored up to the cap failed this way. | Raise `audit.max_tool_iterations` (try `16`), or set `audit.tools_enabled: false` to scan each chunk in a single call. See the cost note below. |
 | `output token limit reached (max_output_tokens)` | The answer, or a tool call inside it, was cut off by the output limit. | Raise `max_output_tokens` or `attacker_max_output_tokens` (Claude models only). |
 | `answer withheld by the provider content filter` | The provider's filter blocked the answer. | Try another model or deployment; see [`Tool-using loop ended with empty content response`](#tool-using-loop-ended-with-empty-content-response-warnings). |
 | `the model returned no content` | The call ended with nothing usable. | Retry; if it repeats for every chunk, switch model. |
@@ -408,7 +408,7 @@ The attacker's answer for that chunk could not be used, so its files are recorde
 | `the file is too large for the model input limit` | A single file does not fit the model's input window. | See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
 | an error message | An unexpected failure on that chunk's call; the run went on with the next one. | Read it; in a Symfony application the same text is in the log. |
 
-**Raising `audit.max_tool_iterations` costs more.** A chunk that explores until the cap uses up to twice the rounds at `16`, and each round re-reads the prompt, so call time and cost grow with it; a chunk the model never stops exploring can still hit the new cap. The value is also part of the attacker cache key, so changing it re-analyzes every chunk once: a run after the change bills the whole project again, not only the chunks that failed.
+**Raising `audit.max_tool_iterations` costs more.** A chunk that explores until the cap uses up to twice the rounds at `16`, and each round re-reads the prompt, so call time and cost grow with it; a model that never stops exploring is still told on the last round to record and stop. The value is also part of the attacker cache key, so changing it re-analyzes every chunk once: a run after the change bills the whole project again, not only the chunks that failed.
 
 ### `Audit incomplete: N file(s) could not be fully analyzed`
 
@@ -587,7 +587,7 @@ Some models do not support tool/function calling — verify your provider's docs
 
 ### Attacker loops indefinitely on tool calls
 
-Lower `audit.max_tool_iterations` from the default `8` to bound the spend. Once the cap is hit the conversation ends: the findings the Attacker already recorded are kept, but the chunk is recorded as errored and not cached, so the run reports `Audit incomplete` and the next run pays for it again. Raise the cap instead when chunks keep failing with `tool-call limit reached`, and read [`✗ chunk N/M failed`](#-chunk-nm-failed-on-the-progress-line) for what that costs.
+Lower `audit.max_tool_iterations` from the default `8` to bound the spend. The last round is announced to the model, which is told to record what it holds and stop (_since 1.22_), and a chunk whose last round does is analyzed and cached like any other. A model that asks to read one more file instead ends the conversation: the findings the Attacker already recorded are kept, but the chunk is recorded as errored and not cached, so the run reports `Audit incomplete` and the next run pays for it again. Raise the cap when chunks keep failing with `tool-call limit reached`, and read [`✗ chunk N/M failed`](#-chunk-nm-failed-on-the-progress-line) for what that costs.
 
 ### `lookup_advisory` always returns `[]`
 
