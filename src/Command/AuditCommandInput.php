@@ -19,6 +19,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Component\String\UnicodeString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidMinScoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 use function Symfony\Component\String\u;
@@ -32,6 +33,10 @@ use function Symfony\Component\String\u;
  */
 final class AuditCommandInput
 {
+    private const int LOWEST_MIN_SCORE = 0;
+
+    private const int HIGHEST_MIN_SCORE = 100;
+
     #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory.')]
     public ?string $projectPath = null;
 
@@ -149,6 +154,20 @@ final class AuditCommandInput
 
         if ($this->showScanned) {
             throw ConflictingCommandOptionsException::forGenerateBaselineWithPreviewFlag('--show-scanned');
+        }
+    }
+
+    /**
+     * `--min-score` gates on the normalized score, which only spans 0 to 100: a
+     * value outside it fails every run or gates none, so it is refused rather
+     * than silently honored.
+     *
+     * @throws InvalidMinScoreException
+     */
+    public function assertMinScoreInRange(): void
+    {
+        if (null !== $this->minScore && ($this->minScore < self::LOWEST_MIN_SCORE || $this->minScore > self::HIGHEST_MIN_SCORE)) {
+            throw InvalidMinScoreException::forScoreOutsideRange($this->minScore, self::LOWEST_MIN_SCORE, self::HIGHEST_MIN_SCORE);
         }
     }
 

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **`audit:run --min-score` refuses a value outside 0 to 100 instead of failing every run or gating none.** The gate compares `--min-score` with the normalized score (`AuditReport::normalizedScore()`, which spans 0 to 100), but `AuditCommandInput::$minScore` (`src/Command/AuditCommandInput.php`) accepted any integer: `--min-score=150` made every run exit `1` with `Audit failed a configured gate. Risk: SAFE. Score: 100/100.`, and `--min-score=-1` silently disabled the gate. `AuditCommandInput::assertMinScoreInRange()` now throws `InvalidMinScoreException` (`src/Command/Exception/InvalidMinScoreException.php`) for such a value, which `AuditCommand` reports as `--min-score must be between 0 and 100, got 150.` with exit code `1` — the code a conflicting option already gets — before the output files are checked and before the preview or the audit spends anything. `0` and `100` stay valid, and omitting the option still gates on the risk level alone.
+
 ## [1.21.0] — 2026-10-04 — Gateway
 
 A release about reaching the model you actually run, and never mistaking a partial audit for a clean one. `init` now configures any OpenAI-compatible AI gateway, a local Ollama, AWS Bedrock and the new platforms of `symfony/ai` 0.14, keeps the API key for you (`auth:set`), and installs the bridge even for a platform whose block you finish by hand; the standalone binary also serves the auditor over MCP. A run that could not analyze every file now says so in every report format and in the GitHub Action, `--fail-on-incomplete` turns that into a failing exit code, a run that analyzed nothing has no verdict, and an answer cut short, a connection cut off mid-response or a chunk too large for the model is recovered instead of ending the audit. The audited repository's own configuration can no longer weaken the run, and the secret scrubber redacts more credential shapes while no longer hiding the code an audit has to read.

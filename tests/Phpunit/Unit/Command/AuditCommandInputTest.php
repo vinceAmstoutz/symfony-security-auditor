@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidMinScoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 
@@ -359,5 +361,56 @@ final class AuditCommandInputTest extends TestCase
         $this->expectExceptionMessage('--generate-baseline requires a real audit run and cannot be combined with --show-scanned, which exits before the LLM is ever invoked.');
 
         $auditCommandInput->assertNoConflictingOptions();
+    }
+
+    /**
+     * @throws InvalidMinScoreException
+     */
+    #[DataProvider('scoresWithinTheRange')]
+    public function test_assert_min_score_in_range_allows_a_score_from_zero_to_one_hundred(?int $minScore): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->minScore = $minScore;
+
+        $auditCommandInput->assertMinScoreInRange();
+
+        self::assertSame($minScore, $auditCommandInput->minScore);
+    }
+
+    /**
+     * @return iterable<string, array{?int}>
+     */
+    public static function scoresWithinTheRange(): iterable
+    {
+        yield 'no gate' => [null];
+        yield 'the floor' => [0];
+        yield 'a middle score' => [75];
+        yield 'the ceiling' => [100];
+    }
+
+    /**
+     * @throws InvalidMinScoreException
+     */
+    #[DataProvider('scoresOutsideTheRange')]
+    public function test_assert_min_score_in_range_rejects_a_score_the_normalized_range_cannot_hold(int $minScore): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->minScore = $minScore;
+
+        $this->expectException(InvalidMinScoreException::class);
+        $this->expectExceptionMessage(\sprintf('--min-score must be between 0 and 100, got %d.', $minScore));
+
+        $auditCommandInput->assertMinScoreInRange();
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function scoresOutsideTheRange(): iterable
+    {
+        yield 'just below the floor' => [-1];
+        yield 'far below the floor' => [-50];
+        yield 'just above the ceiling' => [101];
+        yield 'far above the ceiling' => [150];
     }
 }
