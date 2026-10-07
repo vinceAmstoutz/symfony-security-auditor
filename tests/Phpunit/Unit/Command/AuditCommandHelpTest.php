@@ -39,6 +39,11 @@ final class AuditCommandHelpTest extends TestCase
         self::assertStringContainsString('without the option, a run that analyzed some of its files or holds a finding keeps the code its gates earn and prints a warning', $this->flattened());
     }
 
+    public function test_the_output_documentation_names_the_flag_that_prints_a_configured_report(): void
+    {
+        self::assertStringContainsString('switched off for one run by --no-output, which prints the report', $this->flattened());
+    }
+
     private function flattened(): string
     {
         return (string) preg_replace('/\s+/', ' ', strip_tags(AuditCommandHelp::HELP));

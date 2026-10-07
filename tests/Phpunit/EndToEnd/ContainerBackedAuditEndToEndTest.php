@@ -439,6 +439,33 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
+    public function test_a_no_output_flag_prints_the_report_although_an_output_is_configured(): void
+    {
+        $configuredOutput = $this->fixtureDir.'/configured.json';
+        $commandTester = $this->auditCommandTester($this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json', 'output' => $configuredOutput]]));
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--no-output' => true]);
+
+        self::assertFileDoesNotExist($configuredOutput);
+        self::assertSame(3, $this->decode($commandTester->getDisplay())['files_scanned']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_no_output_flag_and_an_output_flag_together_are_refused_before_the_audit_runs(): void
+    {
+        $output = $this->fixtureDir.'/flag.json';
+        $commandTester = $this->auditCommandTester($this->boot(['model' => 'gpt-4o']));
+
+        $exitCode = $commandTester->execute(['project-path' => $this->fixtureDir, '--no-output' => true, '--output' => $output]);
+
+        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertStringContainsString('--output and --no-output cannot be combined', preg_replace('/\s+/', ' ', $commandTester->getDisplay()) ?? '');
+        self::assertFileDoesNotExist($output);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
     public function test_a_baseline_flag_wins_over_the_configured_baseline(): void
     {
         $configuredBaseline = $this->fixtureDir.'/configured-baseline.json';

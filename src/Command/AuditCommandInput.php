@@ -41,6 +41,9 @@ final class AuditCommandInput
     #[Option(description: 'Output file path (any format)', shortcut: 'o')]
     public ?string $output = null;
 
+    #[Option(description: 'Print the report instead of writing it to a file, whatever audit.output says. Cannot be combined with --output.', name: 'no-output')]
+    public bool $noOutput = false;
+
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
     public bool $dryRun = false;
 
@@ -83,7 +86,7 @@ final class AuditCommandInput
     {
         $this->minScore ??= $auditCommandDefaults->minScore;
         $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
-        $this->output ??= $auditCommandDefaults->output;
+        $this->output ??= $this->noOutput ? null : $auditCommandDefaults->output;
 
         if (!$formatGiven) {
             $this->format = $auditCommandDefaults->format;
@@ -151,15 +154,19 @@ final class AuditCommandInput
     }
 
     /**
-     * `--generate-baseline` requires a real audit run to have real findings
-     * to write to the baseline file, but `--dry-run` and `--show-scanned`
-     * both exit before the LLM is ever invoked — combined, one silently wins
-     * over the other with no file written and no diagnostic.
+     * `--output` with `--no-output` asks for opposite things, and
+     * `--generate-baseline` needs a real audit run while `--dry-run` and
+     * `--show-scanned` exit before the LLM is ever invoked — combined, one
+     * silently wins over the other with no file written and no diagnostic.
      *
      * @throws ConflictingCommandOptionsException
      */
     public function assertNoConflictingOptions(): void
     {
+        if ($this->noOutput && null !== $this->output) {
+            throw ConflictingCommandOptionsException::forOutputWithNoOutput();
+        }
+
         if (null === $this->generateBaseline) {
             return;
         }
