@@ -77,7 +77,7 @@
         "symfony/error-handler": "^7.4 || ^8.0",
         "symfony/var-dumper": "^7.4 || ^8.0",
         "symplify/phpstan-rules": "^14.10",
-        "tomasvotruba/cognitive-complexity": "^1.0"
+        "tomasvotruba/cognitive-complexity": "~1.2.0"
     },
     "suggest": {
         "symfony/ai-albert-platform": "To run the audit against the Albert platform (needs a base_url)",
