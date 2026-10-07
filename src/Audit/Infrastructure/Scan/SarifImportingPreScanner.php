@@ -50,6 +50,7 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
         private array $sarifPaths,
         private Filesystem $filesystem,
         private AuditedProjectPathHolder $auditedProjectPathHolder,
+        private SarifTaintPathFormatter $sarifTaintPathFormatter = new SarifTaintPathFormatter(),
     ) {}
 
     /**
@@ -199,26 +200,20 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
      */
     private function describeWithTaintPath(string $message, array $result, array $scannedPaths): string
     {
-        $steps = $this->taintPathSteps($result, $scannedPaths);
-        if ([] === $steps) {
-            return $message;
-        }
-
-        return \sprintf('%s (taint path: %s)', $message, implode(' -> ', $steps));
+        return $this->sarifTaintPathFormatter->describe($message, $this->taintPathSteps($result, $scannedPaths));
     }
 
     /**
      * A SARIF `codeFlows[0].threadFlows[0].locations` array is the taint-
      * tracking tool's source-to-sink path — richer evidence than the single
-     * primary location. Steps outside the scan surface are dropped, same as
-     * the primary location, so the attacker never sees an unscanned file; an
-     * `...` placeholder marks each gap so a surviving step is never mistaken
-     * for the source (or the whole path for a single relabeled sink).
+     * primary location. A step outside the scan surface comes back as `null`,
+     * same as the primary location is dropped, so the attacker never sees an
+     * unscanned file.
      *
      * @param array<array-key, mixed> $result
      * @param array<string, true>     $scannedPaths
      *
-     * @return list<string>
+     * @return list<string|null>
      */
     private function taintPathSteps(array $result, array $scannedPaths): array
     {
@@ -232,40 +227,7 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
             $rawSteps[] = \is_array($location) ? $this->taintPathStep($location, $scannedPaths) : null;
         }
 
-        return $this->collapseDroppedStepsToEllipses($rawSteps);
-    }
-
-    /**
-     * @param list<string|null> $rawSteps each dropped (null) step collapses to
-     *                                    a single `...` so a surviving step is
-     *                                    never mistaken for the taint source
-     *
-     * @return list<string>
-     */
-    private function collapseDroppedStepsToEllipses(array $rawSteps): array
-    {
-        $steps = [];
-        $droppedSincePreviousStep = false;
-        foreach ($rawSteps as $rawStep) {
-            if (null === $rawStep) {
-                $droppedSincePreviousStep = true;
-
-                continue;
-            }
-
-            if ($droppedSincePreviousStep) {
-                $steps[] = '...';
-            }
-
-            $steps[] = $rawStep;
-            $droppedSincePreviousStep = false;
-        }
-
-        if ($droppedSincePreviousStep && [] !== $steps) {
-            $steps[] = '...';
-        }
-
-        return $steps;
+        return $rawSteps;
     }
 
     /**
