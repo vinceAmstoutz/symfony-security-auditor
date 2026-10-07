@@ -16,5 +16,5 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface ComposerAvailabilityCheckerInterface
 {
-    public function isAvailable(): bool;
+    public function probe(): ComposerProbe;
 }

@@ -58,10 +58,12 @@ final readonly class InitCommand
         private StandaloneConfigFactoryInterface $standaloneConfigFactory,
         private StandaloneConfigWriterInterface $standaloneConfigWriter,
         private BridgeInstallerInterface $bridgeInstaller,
+        private ComposerAvailabilityCheckerInterface $composerAvailabilityChecker,
         private CredentialStoreInterface $credentialStore,
         private Filesystem $filesystem = new Filesystem(),
         private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
         private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
+        private ComposerSetupAdvice $composerSetupAdvice = new ComposerSetupAdvice(),
     ) {}
 
     /**
@@ -72,6 +74,15 @@ final readonly class InitCommand
         SymfonyStyle $symfonyStyle,
         #[MapInput] InitCommandInput $initCommandInput,
     ): int {
+        $composerProbe = $this->composerAvailabilityChecker->probe();
+
+        if (!$composerProbe->isAvailable) {
+            $symfonyStyle->error($this->composerSetupAdvice->problem($composerProbe));
+            $symfonyStyle->writeln($this->composerSetupAdvice->installInstructions());
+
+            return Command::FAILURE;
+        }
+
         $configFile = $this->xdgConfigPathResolver->configFile();
 
         $provider = b($initCommandInput->provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama, or generic.my_gateway for an AI gateway)', 'anthropic'))->trim()->toString();

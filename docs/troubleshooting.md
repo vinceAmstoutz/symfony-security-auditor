@@ -125,14 +125,14 @@ The bridge tree under the data directory was resolved for another PHP than the o
 
 ### `init` fails to install the provider bridge
 
-`init` always runs `composer require symfony/ai-<slug>-platform` under the data directory before it writes the config file. `BridgeInstallationFailedException`:
+`init` always runs `composer require symfony/ai-<slug>-platform` under the data directory before it writes the config file. It checks first, before asking anything, that `composer --version` runs, and `BridgeInstallationFailedException` covers what fails after that:
 
-- **No `composer` binary reachable**:
+- **No working `composer`, or a `composer` that cannot find PHP** — the check stops `init` with exit code `1` before it asks a question, prints the first line `composer --version` printed (`sh: 1: exec: composer: not found`, `/mnt/c/ProgramData/ComposerSetup/bin/composer: 14: php: not found` for the Windows shim on a WSL `PATH` with no PHP of its own, `'composer' is not recognized as an internal or external command,` on Windows) and the commands that install Composer with its PHP on your system, then run `init` again:
+  - **Linux, WSL included** — on Debian and Ubuntu, `sudo apt update && sudo apt install -y php-cli php-curl php-mbstring php-xml unzip composer`; elsewhere the `php-cli`, `composer` and `unzip` packages of your package manager.
+  - **macOS** — `brew install composer`, which installs PHP with it; without Homebrew, the installer of <https://getcomposer.org/download/>.
+  - **Windows** — PHP from <https://windows.php.net/download/> and Composer's Windows installer from <https://getcomposer.org/download/>, then a new terminal so that `PATH` holds both.
 
-  ```text
-  Could not run composer to install the "<package>" provider bridge; is
-  composer on the PATH?
-  ```
+  Only this download needs them: auditing runs on the binary alone, and `doctor` reports the same line in its `Composer` check.
 
 - **`composer require` ran but exited non-zero** (no network, or the package does not exist for a misspelled `--provider`):
 

@@ -77,7 +77,7 @@ irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/mai
 
 > [!TIP]
 >
-> **One command, installed _and_ configured.** Set `SSA_INIT=1` and the installer runs the guided [`init`](#2-configure--the-guided-init) for you right after downloading, so you skip step 2. With a terminal attached it prompts for your provider and offers to store your API key at the end, leaving you ready to audit; in a pipe or CI it takes the Anthropic defaults and stores no key, so export one or run `auth:set` before auditing. `init` fetches the provider bridge with `composer`, so composer must be available for this combined step.
+> **One command, installed _and_ configured.** Set `SSA_INIT=1` and the installer runs the guided [`init`](#2-configure--the-guided-init) for you right after downloading, so you skip step 2. With a terminal attached it prompts for your provider and offers to store your API key at the end, leaving you ready to audit; in a pipe or CI it takes the Anthropic defaults and stores no key, so export one or run `auth:set` before auditing. `init` fetches the provider bridge with `composer`, so composer must be available for this combined step; it checks that first, before asking anything, and when composer does not run it says why and how to install it on macOS, Linux or Windows.
 >
 > ```bash
 > curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
@@ -105,7 +105,7 @@ sha256sum -c symfony-security-auditor-linux-x86_64.sha256
 symfony-security-auditor init
 ```
 
-Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows), downloads the provider bridge you pick, and finally asks for your API key — pasted invisibly, never echoed, never in your shell history. `init` fetches that bridge with `composer`, so composer must be available for this one-time setup step; running audits afterward needs only the binary. The file is rootless (the same keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:` block handed verbatim to `symfony/ai`. See [configuration](docs/configuration.md#standalone-configuration) for the format and provider switching.
+Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows), downloads the provider bridge you pick, and finally asks for your API key — pasted invisibly, never echoed, never in your shell history. `init` fetches that bridge with `composer`, so composer must be available for this one-time setup step — `init` checks that first, before asking anything, and when composer does not run it says why and how to install it on macOS, Linux or Windows; running audits afterward needs only the binary. The file is rootless (the same keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:` block handed verbatim to `symfony/ai`. See [configuration](docs/configuration.md#standalone-configuration) for the format and provider switching.
 
 Press Enter at the key prompt to skip it — you can store the key any time with `auth:set`, or keep using an environment variable and store nothing at all.
 

@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
@@ -99,7 +100,7 @@ final class EnvironmentDoctorTest extends TestCase
 
         $xdgConfigPathResolver = $this->resolver();
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
-        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
 
         $environmentDoctor = new EnvironmentDoctor(
             new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
@@ -153,7 +154,7 @@ final class EnvironmentDoctorTest extends TestCase
 
         $xdgConfigPathResolver = $this->resolver();
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
-        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
         $auditPreflight = self::createStub(AuditPreflightInterface::class);
 
         $environmentDoctor = new EnvironmentDoctor(
@@ -419,7 +420,7 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), [], false)->diagnose();
 
         self::assertEquals(
-            new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not found — needed only to run "init" or switch providers, not to audit.'),
+            new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not usable (php: not found) — needed only to run "init" or switch providers, not to audit. "init" lists how to install it.'),
             $results[2],
         );
     }
@@ -430,7 +431,7 @@ final class EnvironmentDoctorTest extends TestCase
     private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null, ?string $projectConfigFile = null): EnvironmentDoctor
     {
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
-        $composerAvailabilityChecker->method('isAvailable')->willReturn($composerAvailable);
+        $composerAvailabilityChecker->method('probe')->willReturn($composerAvailable ? ComposerProbe::available() : ComposerProbe::unavailable('php: not found'));
 
         $auditPreflight = self::createStub(AuditPreflightInterface::class);
         $auditPreflight->method('failureReason')->willReturn($preflightFailure);
@@ -470,7 +471,7 @@ final class EnvironmentDoctorTest extends TestCase
     {
         $xdgConfigPathResolver = $this->resolver();
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
-        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
 
         return new EnvironmentDoctor(
             new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
