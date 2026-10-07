@@ -531,14 +531,14 @@ Causes (each logs a `warning` via `LoggerInterface`, except the deliberate `offl
 - **`composer` not in `PATH`** — install Composer 2.4+ on the audit host.
 - **`composer.lock` missing** — run `composer install` first; advisory data comes from the lockfile.
 - **Malformed JSON output** — corrupted `composer.lock`. Regenerate it.
-- **Process error** — network failure to Packagist. Retry.
+- **Process error** — network failure to Packagist. Retry: a lookup after a failed `composer audit` runs it again, and so does one after `composer.lock` changes.
 - **`privacy.offline_only: true`** — the advisory feed is intentionally replaced by an empty in-memory database, so `composer audit` never runs; no warning is logged since this is configured behavior, not a failure.
 
 When `lookup_advisory` returns empty, the audit continues without CVE data — no audit failure.
 
 ### `composer audit` is slow
 
-Within a run it executes **once** and the result is cached for the lifetime of the request. Across runs, with `cache.enabled: true` (default), `LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h, keyed by a SHA-256 hash of `composer.lock` — an unchanged lockfile skips `composer audit` entirely on the next run. If it's still the bottleneck, you can pre-warm it before the audit or override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing a baked snapshot.
+Within a run it executes **once** and the result is cached for the lifetime of the request. Across runs, with `cache.enabled: true` (default), `LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h, keyed by a SHA-256 hash of `composer.lock` — an unchanged lockfile skips `composer audit` entirely on the next run. A `composer.lock` that is a symlink or larger than 8 MiB is never read for that hash, so its run is not cached, and an output that is not a JSON document with an `advisories` map is never stored. If it's still the bottleneck, you can pre-warm it before the audit or override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing a baked snapshot.
 
 ### Override the advisory source
 
