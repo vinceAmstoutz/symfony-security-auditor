@@ -168,6 +168,55 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_a_loader_pointed_at_another_project_config_reads_that_file_and_leaves_the_first_loader_alone(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $firstFile = $this->configHome.'/first/.symfony-security-auditor.yaml';
+        $secondFile = $this->configHome.'/second/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($firstFile, "model: first-model\n");
+        $this->filesystem->dumpFile($secondFile, "model: second-model\n");
+        $standaloneConfigLoader = $this->loader($firstFile);
+
+        $second = $standaloneConfigLoader->withProjectConfigFile($secondFile)->load();
+
+        self::assertSame(['second-model', $secondFile, 'first-model'], [$second->auditConfig['model'], $second->projectConfigFile, $standaloneConfigLoader->load()->auditConfig['model']]);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_loader_released_from_its_project_config_reads_the_user_config_alone(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "model: project-model\n");
+
+        $standaloneConfig = $this->loader($projectConfigFile)->withProjectConfigFile(null)->load();
+
+        self::assertSame(['user-model', null], [$standaloneConfig->auditConfig['model'], $standaloneConfig->projectConfigFile]);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_every_key_a_project_config_declares_reaches_the_audit_settings(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
