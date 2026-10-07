@@ -96,7 +96,7 @@ src/
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
-│       ├── Pricing/     # ModelsDevPricingProvider (symfony/models-dev catalog), PlatformCatalogProviders, ModelPrice
+│       ├── Pricing/     # ModelsDevPricingProvider (symfony/models-dev catalog), ModelsDevCatalog, PlatformCatalogProviders, ModelPrice
 │       ├── Progress/    # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY),
 │       │                  LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
