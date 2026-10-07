@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
+
 /**
  * Typed, defensive reads of a progress-event context array. Reporters never
  * trust the payload shape (a custom emitter may pass anything), so a missing or
@@ -57,6 +59,19 @@ final readonly class ProgressContext
         }
 
         return \sprintf(' (%ds)', (int) round($value));
+    }
+
+    /**
+     * Renders the reason a chunk failed as a trailing " — reason" suffix on one
+     * line, or an empty string when the event names none.
+     *
+     * @param array<string, mixed> $context
+     */
+    public static function failureReasonSuffix(array $context): string
+    {
+        $reason = trim(TerminalTextSanitizer::collapseToSingleLine(self::string($context, 'reason')));
+
+        return '' === $reason ? '' : \sprintf(' — %s', $reason);
     }
 
     /**

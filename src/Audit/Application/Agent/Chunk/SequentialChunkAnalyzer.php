@@ -97,12 +97,7 @@ final readonly class SequentialChunkAnalyzer
             }
 
             $this->recordFindings($chunkResult->vulnerabilities(), $coverageRecorder);
-            $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
-                'chunk' => $index + 1,
-                'total_chunks' => \count($chunks),
-                'elapsed_seconds' => microtime(true) - $start,
-                'status' => $statusTrackingCoverageRecorder->chunkStatus($chunk),
-            ]);
+            $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, ChunkCompletionContext::of($index, \count($chunks), microtime(true) - $start, $statusTrackingCoverageRecorder, $chunk));
             array_push($allVulnerabilities, ...$chunkResult->vulnerabilities());
 
             foreach ($chunkResult->dropsByReason() as $reason => $count) {
@@ -178,7 +173,7 @@ final readonly class SequentialChunkAnalyzer
             $this->logger->error('Attacker agent LLM call failed', [
                 'error' => $exception->getMessage(),
             ]);
-            ChunkCoverageRecorder::record($chunk, 'errored', $coverageRecorder);
+            ChunkCoverageRecorder::recordErrored($chunk, ChunkFailureReason::fromThrowable($exception), $coverageRecorder);
 
             return VulnerabilityHydrationResult::empty();
         }
@@ -249,7 +244,7 @@ final readonly class SequentialChunkAnalyzer
                 'error' => $jsonException->getMessage(),
                 'content_preview' => substr($llmResponse->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
-            ChunkCoverageRecorder::record($chunk, 'errored', $coverageRecorder);
+            ChunkCoverageRecorder::recordErrored($chunk, ChunkFailureReason::NOT_JSON, $coverageRecorder);
 
             return VulnerabilityHydrationResult::empty();
         }
@@ -317,7 +312,7 @@ final readonly class SequentialChunkAnalyzer
             'files' => array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $chunk),
             'findings_kept' => \count($rawData),
         ]);
-        ChunkCoverageRecorder::record($chunk, 'errored', $coverageRecorder);
+        ChunkCoverageRecorder::recordErrored($chunk, ChunkFailureReason::fromStopReason($llmResponse->stopReason()), $coverageRecorder);
 
         return $this->vulnerabilityFactory->fromList($rawData);
     }
