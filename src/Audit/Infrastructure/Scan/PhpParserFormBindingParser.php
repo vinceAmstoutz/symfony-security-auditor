@@ -52,6 +52,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
 {
     public function __construct(
         private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
+        private NodeFinder $nodeFinder = new NodeFinder(),
         private NestingDepthGuard $nestingDepthGuard = new NestingDepthGuard(),
     ) {}
 
@@ -67,10 +68,9 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
-        $classes = $nodeFinder->findInstanceOf($ast, Class_::class);
+        $classes = $this->nodeFinder->findInstanceOf($ast, Class_::class);
 
-        return $this->bindingsForClasses($projectFile->relativePath(), $classes, $nodeFinder);
+        return $this->bindingsForClasses($projectFile->relativePath(), $classes);
     }
 
     /**
@@ -97,11 +97,13 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
      *
      * @return list<FormBinding>
      */
-    private function bindingsForClasses(string $filePath, array $classes, NodeFinder $nodeFinder): array
+    private function bindingsForClasses(string $filePath, array $classes): array
     {
         $bindings = [];
         foreach ($classes as $class) {
-            $bindings = [...$bindings, ...$this->bindingsForPublicMethods($filePath, $class, $nodeFinder)];
+            foreach ($this->bindingsForPublicMethods($filePath, $class) as $binding) {
+                $bindings[] = $binding;
+            }
         }
 
         return $bindings;
@@ -110,9 +112,9 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
     /**
      * @return list<FormBinding>
      */
-    private function bindingsForPublicMethods(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
+    private function bindingsForPublicMethods(string $filePath, Class_ $class): array
     {
-        $methodsByName = $this->methodsByName($class);
+        $reachableCallIndex = $this->thisCallReachability->indexCalls($this->methodsByName($class), $this->isCreateFormCall(...));
 
         $bindings = [];
         foreach ($class->getMethods() as $classMethod) {
@@ -120,7 +122,9 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
                 continue;
             }
 
-            $bindings = [...$bindings, ...$this->bindingsForMethod($filePath, $classMethod, $methodsByName, $nodeFinder)];
+            foreach ($this->bindingsForMethod($filePath, $classMethod, $reachableCallIndex) as $binding) {
+                $bindings[] = $binding;
+            }
         }
 
         return $bindings;
@@ -140,20 +144,12 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
     }
 
     /**
-     * @param array<string, ClassMethod> $methodsByName
-     *
      * @return list<FormBinding>
      */
-    private function bindingsForMethod(string $filePath, ClassMethod $classMethod, array $methodsByName, NodeFinder $nodeFinder): array
+    private function bindingsForMethod(string $filePath, ClassMethod $classMethod, ReachableCallIndex $reachableCallIndex): array
     {
-        $body = $this->thisCallReachability->reachableBody($classMethod, $methodsByName);
-
         $bindings = [];
-        foreach ($this->createFormCallSites($body, $nodeFinder) as $call) {
-            if (!$this->isCreateFormCall($call)) {
-                continue;
-            }
-
+        foreach ($this->inSourceOrder($reachableCallIndex->callsFrom($classMethod)) as $call) {
             $formClass = $this->resolveFirstArgumentClassName($call);
             if (null === $formClass) {
                 continue;
@@ -166,26 +162,12 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
     }
 
     /**
-     * Deduplicates by node identity: a diamond-shaped helper call graph (two
-     * reachable methods both calling a shared third helper) can otherwise
-     * surface the same call site twice via {@see ThisCallReachability}.
-     *
-     * @param array<Node> $body
+     * @param list<MethodCall|NullsafeMethodCall|StaticCall> $calls
      *
      * @return list<MethodCall|NullsafeMethodCall|StaticCall>
      */
-    private function createFormCallSites(array $body, NodeFinder $nodeFinder): array
+    private function inSourceOrder(array $calls): array
     {
-        $callsBySpotId = [];
-        foreach ([
-            ...$nodeFinder->findInstanceOf($body, MethodCall::class),
-            ...$nodeFinder->findInstanceOf($body, NullsafeMethodCall::class),
-            ...$nodeFinder->findInstanceOf($body, StaticCall::class),
-        ] as $call) {
-            $callsBySpotId[spl_object_id($call)] = $call;
-        }
-
-        $calls = $callsBySpotId;
         usort($calls, static fn (MethodCall|NullsafeMethodCall|StaticCall $a, MethodCall|NullsafeMethodCall|StaticCall $b): int => $a->getStartTokenPos() <=> $b->getStartTokenPos());
 
         return $calls;

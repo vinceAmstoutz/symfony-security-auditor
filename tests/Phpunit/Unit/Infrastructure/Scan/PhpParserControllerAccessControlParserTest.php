@@ -14,11 +14,15 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
+use PhpParser\Node;
+use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan\Fixture\CountingNodeFinder;
 
 final class PhpParserControllerAccessControlParserTest extends TestCase
 {
@@ -1496,6 +1500,52 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_every_action_of_a_chain_of_helpers_ending_in_a_guard_is_guarded(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class ChainController {
+                #[Route('/first')]
+                public function first(): void { $this->second(); }
+                #[Route('/second')]
+                public function second(): void { $this->third(); }
+                private function third(): void { $this->fourth(); }
+                private function fourth(): void { $this->denyAccessUnlessGranted('EDIT'); }
+                #[Route('/unrelated')]
+                public function unrelated(): void { $this->unrelatedHelper(); }
+                private function unrelatedHelper(): void {}
+            }
+            PHP;
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/ChainController.php', $source));
+
+        self::assertSame(
+            ['first' => ['EDIT'], 'second' => ['EDIT'], 'unrelated' => []],
+            array_column(array_map(static fn (RouteAccessControl $routeAccessControl): array => [$routeAccessControl->methodName(), $routeAccessControl->guardAttributes()], $entries), 1, 0),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chain_of_public_actions_costs_a_bounded_number_of_tree_walks(): void
+    {
+        $actionCount = 400;
+        $source = $this->chainOfPublicActions($actionCount);
+        $countingNodeFinder = new CountingNodeFinder();
+        $phpParserControllerAccessControlParser = new PhpParserControllerAccessControlParser(nodeFinder: $countingNodeFinder, thisCallReachability: new ThisCallReachability($countingNodeFinder));
+
+        $entries = $phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/ChainController.php', $source));
+
+        self::assertCount($actionCount + 1, $entries);
+        self::assertLessThan(8 * $this->nodeCount($source), $countingNodeFinder->visitedNodes);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_file_nested_too_deeply_to_parse_safely(): void
     {
         $nesting = str_repeat('f(', 33000).'1'.str_repeat(')', 33000);
@@ -1533,5 +1583,22 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         }
 
         self::fail('No __invoke entry was parsed.');
+    }
+
+    private function chainOfPublicActions(int $actionCount): string
+    {
+        $source = "<?php\nnamespace App\\Controller;\nuse Symfony\\Component\\Routing\\Attribute\\Route;\nfinal class ChainController extends AbstractController {\n";
+        for ($i = 0; $i < $actionCount; ++$i) {
+            $source .= \sprintf("#[Route('/r%d')]\npublic function m%d() { return \$this->m%d(); }\n", $i, $i, $i + 1);
+        }
+
+        return $source.\sprintf("public function m%d() { return 1; }\n}\n", $actionCount);
+    }
+
+    private function nodeCount(string $source): int
+    {
+        $ast = (new ParserFactory())->createForNewestSupportedVersion()->parse($source) ?? [];
+
+        return \count((new CountingNodeFinder())->findInstanceOf($ast, Node::class));
     }
 }
