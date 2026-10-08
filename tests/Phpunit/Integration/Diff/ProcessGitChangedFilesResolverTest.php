@@ -165,6 +165,50 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_includes_a_new_file_that_was_never_staged(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->writeFile('src/Controller/NewController.php', '<?php // never added');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
+
+        self::assertSame(['src/Controller/NewController.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_leaves_out_a_new_file_a_gitignore_excludes(): void
+    {
+        $this->initRepo();
+        $this->commit('.gitignore', "/var/\n", 'ignore var');
+        $this->writeFile('var/cache/Compiled.php', '<?php // ignored');
+        $this->writeFile('src/New.php', '<?php // never added');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
+
+        self::assertSame(['src/New.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_lists_a_new_file_relative_to_an_audited_subdirectory_and_not_one_outside_it(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->writeFile('src/Sub/New.php', '<?php // never added');
+        $this->writeFile('other/Outside.php', '<?php // outside the audited directory');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'HEAD');
+
+        self::assertSame(['Sub/New.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_returned_paths_are_sorted_for_determinism(): void
     {
         $this->initRepo();
@@ -325,6 +369,28 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
 
+        self::assertFileDoesNotExist($marker);
+    }
+
+    /**
+     * Listing the untracked files consults the same `core.fsmonitor` hook, so a
+     * repo that declares one runs its command on a bare `git ls-files
+     * --others` too.
+     *
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_does_not_execute_the_audited_repos_fsmonitor_hook_while_listing_untracked_files(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+
+        $marker = $this->tmpDir.'-fsmonitor-pwned';
+        $this->runGit(['git', 'config', 'core.fsmonitor', \sprintf('sh -c "touch %s"', $marker)]);
+        $this->writeFile('src/New.php', '<?php // never added');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
+
+        self::assertSame(['src/New.php'], $changed);
         self::assertFileDoesNotExist($marker);
     }
 

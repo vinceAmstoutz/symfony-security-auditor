@@ -27,7 +27,7 @@ use function Symfony\Component\String\u;
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Resolves the set of changed files via three git invocations:
+ * Resolves the set of changed files via four git invocations:
  *
  *   1. `git diff --relative --name-only --diff-filter=ACMR <ref>...HEAD`
  *      — committed changes that diverge from the ref's merge base. The triple
@@ -52,17 +52,21 @@ use function Symfony\Component\String\u;
  *      neutralized below. `diff-files` reports the same "did this tracked
  *      file change" answer without ever invoking a content filter.
  *
- *      Together, invocations 2 and 3 never report genuinely untracked files
- *      (ones never staged at all) — those are invisible to this resolver.
- *      Merged into the result so a local dev running `audit:run --since=main`
- *      sees their staged and already-tracked in-flight work too.
+ *   4. `git ls-files --others --exclude-standard`
+ *      — new files never staged at all, minus what a `.gitignore` leaves out.
+ *      Plumbing again, so no content filter runs: it lists the working tree's
+ *      directory entries and reads no file content.
+ *
+ *      Together, invocations 2, 3 and 4 let a local dev running
+ *      `audit:run --since=main` see their staged, already-tracked and brand-new
+ *      in-flight work too.
  *
  * `--relative` rewrites paths relative to `$projectPath` instead of the git
  * root, and excludes changes outside it — required so the result lines up
  * with `ProjectFile::relativePath()` when the audited project is a
  * subdirectory of a larger repository (a monorepo layout).
  *
- * All three lists are merged, deduplicated, and returned in deterministic
+ * All four lists are merged, deduplicated, and returned in deterministic
  * order.
  */
 final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesResolverInterface
@@ -95,8 +99,9 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         $committed = $this->runGit($projectPath, ['diff', '--relative', '--name-only', '--diff-filter=ACMR', \sprintf('%s...HEAD', $ref)]);
         $staged = $this->runGit($projectPath, ['diff-index', '--relative', '--name-only', '--diff-filter=ACMR', '--cached', 'HEAD']);
         $unstaged = $this->runGit($projectPath, ['diff-files', '--relative', '--name-only', '--diff-filter=ACMR']);
+        $untracked = $this->runGit($projectPath, ['ls-files', '--others', '--exclude-standard']);
 
-        return $this->mergeAndNormalize([...$committed, ...$staged, ...$unstaged]);
+        return $this->mergeAndNormalize([...$committed, ...$staged, ...$unstaged, ...$untracked]);
     }
 
     /**
