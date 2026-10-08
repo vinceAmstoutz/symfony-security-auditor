@@ -28,11 +28,14 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\DependencyInjection\Compiler\AutowirePass;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\Compiler\ResolveClassPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\DependencyInjection\TypedReference;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use Throwable;
@@ -87,6 +90,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
@@ -244,6 +251,35 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ['gpt-4o'],
             $containerBuilder->getParameter('symfony_security_auditor.audit.models_requiring_pricing'),
         );
+    }
+
+    /**
+     * @return iterable<string, array{class-string}>
+     */
+    public static function astParsingParsers(): iterable
+    {
+        yield 'controller access control' => [PhpParserControllerAccessControlParser::class];
+        yield 'form binding' => [PhpParserFormBindingParser::class];
+        yield 'voter capability' => [PhpParserVoterCapabilityParser::class];
+    }
+
+    /**
+     * @param class-string $parserClass
+     */
+    #[DataProvider('astParsingParsers')]
+    public function test_bundle_hands_each_ast_parsing_parser_the_nesting_guard_that_logs_through_the_logger(string $parserClass): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+        (new ResolveClassPass())->process($containerBuilder);
+        (new AutowirePass(false))->process($containerBuilder);
+
+        $guardArguments = $containerBuilder->getDefinition(NestingDepthGuard::class)->getArguments();
+        self::assertCount(1, $guardArguments);
+        self::assertInstanceOf(Reference::class, $guardArguments[0]);
+        self::assertSame('logger', (string) $guardArguments[0]);
+        $guardArgument = $containerBuilder->getDefinition($parserClass)->getArgument('nestingDepthGuard');
+        self::assertInstanceOf(TypedReference::class, $guardArgument);
+        self::assertSame(NestingDepthGuard::class, (string) $guardArgument);
     }
 
     public function test_bundle_defers_composer_audit_until_the_run_sets_the_audited_project_path(): void

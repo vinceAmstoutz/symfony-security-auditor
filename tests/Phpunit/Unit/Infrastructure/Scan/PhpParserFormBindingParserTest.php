@@ -657,4 +657,26 @@ final class PhpParserFormBindingParserTest extends TestCase
             [$bindings[0]->formTypeClass(), $bindings[1]->formTypeClass()],
         );
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_skips_a_file_nested_too_deeply_to_parse_safely(): void
+    {
+        $nesting = str_repeat('f(', 33000).'1'.str_repeat(')', 33000);
+        $source = <<<PHP
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class UserController {
+                public function edit(): void {
+                    \$form = \$this->createForm(UserType::class);
+                    \$x = {$nesting};
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
+    }
 }

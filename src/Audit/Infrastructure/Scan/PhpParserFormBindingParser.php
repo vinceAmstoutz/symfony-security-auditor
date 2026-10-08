@@ -52,12 +52,13 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
 {
     public function __construct(
         private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
+        private NestingDepthGuard $nestingDepthGuard = new NestingDepthGuard(),
     ) {}
 
     #[Override]
     public function parse(ProjectFile $projectFile): array
     {
-        if (!$projectFile->fileType()->isControllerLike()) {
+        if (!$projectFile->fileType()->isControllerLike() || !$this->nestingDepthGuard->admits($projectFile)) {
             return [];
         }
 

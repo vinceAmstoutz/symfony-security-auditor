@@ -661,4 +661,25 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame('App\\Security\\PostVoter', $voterCapability->className());
         self::assertSame(['EDIT'], $voterCapability->supportedAttributes());
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_skips_a_file_nested_too_deeply_to_parse_safely(): void
+    {
+        $nesting = str_repeat('f(', 33000).'1'.str_repeat(')', 33000);
+        $source = <<<PHP
+            <?php
+            namespace App\Security;
+            final class PostVoter {
+                public function supports(string \$attribute, mixed \$subject): bool {
+                    \$x = {$nesting};
+                    return \$attribute === 'EDIT';
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+
+        self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
+    }
 }

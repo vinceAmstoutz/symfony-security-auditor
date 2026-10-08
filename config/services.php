@@ -157,6 +157,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownRep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
@@ -472,6 +473,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
             service(GitChangedFilesResolverInterface::class),
         ]);
+
+    $defaultsConfigurator->set(NestingDepthGuard::class)
+        ->args([service('logger')]);
 
     $defaultsConfigurator->set(PhpParserControllerAccessControlParser::class);
     $defaultsConfigurator->alias(ControllerAccessControlParserInterface::class, PhpParserControllerAccessControlParser::class);
