@@ -37,11 +37,12 @@ final readonly class WritableFilePath
      * Once the directories exist — `dumpFile()` would create them anyway —
      * what remains is what `dumpFile()` needs: a writable directory in every
      * case (it writes a temporary file beside the target and renames it), plus
-     * a destination that is not a directory and, when it already exists, is
-     * writable itself.
+     * a destination that is a writable regular file when it already exists. A
+     * device, a pipe or a socket is none: the rename would replace it with a
+     * regular file.
      */
     public static function canBeWritten(string $path): bool
     {
-        return is_writable(\dirname($path)) && (!file_exists($path) || (!is_dir($path) && is_writable($path)));
+        return is_writable(\dirname($path)) && (!file_exists($path) || (is_file($path) && is_writable($path)));
     }
 }
