@@ -96,6 +96,15 @@ final readonly class FixSynthesizer implements FixSynthesizerInterface
     {
         try {
             $response = $this->llmClient->complete($this->buildSystemPrompt(), $this->buildUserMessage($vulnerability));
+            if ($response->isDegraded()) {
+                $this->logger->warning('Fix synthesis answer was cut short; keeping original remediation', [
+                    'vulnerability_id' => $vulnerability->id(),
+                    'stop_reason' => $response->stopReason(),
+                ]);
+
+                return null;
+            }
+
             $content = u($response->content())->trim()->toString();
 
             return $this->isUsableFix($content) ? $content : null;

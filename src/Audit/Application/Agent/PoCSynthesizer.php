@@ -106,6 +106,15 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 
         try {
             $response = $this->llmClient->complete($systemPrompt, $userMessage);
+            if ($response->isDegraded()) {
+                $this->logger->warning('PoC synthesis answer was cut short; keeping original proof', [
+                    'vulnerability_id' => $vulnerability->id(),
+                    'stop_reason' => $response->stopReason(),
+                ]);
+
+                return null;
+            }
+
             $content = u($response->content())->trim()->toString();
 
             return $this->isUsablePoC($content) ? $content : null;
