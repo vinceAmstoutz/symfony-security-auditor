@@ -81,6 +81,7 @@ final class ReviewerOmittedVerdictTest extends TestCase
         yield 'an empty answer' => [''];
         yield 'an empty object' => ['{}'];
         yield 'notes without an accepted flag' => ['{"reviewer_notes": "looks fine"}'];
+        yield 'an accepted flag the auditor cannot read' => ['{"accepted": "rejected"}'];
     }
 
     /**
@@ -183,6 +184,7 @@ final class ReviewerOmittedVerdictTest extends TestCase
     {
         yield 'no record_review call' => [null];
         yield 'a record_review call without an accepted flag' => [['reviewer_notes' => 'looks fine']];
+        yield 'a record_review call with an accepted flag the auditor cannot read' => [['accepted' => 'rejected']];
     }
 
     /**

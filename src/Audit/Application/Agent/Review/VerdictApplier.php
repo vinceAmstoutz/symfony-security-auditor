@@ -39,7 +39,7 @@ final readonly class VerdictApplier
     {
         $review = $this->normalize($reviewData);
 
-        $accepted = $this->parseAccepted($review['accepted'] ?? false);
+        $accepted = AcceptedFlag::read($review['accepted'] ?? null) ?? false;
         $rawSeverity = $review['adjusted_severity'] ?? null;
         $adjustedSeverity = \is_string($rawSeverity) ? $rawSeverity : null;
         $rawCorrectedType = $review['corrected_type'] ?? null;
@@ -59,31 +59,15 @@ final readonly class VerdictApplier
 
     /**
      * Whether the payload judges the finding at all: a payload with no
-     * `accepted` flag (notes only, an empty object) is not a rejection but a
-     * review the model never made, which a caller records as errored.
+     * `accepted` flag (notes only, an empty object) or one {@see AcceptedFlag}
+     * cannot read is not a rejection but a review the model never made, which
+     * a caller records as errored.
      *
      * @param array<string, mixed>|list<array<string, mixed>> $reviewData
      */
     public function hasVerdict(array $reviewData): bool
     {
-        return null !== ($this->normalize($reviewData)['accepted'] ?? null);
-    }
-
-    /**
-     * PHP's `(bool)` cast treats any non-empty, non-`"0"` string as `true` —
-     * including the literal string `"false"`, which a provider that
-     * stringifies JSON booleans (a known quirk of some non-Anthropic models
-     * reached through this bundle's provider-agnostic seam) can plausibly
-     * send instead of the JSON boolean `false`, silently overturning an
-     * explicit reviewer rejection.
-     */
-    private function parseAccepted(mixed $accepted): bool
-    {
-        if (\is_string($accepted) && 'false' === strtolower(trim($accepted))) {
-            return false;
-        }
-
-        return (bool) $accepted;
+        return null !== AcceptedFlag::read($this->normalize($reviewData)['accepted'] ?? null);
     }
 
     private function applyAdjustedSeverity(Vulnerability $vulnerability, ?string $adjustedSeverity): Vulnerability
@@ -93,7 +77,7 @@ final readonly class VerdictApplier
         }
 
         try {
-            return $vulnerability->withElevatedSeverity(VulnerabilitySeverity::from($adjustedSeverity));
+            return $vulnerability->withElevatedSeverity(VulnerabilitySeverity::from(strtolower(trim($adjustedSeverity))));
         } catch (ValueError) {
             $this->logger->debug('Reviewer returned invalid severity, keeping original', [
                 'adjusted_severity' => $adjustedSeverity,
@@ -110,7 +94,7 @@ final readonly class VerdictApplier
         }
 
         try {
-            return $vulnerability->withCorrectedType(VulnerabilityType::from($correctedType));
+            return $vulnerability->withCorrectedType(VulnerabilityType::from(strtolower(trim($correctedType))));
         } catch (ValueError) {
             $this->logger->debug('Reviewer returned invalid corrected_type, keeping original', [
                 'corrected_type' => $correctedType,
