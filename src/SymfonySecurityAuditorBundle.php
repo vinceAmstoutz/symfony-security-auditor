@@ -53,8 +53,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedPr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\IsolatedComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
@@ -249,7 +249,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
         $servicesConfigurator->alias(ComposerAuditRunnerInterface::class, $bundleConfiguration->cache->enabled
             ? LockfileHashedAdvisoryCache::class
-            : SymfonyProcessComposerAuditRunner::class);
+            : IsolatedComposerAuditRunner::class);
 
         $this->registerStaticPreScanner($servicesConfigurator, $bundleConfiguration);
         $this->registerTriageMemory($servicesConfigurator, $bundleConfiguration);

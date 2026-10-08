@@ -96,7 +96,7 @@ src/
 │       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache,
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
-│       │                  SymfonyProcessComposerAuditRunner + Exception/*
+│       │                  IsolatedComposerAuditRunner, SymfonyProcessComposerAuditRunner + Exception/*
 │       ├── Pricing/     # ModelsDevPricingProvider (symfony/models-dev catalog), ModelsDevCatalog, PlatformCatalogProviders, ModelPrice
 │       ├── Progress/    # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY),
 │       │                  LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
@@ -128,7 +128,7 @@ graph LR
         FS["ProjectFileScanner"]
         PROMPTS["PromptBuilders"]
         CACHE["FilesystemAttackerCache · FilesystemReviewerCache\n(+ Null* twins)"]
-        ADVISORY["ComposerAuditAdvisoryDatabase\nInMemoryAdvisoryDatabase\nSymfonyProcessComposerAuditRunner"]
+        ADVISORY["ComposerAuditAdvisoryDatabase\nInMemoryAdvisoryDatabase\nIsolatedComposerAuditRunner\nSymfonyProcessComposerAuditRunner"]
         TOOLS["ReadFile · Grep · ListFiles · LookupAdvisory tools\nSymfonyToolRegistryFactory"]
         RENDERER["ReportRenderer"]
     end
