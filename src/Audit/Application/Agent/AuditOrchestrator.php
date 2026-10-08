@@ -422,8 +422,13 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $newFindings = 0;
 
         foreach ($reviewed as $vulnerability) {
-            if ($this->admit($vulnerability, $auditContext)) {
-                $auditContext->addVulnerability($vulnerability);
+            $replaced = $this->admit($vulnerability, $auditContext);
+            if (null === $replaced) {
+                continue;
+            }
+
+            $auditContext->addVulnerability($vulnerability);
+            if (!FindingPrecedence::onlyOutranksOnConfidence($vulnerability, $replaced)) {
                 ++$newFindings;
             }
         }
@@ -443,26 +448,26 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * A finding at a new id that overlaps validated findings of the same file
      * and type collapses with them: it is admitted only when it outranks every
      * one of them, and then takes their place.
+     *
+     * @return list<Vulnerability>|null the findings the admitted one replaces, null when it is a duplicate
      */
-    private function admit(Vulnerability $vulnerability, AuditContext $auditContext): bool
+    private function admit(Vulnerability $vulnerability, AuditContext $auditContext): ?array
     {
         $existingById = $auditContext->vulnerabilities()[$vulnerability->id()] ?? null;
         if ($existingById instanceof Vulnerability) {
-            return !$this->isSameIdDuplicate($existingById, $vulnerability);
+            return $this->isSameIdDuplicate($existingById, $vulnerability) ? null : [$existingById];
         }
 
         $overlapped = $this->overlappingValidated($vulnerability, $auditContext);
-        foreach ($overlapped as $existing) {
-            if (!FindingPrecedence::prevails($vulnerability, $existing)) {
-                return false;
-            }
+        if (!FindingPrecedence::prevailsOverAll($vulnerability, $overlapped)) {
+            return null;
         }
 
         foreach ($overlapped as $existing) {
             $auditContext->removeVulnerability($existing->id());
         }
 
-        return true;
+        return $overlapped;
     }
 
     /**

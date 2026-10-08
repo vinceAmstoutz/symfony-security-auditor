@@ -96,10 +96,65 @@ final class FindingPrecedenceTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function finding(VulnerabilitySeverity $vulnerabilitySeverity, float $confidence, bool $validated, int $lineStart = 10): Vulnerability
+    public function test_a_finding_prevails_over_all_incumbents_only_when_it_outranks_each_of_them(): void
+    {
+        $vulnerability = $this->finding(VulnerabilitySeverity::HIGH, 0.9, true);
+        $weaker = $this->finding(VulnerabilitySeverity::MEDIUM, 0.9, true);
+        $equal = $this->finding(VulnerabilitySeverity::HIGH, 0.9, true);
+
+        self::assertTrue(FindingPrecedence::prevailsOverAll($vulnerability, []));
+        self::assertTrue(FindingPrecedence::prevailsOverAll($vulnerability, [$weaker, $weaker]));
+        self::assertFalse(FindingPrecedence::prevailsOverAll($vulnerability, [$weaker, $equal]));
+        self::assertFalse(FindingPrecedence::prevailsOverAll($vulnerability, [$equal, $weaker]));
+    }
+
+    /**
+     * @param array{VulnerabilitySeverity, float, bool, VulnerabilityType}       $challenger severity, confidence, validated, type
+     * @param list<array{VulnerabilitySeverity, float, bool, VulnerabilityType}> $replaced   severity, confidence, validated and type of each replaced finding
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('replacements')]
+    public function test_it_tells_a_replacement_that_only_raises_the_confidence(array $challenger, array $replaced, bool $expected): void
+    {
+        $replacedFindings = array_map(
+            fn (array $incumbent): Vulnerability => $this->finding($incumbent[0], $incumbent[1], $incumbent[2], 10, $incumbent[3]),
+            $replaced,
+        );
+
+        self::assertSame($expected, FindingPrecedence::onlyOutranksOnConfidence($this->finding($challenger[0], $challenger[1], $challenger[2], 10, $challenger[3]), $replacedFindings));
+    }
+
+    /**
+     * @return iterable<string, array{array{VulnerabilitySeverity, float, bool, VulnerabilityType}, list<array{VulnerabilitySeverity, float, bool, VulnerabilityType}>, bool}>
+     */
+    public static function replacements(): iterable
+    {
+        $high = [VulnerabilitySeverity::HIGH, 0.8, true, VulnerabilityType::SQL_INJECTION];
+        $challenger = [VulnerabilitySeverity::HIGH, 0.85, true, VulnerabilityType::SQL_INJECTION];
+
+        yield 'replaces nothing' => [$challenger, [], false];
+        yield 'replaces a finding of the same severity and type' => [$challenger, [$high], true];
+        yield 'replaces several findings of the same severity and type' => [$challenger, [$high, $high], true];
+        yield 'replaces a finding it raises the severity of' => [[VulnerabilitySeverity::CRITICAL, 0.85, true, VulnerabilityType::SQL_INJECTION], [$high], false];
+        yield 'replaces a finding of another type' => [[VulnerabilitySeverity::HIGH, 0.85, true, VulnerabilityType::SSRF], [$high], false];
+        yield 'replaces a finding no reviewer validated' => [$challenger, [[VulnerabilitySeverity::HIGH, 0.8, false, VulnerabilityType::SQL_INJECTION]], false];
+        yield 'replaces one finding it raises the severity of among others' => [$challenger, [$high, [VulnerabilitySeverity::MEDIUM, 0.8, true, VulnerabilityType::SQL_INJECTION]], false];
+        yield 'replaces one finding of another type among others' => [$challenger, [$high, [VulnerabilitySeverity::HIGH, 0.8, true, VulnerabilityType::SSRF]], false];
+        yield 'replaces one unvalidated finding among others' => [$challenger, [$high, [VulnerabilitySeverity::HIGH, 0.8, false, VulnerabilityType::SQL_INJECTION]], false];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function finding(VulnerabilitySeverity $vulnerabilitySeverity, float $confidence, bool $validated, int $lineStart = 10, VulnerabilityType $vulnerabilityType = VulnerabilityType::SQL_INJECTION): Vulnerability
     {
         return Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, $vulnerabilitySeverity, 'title', $confidence),
+            new VulnerabilityClassification($vulnerabilityType, $vulnerabilitySeverity, 'title', $confidence),
             new CodeLocation('src/A.php', $lineStart, $lineStart + 5),
             new VulnerabilityNarrative('d', 'a', 'p', 'r'),
             'c',

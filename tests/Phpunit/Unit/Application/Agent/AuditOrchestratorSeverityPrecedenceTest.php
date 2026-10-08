@@ -383,6 +383,54 @@ final class AuditOrchestratorSeverityPrecedenceTest extends TestCase
         yield 'the same severity and type is a duplicate' => ['{"accepted": true, "adjusted_severity": "high"}', VulnerabilitySeverity::HIGH, VulnerabilityType::SQL_INJECTION];
     }
 
+    /**
+     * @param array<string, mixed> $laterReport
+     *
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    #[DataProvider('reReports')]
+    public function test_a_re_report_asks_for_another_attacker_pass_only_when_it_adds_more_than_confidence(string $firstVerdict, array $laterReport, string $laterVerdict, int $expectedIterations): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            AuditOrchestratorHarness::attackerResponse([AuditOrchestratorHarness::vulnerabilityPayload(confidence: 0.8)]),
+            AuditOrchestratorHarness::attackerResponse([$laterReport]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            LLMResponse::of($firstVerdict, 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+            LLMResponse::of($laterVerdict, 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+        );
+
+        $auditContext = AuditOrchestratorHarness::contextWithMapping($this->tmpDir);
+
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertSame($expectedIterations, $auditContext->getMeta('audit.iterations'));
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, mixed>, string, int}>
+     */
+    public static function reReports(): iterable
+    {
+        $accept = '{"accepted": true}';
+        $sameLocation = AuditOrchestratorHarness::vulnerabilityPayload(confidence: 0.85);
+        $oneLineLower = AuditOrchestratorHarness::vulnerabilityPayload(confidence: 0.85, lineStart: 11, lineEnd: 16);
+
+        yield 'the same finding with a higher confidence' => [$accept, $sameLocation, $accept, 2];
+        yield 'the same weakness one line lower with a higher confidence' => [$accept, $oneLineLower, $accept, 2];
+        yield 'the same finding with its severity raised by the reviewer' => [$accept, $sameLocation, '{"accepted": true, "adjusted_severity": "critical"}', 3];
+        yield 'the same finding reclassified by the reviewer' => [$accept, $sameLocation, '{"accepted": true, "corrected_type": "ssrf"}', 3];
+        yield 'the same weakness one line lower with a higher severity' => [$accept, [...$oneLineLower, 'severity' => 'critical'], $accept, 3];
+        yield 'a validated finding at the place of a rejected one' => ['{"accepted": false}', $sameLocation, $accept, 3];
+    }
+
     #[Override]
     protected function setUp(): void
     {

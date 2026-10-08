@@ -48,6 +48,44 @@ final readonly class FindingPrecedence
     }
 
     /**
+     * @param list<Vulnerability> $incumbents
+     */
+    public static function prevailsOverAll(Vulnerability $vulnerability, array $incumbents): bool
+    {
+        foreach ($incumbents as $incumbent) {
+            if (!self::prevails($vulnerability, $incumbent)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether the challenger differs from the validated findings it replaces by
+     * nothing but a higher confidence, which is no new information.
+     *
+     * @param list<Vulnerability> $replaced
+     */
+    public static function onlyOutranksOnConfidence(Vulnerability $vulnerability, array $replaced): bool
+    {
+        if ([] === $replaced) {
+            return false;
+        }
+
+        foreach ($replaced as $incumbent) {
+            if (!$incumbent->isReviewerValidated()
+                || $incumbent->severity() !== $vulnerability->severity()
+                || $incumbent->type() !== $vulnerability->type()
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @return array{bool, int, float}
      */
     private static function rank(Vulnerability $vulnerability): array
