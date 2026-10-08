@@ -2760,6 +2760,38 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_complete_aborts_at_once_on_a_429_that_says_the_billing_quota_is_exhausted(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RateLimitExceededException(null, 'You exceeded your current quota, please check your plan and billing details.'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 500, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
+        );
+
+        $aborted = false;
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+        } catch (NonTransientLLMFailureException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame([], $fakeSleeper->durations);
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
      * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException

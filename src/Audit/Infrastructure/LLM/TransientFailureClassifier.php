@@ -85,6 +85,19 @@ final readonly class TransientFailureClassifier
     ];
 
     /** @var list<string> */
+    private const array QUOTA_EXHAUSTED_HINTS = [
+        'insufficient_quota',
+        'exceeded your current quota',
+    ];
+
+    /** @var list<string> */
+    private const array SUGGESTED_WAIT_HINTS = [
+        'retry in',
+        'retry after',
+        'try again in',
+    ];
+
+    /** @var list<string> */
     private const array RATE_LIMIT_STATUS_CODES = ['429'];
 
     /** @var list<string> */
@@ -136,9 +149,30 @@ final readonly class TransientFailureClassifier
 
     /**
      * A tool call whose arguments are not valid JSON is a sampling glitch, not
-     * a rejected request: asking again usually gets a well-formed call.
+     * a rejected request: asking again usually gets a well-formed call. A 429
+     * that says the billing quota is used up is the opposite: it repeats until
+     * funds are added, however long the run waits.
      */
     public function isTransient(Throwable $throwable): bool
+    {
+        return !$this->isQuotaExhausted($throwable) && $this->readsAsTransient($throwable);
+    }
+
+    /**
+     * OpenAI answers an exhausted billing quota with a 429 (`insufficient_quota`,
+     * `You exceeded your current quota, please check your plan and billing
+     * details.`), which reads as a rate limit. Gemini words a per-minute rate
+     * limit the same way but adds the wait (`Please retry in 41.8s.`), and
+     * that one clears, so a message that suggests a wait is a rate limit.
+     */
+    private function isQuotaExhausted(Throwable $throwable): bool
+    {
+        $joined = u($this->joinMessages($throwable));
+
+        return $joined->containsAny(self::QUOTA_EXHAUSTED_HINTS) && !$joined->containsAny(self::SUGGESTED_WAIT_HINTS);
+    }
+
+    private function readsAsTransient(Throwable $throwable): bool
     {
         if ($throwable instanceof ServerException || $this->hasInChain($throwable, MalformedToolCallException::class)) {
             return true;
