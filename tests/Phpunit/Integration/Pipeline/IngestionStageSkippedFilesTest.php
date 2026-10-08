@@ -223,6 +223,39 @@ final class IngestionStageSkippedFilesTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    #[DataProvider('spellingsOfTheSameDirectory')]
+    public function test_a_path_spelled_with_dot_or_empty_segments_records_the_same_skipped_files(string $path): void
+    {
+        mkdir($this->tmpDir.'/src/Admin', 0o777, true);
+        mkdir($this->tmpDir.'/src/Billing', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Admin/Big.php', str_repeat('a', (2 * 1024) + 1));
+        file_put_contents($this->tmpDir.'/src/Admin/Small.php', '<?php');
+        file_put_contents($this->tmpDir.'/src/Billing/Big.php', str_repeat('a', (2 * 1024) + 1));
+
+        $auditContext = AuditContext::forProject($this->tmpDir, [$path]);
+        (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger()))->process($auditContext);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+        self::assertSame([['stage' => 'scan', 'file' => 'src/Admin/Big.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame(['src/Admin/Small.php'], $this->analyzedPaths($auditContext));
+        self::assertSame(['src/Admin/Big.php'], $auditReport->unanalyzedFiles());
+        self::assertFalse($auditReport->isComplete());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function spellingsOfTheSameDirectory(): iterable
+    {
+        yield 'the plain spelling' => ['src/Admin'];
+        yield 'a parent segment' => ['src/Billing/../Admin'];
+        yield 'a current directory segment' => ['src/./Admin'];
+        yield 'an empty segment' => ['src//Admin'];
+        yield 'a leading current directory and a trailing separator' => ['./src/./Admin//'];
+        yield 'backslashes and a parent segment' => ['src\\Billing\\..\\Admin'];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_a_blank_path_is_no_path_and_leaves_the_configured_scan_surface_alone(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
