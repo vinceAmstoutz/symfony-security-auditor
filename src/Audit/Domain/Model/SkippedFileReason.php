@@ -21,12 +21,14 @@ enum SkippedFileReason: string
 {
     case TooLarge = 'too_large';
     case Unreadable = 'unreadable';
+    case AmbiguousName = 'ambiguous_name';
 
     public function description(): string
     {
         return match ($this) {
             self::TooLarge => 'it is larger than the scan size limit (scan.max_file_size_kb)',
             self::Unreadable => 'it could not be read',
+            self::AmbiguousName => "its name is the same as another file's once the bytes that are not valid UTF-8 are replaced",
         };
     }
 }

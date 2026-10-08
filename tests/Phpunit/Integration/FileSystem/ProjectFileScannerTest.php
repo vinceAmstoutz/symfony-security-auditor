@@ -374,6 +374,54 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame($absolutePath, $files[0]->absolutePath());
     }
 
+    public function test_it_keeps_one_of_two_files_whose_names_are_the_same_once_their_invalid_bytes_are_replaced_and_reports_the_other_as_skipped(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir."/src/caf\xE9.php", '<?php class A {}');
+        file_put_contents($this->tmpDir."/src/caf\xE8.php", '<?php class B {}');
+
+        $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame([["src/caf\u{FFFD}.php", '<?php class B {}']], array_map(static fn (ProjectFile $projectFile): array => [$projectFile->relativePath(), $projectFile->content()], $projectFileScan->files));
+        self::assertSame([["src/caf\u{FFFD}.php", SkippedFileReason::AmbiguousName]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
+    }
+
+    public function test_the_file_kept_among_those_with_the_same_repaired_name_is_the_first_in_byte_order_of_its_path_not_the_first_listed(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir."/src/caf\xE9.php", '<?php class A {}');
+        file_put_contents($this->tmpDir."/src/caf\xE8.php", '<?php class B {}');
+
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), includedPaths: ["src/caf\xE9.php", "src/caf\xE8.php"]))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame(['<?php class B {}'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->content(), $projectFileScan->files));
+        self::assertCount(1, $projectFileScan->skippedFiles);
+    }
+
+    public function test_three_files_that_share_a_repaired_name_leave_one_file_and_one_skipped_entry_for_the_name(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        foreach (["\xE7", "\xE8", "\xE9"] as $invalidByte) {
+            file_put_contents($this->tmpDir.'/src/caf'.$invalidByte.'.php', '<?php');
+        }
+
+        $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame(["src/caf\u{FFFD}.php"], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files));
+        self::assertSame([["src/caf\u{FFFD}.php", SkippedFileReason::AmbiguousName]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
+    }
+
+    public function test_a_file_reached_through_two_spellings_of_its_path_is_not_a_name_collision(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'src/./App.php', 'src//App.php']))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertCount(1, $projectFileScan->files);
+        self::assertSame([], $projectFileScan->skippedFiles);
+    }
+
     public function test_it_warns_once_that_the_content_of_a_file_was_not_valid_utf8(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
