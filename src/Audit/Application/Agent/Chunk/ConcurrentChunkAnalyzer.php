@@ -393,7 +393,7 @@ final readonly class ConcurrentChunkAnalyzer
             null === $reason
                 ? ChunkCoverageRecorder::record($pendingChunk->chunk, $status, $coverageRecorder)
                 : ChunkCoverageRecorder::recordErrored($pendingChunk->chunk, $reason, $coverageRecorder);
-            $this->recordDrainedFindings($pendingChunk->session, $coverageRecorder);
+            $this->recordDrainedFindings($pendingChunk, $coverageRecorder);
             $results[$index] = $this->vulnerabilityFactory->fromList([]);
         }
 
@@ -408,9 +408,9 @@ final readonly class ConcurrentChunkAnalyzer
      * candidates found before a mid-run abort. A window that was never
      * dispatched drains empty, which is harmless.
      */
-    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
+    private function recordDrainedFindings(PendingChunk $pendingChunk, CoverageRecorderInterface $coverageRecorder): void
     {
-        $vulnerabilities = $this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities();
+        $vulnerabilities = $this->vulnerabilityFactory->fromList($pendingChunk->session->drain(), $pendingChunk->chunk)->vulnerabilities();
         foreach ($vulnerabilities as $vulnerability) {
             $coverageRecorder->recordFoundVulnerability($vulnerability);
         }
@@ -421,7 +421,7 @@ final readonly class ConcurrentChunkAnalyzer
     private function finalize(PendingChunk $pendingChunk, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
         $rawData = $pendingChunk->session->drain();
-        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData);
+        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData, $pendingChunk->chunk);
         $this->recordOutcome($pendingChunk, $llmResponse, $rawData, $vulnerabilityHydrationResult, $coverageRecorder);
         $this->recordFoundVulnerabilities($vulnerabilityHydrationResult, $coverageRecorder);
 
