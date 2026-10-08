@@ -87,7 +87,11 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private const string PHP_EXPRESSION = '/^!?(?:\$[A-Za-z_]\w*(?:[;,)\]]*$|->|\?->|::|\[)|(?:self|static|parent)::[A-Z_][A-Z0-9_]*[;,)\]]*$|[A-Z]\w*::[A-Z_][A-Z0-9_]*[;,)\]]+$|\\\\[A-Za-z_][\w\\\\]*(?:::[A-Za-z_]\w*)?[;,)\]]*$|\[(?:["\'$\]]|\.\.\.)|\((?:\$[A-Za-z_]|new$)|\\\\?[a-z_]\w*\([a-z_]\w*\(|(?:\\\\?[a-z_]\w*|(?:self|static|parent|[A-Z]\w*)::[A-Za-z_]\w*)\((?:(?:[\'"$]|[a-z_]\w*\().*[,;()\]]|.*[;,])$)/';
 
-    private const string INLINE_CREDENTIAL_KEY = '(?:password|passwd|pwd|passphrase|(?<![a-z])pass(?![_-])|(?<![\w?&-])token(?![\w-])|secret|credentials|api[_-]?key|api[_-]?token|api[_-]?secret|access[_-]?token|access[_-]?key|auth[_-]?token|auth[_-]?key|client[_-]?secret|private[_-]?key|account[_-]?key|secret[_-]?key|app[_-]?key|app[_-]?secret|master[_-]?key|signing[_-]?key|encryption[_-]?key|session[_-]?secret|jwt[_-]?secret|refresh[_-]?token|bearer[_-]?token|(?:db|database|root|admin|user|mysql|postgres|pg|mongo|redis|smtp|mail|ftp|ssh)[_-]?pass(?:word|wd)?)';
+    private const string CREDENTIAL_WORDS = 'password|passwd|pwd|passphrase|secret|credentials|api[_-]?key|api[_-]?token|api[_-]?secret|access[_-]?token|access[_-]?key|auth[_-]?token|auth[_-]?key|client[_-]?secret|private[_-]?key|account[_-]?key|secret[_-]?key|app[_-]?key|app[_-]?secret|master[_-]?key|signing[_-]?key|encryption[_-]?key|session[_-]?secret|jwt[_-]?secret|refresh[_-]?token|bearer[_-]?token|(?:db|database|root|admin|user|mysql|postgres|pg|mongo|redis|smtp|mail|ftp|ssh)[_-]?pass(?:word|wd)?';
+
+    private const string PURE_VALUE_FUNCTIONS = 'hex2bin|bin2hex|base64_decode|base64_encode|sodium_hex2bin|sodium_base642bin|password_hash|md5|sha1|trim|ltrim|rtrim|strtolower|strtoupper|urldecode|rawurldecode|urlencode|rawurlencode';
+
+    private const string QUOTED_BODY_OF_GROUP_TWO = '((?:\\\\.|(?!\2)[^\n]){4,}+)';
 
     /**
      * @var array<string, string>
@@ -141,6 +145,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     private function defaultPatterns(): array
     {
         $envCredentialName = $this->envCredentialName();
+        $inlineCredentialKey = $this->inlineCredentialKey();
+        $callCredentialName = \sprintf('(?:%s|token)', self::CREDENTIAL_WORDS);
 
         return [
             SecretPatternLabel::AwsAccessKey->value => '/\bAKIA[0-9A-Z]{16}\b/',
@@ -151,13 +157,15 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
             SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
             SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+@~i',
-            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\n])*+\4|\S+)/m', $envCredentialName),
-            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*[\w-]+[ \t]*:))[ \tA-Za-z0-9]*[A-Za-z0-9])?))/i', self::INLINE_CREDENTIAL_KEY, $envCredentialName),
-            SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', self::INLINE_CREDENTIAL_KEY),
-            SecretPatternLabel::XmlParameter->value => \sprintf('~(<parameter\b[^>]{0,256}?\bkey=(["\'])[^"\'<>]{0,256}?%s[^"\'<>]{0,256}?\2[^>]{0,256}>)(?!\*\*\*REDACTED:)([^<\n]{4,})(?=</parameter>)~i', self::INLINE_CREDENTIAL_KEY),
+            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\r\n])*+(?:\4|(?=\r?$))|\S+)/m', $envCredentialName),
+            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++)?))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS),
+            SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', $inlineCredentialKey),
+            SecretPatternLabel::BlockScalar->value => \sprintf('/^([ \t]*+)(-[ \t]++)?(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?[ \t]*:[ \t]*[|>][+-]?[0-9]?[+-]?[ \t]*(?:#[^\n]*)?)\r?\n((?:\1(?(2)[ \t]{3,}|[ \t]+)[^\n]*(?:\n|\z)|[ \t]*\r?\n)++)/mi', $inlineCredentialKey),
+            SecretPatternLabel::CallArgument->value => \sprintf('/(?|((?:->|::)(?:(?:set|with)[A-Za-z0-9_]{0,24}?)?%1$s[ \t]*\([ \t]*)(["\'])%2$s\2|(\([ \t]*["\'][\w.$:\-]{0,64}%3$s[\w.$:\-]{0,64}["\'][ \t]*,[ \t]*)(["\'])%2$s\2|(new[ \t]+\\\\?PDO[ \t]*\([^,\n]{1,200},[^,\n]{1,100},[ \t]*)(["\'])%2$s\2|((?:\$|->)[A-Za-z_]*key[ \t]*=[ \t]*\\\\?(?:hex2bin|sodium_hex2bin|base64_decode|sodium_base642bin)[ \t]*+\([ \t]*+)(["\'])((?:\\\\.|(?!\2)[^\n]){16,}+)\2|(\bpassword_(?:hash|verify)[ \t]*+\([ \t]*+)(["\'])%2$s\2)/i', $callCredentialName, self::QUOTED_BODY_OF_GROUP_TWO, $inlineCredentialKey),
+            SecretPatternLabel::XmlParameter->value => \sprintf('~(<(?:parameter|argument)\b[^>]{0,256}?\bkey=(["\'])[^"\'<>]{0,256}?%s[^"\'<>]{0,256}?\2[^>]{0,256}>)(?!\*\*\*REDACTED:)([^<\n]{4,}+)(?=</(?:parameter|argument)>)~i', $inlineCredentialKey),
             SecretPatternLabel::BearerToken->value => '/\bBearer\s+[A-Za-z0-9\-_.]{20,4096}\b/i',
             SecretPatternLabel::BasicAuthorization->value => '~\b((?:proxy-)?authorization\b["\']?\s*(?::|=>|=)\s*["\']?basic\s+)[A-Za-z0-9+/=_\-]{8,4096}~i',
-            SecretPatternLabel::OpenAiApiKey->value => '/\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,200}\b/',
+            SecretPatternLabel::OpenAiApiKey->value => '/\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,}+/',
             SecretPatternLabel::SlackWebhookUrl->value => '~\bhttps://hooks\.slack\.com/services/[A-Za-z0-9]+/[A-Za-z0-9]+/[A-Za-z0-9]+\b~',
             SecretPatternLabel::DiscordWebhookUrl->value => '~\bhttps://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/(?:v\d+/)?webhooks/\d+/[A-Za-z0-9_\-]+~',
             SecretPatternLabel::GitlabToken->value => '/\bgl(?:pat|ptt|rt|dt|ft|oas|soat|cbt|imt|agent)-[A-Za-z0-9_\-]{20,}/',
@@ -166,6 +174,16 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::SendgridApiKey->value => '/\bSG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}/',
             SecretPatternLabel::PypiToken->value => '/\bpypi-Ag[A-Za-z0-9_\-]{50,}/',
         ];
+    }
+
+    private function inlineCredentialKey(): string
+    {
+        return \sprintf('(?:%s|(?<![a-z])pass(?![_-])|(?<![\w?&-])token(?![\w-]))', self::CREDENTIAL_WORDS);
+    }
+
+    private function truncatedPrivateKeyPattern(): string
+    {
+        return \sprintf('/-----BEGIN %s-----[ \t\r\n]*+(?:[ \t]*[A-Za-z0-9+\/=]{16,}[ \t]*(?:\r?\n|\z))++/', self::PRIVATE_KEY_LABEL);
     }
 
     /**
@@ -185,8 +203,10 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
                 SecretPatternLabel::EnvAssignment => preg_replace_callback($pattern, $this->redactEnvAssignment(...), $content),
                 SecretPatternLabel::InlineAssignment => preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content),
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
+                SecretPatternLabel::BlockScalar => preg_replace_callback($pattern, $this->redactBlockScalar(...), $content),
+                SecretPatternLabel::CallArgument => preg_replace_callback($pattern, $this->redactCallArgument(...), $content),
                 SecretPatternLabel::XmlParameter => preg_replace_callback($pattern, $this->redactXmlParameter(...), $content),
-                SecretPatternLabel::PemPrivateKey => preg_replace_callback($pattern, $this->redactPreservingLineCount(...), $content),
+                SecretPatternLabel::PemPrivateKey => $this->redactPrivateKeys($pattern, $content),
                 SecretPatternLabel::BearerToken => preg_replace_callback($pattern, $this->redactBearerToken(...), $content),
                 default => preg_replace($pattern, $this->replacementFor($label), $content),
             };
@@ -321,6 +341,34 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     /**
      * @param array<int|string, string> $match
      */
+    private function redactBlockScalar(array $match): string
+    {
+        $lines = $match[4];
+        if (1 !== preg_match('/([ \t]+)\S/', $lines, $firstLine)) {
+            return $match[0];
+        }
+
+        return \sprintf("%s%s%s\n%s%s%s", $match[1], $match[2], $match[3], $firstLine[1], SecretPatternLabel::BlockScalar->placeholder(), str_repeat("\n", substr_count($lines, "\n")));
+    }
+
+    /**
+     * @param array<int|string, string> $match
+     */
+    private function redactCallArgument(array $match): string
+    {
+        $quote = $match[2];
+        $value = $match[3];
+
+        if ($this->isRedactionPlaceholder($value) || $this->isConfigPlaceholder($value)) {
+            return $match[0];
+        }
+
+        return \sprintf('%s%s%s%s', $match[1], $quote, SecretPatternLabel::CallArgument->placeholder(), $quote);
+    }
+
+    /**
+     * @param array<int|string, string> $match
+     */
     private function redactXmlParameter(array $match): string
     {
         if ($this->isConfigPlaceholder($match[3] ?? '')) {
@@ -328,6 +376,13 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         }
 
         return \sprintf('%s%s', $match[1], SecretPatternLabel::XmlParameter->placeholder());
+    }
+
+    private function redactPrivateKeys(string $pattern, string $content): ?string
+    {
+        $withoutWholeKeys = preg_replace_callback($pattern, $this->redactPreservingLineCount(...), $content);
+
+        return null === $withoutWholeKeys ? null : preg_replace_callback($this->truncatedPrivateKeyPattern(), $this->redactPreservingLineCount(...), $withoutWholeKeys);
     }
 
     /**

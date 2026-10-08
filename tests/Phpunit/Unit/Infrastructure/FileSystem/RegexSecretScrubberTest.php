@@ -608,6 +608,317 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame("APP_ENV=dev\nAPP_SECRET=***REDACTED:env_assignment***\nMESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0\nMAILER_DSN=null://null\n", $this->regexSecretScrubber->scrub($dotenv));
     }
 
+    #[DataProvider('literalsPassedToCredentialCallsCases')]
+    public function test_a_literal_passed_to_a_call_that_takes_a_credential_is_redacted(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function literalsPassedToCredentialCallsCases(): iterable
+    {
+        yield 'a config builder secret' => ["\$framework->secret('SuperSecretValue123');", "\$framework->secret('***REDACTED:call_argument***');"];
+        yield 'a double-quoted config builder secret' => ['$framework->secret("SuperSecretValue123");', '$framework->secret("***REDACTED:call_argument***");'];
+        yield 'a config builder password' => ["\$security->password('hunter2hunter2');", "\$security->password('***REDACTED:call_argument***');"];
+        yield 'a password setter' => ["\$user->setPassword('hunter2hunter2');", "\$user->setPassword('***REDACTED:call_argument***');"];
+        yield 'an api token setter' => ["\$client->setApiToken('abcdef0123456789');", "\$client->setApiToken('***REDACTED:call_argument***');"];
+        yield 'a plain password setter' => ["\$user->setPlainPassword('hunter2hunter2');", "\$user->setPlainPassword('***REDACTED:call_argument***');"];
+        yield 'a bare token setter' => ["\$client->setToken('abcd1234efgh');", "\$client->setToken('***REDACTED:call_argument***');"];
+        yield 'a fluent setter' => ["\$u->setName('Ada')->withSecret('abcd1234efgh')->setActive(true);", "\$u->setName('Ada')->withSecret('***REDACTED:call_argument***')->setActive(true);"];
+        yield 'a static setter' => ["Settings::setPassphrase('abcd1234efgh');", "Settings::setPassphrase('***REDACTED:call_argument***');"];
+        yield 'a nullsafe setter' => ["\$client?->setClientSecret('abcd1234efgh');", "\$client?->setClientSecret('***REDACTED:call_argument***');"];
+        yield 'a setter with a space before the parenthesis' => ["\$user->setPassword ( 'hunter2hunter2' );", "\$user->setPassword ( '***REDACTED:call_argument***' );"];
+        yield 'an upper-case setter' => ["\$user->SETPASSWORD('hunter2hunter2');", "\$user->SETPASSWORD('***REDACTED:call_argument***');"];
+        yield 'a literal followed by more arguments' => ["\$user->setPassword('hunter2hunter2', true);", "\$user->setPassword('***REDACTED:call_argument***', true);"];
+        yield 'a literal with an escaped quote' => ["\$user->setPassword('hunter\\'2hunter2');", "\$user->setPassword('***REDACTED:call_argument***');"];
+        yield 'a literal of exactly four characters' => ["\$user->setPassword('abcd');", "\$user->setPassword('***REDACTED:call_argument***');"];
+        yield 'a key and a value' => ["\$bag->set('db_password', 'hunter2hunter2');", "\$bag->set('db_password', '***REDACTED:call_argument***');"];
+        yield 'a parameter named like a password' => ["\$qb->setParameter('database_password', 'hunter2hunter2');", "\$qb->setParameter('database_password', '***REDACTED:call_argument***');"];
+        yield 'a named argument' => ["\$definition->arg('\$apiKey', 'abcdef0123456789');", "\$definition->arg('\$apiKey', '***REDACTED:call_argument***');"];
+        yield 'a dotted parameter name' => ['$container->setParameter("app.secret", "abcdef0123456789");', '$container->setParameter("app.secret", "***REDACTED:call_argument***");'];
+        yield 'a bare token key' => ["\$session->set('token', 'abcdef0123456789');", "\$session->set('token', '***REDACTED:call_argument***');"];
+        yield 'a key and a value without spaces' => ["\$bag->set('db_password','hunter2hunter2');", "\$bag->set('db_password','***REDACTED:call_argument***');"];
+        yield 'a key and a value on one line of a chain' => ["\$c->set('mailer_password', 'hunter2hunter2')->set('x', 1);", "\$c->set('mailer_password', '***REDACTED:call_argument***')->set('x', 1);"];
+        yield 'a key decoded from a long hex literal' => ["\$key = hex2bin('00112233445566778899aabbccddeeff');", "\$key = hex2bin('***REDACTED:call_argument***');"];
+        yield 'a property decoded from a long base64 literal' => ['$this->key = base64_decode("c2VjcmV0c2VjcmV0c2VjcmV0");', '$this->key = base64_decode("***REDACTED:call_argument***");'];
+        yield 'a key decoded from a literal of exactly sixteen characters' => ["\$key = hex2bin('0011223344556677');", "\$key = hex2bin('***REDACTED:call_argument***');"];
+        yield 'a key decoded through sodium' => ["\$cipherKey = \\sodium_hex2bin('00112233445566778899aabbccddeeff');", "\$cipherKey = \\sodium_hex2bin('***REDACTED:call_argument***');"];
+        yield 'a password hashed from a literal' => ["\$hash = password_hash('admin12345', PASSWORD_DEFAULT);", "\$hash = password_hash('***REDACTED:call_argument***', PASSWORD_DEFAULT);"];
+        yield 'a password verified against a literal' => ['return password_verify("letmein1", $hash);', 'return password_verify("***REDACTED:call_argument***", $hash);'];
+        yield 'a pdo connection' => ["\$pdo = new PDO('mysql:host=localhost', 'root', 'hunter2hunter2');", "\$pdo = new PDO('mysql:host=localhost', 'root', '***REDACTED:call_argument***');"];
+        yield 'a qualified pdo connection' => ["\$pdo = new \\PDO(\$dsn, \$user, 'hunter2hunter2', [PDO::ATTR_ERRMODE => 1]);", "\$pdo = new \\PDO(\$dsn, \$user, '***REDACTED:call_argument***', [PDO::ATTR_ERRMODE => 1]);"];
+    }
+
+    #[DataProvider('callsThatTakeNoCredentialLiteralCases')]
+    public function test_a_call_that_takes_no_credential_literal_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function callsThatTakeNoCredentialLiteralCases(): iterable
+    {
+        yield 'a password hashed from a variable' => ['$user->setPassword($hasher->hash($plain));'];
+        yield 'a password read from the environment' => ["\$user->setPassword('%env(APP_PASSWORD)%');"];
+        yield 'an empty password' => ["\$user->setPassword('');"];
+        yield 'a three character literal' => ["\$user->setPassword('abc');"];
+        yield 'a csrf token read by id' => ["\$manager->getToken('authenticate');"];
+        yield 'a csrf token checked by id' => ["\$this->isCsrfTokenValid('delete-item', \$token);"];
+        yield 'a token id setter' => ["\$config->setTokenId('delete_item');"];
+        yield 'a password parameter setter' => ["\$config->setPasswordParameter('_password');"];
+        yield 'a token setter holding null' => ['$tokenStorage->setToken(null);'];
+        yield 'a token setter holding a variable' => ['$tokenStorage->setToken($token);'];
+        yield 'a form field named password' => ["\$builder->add('password', PasswordType::class);"];
+        yield 'a translation of a password label' => ["\$translator->trans('password', [], 'forms');"];
+        yield 'a csrf token parameter' => ["\$bag->set('csrf_token', 'abcdef0123456789');"];
+        yield 'a token id parameter' => ["\$bag->setParameter('token_id', 'delete_item');"];
+        yield 'a password key holding a variable' => ["\$bag->set('db_password', \$password);"];
+        yield 'a password key holding a reference' => ["\$bag->set('db_password', '%env(DB_PASSWORD)%');"];
+        yield 'a password key holding an empty default' => ["\$request->request->get('password', '');"];
+        yield 'a non credential key holding a literal' => ["\$bag->set('locale', 'fr_FR');"];
+        yield 'a password hashed into a hash variable' => ['$hash = password_hash($plain, PASSWORD_DEFAULT);'];
+        yield 'a password hashed from an empty literal' => ["\$hash = password_hash('', PASSWORD_DEFAULT);"];
+        yield 'a pdo connection without a password' => ["\$pdo = new PDO('sqlite::memory:');"];
+        yield 'a pdo connection taking its password from a variable' => ['$pdo = new PDO($dsn, $user, $password);'];
+        yield 'a pdo connection with a user only' => ["\$pdo = new PDO(\$dsn, 'root');"];
+        yield 'a pdo class constant' => ['$mode = PDO::ATTR_ERRMODE;'];
+        yield 'a key decoded from a literal of fifteen characters' => ["\$key = hex2bin('001122334455667');"];
+        yield 'a key decoded from a short literal' => ["\$key = hex2bin('0011');"];
+        yield 'a key decoded from a short literal and a long comment' => ["\$key = hex2bin('0011'); // decoded with a comment longer than sixteen characters"];
+        yield 'a key decoded from a variable' => ['$key = base64_decode($encoded);'];
+        yield 'a cache key hashed from a literal' => ["\$cacheKey = md5('users_list_of_the_day');"];
+        yield 'a key decoded from a reference' => ["\$key = hex2bin('%env(KEY_HEX)%');"];
+        yield 'another class built with literals' => ["\$mail = new Mailer('smtp://localhost', 'noreply', 'hunter2hunter2');"];
+    }
+
+    #[DataProvider('literalsAssignedToCredentialOffsetsCases')]
+    public function test_a_literal_assigned_to_a_credential_named_offset_is_redacted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function literalsAssignedToCredentialOffsetsCases(): iterable
+    {
+        yield 'a config entry' => ["\$cfg['password'] = 'hunter2hunter2';", "\$cfg['password'] = '***REDACTED:inline_assignment***';"];
+        yield 'an environment entry' => ["\$_ENV['APP_SECRET'] = 'hunter2hunter2';", "\$_ENV['APP_SECRET'] = '***REDACTED:inline_assignment***';"];
+        yield 'a nested double-quoted entry' => ['$config["database"]["password"]= "hunter2hunter2";', '$config["database"]["password"]= "***REDACTED:inline_assignment***";'];
+        yield 'an entry with spaces inside the brackets' => ["\$cfg['api_key']   =   'abcdef0123456789';", "\$cfg['api_key']   =   '***REDACTED:inline_assignment***';"];
+    }
+
+    #[DataProvider('offsetsThatHoldNoCredentialLiteralCases')]
+    public function test_a_credential_named_offset_that_holds_no_literal_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function offsetsThatHoldNoCredentialLiteralCases(): iterable
+    {
+        yield 'a hash read into an entry' => ["\$row['password'] = \$hash;"];
+        yield 'a token read from an object' => ["\$data['token'] = \$token->getValue();"];
+        yield 'an entry compared with a literal' => ["if (\$_POST['password'] === 'letmein') {"];
+        yield 'an entry read from the environment' => ["\$_ENV['APP_SECRET'] = getenv('APP_SECRET');"];
+        yield 'an entry holding a reference' => ["\$cfg['password'] = '%env(DB_PASSWORD)%';"];
+    }
+
+    #[DataProvider('literalsWrappedInAPureFunctionCases')]
+    public function test_a_literal_wrapped_in_a_pure_function_under_a_credential_key_is_redacted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function literalsWrappedInAPureFunctionCases(): iterable
+    {
+        yield 'a key decoded from hex' => ["\$encryptionKey = hex2bin('00112233445566778899aabbccddeeff');", "\$encryptionKey = hex2bin('***REDACTED:inline_assignment***');"];
+        yield 'a password hashed with an algorithm' => ["\$password = password_hash('admin12345', PASSWORD_DEFAULT);", "\$password = password_hash('***REDACTED:inline_assignment***', PASSWORD_DEFAULT);"];
+        yield 'a secret decoded from base64' => ["'secret' => base64_decode('c2VjcmV0c2VjcmV0'),", "'secret' => base64_decode('***REDACTED:inline_assignment***'),"];
+        yield 'a key encoded to base64' => ['$apiKey = base64_encode("abcdef0123456789");', '$apiKey = base64_encode("***REDACTED:inline_assignment***");'];
+        yield 'a key trimmed from the root namespace' => ["\$apiKey = \\trim('  abcdef0123456789  ');", "\$apiKey = \\trim('***REDACTED:inline_assignment***');"];
+        yield 'a password lower-cased' => ["\$password = strtolower('HunterTwo2024');", "\$password = strtolower('***REDACTED:inline_assignment***');"];
+        yield 'a password upper-cased' => ["\$password = strtoupper('hunter2hunter2');", "\$password = strtoupper('***REDACTED:inline_assignment***');"];
+        yield 'a password hashed with md5' => ["\$password = md5('hunter2hunter2');", "\$password = md5('***REDACTED:inline_assignment***');"];
+        yield 'a password hashed with sha1' => ["\$password = sha1('hunter2hunter2');", "\$password = sha1('***REDACTED:inline_assignment***');"];
+        yield 'a key converted to binary' => ["\$secretKey = bin2hex('hunter2hunter2');", "\$secretKey = bin2hex('***REDACTED:inline_assignment***');"];
+        yield 'a key decoded from a url' => ["\$secretKey = urldecode('hunter2%20hunter2');", "\$secretKey = urldecode('***REDACTED:inline_assignment***');"];
+        yield 'a call with a space after the parenthesis' => ["\$password = md5( 'hunter2hunter2' );", "\$password = md5( '***REDACTED:inline_assignment***' );"];
+        yield 'a key decoded from sodium hex' => ["\$secretKey = sodium_hex2bin('00112233445566778899aabbccddeeff');", "\$secretKey = sodium_hex2bin('***REDACTED:inline_assignment***');"];
+    }
+
+    #[DataProvider('callsAroundNoLiteralUnderACredentialKeyCases')]
+    public function test_a_call_that_wraps_no_literal_under_a_credential_key_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function callsAroundNoLiteralUnderACredentialKeyCases(): iterable
+    {
+        yield 'a password hashed from a variable' => ['$password = password_hash($plain, PASSWORD_DEFAULT);'];
+        yield 'a key generated at random' => ['$secretKey = bin2hex(random_bytes(32));'];
+        yield 'a key decoded from the environment' => ["\$encryptionKey = hex2bin(getenv('KEY_HEX'));"];
+        yield 'a hash whose first argument names the algorithm' => ["\$signingKey = hash_hmac('sha256', \$payload, \$userInput);"];
+        yield 'a wrapped reference' => ["\$password = md5('%env(SALT)%');"];
+        yield 'a wrapped empty literal' => ["\$password = md5('');"];
+        yield 'a function that is no wrapper' => ["\$password = generate_password('hunter2hunter2');"];
+    }
+
+    #[DataProvider('xmlArgumentsCases')]
+    public function test_an_xml_service_argument_named_like_a_credential_is_redacted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function xmlArgumentsCases(): iterable
+    {
+        yield 'a named argument' => ['<argument key="$apiKey">abcdef0123456789</argument>', '<argument key="$apiKey">***REDACTED:xml_parameter***</argument>'];
+        yield 'a typed password argument' => ['<argument type="string" key="$password">hunter2hunter2</argument>', '<argument type="string" key="$password">***REDACTED:xml_parameter***</argument>'];
+        yield 'a single-quoted key' => ["<argument key='\$clientSecret'>hunter2hunter2</argument>", "<argument key='\$clientSecret'>***REDACTED:xml_parameter***</argument>"];
+        yield 'an argument next to a parameter' => ["<parameter key=\"mailer_password\">hunter2hunter2</parameter>\n<argument key=\"\$apiKey\">abcdef0123456789</argument>", "<parameter key=\"mailer_password\">***REDACTED:xml_parameter***</parameter>\n<argument key=\"\$apiKey\">***REDACTED:xml_parameter***</argument>"];
+    }
+
+    #[DataProvider('xmlArgumentsThatHoldNoCredentialCases')]
+    public function test_an_xml_service_argument_that_holds_no_credential_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function xmlArgumentsThatHoldNoCredentialCases(): iterable
+    {
+        yield 'a reference' => ['<argument key="$apiKey">%env(API_KEY)%</argument>'];
+        yield 'an argument named like a label' => ['<argument key="$label">hunter2hunter2</argument>'];
+        yield 'an argument without a key' => ['<argument>hunter2hunter2</argument>'];
+        yield 'a service reference' => ['<argument key="$apiKey" type="service" id="app.api_key"/>'];
+    }
+
+    #[DataProvider('yamlBlockScalarCases')]
+    public function test_a_yaml_block_scalar_under_a_credential_key_is_redacted_and_the_document_still_parses(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+        self::assertNotNull(Yaml::parse($output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function yamlBlockScalarCases(): iterable
+    {
+        yield 'a literal block' => ["secret: |\n    hunter2hunter2\n    second line\nnext: 1", "secret: |\n    ***REDACTED:block_scalar***\n\nnext: 1"];
+        yield 'a folded block that strips the last newline' => ["password: >-\n    hunter2hunter2\nnext: 1", "password: >-\n    ***REDACTED:block_scalar***\nnext: 1"];
+        yield 'a block that keeps trailing newlines' => ["api_key: |+\n  abcdef0123456789\n\n  more\nnext: 1", "api_key: |+\n  ***REDACTED:block_scalar***\n\n\nnext: 1"];
+        yield 'a block with an indentation indicator' => ["secret: |2\n    hunter2hunter2\nnext: 1", "secret: |2\n    ***REDACTED:block_scalar***\nnext: 1"];
+        yield 'a block nested in a mapping' => ["framework:\n    secret: |\n        hunter2hunter2\n    other: 1\n", "framework:\n    secret: |\n        ***REDACTED:block_scalar***\n    other: 1\n"];
+        yield 'a block in a list item' => ["credentials:\n    - password: |\n          hunter2hunter2\n      name: a\n", "credentials:\n    - password: |\n          ***REDACTED:block_scalar***\n      name: a\n"];
+        yield 'a block with a comment after the indicator' => ["secret: | # kept\n    hunter2hunter2\nnext: 1", "secret: | # kept\n    ***REDACTED:block_scalar***\nnext: 1"];
+        yield 'a block ending the file without a newline' => ["secret: |\n    hunter2hunter2", "secret: |\n    ***REDACTED:block_scalar***"];
+        yield 'a block with an empty line inside' => ["secret: |\n    first part\n\n    second part\nnext: 1", "secret: |\n    ***REDACTED:block_scalar***\n\n\nnext: 1"];
+        yield 'a block with windows line endings' => ["secret: |\r\n    hunter2hunter2\r\nnext: 1", "secret: |\n    ***REDACTED:block_scalar***\nnext: 1"];
+    }
+
+    #[DataProvider('yamlBlockScalarsThatHoldNoCredentialCases')]
+    public function test_a_yaml_block_scalar_that_holds_no_credential_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function yamlBlockScalarsThatHoldNoCredentialCases(): iterable
+    {
+        yield 'a block under another key' => ["description: |\n    hunter2hunter2\nnext: 1"];
+        yield 'a block that is empty' => ["secret: |\nnext: 1"];
+        yield 'a block of blank lines' => ["secret: |\n  \n\n   \nnext: 1"];
+        yield 'a block whose next line is not indented' => ["secret: |\nhunter2hunter2\n"];
+        yield 'a reference on a block key' => ["secret: '%env(APP_SECRET)%'\n    indented: line\n"];
+        yield 'a plain scalar' => ["secret: abc\n    continued\n"];
+    }
+
+    #[DataProvider('truncatedPrivateKeyCases')]
+    public function test_a_private_key_cut_before_its_end_marker_is_redacted_to_the_end_of_its_body(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function truncatedPrivateKeyCases(): iterable
+    {
+        $line = 'MIIEowIBAAKCAQEAxYZabcdef';
+
+        yield 'a key cut after two lines' => ["-----BEGIN RSA PRIVATE KEY-----\n{$line}\n{$line}", "***REDACTED:pem_private_key***\n\n"];
+        yield 'a key cut after a line break' => ["-----BEGIN PRIVATE KEY-----\n{$line}\n", "***REDACTED:pem_private_key***\n\n"];
+        yield 'a key cut and followed by other text' => ["a: 1\n-----BEGIN OPENSSH PRIVATE KEY-----\n{$line}\n{$line}\n\nb: 2\n", "a: 1\n***REDACTED:pem_private_key***\n\n\n\nb: 2\n"];
+        yield 'a pgp key with a blank line after its header' => ["-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nlQOYBF0abcdefSECRETvalue\n=abcd", "***REDACTED:pem_private_key***\n\n\n=abcd"];
+        yield 'a key with windows line endings' => ["-----BEGIN EC PRIVATE KEY-----\r\n{$line}\r\n{$line}", "***REDACTED:pem_private_key***\n\n"];
+        yield 'an indented key cut in a yaml block' => ["key: |\n  -----BEGIN PRIVATE KEY-----\n  {$line}\n  {$line}\n", "key: |\n  ***REDACTED:pem_private_key***\n\n\n"];
+    }
+
+    #[DataProvider('privateKeyHeadersWithoutAKeyCases')]
+    public function test_a_private_key_header_followed_by_no_key_material_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function privateKeyHeadersWithoutAKeyCases(): iterable
+    {
+        yield 'a header quoted in code' => ["if (str_contains(\$pem, '-----BEGIN PRIVATE KEY-----')) {\n    return true;\n}"];
+        yield 'a header alone' => ['-----BEGIN PRIVATE KEY-----'];
+        yield 'a header followed by prose' => ["-----BEGIN PRIVATE KEY-----\nthis is a header\n"];
+        yield 'a header followed by a short line' => ["-----BEGIN PRIVATE KEY-----\nabc123\n"];
+        yield 'a public key' => ["-----BEGIN PUBLIC KEY-----\nMIIEowIBAAKCAQEAxYZabcdef\n"];
+    }
+
+    #[DataProvider('unterminatedQuotedEnvValueCases')]
+    public function test_an_environment_value_whose_quote_is_never_closed_is_redacted_to_the_end_of_the_line(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function unterminatedQuotedEnvValueCases(): iterable
+    {
+        yield 'a double quote' => ['APP_SECRET="a b c', 'APP_SECRET=***REDACTED:env_assignment***'];
+        yield 'a single quote' => ["MAIL_PASSWORD='super secret passphrase", 'MAIL_PASSWORD=***REDACTED:env_assignment***'];
+        yield 'a quote with lines around it' => ["A=1\nAPP_SECRET=\"a b c\nOTHER=2\n", "A=1\nAPP_SECRET=***REDACTED:env_assignment***\nOTHER=2\n"];
+        yield 'a quote with an escaped quote inside' => ['APP_SECRET="a \\" b', 'APP_SECRET=***REDACTED:env_assignment***'];
+        yield 'a quote followed by a windows line ending' => ["APP_SECRET=\"a b c\r\nOTHER=2", "APP_SECRET=***REDACTED:env_assignment***\r\nOTHER=2"];
+        yield 'a closed quote is still redacted on its own' => ['APP_SECRET="a b c" # note', 'APP_SECRET=***REDACTED:env_assignment*** # note'];
+    }
+
+    #[DataProvider('longOpenAiKeyCases')]
+    public function test_an_openai_key_is_redacted_whatever_its_length(string $key): void
+    {
+        $output = $this->regexSecretScrubber->scrub("OPENAI = {$key} end");
+
+        self::assertSame('OPENAI = ***REDACTED:openai_api_key*** end', $output);
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function longOpenAiKeyCases(): iterable
+    {
+        yield 'twenty characters' => ['sk-'.str_repeat('a1B2', 5)];
+        yield 'exactly two hundred characters' => ['sk-'.str_repeat('a1B2', 50)];
+        yield 'two hundred and one characters' => ['sk-'.str_repeat('a1B2', 50).'c'];
+        yield 'a project key of three hundred characters' => ['sk-proj-'.str_repeat('a1B2', 75)];
+        yield 'a key of a few thousand characters' => ['sk-'.str_repeat('a1B2_-', 700)];
+    }
+
+    public function test_a_word_that_merely_ends_in_sk_is_no_openai_key(): void
+    {
+        $input = 'the task-'.str_repeat('a1B2', 8).' and the sk-short';
+
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
     public function test_it_leaves_non_credential_content_unmodified(): void
     {
         $code = "<?php\n\nclass UserController {\n    public function indexAction(): Response\n    {\n        return new Response('hello');\n    }\n}\n";
@@ -628,6 +939,18 @@ final class RegexSecretScrubberTest extends TestCase
         $twice = $this->regexSecretScrubber->scrub($once);
 
         self::assertSame($once, $twice);
+    }
+
+    public function test_scrubbing_credentials_written_as_call_arguments_blocks_and_truncated_keys_is_idempotent(): void
+    {
+        $input = "\$user->setPassword('hunter2hunter2');\n\$bag->set('db_password', 'hunter2hunter2');\n\$cfg['password'] = md5('hunter2hunter2');\n"
+            ."<argument key=\"\$apiKey\">abcdef0123456789</argument>\nsecret: |\n    hunter2hunter2\nAPP_SECRET=\"a b c\n"
+            .'sk-'.str_repeat('a1B2', 60)."\n-----BEGIN PRIVATE KEY-----\nMIIEowIBAAKCAQEAxYZabcdef\n";
+
+        $once = $this->regexSecretScrubber->scrub($input);
+
+        self::assertStringNotContainsString('hunter2hunter2', $once);
+        self::assertSame($once, $this->regexSecretScrubber->scrub($once));
     }
 
     public function test_multiple_secrets_in_same_input_are_all_redacted(): void
@@ -1131,12 +1454,71 @@ final class RegexSecretScrubberTest extends TestCase
     {
         yield 'private key headers without an end marker' => [str_repeat('-----BEGIN PRIVATE KEY-----', 4855)];
         yield 'scheme characters with no scheme separator' => [str_repeat('a-', 65536).'@'];
+        yield 'a private key header followed by blank lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("\n", 524288)];
+        yield 'an xml argument whose body is never closed' => ['<argument key="password">'.str_repeat('a', 524288)];
+        yield 'a block scalar header over blank lines' => ["secret: |\n".str_repeat("  \n", 170000)];
+        yield 'credential key openings' => [str_repeat("('db_password', ", 32768)];
+        yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
+        yield 'pdo connections without a password' => [str_repeat('new PDO(a,b,', 43690)];
+        yield 'password function openings' => [str_repeat('password_hash(', 37449)];
         yield 'constant keywords with no name' => [str_repeat('const ', 87381)];
         yield 'constants named like credentials with no value' => [str_repeat('const SECRET_KEY ', 30840)];
         yield 'closers after a credential key' => ['password: '.str_repeat(')', 524288)];
         yield 'placeholder openings after colons' => [str_repeat(': ***REDACTED:x', 34952)];
         yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
         yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
+    }
+
+    #[DataProvider('hostileContentWithTheJitCases')]
+    public function test_a_crafted_file_is_scrubbed_in_linear_time_with_the_jit(string $content): void
+    {
+        self::assertLessThan(1.0, $this->secondsToScrubUnchanged($content));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function hostileContentWithTheJitCases(): iterable
+    {
+        yield 'a private key header followed by blank lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("\n", 524288)];
+        yield 'an xml argument whose body is never closed' => ['<argument key="password">'.str_repeat('a', 524288)];
+        yield 'a block scalar header over blank lines' => ["secret: |\n".str_repeat("  \n", 170000)];
+        yield 'credential key openings' => [str_repeat("('db_password', ", 32768)];
+        yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
+        yield 'password function openings' => [str_repeat('password_hash(', 37449)];
+    }
+
+    #[DataProvider('hostileContentRedactedCases')]
+    public function test_a_crafted_file_is_redacted_in_linear_time_with_the_jit(string $content, string $expected): void
+    {
+        $this->assertRedactedInLinearTime($content, $expected);
+    }
+
+    #[DataProvider('hostileContentRedactedCases')]
+    #[RunInSeparateProcess]
+    public function test_a_crafted_file_is_redacted_in_linear_time_without_the_jit(string $content, string $expected): void
+    {
+        ini_set('pcre.jit', '0');
+
+        $this->assertRedactedInLinearTime($content, $expected);
+    }
+
+    private function assertRedactedInLinearTime(string $content, string $expected): void
+    {
+        $startedAt = hrtime(true);
+
+        $output = $this->regexSecretScrubber->scrub($content);
+
+        self::assertLessThan(1.0, (hrtime(true) - $startedAt) / 1_000_000_000);
+        self::assertSame(md5($expected), md5($output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function hostileContentRedactedCases(): iterable
+    {
+        yield 'a pure function call opening on spaces' => ['password = md5('.str_repeat(' ', 524288), 'password = ***REDACTED:inline_assignment***'.str_repeat(' ', 524288)];
+        yield 'an openai key of half a megabyte' => ['sk-'.str_repeat('a', 524288), '***REDACTED:openai_api_key***'];
+        yield 'a block scalar of a hundred thousand lines' => ["secret: |\n".str_repeat("  x\n", 100000), "secret: |\n  ***REDACTED:block_scalar***".str_repeat("\n", 100000)];
+        yield 'a private key cut after thirty thousand lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("MIIEowIBAAKCAQEAx\n", 30000), '***REDACTED:pem_private_key***'.str_repeat("\n", 30001)];
+        yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
     }
 
     #[RunInSeparateProcess]
@@ -1165,7 +1547,7 @@ final class RegexSecretScrubberTest extends TestCase
         $output = $this->regexSecretScrubber->scrub($content);
         $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
 
-        self::assertSame($content, $output);
+        self::assertSame(md5($content), md5($output));
 
         return $elapsedSeconds;
     }

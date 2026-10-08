@@ -38,6 +38,8 @@ enum SecretPatternLabel: string
     case PypiToken = 'pypi_token';
     case DiscordWebhookUrl = 'discord_webhook_url';
     case XmlParameter = 'xml_parameter';
+    case CallArgument = 'call_argument';
+    case BlockScalar = 'block_scalar';
     case Unscannable = 'unscannable';
 
     public function placeholder(): string
