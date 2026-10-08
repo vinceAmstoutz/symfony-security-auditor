@@ -40,7 +40,7 @@ src/
 ├── Audit/
 │   ├── Domain/          # Pure PHP — no framework, no I/O
 │   │   ├── Model/       # Value objects and enums
-│   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, RejectedFindingRecorderInterface, NullCoverageRecorder
+│   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, RejectedFindingRecorderInterface, FailureReasonRecorderInterface, NullCoverageRecorder
 │   │   └── Port/        # Cross-layer ports — LLMClientInterface,
 │   │       │              BatchCapableLLMClientInterface,
 │   │       │              ToolBatchCapableLLMClientInterface, LLMResponse,
