@@ -216,7 +216,7 @@ final readonly class BatchWindowResolver
 
         try {
             $content = $this->platformResultExtractor->extractText($deferredResult->getResult());
-            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
+            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult, $dispatchedRequest->estimatedInputTokens);
             $this->rateLimiter->record($inputTokens, $outputTokens);
             $reconciled = true;
 

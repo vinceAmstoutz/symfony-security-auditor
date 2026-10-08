@@ -45,16 +45,23 @@ final readonly class PlatformResultExtractor
         private LoggerInterface $logger = new NullLogger(),
     ) {}
 
-    /** @return array{0: int, 1: int, 2: int, 3: int}
+    /**
+     * The usage the provider reported for an answered call, or, when it
+     * reported none (Bedrock's InvokeModel route, a gateway that omits
+     * `usage`), the call's estimated input tokens, which the provider bills
+     * all the same: the output it produced is then unknown and counted as
+     * none.
+     *
+     * @return array{0: int, 1: int, 2: int, 3: int}
      *
      * @throws NegativeTokenCountException
      */
-    public function extractTokens(DeferredResult $deferredResult): array
+    public function extractTokens(DeferredResult $deferredResult, int $estimatedInputTokens): array
     {
         $metadata = $deferredResult->getMetadata()->all();
         $tokenUsage = $metadata['token_usage'] ?? null;
         if (!$tokenUsage instanceof TokenUsageInterface) {
-            return [0, 0, 0, 0];
+            return $this->bookEstimatedInput($estimatedInputTokens);
         }
 
         [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->tokenCounts($tokenUsage);
@@ -62,6 +69,21 @@ final readonly class PlatformResultExtractor
         $this->tokenUsageRecorder?->record($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
 
         return [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
+    }
+
+    /**
+     * @return array{0: int, 1: int, 2: int, 3: int}
+     *
+     * @throws NegativeTokenCountException
+     */
+    private function bookEstimatedInput(int $estimatedInputTokens): array
+    {
+        $this->logger->debug('The provider reported no token usage for an answer; it is booked at its estimated input tokens, since the provider bills the request it accepted', [
+            'estimated_input_tokens' => $estimatedInputTokens,
+        ]);
+        $this->tokenUsageRecorder?->record($estimatedInputTokens, 0, 0, 0);
+
+        return [$estimatedInputTokens, 0, 0, 0];
     }
 
     /**

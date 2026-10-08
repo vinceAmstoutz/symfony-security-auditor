@@ -150,7 +150,7 @@ final readonly class SequentialToolLoop
      */
     private function bookIteration(ConversationState $conversationState, DeferredResult $deferredResult): ConversationState
     {
-        $callTokens = $this->extractCallTokens($deferredResult);
+        $callTokens = $this->extractCallTokens($deferredResult, $conversationState->estimatedInputTokens);
         $this->toolIterationBooker->book($deferredResult, TokenUsageSnapshot::of(...$callTokens));
 
         return $conversationState->withRecordedTokens(...$callTokens);
@@ -161,10 +161,10 @@ final readonly class SequentialToolLoop
      *
      * @throws NegativeTokenCountException
      */
-    private function extractCallTokens(DeferredResult $deferredResult): array
+    private function extractCallTokens(DeferredResult $deferredResult, int $estimatedInputTokens): array
     {
         try {
-            return $this->platformResultExtractor->extractTokens($deferredResult);
+            return $this->platformResultExtractor->extractTokens($deferredResult, $estimatedInputTokens);
         } catch (Throwable $throwable) {
             $this->rateLimiter->record(0, 0);
 

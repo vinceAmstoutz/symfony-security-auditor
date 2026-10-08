@@ -28,6 +28,7 @@ use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\AI\Platform\Tool\Tool;
 
 /**
@@ -254,6 +255,9 @@ final class ScriptedAuditPlatform implements PlatformInterface
             (object) ['text' => ''],
         );
 
-        return new DeferredResult(new PlainConverter($result), $rawResult, $options);
+        $deferredResult = new DeferredResult(new PlainConverter($result), $rawResult, $options);
+        $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 0, completionTokens: 0));
+
+        return $deferredResult;
     }
 }
