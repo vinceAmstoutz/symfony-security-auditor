@@ -282,7 +282,7 @@ symfony_security_auditor:
 
 ### What PHP versions are supported?
 
-Installing the **bundle** requires PHP **8.3+** in the host application (PHP 8.4 and 8.5 are covered by the CI matrix). The **standalone binary** bundles its own PHP runtime, so the PHP version of the audited project does not matter.
+Installing the **bundle** requires PHP **8.3+** in the host application (PHP 8.4 and 8.5 are covered by the CI matrix). The **standalone binary** bundles its own PHP runtime, so the PHP version of the audited project does not matter and running audits needs no PHP or Composer on the host — only its one-time `init` does (see the [requirements](../README.md#requirements)).
 
 ### What Symfony versions are supported?
 

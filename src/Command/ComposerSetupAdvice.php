@@ -17,15 +17,17 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * What `init` tells a user whose machine cannot run `composer`, which it needs
- * once to download the provider bridge: why the probe failed and how to
- * install Composer — with the PHP it runs on — on the operating system the
- * binary was built for.
+ * once to download the provider bridge: whether it is Composer or the PHP it
+ * runs on that is missing, what the system reported, and how to install both
+ * on the operating system the binary was built for.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ComposerSetupAdvice
 {
     private const string DOWNLOAD_PAGE = 'https://getcomposer.org/download/';
+
+    private const string PHP_NOT_FOUND = '/\bphp(?:\.exe)?[\'"\x{2018}\x{2019}]?:? (?:is )?(?:not found|command not found|not recognized)|\bphp[\'"\x{2018}\x{2019}]?: No such file|command not found: php\b/iu';
 
     public function __construct(
         private string $osFamily = \PHP_OS_FAMILY,
@@ -34,9 +36,11 @@ final readonly class ComposerSetupAdvice
     public function problem(ComposerProbe $composerProbe): string
     {
         return implode("\n", [
-            'init downloads the provider bridge with Composer, which needs PHP, and running "composer --version" failed:',
-            \sprintf('  %s', OutputFormatter::escape($composerProbe->failure)),
-            'Only this one-time download needs them, not auditing. Install both, then run "init" again.',
+            1 === preg_match(self::PHP_NOT_FOUND, $composerProbe->failure)
+                ? 'init cannot continue: Composer is installed, but PHP, which it runs on, is not.'
+                : 'init cannot continue: Composer, which it uses to download the package for your AI provider, is not installed or does not start.',
+            \sprintf('  It reported: %s', OutputFormatter::escape($composerProbe->failure)),
+            'Only this one-time download needs PHP and Composer, not auditing. Install them, then run "init" again.',
         ]);
     }
 

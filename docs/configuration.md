@@ -437,7 +437,7 @@ When you run the [standalone binary](../README.md#standalone-tool-binary) instea
 | attacker/reviewer and advisory caches | `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`) | `%LOCALAPPDATA%\symfony-security-auditor` |
 | the downloaded provider bridge(s) | `$XDG_DATA_HOME/symfony-security-auditor` (→ `~/.local/share/…`) | `%LOCALAPPDATA%\symfony-security-auditor` |
 
-> **Requirements & platform support.** Each release ships a self-contained native binary that bundles its own PHP runtime (nothing to install on the host) for **Linux** (x86-64, arm64), **macOS** (Intel, Apple Silicon), and **Windows** (x86-64) — install it with the script or download it from the release. `init` fetches the provider bridge with `composer`, and `--since` uses `git`, so those tools must be present on the host when you use those features (the audit itself needs only the binary).
+> **Requirements & platform support.** Each release ships a self-contained native binary that bundles its own PHP runtime (nothing to install on the host to run audits) for **Linux** (x86-64, arm64), **macOS** (Intel, Apple Silicon), and **Windows** (x86-64) — install it with the script or download it from the release. Two features use a tool of their own, which must be present on the host when you use them (the audit itself needs only the binary): `init` fetches the provider bridge with `composer`, which needs a PHP of its own, and `--since` uses `git`. `init` checks `composer` before it asks anything and says whether Composer or its PHP is missing; the [requirements](../README.md#requirements) list the install commands for each system.
 
 **Redirecting the base directory (`SYMFONY_SECURITY_AUDITOR_HOME`).** Some container base images export `XDG_CONFIG_HOME` to a root-owned path — Caddy and FrankenPHP set it to `/config`, for example — so a non-root user running `init` there hits `mkdir(): Permission denied`. Set `SYMFONY_SECURITY_AUDITOR_HOME` to the absolute path of any writable directory to override where the config, cache, and bridge directories live; it outranks the XDG variables and `$HOME`, giving `~/.config`, `~/.cache`, and `~/.local/share` beneath it:
 
@@ -981,7 +981,7 @@ The audit runs with the auditor's own configured platform, models and profile: `
 
 ### `init` — generating the standalone configuration
 
-Standalone only. Writes `config.yaml` and downloads the provider bridge it needs. Every option it is not given is prompted for. Under `--no-interaction` the ones with defaults fall back to them, and a platform that requires a `--base-url` or an `--endpoint` is refused rather than written half-configured.
+Standalone only. Writes `config.yaml` and downloads the provider bridge it needs, which takes `composer` and the PHP it runs on — checked before any prompt, see the [requirements](../README.md#requirements). Every option it is not given is prompted for. Under `--no-interaction` the ones with defaults fall back to them, and a platform that requires a `--base-url` or an `--endpoint` is refused rather than written half-configured.
 
 | Option | Default | Description |
 | --- | --- | --- |

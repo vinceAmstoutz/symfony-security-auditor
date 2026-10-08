@@ -21,18 +21,59 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerSetupAdvice;
 
 final class ComposerSetupAdviceTest extends TestCase
 {
-    public function test_it_says_what_failed_and_that_only_the_one_time_download_needs_it(): void
+    #[DataProvider('failuresNamingPhp')]
+    public function test_it_names_the_missing_php_when_composer_cannot_find_it(string $failure): void
     {
-        $problem = (new ComposerSetupAdvice('Linux'))->problem(ComposerProbe::unavailable('php: not found'));
+        $problem = (new ComposerSetupAdvice('Linux'))->problem(ComposerProbe::unavailable($failure));
 
         self::assertSame(
             implode("\n", [
-                'init downloads the provider bridge with Composer, which needs PHP, and running "composer --version" failed:',
-                '  php: not found',
-                'Only this one-time download needs them, not auditing. Install both, then run "init" again.',
+                'init cannot continue: Composer is installed, but PHP, which it runs on, is not.',
+                \sprintf('  It reported: %s', $failure),
+                'Only this one-time download needs PHP and Composer, not auditing. Install them, then run "init" again.',
             ]),
             $problem,
         );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function failuresNamingPhp(): iterable
+    {
+        yield 'dash, behind a Windows shim in WSL' => ['/mnt/c/ProgramData/ComposerSetup/bin/composer: 14: php: not found'];
+        yield 'bash' => ['composer: line 3: php: command not found'];
+        yield 'zsh' => ['zsh: command not found: php'];
+        yield 'a shebang resolving php, straight quotes' => ["/usr/bin/env: 'php': No such file or directory"];
+        yield 'a shebang resolving php, curly quotes' => ["/usr/bin/env: \u{2018}php\u{2019}: No such file or directory"];
+        yield 'the Windows command prompt' => ["'php' is not recognized as an internal or external command,"];
+        yield 'the Windows command prompt, naming the executable' => ['php.exe is not recognized as an internal or external command,'];
+    }
+
+    #[DataProvider('failuresNotNamingPhp')]
+    public function test_it_says_composer_is_missing_when_php_is_not_what_failed(string $failure): void
+    {
+        $problem = (new ComposerSetupAdvice('Linux'))->problem(ComposerProbe::unavailable($failure));
+
+        self::assertSame(
+            implode("\n", [
+                'init cannot continue: Composer, which it uses to download the package for your AI provider, is not installed or does not start.',
+                \sprintf('  It reported: %s', $failure),
+                'Only this one-time download needs PHP and Composer, not auditing. Install them, then run "init" again.',
+            ]),
+            $problem,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function failuresNotNamingPhp(): iterable
+    {
+        yield 'Composer absent from the PATH' => ['sh: 1: exec: composer: not found'];
+        yield 'Composer absent on the Windows command prompt' => ["'composer' is not recognized as an internal or external command,"];
+        yield 'a path that merely contains php' => ['/opt/php/bin/composer: not found'];
+        yield 'no output at all' => ['"composer --version" exited with code 3'];
     }
 
     #[DataProvider('operatingSystems')]
@@ -66,7 +107,7 @@ final class ComposerSetupAdviceTest extends TestCase
     {
         $problem = (new ComposerSetupAdvice('Linux'))->problem(ComposerProbe::unavailable('<error>boom</error>'));
 
-        self::assertStringContainsString('  <error>boom</error>', (new OutputFormatter())->format($problem));
+        self::assertStringContainsString('  It reported: <error>boom</error>', (new OutputFormatter())->format($problem));
     }
 
     public function test_it_defaults_to_the_operating_system_it_runs_on(): void

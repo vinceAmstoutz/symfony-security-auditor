@@ -57,7 +57,26 @@ The auditor ships two maintained ways to run it — pick the one that fits:
 
 ## Standalone tool (binary)
 
-Run the auditor like PHPStan or Psalm — one install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** that bundles its own PHP runtime (nothing to install on the host) for Linux, macOS, and Windows.
+Run the auditor like PHPStan or Psalm — one install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** that bundles its own PHP runtime (nothing to install on the host to run audits — see [Requirements](#requirements)) for Linux, macOS, and Windows.
+
+### Requirements
+
+**Running audits needs nothing but the binary.** It bundles its own PHP runtime, so there is no PHP, Composer or Symfony to install, whatever the audited project uses — only an API key for your provider (not even that for a local model such as [Ollama](#supported-platforms)).
+
+**The one-time [`init`](#2-configure--the-guided-init) is the exception: it needs `composer`, and the PHP it runs on, on your machine**, because it downloads the package that talks to your AI provider. It checks for both before asking you anything and, when one is missing, says which. Install them once, with network access to `packagist.org` and `github.com`:
+
+| System | Install PHP and Composer |
+| --- | --- |
+| Debian, Ubuntu, WSL | `sudo apt update && sudo apt install -y php-cli php-curl php-mbstring php-xml unzip composer` |
+| macOS | `brew install composer` (installs PHP with it) |
+| Windows | PHP from <https://windows.php.net/download/>, then the Composer installer from <https://getcomposer.org/download/>; open a new terminal afterwards |
+| Other Linux | the `php-cli`, `composer` and `unzip` packages of your package manager |
+
+> [!NOTE]
+>
+> **On WSL, install them inside WSL.** A Windows Composer reached through `/mnt/c/…` cannot run there: it looks for a PHP of its own and finds none (`…/composer: 14: php: not found`).
+
+Two features use a tool of their own: `--since` needs `git`, and the live CVE lookups of an audit use `composer audit` when `composer` is present — without it the audit runs without advisory data.
 
 ### 1. Install
 
@@ -165,7 +184,7 @@ symfony-security-auditor self-update --check  # only report whether a newer vers
 
 ### 1. Install — Symfony Flex wires everything
 
-Installing the bundle requires **PHP 8.3+ and Symfony 7.4+** in the host application (see [`composer.json`](composer.json)) — the standalone binary has no such requirement, since it bundles its own runtime.
+Installing the bundle requires **PHP 8.3+ and Symfony 7.4+** in the host application (see [`composer.json`](composer.json)) — the standalone binary needs no PHP to audit, since it bundles its own runtime (only its one-time `init` needs PHP and Composer, see its [requirements](#requirements)).
 
 ```bash
 composer require --dev vinceamstoutz/symfony-security-auditor
