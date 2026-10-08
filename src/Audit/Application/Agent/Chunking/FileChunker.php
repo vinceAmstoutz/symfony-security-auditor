@@ -200,8 +200,9 @@ final readonly class FileChunker
             $assignments[$featureName] = [];
         }
 
+        $featureNameIndex = FeatureNameIndex::of($featureNames);
         foreach ($files as $file) {
-            $matchedFeature = $this->findFeatureForFile($file, $featureNames);
+            $matchedFeature = $this->findFeatureForFile($file, $featureNameIndex);
 
             if (null === $matchedFeature) {
                 continue;
@@ -213,49 +214,29 @@ final readonly class FileChunker
         return $assignments;
     }
 
-    /**
-     * @param list<string> $featureNames
-     */
-    private function findFeatureForFile(ProjectFile $projectFile, array $featureNames): ?string
+    private function findFeatureForFile(ProjectFile $projectFile, FeatureNameIndex $featureNameIndex): ?string
     {
-        $baseName = basename(basename($projectFile->relativePath(), '.php'), '.twig');
         $relativePath = $projectFile->relativePath();
+        $baseName = basename(basename($relativePath, '.php'), '.twig');
 
-        $matchedFeature = null;
-        foreach ($featureNames as $featureName) {
-            if (!$this->fileBelongsToFeature($baseName, $relativePath, $featureName)) {
-                continue;
-            }
-
-            if (null === $matchedFeature || \strlen($featureName) > \strlen($matchedFeature)) {
-                $matchedFeature = $featureName;
-            }
-        }
-
-        return $matchedFeature;
-    }
-
-    private function fileBelongsToFeature(string $baseName, string $relativePath, string $featureName): bool
-    {
-        if ($this->baseNameStartsAtFeatureBoundary($baseName, $featureName)) {
-            return true;
-        }
-
-        return u($relativePath)->ignoreCase()->containsAny(\sprintf('/%s/', $featureName));
+        return $featureNameIndex->mostSpecific([
+            ...array_filter(
+                $featureNameIndex->startingBaseName($baseName),
+                fn (string $featureName): bool => $this->baseNameStartsAtFeatureBoundary($baseName, $featureName),
+            ),
+            ...$featureNameIndex->namedByDirectory($relativePath),
+        ]);
     }
 
     /**
-     * `startsWith()` alone would let `UsersController` match feature `User` —
-     * the prefix stops mid-word instead of at a CamelCase boundary. Requiring
-     * the remainder to be empty or start with an uppercase letter rejects that
+     * A base name that starts with the feature name must not match on the
+     * prefix alone: `UsersController` would match feature `User`, though the
+     * prefix stops mid-word instead of at a CamelCase boundary. Requiring the
+     * remainder to be empty or start with an uppercase letter rejects that
      * false match while still matching `UserController`, `UserRepository`, ….
      */
     private function baseNameStartsAtFeatureBoundary(string $baseName, string $featureName): bool
     {
-        if (!u($baseName)->startsWith($featureName)) {
-            return false;
-        }
-
         $remainder = u($baseName)->slice(u($featureName)->length());
         if (0 === $remainder->length()) {
             return true;
