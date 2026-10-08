@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\AttackerC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\SequentialChunkAnalyzer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
@@ -35,6 +36,11 @@ final class SequentialChunkAnalyzerHarness
 {
     public static function analyzer(LLMClientInterface $llmClient, AttackerCacheInterface $attackerCache, bool $structured, ?LoggerInterface $logger = null, ?ProgressReporterInterface $progressReporter = null): SequentialChunkAnalyzer
     {
+        return self::analyzerRecordingThrough($llmClient, $attackerCache, $structured ? new RecordVulnerabilityToolFactory() : null, $logger, $progressReporter);
+    }
+
+    public static function analyzerRecordingThrough(LLMClientInterface $llmClient, AttackerCacheInterface $attackerCache, ?RecordVulnerabilityToolFactoryInterface $recordVulnerabilityToolFactory, ?LoggerInterface $logger = null, ?ProgressReporterInterface $progressReporter = null): SequentialChunkAnalyzer
+    {
         return new SequentialChunkAnalyzer(
             $llmClient,
             new ChunkContextFactory(new AttackerPromptBuilder(), new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver()),
@@ -43,8 +49,8 @@ final class SequentialChunkAnalyzerHarness
             $logger ?? new NullLogger(),
             $progressReporter ?? new NullProgressReporter(),
             3,
-            $structured,
-            $structured ? new RecordVulnerabilityToolFactory() : null,
+            $recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface,
+            $recordVulnerabilityToolFactory,
         );
     }
 

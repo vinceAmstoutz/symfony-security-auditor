@@ -28,6 +28,8 @@ final readonly class ChunkFailureReason
 
     public const string FILE_TOO_LARGE = 'the file is too large for the model input limit';
 
+    public const string RECORDING_REFUSED = 'a finding the record tool refused was never recorded again';
+
     private const int MAX_MESSAGE_LENGTH = 120;
 
     public static function fromStopReason(string $stopReason): string

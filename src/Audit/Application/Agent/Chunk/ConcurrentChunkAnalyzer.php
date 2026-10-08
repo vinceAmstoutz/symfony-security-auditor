@@ -50,6 +50,8 @@ final readonly class ConcurrentChunkAnalyzer
 {
     private OversizedChunkRecovery $oversizedChunkRecovery;
 
+    private RefusedRecordingRecorder $refusedRecordingRecorder;
+
     private ChunkOutcomeRecorder $chunkOutcomeRecorder;
 
     public function __construct(
@@ -64,6 +66,7 @@ final readonly class ConcurrentChunkAnalyzer
         private int $maxConcurrent,
     ) {
         $this->oversizedChunkRecovery = new OversizedChunkRecovery($logger, $attackerChunkCache, $vulnerabilityFactory);
+        $this->refusedRecordingRecorder = new RefusedRecordingRecorder($logger);
         $this->chunkOutcomeRecorder = new ChunkOutcomeRecorder($attackerChunkCache, $logger);
     }
 
@@ -448,6 +451,13 @@ final readonly class ConcurrentChunkAnalyzer
                 'findings_kept' => \count($rawData),
             ]);
             ChunkCoverageRecorder::recordErrored($pendingChunk->chunk, ChunkFailureReason::fromStopReason($llmResponse->stopReason()), $coverageRecorder);
+
+            return;
+        }
+
+        $refusedCalls = $pendingChunk->session->unsettledRefusals();
+        if ($refusedCalls > 0) {
+            $this->refusedRecordingRecorder->record($pendingChunk->chunk, \count($rawData), $refusedCalls, $coverageRecorder);
 
             return;
         }

@@ -60,7 +60,7 @@ final readonly class RecordReviewTool implements RecordingToolInterface
 
         $this->reviewCollector->add($arguments);
 
-        return 'recorded';
+        return self::RECORDED;
     }
 
     /**

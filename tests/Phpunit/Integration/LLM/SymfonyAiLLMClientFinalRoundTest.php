@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTok
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
@@ -38,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBindin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\CountingRecordingTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedResultTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\RefusingRecordingTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedResultPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ToolCallCounter;
 
@@ -377,6 +379,130 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
         self::assertCount(2, $scriptedResultPlatform->requests);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_last_round_whose_recording_call_is_refused_is_a_cut_short_answer(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('refuse'),
+        ]);
+
+        $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->refusingRegistry(), 2);
+
+        self::assertSame('max_tool_iterations', $llmResponse->stopReason());
+        self::assertTrue($llmResponse->isDegraded());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_last_round_where_one_recording_call_is_refused_and_another_recorded_still_ends_the_conversation(): void
+    {
+        $toolCallCounter = new ToolCallCounter();
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('refuse', 'record'),
+        ]);
+
+        $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->refusingRegistry($toolCallCounter), 2);
+
+        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame(1, $toolCallCounter->calls);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_last_round_that_reads_is_not_concluded_whatever_its_tool_answers(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+        ]);
+        $toolRegistry = new ToolRegistry([new FixedResultTool('lookup', RecordingToolInterface::RECORDED)], new NullLogger());
+
+        $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $toolRegistry, 2);
+
+        self::assertSame('max_tool_iterations', $llmResponse->stopReason());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_concurrent_last_round_whose_recording_call_is_refused_is_a_cut_short_answer(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('refuse'),
+        ]);
+
+        $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $this->refusingRegistry()],
+        ], 4, 2);
+
+        self::assertSame('max_tool_iterations', $responses[0]->stopReason());
+        self::assertTrue($responses[0]->isDegraded());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_concurrent_last_round_where_one_recording_call_is_refused_and_another_recorded_still_ends_the_conversation(): void
+    {
+        $toolCallCounter = new ToolCallCounter();
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('refuse', 'record'),
+        ]);
+
+        $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $this->refusingRegistry($toolCallCounter)],
+        ], 4, 2);
+
+        self::assertSame('end_turn', $responses[0]->stopReason());
+        self::assertSame(1, $toolCallCounter->calls);
+    }
+
     private function client(ScriptedResultPlatform $scriptedResultPlatform): SymfonyAiLLMClient
     {
         return new SymfonyAiLLMClient(new PlatformBinding($scriptedResultPlatform, 'm', new NullLogger()));
@@ -390,6 +516,18 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
         return new ToolRegistry([
             new FixedResultTool('lookup', 'a file'),
             new CountingRecordingTool('record', $toolCallCounter),
+        ], new NullLogger());
+    }
+
+    /**
+     * @throws InvalidToolRegistryException
+     */
+    private function refusingRegistry(?ToolCallCounter $toolCallCounter = null): ToolRegistry
+    {
+        return new ToolRegistry([
+            new FixedResultTool('lookup', 'a file'),
+            new RefusingRecordingTool('refuse'),
+            new CountingRecordingTool('record', $toolCallCounter ?? new ToolCallCounter()),
         ], new NullLogger());
     }
 

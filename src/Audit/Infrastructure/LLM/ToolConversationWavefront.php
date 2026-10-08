@@ -447,7 +447,7 @@ final readonly class ToolConversationWavefront
 
         $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
 
-        return FinalRound::isConcludedBy($conversationState->roundsLeft, $toolLLMRequest->tools, ...$toolCalls)
+        return FinalRound::isConcludedBy($conversationState->roundsLeft, $toolLLMRequest->tools, $toolCalls, $toolResults)
             ? $conversationState->withResponse(FinalRound::answer($this->model, TokenUsageSnapshot::of($conversationState->input, $conversationState->output, $conversationState->cacheRead, $conversationState->cacheCreation)))
             : $conversationState;
     }
