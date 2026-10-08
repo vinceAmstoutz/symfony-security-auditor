@@ -80,11 +80,30 @@ final class EstimateAuditCostUseCaseMappingOverheadTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      * @throws InvalidToolRegistryException
      * @throws LLMProviderException
      * @throws BudgetExceededException
      */
-    private function inputTokensOfOneAttackerIteration(): int
+    public function test_the_estimate_of_a_path_scoped_run_prices_the_mapping_of_the_routes_outside_the_path(): void
+    {
+        $realInputTokens = $this->inputTokensOfOneAttackerIteration(['src/Service']);
+
+        $estimatedInputTokens = $this->estimatedAttackerInputTokens(['src/Service']);
+
+        self::assertGreaterThanOrEqual($realInputTokens * 0.9, $estimatedInputTokens);
+        self::assertLessThanOrEqual($realInputTokens * 2, $estimatedInputTokens);
+    }
+
+    /**
+     * @param list<string> $scanPaths
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     */
+    private function inputTokensOfOneAttackerIteration(array $scanPaths = []): int
     {
         $llmClient = new class(new ResolvingTokenEstimator(), self::MODEL) implements LLMClientInterface {
             public int $inputTokens = 0;
@@ -119,7 +138,7 @@ final class EstimateAuditCostUseCaseMappingOverheadTest extends TestCase
         };
 
         $nullLogger = new NullLogger();
-        $auditContext = AuditContext::forProject($this->projectDir);
+        $auditContext = AuditContext::forProject($this->projectDir, $scanPaths);
         (new IngestionStage(new ProjectFileScanner($nullLogger), $nullLogger))->process($auditContext);
         $this->mappingStage()->process($auditContext);
         $attackerAgent = new AttackerAgent(
@@ -134,10 +153,12 @@ final class EstimateAuditCostUseCaseMappingOverheadTest extends TestCase
     }
 
     /**
+     * @param list<string> $scanPaths
+     *
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
-    private function estimatedAttackerInputTokens(): int
+    private function estimatedAttackerInputTokens(array $scanPaths = []): int
     {
         $nullLogger = new NullLogger();
         $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
@@ -155,7 +176,7 @@ final class EstimateAuditCostUseCaseMappingOverheadTest extends TestCase
             mappingStage: $this->mappingStage(),
         );
 
-        return $estimateAuditCostUseCase->execute($this->projectDir)->cost()->byRole()['attacker']['input_tokens'];
+        return $estimateAuditCostUseCase->execute($this->projectDir, $scanPaths)->cost()->byRole()['attacker']['input_tokens'];
     }
 
     private function mappingStage(): MappingStage

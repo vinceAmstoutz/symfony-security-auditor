@@ -142,7 +142,7 @@ final readonly class EstimateAuditCostUseCase
         }
 
         $chunks = $this->fileChunker->chunk($files);
-        $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scannedFiles));
+        $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scanPaths, $scannedFiles));
 
         if ($this->toolsEnabled) {
             $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * $this->toolRoundTripMultiplier());
@@ -226,13 +226,15 @@ final readonly class EstimateAuditCostUseCase
      * The project mapping every chunk's user message carries — the firewall,
      * route access-control, voter and form sections — which grows with the
      * routes of the project, not with the chunk. The pipeline maps every file
-     * it scanned, however a git diff then narrows the files to audit.
+     * it scanned, however a git diff then narrows the files to audit, and the
+     * configured scope besides when `--path` narrows the scan.
      *
+     * @param list<string>      $scanPaths    as given on the command line
      * @param list<ProjectFile> $scannedFiles
      *
      * @throws InvalidAuditContextException
      */
-    private function mappingPromptTokens(string $projectPath, array $scannedFiles): int
+    private function mappingPromptTokens(string $projectPath, array $scanPaths, array $scannedFiles): int
     {
         if (!$this->attackerPromptBuilder instanceof AttackerPromptBuilderInterface || !$this->mappingStage instanceof StageInterface) {
             return 0;
@@ -240,6 +242,7 @@ final readonly class EstimateAuditCostUseCase
 
         $auditContext = AuditContext::forProject($projectPath);
         $auditContext->setProjectFiles($scannedFiles);
+        $auditContext->setMappingFiles(ScopedScan::mappingFiles($this->projectFileScanner, $projectPath, $scanPaths, $scannedFiles));
 
         $this->mappingStage->process($auditContext);
         $symfonyMapping = $auditContext->mapping();
