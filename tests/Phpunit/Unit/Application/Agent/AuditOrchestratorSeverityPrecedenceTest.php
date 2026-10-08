@@ -198,6 +198,36 @@ final class AuditOrchestratorSeverityPrecedenceTest extends TestCase
     }
 
     /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_rejected_re_report_never_displaces_a_validated_finding_the_reviewer_reclassified(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            AuditOrchestratorHarness::attackerResponse([AuditOrchestratorHarness::vulnerabilityPayload()]),
+            AuditOrchestratorHarness::attackerResponse([AuditOrchestratorHarness::vulnerabilityPayload()]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            LLMResponse::of('{"accepted": true, "corrected_type": "ssrf"}', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+            LLMResponse::of((string) json_encode(['accepted' => false]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+        );
+
+        $auditContext = AuditOrchestratorHarness::contextWithMapping($this->tmpDir);
+
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        $validated = array_values($auditContext->validatedVulnerabilities());
+        self::assertCount(1, $validated);
+        self::assertSame(VulnerabilityType::SSRF, $validated[0]->type());
+    }
+
+    /**
      * @param list<array{VulnerabilitySeverity, int, int}> $reportedFirst  severity, line start and line end of each finding the first iteration reports
      * @param array{VulnerabilitySeverity, int, int}       $reportedLater  the finding the second iteration reports
      * @param list<int>                                    $expectedStarts the line starts of the findings the report keeps

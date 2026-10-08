@@ -107,6 +107,16 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame(4.0, $modelsDevPricingProvider->cacheCreationPricePerMillionTokens('claude-bad-cache'));
     }
 
+    public function test_it_prices_a_model_listing_only_an_input_rate_with_a_free_output_and_cache_rates_at_the_input_rate(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('input-only-cost.json');
+
+        self::assertSame(3.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-input-only'));
+        self::assertSame(0.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('claude-input-only'));
+        self::assertSame(3.0, $modelsDevPricingProvider->cacheReadPricePerMillionTokens('claude-input-only'));
+        self::assertSame(3.0, $modelsDevPricingProvider->cacheCreationPricePerMillionTokens('claude-input-only'));
+    }
+
     public function test_it_resolves_a_provider_qualified_id_across_providers(): void
     {
         $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');

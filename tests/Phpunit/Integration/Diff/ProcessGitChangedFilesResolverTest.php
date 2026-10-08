@@ -459,6 +459,29 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $processGitChangedFilesResolver->changedSince($this->tmpDir, 'main');
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_gives_every_git_diff_the_configured_timeout(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+        $processes = [];
+
+        $processGitChangedFilesResolver = new ProcessGitChangedFilesResolver(
+            timeoutSeconds: 7.5,
+            gitDiffProcessFactory: static function (array $argv, string $projectPath) use (&$processes): Process {
+                $processes[] = $process = Process::fromShellCommandline('true');
+
+                return $process;
+            },
+        );
+
+        $processGitChangedFilesResolver->changedSince($this->tmpDir, 'main');
+
+        self::assertSame([7.5, 7.5, 7.5, 7.5], array_map(static fn (Process $process): ?float => $process->getTimeout(), $processes));
+    }
+
     #[Override]
     protected function setUp(): void
     {
