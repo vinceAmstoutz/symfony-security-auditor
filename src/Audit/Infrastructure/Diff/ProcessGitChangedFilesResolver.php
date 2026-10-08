@@ -21,6 +21,7 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Utf8Normalizer;
 
 use function Symfony\Component\String\u;
 
@@ -183,7 +184,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         }
 
         return array_values(array_filter(
-            explode("\0", $process->getOutput()),
+            explode("\0", Utf8Normalizer::normalize($process->getOutput())),
             static fn (string $line): bool => !u($line)->trim()->isEmpty(),
         ));
     }

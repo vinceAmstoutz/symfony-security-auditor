@@ -135,6 +135,21 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_names_a_changed_file_whose_name_is_not_valid_utf8_the_way_the_scanner_does(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit("src/Bar\xFF.php", '<?php // odd name', 'add odd name');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertSame(["src/Bar\u{FFFD}.php"], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_includes_a_changed_file_whose_name_contains_a_double_quote(): void
     {
         $this->initRepo();

@@ -418,6 +418,10 @@ The `coverage` array names, for each file, the stage that failed. For an LLM fai
 
 When **no** file could be analyzed and nothing was found, the run has no verdict: it exits `1` whatever the gates say, and the reports read `RISK LEVEL: UNKNOWN  (no file was analyzed)` on the console — `UNKNOWN (no file was analyzed)` in Markdown and HTML — instead of a SAFE result. When only some files failed, or the run still holds a finding, the risk level and grade cover only the files analyzed, and the reports say so.
 
+### `File content is not valid UTF-8` / `File name is not valid UTF-8` warnings
+
+The scanner met a file whose bytes, or whose name, are not UTF-8 — typically a legacy Latin-1 file with an accented comment, or a name git accepted as it is on Linux. It replaces each invalid byte with `�` (U+FFFD) and audits the file like any other: the report is complete, a renamed file appears under its replaced name (`src/Controller/Fo�o.php`), and the warning (in the log of a Symfony application; the standalone binary writes none) names it. Nothing needs fixing for the audit to run; to see the file under its real name, re-encode the content to UTF-8 or rename the file.
+
 ### Report has zero vulnerabilities but I know there are some
 
 Diagnostic order:

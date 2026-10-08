@@ -348,6 +348,93 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame($content, $files[0]->content());
     }
 
+    public function test_it_replaces_bytes_that_are_not_valid_utf8_in_file_content_with_the_replacement_character(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Legacy.php', "<?php\n// caf\xE9\n");
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame("<?php\n// caf\u{FFFD}\n", $files[0]->content());
+    }
+
+    public function test_it_replaces_bytes_that_are_not_valid_utf8_in_a_file_name_with_the_replacement_character(): void
+    {
+        mkdir($this->tmpDir.'/src/Controller', 0o777, true);
+        $absolutePath = $this->tmpDir."/src/Controller/Fo\xFFo.php";
+        file_put_contents($absolutePath, '<?php class Foo {}');
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame("src/Controller/Fo\u{FFFD}o.php", $files[0]->relativePath());
+        self::assertSame($absolutePath, $files[0]->absolutePath());
+    }
+
+    public function test_it_warns_once_that_the_content_of_a_file_was_not_valid_utf8(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Legacy.php', "<?php\n// caf\xE9\n");
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = [$message, $context];
+            },
+        );
+
+        (new ProjectFileScanner($logger))->scan($this->tmpDir);
+
+        self::assertSame([['File content is not valid UTF-8, its invalid bytes were replaced', ['path' => 'src/Legacy.php']]], $warnings);
+    }
+
+    public function test_it_warns_once_that_a_file_name_was_not_valid_utf8_and_names_it_as_replaced(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir."/src/Fo\xFFo.php", '<?php class Foo {}');
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = [$message, $context];
+            },
+        );
+
+        (new ProjectFileScanner($logger))->scan($this->tmpDir);
+
+        self::assertSame([['File name is not valid UTF-8, its invalid bytes were replaced', ['path' => "src/Fo\u{FFFD}o.php"]]], $warnings);
+    }
+
+    public function test_it_does_not_warn_about_encoding_for_valid_utf8_names_and_content(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Café.php', "<?php\n// café\n");
+
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('warning');
+
+        $files = (new ProjectFileScanner($logger))->scan($this->tmpDir);
+
+        self::assertSame(['src/Café.php' => "<?php\n// café\n"], [$files[0]->relativePath() => $files[0]->content()]);
+    }
+
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
+    public function test_the_secret_scrubber_sees_the_bytes_of_a_file_as_they_are_on_disk(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Legacy.php', "<?php\n// geheim\xE4 caf\xE9\n");
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), secretScrubber: new RegexSecretScrubber(["/geheim\xE4/"]));
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertSame("<?php\n// ***REDACTED:custom_0*** caf\u{FFFD}\n", $files[0]->content());
+    }
+
     public function test_it_logs_scanning_start_and_completion_with_exact_context(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
