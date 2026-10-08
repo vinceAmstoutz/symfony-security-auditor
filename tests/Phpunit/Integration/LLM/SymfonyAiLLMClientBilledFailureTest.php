@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
@@ -389,6 +390,119 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $body
+     *
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     */
+    #[DataProvider('gatewayRefusalsWithoutAnErrorOrChoicesCases')]
+    public function test_complete_aborts_on_a_gateway_refusal_whose_json_body_reads_as_an_empty_answer_without_booking_it(int $status, array $body): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusal($status, $body)]);
+
+        $aborted = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->complete('sys', 'user');
+        } catch (NonTransientLLMFailureException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+        $this->assertNothingWasBooked();
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     */
+    public function test_complete_with_tools_aborts_on_a_gateway_refusal_whose_json_body_reads_as_an_empty_answer_without_booking_it(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusal(404, ['detail' => 'Not Found'])]);
+
+        $aborted = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->completeWithTools('sys', 'user', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
+        } catch (NonTransientLLMFailureException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(1, $scriptedDeferredPlatform->invocations);
+        $this->assertNothingWasBooked();
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     */
+    public function test_complete_batch_aborts_on_a_gateway_refusal_whose_json_body_reads_as_an_empty_answer_without_booking_it(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusal(404, ['detail' => 'Not Found']), $this->gatewayRefusal(404, ['detail' => 'Not Found'])]);
+
+        $aborted = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->completeBatch([['system' => 'sys', 'user' => 'user']], 2);
+        } catch (NonTransientLLMFailureException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(2, $scriptedDeferredPlatform->invocations);
+        self::assertSame(0, $this->budgetTracker->tokensUsed());
+        self::assertSame(0, $this->tokenUsageRecorder->snapshot()->inputTokens());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     */
+    public function test_complete_batch_with_tools_aborts_on_a_gateway_refusal_whose_json_body_reads_as_an_empty_answer_without_booking_it(): void
+    {
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->gatewayRefusal(404, ['detail' => 'Not Found']), $this->gatewayRefusal(404, ['detail' => 'Not Found']), $this->gatewayRefusal(404, ['detail' => 'Not Found'])]);
+
+        $aborted = false;
+        try {
+            $this->client($scriptedDeferredPlatform)->completeBatchWithTools([['system' => 'sys', 'user' => 'user', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 2, 3);
+        } catch (NonTransientLLMFailureException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted);
+        self::assertSame(3, $scriptedDeferredPlatform->invocations);
+        self::assertSame(0, $this->budgetTracker->tokensUsed());
+        self::assertSame(0, $this->tokenUsageRecorder->snapshot()->inputTokens());
+    }
+
+    /** @return iterable<string, array{int, array<string, mixed>}> */
+    public static function gatewayRefusalsWithoutAnErrorOrChoicesCases(): iterable
+    {
+        yield 'a 404 from a wrong base url path' => [404, ['detail' => 'Not Found']];
+        yield 'a 403 from a gateway' => [403, ['message' => 'Forbidden']];
+        yield 'a 422 from a validation layer' => [422, ['detail' => [['msg' => 'field required']]]];
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      */
     private function assertNothingWasBooked(): void
@@ -405,6 +519,18 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         $payloadTooLarge->method('toArray')->willReturn(['message' => 'Request size limit exceeded']);
 
         return new DeferredResult(new ThrowingConverter(new PlatformRuntimeException('Response does not contain choices.')), new RawHttpResult($payloadTooLarge), []);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function gatewayRefusal(int $status, array $body): DeferredResult
+    {
+        $refusal = self::createStub(ResponseInterface::class);
+        $refusal->method('getStatusCode')->willReturn($status);
+        $refusal->method('toArray')->willReturn($body);
+
+        return new DeferredResult(new ThrowingConverter(new PlatformRuntimeException('Response does not contain choices.')), new RawHttpResult($refusal), []);
     }
 
     private function toolCallRecordingAFinding(): DeferredResult
