@@ -43,19 +43,17 @@ final readonly class ReviewOutcomeRecorder
     ) {}
 
     /**
-     * A null payload — empty response or no recorded verdict — rejects the
-     * finding.
+     * A null payload — empty response or no recorded verdict — or one with no
+     * `accepted` flag is a review the model never made: the finding is
+     * recorded as errored, never as rejected, so it is not reported to the
+     * attacker as a rejection and is reviewed again on the next run.
      *
      * @param array<string, mixed>|list<array<string, mixed>>|null $review
      */
     public function recordVerdict(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
-        if (null === $review) {
-            ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
-            $rejected = $vulnerability->withReviewerValidation(false);
-            $coverageRecorder->recordReviewedFinding($rejected);
-
-            return $rejected;
+        if (null === $review || !$this->verdictApplier->hasVerdict($review)) {
+            return $this->recordUnjudged($vulnerability, $coverageRecorder);
         }
 
         $reviewed = $this->verdictApplier->apply($vulnerability, $review);
@@ -94,6 +92,15 @@ final readonly class ReviewOutcomeRecorder
         $this->logger->warning('Reviewer response was cut short; the finding is recorded as errored and left out of the cache', [
             'vulnerability_id' => $vulnerability->id(),
             'stop_reason' => $llmResponse->stopReason(),
+        ]);
+
+        return $this->recordErrored($vulnerability, $coverageRecorder);
+    }
+
+    private function recordUnjudged(Vulnerability $vulnerability, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        $this->logger->warning('Reviewer reached no verdict for the finding; it is recorded as errored and left out of the cache', [
+            'vulnerability_id' => $vulnerability->id(),
         ]);
 
         return $this->recordErrored($vulnerability, $coverageRecorder);

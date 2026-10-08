@@ -58,6 +58,18 @@ final readonly class VerdictApplier
     }
 
     /**
+     * Whether the payload judges the finding at all: a payload with no
+     * `accepted` flag (notes only, an empty object) is not a rejection but a
+     * review the model never made, which a caller records as errored.
+     *
+     * @param array<string, mixed>|list<array<string, mixed>> $reviewData
+     */
+    public function hasVerdict(array $reviewData): bool
+    {
+        return null !== ($this->normalize($reviewData)['accepted'] ?? null);
+    }
+
+    /**
      * PHP's `(bool)` cast treats any non-empty, non-`"0"` string as `true` —
      * including the literal string `"false"`, which a provider that
      * stringifies JSON booleans (a known quirk of some non-Anthropic models

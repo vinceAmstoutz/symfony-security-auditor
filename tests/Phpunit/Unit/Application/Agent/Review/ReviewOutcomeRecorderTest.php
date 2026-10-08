@@ -80,7 +80,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_a_finding_without_any_verdict_still_reports_as_reviewed(): void
     {
-        $progressReporter = $this->expectingReviewedEvent(false, 'rejected');
+        $progressReporter = $this->expectingReviewedEvent(false, 'errored');
 
         $vulnerability = $this->recorder($progressReporter)->recordVerdict($this->vulnerability(), null, new NullCoverageRecorder());
 
@@ -102,29 +102,73 @@ final class ReviewOutcomeRecorderTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_explicit_rejection_is_recorded_as_one(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), ['accepted' => false], $recordingCoverageRecorder);
+
+        self::assertSame(['T'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->rejected));
+        self::assertSame([['stage' => 'reviewer', 'filePath' => 'src/A.php', 'status' => 'rejected']], $recordingCoverageRecorder->coverage);
+    }
+
+    /**
      * @param array<string, mixed>|null $verdict
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    #[DataProvider('rejectingVerdicts')]
-    public function test_a_rejection_is_recorded_as_one(?array $verdict): void
+    #[DataProvider('verdictsThatJudgeNothing')]
+    public function test_a_finding_the_model_never_judged_is_recorded_errored_and_never_reported_as_rejected(?array $verdict): void
     {
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), $verdict, $recordingCoverageRecorder);
+        $vulnerability = $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), $verdict, $recordingCoverageRecorder);
 
-        self::assertSame(['T'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->rejected));
+        self::assertFalse($vulnerability->isReviewerValidated());
+        self::assertSame([['stage' => 'reviewer', 'filePath' => 'src/A.php', 'status' => 'errored']], $recordingCoverageRecorder->coverage);
+        self::assertSame([], $recordingCoverageRecorder->rejected);
+        self::assertSame([$vulnerability], $recordingCoverageRecorder->reviewed);
     }
 
     /**
      * @return iterable<string, array{array<string, mixed>|null}>
      */
-    public static function rejectingVerdicts(): iterable
+    public static function verdictsThatJudgeNothing(): iterable
     {
-        yield 'an explicit rejection' => [['accepted' => false]];
         yield 'no verdict at all' => [null];
+        yield 'an empty verdict' => [[]];
+        yield 'notes without an accepted flag' => [['reviewer_notes' => 'looks fine']];
+        yield 'an accepted flag set to null' => [['accepted' => null]];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_warning_for_a_finding_the_model_never_judged_names_the_finding(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Reviewer reached no verdict for the finding; it is recorded as errored and left out of the cache',
+            ['vulnerability_id' => $this->vulnerability()->id()],
+        );
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            $logger,
+            self::createStub(ProgressReporterInterface::class),
+        );
+
+        $vulnerability = $reviewOutcomeRecorder->recordVerdict($this->vulnerability(), null, new NullCoverageRecorder());
+
+        self::assertFalse($vulnerability->isReviewerValidated());
     }
 
     /**
@@ -258,7 +302,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_a_null_verdict_records_the_rejected_finding_with_the_coverage_recorder(): void
+    public function test_a_null_verdict_records_the_errored_finding_with_the_coverage_recorder(): void
     {
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
