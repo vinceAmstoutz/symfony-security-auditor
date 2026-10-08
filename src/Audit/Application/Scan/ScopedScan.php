@@ -22,6 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScan
  * configured scan surface. With paths, a command line flag wins over the
  * configuration: a scanner that can be told where to look scans exactly those
  * paths, and one that cannot has its result narrowed to them, as before.
+ * The files the Symfony mapping is read from are a wider set: `--path` only
+ * narrows what is audited, so the configured scope still supplies the security
+ * configuration, voters and forms that decide how each audited route is guarded.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -45,5 +48,25 @@ final readonly class ScopedScan
         }
 
         return ScanPathFilter::apply($projectFileScanner->scan($projectPath), $paths);
+    }
+
+    /**
+     * @param list<string>      $scanPaths   as given on the command line
+     * @param list<ProjectFile> $scopedFiles what {@see self::files()} returned for the same paths
+     *
+     * @return list<ProjectFile>
+     */
+    public static function mappingFiles(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $scanPaths, array $scopedFiles): array
+    {
+        if ([] === ScanPathFilter::normalize($scanPaths)) {
+            return $scopedFiles;
+        }
+
+        $byRelativePath = [];
+        foreach ([...$projectFileScanner->scan($projectPath), ...$scopedFiles] as $file) {
+            $byRelativePath[$file->relativePath()] ??= $file;
+        }
+
+        return array_values($byRelativePath);
     }
 }

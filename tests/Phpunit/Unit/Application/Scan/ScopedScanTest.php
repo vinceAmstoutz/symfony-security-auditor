@@ -72,6 +72,68 @@ final class ScopedScanTest extends TestCase
     }
 
     /**
+     * @param list<string> $scanPaths
+     *
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('pathsThatNameNothing')]
+    public function test_without_a_path_the_mapping_is_built_from_the_configured_scan_without_scanning_again(array $scanPaths): void
+    {
+        $configured = [$this->file('src/A.php')];
+        $recordingScopedScanner = new RecordingScopedScanner($configured, [$this->file('apps/api/B.php')]);
+        $scopedFiles = ScopedScan::files($recordingScopedScanner, '/project', $scanPaths);
+
+        self::assertSame($configured, ScopedScan::mappingFiles($recordingScopedScanner, '/project', $scanPaths, $scopedFiles));
+        self::assertSame([['scan', null]], $recordingScopedScanner->calls);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_path_leaves_the_configured_scope_in_the_mapping_and_adds_what_only_the_path_reaches(): void
+    {
+        $projectFile = $this->file('config/packages/security.yaml');
+        $controller = $this->file('src/Controller/A.php');
+        $outside = $this->file('apps/api/src/B.php');
+        $recordingScopedScanner = new RecordingScopedScanner([$projectFile, $controller], [$outside]);
+
+        self::assertSame(
+            [$projectFile, $controller, $outside],
+            ScopedScan::mappingFiles($recordingScopedScanner, '/project', ['apps/api'], [$outside]),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_file_the_configured_scope_and_the_path_both_reach_is_mapped_once_as_the_configured_scan_read_it(): void
+    {
+        $projectFile = $this->file('src/Controller/A.php');
+        $scopedController = $this->file('src/Controller/A.php');
+        $recordingScopedScanner = new RecordingScopedScanner([$projectFile], [$scopedController]);
+
+        $mappingFiles = ScopedScan::mappingFiles($recordingScopedScanner, '/project', ['src/Controller'], [$scopedController]);
+
+        self::assertCount(1, $mappingFiles);
+        self::assertSame($projectFile, $mappingFiles[0]);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_scanner_that_cannot_take_paths_maps_everything_it_scans(): void
+    {
+        $projectFile = $this->file('apps/api/B.php');
+        $outOfScope = $this->file('apps/web/C.php');
+        $fixedScanner = new FixedScanner([$outOfScope, $projectFile]);
+
+        self::assertSame(
+            [$outOfScope, $projectFile],
+            ScopedScan::mappingFiles($fixedScanner, '/project', ['apps/api'], ScopedScan::files($fixedScanner, '/project', ['apps/api'])),
+        );
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     private function file(string $relativePath): ProjectFile

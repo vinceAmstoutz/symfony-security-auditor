@@ -62,7 +62,7 @@ final readonly class AuditReport
                 $auditContext->startedAt(),
                 new DateTimeImmutable(),
                 \count($auditContext->projectFiles()),
-                \count($auditContext->mappingFiles()),
+                $auditContext->filesDiscovered(),
                 $auditContext->isCostEstimate(),
                 $auditContext->diffSinceRef(),
                 $auditContext->scanPaths(),
