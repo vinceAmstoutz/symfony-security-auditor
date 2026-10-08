@@ -56,6 +56,33 @@ final class PlatformResultExtractorTest extends TestCase
     }
 
     /**
+     * @param array{int, int, int, int} $expectedTokens input, output, cache read, cache creation
+     *
+     * @throws NegativeTokenCountException
+     */
+    #[DataProvider('cachedInputCases')]
+    public function test_it_books_cached_input_apart_from_the_input_whatever_the_providers_convention(TokenUsage $tokenUsage, array $expectedTokens): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage)));
+    }
+
+    /** @return iterable<string, array{TokenUsage, array{int, int, int, int}}> */
+    public static function cachedInputCases(): iterable
+    {
+        yield 'cached tokens an OpenAI-style provider counts inside the prompt' => [new TokenUsage(promptTokens: 10000, completionTokens: 200, cachedTokens: 9000, totalTokens: 10200), [1000, 200, 9000, 0]];
+        yield 'cached tokens a gateway reports as cache reads inside the prompt' => [new TokenUsage(promptTokens: 10000, completionTokens: 200, cachedTokens: 9000, cacheReadTokens: 9000, totalTokens: 10200), [1000, 200, 9000, 0]];
+        yield 'cache reads win over a differing aggregate of cached tokens' => [new TokenUsage(promptTokens: 10000, completionTokens: 200, cachedTokens: 9500, cacheReadTokens: 9000, totalTokens: 10200), [1000, 200, 9000, 0]];
+        yield 'a prompt that is entirely cached' => [new TokenUsage(promptTokens: 9000, completionTokens: 200, cachedTokens: 9000, totalTokens: 9200), [0, 200, 9000, 0]];
+        yield 'cached tokens that cannot fit inside the prompt' => [new TokenUsage(promptTokens: 8999, completionTokens: 200, cachedTokens: 9000, totalTokens: 9199), [8999, 200, 0, 0]];
+        yield 'no cached tokens' => [new TokenUsage(promptTokens: 10000, completionTokens: 200, totalTokens: 10200), [10000, 200, 0, 0]];
+        yield 'cache reads and writes counted apart from the prompt' => [new TokenUsage(promptTokens: 1000, completionTokens: 200, cachedTokens: 9000, cacheCreationTokens: 0, cacheReadTokens: 9000), [1000, 200, 9000, 0]];
+        yield 'cache reads and writes counted apart from the prompt with a total' => [new TokenUsage(promptTokens: 10000, completionTokens: 200, cachedTokens: 9300, cacheCreationTokens: 300, cacheReadTokens: 9000, totalTokens: 19500), [10000, 200, 9000, 300]];
+        yield 'cache reads with no total to show they sit inside the prompt' => [new TokenUsage(promptTokens: 10000, completionTokens: 200, cachedTokens: 9000, cacheReadTokens: 9000), [10000, 200, 9000, 0]];
+    }
+
+    /**
      * A negative count is a compromised or malfunctioning provider response.
      * `$tokenUsageRecorder` is optional and defaults to `null`
      * ({@see PlatformAccountingConfig}),

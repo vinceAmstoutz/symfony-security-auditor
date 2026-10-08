@@ -85,12 +85,33 @@ final readonly class PlatformResultExtractor
      */
     private function tokenCounts(TokenUsageInterface $tokenUsage): array
     {
+        $promptTokens = $tokenUsage->getPromptTokens() ?? 0;
+        $cachedInsidePrompt = $this->cachedTokensInsidePrompt($tokenUsage, $promptTokens);
+
         return [
-            $tokenUsage->getPromptTokens() ?? 0,
+            $promptTokens - $cachedInsidePrompt,
             $tokenUsage->getCompletionTokens() ?? 0,
-            $tokenUsage->getCacheReadTokens() ?? 0,
+            0 === $cachedInsidePrompt ? $tokenUsage->getCacheReadTokens() ?? 0 : $cachedInsidePrompt,
             $tokenUsage->getCacheCreationTokens() ?? 0,
         ];
+    }
+
+    /**
+     * Anthropic counts cache reads and writes apart from its input tokens and
+     * always reports the writes; OpenAI-style providers (OpenAI, Gemini,
+     * DeepSeek, gateways) report a total and count the cached tokens inside
+     * the prompt. Booking both as they come would bill the cached share twice
+     * at the full input rate, or never at the cache rate.
+     */
+    private function cachedTokensInsidePrompt(TokenUsageInterface $tokenUsage, int $promptTokens): int
+    {
+        if (null !== $tokenUsage->getCacheCreationTokens() || null === $tokenUsage->getTotalTokens()) {
+            return 0;
+        }
+
+        $cachedTokens = $tokenUsage->getCacheReadTokens() ?? $tokenUsage->getCachedTokens() ?? 0;
+
+        return $cachedTokens <= $promptTokens ? $cachedTokens : 0;
     }
 
     /**

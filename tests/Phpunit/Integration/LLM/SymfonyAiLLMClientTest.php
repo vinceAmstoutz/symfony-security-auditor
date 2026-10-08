@@ -1848,6 +1848,35 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
      * @throws NonTransientLLMFailureException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_complete_books_cached_input_an_openai_style_provider_counts_inside_the_prompt_once(): void
+    {
+        $budgetTracker = new BudgetTracker(AuditBudget::unlimited(), new CostCalculator($this->stubPricing(0.0, 0.0)));
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 10000, completionTokens: 200, cachedTokens: 9000, totalTokens: 10200),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(budgetTracker: $budgetTracker),
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([1000, 200, 9000], [$llmResponse->inputTokens(), $llmResponse->outputTokens(), $llmResponse->cacheReadTokens()]);
+        self::assertSame(10200, $budgetTracker->tokensUsed());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
