@@ -95,7 +95,7 @@ final class EnvironmentDoctorTest extends TestCase
         $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
         $this->installBridge();
         $refreshed = $this->cacheHome.'/symfony-security-auditor/models-dev.json';
-        (new Filesystem())->dumpFile($refreshed, '{"anthropic":{}}');
+        (new Filesystem())->dumpFile($refreshed, '{"anthropic":{"models":{"claude-opus-5":{"cost":{"input":5,"output":25}}}}}');
 
         $xdgConfigPathResolver = $this->resolver();
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
@@ -118,6 +118,32 @@ final class EnvironmentDoctorTest extends TestCase
             $results[3]->detail,
             'the bundled package version describes the packaged catalog only; stamping it onto a refreshed override asserts a version that file does not have',
         );
+    }
+
+    public function test_it_names_the_bundled_catalog_when_the_refreshed_one_is_unusable(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+        $refreshed = $this->cacheHome.'/symfony-security-auditor/models-dev.json';
+        (new Filesystem())->dumpFile($refreshed, '{"anthropic":{}}');
+
+        $xdgConfigPathResolver = $this->resolver();
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+
+        $environmentDoctor = new EnvironmentDoctor(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            $composerAvailabilityChecker,
+            self::createStub(AuditPreflightInterface::class),
+            new ModelsDevPricingProvider(new NullLogger(), $refreshed),
+        );
+
+        $results = $environmentDoctor->diagnose();
+
+        self::assertSame(DoctorCheckStatus::Ok, $results[3]->status);
+        self::assertStringNotContainsString($refreshed, $results[3]->detail, 'the run prices from the bundled catalog, so doctor must not name an override it ignores');
+        self::assertMatchesRegularExpression('/^symfony\/models-dev v?[0-9]+(\.[0-9]+)* \(.+models-dev\.json\)\.$/', $results[3]->detail);
     }
 
     public function test_it_warns_when_the_pricing_catalog_package_is_not_installed(): void
