@@ -665,6 +665,51 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_keeps_numeric_looking_literals_that_differ_as_text_apart_and_as_strings(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class NumericVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, ['1', '01', '1.0', '1e0', '1', '123'], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/NumericVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['1', '01', '1.0', '1e0', '123'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_lists_string_literals_before_the_values_of_constant_fetches(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class OrderedVoter {
+                const EDIT = 'EDIT';
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, [self::EDIT, 'DELETE'], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/OrderedVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['DELETE', 'EDIT'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_file_nested_too_deeply_to_parse_safely(): void
     {
         $nesting = str_repeat('f(', 33000).'1'.str_repeat(')', 33000);

@@ -174,19 +174,12 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         $instanceofNodes = $nodeFinder->findInstanceOf($body, Instanceof_::class);
         foreach ($instanceofNodes as $instanceofNode) {
             $classExpression = $instanceofNode->class;
-            if (!$classExpression instanceof Name) {
-                continue;
+            if ($classExpression instanceof Name) {
+                $names[] = $classExpression->toString();
             }
-
-            $resolved = $classExpression->toString();
-            if (\in_array($resolved, $names, true)) {
-                continue;
-            }
-
-            $names[] = $resolved;
         }
 
-        return $names;
+        return array_values(array_unique($names));
     }
 
     private function resolveClassName(Class_ $class): string
