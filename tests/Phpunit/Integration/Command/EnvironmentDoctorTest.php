@@ -130,7 +130,7 @@ final class EnvironmentDoctorTest extends TestCase
 
         $xdgConfigPathResolver = $this->resolver();
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
-        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
 
         $environmentDoctor = new EnvironmentDoctor(
             new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
