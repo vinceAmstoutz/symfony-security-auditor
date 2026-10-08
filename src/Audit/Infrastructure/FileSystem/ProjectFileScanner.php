@@ -23,11 +23,15 @@ use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
 use UnexpectedValueException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class ProjectFileScanner implements ScopedProjectFileScannerInterface
+final readonly class ProjectFileScanner implements ScopedProjectFileScannerInterface, SkippedFileReportingProjectFileScannerInterface
 {
     /** @var list<string> */
     private const array PHP_EXTENSIONS = ['php'];
@@ -85,7 +89,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     #[Override]
     public function scan(string $projectPath): array
     {
-        return $this->scanRoots($projectPath, $this->includedPaths, 'No included paths exist in project', ['included_paths' => $this->includedPaths, 'project_path' => $projectPath]);
+        return $this->scanReportingSkippedFiles($projectPath)->files;
     }
 
     /**
@@ -96,16 +100,27 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     #[Override]
     public function scanWithin(string $projectPath, array $scanPaths): array
     {
+        return $this->scanReportingSkippedFiles($projectPath, $scanPaths)->files;
+    }
+
+    /**
+     * @param list<string> $scanPaths project-relative paths that replace the configured ones; none scans the configured ones
+     */
+    #[Override]
+    public function scanReportingSkippedFiles(string $projectPath, array $scanPaths = []): ProjectFileScan
+    {
+        if ([] === $scanPaths) {
+            return $this->scanRoots($projectPath, $this->includedPaths, 'No included paths exist in project', ['included_paths' => $this->includedPaths, 'project_path' => $projectPath]);
+        }
+
         return $this->scanRoots($projectPath, $scanPaths, 'No scan paths exist in project', ['scan_paths' => $scanPaths, 'project_path' => $projectPath]);
     }
 
     /**
      * @param list<string>         $roots          project-relative directories and files to scan
      * @param array<string, mixed> $noRootsContext what the warning says when none of the roots exists
-     *
-     * @return list<ProjectFile>
      */
-    private function scanRoots(string $projectPath, array $roots, string $noRootsMessage, array $noRootsContext): array
+    private function scanRoots(string $projectPath, array $roots, string $noRootsMessage, array $noRootsContext): ProjectFileScan
     {
         $this->logger->info('Scanning project', ['path' => $projectPath]);
 
@@ -114,72 +129,73 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         if ([] === $directories && [] === $explicitFiles) {
             $this->logger->warning($noRootsMessage, $noRootsContext);
 
-            return [];
+            return new ProjectFileScan([], []);
         }
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
 
-        $files = $this->inRelativePathOrder($this->eachFileOnce(array_merge(
-            $this->scanDirectories($directories, $projectPath, $reader),
-            $this->scanExplicitFiles($explicitFiles, $projectPath, $reader),
+        $directoryScan = $this->scanDirectories($directories, $projectPath, $reader);
+        $explicitFileScan = $this->scanExplicitFiles($explicitFiles, $projectPath, $reader);
+
+        $projectFileScan = $this->inRelativePathOrder($this->eachFileOnce(new ProjectFileScan(
+            array_merge($directoryScan->files, $explicitFileScan->files),
+            array_merge($directoryScan->skippedFiles, $explicitFileScan->skippedFiles),
         )));
 
-        $this->logger->info('Scan complete', ['files' => \count($files)]);
+        $this->logger->info('Scan complete', ['files' => \count($projectFileScan->files)]);
 
-        return $files;
+        return $projectFileScan;
     }
 
     /**
      * Paths that overlap — a directory and one inside it, a directory and a
      * file in it — reach the same file more than once.
-     *
-     * @param list<ProjectFile> $files
-     *
-     * @return list<ProjectFile>
      */
-    private function eachFileOnce(array $files): array
+    private function eachFileOnce(ProjectFileScan $projectFileScan): ProjectFileScan
     {
-        $byRelativePath = [];
-        foreach ($files as $file) {
-            $byRelativePath[$file->relativePath()] ??= $file;
+        $files = [];
+        foreach ($projectFileScan->files as $file) {
+            $files[$file->relativePath()] ??= $file;
         }
 
-        return array_values($byRelativePath);
+        $skippedFiles = [];
+        foreach ($projectFileScan->skippedFiles as $skippedFile) {
+            $skippedFiles[$skippedFile->relativePath] ??= $skippedFile;
+        }
+
+        return new ProjectFileScan(array_values($files), array_values($skippedFiles));
     }
 
     /**
      * A filesystem lists a directory in its own storage order, which differs
      * between machines; the chunks built from this list, and the prompts and
      * cache keys built from those, must not.
-     *
-     * @param list<ProjectFile> $files
-     *
-     * @return list<ProjectFile>
      */
-    private function inRelativePathOrder(array $files): array
+    private function inRelativePathOrder(ProjectFileScan $projectFileScan): ProjectFileScan
     {
+        $files = $projectFileScan->files;
         usort($files, static fn (ProjectFile $left, ProjectFile $right): int => strcmp($left->relativePath(), $right->relativePath()));
 
-        return $files;
+        $skippedFiles = $projectFileScan->skippedFiles;
+        usort($skippedFiles, static fn (SkippedFile $left, SkippedFile $right): int => strcmp($left->relativePath, $right->relativePath));
+
+        return new ProjectFileScan($files, $skippedFiles);
     }
 
     /**
      * @param list<string>                 $directories
      * @param Closure(SplFileInfo): string $reader
-     *
-     * @return list<ProjectFile>
      */
-    private function scanDirectories(array $directories, string $projectPath, Closure $reader): array
+    private function scanDirectories(array $directories, string $projectPath, Closure $reader): ProjectFileScan
     {
         if ([] === $directories) {
-            return [];
+            return new ProjectFileScan([], []);
         }
 
         $finder = (new Finder())
             ->files()
             ->in($directories)
             ->name($this->finderNamePatterns())
-            ->size(\sprintf('<= %dKi', $this->maxFileSizeKb))
             ->filter($this->entersReadableDirectory(...), true);
 
         return $this->collectFilesFrom($finder, $projectPath, $reader);
@@ -208,48 +224,51 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     /**
      * @param list<string>                 $explicitFiles
      * @param Closure(SplFileInfo): string $reader
-     *
-     * @return list<ProjectFile>
      */
-    private function scanExplicitFiles(array $explicitFiles, string $projectPath, Closure $reader): array
+    private function scanExplicitFiles(array $explicitFiles, string $projectPath, Closure $reader): ProjectFileScan
     {
         $files = [];
+        $skippedFiles = [];
         foreach ($explicitFiles as $explicitFile) {
             $explicitFinder = (new Finder())
                 ->files()
                 ->ignoreDotFiles(false)
                 ->in(\dirname($explicitFile))
                 ->depth('== 0')
-                ->name(basename($explicitFile))
-                ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
+                ->name(basename($explicitFile));
 
-            $files = array_merge($files, $this->collectFilesFrom($explicitFinder, $projectPath, $reader));
+            $explicitFileScan = $this->collectFilesFrom($explicitFinder, $projectPath, $reader);
+            $files = array_merge($files, $explicitFileScan->files);
+            $skippedFiles = array_merge($skippedFiles, $explicitFileScan->skippedFiles);
         }
 
-        return $files;
+        return new ProjectFileScan($files, $skippedFiles);
     }
 
     /**
      * @param Closure(SplFileInfo): string $reader
-     *
-     * @return list<ProjectFile>
      */
-    private function collectFilesFrom(Finder $finder, string $projectPath, Closure $reader): array
+    private function collectFilesFrom(Finder $finder, string $projectPath, Closure $reader): ProjectFileScan
     {
         if ($this->respectGitignore) {
             $finder->ignoreVCSIgnored(true);
         }
 
         $files = [];
+        $skippedFiles = [];
         /** @var SplFileInfo $splFile */
         foreach ($finder as $splFile) {
-            $file = $this->buildProjectFile($splFile, $projectPath, $reader);
-            if ($file instanceof ProjectFile) {
-                $files[] = $file;
+            $outcome = $this->scanFile($splFile, $projectPath, $reader);
+            if ($outcome instanceof ProjectFile) {
+                $files[] = $outcome;
+            }
+
+            if ($outcome instanceof SkippedFile) {
+                $skippedFiles[] = $outcome;
             }
         }
 
-        return $files;
+        return new ProjectFileScan($files, $skippedFiles);
     }
 
     /**
@@ -374,7 +393,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     /**
      * @param Closure(SplFileInfo): string $reader
      */
-    private function buildProjectFile(SplFileInfo $splFile, string $projectPath, Closure $reader): ?ProjectFile
+    private function scanFile(SplFileInfo $splFile, string $projectPath, Closure $reader): ProjectFile|SkippedFile|null
     {
         if ($splFile->isLink()) {
             $this->logger->warning('Skipped symlinked file', ['path' => $splFile->getPathname()]);
@@ -382,8 +401,13 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
             return null;
         }
 
+        $relativePath = $this->validUtf8RelativePath($splFile, $projectPath);
+
         try {
-            $relativePath = $this->validUtf8RelativePath($splFile, $projectPath);
+            if ($splFile->getSize() > $this->maxFileSizeKb * 1024) {
+                return new SkippedFile($relativePath, SkippedFileReason::TooLarge);
+            }
+
             $content = $reader($splFile);
             if ($this->secretScrubber instanceof SecretScrubberInterface) {
                 $content = $this->secretScrubber->scrub($content);
@@ -400,7 +424,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
                 'error' => $throwable->getMessage(),
             ]);
 
-            return null;
+            return new SkippedFile($relativePath, SkippedFileReason::Unreadable);
         }
     }
 
