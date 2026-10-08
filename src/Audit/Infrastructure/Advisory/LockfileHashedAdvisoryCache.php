@@ -19,6 +19,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\MalformedAdvisoryPayloadException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\UnsafeAdvisoryCacheWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 
@@ -50,18 +51,22 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
      */
     private const int TTL_SECONDS = 86_400;
 
+    private LockfileHasher $lockfileHasher;
+
     public function __construct(
         private ComposerAuditRunnerInterface $composerAuditRunner,
         private string $cacheDir,
         private Filesystem $filesystem,
         private LoggerInterface $logger,
         private ClockInterface $clock,
-    ) {}
+    ) {
+        $this->lockfileHasher = new LockfileHasher($filesystem, $logger);
+    }
 
     #[Override]
     public function run(string $projectPath): string
     {
-        $lockfileHash = $this->lockfileHash($projectPath);
+        $lockfileHash = $this->lockfileHasher->hash($projectPath);
 
         if (null !== $lockfileHash) {
             $cachedJson = $this->readCache($lockfileHash);
@@ -74,33 +79,22 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
 
         $json = $this->composerAuditRunner->run($projectPath);
 
-        if (null !== $lockfileHash) {
+        if (null !== $lockfileHash && $this->isAdvisoryDocument($json)) {
             $this->writeCache($lockfileHash, $json);
         }
 
         return $json;
     }
 
-    private function lockfileHash(string $projectPath): ?string
+    private function isAdvisoryDocument(string $json): bool
     {
-        $lockfilePath = \sprintf('%s/composer.lock', u($projectPath)->trimEnd('/')->toString());
-
-        if (!$this->filesystem->exists($lockfilePath)) {
-            return null;
-        }
-
         try {
-            $contents = $this->filesystem->readFile($lockfilePath);
-        } catch (IOException $ioException) {
-            $this->logger->warning('composer.lock present but unreadable; skipping advisory cache', [
-                'path' => $lockfilePath,
-                'error' => $ioException->getMessage(),
-            ]);
-
-            return null;
+            AdvisoryPayload::fromJson($json);
+        } catch (MalformedAdvisoryPayloadException) {
+            return false;
         }
 
-        return hash('sha256', $contents);
+        return true;
     }
 
     private function pathForHash(string $hash): string

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Advisory;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -141,6 +142,39 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             );
 
         new ComposerAuditAdvisoryDatabase($this->stubRunner('42'), new AuditedProjectPathHolder('/proj'), $logger);
+    }
+
+    #[DataProvider('failingRunners')]
+    public function test_it_reports_a_load_that_failed(ComposerAuditRunnerInterface $composerAuditRunner): void
+    {
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertTrue($composerAuditAdvisoryDatabase->hasFailedToLoad());
+    }
+
+    /**
+     * @return iterable<string, array{ComposerAuditRunnerInterface}>
+     */
+    public static function failingRunners(): iterable
+    {
+        $unavailable = self::createStub(ComposerAuditRunnerInterface::class);
+        $unavailable->method('run')->willThrowException(AdvisorySourceUnavailableException::forBinaryNotFound());
+        yield 'source unavailable' => [$unavailable];
+
+        $malformed = self::createStub(ComposerAuditRunnerInterface::class);
+        $malformed->method('run')->willReturn('not json at all');
+        yield 'malformed payload' => [$malformed];
+
+        $unexpected = self::createStub(ComposerAuditRunnerInterface::class);
+        $unexpected->method('run')->willThrowException(new RuntimeException('network blew up'));
+        yield 'unexpected failure' => [$unexpected];
+    }
+
+    public function test_an_audit_without_any_advisory_is_not_a_failed_load(): void
+    {
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner('{"advisories": []}'), new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertFalse($composerAuditAdvisoryDatabase->hasFailedToLoad());
     }
 
     public function test_lookup_returns_empty_when_runner_throws_unexpected_exception(): void

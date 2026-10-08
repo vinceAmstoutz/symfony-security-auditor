@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -47,10 +47,7 @@ final readonly class IngestionStage implements StageInterface
             'path' => $auditContext->projectPath(),
         ]);
 
-        $scannedFiles = ScanPathFilter::apply(
-            $this->projectFileScanner->scan($auditContext->projectPath()),
-            $auditContext->scanPaths(),
-        );
+        $scannedFiles = ScopedScan::files($this->projectFileScanner, $auditContext->projectPath(), $auditContext->scanPaths());
 
         $files = $scannedFiles;
         $diffSinceRef = $auditContext->diffSinceRef();
