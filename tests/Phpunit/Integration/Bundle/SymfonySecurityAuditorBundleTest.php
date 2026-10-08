@@ -1403,6 +1403,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertNotSame($enabledKeySalt, $disabledKeySalt);
     }
 
+    public function test_bundle_cache_key_salt_carries_the_code_slicer_version_when_slicing_is_on(): void
+    {
+        $keySalt = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => true]]])
+            ->getParameter('symfony_security_auditor.cache.key_salt');
+
+        self::assertIsString($keySalt);
+        self::assertStringContainsString(\sprintf('|slice-v%d-on-80|', RegexCodeSlicer::CACHE_VERSION), $keySalt);
+    }
+
     public function test_bundle_cache_key_salt_changes_when_code_slicing_threshold_changes(): void
     {
         $narrowThresholdKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => true, 'min_lines_before_slicing' => 10]]])

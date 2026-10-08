@@ -625,6 +625,12 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'QueryBuilder where concat' => ['$qb->where(\'u.name = \'.$tainted);'];
         yield 'QueryBuilder andWhere concat' => ['$qb->andWhere(\'u.role = \'.$role);'];
         yield 'QueryBuilder having concat' => ['$qb->having(\'COUNT(x) > \'.$n);'];
+        yield 'PDO query' => ['$stmt = $this->pdo->query($sql);'];
+        yield 'PDO prepare' => ['$stmt = $this->pdo->prepare($sql);'];
+        yield 'DBAL fetchAllAssociative' => ['$rows = $this->connection->fetchAllAssociative($sql);'];
+        yield 'ORM createNativeQuery' => ['$query = $this->entityManager->createNativeQuery($sql, $mapping);'];
+        yield 'repository find by identifier' => ['$invoice = $this->invoices->find($id);'];
+        yield 'repository findOneBy criteria' => ['$invoice = $this->invoices->findOneBy([\'number\' => $number]);'];
     }
 
     /**

@@ -33,6 +33,8 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
 {
     public const int DEFAULT_MIN_LINES_BEFORE_SLICING = 80;
 
+    public const int CACHE_VERSION = 1;
+
     private const string ELIDED_PLACEHOLDER = '// elided';
 
     public function __construct(
