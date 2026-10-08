@@ -91,7 +91,11 @@ final readonly class SequentialToolLoop
                 return $this->textResponseAndLog($conversationState, $deferredResult, $platformResult, $iteration);
             }
 
-            $conversationState = $this->runToolCalls($conversationState, $toolCalls, $toolRegistry, $iteration);
+            $roundsLeft = $maxToolIterations - $iteration;
+            $conversationState = $this->runToolCalls($conversationState, $toolCalls, $toolRegistry, $iteration, $roundsLeft);
+            if (FinalRound::isConcludedBy($roundsLeft, $toolRegistry, ...$toolCalls)) {
+                return FinalRound::answer($this->model, $conversationState->tokenUsage());
+            }
         }
 
         return $this->iterationCapResponseAndLog($conversationState, $maxToolIterations);
@@ -194,14 +198,14 @@ final readonly class SequentialToolLoop
     /**
      * @param list<ToolCall> $toolCalls
      */
-    private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolRegistry $toolRegistry, int $iteration): ConversationState
+    private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolRegistry $toolRegistry, int $iteration, int $roundsLeft): ConversationState
     {
         $conversationState->bag->add(new AssistantMessage(...$toolCalls));
 
         $toolResults = [];
-        foreach ($toolCalls as $toolCall) {
+        foreach ($toolCalls as $position => $toolCall) {
             $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
-            $conversationState->bag->add(new ToolCallMessage($toolCall, new Text($result)));
+            $conversationState->bag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $roundsLeft, $position === array_key_last($toolCalls)))));
             $toolResults[] = $result;
             $this->logger->debug('Tool invoked', [
                 'tool' => $toolCall->getName(),
