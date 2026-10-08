@@ -14,10 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem;
 
 use Override;
+use PDO;
+use PhpParser\ParserFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 
@@ -312,6 +315,47 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'the access token handler of a firewall' => ['token_handler: App\\Security\\AccessTokenHandler'];
         yield 'a constant defined from the environment' => ["define('DB_PASSWORD', getenv('DB_PASSWORD'));"];
         yield 'an xml parameter read from the environment' => ['<parameter key="mailer_password">%env(MAILER_PASSWORD)%</parameter>'];
+        yield 'a password property reset to null' => ['$this->plainPassword = null;'];
+        yield 'a secret entry set to null' => ["'secret' => null,"];
+        yield 'a password variable set to false' => ['$password = false;'];
+        yield 'a password property set to true' => ['$this->password = true;'];
+        yield 'a token variable set to an upper-case NULL' => ['$token = NULL;'];
+        yield 'a null default of a parameter closing the signature' => ['public function __construct(?string $password = null)'];
+        yield 'a null default of a parameter followed by another' => ['public function connect(?string $password = null, ?array $options = null): self'];
+        yield 'a null default of a final parameter followed by a return type' => ['public function migrate(#[\\SensitiveParameter] $credentials = null): bool'];
+        yield 'a yaml secret set to null' => ['secret: null'];
+        yield 'a yaml token set to true' => ['token: true'];
+        yield 'a yaml credentials flag set to false' => ['persist-credentials: false'];
+        yield 'a yaml flag set to an upper-case True' => ['require_ci_to_pass: True'];
+        yield 'a key size set to a number' => ["'private_key_bits' => 1024,"];
+        yield 'a password variable set to a number' => ['$password = 123456;'];
+        yield 'a number closing an argument list' => ['new Pbkdf2(password: 100000)'];
+        yield 'a signed number' => ['$password = -1000;'];
+        yield 'a positive number' => ['$password = +1000,'];
+        yield 'a decimal number' => ['$password = 12.50;'];
+        yield 'a lower-case false in yaml' => ['secret: false'];
+        yield 'an upper-case FALSE' => ['$secret = FALSE;'];
+        yield 'an upper-case TRUE' => ['$secret = TRUE;'];
+        yield 'a password cast to a string from a variable' => ['$password = (string) $request->get(\'password\');'];
+        yield 'a password cast to a string from a short variable' => ['$password = (string) $x;'];
+        yield 'a negated password variable' => ['$password = !$input;'];
+        yield 'a negated password call' => ['$password = !empty($input);'];
+        yield 'a password array built from variables' => ['$password = [$first, $second];'];
+        yield 'a password array of form options' => ["'password' => ['label' => 'Password'],"];
+        yield 'a private key type read from a global constant' => ["'private_key_type' => \\OPENSSL_KEYTYPE_RSA,"];
+        yield 'a token read from a qualified class constant' => ['$token = \\App\\Security\\Token::DEFAULT;'];
+        yield 'a password variable closing an argument list' => ['new User(password: $plain)'];
+        yield 'a password variable closing an array' => ["foreach (['username' => \$user, 'password' => \$expectedPassword] as \$value) {"];
+        yield 'a password read from the environment closing an array' => ["['username' => getenv('COUCHBASE_USER'), 'password' => getenv('COUCHBASE_PASS')]"];
+        yield 'a secret read from a constant closing an argument list' => ['hash_hmac(\'sha256\', $data, secret: self::SECRET)'];
+        yield 'a secret read from a class constant closing an array' => ["['secret' => Foo::SECRET]"];
+        yield 'an app secret variable closing an argument list' => ['configure(app_secret: $Secr3t)'];
+        yield 'a static access on a pass variable' => ['$message = str_replace("\\n", "\\n".$pass::class.\': \', trim($message));'];
+        yield 'a class constant of a password constraint' => ['->setCode(NotCompromisedPassword::COMPROMISED_PASSWORD_ERROR)'];
+        yield 'a class name of a credentials provider' => ['if (!class_exists(ApplicationDefaultCredentials::class)) {'];
+        yield 'a parenthesised condition on a pass variable' => ['$pass = ($user || $pass) ? "$pass@" : \'\';'];
+        yield 'an instance built in parentheses' => ['$credentials = (new Definition(FetchAuthTokenInterface::class))'];
+        yield 'a token built by nested calls' => ['$token = unserialize(serialize(new TestBrowserToken()));'];
     }
 
     #[DataProvider('credentialWrittenTheSymfonyOrPhpWayCases')]
@@ -359,7 +403,139 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a literal shaped like a constant without a terminator' => ['password: P4ss::WORD_1', 'P4ss::WORD_1'];
         yield 'a literal shaped like a static call with a number' => ['secret: Foo::bar(1)', 'Foo::bar(1)'];
         yield 'a literal carrying on after what looks like a statement end' => ['password: $Abc;def123', 'Abc;def123'];
-        yield 'a literal ending in a parenthesis after a dollar sign' => ['app_secret: $Secr3t)', 'Secr3t'];
+        yield 'a literal ending in a parenthesis after a dollar sign' => ['app_secret: $Secr3t!)', 'Secr3t'];
+        yield 'a literal shaped like a variable followed by more text' => ['api_key: $Abc)def123', 'def123'];
+        yield 'a literal shaped like a qualified name followed by more text' => ['api_key: \\Abc-def123,', 'def123'];
+        yield 'a literal shaped like an array opening on a word' => ['password: [hunter2xyz', 'hunter2xyz'];
+        yield 'a literal shaped like a negated word' => ['password: !Hunter2xyz', 'Hunter2xyz'];
+        yield 'a literal cast to a string' => ["password: (string) 'hunter2hunter2'", 'hunter2hunter2'];
+    }
+
+    #[DataProvider('phpConstantsNamedLikeCredentialsCases')]
+    public function test_a_php_constant_named_like_a_credential_keeps_its_declaration_syntax(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        $this->assertParsesAsPhp($output);
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function phpConstantsNamedLikeCredentialsCases(): iterable
+    {
+        yield 'a string constant that is only named like a token' => ["<?php class A { private const CSRF_TOKEN_ID = 'delete_item'; }", "<?php class A { private const CSRF_TOKEN_ID = '***REDACTED:env_assignment***'; }"];
+        yield 'an integer constant' => ['<?php class A { private const MAX_KEY_LENGTH = 250; }', '<?php class A { private const MAX_KEY_LENGTH = 250; }'];
+        yield 'a constant read from a class constant' => ['<?php class A { public const ATTR_SSL_KEY = '.PDO::class.'::MYSQL_ATTR_SSL_KEY; }', '<?php class A { public const ATTR_SSL_KEY = '.PDO::class.'::MYSQL_ATTR_SSL_KEY; }'];
+        yield 'an array constant' => ["<?php class A {\n    private const VALID_DSN_OPTIONS = [\n        'a',\n    ];\n}", "<?php class A {\n    private const VALID_DSN_OPTIONS = [\n        'a',\n    ];\n}"];
+        yield 'a constant holding a literal credential' => ["<?php class A { private const DEFAULT_PASSWORD = 'hunter2supersecure'; }", "<?php class A { private const DEFAULT_PASSWORD = '***REDACTED:env_assignment***'; }"];
+        yield 'a typed constant holding a literal credential' => ['<?php class A { private const string HMAC_KEY = "zzz999aaa111"; }', '<?php class A { private const string HMAC_KEY = "***REDACTED:env_assignment***"; }'];
+        yield 'a nullable typed constant' => ["<?php class A { private const ?string API_KEY = 'zzz999aaa111'; }", "<?php class A { private const ?string API_KEY = '***REDACTED:env_assignment***'; }"];
+        yield 'a union typed constant' => ["<?php class A { private const int|string API_KEY = 'zzz999aaa111'; }", "<?php class A { private const int|string API_KEY = '***REDACTED:env_assignment***'; }"];
+        yield 'a constant at the top of a namespace' => ["<?php\nconst DB_PW = 'hunter2supersecure';\n", "<?php\nconst DB_PW = '***REDACTED:env_assignment***';\n"];
+    }
+
+    #[DataProvider('unquotedCredentialsFollowedByCodeCases')]
+    public function test_an_unquoted_credential_is_redacted_without_the_closing_syntax_that_follows_it(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function unquotedCredentialsFollowedByCodeCases(): iterable
+    {
+        yield 'a statement terminator' => ['$password = hunter2xx;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'an argument separator' => ['connect(password: hunter2xx, port: 5432)', 'connect(password: "***REDACTED:inline_assignment***", port: 5432)'];
+        yield 'a closing parenthesis' => ['connect(password: hunter2xx);', 'connect(password: "***REDACTED:inline_assignment***");'];
+        yield 'a closing bracket' => ["[user: 'a', password: hunter2xx]", "[user: 'a', password: \"***REDACTED:inline_assignment***\"]"];
+        yield 'a closing quote and a separator' => ["'x-api-key: hunter2xx', 'Accept: json'", "'x-api-key: ***REDACTED:inline_assignment***', 'Accept: json'"];
+        yield 'a return type colon' => ['fn(string $password = hunter2xx): bool', 'fn(string $password = ***REDACTED:inline_assignment***): bool'];
+        yield 'a flow mapping entry followed by a key' => ['{ password: hunter2xx, roles: [ROLE_USER] }', '{ password: "***REDACTED:inline_assignment***", roles: [ROLE_USER] }'];
+        yield 'a passphrase with a comma after its first word' => ['password: correct, horse battery staple', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a run of closers' => ['password = hunter2xx;;;;;;;;;;', 'password = ***REDACTED:inline_assignment***;;;;;;;;;;'];
+        yield 'a double quote and a separator' => ['"x-api-key: hunter2xx", "Accept: json"', '"x-api-key: ***REDACTED:inline_assignment***", "Accept: json"'];
+        yield 'a closing parenthesis before more words' => ['connect(password: hunter2xx) and more', 'connect(password: "***REDACTED:inline_assignment***") and more'];
+        yield 'a closing bracket before more words' => ['[password: hunter2xx] and more', '[password: "***REDACTED:inline_assignment***"] and more'];
+        yield 'a terminator before more words' => ['$password = hunter2xx; $next = 1', '$password = ***REDACTED:inline_assignment***; $next = 1'];
+        yield 'a return type colon before more words' => ['fn($password = hunter2xx): bool', 'fn($password = ***REDACTED:inline_assignment***): bool'];
+        yield 'a single quote before more words' => ["'x-api-key: hunter2xx' and more", "'x-api-key: ***REDACTED:inline_assignment***' and more"];
+        yield 'a double quote before more words' => ['"x-api-key: hunter2xx" and more', '"x-api-key: ***REDACTED:inline_assignment***" and more'];
+        yield 'a comma before a hyphenated key' => ['{ password: hunter2xx, role-name: admin }', '{ password: "***REDACTED:inline_assignment***", role-name: admin }'];
+        yield 'a comma before more words' => ['password: hunter2xx, and more words', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a core of exactly four characters' => ['$password = abcd;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'a bare number in yaml' => ['password: 12345678', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a word starting like null' => ['password: nullable1234;', 'password: ***REDACTED:inline_assignment***;'];
+        yield 'a word starting like true' => ['password: true1234;', 'password: ***REDACTED:inline_assignment***;'];
+        yield 'a word ending like false' => ['password: notfalse;', 'password: ***REDACTED:inline_assignment***;'];
+        yield 'a number followed by letters' => ['password: 1234abcd;', 'password: ***REDACTED:inline_assignment***;'];
+        yield 'letters followed by a number' => ['password: abcd1234;', 'password: ***REDACTED:inline_assignment***;'];
+        yield 'a cast before a quoted literal' => ["\$password = (string) 'hunter2hunter2';", "\$password = (string) '***REDACTED:inline_assignment***';"];
+        yield 'a cast before an unquoted literal' => ['$password = (int) hunter2xx;', '$password = (int) ***REDACTED:inline_assignment***;'];
+    }
+
+    #[DataProvider('valuesTooShortOnceTheirClosersAreSetAsideCases')]
+    public function test_a_value_of_fewer_than_four_characters_once_its_closers_are_set_aside_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function valuesTooShortOnceTheirClosersAreSetAsideCases(): iterable
+    {
+        yield 'three characters and a terminator' => ['$password = abc;'];
+        yield 'three characters and a closing bracket' => ["['password' => abc]"];
+        yield 'only closers' => ['password: ;;;;'];
+    }
+
+    #[DataProvider('redactedYamlScalarCases')]
+    public function test_a_redacted_yaml_scalar_is_quoted_so_the_document_still_parses(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertNotNull(Yaml::parse($output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function redactedYamlScalarCases(): iterable
+    {
+        yield 'an unquoted password' => ['search_password: s3cretValue99', 'search_password: "***REDACTED:inline_assignment***"'];
+        yield 'an unquoted password under a section' => ["ldap:\n    search_password: s3cretValue99\n    host: ldap.example.com\n", "ldap:\n    search_password: \"***REDACTED:inline_assignment***\"\n    host: ldap.example.com\n"];
+        yield 'a password aligned with several spaces' => ['secret:        s3cretValue99', 'secret:        "***REDACTED:inline_assignment***"'];
+        yield 'a password with a windows line ending' => ["password: s3cretValue99\r\nhost: a\r\n", "password: \"***REDACTED:inline_assignment***\"\r\nhost: a\r\n"];
+        yield 'a password followed by a comment' => ['password: s3cretValue99 # the database', 'password: "***REDACTED:inline_assignment***" # the database'];
+        yield 'a password in a flow mapping' => ['users: { admin: { password: s3cretValue99, roles: [ROLE_ADMIN] } }', 'users: { admin: { password: "***REDACTED:inline_assignment***", roles: [ROLE_ADMIN] } }'];
+        yield 'a password last in a flow mapping' => ['user: { roles: [ROLE_USER], password: s3cretValue99 }', 'user: { roles: [ROLE_USER], password: "***REDACTED:inline_assignment***" }'];
+        yield 'an aws key' => ['aws_key: '.self::AWS.'IOSFODNN7EXAMPLE', 'aws_key: "***REDACTED:aws_access_key***"'];
+        yield 'a list of tokens' => ["tokens:\n    - ".self::GHP.'_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij', "tokens:\n    - \"***REDACTED:github_token***\""];
+        yield 'a bearer header' => ['Authorization: Bearer '.str_repeat('a1B2', 8), 'Authorization: "***REDACTED:bearer_token***"'];
+        yield 'a jwt' => ['jwt: '.self::JWT.'hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c', 'jwt: "***REDACTED:jwt***"'];
+    }
+
+    #[DataProvider('redactedValuesThatAreNoYamlScalarCases')]
+    public function test_a_redacted_value_that_does_not_start_a_yaml_scalar_is_left_unquoted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function redactedValuesThatAreNoYamlScalarCases(): iterable
+    {
+        yield 'a dotenv assignment' => ['API_TOKEN=should_be_redacted_too', 'API_TOKEN=***REDACTED:env_assignment***'];
+        yield 'an ini assignment' => ['password = s3cretValue99', 'password = ***REDACTED:inline_assignment***'];
+        yield 'a php array entry' => ["'password' => hunter2xx,", "'password' => ***REDACTED:inline_assignment***,"];
+        yield 'a header inside a php string' => ["'x-api-key: hunter2xx', 'Accept: json'", "'x-api-key: ***REDACTED:inline_assignment***', 'Accept: json'"];
+        yield 'a header inside a php string followed by text' => ['"x-api-key: hunter2xx and more"', '"x-api-key: ***REDACTED:inline_assignment***"'];
+        yield 'a scalar already quoted' => ["password: 'hunter2hunter2'", "password: '***REDACTED:inline_assignment***'"];
+        yield 'a scalar that goes on after the placeholder' => ['note: '.self::AWS.'IOSFODNN7EXAMPLE is leaked', 'note: ***REDACTED:aws_access_key*** is leaked'];
+        yield 'a bearer token inside a php string' => ["'Authorization: Bearer ".str_repeat('a1B2', 8)."'", "'Authorization: ***REDACTED:bearer_token***'"];
+    }
+
+    public function test_scrubbing_an_already_scrubbed_yaml_document_changes_nothing(): void
+    {
+        $once = $this->regexSecretScrubber->scrub('api_key: '.self::AWS."IOSFODNN7EXAMPLE\npassword: s3cretValue99\n");
+
+        self::assertSame("api_key: \"***REDACTED:aws_access_key***\"\npassword: \"***REDACTED:inline_assignment***\"\n", $once);
+        self::assertSame($once, $this->regexSecretScrubber->scrub($once));
     }
 
     #[DataProvider('bearerTokenLayoutCases')]
@@ -376,7 +552,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $token = str_repeat('a1B2', 8);
 
-        yield 'the token on the next line' => ["Authorization: Bearer\n{$token}\nnext", "Authorization: ***REDACTED:bearer_token***\n\nnext"];
+        yield 'the token on the next line' => ["Authorization: Bearer\n{$token}\nnext", "Authorization: \"***REDACTED:bearer_token***\"\n\nnext"];
         yield 'spaces then a break then the token' => ["Bearer  \n  {$token}", "***REDACTED:bearer_token***\n"];
         yield 'two breaks before the token' => ["Bearer\n\n{$token}!", "***REDACTED:bearer_token***\n\n!"];
         yield 'the token on the same line' => ["Bearer {$token}\nnext", "***REDACTED:bearer_token***\nnext"];
@@ -494,7 +670,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub('password: supersecretvalue');
 
-        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+        self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
     }
 
     #[DataProvider('additionalInlineCredentialKeyCases')]
@@ -539,7 +715,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub("password:\nsecret: hunter2ProdPassword");
 
-        self::assertSame("password:\nsecret: ***REDACTED:inline_assignment***", $output);
+        self::assertSame("password:\nsecret: \"***REDACTED:inline_assignment***\"", $output);
     }
 
     public function test_unquoted_all_caps_key_value_is_only_redacted_once_by_env_assignment(): void
@@ -609,7 +785,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub('password: hunter2 secret pass phrase');
 
-        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+        self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
     }
 
     public function test_a_value_wrapped_to_the_next_line_is_still_redacted(): void
@@ -708,7 +884,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub('password: correcthorse#batterystaple');
 
-        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+        self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
     }
 
     #[DataProvider('midWordCredentialKeyCases')]
@@ -891,7 +1067,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub(\sprintf("%s\npassword: hunter2hunter2", $craftedLine));
 
-        self::assertSame(\sprintf("%s\npassword: ***REDACTED:inline_assignment***", $craftedLine), $output);
+        self::assertSame(\sprintf("%s\npassword: \"***REDACTED:inline_assignment***\"", $craftedLine), $output);
     }
 
     /** @return iterable<string, array{0: string}> */
@@ -907,7 +1083,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub('password: abcd'.str_repeat(' a', 8188));
 
-        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+        self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
     }
 
     #[DataProvider('repetitionsPastThePcreRecursionLimitCases')]
@@ -928,10 +1104,10 @@ final class RegexSecretScrubberTest extends TestCase
             'a segment before an environment credential word' => ' '.str_repeat('A_', 24998).'=',
             'a segment after an environment credential word' => ' SECRET'.str_repeat('_A', 23807).'=',
         ] as $name => $craftedLine) {
-            yield $name => [\sprintf("%s\npassword: hunter2hunter2", $craftedLine), \sprintf("%s\npassword: ***REDACTED:inline_assignment***", $craftedLine)];
+            yield $name => [\sprintf("%s\npassword: hunter2hunter2", $craftedLine), \sprintf("%s\npassword: \"***REDACTED:inline_assignment***\"", $craftedLine)];
         }
 
-        yield 'a word of an unquoted value' => ['password: abcd'.str_repeat(' a', 49997), 'password: ***REDACTED:inline_assignment***'];
+        yield 'a word of an unquoted value' => ['password: abcd'.str_repeat(' a', 49997), 'password: "***REDACTED:inline_assignment***"'];
     }
 
     public function test_half_a_megabyte_of_private_key_headers_is_scrubbed_in_linear_time(): void
@@ -955,6 +1131,10 @@ final class RegexSecretScrubberTest extends TestCase
     {
         yield 'private key headers without an end marker' => [str_repeat('-----BEGIN PRIVATE KEY-----', 4855)];
         yield 'scheme characters with no scheme separator' => [str_repeat('a-', 65536).'@'];
+        yield 'constant keywords with no name' => [str_repeat('const ', 87381)];
+        yield 'constants named like credentials with no value' => [str_repeat('const SECRET_KEY ', 30840)];
+        yield 'closers after a credential key' => ['password: '.str_repeat(')', 524288)];
+        yield 'placeholder openings after colons' => [str_repeat(': ***REDACTED:x', 34952)];
         yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
         yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
     }
@@ -1040,6 +1220,13 @@ final class RegexSecretScrubberTest extends TestCase
     protected function setUp(): void
     {
         $this->regexSecretScrubber = new RegexSecretScrubber();
+    }
+
+    private function assertParsesAsPhp(string $code): void
+    {
+        $nodes = (new ParserFactory())->createForNewestSupportedVersion()->parse($code);
+
+        self::assertNotNull($nodes);
     }
 
     private function secretFragmentOf(string $input): string
