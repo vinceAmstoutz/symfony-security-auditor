@@ -25,6 +25,8 @@ final readonly class LLMAnswerJsonDecoder
 {
     private const int JSON_MAX_DEPTH = 512;
 
+    private const int MAX_RECOVERY_CANDIDATES = 64;
+
     /**
      * Returns the decoded value as `mixed` so the not-array guard in
      * `LLMResponse::parseJson` remains the single place that enforces the
@@ -61,7 +63,8 @@ final readonly class LLMAnswerJsonDecoder
      * prose after its answer must not either. When no top-level block
      * qualifies, as when the output limit cut an array off before its closing
      * bracket, the first balanced block anywhere that decodes is taken (the
-     * first complete object of that array), or `null` when none do. A JSON
+     * first complete object of that array), or `null` when none do, among the
+     * first {@see self::MAX_RECOVERY_CANDIDATES} openers only. A JSON
      * object written after the answer still stands for it: nothing here knows
      * the shape the caller expects.
      *
@@ -159,7 +162,7 @@ final readonly class LLMAnswerJsonDecoder
      */
     private static function firstDecodedBlock(string $content, array $openerPositions): mixed
     {
-        foreach ($openerPositions as $openerPosition) {
+        foreach (\array_slice($openerPositions, 0, self::MAX_RECOVERY_CANDIDATES) as $openerPosition) {
             $block = BalancedBlockScanner::balancedBlockOpenedAt($content, $openerPosition);
             $decoded = null === $block ? null : self::decodeBlock($block);
             if (null !== $decoded) {
