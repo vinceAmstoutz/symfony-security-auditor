@@ -53,6 +53,11 @@ final readonly class RecordReviewTool implements RecordingToolInterface
     #[Override]
     public function execute(array $arguments): string
     {
+        $violation = RequiredArguments::violation($this->buildSchema(), $arguments);
+        if (null !== $violation) {
+            return $violation;
+        }
+
         $this->reviewCollector->add($arguments);
 
         return 'recorded';
