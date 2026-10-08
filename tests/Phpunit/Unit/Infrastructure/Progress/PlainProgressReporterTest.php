@@ -77,6 +77,27 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  ✗ chunk 2/3 failed (12s)\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_it_names_why_a_chunk_failed(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored', 'reason' => 'tool-call limit reached (audit.max_tool_iterations)']);
+
+        self::assertSame("  ✗ chunk 2/3 failed (12s) — tool-call limit reached (audit.max_tool_iterations)\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_a_failure_reason_spanning_lines_is_printed_on_one_line(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored', 'reason' => "first line\nsecond line"]);
+
+        self::assertSame("  ✗ chunk 2/3 failed (12s) — first line second line\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_a_blank_failure_reason_prints_no_suffix(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored', 'reason' => "  \n "]);
+
+        self::assertSame("  ✗ chunk 2/3 failed (12s)\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_marks_an_analyzed_chunk_as_done(): void
     {
         $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 0.0, 'status' => 'analyzed']);

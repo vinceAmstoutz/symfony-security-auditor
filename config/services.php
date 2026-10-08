@@ -167,6 +167,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewT
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandDefaults;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
@@ -191,6 +192,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\StdioMcpTransportFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDifferInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
@@ -736,6 +738,14 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 ->args([param('symfony_security_auditor.audit.fail_on')]),
             param('symfony_security_auditor.audit.poc_synthesis.enabled'),
             param('symfony_security_auditor.audit.fix_synthesis.enabled'),
+            inline_service(AuditCommandDefaults::class)->args([
+                param('symfony_security_auditor.audit.min_score'),
+                param('symfony_security_auditor.audit.fail_on_incomplete'),
+                inline_service(OutputFormat::class)
+                    ->factory([OutputFormat::class, 'from'])
+                    ->args([param('symfony_security_auditor.audit.format')]),
+                param('symfony_security_auditor.audit.output'),
+            ]),
         ])
         ->tag('console.command');
 

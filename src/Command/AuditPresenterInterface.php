@@ -45,6 +45,14 @@ interface AuditPresenterInterface
      */
     public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void;
 
+    /**
+     * Says that a scan listed no file, and under which project and `--path`
+     * values it looked, so a wrong folder or path shows at a glance.
+     *
+     * @param list<string> $scanPaths
+     */
+    public function noFilesMatched(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths): void;
+
     public function scannedFilesHint(SymfonyStyle $symfonyStyle, int $fileCount): void;
 
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void;

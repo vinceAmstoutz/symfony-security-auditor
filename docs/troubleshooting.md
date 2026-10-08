@@ -88,7 +88,7 @@ Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.
 
 - Declaring `scan.import_sarif` aborts with `ProjectConfigScanOverrideException` carrying the equivalent message for that key.
 
-`doctor` reports the same message under a failed `Configuration` check. Per-project overrides of audit settings (chunking strategy, `fail_on`, excluded paths, …) are unaffected — move only `platform`/`provider`/`scan.import_sarif` to your user `config.yaml`.
+`doctor` reports the same message under a failed `Configuration` check. Per-project overrides of audit settings (chunking strategy, `fail_on`, scan scope, …) are unaffected — move only `platform`/`provider`/`scan.import_sarif` to your user `config.yaml`.
 
 ### `self-update` fails
 
@@ -196,7 +196,15 @@ VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['al
 
 ### `[ERROR] Project path "/x" is not a valid directory`
 
-The `project-path` argument must point to a directory that exists. Use an absolute path, or omit the argument to default to the current working directory.
+The `project-path` argument must point to a directory that exists. Use an absolute path, or omit the argument to default to the current working directory. A relative one is resolved against the folder you run the command from, so `audit src/Command` run from your home folder looks for `~/src/Command`. _Since 1.22_ the check runs right after the header, before anything is scanned, and fails with exit code `1`.
+
+To audit part of a project, name the project and give the part with `--path`, relative to the project:
+
+```bash
+symfony-security-auditor audit /path/to/project --path src/Command
+```
+
+An absolute `--path` inside the project is accepted, and one outside it is refused. _Since 1.22_ `--path` replaces `scan.included_paths` for the run, so it reaches a folder the configured scope does not (`--path apps/api` on a monorepo); it still has to exist in the project and hold PHP, Twig, YAML or XML files. If a scan still lists nothing, the warning names the project and the `--path` values it applied: `No files matched under "/home/me" for --path src/Command.`
 
 ### `[ERROR] Project does not look like a Symfony app`
 
@@ -213,7 +221,7 @@ Exit code `1` is also used for:
 - Unhandled exception during pipeline execution (check stderr).
 - Validator errors on the input (e.g. `--format` set to a value it does not support — see [Configuration → Options](configuration.md#options)).
 
-Re-run with `-v` or `-vv` to see the underlying error.
+In a Symfony application, re-run with `-v` or `-vv` to see more of the application log (`warning` entries and above show by default). The standalone binary writes no log, so `-v` adds nothing there: it names why a chunk failed on its `✗ chunk N/M failed` progress line (see [`✗ chunk N/M failed`](#-chunk-nm-failed-on-the-progress-line)) and prints the error that stopped a run.
 
 ## LLM & Provider Errors
 
@@ -386,6 +394,22 @@ Then verify with `ollama list`. The model name in `symfony_security_auditor.yaml
 
 ## Empty / Surprising Reports
 
+### `✗ chunk N/M failed` on the progress line
+
+The attacker's answer for that chunk could not be used, so its files are recorded as errored, left out of the cache and counted in `Audit incomplete: N file(s) could not be fully analyzed`. _Since 1.22_ the line names why; before, it only said `failed`, and the standalone binary — which writes no log — gave no other hint.
+
+| Reason on the line | What happened | What to do |
+| --- | --- | --- |
+| `tool-call limit reached (audit.max_tool_iterations)` | The model kept calling `read_file`, `grep` or `list_files` and never ended its turn within `audit.max_tool_iterations` rounds. | Raise `audit.max_tool_iterations` (try `16`), or set `audit.tools_enabled: false` to scan each chunk in a single call. See the cost note below. |
+| `output token limit reached (max_output_tokens)` | The answer, or a tool call inside it, was cut off by the output limit. | Raise `max_output_tokens` or `attacker_max_output_tokens` (Claude models only). |
+| `answer withheld by the provider content filter` | The provider's filter blocked the answer. | Try another model or deployment; see [`Tool-using loop ended with empty content response`](#tool-using-loop-ended-with-empty-content-response-warnings). |
+| `the model returned no content` | The call ended with nothing usable. | Retry; if it repeats for every chunk, switch model. |
+| `the answer was not valid JSON` | Only with `audit.structured_collection: false`. | See [`LLM response was empty`](#llm-response-was-empty--failed-to-parse--json-response). |
+| `the file is too large for the model input limit` | A single file does not fit the model's input window. | See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
+| an error message | An unexpected failure on that chunk's call; the run went on with the next one. | Read it; in a Symfony application the same text is in the log. |
+
+**Raising `audit.max_tool_iterations` costs more.** A chunk that explores until the cap uses up to twice the rounds at `16`, and each round re-reads the prompt, so call time and cost grow with it; a chunk the model never stops exploring can still hit the new cap. The value is also part of the attacker cache key, so changing it re-analyzes every chunk once: a run after the change bills the whole project again, not only the chunks that failed.
+
 ### `Audit incomplete: N file(s) could not be fully analyzed`
 
 Some file was never fully analyzed: its LLM call failed even after the retries in `audit.retry.*`, an abort (a provider error, a budget cap) stopped the run before reaching it, or secret scrubbing could not scan it and withheld its content (`secret_scrubbing` in the `coverage` array). Every report format says so instead of printing "No validated vulnerabilities found", because a file nobody analyzed can still hold a vulnerability. The JSON report sets `complete: false`, SARIF sets `invocations[0].executionSuccessful: false`, and the `coverage` array in the JSON report lists each file with its `errored` or `aborted` status.
@@ -402,7 +426,7 @@ Diagnostic order:
 2. **Inspect attacker output before review** — temporarily decorate `ReviewerAgent` to log all incoming candidates, including non-validated ones.
 3. **Raise `audit.max_iterations`** to `5` — the loop stops early when no new findings emerge; a stronger pass can surface more.
 4. **Switch to a stronger model** — Claude Opus and GPT-5.6 consistently outperform small models.
-5. **Check the file actually got scanned** — run with `-vv` to see ingested file counts and chunk counts.
+5. **Check the file actually got scanned** — run with `--show-scanned` to list the files in scope (the progress line `Auditing N file(s)` gives the count, and `chunk i/M` the chunks); in a Symfony application, `-vv` also logs the ingested file and chunk counts.
 6. **`scan.respect_gitignore: true`** silently skips files in `.gitignore`. Set to `false` to include them.
 7. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files.
 
@@ -563,7 +587,7 @@ Some models do not support tool/function calling — verify your provider's docs
 
 ### Attacker loops indefinitely on tool calls
 
-Lower `audit.max_tool_iterations` from the default `8`. Once the cap is hit, the Attacker is forced to commit to a final JSON answer.
+Lower `audit.max_tool_iterations` from the default `8` to bound the spend. The last round is announced to the model, which is told to record what it holds and stop (_since 1.22_), and a chunk whose last round does is analyzed and cached like any other. A model that asks to read one more file instead ends the conversation: the findings the Attacker already recorded are kept, but the chunk is recorded as errored and not cached, so the run reports `Audit incomplete` and the next run pays for it again. Raise the cap when chunks keep failing that way: it gives the model more rounds to read, at the price of more rounds (each re-reads the prompt) and of a one-time re-analysis, since the value is part of the attacker cache key.
 
 ### `lookup_advisory` always returns `[]`
 

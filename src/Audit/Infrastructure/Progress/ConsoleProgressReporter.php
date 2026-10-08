@@ -187,11 +187,14 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             return;
         }
 
+        $failed = 'errored' === ProgressContext::string($context, 'status');
+
         $this->writeAboveBar(\sprintf(
-            'errored' === ProgressContext::string($context, 'status') ? '<fg=red>  ✗ chunk %d/%d failed%s</>' : '<fg=green>  ✓ chunk %d/%d analyzed%s</>',
+            $failed ? '<fg=red>  ✗ chunk %d/%d failed%s%s</>' : '<fg=green>  ✓ chunk %d/%d analyzed%s</>',
             $chunk,
             $totalChunks,
             ProgressContext::durationSuffix($context, 'elapsed_seconds'),
+            $failed ? OutputFormatter::escape(ProgressContext::failureReasonSuffix($context)) : '',
         ));
     }
 
