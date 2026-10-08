@@ -80,6 +80,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Inv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
@@ -1020,7 +1021,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
      */
-    public function test_it_filters_non_array_entries_out_of_cached_payload_as_a_list(): void
+    public function test_it_keeps_the_findings_of_a_payload_with_a_non_array_entry_but_records_the_chunk_errored_and_leaves_it_out_of_the_cache(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
 
@@ -1041,22 +1042,22 @@ final class AttackerAgentTest extends TestCase
         $secondFinding = ['type' => 'sql_injection'] + $firstFinding;
         $secondFinding['title'] = 'Second';
 
-        $mixedPayload = [$firstFinding, 'stray prose entry', $secondFinding];
-
         $cache = $this->createMock(AttackerCacheInterface::class);
         $cache->method('get')->willReturn(null);
-        $cache->expects(self::once())
-            ->method('store')
-            ->with(self::isArray(), [$firstFinding, $secondFinding]);
+        $cache->expects(self::never())->method('store');
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::of((string) json_encode($mixedPayload), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+            ->willReturn(LLMResponse::of((string) json_encode([$firstFinding, 'stray prose entry', $secondFinding]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $recordingCoverageRecorder);
+
+        self::assertSame(['First', 'Second'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/Controller/UserController.php', 'status' => 'errored']], $recordingCoverageRecorder->coverage);
     }
 
     /**

@@ -18,6 +18,11 @@ use InvalidArgumentException;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final class ConflictingCommandOptionsException extends InvalidArgumentException
 {
+    public static function forOutputWithNoOutput(): self
+    {
+        return new self('--output and --no-output cannot be combined: one writes the report to a file, the other prints it.');
+    }
+
     public static function forGenerateBaselineWithPreviewFlag(string $previewFlag): self
     {
         return new self(\sprintf(

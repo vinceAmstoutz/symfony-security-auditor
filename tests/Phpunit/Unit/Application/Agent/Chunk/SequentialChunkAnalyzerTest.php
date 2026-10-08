@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chun
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\AttackerChunkCache;
@@ -42,12 +43,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\ChunkAnalysisInputs;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\SequentialChunkAnalyzerHarness;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class SequentialChunkAnalyzerTest extends TestCase
 {
@@ -92,6 +95,87 @@ final class SequentialChunkAnalyzerTest extends TestCase
                 $recordingCoverageRecorder->coverage,
             );
         }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_chunk_stopped_at_the_tool_cap_reports_the_cap_as_the_reason_it_failed(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('', 'm', 'max_tool_iterations', TokenUsageSnapshot::of(1, 1)));
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFile('src/A.php')]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
+
+        $completed = $recordingProgressReporter->eventsNamed('attacker.chunk.completed');
+        self::assertCount(1, $completed);
+        self::assertSame('errored', $completed[0]['status']);
+        self::assertSame('tool-call limit reached (audit.max_tool_iterations)', $completed[0]['reason']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_chunk_whose_call_failed_reports_the_error_as_the_reason_it_failed(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willThrowException(new RuntimeException('connection hiccup'));
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFile('src/A.php')]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
+
+        self::assertSame('connection hiccup', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_chunk_answered_with_something_other_than_json_reports_that_as_the_reason_it_failed(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('I could not find anything to report.', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFile('src/A.php')]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
+
+        self::assertSame('the answer was not valid JSON', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_single_file_the_model_cannot_fit_reports_that_as_the_reason_its_chunk_failed(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willThrowException(new LLMRequestTooLargeException('prompt is too long'));
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFileOfSize('src/A.php', 16384)]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
+
+        self::assertSame('the file is too large for the model input limit', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
     }
 
     private function vulnerabilityFactory(): VulnerabilityFactory
@@ -211,9 +295,9 @@ final class SequentialChunkAnalyzerTest extends TestCase
         self::assertSame([['stage' => 'attacker', 'filePath' => 'src/A.php', 'status' => 'analyzed']], $recordingCoverageRecorder->coverage);
     }
 
-    private function analyzer(LLMClientInterface $llmClient, AttackerCacheInterface $attackerCache, bool $structured, ?LoggerInterface $logger = null): SequentialChunkAnalyzer
+    private function analyzer(LLMClientInterface $llmClient, AttackerCacheInterface $attackerCache, bool $structured, ?LoggerInterface $logger = null, ?ProgressReporterInterface $progressReporter = null): SequentialChunkAnalyzer
     {
-        return SequentialChunkAnalyzerHarness::analyzer($llmClient, $attackerCache, $structured, $logger);
+        return SequentialChunkAnalyzerHarness::analyzer($llmClient, $attackerCache, $structured, $logger, $progressReporter);
     }
 
     private function request(): AttackerAnalysisRequest

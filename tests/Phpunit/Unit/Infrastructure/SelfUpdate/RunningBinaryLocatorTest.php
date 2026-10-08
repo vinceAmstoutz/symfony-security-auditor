@@ -173,6 +173,55 @@ final class RunningBinaryLocatorTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
+    public function test_it_never_resolves_a_bare_invoked_name_against_the_working_directory(): void
+    {
+        $decoy = $this->workingDirectory.'/symfony-security-auditor';
+        $this->createExecutableBinary($decoy);
+        $binDirectory = $this->workingDirectory.'/real-bin';
+        (new Filesystem())->mkdir($binDirectory);
+        $this->createExecutableBinary($binDirectory.'/symfony-security-auditor');
+
+        $path = $this->inWorkingDirectory(fn (): string => (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $binDirectory))->path());
+
+        self::assertSame($binDirectory.'/symfony-security-auditor', $path);
+    }
+
+    public function test_it_fails_rather_than_target_a_same_named_executable_in_the_working_directory_when_the_path_has_none(): void
+    {
+        $this->createExecutableBinary($this->workingDirectory.'/symfony-security-auditor');
+
+        $this->expectException(SelfUpdateFailedException::class);
+
+        $this->inWorkingDirectory(fn (): string => (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $this->workingDirectory.'/empty-bin'))->path());
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_resolves_a_relative_invoked_path_with_a_directory_against_the_working_directory(): void
+    {
+        $this->createExecutableBinary($this->workingDirectory.'/real-bin/symfony-security-auditor');
+
+        $path = $this->inWorkingDirectory(fn (): string => (new RunningBinaryLocator($this->workingDirectory.'/missing', 'real-bin/symfony-security-auditor', 'micro'))->path());
+
+        self::assertSame($this->workingDirectory.'/real-bin/symfony-security-auditor', $path);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_resolves_a_dot_relative_invoked_path_against_the_working_directory(): void
+    {
+        $this->createExecutableBinary($this->workingDirectory.'/symfony-security-auditor');
+
+        $path = $this->inWorkingDirectory(fn (): string => (new RunningBinaryLocator($this->workingDirectory.'/missing', './symfony-security-auditor', 'micro'))->path());
+
+        self::assertSame($this->workingDirectory.'/symfony-security-auditor', $path);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
     public function test_it_fails_when_a_bare_invoked_name_is_not_found_on_the_path(): void
     {
         $this->expectException(SelfUpdateFailedException::class);
@@ -224,6 +273,22 @@ final class RunningBinaryLocatorTest extends TestCase
         $this->expectExceptionMessage('running under the "cli" PHP SAPI');
 
         (new RunningBinaryLocator($procSelfExe, '', 'cli'))->path();
+    }
+
+    /**
+     * @param callable(): string $callback
+     */
+    private function inWorkingDirectory(callable $callback): string
+    {
+        $workingDirectoryBefore = getcwd();
+        self::assertIsString($workingDirectoryBefore);
+        chdir($this->workingDirectory);
+
+        try {
+            return $callback();
+        } finally {
+            chdir($workingDirectoryBefore);
+        }
     }
 
     private function createExecutableBinary(string $path): void
