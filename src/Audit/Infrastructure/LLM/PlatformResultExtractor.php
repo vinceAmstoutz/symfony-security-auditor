@@ -17,6 +17,8 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\AI\Platform\FinishReason\FinishReason;
 use Symfony\AI\Platform\FinishReason\FinishReasonCase;
+use Symfony\AI\Platform\Message\AssistantMessage;
+use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\MultiPartResult;
 use Symfony\AI\Platform\Result\ResultInterface;
@@ -216,6 +218,16 @@ final readonly class PlatformResultExtractor
         }
 
         return [];
+    }
+
+    /**
+     * The model's answer as the assistant turn that goes back with the tool
+     * results: whole, so a signed thinking block and the text in between its
+     * tool calls come back the way the provider produced them.
+     */
+    public function extractAssistantMessage(ResultInterface $result): AssistantMessage
+    {
+        return Message::ofAssistant($result);
     }
 
     public function extractText(ResultInterface $result): string

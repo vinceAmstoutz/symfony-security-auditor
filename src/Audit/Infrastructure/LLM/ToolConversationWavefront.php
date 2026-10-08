@@ -14,14 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Psr\Log\LoggerInterface;
-use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\Content\Text;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
-use Symfony\AI\Platform\Result\ToolCall;
+use Symfony\AI\Platform\Result\ResultInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -353,10 +352,8 @@ final readonly class ToolConversationWavefront
         $conversationState = $conversationState->withRecordedTokens(...$callTokens);
         $this->toolIterationBooker->book($deferredResult, TokenUsageSnapshot::of(...$callTokens));
 
-        $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
-
-        if ([] !== $toolCalls) {
-            return $this->runToolCalls($conversationState, $toolCalls, $toolLLMRequest);
+        if ([] !== $this->platformResultExtractor->extractToolCalls($platformResult)) {
+            return $this->runToolCalls($conversationState, $platformResult, $toolLLMRequest);
         }
 
         return $conversationState->withResponse(LLMResponse::of(
@@ -430,13 +427,12 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param list<ToolCall> $toolCalls
-     *
      * @throws InvalidTokenUsageException
      */
-    private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolLLMRequest $toolLLMRequest): ConversationState
+    private function runToolCalls(ConversationState $conversationState, ResultInterface $platformResult, ToolLLMRequest $toolLLMRequest): ConversationState
     {
-        $conversationState->bag->add(new AssistantMessage(...$toolCalls));
+        $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
+        $conversationState->bag->add($this->platformResultExtractor->extractAssistantMessage($platformResult));
 
         $toolResults = [];
         foreach ($toolCalls as $position => $toolCall) {
