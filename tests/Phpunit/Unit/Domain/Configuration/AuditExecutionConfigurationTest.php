@@ -210,5 +210,9 @@ final class AuditExecutionConfigurationTest extends TestCase
         self::assertTrue($auditExecutionConfiguration->reviewerStructuredCollection);
         self::assertTrue($auditExecutionConfiguration->stableSystemPrompt);
         self::assertFalse($auditExecutionConfiguration->triageMemory);
+        self::assertNull($auditExecutionConfiguration->minScore);
+        self::assertFalse($auditExecutionConfiguration->failOnIncomplete);
+        self::assertSame('console', $auditExecutionConfiguration->format);
+        self::assertNull($auditExecutionConfiguration->output);
     }
 }

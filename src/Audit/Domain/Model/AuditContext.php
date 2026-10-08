@@ -275,6 +275,11 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
         $this->vulnerabilities[$vulnerability->id()] = $vulnerability;
     }
 
+    public function removeVulnerability(string $id): void
+    {
+        unset($this->vulnerabilities[$id]);
+    }
+
     public function setMeta(string $key, mixed $value): void
     {
         $this->metadata[$key] = $value;

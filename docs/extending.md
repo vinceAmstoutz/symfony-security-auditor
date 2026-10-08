@@ -55,7 +55,7 @@ Key read methods: `content()`, `stopReason()`, `parseJson(): array` (strips a ma
 
 _Since 1.21_, the auditor reads two things from your client beyond the answer itself:
 
-- **Stop reasons.** `LLMResponse::isDegraded()` treats an answer with one of these stop reasons as cut short: `length` (the output token limit), `content-filter` (a content filter withheld it), `max_tool_iterations` (a tool loop stopped at its cap), `empty_content` (no content at all) and `request_too_large` (see below). A degraded answer is never cached, and the files or findings it covered are recorded as errored, so the next run retries them. Normalise the provider's raw `finish_reason` to these values — OpenAI's `content_filter` is `content-filter`, Anthropic's `max_tokens` is `length` — since any other value counts as a complete answer.
+- **Stop reasons.** `LLMResponse::isDegraded()` treats an answer with one of these stop reasons as cut short: `length` (the output token limit), `content-filter` (a content filter withheld it), `max_tool_iterations` (a tool loop whose last round still asked to read more), `empty_content` (no content at all) and `request_too_large` (see below). A degraded answer is never cached, and the files or findings it covered are recorded as errored, so the next run retries them. Normalise the provider's raw `finish_reason` to these values — OpenAI's `content_filter` is `content-filter`, Anthropic's `max_tokens` is `length` — since any other value counts as a complete answer.
 - **A prompt the model cannot fit.** When the provider refuses a prompt as larger than the model's window (`context_length_exceeded`, HTTP `413`), throw `Audit\Domain\Exception\LLMRequestTooLargeException` from `complete()` or `completeWithTools()` — `LLMRequestTooLargeException::fromProviderRejection($previous)` wraps the provider's error. The attacker then splits the chunk in two and analyzes each half, and the reviewer records that finding as errored or splits its batch; any other `LLMProviderException` aborts the audit. A `BatchCapableLLMClientInterface` client cannot throw for one request of a batch, so it answers that request with an `LLMResponse` whose stop reason is `request_too_large` and whose content carries the refusal.
 - **Transient failures.** `audit.retry` drives the bundled `symfony/ai` client only. A custom client retries what it can recover from — a `429`, a `5xx`, a connection cut off mid-response — itself, and throws an `LLMProviderException` only once that fails, since that ends the audit.
 
@@ -191,6 +191,7 @@ interface StageInterface
 | `vulnerabilities(): array<string, Vulnerability>` | keyed by id |
 | `addVulnerability(Vulnerability $v): void` | add a new finding |
 | `replaceVulnerability(Vulnerability $v): void` | overwrite an existing id |
+| `removeVulnerability(string $id): void` | drop a finding by id; an unknown id is ignored |
 | `validatedVulnerabilities(): array<string, Vulnerability>` | reviewer-validated subset |
 | `setMeta(string $key, mixed $value): void` | arbitrary stage-to-stage data |
 | `getMeta(string $key, mixed $default = null): mixed` | read stage metadata |
@@ -219,13 +220,14 @@ final class DeduplicationStage implements StageInterface
             $key = $vuln->filePath() . ':' . $vuln->lineStart() . ':' . $vuln->type()->value;
 
             if (array_key_exists($key, $seen)) {
-                // Keep the one with higher confidence; replace lower-confidence duplicate.
+                // Keep the one with higher confidence; drop the lower-confidence duplicate.
                 $existing = $context->vulnerabilities()[$seen[$key]];
                 if ($vuln->confidence() > $existing->confidence()) {
-                    $context->replaceVulnerability($vuln);
+                    $context->removeVulnerability($seen[$key]);
                     $seen[$key] = $id;
+                } else {
+                    $context->removeVulnerability($id);
                 }
-                // Drop the current entry — no API to remove, so overwrite with the winner.
                 continue;
             }
 
@@ -235,7 +237,7 @@ final class DeduplicationStage implements StageInterface
 }
 ```
 
-> `AuditContext` has no `removeVulnerability()` method. If your stage needs to filter findings, collect the survivors and call `replaceVulnerability()` for each, or store a skip-list in metadata with `setMeta()` for a downstream consumer.
+> To drop a finding, call `removeVulnerability()` with its id. To keep a finding out of a downstream consumer without deleting it, store a skip-list in metadata with `setMeta()` instead.
 
 ### Wire — append after AuditStage
 
@@ -316,7 +318,7 @@ Beyond the seams above, these Domain ports can each be implemented and aliased i
 - `CodeSlicerInterface` — control how files are trimmed before the LLM (default: `NullCodeSlicer`; enable the bundled `RegexCodeSlicer` with `audit.code_slicing.enabled: true`).
 - `GitChangedFilesResolverInterface` — change how `--since` resolves the changed-file set (default: `ProcessGitChangedFilesResolver`, backed by `git diff`).
 - `BatchCapableLLMClientInterface` — an opt-in extension of `LLMClientInterface` for clients that resolve several prompts concurrently; the reviewer uses it when `audit.reviewer_max_concurrent > 1`.
-- `RecordVulnerabilityToolFactoryInterface` — builds the schema-enforced tool used in `audit.structured_collection` mode (default: `RecordVulnerabilityToolFactory` returning `RecordVulnerabilityTool`). Swap the factory if you want to enrich the tool's schema (extra fields, tighter enums) without forking the agent — every provider that supports tool use will validate calls against the schema you publish.
+- `RecordVulnerabilityToolFactoryInterface` — builds the schema-enforced tool used in `audit.structured_collection` mode (default: `RecordVulnerabilityToolFactory` returning `RecordVulnerabilityTool`). Swap the factory if you want to enrich the tool's schema (extra fields, tighter enums) without forking the agent — every provider that supports tool use will validate calls against the schema you publish. _Since 1.22_ a tool you publish should implement `Tool\RecordingToolInterface`, the marker `RecordVulnerabilityTool` carries: a conversation whose last allowed tool round calls a recording tool has concluded, where a last round that only reads reads as a model that never stopped exploring.
 - `SecretScrubberInterface` — `scrub(string $content): string`, applied to every file before its content reaches the LLM (default: `RegexSecretScrubber`; `NullSecretScrubber` when `scan.secret_scrubbing.enabled: false`). Implement it for redaction the bundled patterns cannot express — e.g. calling out to a dedicated secret-detection engine. Extra PCRE patterns alone do not need a class: use `scan.secret_scrubbing.additional_patterns`.
 - `AdvisoryDatabaseInterface` — `lookup(string $packageName, string $installedVersion): array` backing the attacker's `lookup_advisory` tool (default: `ComposerAuditAdvisoryDatabase` running `composer audit`; `InMemoryAdvisoryDatabase` is the offline fallback). Implement it to query an internal vulnerability feed or a commercial advisory service.
 - `PricingProviderInterface` — per-model USD prices for cost estimation (default: `ModelsDevPricingProvider` reading the `symfony/models-dev` catalog). Also implement `CacheAwarePricingProviderInterface` if your source knows cache-read/cache-write rates — the cost report then prices cached tokens at their discounted rate, and `ServingPlatformPricingProviderInterface` if it knows which rates belong to the platform serving the audit — a model the provider reports answering a call is then billed as that model only when that platform prices it. Implement for private model deployments or negotiated pricing.
@@ -324,7 +326,7 @@ Beyond the seams above, these Domain ports can each be implemented and aliased i
 - `TokenEstimatorInterface` — `estimateTokens(string $text, string $model)` used for pre-flight budgeting and rate-limit sizing (default: `ResolvingTokenEstimator`, which picks the per-provider heuristic matching the model id). To tune a single provider instead of the whole port, register a service implementing the Infrastructure-level `ProviderTokenEstimatorInterface` — it is auto-tagged and joins the resolver's candidate list.
 - `SecurityConfigParserInterface` — extracts the route access-control map and firewall rules from raw security configuration content (default: `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse). Implement it when your project encodes access control outside standard YAML — e.g. PHP or XML security config, or a custom DSL. _Since 1.21._ Also implement `ProductionAwareSecurityConfigParserInterface` — `isLoadedInProduction(string $relativePath): bool` — when your parser knows which configuration files the application loads in production: `MappingStage` then reads only those, so a rule in a test override or a file nothing imports never marks a route as covered. A parser without it is handed every configuration file.
 - `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`, `FormBindingParserInterface` — the deterministic AST extractions (`#[IsGranted]`/`denyAccessUnlessGranted`, voter attributes, form field-to-entity bindings) that feed the `SymfonyMapping` given to the attacker (defaults: the `PhpParser*` implementations in `Infrastructure/Scan/`). Implement one when your project encodes access control in a custom idiom the bundled parser cannot see.
-- `ProgressReporterInterface` — `report(string $event, array $context)` for every progress event the pipeline emits (defaults: `ConsoleProgressReporter` on a TTY, `PlainProgressReporter` otherwise, `LoggerProgressReporter` for logs). Implement it to stream audit progress to a dashboard, metrics system, or chat webhook; the stable event names are the cases of the `Audit\Domain\Model\ProgressEvent` enum.
+- `ProgressReporterInterface` — `report(string $event, array $context)` for every progress event the pipeline emits (defaults: `ConsoleProgressReporter` on a TTY, `PlainProgressReporter` otherwise, `LoggerProgressReporter` for logs). Implement it to stream audit progress to a dashboard, metrics system, or chat webhook; the stable event names are the cases of the `Audit\Domain\Model\ProgressEvent` enum. _Since 1.22_ the `attacker.chunk.completed` context carries a `reason` (a short sentence) next to `status: errored` when the chunk failed for a reason worth showing.
 - `ReviewerFeedbackProviderInterface` — `feedback(): ReviewerFeedback` supplying the maintainer-trusted false-positive feedback injected into the reviewer prompt (default: the baseline-backed `ReviewerFeedbackHolder`, composed with `FilesystemTriageMemoryStore` via `CompositeReviewerFeedbackProvider` when `audit.triage_memory: true`). Implement it to source feedback from elsewhere — a shared team knowledge base, a ticketing system's "won't fix" list.
 - `TriageMemoryRecorderInterface` — `record(string $type, string $file, string $title, int $line, string $reason)` called whenever the reviewer rejects a finding with a non-empty `reviewer_notes` explanation (default: `NullTriageMemoryRecorder`, or `FilesystemTriageMemoryStore` when `audit.triage_memory: true`). Implement it to persist rejections somewhere other than the local filesystem — a shared cache reachable by every CI runner, for example — so the cross-run memory survives across ephemeral containers.
 - `AttackerSkillPromptRendererInterface` — `render(array $presentTypes, bool $emitAll): string` builds the attacker's skill-block text for a set of `ProjectFileType`s (default: `AttackerSkillRegistry`, the same registry the real attack loop renders from). `--dry-run`'s cost estimate calls it once per chunk to size the skill-prompt overhead accurately, mirroring how `stable_system_prompt` changes what a real run actually sends. `$emitAll` bypasses the `$presentTypes` filter and renders every registered skill — the shape `stable_system_prompt: true` needs, since it holds the system prompt fixed across chunks to keep provider prompt caching effective.

@@ -20,6 +20,7 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -168,6 +169,46 @@ final class ToolRegistryTest extends TestCase
         self::assertSame('Tool execution failed', $warnings[0][0]);
         self::assertSame('boom', $warnings[0][1]['tool']);
         self::assertSame('kaboom', $warnings[0][1]['error']);
+    }
+
+    /**
+     * @throws InvalidToolRegistryException
+     */
+    public function test_is_recording_is_true_only_for_a_registered_recording_tool(): void
+    {
+        $toolRegistry = new ToolRegistry(
+            tools: [$this->makeTool('read'), $this->makeRecordingTool('record')],
+            logger: new NullLogger(),
+        );
+
+        self::assertSame(
+            ['read' => false, 'record' => true, 'missing' => false],
+            ['read' => $toolRegistry->isRecording('read'), 'record' => $toolRegistry->isRecording('record'), 'missing' => $toolRegistry->isRecording('missing')],
+        );
+    }
+
+    private function makeRecordingTool(string $name): RecordingToolInterface
+    {
+        return new class($name) implements RecordingToolInterface {
+            public function __construct(
+                private readonly string $name,
+            ) {}
+
+            /**
+             * @throws InvalidToolDefinitionException
+             */
+            #[Override]
+            public function definition(): ToolDefinition
+            {
+                return new ToolDefinition($this->name, 'desc-'.$this->name, ['type' => 'object']);
+            }
+
+            #[Override]
+            public function execute(array $arguments): string
+            {
+                return 'recorded';
+            }
+        };
     }
 
     /**

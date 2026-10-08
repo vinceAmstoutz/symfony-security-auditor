@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
+
 /**
  * Scores an audit run against its ground-truth manifest at (file, type)
  * granularity: a seeded finding the run reproduced is a true positive, one it
@@ -81,6 +83,7 @@ final readonly class EvalScorer
     /**
      * Deduplicates to a set of file-keys per type, so a class is scored as
      * present-or-absent per file rather than double-counting repeated findings.
+     * A path the model echoed with a leading `./` names the same file.
      *
      * @param list<array{file: string, type: string}> $findings
      *
@@ -90,7 +93,7 @@ final readonly class EvalScorer
     {
         $byType = [];
         foreach ($findings as $finding) {
-            $byType[$finding['type']][$finding['file']] = true;
+            $byType[$finding['type']][EchoedFilePath::normalize($finding['file'])] = true;
         }
 
         return $byType;

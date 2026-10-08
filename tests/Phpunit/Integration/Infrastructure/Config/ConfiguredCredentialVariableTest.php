@@ -108,6 +108,13 @@ final class ConfiguredCredentialVariableTest extends TestCase
         self::assertSame('GATEWAY_TOKEN', $this->configuredCredentialVariable()->name());
     }
 
+    public function test_it_names_the_variable_of_an_instance_whose_name_the_configuration_spells_with_a_hyphen(): void
+    {
+        $this->writeConfig("provider: generic.my_gw\nplatform:\n    generic:\n        my-gw:\n            api_key: '%env(GATEWAY_TOKEN)%'\n");
+
+        self::assertSame('GATEWAY_TOKEN', $this->configuredCredentialVariable()->name());
+    }
+
     public function test_it_names_no_variable_when_the_selected_provider_is_not_configured(): void
     {
         $this->writeConfig("provider: mistral\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
