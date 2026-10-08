@@ -97,7 +97,7 @@ src/
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
-│       ├── Pricing/     # ModelsDevPricingProvider (symfony/models-dev catalog), PlatformCatalogProviders, ModelPrice
+│       ├── Pricing/     # ModelsDevPricingProvider (symfony/models-dev catalog), ModelsDevCatalog, PlatformCatalogProviders, ModelPrice
 │       ├── Progress/    # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY),
 │       │                  LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
@@ -384,7 +384,9 @@ Like the attacker, the agent itself is a thin orchestrator — mode resolution a
 
 ### `VulnerabilityFactory`
 
-Parses raw `array<string, mixed>` from LLM JSON output into `Vulnerability` instances. Each entry is first checked against `symfony/validator` constraints (non-blank `title` / `description` / `file_path`, sane length bounds on every free-text field); on violation the entry is dropped under `VulnerabilityDropReason::VALIDATION_FAILED`. Surviving entries are hydrated; invalid or missing fields are handled with null-coalescing casts; invalid enum values cause a caught `\Throwable` and the entry is dropped under `VulnerabilityDropReason::HYDRATION_FAILED`. Non-array list entries are dropped under `VulnerabilityDropReason::NON_ARRAY_ENTRY`.
+Parses raw `array<string, mixed>` from LLM JSON output into `Vulnerability` instances. What can be recovered safely is normalised first, so a finding is not lost over its formatting: a free-text field over its length bound (`title` 500, `description` / `vulnerable_code` / `attack_vector` / `proof` / `remediation` 5000 characters) is cut to the bound, an inverted line range is swapped (a `line_end` below 1 reads as `line_start`), a `type` or `severity` in another case or with surrounding whitespace is lower-cased and trimmed, and a `confidence` written as a percentage (above 1, up to 100) is scaled to the 0–1 range. Each entry is then checked against `symfony/validator` constraints (non-blank `title` / `description` / `file_path`, a `file_path` of at most 500 characters — a cut path would name another file); on violation the entry is dropped under `VulnerabilityDropReason::VALIDATION_FAILED`. Surviving entries are hydrated; invalid or missing fields are handled with null-coalescing casts; invalid enum values cause a caught `\Throwable` and the entry is dropped under `VulnerabilityDropReason::HYDRATION_FAILED`. Non-array list entries are dropped under `VulnerabilityDropReason::NON_ARRAY_ENTRY`.
+
+A dropped entry is a finding lost, so the chunk analyzers (`ChunkOutcomeRecorder`) settle a chunk whose answer lost any entry as `errored` instead of `analyzed`: the findings that did hydrate are kept, the report is incomplete (`--fail-on-incomplete` can fire) and the answer is not written to the attacker cache, so the next run asks the model again rather than replaying a lossy answer as its complete verdict.
 
 `fromArray()` still returns `?Vulnerability`. `fromList()` returns a `VulnerabilityHydrationResult` value object exposing both the hydrated vulnerabilities and per-reason drop counts. `AttackerAgent::analyze` aggregates the per-chunk drop counts and surfaces them on its `Attacker agent complete` info log as `total_dropped_entries` / `dropped_by_reason`.
 
@@ -443,7 +445,7 @@ Each builder is a thin composer delegating the bulk to collaborators:
 
 The attacker prompt has two modes selected by `audit.structured_collection`:
 
-- **`true` (default)** — the prompt instructs the model to record findings via the `record_vulnerability` tool, one call per finding. The tool's input schema mirrors the `Vulnerability` shape and the provider validates each call before the agent ever sees it, so bare-string and wrapper-object drift is structurally impossible.
+- **`true` (default)** — the prompt instructs the model to record findings via the `record_vulnerability` tool, one call per finding. The tool's input schema mirrors the `Vulnerability` shape and the provider validates each call before the agent ever sees it, so bare-string and wrapper-object drift is structurally impossible. A provider that does not enforce the schema gets the same answer from the tool itself: a call missing a required key (or giving a non-string for a string key) is answered with an `Error: …` text the model retries from inside the tool loop, and never reaches the collector.
 - **`false`** — the prompt instructs the model to output a JSON array of vulnerability objects matching `VulnerabilityFactory::fromArray()`'s expected keys. The tightened rules block forbids non-object array elements, environment-keyed wrapper objects, and bare environment-name strings; the `VulnerabilityFactory` then validates each entry with `symfony/validator` before hydration.
 
 Both modes share the same intro, severity/confidence rubrics, file-numbering protocol, scope guidance, single few-shot example, and — when files of the corresponding `ProjectFile` type appear in the chunk — per-artifact skill blocks (controller, api_resource, live_component, voter, form, repository, entity, template, config, php, …). Skill blocks emit both attack patterns to hunt and patterns explicitly NOT to flag, reducing reviewer noise. Blocks are emitted in attack-surface priority order, not alphabetically.

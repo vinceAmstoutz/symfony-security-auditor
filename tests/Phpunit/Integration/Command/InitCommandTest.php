@@ -1115,6 +1115,27 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_refuses_an_instance_named_by_an_environment_placeholder_without_writing_anything(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.%env(GATEWAY)%', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [Command::INVALID, true, [], false],
+            [
+                $exitCode,
+                str_contains($this->unwrappedDisplay($commandTester), 'uses an instance name holding "%...%"'),
+                $this->recordingBridgeInstaller->installations,
+                file_exists($this->configFile()),
+            ],
+            $commandTester->getDisplay(),
+        );
+    }
+
     public function test_it_refuses_a_missing_base_url_when_the_prompt_reaches_end_of_input(): void
     {
         $commandTester = $this->commandTester();

@@ -181,6 +181,30 @@ final class AuditCommandIncompleteRunTest extends TestCase
         self::assertStringContainsString('The scan found no file to audit, so the run has no verdict.', $this->flattened($commandTester->getDisplay()));
     }
 
+    public function test_a_run_whose_scan_found_no_file_fails_and_never_calls_itself_complete(): void
+    {
+        $commandTester = $this->commandTester(self::createStub(PipelineInterface::class));
+
+        $exitCode = $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        $display = $this->flattened($commandTester->getDisplay());
+        self::assertStringContainsString('RISK LEVEL: UNKNOWN (no file was analyzed)', $display);
+        self::assertStringContainsString('[ERROR] The scan found no file to audit, so the run has no verdict. A run with no verdict cannot pass, so it fails.', $display);
+        self::assertStringNotContainsString('Audit complete', $display);
+        self::assertStringNotContainsString('SAFE', $display);
+    }
+
+    public function test_a_report_on_stdout_from_a_scan_that_found_no_file_fails_and_says_why_on_stderr(): void
+    {
+        $commandTester = $this->commandTester(self::createStub(PipelineInterface::class));
+
+        $exitCode = $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => 'json'], ['capture_stderr_separately' => true]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('[ERROR] The scan found no file to audit, so the run has no verdict. A run with no verdict cannot pass, so it fails.', $this->flattened($commandTester->getErrorOutput()));
+    }
+
     private function flattened(string $output): string
     {
         return (string) preg_replace('/\s+/', ' ', $output);

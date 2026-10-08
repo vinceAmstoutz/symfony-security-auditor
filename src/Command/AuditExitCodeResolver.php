@@ -50,7 +50,7 @@ final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInter
     #[Override]
     public function hasNoVerdict(AuditReport $auditReport): bool
     {
-        return 0 === $auditReport->filesDiscovered() || $auditReport->hasNoVerdict();
+        return $auditReport->hasNoVerdict();
     }
 
     private function scoreIsBelow(AuditReport $auditReport, ?int $minimumScore): bool

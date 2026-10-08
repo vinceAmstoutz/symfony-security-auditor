@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
@@ -38,8 +39,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\PartlyFailedPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\SingleFileAuditPipeline;
 
@@ -149,6 +153,50 @@ final class AuditToolTest extends TestCase
         $auditTool->audit($this->projectPath.'/nested/..');
 
         self::assertSame($this->projectPath, $auditedProjectPathHolder->path());
+    }
+
+    public function test_it_refuses_a_budgeted_run_on_an_unpriced_model_before_any_llm_call(): void
+    {
+        $pipeline = $this->createMock(PipelineInterface::class);
+        $pipeline->expects(self::never())->method('process');
+        $auditTool = $this->budgetedAuditTool($this->budgetGuard(10.0, ['priced-model', 'mystery-model']), $pipeline);
+
+        try {
+            $auditTool->audit($this->projectPath);
+            self::fail('A budgeted run on an unpriced model must be refused.');
+        } catch (ToolCallException $toolCallException) {
+            self::assertSame(
+                'Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd. Unpriced model(s): mystery-model.',
+                $toolCallException->getMessage(),
+            );
+            self::assertInstanceOf(UnenforceableBudgetException::class, $toolCallException->getPrevious());
+        }
+    }
+
+    /**
+     * @throws ToolCallException
+     */
+    public function test_it_runs_a_budgeted_audit_when_every_model_is_priced(): void
+    {
+        $auditTool = $this->budgetedAuditTool($this->budgetGuard(10.0, ['priced-model']));
+
+        $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($report);
+        self::assertSame($this->projectPath, $report['project']);
+    }
+
+    /**
+     * @throws ToolCallException
+     */
+    public function test_it_runs_an_unbudgeted_audit_on_an_unpriced_model(): void
+    {
+        $auditTool = $this->budgetedAuditTool($this->budgetGuard(null, ['mystery-model']));
+
+        $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($report);
+        self::assertSame($this->projectPath, $report['project']);
     }
 
     /**
@@ -285,6 +333,7 @@ final class AuditToolTest extends TestCase
             new BaselineProcessor(new Baseline(), $this->baselineAccepting($vulnerability, 'The id is cast to int upstream.')),
             new FindingTypeFilter(),
             $reviewerFeedbackHolder,
+            $this->budgetGuard(),
         );
 
         $auditTool->audit($this->projectPath);
@@ -309,7 +358,30 @@ final class AuditToolTest extends TestCase
             new BaselineProcessor(new Baseline(), $configuredBaseline),
             $findingTypeFilter ?? new FindingTypeFilter(),
             new ReviewerFeedbackHolder(),
+            $this->budgetGuard(),
         );
+    }
+
+    private function budgetedAuditTool(UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard, ?PipelineInterface $pipeline = null): AuditTool
+    {
+        return new AuditTool(
+            new RunAuditUseCase($pipeline ?? new SingleFileAuditPipeline(), new NullLogger()),
+            new JsonReportRenderer(),
+            $this->auditedProjectPathHolder(),
+            new BaselineProcessor(new Baseline()),
+            new FindingTypeFilter(),
+            new ReviewerFeedbackHolder(),
+            $unpricedModelBudgetGuard,
+        );
+    }
+
+    /** @param list<string> $models */
+    private function budgetGuard(?float $maxCostUsd = null, array $models = []): UnpricedModelBudgetGuard
+    {
+        $pricing = self::createStub(PricingProviderInterface::class);
+        $pricing->method('hasModel')->willReturnCallback(static fn (string $model): bool => 'priced-model' === $model);
+
+        return new UnpricedModelBudgetGuard($pricing, $models, $maxCostUsd);
     }
 
     private function auditedProjectPathHolder(): AuditedProjectPathHolder

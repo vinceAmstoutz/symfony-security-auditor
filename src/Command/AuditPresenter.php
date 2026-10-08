@@ -31,6 +31,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
+    private const string NO_FILE_FOUND_VERDICT = 'The scan found no file to audit, so the run has no verdict.';
+
     public function __construct(
         private PricingProviderInterface $pricingProvider,
         private ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
@@ -352,7 +354,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        if (!$auditReport->isComplete()) {
+        if ($this->statesNoCleanResult($auditReport)) {
             $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode);
 
             return;
@@ -368,7 +370,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
-        if ($auditReport->isComplete()) {
+        if (!$this->statesNoCleanResult($auditReport)) {
             return;
         }
 
@@ -389,12 +391,22 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->warning(ExitCode::Success->value === $exitCode ? \sprintf('%s Pass --fail-on-incomplete to fail the run when this happens.', $summary) : $summary);
     }
 
+    private function statesNoCleanResult(AuditReport $auditReport): bool
+    {
+        return !$auditReport->isComplete() || $auditReport->hasNoVerdict();
+    }
+
     /**
-     * A run with no verdict — no file analyzed, nothing found — states no
-     * risk level: a SAFE there would vouch for code nobody read.
+     * A run with no verdict — no file found, or none analyzed and nothing
+     * found — states no risk level: a SAFE there would vouch for code nobody
+     * read.
      */
     private function incompleteSummary(AuditReport $auditReport): string
     {
+        if (0 === $auditReport->filesDiscovered()) {
+            return self::NO_FILE_FOUND_VERDICT;
+        }
+
         if ($auditReport->hasNoVerdict()) {
             return \sprintf(
                 'Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict. Vulnerabilities: %d.',
@@ -417,7 +429,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->error(\sprintf(
             '%s The baseline at %s was left as it was: a run with no verdict cannot replace the accepted findings, so it fails.',
             0 === $auditReport->filesDiscovered()
-                ? 'The scan found no file to audit, so the run has no verdict.'
+                ? self::NO_FILE_FOUND_VERDICT
                 : \sprintf('Audit incomplete: none of the %d file(s) in scope could be analyzed, so the run has no verdict.', $auditReport->filesScanned()),
             $path,
         ));

@@ -141,6 +141,7 @@ final readonly class AuditCommand
         try {
             try {
                 $auditCommandInput->assertNoConflictingOptions();
+                $auditCommandInput->assertMinScoreInRange();
                 $this->assertOutputsWritable($auditCommandInput, $projectPath);
 
                 if ($auditCommandInput->showScanned) {

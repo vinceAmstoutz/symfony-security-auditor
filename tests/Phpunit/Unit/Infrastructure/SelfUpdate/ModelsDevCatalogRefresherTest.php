@@ -123,6 +123,89 @@ final class ModelsDevCatalogRefresherTest extends TestCase
         self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
     }
 
+    public function test_it_never_writes_a_cost_that_is_not_a_finite_non_negative_price_with_an_input_rate(): void
+    {
+        $download = <<<'JSON'
+            {
+              "anthropic": {
+                "name": "Anthropic",
+                "models": {
+                  "valid": {"id": "valid", "cost": {"input": 5, "output": 25, "cache_read": 0.5}},
+                  "free": {"id": "free", "cost": {"input": 0, "output": 0}},
+                  "unpriced": {"id": "unpriced"},
+                  "negative-input": {"id": "negative-input", "cost": {"input": -1, "output": 25}},
+                  "infinite-input": {"id": "infinite-input", "cost": {"input": 1e999, "output": 25}},
+                  "missing-input": {"id": "missing-input", "cost": {"output": 25}},
+                  "textual-input": {"id": "textual-input", "cost": {"input": "free"}},
+                  "negative-output": {"id": "negative-output", "cost": {"input": 5, "output": -0.01}},
+                  "negative-cache-write": {"id": "negative-cache-write", "cost": {"input": 5, "cache_write": -0.01}},
+                  "scalar-cost": {"id": "scalar-cost", "cost": 5}
+                }
+              },
+              "notes": "not a provider",
+              "openai": {"models": "not a map"}
+            }
+            JSON;
+
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting($download), $this->cacheDir, self::createStub(LoggerInterface::class)))->refresh();
+
+        self::assertSame(PricingCatalogRefreshOutcome::Refreshed, $pricingCatalogRefreshOutcome);
+        self::assertSame(
+            [
+                'anthropic' => [
+                    'name' => 'Anthropic',
+                    'models' => [
+                        'valid' => ['id' => 'valid', 'cost' => ['input' => 5, 'output' => 25, 'cache_read' => 0.5]],
+                        'free' => ['id' => 'free', 'cost' => ['input' => 0, 'output' => 0]],
+                        'unpriced' => ['id' => 'unpriced'],
+                        'negative-input' => ['id' => 'negative-input'],
+                        'infinite-input' => ['id' => 'infinite-input'],
+                        'missing-input' => ['id' => 'missing-input'],
+                        'textual-input' => ['id' => 'textual-input'],
+                        'negative-output' => ['id' => 'negative-output'],
+                        'negative-cache-write' => ['id' => 'negative-cache-write'],
+                        'scalar-cost' => ['id' => 'scalar-cost'],
+                    ],
+                ],
+                'notes' => 'not a provider',
+                'openai' => ['models' => 'not a map'],
+            ],
+            json_decode((string) file_get_contents($this->cacheDir.'/models-dev.json'), true, flags: \JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function test_it_never_installs_a_download_whose_only_costs_are_invalid(): void
+    {
+        (new Filesystem())->dumpFile($this->cacheDir.'/models-dev.json', self::VALID_CATALOG);
+
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Could not refresh the bundled pricing catalog',
+            self::callback(static fn (array $context): bool => \is_string($context['exception'] ?? null) && str_contains($context['exception'], 'carries no model pricing')),
+        );
+
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{"models":{"claude-opus-5":{"cost":{"input":-5,"output":25}}}}}'), $this->cacheDir, $logger))->refresh();
+
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $pricingCatalogRefreshOutcome);
+        self::assertStringEqualsFile($this->cacheDir.'/models-dev.json', self::VALID_CATALOG);
+        self::assertSame(['models-dev.json'], $this->filesInCacheDir());
+    }
+
+    public function test_it_never_installs_a_download_that_cannot_be_written_back_as_json(): void
+    {
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Could not refresh the bundled pricing catalog',
+            self::callback(static fn (array $context): bool => \is_string($context['exception'] ?? null) && str_contains($context['exception'], 'is not valid JSON')),
+        );
+
+        $pricingCatalogRefreshOutcome = (new ModelsDevCatalogRefresher($this->releaseClientWriting('{"anthropic":{"limit":{"context":1e999},"models":{"claude-opus-5":{"cost":{"input":5,"output":25}}}}}'), $this->cacheDir, $logger))->refresh();
+
+        self::assertSame(PricingCatalogRefreshOutcome::Failed, $pricingCatalogRefreshOutcome);
+        self::assertFileDoesNotExist($this->cacheDir.'/models-dev.json');
+        self::assertSame([], $this->filesInCacheDir());
+    }
+
     public function test_it_never_installs_a_download_that_decodes_to_a_non_array_value(): void
     {
         $logger = self::createMock(LoggerInterface::class);
