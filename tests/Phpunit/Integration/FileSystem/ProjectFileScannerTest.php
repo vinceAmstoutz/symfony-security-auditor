@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
+use Closure;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -26,12 +27,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
 
 final class ProjectFileScannerTest extends TestCase
 {
     // Split via constant so neither CS Fixer's `no_useless_concat_operator`
     // nor GitHub's secret scanner sees a contiguous credential-shaped string.
     private const string STRIPE_LIVE_PREFIX = 'sk_live';
+
+    private const int UNPRIVILEGED_USER_ID = 65534;
 
     private string $tmpDir;
 
@@ -625,6 +629,34 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('disk read error', $error);
     }
 
+    public function test_it_skips_an_unreadable_directory_and_logs_it_instead_of_aborting_the_scan(): void
+    {
+        mkdir($this->tmpDir.'/src/Locked', 0o777, true);
+        mkdir($this->tmpDir.'/src/Zeta', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Readable.php', '<?php class Readable {}');
+        file_put_contents($this->tmpDir.'/src/Locked/Hidden.php', '<?php class Hidden {}');
+        file_put_contents($this->tmpDir.'/src/Zeta/Later.php', '<?php class Later {}');
+        $warningCollectingLogger = new WarningCollectingLogger();
+        $projectFileScanner = new ProjectFileScanner($warningCollectingLogger, ['src']);
+        $projectFileScanner->scan($this->tmpDir);
+        chmod($this->tmpDir.'/src/Locked', 0o000);
+
+        try {
+            $files = $this->asUnprivilegedUser(fn (): array => $projectFileScanner->scan($this->tmpDir));
+        } finally {
+            chmod($this->tmpDir.'/src/Locked', 0o755);
+        }
+
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
+        self::assertSame(['src/Readable.php', 'src/Zeta/Later.php'], $paths);
+        self::assertCount(1, $warningCollectingLogger->warnings);
+        [$message, $context] = $warningCollectingLogger->warnings[0];
+        self::assertSame('Skipped unreadable directory', $message);
+        self::assertSame($this->tmpDir.'/src/Locked', $context['path']);
+        self::assertIsString($context['error']);
+        self::assertStringContainsString('Permission denied', $context['error']);
+    }
+
     public function test_it_skips_a_symlinked_file_and_logs_a_warning(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -810,5 +842,25 @@ final class ProjectFileScannerTest extends TestCase
     public function test_it_scans_nothing_when_the_project_path_does_not_exist(): void
     {
         self::assertSame([], $this->projectFileScanner->scan($this->tmpDir.'/missing-'.uniqid('', true)));
+    }
+
+    /**
+     * @param Closure(): list<ProjectFile> $action
+     *
+     * @return list<ProjectFile>
+     */
+    private function asUnprivilegedUser(Closure $action): array
+    {
+        if (0 !== posix_geteuid()) {
+            return $action();
+        }
+
+        self::assertTrue(posix_seteuid(self::UNPRIVILEGED_USER_ID));
+
+        try {
+            return $action();
+        } finally {
+            posix_seteuid(0);
+        }
     }
 }
