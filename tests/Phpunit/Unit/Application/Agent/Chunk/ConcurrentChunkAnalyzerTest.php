@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk;
 
 use Override;
+use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -23,20 +24,24 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\Concurren
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\ChunkAnalysisInputs;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\ConcurrentChunkAnalyzerHarness;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\CountingAttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
@@ -94,6 +99,95 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
         );
 
         self::assertSame([1, 1], $requestCounts);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_cached_and_dispatched_chunks_keep_their_own_findings_in_chunk_order(): void
+    {
+        $cache = self::createStub(AttackerCacheInterface::class);
+        $cache->method('get')->willReturnCallback(static fn (array $chunk): ?array => self::cachedFindingsOf($chunk));
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('dispatched '.self::fileNamed($request)));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        [$vulnerabilities] = $this->makeAnalyzer($llmClient, 2, $cache)->analyze(
+            [[$this->makeFile('src/A.php')], [$this->makeFile('src/B.php')], [$this->makeFile('src/C.php')]],
+            $this->request(),
+            new RecordingCoverageRecorder(),
+            new RiskMarkerIndex([]),
+        );
+
+        self::assertSame(['cached A', 'dispatched B', 'dispatched C'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_a_context_aware_cache_serves_a_chunk_that_carries_risk_markers(): void
+    {
+        $cache = self::createStub(ContextAwareAttackerCacheInterface::class);
+        $cache->method('getForContext')->willReturn([self::recordedFinding('cached with context')]);
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeBatchWithTools');
+        $chunk = [$this->makeFile('src/A.php')];
+
+        [$vulnerabilities] = $this->makeAnalyzer($llmClient, 2, $cache)->analyze(
+            [$chunk],
+            $this->request(),
+            new RecordingCoverageRecorder(),
+            new RiskMarkerIndex([RiskMarker::create('src/A.php', 1, 'sql_injection', 'raw query')]),
+        );
+
+        self::assertSame(['cached with context'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_it_builds_the_prompts_of_a_window_only_when_it_dispatches_it(): void
+    {
+        $countingAttackerPromptBuilder = new CountingAttackerPromptBuilder();
+        $promptsBuiltAtDispatch = [];
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$promptsBuiltAtDispatch, $countingAttackerPromptBuilder): array {
+                $promptsBuiltAtDispatch[] = $countingAttackerPromptBuilder->userMessagesBuilt;
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        ConcurrentChunkAnalyzerHarness::analyzerBuildingPromptsWith($llmClient, 2, $countingAttackerPromptBuilder)->analyze(
+            [
+                [$this->makeFile('src/A.php')], [$this->makeFile('src/B.php')],
+                [$this->makeFile('src/C.php')], [$this->makeFile('src/D.php')],
+                [$this->makeFile('src/E.php')], [$this->makeFile('src/F.php')],
+            ],
+            $this->request(),
+            new RecordingCoverageRecorder(),
+            new RiskMarkerIndex([]),
+        );
+
+        self::assertSame([2, 4, 6], $promptsBuiltAtDispatch);
     }
 
     /**
@@ -386,6 +480,28 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
     private function makeAnalyzer(ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient, int $maxConcurrent, ?AttackerCacheInterface $attackerCache = null, ?LoggerInterface $logger = null, ?ProgressReporterInterface $progressReporter = null): ConcurrentChunkAnalyzer
     {
         return ConcurrentChunkAnalyzerHarness::analyzer($toolBatchCapableLLMClient, $maxConcurrent, $attackerCache, $logger, $progressReporter);
+    }
+
+    /**
+     * @param array<mixed> $chunk
+     *
+     * @return ?list<array<string, mixed>>
+     */
+    private static function cachedFindingsOf(array $chunk): ?array
+    {
+        $file = $chunk[0] ?? null;
+        Assert::assertInstanceOf(ProjectFile::class, $file);
+
+        return 'src/A.php' === $file->relativePath() ? [self::recordedFinding('cached A')] : null;
+    }
+
+    private static function fileNamed(mixed $request): string
+    {
+        Assert::assertIsArray($request);
+        $userMessage = $request['user'] ?? null;
+        Assert::assertIsString($userMessage);
+
+        return str_contains($userMessage, 'src/B.php') ? 'B' : 'C';
     }
 
     private function request(): AttackerAnalysisRequest

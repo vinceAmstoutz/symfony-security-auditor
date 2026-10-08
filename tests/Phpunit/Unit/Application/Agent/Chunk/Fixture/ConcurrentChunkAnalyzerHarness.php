@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ConcurrentChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
@@ -43,6 +44,21 @@ final class ConcurrentChunkAnalyzerHarness
             ChunkAnalysisInputs::vulnerabilityFactory(),
             $logger ?? new NullLogger(),
             $progressReporter ?? new NullProgressReporter(),
+            3,
+            new RecordVulnerabilityToolFactory(),
+            $maxConcurrent,
+        );
+    }
+
+    public static function analyzerBuildingPromptsWith(ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient, int $maxConcurrent, AttackerPromptBuilderInterface $attackerPromptBuilder): ConcurrentChunkAnalyzer
+    {
+        return new ConcurrentChunkAnalyzer(
+            $toolBatchCapableLLMClient,
+            new ChunkContextFactory($attackerPromptBuilder, new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver()),
+            new AttackerChunkCache(new NullAttackerCache(), ChunkAnalysisInputs::vulnerabilityFactory(), new NullLogger()),
+            ChunkAnalysisInputs::vulnerabilityFactory(),
+            new NullLogger(),
+            new NullProgressReporter(),
             3,
             new RecordVulnerabilityToolFactory(),
             $maxConcurrent,
