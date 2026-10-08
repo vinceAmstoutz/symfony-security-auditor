@@ -105,6 +105,41 @@ final class EvalScorerTest extends TestCase
         self::assertSame(0, $evalReport->overall->falsePositives);
     }
 
+    public function test_a_path_the_model_echoed_with_a_leading_current_directory_still_matches_its_seed(): void
+    {
+        $groundTruthManifest = new GroundTruthManifest([new ExpectedFinding('src/A.php', 'sql_injection')]);
+
+        $evalReport = (new EvalScorer())->score($groundTruthManifest, [['file' => './src/A.php', 'type' => 'sql_injection']]);
+
+        self::assertSame(1, $evalReport->overall->truePositives);
+        self::assertSame(0, $evalReport->overall->falsePositives);
+        self::assertSame(0, $evalReport->overall->falseNegatives);
+    }
+
+    public function test_a_seed_written_with_a_leading_current_directory_matches_the_reported_path(): void
+    {
+        $groundTruthManifest = new GroundTruthManifest([new ExpectedFinding('./src/A.php', 'sql_injection')]);
+
+        $evalReport = (new EvalScorer())->score($groundTruthManifest, [['file' => 'src/A.php', 'type' => 'sql_injection']]);
+
+        self::assertSame(1, $evalReport->overall->truePositives);
+        self::assertSame(0, $evalReport->overall->falsePositives);
+        self::assertSame(0, $evalReport->overall->falseNegatives);
+    }
+
+    public function test_the_same_file_reported_with_and_without_a_leading_current_directory_is_counted_once(): void
+    {
+        $groundTruthManifest = new GroundTruthManifest([new ExpectedFinding('src/A.php', 'sql_injection')]);
+
+        $evalReport = (new EvalScorer())->score($groundTruthManifest, [
+            ['file' => './src/A.php', 'type' => 'sql_injection'],
+            ['file' => 'src/A.php', 'type' => 'sql_injection'],
+        ]);
+
+        self::assertSame(1, $evalReport->overall->truePositives);
+        self::assertSame(0, $evalReport->overall->falsePositives);
+    }
+
     public function test_an_empty_manifest_with_no_findings_scores_perfect_by_convention(): void
     {
         $evalReport = (new EvalScorer())->score(new GroundTruthManifest([]), []);

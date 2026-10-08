@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
@@ -123,7 +123,7 @@ final readonly class EstimateAuditCostUseCase
         $auditContext = AuditContext::forProject($projectPath, $scanPaths, diffSinceRef: $diffSinceRef);
         $auditContext->markAsCostEstimate();
 
-        $files = $this->filterByScanPaths($this->projectFileScanner->scan($projectPath), $scanPaths);
+        $files = ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths);
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             $files = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
         }
@@ -228,17 +228,6 @@ final readonly class EstimateAuditCostUseCase
         $skillPrompt = $this->attackerSkillPromptRenderer->render($presentTypes, $this->emitAllSkills);
 
         return '' === $skillPrompt ? 0 : $this->tokenEstimator->estimateTokens($skillPrompt, $this->primaryModel);
-    }
-
-    /**
-     * @param list<ProjectFile> $files
-     * @param list<string>      $scanPaths
-     *
-     * @return list<ProjectFile>
-     */
-    private function filterByScanPaths(array $files, array $scanPaths): array
-    {
-        return ScanPathFilter::apply($files, $scanPaths);
     }
 
     /**

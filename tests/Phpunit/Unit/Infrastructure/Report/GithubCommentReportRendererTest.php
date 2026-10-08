@@ -107,6 +107,19 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_gives_no_grade_to_a_scan_that_found_no_file(): void
+    {
+        $output = $this->renderer->render($this->makeReportOfAScanThatFoundNoFile());
+
+        self::assertStringContainsString("## Security audit: incomplete (no file was analyzed)\n\n**Risk level:** UNKNOWN · ", $output);
+        self::assertStringContainsString('> ⚠️ **Audit incomplete: the scan found no file to audit, so this report has no verdict', $output);
+        self::assertStringNotContainsString('100/100', $output);
+        self::assertStringNotContainsString('No validated vulnerabilities found.', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_never_calls_an_incomplete_audit_clean(): void
     {
         self::assertStringNotContainsString('No validated vulnerabilities found.', $this->renderer->render($this->makeIncompleteReport()));

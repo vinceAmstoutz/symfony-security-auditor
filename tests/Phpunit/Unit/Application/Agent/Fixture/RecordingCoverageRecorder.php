@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixt
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\FailureReasonRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRecorderInterface;
 
 /**
@@ -25,10 +26,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRe
  * without mocking the port. Drain semantics mirror the production recorder
  * (return-and-clear).
  */
-final class RecordingCoverageRecorder implements CoverageRecorderInterface, RejectedFindingRecorderInterface
+final class RecordingCoverageRecorder implements CoverageRecorderInterface, RejectedFindingRecorderInterface, FailureReasonRecorderInterface
 {
     /** @var list<array{stage: string, filePath: string, status: string}> */
     public array $coverage = [];
+
+    /** @var list<array{stage: string, filePath: string, reason: string}> */
+    public array $failureReasons = [];
 
     /** @var list<Vulnerability> */
     public array $reviewed = [];
@@ -43,6 +47,12 @@ final class RecordingCoverageRecorder implements CoverageRecorderInterface, Reje
     public function recordCoverage(string $stage, string $filePath, string $status): void
     {
         $this->coverage[] = ['stage' => $stage, 'filePath' => $filePath, 'status' => $status];
+    }
+
+    #[Override]
+    public function recordFailureReason(string $stage, string $filePath, string $reason): void
+    {
+        $this->failureReasons[] = ['stage' => $stage, 'filePath' => $filePath, 'reason' => $reason];
     }
 
     #[Override]

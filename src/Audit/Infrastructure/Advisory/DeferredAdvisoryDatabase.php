@@ -20,7 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
 /**
  * Defers constructing {@see ComposerAuditAdvisoryDatabase} — and therefore
  * running `composer audit` — until the first {@see self::lookup()} call,
- * memoizing the result for as long as the holder's path stays unchanged.
+ * memoizing the result for as long as the holder's path and the content of the
+ * project's `composer.lock` stay unchanged. A load that failed is never
+ * memoized: the next lookup tries `composer audit` again.
  *
  * `ComposerAuditAdvisoryDatabase` is `final readonly`, so it cannot be a
  * Symfony `->lazy()` service: proxy generation requires either a native PHP
@@ -30,23 +32,24 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  * `AuditCommand` sets it — without relying on proxy generation.
  *
  * Not readonly: it memoizes the inner database on first use, and rebuilds it
- * whenever the holder is re-targeted to a different project — a service
- * instance reused across two audits must not keep serving the first
- * project's stale snapshot (stateful collaborator carve-out — same shape as
- * `AuditedProjectPathHolder`).
+ * whenever the holder is re-targeted to a different project or the lockfile is
+ * rewritten — a service instance reused across two audits (`mcp:serve`) must
+ * not keep serving a stale snapshot (stateful collaborator carve-out — same
+ * shape as `AuditedProjectPathHolder`).
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
 {
-    private ?AdvisoryDatabaseInterface $advisoryDatabase = null;
+    private ?ComposerAuditAdvisoryDatabase $composerAuditAdvisoryDatabase = null;
 
-    private ?string $memoizedProjectPath = null;
+    private ?string $memoizedSnapshotKey = null;
 
     public function __construct(
         private readonly ComposerAuditRunnerInterface $composerAuditRunner,
         private readonly AuditedProjectPathHolder $auditedProjectPathHolder,
         private readonly LoggerInterface $logger,
+        private readonly LockfileHasher $lockfileHasher,
     ) {}
 
     #[Override]
@@ -55,20 +58,33 @@ final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
         return $this->innerDatabase()->lookup($packageName, $installedVersion);
     }
 
-    /**
-     * Rebuilds the inner database whenever the holder's path has moved since
-     * the last lookup — otherwise a service instance reused across a second
-     * audit of a different project would keep serving the first project's
-     * stale `composer audit` snapshot.
-     */
     private function innerDatabase(): AdvisoryDatabaseInterface
     {
-        $currentProjectPath = $this->auditedProjectPathHolder->path();
-        if (!$this->advisoryDatabase instanceof AdvisoryDatabaseInterface || $currentProjectPath !== $this->memoizedProjectPath) {
-            $this->advisoryDatabase = new ComposerAuditAdvisoryDatabase($this->composerAuditRunner, $this->auditedProjectPathHolder, $this->logger);
-            $this->memoizedProjectPath = $currentProjectPath;
+        $snapshotKey = $this->snapshotKey();
+        if ($this->composerAuditAdvisoryDatabase instanceof ComposerAuditAdvisoryDatabase && $snapshotKey === $this->memoizedSnapshotKey) {
+            return $this->composerAuditAdvisoryDatabase;
         }
 
-        return $this->advisoryDatabase;
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->composerAuditRunner, $this->auditedProjectPathHolder, $this->logger);
+        if ($composerAuditAdvisoryDatabase->hasFailedToLoad()) {
+            return $composerAuditAdvisoryDatabase;
+        }
+
+        $this->composerAuditAdvisoryDatabase = $composerAuditAdvisoryDatabase;
+        $this->memoizedSnapshotKey = $snapshotKey;
+
+        return $composerAuditAdvisoryDatabase;
+    }
+
+    /**
+     * Otherwise a service instance reused across a second audit of a
+     * different project, or of the same project after `composer update`,
+     * would keep serving the first `composer audit` snapshot.
+     */
+    private function snapshotKey(): string
+    {
+        $projectPath = $this->auditedProjectPathHolder->path();
+
+        return \sprintf("%s\0%s", $projectPath, $this->lockfileHasher->hash($projectPath) ?? '');
     }
 }

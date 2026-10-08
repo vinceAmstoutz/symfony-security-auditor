@@ -17,11 +17,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
@@ -38,6 +40,7 @@ final class RiskHeadlineTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
      */
     #[DataProvider('runs')]
     public function test_it_states_the_risk_level_of_every_run_that_reached_a_verdict(array $attackerStatuses, bool $holdsAFinding, string $expectedRiskLevel): void
@@ -54,6 +57,7 @@ final class RiskHeadlineTest extends TestCase
         yield 'a partly failed run' => [['analyzed', 'errored'], true, 'LOW'];
         yield 'a run that analyzed no file yet holds a finding' => [['errored', 'aborted'], true, 'LOW'];
         yield 'a run that analyzed no file and found nothing' => [['errored', 'aborted'], false, 'UNKNOWN'];
+        yield 'a scan that found no file' => [[], false, 'UNKNOWN'];
     }
 
     /**
@@ -63,6 +67,7 @@ final class RiskHeadlineTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
      */
     #[DataProvider('scoreDetails')]
     public function test_it_qualifies_the_score_by_what_the_run_analyzed(array $attackerStatuses, bool $holdsAFinding, string $expectedScoreDetail): void
@@ -79,6 +84,7 @@ final class RiskHeadlineTest extends TestCase
         yield 'a partly failed run' => [['analyzed', 'errored'], true, 'Score: 10, on the files analyzed'];
         yield 'a run that analyzed no file yet holds a finding' => [['errored', 'aborted'], true, 'Score: 10, on the files analyzed'];
         yield 'a run that analyzed no file and found nothing' => [['errored', 'aborted'], false, 'no file was analyzed'];
+        yield 'a scan that found no file' => [[], false, 'no file was analyzed'];
     }
 
     /**
@@ -88,13 +94,19 @@ final class RiskHeadlineTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
      */
     private function report(array $attackerStatuses, bool $holdsAFinding): AuditReport
     {
         $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $files = [];
         foreach ($attackerStatuses as $index => $status) {
-            $auditContext->recordCoverage('attacker', \sprintf('src/File%d.php', $index), $status);
+            $path = \sprintf('src/File%d.php', $index);
+            $files[] = ProjectFile::create($path, sys_get_temp_dir().'/'.$path, '<?php');
+            $auditContext->recordCoverage('attacker', $path, $status);
         }
+
+        $auditContext->setProjectFiles($files);
 
         if ($holdsAFinding) {
             $auditContext->addVulnerability(Vulnerability::of(

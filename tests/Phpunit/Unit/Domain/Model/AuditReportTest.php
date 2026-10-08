@@ -999,6 +999,32 @@ final class AuditReportTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_scan_that_discovered_no_file_has_no_verdict(): void
+    {
+        $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+
+        self::assertSame(0, $auditReport->filesDiscovered());
+        self::assertTrue($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_diff_run_that_left_no_file_to_analyze_still_has_a_verdict(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setMappingFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame(0, $auditReport->filesScanned());
+        self::assertFalse($auditReport->hasNoVerdict());
+    }
+
+    /**
      * @param list<array{string, string, string}> $coverage
      *
      * @throws InvalidAuditContextException
