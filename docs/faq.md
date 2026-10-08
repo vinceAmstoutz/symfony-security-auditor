@@ -209,7 +209,7 @@ For a stricter guarantee, run the audit in a network namespace or container that
 
 ### Does it log my source code anywhere?
 
-Locally, only via `LoggerInterface` warnings if the Attacker / Reviewer fails to parse JSON or the advisory feed fails to load — and only the **error context**, not the source. The filesystem cache (`cache.dir`) stores LLM **responses** keyed by content hash; no plaintext source code is written to the cache.
+Locally, only via `LoggerInterface` warnings if the Attacker / Reviewer fails to parse JSON or the advisory feed fails to load — and only the **error context**, not the source. The filesystem cache (`cache.dir`) stores LLM **responses** keyed by content hash: the findings the model reported, with the short source excerpts it quoted as evidence, and the reviewer's reasoning. No project file is written to it, but the entries describe unfixed vulnerabilities, so treat the directory like a report and keep it out of shared CI caches and public artifacts.
 
 ### What about the `lookup_advisory` tool?
 
