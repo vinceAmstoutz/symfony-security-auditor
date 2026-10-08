@@ -28,6 +28,8 @@ final readonly class AttackerContextPromptRenderer
 {
     private const int MAX_TITLE_LENGTH = 120;
 
+    private const int MAX_LISTED_LOCATIONS = 100;
+
     /**
      * @param list<RiskMarker> $markers
      */
@@ -61,20 +63,7 @@ final readonly class AttackerContextPromptRenderer
      */
     public function renderPreviousFindings(array $previousFindings): string
     {
-        $byType = [];
-        foreach ($previousFindings as $previousFinding) {
-            $byType[$previousFinding->type()->value][] = \sprintf(
-                '%s:%d-%d',
-                $this->sanitizeLine($previousFinding->filePath()),
-                $previousFinding->lineStart(),
-                $previousFinding->lineEnd(),
-            );
-        }
-
-        $lines = [];
-        foreach ($byType as $type => $locations) {
-            $lines[] = \sprintf('- %s: %s', $type, implode(', ', $locations));
-        }
+        $lines = $this->locationLines($previousFindings);
 
         return <<<PROMPT
             ## Patterns Already Confirmed in Earlier Iterations
@@ -91,20 +80,7 @@ final readonly class AttackerContextPromptRenderer
      */
     public function renderRejectedFindings(array $rejectedFindings): string
     {
-        $byType = [];
-        foreach ($rejectedFindings as $rejectedFinding) {
-            $byType[$rejectedFinding->type()->value][] = \sprintf(
-                '%s:%d-%d',
-                $this->sanitizeLine($rejectedFinding->filePath()),
-                $rejectedFinding->lineStart(),
-                $rejectedFinding->lineEnd(),
-            );
-        }
-
-        $lines = [];
-        foreach ($byType as $type => $locations) {
-            $lines[] = \sprintf('- %s: %s', $type, implode(', ', $locations));
-        }
+        $lines = $this->locationLines($rejectedFindings);
 
         return <<<PROMPT
             ## Findings Already Rejected by the Reviewer
@@ -139,6 +115,42 @@ final readonly class AttackerContextPromptRenderer
 
             {$this->indent(implode("\n", $lines))}
             PROMPT;
+    }
+
+    /**
+     * Each type with the locations of its findings, capped at
+     * {@see self::MAX_LISTED_LOCATIONS} findings since every chunk of a
+     * request carries the list.
+     *
+     * @param list<Vulnerability> $findings
+     *
+     * @return list<string>
+     */
+    private function locationLines(array $findings): array
+    {
+        $listed = \array_slice($findings, 0, self::MAX_LISTED_LOCATIONS);
+
+        $byType = [];
+        foreach ($listed as $finding) {
+            $byType[$finding->type()->value][] = \sprintf(
+                '%s:%d-%d',
+                $this->sanitizeLine($finding->filePath()),
+                $finding->lineStart(),
+                $finding->lineEnd(),
+            );
+        }
+
+        $lines = [];
+        foreach ($byType as $type => $locations) {
+            $lines[] = \sprintf('- %s: %s', $type, implode(', ', $locations));
+        }
+
+        $notListed = \count($findings) - \count($listed);
+        if ($notListed > 0) {
+            $lines[] = \sprintf('- … and %d more not listed', $notListed);
+        }
+
+        return $lines;
     }
 
     private function indent(string $content): string
