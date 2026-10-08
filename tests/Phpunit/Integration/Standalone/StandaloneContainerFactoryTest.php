@@ -140,6 +140,68 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
+    #[DataProvider('cacheDirectoriesHoldingPercentSigns')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_takes_a_cache_directory_holding_percent_signs_literally(string $cacheDir): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $cacheDir,
+        );
+
+        self::assertSame(
+            [$cacheDir, $cacheDir],
+            [$containerBuilder->getParameter('kernel.cache_dir'), $containerBuilder->getParameter('kernel.build_dir')],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function cacheDirectoriesHoldingPercentSigns(): iterable
+    {
+        yield 'a pair naming no parameter' => ['/tmp/%x%/cache'];
+        yield 'a doubled percent sign' => ['/tmp/a%%b/cache'];
+        yield 'an environment placeholder' => ['/tmp/%env(HOME)%/cache'];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_takes_a_working_directory_holding_percent_signs_literally(): void
+    {
+        $workingDirectory = sys_get_temp_dir().'/ssa-%x%-'.bin2hex(random_bytes(6));
+        (new Filesystem())->mkdir($workingDirectory);
+
+        try {
+            chdir($workingDirectory);
+
+            $containerBuilder = (new StandaloneContainerFactory())->create(
+                new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+                $this->cacheDir,
+            );
+
+            self::assertSame(getcwd(), $containerBuilder->getParameter('kernel.project_dir'));
+        } finally {
+            chdir(sys_get_temp_dir());
+            (new Filesystem())->remove($workingDirectory);
+        }
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_it_provides_every_service_the_ollama_platform_demands_outright(): void
