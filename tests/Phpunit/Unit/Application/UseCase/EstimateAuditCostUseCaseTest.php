@@ -500,6 +500,32 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
+    public function test_a_diff_that_leaves_no_file_still_counts_the_files_the_scan_found(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn([]);
+
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
+                $this->makeProjectFile('src/A.php', 'a'),
+                $this->makeProjectFile('src/B.php', 'b'),
+                $this->makeProjectFile('src/C.php', 'c'),
+            ],
+            'gitChangedFilesResolver' => $gitChangedFilesResolver,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir, [], 'main');
+
+        self::assertSame(3, $auditReport->filesDiscovered());
+        self::assertSame(0, $auditReport->filesScanned());
+        self::assertFalse($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_without_a_diff_since_ref_the_estimate_covers_every_file(): void
     {
         $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
