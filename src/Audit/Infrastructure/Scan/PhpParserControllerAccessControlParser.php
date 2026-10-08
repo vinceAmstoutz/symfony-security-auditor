@@ -54,12 +54,13 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         private NodeFinder $nodeFinder = new NodeFinder(),
         private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
         private IsGrantedAttributeParser $isGrantedAttributeParser = new IsGrantedAttributeParser(),
+        private NestingDepthGuard $nestingDepthGuard = new NestingDepthGuard(),
     ) {}
 
     #[Override]
     public function parse(ProjectFile $projectFile): array
     {
-        if (!$projectFile->fileType()->isControllerLike()) {
+        if (!$projectFile->fileType()->isControllerLike() || !$this->nestingDepthGuard->admits($projectFile)) {
             return [];
         }
 

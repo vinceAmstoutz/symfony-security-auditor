@@ -1496,6 +1496,26 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_skips_a_file_nested_too_deeply_to_parse_safely(): void
+    {
+        $nesting = str_repeat('f(', 33000).'1'.str_repeat(')', 33000);
+        $source = <<<PHP
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route('/admin')]
+                public function dashboard() { return {$nesting}; }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        self::assertSame([], $this->phpParserControllerAccessControlParser->parse($projectFile));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $relativePath, string $content): ProjectFile
     {
         return ProjectFile::create($relativePath, '/app/'.$relativePath, $content);

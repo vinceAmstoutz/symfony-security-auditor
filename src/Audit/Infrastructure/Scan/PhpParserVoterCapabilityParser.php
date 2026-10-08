@@ -44,12 +44,13 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     public function __construct(
         private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
         private VoterSupportedAttributeCollector $voterSupportedAttributeCollector = new VoterSupportedAttributeCollector(),
+        private NestingDepthGuard $nestingDepthGuard = new NestingDepthGuard(),
     ) {}
 
     #[Override]
     public function parse(ProjectFile $projectFile): ?VoterCapability
     {
-        if (ProjectFileType::VOTER !== $projectFile->fileType()) {
+        if (ProjectFileType::VOTER !== $projectFile->fileType() || !$this->nestingDepthGuard->admits($projectFile)) {
             return null;
         }
 
