@@ -669,6 +669,21 @@ final class ReportWriterTest extends TestCase
      * @throws UnsafeReportWriteException
      * @throws ReportWriteFailedException
      */
+    public function test_assert_writable_refuses_an_existing_output_file_that_is_not_a_regular_file(): void
+    {
+        $pipe = $this->tmpDir.'/report.pipe';
+        posix_mkfifo($pipe, 0o600);
+
+        $this->expectException(ReportWriteFailedException::class);
+        $this->expectExceptionMessage('before the audit spends anything');
+
+        $this->reportWriter->assertWritable($pipe, $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
     public function test_assert_writable_refuses_a_directory_as_the_output_file(): void
     {
         $this->expectException(ReportWriteFailedException::class);
