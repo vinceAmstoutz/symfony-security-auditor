@@ -42,6 +42,10 @@ final readonly class AttackerAnalysisRequest
      *                                               refines or discards each one — unlike
      *                                               previousFindings they are unvalidated and
      *                                               must be re-reported when confirmed
+     * @param ?list<ProjectFile>  $toolFiles         the files the investigation tools may open when they
+     *                                               are not the files to analyze — every scanned file on a
+     *                                               run narrowed by `--since`, `--path` or the escalation
+     *                                               deep pass; null means `files`
      */
     public function __construct(
         public array $files,
@@ -50,7 +54,16 @@ final readonly class AttackerAnalysisRequest
         public array $previousFindings = [],
         public array $rejectedFindings = [],
         public array $candidateFindings = [],
+        public ?array $toolFiles = null,
     ) {}
+
+    /**
+     * @return list<ProjectFile>
+     */
+    public function filesForTools(): array
+    {
+        return $this->toolFiles ?? $this->files;
+    }
 
     /**
      * @param list<ProjectFile>   $files
@@ -58,6 +71,6 @@ final readonly class AttackerAnalysisRequest
      */
     public function withFilesAndCandidateFindings(array $files, array $candidateFindings): self
     {
-        return new self($files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, $candidateFindings);
+        return new self($files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, $candidateFindings, $this->filesForTools());
     }
 }

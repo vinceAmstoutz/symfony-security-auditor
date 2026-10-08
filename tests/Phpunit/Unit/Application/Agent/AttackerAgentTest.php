@@ -92,8 +92,8 @@ final class AttackerAgentTest extends TestCase
     private string $tmpDir;
 
     /**
-     * @param list<ProjectFile>                                                                                         $files
-     * @param array{bypassCache?: bool, previousFindings?: list<Vulnerability>, rejectedFindings?: list<Vulnerability>} $overrides
+     * @param list<ProjectFile>                                                                                                                        $files
+     * @param array{bypassCache?: bool, previousFindings?: list<Vulnerability>, rejectedFindings?: list<Vulnerability>, toolFiles?: list<ProjectFile>} $overrides
      *
      * @return list<Vulnerability>
      */
@@ -106,6 +106,7 @@ final class AttackerAgentTest extends TestCase
                 $overrides['bypassCache'] ?? false,
                 $overrides['previousFindings'] ?? [],
                 $overrides['rejectedFindings'] ?? [],
+                toolFiles: $overrides['toolFiles'] ?? null,
             ),
             $coverageRecorder,
         );
@@ -1450,6 +1451,30 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['toolRegistryFactory' => $factory, 'toolsEnabled' => true]);
 
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
+    }
+
+    /**
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
+    public function test_its_tools_open_the_files_the_request_names_for_them_while_only_the_request_files_are_analyzed(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $toolFiles = [...$files, $this->makeFile('src/Service/Clean.php')];
+
+        $factory = $this->createMock(ToolRegistryFactoryInterface::class);
+        $factory->expects(self::once())->method('forProjectFiles')->with($toolFiles)->willReturn(new ToolRegistry([], new NullLogger()));
+
+        $recordingLLMClient = new RecordingLLMClient();
+
+        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient, ['toolRegistryFactory' => $factory, 'toolsEnabled' => true]);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['toolFiles' => $toolFiles]);
+
+        self::assertCount(1, $recordingLLMClient->capturedUserMessages);
+        self::assertStringContainsString('src/Controller/A.php', $recordingLLMClient->capturedUserMessages[0]);
+        self::assertStringNotContainsString('src/Service/Clean.php', $recordingLLMClient->capturedUserMessages[0]);
     }
 
     /**

@@ -43,6 +43,9 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
     /** @var list<ProjectFile> */
     public array $lastFiles = [];
 
+    /** @var list<ProjectFile> */
+    public array $lastToolFiles = [];
+
     /** @var list<Vulnerability> */
     public array $lastPreviousFindings = [];
 
@@ -75,6 +78,7 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
     {
         ++$this->callCount;
         $this->lastFiles = $attackerAnalysisRequest->files;
+        $this->lastToolFiles = $attackerAnalysisRequest->filesForTools();
         $this->lastPreviousFindings = $attackerAnalysisRequest->previousFindings;
         $this->previousFindingsCountPerCall[] = \count($attackerAnalysisRequest->previousFindings);
         $this->lastRejectedFindings = $attackerAnalysisRequest->rejectedFindings;

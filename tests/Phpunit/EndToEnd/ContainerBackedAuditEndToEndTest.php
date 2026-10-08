@@ -54,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ConnectionCutAfterToolAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ExploringAuditPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\FileReadingAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAuditPlatform;
@@ -585,6 +586,26 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         self::assertSame(['src/Service/Clean.php'], $this->analyzedFiles($configured));
         self::assertSame(['src/Controller/AdminController.php'], $this->analyzedFiles($overridden));
         self::assertSame(['src/Controller/AdminController.php'], $this->filesWithFindings($overridden));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_the_tools_of_a_scoped_run_read_a_scanned_file_outside_the_path(): void
+    {
+        FileReadingAuditPlatform::$answers = [];
+        $kernel = $this->boot(
+            ['model' => 'gpt-4o', 'audit' => ['reviewer_tools_enabled' => true, 'reviewer_structured_collection' => false]],
+            FileReadingAuditPlatform::class,
+        );
+        $commandTester = $this->auditCommandTester($kernel);
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['src/Controller'], '--format' => 'json']);
+
+        $report = $this->decode($commandTester->getDisplay());
+        $cleanService = (string) file_get_contents($this->fixtureDir.'/src/Service/Clean.php');
+        self::assertSame(['src/Controller/AdminController.php'], $this->analyzedFiles($report));
+        self::assertSame(['attacker' => $cleanService, 'reviewer' => $cleanService], FileReadingAuditPlatform::$answers);
+        self::assertSame(['src/Controller/AdminController.php'], $this->filesWithFindings($report));
     }
 
     #[RunInSeparateProcess]
