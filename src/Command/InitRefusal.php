@@ -211,7 +211,7 @@ final readonly class InitRefusal
             return self::sentence('"%s" uses an instance name holding a character a service name cannot contain: an apostrophe, a line break, a null byte, or a trailing backslash.', $provider, $platform);
         }
 
-        if (!ContainerParameterSyntax::isAbsentFrom($instance)) {
+        if (ContainerParameterSyntax::holdsReference($instance)) {
             return self::sentence('"%s" uses an instance name holding "%%...%%", which would be read as a container parameter rather than as part of the name.', $provider, $platform);
         }
 

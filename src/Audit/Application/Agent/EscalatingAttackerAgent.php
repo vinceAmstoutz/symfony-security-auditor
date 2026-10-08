@@ -42,7 +42,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  *      and its silence is a discard — so a refined location or type never
  *      reaches the reviewer twice; cheap findings on files it did not judge
  *      (cold files, or hot files it errored on) pass through, deduplicated
- *      by Vulnerability::id().
+ *      by Vulnerability::id(). A discarded cheap finding also leaves the
+ *      coverage recorder's recoverable findings, so draining them after the
+ *      pass cannot bring it back.
  *
  * Net effect: full-project coverage at roughly 1/3 to 1/5 of running the
  * expensive model on every chunk, with detection quality close to the
@@ -87,7 +89,39 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
             $statusTrackingCoverageRecorder,
         );
 
-        return $this->merge($cheapFindings, $expensiveFindings, $statusTrackingCoverageRecorder->analyzedFiles());
+        $analyzedByExpensive = $statusTrackingCoverageRecorder->analyzedFiles();
+        $this->withdrawFromRecovery($coverageRecorder, array_filter(
+            $cheapFindings,
+            fn (Vulnerability $vulnerability): bool => $this->isJudged($vulnerability, $analyzedByExpensive),
+        ));
+
+        return $this->merge($cheapFindings, $expensiveFindings, $analyzedByExpensive);
+    }
+
+    /**
+     * A cheap finding the deep pass judged and dropped was recorded for
+     * recovery while the cheap pass ran. Left there, the orchestrator's drain
+     * of recovered findings would bring it back and undo the discard, so it
+     * leaves the buffer and only a finding this pass keeps, or one a chunk
+     * recorded but could not return, stays recoverable.
+     *
+     * @param array<Vulnerability> $discarded
+     */
+    private function withdrawFromRecovery(CoverageRecorderInterface $coverageRecorder, array $discarded): void
+    {
+        foreach ($coverageRecorder->drainFoundVulnerabilities() as $vulnerability) {
+            if (!\in_array($vulnerability, $discarded, true)) {
+                $coverageRecorder->recordFoundVulnerability($vulnerability);
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $analyzedByExpensive
+     */
+    private function isJudged(Vulnerability $vulnerability, array $analyzedByExpensive): bool
+    {
+        return \in_array(EchoedFilePath::normalize($vulnerability->filePath()), $analyzedByExpensive, true);
     }
 
     /**
@@ -132,7 +166,7 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
         }
 
         foreach ($cheap as $vulnerability) {
-            if (\in_array(EchoedFilePath::normalize($vulnerability->filePath()), $analyzedByExpensive, true) || \array_key_exists($vulnerability->id(), $byId)) {
+            if ($this->isJudged($vulnerability, $analyzedByExpensive) || \array_key_exists($vulnerability->id(), $byId)) {
                 continue;
             }
 

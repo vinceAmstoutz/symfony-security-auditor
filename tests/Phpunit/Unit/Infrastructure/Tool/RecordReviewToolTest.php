@@ -173,4 +173,56 @@ final class RecordReviewToolTest extends TestCase
 
         self::assertSame('recorded', $recordReviewTool->execute(['id' => 'VULN-1', 'accepted' => false]));
     }
+
+    #[DataProvider('requiredArguments')]
+    public function test_execute_refuses_a_call_missing_a_required_argument_and_records_nothing(string $name): void
+    {
+        $reviewCollector = new ReviewCollector();
+        $recordReviewTool = new RecordReviewTool($reviewCollector);
+        $arguments = ['id' => 'VULN-1', 'accepted' => true, 'reviewer_notes' => 'real risk'];
+        unset($arguments[$name]);
+
+        $result = $recordReviewTool->execute($arguments);
+
+        self::assertSame(\sprintf('Error: missing required argument "%s".', $name), $result);
+        self::assertSame([], $reviewCollector->drain());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     *
+     * @throws InvalidToolDefinitionException
+     */
+    public static function requiredArguments(): iterable
+    {
+        $required = (new RecordReviewTool(new ReviewCollector()))->definition()->parametersSchema['required'] ?? [];
+        self::assertIsArray($required);
+
+        foreach ($required as $name) {
+            self::assertIsString($name);
+
+            yield $name => [$name];
+        }
+    }
+
+    public function test_execute_refuses_a_finding_id_that_is_not_a_string_and_records_nothing(): void
+    {
+        $reviewCollector = new ReviewCollector();
+        $recordReviewTool = new RecordReviewTool($reviewCollector);
+
+        $result = $recordReviewTool->execute(['id' => 7, 'accepted' => true]);
+
+        self::assertSame('Error: argument "id" must be a string.', $result);
+        self::assertSame([], $reviewCollector->drain());
+    }
+
+    public function test_execute_records_a_rejection(): void
+    {
+        $reviewCollector = new ReviewCollector();
+        $recordReviewTool = new RecordReviewTool($reviewCollector);
+
+        $recordReviewTool->execute(['id' => 'VULN-1', 'accepted' => false]);
+
+        self::assertSame([['id' => 'VULN-1', 'accepted' => false]], $reviewCollector->drain());
+    }
 }

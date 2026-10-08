@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
 
 final class ListScannedFilesUseCaseTest extends TestCase
 {
@@ -39,6 +40,22 @@ final class ListScannedFilesUseCaseTest extends TestCase
             ['src/Controller/HomeController.php', 'config/packages/security.yaml'],
             array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files),
         );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scan_paths_replace_the_configured_scan_for_a_scanner_that_can_take_them(): void
+    {
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [$this->makeProjectFile('src/Configured.php')],
+            [$this->makeProjectFile('apps/api/src/Outside.php')],
+        );
+
+        $files = (new ListScannedFilesUseCase($recordingScopedScanner))->execute('/project', ['apps/api']);
+
+        self::assertSame(['apps/api/src/Outside.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
+        self::assertSame([['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
     }
 
     /**
