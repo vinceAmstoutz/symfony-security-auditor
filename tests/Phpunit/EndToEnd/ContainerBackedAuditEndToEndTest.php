@@ -289,11 +289,241 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         self::assertSame(ExitCode::Failure->value, $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => 'json']));
     }
 
+    #[DataProvider('scopedRunFromOutsideCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_scoped_run_started_outside_the_project_audits_only_the_scoped_directory(string $workingFolder, string $projectArgument, string $pathArgument): void
+    {
+        $this->addVulnerableCommand();
+        $base = \dirname($this->kernelDir);
+        $workingDirectory = 'base' === $workingFolder ? $base : $base.'/elsewhere';
+        (new Filesystem())->mkdir($workingDirectory);
+        $previousWorkingDirectory = getcwd();
+        self::assertNotFalse($previousWorkingDirectory);
+        chdir($workingDirectory);
+
+        try {
+            $commandTester = new CommandTester($this->auditCommand($this->boot(['model' => 'gpt-4o'])));
+            $commandTester->execute([
+                'project-path' => 'absolute' === $projectArgument ? $this->fixtureDir : $projectArgument,
+                '--path' => ['absolute' === $pathArgument ? $this->fixtureDir.'/src/Command' : $pathArgument],
+                '--format' => 'json',
+            ]);
+        } finally {
+            chdir($previousWorkingDirectory);
+        }
+
+        $report = $this->decode($commandTester->getDisplay());
+        self::assertSame(1, $report['files_scanned']);
+        self::assertSame(['since' => null, 'paths' => ['src/Command']], $report['scope']);
+        self::assertSame(['src/Command/PurgeCommand.php'], $this->analyzedFiles($report));
+        self::assertSame(['src/Command/PurgeCommand.php'], $this->filesWithFindings($report));
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function scopedRunFromOutsideCases(): iterable
+    {
+        yield 'a relative path, the project named by its absolute path' => ['elsewhere', 'absolute', 'src/Command'];
+        yield 'an absolute path inside the project' => ['elsewhere', 'absolute', 'absolute'];
+        yield 'the project named relative to the working directory' => ['base', 'fixture', 'src/Command'];
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_path_outside_the_default_scan_surface_is_audited_when_the_flag_names_it(): void
+    {
+        (new Filesystem())->dumpFile(
+            $this->fixtureDir.'/apps/api/src/ApiPurge.php',
+            "<?php\nnamespace Api;\nclass ApiPurge\n{\n    public function __invoke(): int\n    {\n        // SECURITY_AUDITOR_SINK\n        return (int) unserialize(\$_SERVER['argv'][1]);\n    }\n}\n",
+        );
+
+        $commandTester = new CommandTester($this->auditCommand($this->boot(['model' => 'gpt-4o'])));
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['apps/api'], '--format' => 'json']);
+
+        $report = $this->decode($commandTester->getDisplay());
+        self::assertSame(1, $report['files_scanned']);
+        self::assertSame(['since' => null, 'paths' => ['apps/api']], $report['scope']);
+        self::assertSame(['apps/api/src/ApiPurge.php'], $this->analyzedFiles($report));
+        self::assertSame(['apps/api/src/ApiPurge.php'], $this->filesWithFindings($report));
+    }
+
+    #[DataProvider('failOnPrecedenceCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_fail_on_flag_wins_over_the_configured_fail_on(string $configured, ?string $flag, int $expectedExitCode): void
+    {
+        $commandTester = new CommandTester($this->auditCommand($this->boot(['model' => 'gpt-4o', 'audit' => ['fail_on' => $configured]])));
+        $arguments = ['project-path' => $this->fixtureDir, '--format' => 'json'];
+
+        self::assertSame($expectedExitCode, $commandTester->execute(null === $flag ? $arguments : [...$arguments, '--fail-on' => $flag]));
+    }
+
+    /**
+     * @return iterable<string, array{string, ?string, int}>
+     */
+    public static function failOnPrecedenceCases(): iterable
+    {
+        yield 'the configured level alone, above the risk' => ['critical', null, 0];
+        yield 'the configured level alone, at the risk' => ['low', null, 1];
+        yield 'a flag that lowers the level below the risk' => ['critical', 'low', 1];
+        yield 'a flag that raises the level above the risk' => ['low', 'critical', 0];
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_baseline_flag_wins_over_the_configured_baseline(): void
+    {
+        $configuredBaseline = $this->fixtureDir.'/configured-baseline.json';
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['baseline' => $configuredBaseline]]);
+        $this->auditCommandTester($kernel)->execute(['project-path' => $this->fixtureDir, '--generate-baseline' => $configuredBaseline, '--format' => 'json']);
+
+        $withTheConfiguredBaseline = $this->decode($this->execute($kernel, 'json'));
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--baseline' => $this->fixtureDir.'/another-baseline.json', '--format' => 'json']);
+
+        $withTheFlag = $this->decode($commandTester->getDisplay());
+
+        self::assertSame(0, $withTheConfiguredBaseline['total_vulnerabilities']);
+        self::assertSame(1, $withTheFlag['total_vulnerabilities']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_no_cache_flag_wins_over_the_enabled_cache(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
+        $this->execute($kernel, 'json');
+
+        $served = $this->decode($this->execute($kernel, 'json'));
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--no-cache' => true, '--format' => 'json']);
+
+        $bypassed = $this->decode($commandTester->getDisplay());
+
+        self::assertContains('cached', $this->attackerStatuses($served));
+        self::assertNotContains('cached', $this->attackerStatuses($bypassed));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_path_flag_wins_over_the_configured_included_paths(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'scan' => ['included_paths' => ['src/Service']]]);
+
+        $configured = $this->decode($this->execute($kernel, 'json'));
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['src/Controller'], '--format' => 'json']);
+
+        $overridden = $this->decode($commandTester->getDisplay());
+
+        self::assertSame(['src/Service/Clean.php'], $this->analyzedFiles($configured));
+        self::assertSame(['src/Controller/AdminController.php'], $this->analyzedFiles($overridden));
+        self::assertSame(['src/Controller/AdminController.php'], $this->filesWithFindings($overridden));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_the_same_run_without_a_path_audits_every_directory_of_the_project(): void
+    {
+        $this->addVulnerableCommand();
+
+        $report = $this->decode($this->runAudit(['model' => 'gpt-4o'], 'json'));
+
+        self::assertSame(['src/Command/PurgeCommand.php', 'src/Controller/AdminController.php'], $this->filesWithFindings($report));
+    }
+
     /** @return iterable<string, array{array<string, mixed>}> */
     public static function collectionModeCases(): iterable
     {
         yield 'structured collection (tool calls)' => [[]];
         yield 'json collection (array fallback)' => [['audit' => ['structured_collection' => false, 'reviewer_structured_collection' => false]]];
+    }
+
+    private function auditCommandTester(Kernel $kernel): CommandTester
+    {
+        return new CommandTester($this->auditCommand($kernel));
+    }
+
+    /**
+     * @param array<array-key, mixed> $report
+     *
+     * @return list<string>
+     */
+    private function attackerStatuses(array $report): array
+    {
+        $statuses = [];
+        foreach ($this->entriesOf($report, 'coverage') as $entry) {
+            if ('attacker' === $this->fieldOf($entry, 'stage')) {
+                $statuses[] = $this->fieldOf($entry, 'status');
+            }
+        }
+
+        return $statuses;
+    }
+
+    private function addVulnerableCommand(): void
+    {
+        (new Filesystem())->dumpFile(
+            $this->fixtureDir.'/src/Command/PurgeCommand.php',
+            "<?php\nnamespace App\\Command;\nclass PurgeCommand\n{\n    public function __invoke(): int\n    {\n        // SECURITY_AUDITOR_SINK\n        return (int) unserialize(\$_SERVER['argv'][1]);\n    }\n}\n",
+        );
+    }
+
+    /**
+     * @param array<array-key, mixed> $report
+     *
+     * @return list<string>
+     */
+    private function analyzedFiles(array $report): array
+    {
+        $analyzed = [];
+        foreach ($this->entriesOf($report, 'coverage') as $entry) {
+            if ('attacker' === $this->fieldOf($entry, 'stage') && 'analyzed' === $this->fieldOf($entry, 'status')) {
+                $analyzed[] = $this->fieldOf($entry, 'file');
+            }
+        }
+
+        $files = array_values(array_unique($analyzed));
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * @param array<array-key, mixed> $report
+     *
+     * @return list<string>
+     */
+    private function filesWithFindings(array $report): array
+    {
+        $files = array_values(array_unique(array_map(fn (mixed $entry): string => $this->fieldOf($entry, 'file'), $this->entriesOf($report, 'vulnerabilities'))));
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * @param array<array-key, mixed> $report
+     *
+     * @return array<array-key, mixed>
+     */
+    private function entriesOf(array $report, string $key): array
+    {
+        $entries = $report[$key] ?? null;
+        self::assertIsArray($entries);
+
+        return $entries;
+    }
+
+    private function fieldOf(mixed $entry, string $field): string
+    {
+        self::assertIsArray($entry);
+        $value = $entry[$field] ?? null;
+        self::assertIsString($value);
+
+        return $value;
     }
 
     /**

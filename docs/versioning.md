@@ -100,6 +100,7 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 - `BatchCapableLLMClientInterface` — opt-in extension of `LLMClientInterface` for clients that resolve several prompts concurrently. Consumers check `instanceof` and fall back to looping `complete()`, so it never breaks an existing client.
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
+- `ScopedProjectFileScannerInterface` — opt-in extension of `ProjectFileScannerInterface` for scanners that can be told which paths to scan, so that `--path` replaces the configured scope. Consumers check `instanceof` and fall back to narrowing the result of `scan()`, so it never breaks an existing scanner.
 - `AttackerCacheInterface`
 - `ReviewerCacheInterface` — host applications may implement this and alias it to back the reviewer-verdict cache with their own store (Redis, a shared filesystem, …).
 - `StaticPreScannerInterface` — host applications may implement this and alias it to supply their own deterministic risk-marker scan.
