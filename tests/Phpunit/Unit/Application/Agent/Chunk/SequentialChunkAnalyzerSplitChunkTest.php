@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\Sequentia
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -36,6 +37,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\ChunkAnalysisInputs;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\SequentialChunkAnalyzerHarness;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
@@ -110,6 +113,44 @@ final class SequentialChunkAnalyzerSplitChunkTest extends TestCase
             ],
             $recordingCoverageRecorder->coverage,
         );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_a_file_the_pre_scanner_flags_on_every_line_is_analyzed_instead_of_stopping_the_run(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/FloodController.php',
+            '/app/src/Controller/FloodController.php',
+            "<?php\nclass FloodController extends AbstractController\n{\n".str_repeat("\$request->x;\n", 8000)."}\n",
+        );
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user): LLMResponse {
+            if (\strlen($system) + \strlen($user) > 800_000) {
+                throw new LLMRequestTooLargeException('prompt is too long');
+            }
+
+            return self::jsonAnswer('from the flooded file');
+        });
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        [$vulnerabilities] = $this->analyzer($llmClient, new NullAttackerCache(), false)->analyze(
+            [[$projectFile]],
+            $this->request(),
+            $recordingCoverageRecorder,
+            null,
+            new RiskMarkerIndex((new RegexStaticPreScanner())->scan([$projectFile])),
+        );
+
+        self::assertSame(['from the flooded file'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/Controller/FloodController.php', 'status' => 'analyzed']], $recordingCoverageRecorder->coverage);
     }
 
     /**

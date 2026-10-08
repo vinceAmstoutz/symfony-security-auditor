@@ -28,25 +28,21 @@ final readonly class AttackerContextPromptRenderer
 {
     private const int MAX_TITLE_LENGTH = 120;
 
+    private const int MAX_LISTED_MARKERS_PER_PATTERN = 20;
+
     private const int MAX_LISTED_LOCATIONS = 100;
 
     /**
+     * Lists the markers of a file's pattern up to a cap and counts the rest:
+     * a file flagged on every line would otherwise get hints several times its
+     * own size, resent with every iteration.
+     *
      * @param list<RiskMarker> $markers
      */
     public function renderRiskMarkers(array $markers): string
     {
-        $byFile = [];
-        foreach ($markers as $marker) {
-            $byFile[$this->sanitizeLine($marker->filePath())][] = \sprintf(
-                'L%d %s — %s',
-                $marker->line(),
-                $this->sanitizeLine($marker->pattern()),
-                $this->sanitizeLine($marker->description()),
-            );
-        }
-
         $blocks = [];
-        foreach ($byFile as $filePath => $lines) {
+        foreach ($this->markerLinesByFile($markers) as $filePath => $lines) {
             $blocks[] = \sprintf("%s:\n%s", $filePath, $this->indent(implode("\n", $lines)));
         }
 
@@ -115,6 +111,48 @@ final readonly class AttackerContextPromptRenderer
 
             {$this->indent(implode("\n", $lines))}
             PROMPT;
+    }
+
+    /**
+     * @param list<RiskMarker> $markers
+     *
+     * @return array<string, list<string>>
+     */
+    private function markerLinesByFile(array $markers): array
+    {
+        $lines = [];
+        $countsByFileAndPattern = [];
+        foreach ($markers as $marker) {
+            $filePath = $this->sanitizeLine($marker->filePath());
+            $pattern = $this->sanitizeLine($marker->pattern());
+            $count = ($countsByFileAndPattern[$filePath][$pattern] ?? 0) + 1;
+            $countsByFileAndPattern[$filePath][$pattern] = $count;
+
+            if ($count <= self::MAX_LISTED_MARKERS_PER_PATTERN) {
+                $lines[$filePath][] = \sprintf('L%d %s — %s', $marker->line(), $pattern, $this->sanitizeLine($marker->description()));
+            }
+        }
+
+        return $this->withUnlistedCounts($lines, $countsByFileAndPattern);
+    }
+
+    /**
+     * @param array<string, list<string>>       $lines
+     * @param array<string, array<string, int>> $countsByFileAndPattern
+     *
+     * @return array<string, list<string>>
+     */
+    private function withUnlistedCounts(array $lines, array $countsByFileAndPattern): array
+    {
+        foreach ($countsByFileAndPattern as $filePath => $countsByPattern) {
+            foreach ($countsByPattern as $pattern => $count) {
+                if ($count > self::MAX_LISTED_MARKERS_PER_PATTERN) {
+                    $lines[$filePath][] = \sprintf('+%d more %s markers not listed', $count - self::MAX_LISTED_MARKERS_PER_PATTERN, $pattern);
+                }
+            }
+        }
+
+        return $lines;
     }
 
     /**
