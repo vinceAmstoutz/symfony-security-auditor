@@ -47,6 +47,17 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     private const string GLUED_ENV_CREDENTIAL_KEY = '(?:API|APP|AUTH|ACCESS|SECRET|PRIVATE|CLIENT|MASTER|ACCOUNT|SIGNING|ENCRYPTION|JWT|OAUTH|SESSION|REFRESH|BEARER|PASS|DB|DATABASE|ROOT|ADMIN|USER|MYSQL|POSTGRES|PG|MONGO|REDIS|SMTP|MAIL|FTP|SSH){1,4}(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|PASS)';
 
     /**
+     * A plain YAML scalar cannot start with `*`: a placeholder standing alone
+     * as a mapping value, a list item or a flow entry is read as an alias and
+     * fails the whole document, so it is quoted.
+     */
+    private const string UNQUOTED_YAML_PLACEHOLDER = '/([:\-][ \t]++)(\*\*\*REDACTED:[a-z0-9_]++\*\*\*)(?=[ \t]*+(?:[,})\]#]|\r?$))/m';
+
+    private const string STATEMENT_CLOSERS = ';:,\'")]';
+
+    private const int MINIMUM_SECRET_LENGTH = 4;
+
+    /**
      * A DSN assignment whose value is a URL with no user part and no credential-named
      * parameter holds nothing to hide: `MAILER_DSN=null://null` or the stock
      * `MESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0`.
@@ -63,13 +74,18 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     /**
      * The first word of an unquoted value, shaped the way only PHP code is: a
      * variable followed by an access (`$request->`, `$_GET[`) or ending there
-     * (`$plain,`), a class constant (`self::DEFAULT_SECRET`, `Foo::BAR;`), or a
-     * call — static or a lower-case function — that ends the statement
-     * (`uniqid();`, `mt_rand(1000,`) or opens on a string, a variable or
-     * another call (`hash_hmac('sha256',`). `$2y$13$…`, `summer(2024)`,
-     * `abc('x')yz` or `P4ss::WORD_1` match none of them.
+     * (`$plain,`, `$plain)`), a class constant (`self::DEFAULT_SECRET`,
+     * `Foo::BAR;`, `\PDO::ATTR_KEY`), a global one (`\OPENSSL_KEYTYPE_RSA,`),
+     * an array opening on a variable, a string or a spread (`[$a, $b]`), a
+     * negation of any of them, a parenthesised variable or instance
+     * (`($a || $b)`, `(new Foo())`), a call nested in a call
+     * (`unserialize(serialize(`), or a call — static or a lower-case function —
+     * that ends the statement (`uniqid();`, `mt_rand(1000,`), closes an
+     * argument list or an array (`getenv('X')]`) or opens on a string, a
+     * variable or another call (`hash_hmac('sha256',`). `$2y$13$…`,
+     * `summer(2024)`, `abc('x')yz` or `P4ss::WORD_1` match none of them.
      */
-    private const string PHP_EXPRESSION = '/^(?:\$[A-Za-z_]\w*(?:[;,]?$|->|\?->|::|\[)|(?:self|static|parent)::[A-Z_][A-Z0-9_]*[;,]?$|[A-Z]\w*::[A-Z_][A-Z0-9_]*[;,]$|(?:\\\\?[a-z_]\w*|(?:self|static|parent|[A-Z]\w*)::[A-Za-z_]\w*)\((?:(?:[\'"$]|[a-z_]\w*\().*[,;()]|.*[;,])$)/';
+    private const string PHP_EXPRESSION = '/^!?(?:\$[A-Za-z_]\w*(?:[;,)\]]*$|->|\?->|::|\[)|(?:self|static|parent)::[A-Z_][A-Z0-9_]*[;,)\]]*$|[A-Z]\w*::[A-Z_][A-Z0-9_]*[;,)\]]+$|\\\\[A-Za-z_][\w\\\\]*(?:::[A-Za-z_]\w*)?[;,)\]]*$|\[(?:["\'$\]]|\.\.\.)|\((?:\$[A-Za-z_]|new$)|\\\\?[a-z_]\w*\([a-z_]\w*\(|(?:\\\\?[a-z_]\w*|(?:self|static|parent|[A-Z]\w*)::[A-Za-z_]\w*)\((?:(?:[\'"$]|[a-z_]\w*\().*[,;()\]]|.*[;,])$)/';
 
     private const string INLINE_CREDENTIAL_KEY = '(?:password|passwd|pwd|passphrase|(?<![a-z])pass(?![_-])|(?<![\w?&-])token(?![\w-])|secret|credentials|api[_-]?key|api[_-]?token|api[_-]?secret|access[_-]?token|access[_-]?key|auth[_-]?token|auth[_-]?key|client[_-]?secret|private[_-]?key|account[_-]?key|secret[_-]?key|app[_-]?key|app[_-]?secret|master[_-]?key|signing[_-]?key|encryption[_-]?key|session[_-]?secret|jwt[_-]?secret|refresh[_-]?token|bearer[_-]?token|(?:db|database|root|admin|user|mysql|postgres|pg|mongo|redis|smtp|mail|ftp|ssh)[_-]?pass(?:word|wd)?)';
 
@@ -135,8 +151,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
             SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
             SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+@~i',
-            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)%s)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\2)[^\n])*+\2|\S+)/m', $envCredentialName),
-            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=])|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \tA-Za-z0-9]*[A-Za-z0-9])?))/i', self::INLINE_CREDENTIAL_KEY, $envCredentialName),
+            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\n])*+\4|\S+)/m', $envCredentialName),
+            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*[\w-]+[ \t]*:))[ \tA-Za-z0-9]*[A-Za-z0-9])?))/i', self::INLINE_CREDENTIAL_KEY, $envCredentialName),
             SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', self::INLINE_CREDENTIAL_KEY),
             SecretPatternLabel::XmlParameter->value => \sprintf('~(<parameter\b[^>]{0,256}?\bkey=(["\'])[^"\'<>]{0,256}?%s[^"\'<>]{0,256}?\2[^>]{0,256}>)(?!\*\*\*REDACTED:)([^<\n]{4,})(?=</parameter>)~i', self::INLINE_CREDENTIAL_KEY),
             SecretPatternLabel::BearerToken->value => '/\bBearer\s+[A-Za-z0-9\-_.]{20,4096}\b/i',
@@ -166,6 +182,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     {
         foreach ($this->patterns as $label => $pattern) {
             $result = match (SecretPatternLabel::tryFrom($label)) {
+                SecretPatternLabel::EnvAssignment => preg_replace_callback($pattern, $this->redactEnvAssignment(...), $content),
                 SecretPatternLabel::InlineAssignment => preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content),
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
                 SecretPatternLabel::XmlParameter => preg_replace_callback($pattern, $this->redactXmlParameter(...), $content),
@@ -181,7 +198,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             $content = $result;
         }
 
-        return $content;
+        return preg_replace(self::UNQUOTED_YAML_PLACEHOLDER, '$1"$2"', $content) ?? $content;
     }
 
     /**
@@ -204,7 +221,6 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     private function replacementFor(string $label): string
     {
         return match (SecretPatternLabel::tryFrom($label)) {
-            SecretPatternLabel::EnvAssignment => \sprintf('$1=***REDACTED:%s***', $label),
             SecretPatternLabel::ConnectionUri => \sprintf('$1***REDACTED:%s***@', $label),
             SecretPatternLabel::BasicAuthorization => \sprintf('$1***REDACTED:%s***', $label),
             default => \sprintf('***REDACTED:%s***', $label),
@@ -230,18 +246,61 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     }
 
     /**
+     * A shell or dotenv assignment is rewritten to `NAME=***REDACTED***`. A PHP
+     * constant declaration is no such assignment: it keeps its spacing, its
+     * quotes and its terminator, and a value that is no string literal is code.
+     *
+     * @param array<int|string, string> $match
+     */
+    private function redactEnvAssignment(array $match): string
+    {
+        $isConstantDeclaration = '' !== ($match[2] ?? '');
+        if (!$isConstantDeclaration) {
+            return \sprintf('%s=%s', $match[1], SecretPatternLabel::EnvAssignment->placeholder());
+        }
+
+        $quote = $match[4] ?? '';
+        if ('' === $quote) {
+            return $match[0];
+        }
+
+        return \sprintf('%s%s%s%s%s', $match[1], $match[3], $quote, SecretPatternLabel::EnvAssignment->placeholder(), $quote);
+    }
+
+    /**
      * @param array<int|string, string> $match
      */
     private function redactInlineAssignment(array $match): string
     {
         $quote = $match[2] ?? '';
         $value = ($match[3] ?? '').($match[4] ?? '');
+        $secret = '' === $quote ? rtrim($value, self::STATEMENT_CLOSERS) : $value;
 
-        if ($this->isConfigPlaceholder($value) || $this->isCode($value, '' !== $quote)) {
+        if ($this->isKeptReadable($secret, $value, '' !== $quote)) {
             return $match[0];
         }
 
-        return \sprintf('%s%s***REDACTED:%s***%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote);
+        return \sprintf('%s%s***REDACTED:%s***%s%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote, substr($value, \strlen($secret)));
+    }
+
+    private function isKeptReadable(string $secret, string $value, bool $quoted): bool
+    {
+        return self::MINIMUM_SECRET_LENGTH > \strlen($secret)
+            || $this->isRedactionPlaceholder($secret)
+            || $this->isConfigPlaceholder($value)
+            || $this->isCode($value, $quoted)
+            || $this->isNeutralLiteral($secret, \strlen($secret) < \strlen($value));
+    }
+
+    /**
+     * `null`, `true` and `false` carry no secret, nor does a number that a
+     * statement or an argument list ends right after; a bare number in YAML or
+     * a dotenv file may still be a password.
+     */
+    private function isNeutralLiteral(string $secret, bool $terminated): bool
+    {
+        return 1 === preg_match('/\A(?:null|true|false)\z/i', $secret)
+            || ($terminated && 1 === preg_match('/\A[+-]?\d+(?:\.\d+)?\z/', $secret));
     }
 
     /**
@@ -308,6 +367,11 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     {
         return 1 === preg_match('/\A%[^%\s]+%\z/', $value)
             || 1 === preg_match('/\A\$(?:\{[A-Z_][A-Z0-9_]*\}|[A-Z_][A-Z0-9_]*)\z/', $value);
+    }
+
+    private function isRedactionPlaceholder(string $value): bool
+    {
+        return 1 === preg_match('/\A\*\*\*REDACTED:[a-z0-9_]+\*\*\*\z/', $value);
     }
 
     private function validatePattern(string $pattern): ?string
