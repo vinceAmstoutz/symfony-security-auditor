@@ -260,6 +260,23 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'php_array_env_reference' => ["'api_key' => '%env(ANTHROPIC_API_KEY)%'"];
     }
 
+    #[DataProvider('dollarValuesThatAreNoEnvironmentReferenceCases')]
+    public function test_a_dollar_value_that_is_no_environment_reference_is_redacted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function dollarValuesThatAreNoEnvironmentReferenceCases(): iterable
+    {
+        yield 'a quoted mixed-case word' => ["password: '\$ecretValue'", "password: '***REDACTED:inline_assignment***'"];
+        yield 'a double-quoted mixed-case word' => ['password: "$uperS3cret"', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a php array entry holding a mixed-case word' => ["'password' => '\$ecretValue',", "'password' => '***REDACTED:inline_assignment***',"];
+        yield 'a braced mixed-case word' => ['password = ${uperS3cret}', 'password = ***REDACTED:inline_assignment***'];
+        yield 'a braced lower-case word in quotes' => ["api_key: '\${dbPassword}'", "api_key: '***REDACTED:inline_assignment***'"];
+        yield 'a wrapped quoted mixed-case word' => ["'password' =>\n    '\$ecretValue',", "'password' =>\n'***REDACTED:multiline_assignment***',"];
+    }
+
     #[DataProvider('codeTheAuditorMustReadCases')]
     public function test_it_leaves_code_that_merely_names_a_credential_readable(string $input): void
     {
@@ -343,6 +360,76 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a literal shaped like a static call with a number' => ['secret: Foo::bar(1)', 'Foo::bar(1)'];
         yield 'a literal carrying on after what looks like a statement end' => ['password: $Abc;def123', 'Abc;def123'];
         yield 'a literal ending in a parenthesis after a dollar sign' => ['app_secret: $Secr3t)', 'Secr3t'];
+    }
+
+    #[DataProvider('bearerTokenLayoutCases')]
+    public function test_a_bearer_token_keeps_the_number_of_lines_it_spanned(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function bearerTokenLayoutCases(): iterable
+    {
+        $token = str_repeat('a1B2', 8);
+
+        yield 'the token on the next line' => ["Authorization: Bearer\n{$token}\nnext", "Authorization: ***REDACTED:bearer_token***\n\nnext"];
+        yield 'spaces then a break then the token' => ["Bearer  \n  {$token}", "***REDACTED:bearer_token***\n"];
+        yield 'two breaks before the token' => ["Bearer\n\n{$token}!", "***REDACTED:bearer_token***\n\n!"];
+        yield 'the token on the same line' => ["Bearer {$token}\nnext", "***REDACTED:bearer_token***\nnext"];
+    }
+
+    #[DataProvider('dsnsHoldingNoCredentialCases')]
+    public function test_a_dsn_without_a_credential_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function dsnsHoldingNoCredentialCases(): iterable
+    {
+        yield 'a doctrine messenger transport' => ['MESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0'];
+        yield 'a null mailer' => ['MAILER_DSN=null://null'];
+        yield 'a quoted null mailer' => ['MAILER_DSN="null://null"'];
+        yield 'a single-quoted sync transport' => ["MESSENGER_TRANSPORT_DSN='sync://'"];
+        yield 'a local smtp server with a port' => ['MAILER_DSN=smtp://localhost:1025'];
+        yield 'a transport with several harmless options' => ['MESSENGER_TRANSPORT_DSN=doctrine://default?table_name=messages&queue_name=default&redeliver_timeout=3600'];
+        yield 'a suffixed dsn name' => ['SENTRY_DSN_URL=https://sentry.example.com/1'];
+        yield 'a dsn followed by a comment' => ['MAILER_DSN=null://null # no mail in dev'];
+    }
+
+    #[DataProvider('dsnsHoldingACredentialCases')]
+    public function test_a_dsn_that_may_hold_a_credential_is_still_redacted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function dsnsHoldingACredentialCases(): iterable
+    {
+        yield 'a user and a password' => ['MAILER_DSN=smtp://user:pass@smtp.example.com:25', 'MAILER_DSN=***REDACTED:env_assignment***'];
+        yield 'an api key as the user' => ['MAILER_DSN=sendgrid://SG.abcdefghij@default', 'MAILER_DSN=***REDACTED:env_assignment***'];
+        yield 'an auth query parameter' => ['REDIS_DSN=redis://localhost?auth=hunter2', 'REDIS_DSN=***REDACTED:env_assignment***'];
+        yield 'a password query parameter after a harmless one' => ['MESSENGER_TRANSPORT_DSN=redis://localhost?stream=a&password=hunter2', 'MESSENGER_TRANSPORT_DSN=***REDACTED:env_assignment***'];
+        yield 'a token query parameter' => ['MAILER_DSN=mailgun+api://default?token=abcdef', 'MAILER_DSN=***REDACTED:env_assignment***'];
+        yield 'a secret query parameter' => ['MAILER_DSN=ses+api://default?client_secret=abcdef', 'MAILER_DSN=***REDACTED:env_assignment***'];
+        yield 'a credentials query parameter' => ['MAILER_DSN=ses+api://default?credentials=abcdef', 'MAILER_DSN=***REDACTED:env_assignment***'];
+        yield 'a key query parameter' => ['MAILER_DSN=mailjet+api://default?key=abcdef', 'MAILER_DSN=***REDACTED:env_assignment***'];
+        yield 'a parameter separated by a semicolon' => ['DATABASE_DSN=mysql://host;pwd=hunter2', 'DATABASE_DSN=***REDACTED:env_assignment***'];
+        yield 'a dsn that is no url' => ['DATABASE_DSN=pgsql:host=localhost;password=hunter2', 'DATABASE_DSN=***REDACTED:env_assignment***'];
+        yield 'a quoted dsn with a user' => ['MAILER_DSN="brevo+api://abcdef@default"', 'MAILER_DSN=***REDACTED:env_assignment***'];
+        yield 'a name that holds no dsn word' => ['API_KEY=https://example.com/feed', 'API_KEY=***REDACTED:env_assignment***'];
+        yield 'a dsn word and a credential word' => ['DSN_PASSWORD=hunter2supersecure', 'DSN_PASSWORD=***REDACTED:env_assignment***'];
+    }
+
+    public function test_a_stock_dotenv_file_raises_one_redaction_marker_for_its_one_secret(): void
+    {
+        $dotenv = "APP_ENV=dev\nAPP_SECRET=0123456789abcdef0123456789abcdef\nMESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0\nMAILER_DSN=null://null\n";
+
+        self::assertSame("APP_ENV=dev\nAPP_SECRET=***REDACTED:env_assignment***\nMESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0\nMAILER_DSN=null://null\n", $this->regexSecretScrubber->scrub($dotenv));
     }
 
     public function test_it_leaves_non_credential_content_unmodified(): void
@@ -546,11 +633,24 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame("\$config = [\n    'client_secret_value' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
     }
 
-    public function test_a_multiline_secret_spanning_two_newlines_reproduces_every_newline_it_spanned(): void
+    #[DataProvider('multilineAssignmentLayoutCases')]
+    public function test_a_multiline_secret_keeps_the_number_of_lines_it_spanned(string $input, string $expected): void
     {
-        $output = $this->regexSecretScrubber->scrub("password\n: \n'SuperSecretValue1234'");
+        $output = $this->regexSecretScrubber->scrub($input);
 
-        self::assertSame("password\n:\n\n'***REDACTED:multiline_assignment***'", $output);
+        self::assertSame($expected, $output);
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function multilineAssignmentLayoutCases(): iterable
+    {
+        yield 'a break before the delimiter and another after it' => ["password\n: \n'SuperSecretValue1234'", "password\n:\n'***REDACTED:multiline_assignment***'"];
+        yield 'a break before the delimiter only' => ["'password'\n=> 'SuperSecretValue1234'", "'password'\n=> '***REDACTED:inline_assignment***'"];
+        yield 'a break before a fat arrow and another after it' => ["'password'\n=>\n'SuperSecretValue1234'", "'password'\n=>\n'***REDACTED:multiline_assignment***'"];
+        yield 'two breaks before the delimiter' => ["secret\n\n=\n'SuperSecretValue1234'", "secret\n\n=\n'***REDACTED:multiline_assignment***'"];
+        yield 'a break after the delimiter only' => ["password:\n  'SuperSecretValue1234'", "password:\n'***REDACTED:multiline_assignment***'"];
+        yield 'windows line endings' => ["password:\r\n  'SuperSecretValue1234'", "password:\n'***REDACTED:multiline_assignment***'"];
     }
 
     public function test_a_symfony_placeholder_wrapped_to_the_next_line_is_left_unmodified(): void
@@ -855,6 +955,28 @@ final class RegexSecretScrubberTest extends TestCase
     {
         yield 'private key headers without an end marker' => [str_repeat('-----BEGIN PRIVATE KEY-----', 4855)];
         yield 'scheme characters with no scheme separator' => [str_repeat('a-', 65536).'@'];
+        yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
+        yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
+    }
+
+    #[RunInSeparateProcess]
+    public function test_a_dsn_longer_than_a_url_can_be_is_redacted_in_linear_time_without_the_jit(): void
+    {
+        ini_set('pcre.jit', '0');
+        $startedAt = hrtime(true);
+
+        $output = $this->regexSecretScrubber->scrub('MAILER_DSN=a://b'.str_repeat('?c=d', 131070));
+
+        self::assertLessThan(1.0, (hrtime(true) - $startedAt) / 1_000_000_000);
+        self::assertSame('MAILER_DSN=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_a_dsn_of_exactly_the_longest_credential_free_length_is_left_readable_and_one_character_more_is_redacted(): void
+    {
+        $value = 'a://'.str_repeat('b', 256);
+
+        self::assertSame('MAILER_DSN='.$value, $this->regexSecretScrubber->scrub('MAILER_DSN='.$value));
+        self::assertSame('MAILER_DSN=***REDACTED:env_assignment***', $this->regexSecretScrubber->scrub('MAILER_DSN='.$value.'b'));
     }
 
     private function secondsToScrubUnchanged(string $content): float
