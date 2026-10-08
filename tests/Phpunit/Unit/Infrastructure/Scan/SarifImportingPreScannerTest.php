@@ -373,6 +373,69 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws MalformedSarifFileException
      * @throws InvalidCustomRiskPatternException
      */
+    #[DataProvider('windowsDriveUriSpellings')]
+    public function test_a_windows_drive_artifact_uri_matches_the_scanned_file(string $projectRoot, string $uri): void
+    {
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [
+            $this->sarifResult('TaintedSql', 'Detected tainted SQL', $uri, 3),
+        ])]);
+
+        $markers = $this->scanner([$sarif], projectRoot: $projectRoot)
+            ->scan([$this->projectFile('src/A.php', $projectRoot)]);
+
+        self::assertCount(1, $markers, \sprintf('SARIF spells the file as %s under the project root %s, which must still resolve to the scanned file.', $uri, $projectRoot));
+        self::assertSame('src/A.php', $markers[0]->filePath());
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function windowsDriveUriSpellings(): iterable
+    {
+        yield 'file scheme with forward slashes' => ['C:/proj', 'file:///C:/proj/src/A.php'];
+        yield 'file scheme under a backslash project root' => ['C:\\proj', 'file:///C:/proj/src/A.php'];
+        yield 'file scheme under a project root ending in a separator' => ['C:/proj/', 'file:///C:/proj/src/A.php'];
+        yield 'file scheme with a lower-case drive letter' => ['C:\\proj', 'file:///c:/proj/src/A.php'];
+        yield 'file scheme under a lower-case project root drive' => ['c:/proj', 'file:///C:/proj/src/A.php'];
+        yield 'file scheme with two slashes' => ['C:/proj', 'file://C:/proj/src/A.php'];
+        yield 'bare drive path with backslashes' => ['C:\\proj', 'C:\\proj\\src\\A.php'];
+        yield 'dot segments before the file' => ['C:/proj', 'file:///C:/proj/lib/../src/A.php'];
+        yield 'percent-encoded space in the project root' => ['C:/Users/me/my app', 'file:///C:/Users/me/my%20app/src/A.php'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
+     */
+    #[DataProvider('windowsDriveUrisOutsideTheProject')]
+    public function test_a_windows_drive_artifact_uri_outside_the_project_is_dropped(string $uri): void
+    {
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [
+            $this->sarifResult('TaintedSql', 'Detected tainted SQL', $uri, 3),
+        ])]);
+
+        $markers = $this->scanner([$sarif], projectRoot: 'C:/proj')
+            ->scan([$this->projectFile('src/A.php', 'C:/proj')]);
+
+        self::assertSame([], $markers);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function windowsDriveUrisOutsideTheProject(): iterable
+    {
+        yield 'another drive' => ['file:///D:/proj/src/A.php'];
+        yield 'a sibling directory' => ['file:///C:/other/src/A.php'];
+        yield 'a directory sharing the project root as a prefix' => ['file:///C:/proj2/src/A.php'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
+     */
     public function test_a_percent_encoded_absolute_uri_resolves_under_a_project_root_holding_a_space(): void
     {
         $sarif = $this->writeSarif([$this->sarifRun('Psalm', [

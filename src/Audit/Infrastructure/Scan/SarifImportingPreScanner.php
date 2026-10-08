@@ -302,8 +302,8 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
      */
     private function normalizeUri(string $uri): string
     {
-        $normalized = u($this->decodePercentEncoding($uri))->trimPrefix('./');
-        $projectRootPrefix = u($this->auditedProjectPathHolder->path())->ensureEnd('/');
+        $normalized = u(WindowsDrivePath::normalize($this->decodePercentEncoding($uri)))->trimPrefix('./');
+        $projectRootPrefix = u(WindowsDrivePath::normalize($this->auditedProjectPathHolder->path()))->ensureEnd('/');
 
         return $normalized->trimPrefix($projectRootPrefix->toString())->trimStart('/')->toString();
     }
