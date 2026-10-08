@@ -23,6 +23,8 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
@@ -218,32 +220,81 @@ final class StandaloneContainerFactoryTest extends TestCase
     }
 
     /**
+     * @param array<array-key, mixed>         $auditConfig
+     * @param array<string, float|int|string> $expectedOptions
+     *
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    #[DataProvider('httpTimeouts')]
+    #[DataProvider('httpClientOptionCases')]
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
-    public function test_the_platform_reaches_the_provider_through_a_client_that_waits_as_long_as_configured(?float $configured, float $expected): void
+    public function test_the_platform_reaches_the_provider_through_a_client_that_waits_as_long_as_configured(?float $configured, array $auditConfig, array $expectedOptions): void
     {
         $standalonePlatformConfig = new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434']], 'ollama');
-        $standaloneConfig = null === $configured ? new StandaloneConfig([], $standalonePlatformConfig) : new StandaloneConfig([], $standalonePlatformConfig, httpTimeout: $configured);
+        $standaloneConfig = null === $configured ? new StandaloneConfig($auditConfig, $standalonePlatformConfig) : new StandaloneConfig($auditConfig, $standalonePlatformConfig, httpTimeout: $configured);
 
         $containerBuilder = (new StandaloneContainerFactory())->create($standaloneConfig, $this->cacheDir);
 
-        self::assertSame([['timeout' => $expected, 'max_duration' => 0]], $containerBuilder->getDefinition('http_client')->getArguments());
+        self::assertSame([$expectedOptions], $containerBuilder->getDefinition('http_client')->getArguments());
     }
 
     /**
-     * @return iterable<string, array{?float, float}>
+     * @return iterable<string, array{?float, array<array-key, mixed>, array<string, float|int|string>}>
      */
-    public static function httpTimeouts(): iterable
+    public static function httpClientOptionCases(): iterable
     {
-        yield 'ten minutes when none is configured' => [null, 600.0];
-        yield 'what the configuration sets' => [1800.0, 1800.0];
+        yield 'ten minutes when none is configured' => [null, [], ['timeout' => 600.0, 'max_duration' => 0]];
+        yield 'what the configuration sets' => [1800.0, [], ['timeout' => 1800.0, 'max_duration' => 0]];
+        yield 'no proxy when offline only' => [null, ['privacy' => ['offline_only' => true]], ['timeout' => 600.0, 'max_duration' => 0, 'no_proxy' => '*']];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_offline_only_keeps_the_provider_client_away_from_a_proxy_in_the_environment(): void
+    {
+        $proxy = stream_socket_server('tcp://127.0.0.1:0');
+        self::assertIsResource($proxy);
+        $proxyAddress = stream_socket_get_name($proxy, false);
+        self::assertIsString($proxyAddress);
+        $_SERVER['http_proxy'] = \sprintf('http://%s', $proxyAddress);
+        $_SERVER['no_proxy'] = '';
+        $_SERVER['NO_PROXY'] = '';
+
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['privacy' => ['offline_only' => true]],
+                new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434']], 'ollama'),
+            ),
+            $this->cacheDir,
+        );
+        $options = $containerBuilder->getDefinition('http_client')->getArguments()[0];
+        self::assertIsArray($options);
+
+        $failure = null;
+
+        try {
+            HttpClient::create($options)->request('GET', 'http://127.0.0.1:1/', ['timeout' => 0.5])->getStatusCode();
+        } catch (TransportExceptionInterface $transportException) {
+            $failure = $transportException;
+        }
+
+        $readable = [$proxy];
+        $write = null;
+        $except = null;
+
+        self::assertInstanceOf(TransportExceptionInterface::class, $failure);
+        self::assertSame(0, stream_select($readable, $write, $except, 0), 'the request reached the proxy');
     }
 
     /**
