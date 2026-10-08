@@ -1563,6 +1563,21 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         }
     }
 
+    #[DataProvider('scoresAtEitherBound')]
+    public function test_bundle_accepts_a_minimum_score_at_either_bound(int $score): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['min_score' => $score]]);
+
+        self::assertSame($score, $containerBuilder->getParameter('symfony_security_auditor.audit.min_score'));
+    }
+
+    /** @return iterable<string, array{int}> */
+    public static function scoresAtEitherBound(): iterable
+    {
+        yield 'the lowest score' => [0];
+        yield 'the highest score' => [100];
+    }
+
     /** @param array<string, mixed> $audit */
     #[DataProvider('invalidGateAndReportSettings')]
     public function test_bundle_rejects_a_gate_or_report_setting_it_cannot_honour(array $audit): void
