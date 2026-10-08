@@ -46,6 +46,13 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private const string GLUED_ENV_CREDENTIAL_KEY = '(?:API|APP|AUTH|ACCESS|SECRET|PRIVATE|CLIENT|MASTER|ACCOUNT|SIGNING|ENCRYPTION|JWT|OAUTH|SESSION|REFRESH|BEARER|PASS|DB|DATABASE|ROOT|ADMIN|USER|MYSQL|POSTGRES|PG|MONGO|REDIS|SMTP|MAIL|FTP|SSH){1,4}(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|PASS)';
 
+    /**
+     * A DSN assignment whose value is a URL with no user part and no credential-named
+     * parameter holds nothing to hide: `MAILER_DSN=null://null` or the stock
+     * `MESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0`.
+     */
+    private const string CREDENTIAL_FREE_DSN_ASSIGNMENT = '(?:[A-Z][A-Z0-9]*_){0,8}DSN(?:_[A-Z0-9]+){0,8}\s*=[ \t]*["\']?[a-z][a-z0-9+.\-]{0,31}:\/\/(?![^\s"\'@?;]{0,256}+[?;][^\s"\'@]{0,256}(?i:auth|key|token|secret|pass|pwd|cred))[^@\s"\']{0,256}+(?:["\']|\s|\z)';
+
     private const string PRIVATE_KEY_LABEL = '(?:(?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY|PGP PRIVATE KEY BLOCK)';
 
     /**
@@ -151,7 +158,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private function envCredentialName(): string
     {
-        return \sprintf('(?:[A-Z][A-Z0-9]*_){0,8}(?:(?:TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|KEY|DSN)(?:_[A-Z0-9]+){0,8}|%s(?:_[A-Z0-9]+){0,8}|PASS|PW)', self::GLUED_ENV_CREDENTIAL_KEY);
+        return \sprintf('(?!%s)(?:[A-Z][A-Z0-9]*_){0,8}(?:(?:TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|KEY|DSN)(?:_[A-Z0-9]+){0,8}|%s(?:_[A-Z0-9]+){0,8}|PASS|PW)', self::CREDENTIAL_FREE_DSN_ASSIGNMENT, self::GLUED_ENV_CREDENTIAL_KEY);
     }
 
     #[Override]
@@ -163,6 +170,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
                 SecretPatternLabel::XmlParameter => preg_replace_callback($pattern, $this->redactXmlParameter(...), $content),
                 SecretPatternLabel::PemPrivateKey => preg_replace_callback($pattern, $this->redactPreservingLineCount(...), $content),
+                SecretPatternLabel::BearerToken => preg_replace_callback($pattern, $this->redactBearerToken(...), $content),
                 default => preg_replace($pattern, $this->replacementFor($label), $content),
             };
 
@@ -248,7 +256,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             return $match[0];
         }
 
-        return \sprintf('%s%s%s***REDACTED:%s***%s', $match[1], str_repeat("\n", substr_count($match[0], "\n")), $quote, SecretPatternLabel::MultilineAssignment->value, $quote);
+        return \sprintf("%s\n%s***REDACTED:%s***%s", $match[1], $quote, SecretPatternLabel::MultilineAssignment->value, $quote);
     }
 
     /**
@@ -276,6 +284,14 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         return $this->placeholderPreservingLineCount(SecretPatternLabel::PemPrivateKey, $match[0]);
     }
 
+    /**
+     * @param array<int|string, string> $match
+     */
+    private function redactBearerToken(array $match): string
+    {
+        return $this->placeholderPreservingLineCount(SecretPatternLabel::BearerToken, $match[0]);
+    }
+
     private function placeholderPreservingLineCount(SecretPatternLabel $secretPatternLabel, string $replaced): string
     {
         return \sprintf('%s%s', $secretPatternLabel->placeholder(), str_repeat("\n", substr_count($replaced, "\n")));
@@ -291,7 +307,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     private function isConfigPlaceholder(string $value): bool
     {
         return 1 === preg_match('/\A%[^%\s]+%\z/', $value)
-            || 1 === preg_match('/\A\$\{?[A-Za-z_]\w*\}?\z/', $value);
+            || 1 === preg_match('/\A\$(?:\{[A-Z_][A-Z0-9_]*\}|[A-Z_][A-Z0-9_]*)\z/', $value);
     }
 
     private function validatePattern(string $pattern): ?string
