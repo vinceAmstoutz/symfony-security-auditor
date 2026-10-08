@@ -29,7 +29,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 18;
+    public const int PROMPT_VERSION = 19;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -203,7 +203,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     {
         return <<<'PROMPT'
             Valid type values:
-            sql_injection, command_injection, ldap_injection, xpath_injection, twig_injection, header_injection,
+            sql_injection, command_injection, ldap_injection, xpath_injection, twig_injection, header_injection, xss,
             broken_access_control, missing_voter, voter_bypass, role_escalation, insecure_direct_object_reference,
             missing_csrf_protection, json_hijacking, business_logic_flaw, race_condition, insecure_workflow, price_manipulation,
             state_machine_bypass, mass_assignment, insecure_deserialization, unsafe_parameter_binding,

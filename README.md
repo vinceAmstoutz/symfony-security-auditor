@@ -271,7 +271,7 @@ The second snippet is the shape Claude Desktop, Cursor, Windsurf and Gemini CLI 
 ## Features
 
 - **Multi-agent loop** — adversarial Attacker + skeptical Reviewer cut false positives across up to 3 iterations, with confirmed findings fed back so later iterations generalize patterns instead of re-finding the same bugs, and the Reviewer remembering its own rejections across runs.
-- **49 vulnerability types** covering OWASP-aligned categories: Injection, Broken Access Control, Logic Flaws, Symfony-specific, Data Exposure, Cryptographic — including the modern Symfony 7.x/8.x surface (Authenticators, Messenger handlers, Webhooks, Serializer denormalizers, Schedules, RateLimiter, Mailer, cache poisoning).
+- **50 vulnerability types** covering OWASP-aligned categories: Injection, Broken Access Control, Logic Flaws, Symfony-specific, Data Exposure, Cryptographic — including the modern Symfony 7.x/8.x surface (Authenticators, Messenger handlers, Webhooks, Serializer denormalizers, Schedules, RateLimiter, Mailer, cache poisoning).
 - **Symfony-aware** — understands Controllers, Voters, Forms, Firewalls, Routes, `#[IsGranted]`, `denyAccessUnlessGranted`, `#[MapRequestPayload]`, Twig/Live Components, and surfaces controllers without proper access checks.
 - **Feature-based chunking** — groups a controller with its entity, repository, form, voter, and templates so the Attacker can follow data flow across files.
 - **Deterministic pre-scan** — a zero-token risk-marker pass flags concrete locations (unserialize, `|raw`, hardcoded secrets, unsafe Doctrine, …) to focus the LLM; optional **lean mode** drops marker-free files to cut tokens. Results from other SAST tools can be imported as markers via SARIF.

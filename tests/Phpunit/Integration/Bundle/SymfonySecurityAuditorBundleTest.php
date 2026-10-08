@@ -1688,12 +1688,12 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'audit' => [
-                'excluded_types' => ['missing_rate_limiting', 'log_injection'],
+                'excluded_types' => ['missing_rate_limiting', 'log_injection', 'xss'],
                 'included_types' => ['sql_injection'],
             ],
         ]);
 
-        self::assertSame(['missing_rate_limiting', 'log_injection'], $containerBuilder->getParameter('symfony_security_auditor.audit.excluded_types'));
+        self::assertSame(['missing_rate_limiting', 'log_injection', 'xss'], $containerBuilder->getParameter('symfony_security_auditor.audit.excluded_types'));
         self::assertSame(['sql_injection'], $containerBuilder->getParameter('symfony_security_auditor.audit.included_types'));
     }
 

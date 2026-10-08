@@ -1911,6 +1911,38 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString($typeValue, $prompt);
     }
 
+    public function test_base_prompt_valid_type_list_is_exactly_the_vulnerability_type_enum(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertSame(1, preg_match('/Valid type values:\n(.+?)\n\n/s', $prompt, $matches));
+        $listed = preg_split('/[\s,]+/', trim($matches[1]));
+        $expected = array_map(static fn (VulnerabilityType $vulnerabilityType): string => $vulnerabilityType->value, VulnerabilityType::cases());
+        sort($expected);
+        self::assertIsArray($listed);
+        sort($listed);
+
+        self::assertSame($expected, $listed);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_template_skill_reports_unescaped_output_as_xss(): void
+    {
+        $projectFile = ProjectFile::create(
+            'templates/base.html.twig',
+            '/app/templates/base.html.twig',
+            '{{ user.name }}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('without `|json_encode`. Report as `xss`.', $prompt);
+        self::assertStringContainsString('untrusted DB content. Report as `xss`.', $prompt);
+        self::assertStringContainsString('protocol whitelist (javascript:, data:). Report as `xss`.', $prompt);
+    }
+
     /** @return iterable<string, array{string}> */
     public static function vulnerabilityTypeValues(): iterable
     {

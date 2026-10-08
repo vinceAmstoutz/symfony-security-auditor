@@ -37,12 +37,12 @@ final readonly class TemplateAttackerSkill implements AttackerSkillInterface
         return <<<'SKILL'
             <skills role="template">
             Hunt:
-            - `|raw` filter applied to variables originating from user input or untrusted DB content.
+            - `|raw` filter applied to variables originating from user input or untrusted DB content. Report as `xss`.
             - `autoescape` overridden to `false` or to a context that does not match the surrounding HTML/JS/URL context.
             - `{{ include(user_input) }}` or `{% include %}` with dynamic template names — SSTI vector.
             - `{% sandbox %}` / `{% apply %}` blocks lifting restrictions on user-supplied template fragments.
-            - Inline JavaScript context (`<script>var x = {{ value }};`) without `|json_encode` — XSS via Twig.
-            - URL attributes (`href`, `src`) built from user input without `|url_encode` and protocol whitelist (javascript:, data:).
+            - Inline JavaScript context (`<script>var x = {{ value }};`) without `|json_encode`. Report as `xss`.
+            - URL attributes (`href`, `src`) built from user input without `|url_encode` and protocol whitelist (javascript:, data:). Report as `xss`.
             - Twig Components (`<twig:Component …/>`) passing user input through `data-*` attributes without escaping (`<twig:UserCard name="{{ name|raw }}"/>`).
             - Live Components emitting `data-live-action-param` / `data-live-prop` with untrusted values — bound back to the server unchecked.
             Do NOT flag:
