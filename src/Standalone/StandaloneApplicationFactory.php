@@ -63,11 +63,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Running
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ThrottledUpdateAvailabilityNotifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthRemoveCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
@@ -168,7 +170,12 @@ final readonly class StandaloneApplicationFactory
     {
         $workingDirectory = self::workingDirectoryFor($environment);
 
-        return null !== $workingDirectory ? \sprintf('%s/%s', $workingDirectory, self::PROJECT_CONFIG_FILENAME) : null;
+        return null !== $workingDirectory ? self::projectConfigFileIn($workingDirectory) : null;
+    }
+
+    private static function projectConfigFileIn(string $directory): string
+    {
+        return \sprintf('%s/%s', $directory, self::PROJECT_CONFIG_FILENAME);
     }
 
     /**
@@ -406,8 +413,23 @@ final readonly class StandaloneApplicationFactory
             false,
             fn (): Command => $standaloneApplication->describesCommandsOnly()
                 ? $this->standaloneConsoleCommandFactory->describe(AuditCommand::class)
-                : $this->loadAuditCommand($standaloneApplication->needsProviderCredentials()),
+                : $this->loadAuditCommand($standaloneApplication->needsProviderCredentials(), $this->projectConfigFileNamedBy($standaloneApplication)),
         );
+    }
+
+    /**
+     * The configuration file that ships with the project being audited — the
+     * one the command line names, or the working directory's when it names
+     * none (null here, which keeps the loader's own).
+     *
+     * @throws WorkingDirectoryUnavailableException
+     */
+    private function projectConfigFileNamedBy(StandaloneApplication $standaloneApplication): ?string
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->projectPath = $standaloneApplication->projectPathGivenTo($this->standaloneConsoleCommandFactory->describe(AuditCommand::class));
+
+        return null === $auditCommandInput->projectPath ? null : self::projectConfigFileIn($auditCommandInput->resolvedProjectPath());
     }
 
     /**
@@ -429,9 +451,9 @@ final readonly class StandaloneApplicationFactory
      * @throws ProjectConfigUserOnlyKeyException
      * @throws UnsupportedEnvPlaceholderException
      */
-    private function loadAuditCommand(bool $credentialsRequired): Command
+    private function loadAuditCommand(bool $credentialsRequired, ?string $projectConfigFile): Command
     {
-        return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired));
+        return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired, $projectConfigFile));
     }
 
     private function lazyMcpServeCommand(StandaloneApplication $standaloneApplication): LazyCommand
@@ -468,7 +490,7 @@ final readonly class StandaloneApplicationFactory
      */
     private function loadMcpServeCommand(): Command
     {
-        return $this->standaloneConsoleCommandFactory->createMcpServer($this->buildContainer(true));
+        return $this->standaloneConsoleCommandFactory->createMcpServer($this->buildContainer(true, null));
     }
 
     /**
@@ -493,12 +515,13 @@ final readonly class StandaloneApplicationFactory
      * @throws ProjectConfigUserOnlyKeyException
      * @throws UnsupportedEnvPlaceholderException
      */
-    private function buildContainer(bool $credentialsRequired): ContainerBuilder
+    private function buildContainer(bool $credentialsRequired, ?string $projectConfigFile): ContainerBuilder
     {
         $this->assertBridgeTreeLoadable();
+        $standaloneConfigLoader = null === $projectConfigFile ? $this->standaloneConfigLoader : $this->standaloneConfigLoader->withProjectConfigFile($projectConfigFile);
 
         return $this->standaloneContainerFactory->create(
-            $this->standaloneConfigLoader->load($credentialsRequired),
+            $standaloneConfigLoader->load($credentialsRequired),
             $this->xdgConfigPathResolver->cacheDir(),
         );
     }

@@ -73,6 +73,11 @@ final readonly class ToolRegistry
         return \array_key_exists($name, $this->tools);
     }
 
+    public function isRecording(string $name): bool
+    {
+        return ($this->tools[$name] ?? null) instanceof RecordingToolInterface;
+    }
+
     /**
      * @param array<string, mixed> $arguments
      */
