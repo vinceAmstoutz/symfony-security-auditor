@@ -436,7 +436,7 @@ Thin value object wrapping the raw string content. Key method: `parseJson()` str
 
 ### `ProjectFileScanner`
 
-Walks a project directory, reads `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files, constructs `ProjectFile` instances with relative paths (relative to the scanned root), returned in relative-path order so the chunks built from them — and their prompts and cache keys — are the same on every machine, whatever order the filesystem lists a directory in.
+Walks a project directory, reads `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files, constructs `ProjectFile` instances with relative paths (relative to the scanned root), returned in relative-path order so the chunks built from them — and their prompts and cache keys — are the same on every machine, whatever order the filesystem lists a directory in. Every later stage reads that text as UTF-8, so the scanner is where the text is made valid: `Utf8Normalizer` replaces each byte that is not UTF-8 — a Latin-1 comment in a legacy file, a file name git accepts as it is — with U+FFFD in the content, once the secret scrubber has seen the bytes as they are on disk, and in the relative path, and logs a warning naming the file. The file is analyzed like any other; `ProcessGitChangedFilesResolver` names `--since` paths the same way so the diff filter still matches.
 
 ### `AttackerPromptBuilder` / `ReviewerPromptBuilder`
 

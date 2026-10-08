@@ -383,15 +383,16 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         }
 
         try {
+            $relativePath = $this->validUtf8RelativePath($splFile, $projectPath);
             $content = $reader($splFile);
             if ($this->secretScrubber instanceof SecretScrubberInterface) {
                 $content = $this->secretScrubber->scrub($content);
             }
 
             return ProjectFile::create(
-                relativePath: Path::makeRelative($splFile->getPathname(), $projectPath),
+                relativePath: $relativePath,
                 absolutePath: $splFile->getPathname(),
-                content: $content,
+                content: $this->validUtf8Content($content, $relativePath),
             );
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to read file', [
@@ -401,6 +402,27 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
             return null;
         }
+    }
+
+    private function validUtf8RelativePath(SplFileInfo $splFile, string $projectPath): string
+    {
+        $relativePath = Path::makeRelative($splFile->getPathname(), $projectPath);
+        $valid = Utf8Normalizer::normalize($relativePath);
+        if ($valid !== $relativePath) {
+            $this->logger->warning('File name is not valid UTF-8, its invalid bytes were replaced', ['path' => $valid]);
+        }
+
+        return $valid;
+    }
+
+    private function validUtf8Content(string $content, string $relativePath): string
+    {
+        $valid = Utf8Normalizer::normalize($content);
+        if ($valid !== $content) {
+            $this->logger->warning('File content is not valid UTF-8, its invalid bytes were replaced', ['path' => $relativePath]);
+        }
+
+        return $valid;
     }
 
     /**

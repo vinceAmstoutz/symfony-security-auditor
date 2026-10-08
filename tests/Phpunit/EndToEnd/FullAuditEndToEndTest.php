@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
+use ArrayObject;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
@@ -40,6 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCost
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
@@ -53,6 +56,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 
 /**
  * End-to-end tests exercise the full audit workflow against a realistic Symfony project fixture.
@@ -185,6 +189,60 @@ final class FullAuditEndToEndTest extends TestCase
         self::assertIsString(json_encode($data));
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    #[DataProvider('codeSlicers')]
+    public function test_audit_of_a_latin1_controller_sends_the_model_valid_utf8(CodeSlicerInterface $codeSlicer): void
+    {
+        $this->createSymfonyProjectFixture(secure: true);
+        file_put_contents(
+            $this->fixtureProjectDir.'/src/Controller/LegacyController.php',
+            "<?php\nclass LegacyController\n{\n".str_repeat("    // accentu\xE9\n", 100)."}\n",
+        );
+
+        /** @var ArrayObject<int, string> $arrayObject */
+        $arrayObject = new ArrayObject();
+        $auditReport = $this->makeUseCase($this->promptRecordingAttacker($arrayObject), self::createStub(LLMClientInterface::class), $codeSlicer)->execute($this->fixtureProjectDir);
+
+        self::assertNotSame([], $arrayObject->getArrayCopy());
+        self::assertSame([], array_filter($arrayObject->getArrayCopy(), static fn (string $prompt): bool => !mb_check_encoding($prompt, 'UTF-8')));
+        self::assertTrue($auditReport->isComplete());
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_audit_of_a_project_with_a_file_name_that_is_not_valid_utf8_analyzes_that_file_under_a_valid_name(): void
+    {
+        $this->createSymfonyProjectFixture(secure: true);
+        file_put_contents($this->fixtureProjectDir."/templates/r\xE9sum\xE9.html.twig", '{{ resume }}');
+
+        /** @var ArrayObject<int, string> $arrayObject */
+        $arrayObject = new ArrayObject();
+        $auditReport = $this->makeUseCase($this->promptRecordingAttacker($arrayObject), self::createStub(LLMClientInterface::class))->execute($this->fixtureProjectDir);
+
+        self::assertStringContainsString("templates/r\u{FFFD}sum\u{FFFD}.html.twig", implode("\n", $arrayObject->getArrayCopy()));
+        self::assertTrue($auditReport->isComplete());
+    }
+
+    /**
+     * @return iterable<string, array{CodeSlicerInterface}>
+     */
+    public static function codeSlicers(): iterable
+    {
+        yield 'code slicing off' => [new NullCodeSlicer()];
+        yield 'code slicing on' => [new RegexCodeSlicer(80)];
+    }
+
     #[Override]
     protected function setUp(): void
     {
@@ -255,10 +313,27 @@ final class FullAuditEndToEndTest extends TestCase
         );
     }
 
-    private function makeUseCase(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM): RunAuditUseCase
+    /**
+     * @param ArrayObject<int, string> $arrayObject
+     */
+    private function promptRecordingAttacker(ArrayObject $arrayObject): LLMClientInterface
+    {
+        $attackerLLM = self::createStub(LLMClientInterface::class);
+        $attackerLLM->method('complete')->willReturnCallback(
+            static function (string $systemPrompt, string $userMessage) use ($arrayObject): LLMResponse {
+                $arrayObject[] = $userMessage;
+
+                return LLMResponse::of('[]', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0));
+            },
+        );
+
+        return $attackerLLM;
+    }
+
+    private function makeUseCase(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, CodeSlicerInterface $codeSlicer = new NullCodeSlicer()): RunAuditUseCase
     {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent(new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullCodeSlicer()), new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), new NullProgressReporter()), new AttackerAnalysisSettings(), new NullLogger()),
+            new AttackerAgent(new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), $codeSlicer), new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), new NullProgressReporter()), new AttackerAnalysisSettings(), new NullLogger()),
             new ReviewerAgent(
                 new ReviewerAgentCollaborators(
                     $reviewerLLM,
