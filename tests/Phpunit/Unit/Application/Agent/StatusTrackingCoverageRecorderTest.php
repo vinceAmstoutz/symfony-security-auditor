@@ -53,6 +53,62 @@ final class StatusTrackingCoverageRecorderTest extends TestCase
         self::assertSame([], $recordingCoverageRecorder->found);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_says_why_a_chunk_ended_errored(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'errored');
+        $statusTrackingCoverageRecorder->recordFailureReason('attacker', 'src/A.php', 'tool-call limit reached');
+
+        self::assertSame('tool-call limit reached', $statusTrackingCoverageRecorder->chunkFailureReason([ProjectFile::create('src/B.php', 'src/B.php', '<?php'), ProjectFile::create('src/A.php', 'src/A.php', '<?php')]));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chunk_with_no_recorded_reason_has_none(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        self::assertNull($statusTrackingCoverageRecorder->chunkFailureReason([ProjectFile::create('src/A.php', 'src/A.php', '<?php')]));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_file_analyzed_after_it_failed_no_longer_has_a_failure_reason(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'errored');
+        $statusTrackingCoverageRecorder->recordFailureReason('attacker', 'src/A.php', 'tool-call limit reached');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'analyzed');
+
+        self::assertNull($statusTrackingCoverageRecorder->chunkFailureReason([ProjectFile::create('src/A.php', 'src/A.php', '<?php')]));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_reason_for_another_stage_is_not_a_reason_the_attacker_chunk_failed(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+        $statusTrackingCoverageRecorder->recordFailureReason('reviewer', 'src/A.php', 'review call failed');
+
+        self::assertNull($statusTrackingCoverageRecorder->chunkFailureReason([ProjectFile::create('src/A.php', 'src/A.php', '<?php')]));
+    }
+
+    public function test_it_forwards_a_failure_reason_to_the_recorder_it_wraps(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        (new StatusTrackingCoverageRecorder($recordingCoverageRecorder))->recordFailureReason('attacker', 'src/A.php', 'tool-call limit reached');
+
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/A.php', 'reason' => 'tool-call limit reached']], $recordingCoverageRecorder->failureReasons);
+    }
+
     public function test_it_lists_the_files_the_attacker_last_left_analyzed_or_cached(): void
     {
         $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());

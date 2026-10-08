@@ -695,6 +695,66 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_an_invalid_project_path_is_refused_before_any_scan_or_warning(): void
+    {
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => '/nonexistent/src/Command', '--show-scanned' => true]);
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertStringContainsString('Project path "/nonexistent/src/Command" is not a valid directory', $commandTester->getDisplay());
+        self::assertStringNotContainsString('No files matched', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_an_absolute_path_inside_the_project_scans_that_directory(): void
+    {
+        $this->createProjectDir();
+        mkdir($this->fixtureDir.'/src/Entity', 0o777, true);
+        file_put_contents($this->fixtureDir.'/src/Entity/User.php', '<?php class User {}');
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => [$this->fixtureDir.'/src/Controller'], '--show-scanned' => true]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('src/Controller/HomeController.php', $commandTester->getDisplay());
+        self::assertStringNotContainsString('src/Entity/User.php', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_an_absolute_path_outside_the_project_is_refused_naming_it(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['/somewhere/else'], '--show-scanned' => true]);
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertStringContainsString('The --path "/somewhere/else" lies outside the project', $commandTester->getDisplay());
+        self::assertStringNotContainsString('No files matched', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_scan_that_matches_nothing_names_the_project_and_the_paths_it_applied(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['src/Missing', 'lib'], '--show-scanned' => true]);
+
+        $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+        self::assertIsString($display);
+        self::assertStringContainsString('No files matched under "'.$this->fixtureDir.'" for --path src/Missing, lib.', $display);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_defaults_project_path_to_cwd_when_argument_omitted(): void
     {
         $this->createProjectDir();

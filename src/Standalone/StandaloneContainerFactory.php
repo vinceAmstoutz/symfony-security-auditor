@@ -72,15 +72,7 @@ final readonly class StandaloneContainerFactory
             $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal($standaloneConfig->platform);
         }
 
-        $workingDirectory = getcwd();
-
-        $containerBuilder = new ContainerBuilder(new EnvPlaceholderParameterBag([
-            'kernel.cache_dir' => $cacheDir,
-            'kernel.build_dir' => $cacheDir,
-            'kernel.project_dir' => false !== $workingDirectory ? $workingDirectory : $cacheDir,
-            'kernel.environment' => 'prod',
-            'kernel.debug' => false,
-        ]));
+        $containerBuilder = new ContainerBuilder(new EnvPlaceholderParameterBag($this->kernelParameters($cacheDir)));
 
         $containerBuilder->register('event_dispatcher', EventDispatcher::class)->setPublic(true);
         $containerBuilder->register('logger', NullLogger::class);
@@ -107,6 +99,27 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    /**
+     * The directories come from the user's home and the working directory, so
+     * their `%` signs are escaped: left as typed, a pair reads as a parameter
+     * reference, `%%` loses one sign and `%env(VAR)%` becomes the variable.
+     *
+     * @return array<string, bool|string>
+     */
+    private function kernelParameters(string $cacheDir): array
+    {
+        $escapedCacheDir = ContainerParameterSyntax::escape($cacheDir);
+        $workingDirectory = getcwd();
+
+        return [
+            'kernel.cache_dir' => $escapedCacheDir,
+            'kernel.build_dir' => $escapedCacheDir,
+            'kernel.project_dir' => false !== $workingDirectory ? ContainerParameterSyntax::escape($workingDirectory) : $escapedCacheDir,
+            'kernel.environment' => 'prod',
+            'kernel.debug' => false,
+        ];
     }
 
     /**
