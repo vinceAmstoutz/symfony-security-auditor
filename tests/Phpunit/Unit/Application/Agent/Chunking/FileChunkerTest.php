@@ -539,6 +539,64 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_feature_keeps_a_file_matching_two_equal_length_features_with_the_one_declared_first_whatever_the_path_order(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Controller/PostController.php'),
+            $this->makeFile('src/Post/User/Shared.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/Post/User/Shared.php', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_directory_match_ignores_the_first_segment_of_the_path_and_the_file_name(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('User/Thing.php'),
+            $this->makeFile('docs/user'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertNotContains('User/Thing.php', $paths);
+        self::assertNotContains('docs/user', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_chunks_a_thousand_controllers_and_five_thousand_other_files_quickly(): void
+    {
+        $files = [];
+        for ($i = 0; $i < 1000; ++$i) {
+            $files[] = $this->makeFile(\sprintf('src/Controller/Feature%dController.php', $i));
+        }
+
+        for ($i = 0; $i < 5000; ++$i) {
+            $files[] = $this->makeFile(\sprintf('src/Service/Svc%d.php', $i));
+        }
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        self::assertCount(1500, $chunks);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_positive_chunk_size_is_clamped_to_one(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
