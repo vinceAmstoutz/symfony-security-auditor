@@ -50,7 +50,7 @@ final class ProcessReleaseClientTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
-    public function test_get_bounds_the_transfer_tightly_and_passes_the_url(): void
+    public function test_get_bounds_the_transfer_and_the_body_tightly_and_passes_the_url(): void
     {
         $captured = [];
         $processReleaseClient = new ProcessReleaseClient(static function (array $arguments) use (&$captured): Process {
@@ -61,13 +61,13 @@ final class ProcessReleaseClientTest extends TestCase
 
         $processReleaseClient->get('https://example.test/resource');
 
-        self::assertSame(['--max-time', '20', 'https://example.test/resource'], $captured);
+        self::assertSame(['--max-time', '20', '--max-filesize', '1048576', 'https://example.test/resource'], $captured);
     }
 
     /**
      * @throws SelfUpdateFailedException
      */
-    public function test_download_keeps_a_generous_transfer_bound_and_targets_the_destination(): void
+    public function test_download_keeps_a_generous_transfer_and_body_bound_and_targets_the_destination(): void
     {
         $captured = [];
         $destination = $this->workingDirectory.'/asset';
@@ -79,7 +79,7 @@ final class ProcessReleaseClientTest extends TestCase
 
         $processReleaseClient->download('https://example.test/asset', $destination);
 
-        self::assertSame(['--max-time', '600', '--output', $destination, 'https://example.test/asset'], $captured);
+        self::assertSame(['--max-time', '600', '--output', $destination, '--max-filesize', '268435456', 'https://example.test/asset'], $captured);
     }
 
     /**
@@ -130,6 +130,16 @@ final class ProcessReleaseClientTest extends TestCase
         $this->expectException(SelfUpdateFailedException::class);
 
         $processReleaseClient->get('https://example.test/resource');
+    }
+
+    public function test_default_process_builder_keeps_every_transfer_and_redirect_on_https_with_tls_1_2_or_newer(): void
+    {
+        $process = (ProcessReleaseClient::defaultProcessBuilder())(['https://example.test/asset']);
+
+        self::assertSame(
+            "'curl' '-fsSL' '--proto' '=https' '--tlsv1.2' '--connect-timeout' '10' '-H' 'User-Agent: symfony-security-auditor-self-update' 'https://example.test/asset'",
+            $process->getCommandLine(),
+        );
     }
 
     public function test_default_process_builder_uses_authenticated_curl(): void
