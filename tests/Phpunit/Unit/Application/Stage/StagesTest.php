@@ -69,6 +69,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\SymfonyMapp
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
 
 final class StagesTest extends TestCase
 {
@@ -158,6 +159,24 @@ final class StagesTest extends TestCase
 
         self::assertCount(0, $auditContext->projectFiles());
         self::assertSame(0, $auditContext->getMeta('ingestion.file_count'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_ingestion_stage_scans_the_context_scan_paths_instead_of_the_configured_ones_when_the_scanner_can_take_them(): void
+    {
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [ProjectFile::create('src/Configured.php', '/app/src/Configured.php', '<?php')],
+            [ProjectFile::create('apps/api/src/Outside.php', '/app/apps/api/src/Outside.php', '<?php')],
+        );
+        $auditContext = AuditContext::forProject($this->tmpDir, ['apps/api']);
+
+        (new IngestionStage($recordingScopedScanner, new NullLogger()))->process($auditContext);
+
+        self::assertSame(['apps/api/src/Outside.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
+        self::assertSame([['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
     }
 
     /**

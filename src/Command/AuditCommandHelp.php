@@ -37,6 +37,7 @@ final readonly class AuditCommandHelp
         Use <info>--output</info> (<info>-o</info>) to write the report to a file:
           <info>%command.full_name% --format=sarif --output=report.sarif</info>
           <info>%command.full_name% --format=html --output=report.html</info>
+        A report path set in <info>audit.output</info> is replaced by <info>--output</info>, or switched off for one run by <info>--no-output</info>, which prints the report.
 
         Baseline (suppress accepted findings):
           <info>%command.full_name% --generate-baseline=.security-baseline.json</info>  accept current findings
