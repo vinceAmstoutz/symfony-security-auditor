@@ -30,6 +30,10 @@ use function Symfony\Component\String\u;
  */
 final readonly class GithubAnnotationsReportRenderer implements ReportRendererInterface
 {
+    public function __construct(
+        private ReportPathPrefix $reportPathPrefix = new ReportPathPrefix(),
+    ) {}
+
     #[Override]
     public function format(): string
     {
@@ -73,7 +77,7 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
     private function properties(Vulnerability $vulnerability): string
     {
         $properties = [
-            'file' => $this->escapeProperty($vulnerability->filePath()),
+            'file' => $this->escapeProperty($this->reportPathPrefix->apply($vulnerability->filePath())),
             'line' => $vulnerability->lineStart(),
         ];
 

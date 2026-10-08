@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPathPrefix;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
 
@@ -538,6 +539,38 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_puts_the_configured_folder_before_the_artifact_location(): void
+    {
+        $sarifReportRenderer = new SarifReportRenderer(reportPathPrefix: new ReportPathPrefix('backend'));
+        $auditReport = $this->makeReport($this->makeValidatedVuln(filePath: 'src/Controller/UserController.php'));
+
+        $decoded = $this->decodeSarif($auditReport, $sarifReportRenderer);
+
+        self::assertSame('backend/src/Controller/UserController.php', $decoded['runs'][0]['results'][0]['locations'][0]['physicalLocation']['artifactLocation']['uri']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_percent_encodes_the_configured_folder_with_the_rest_of_the_artifact_location(): void
+    {
+        $sarifReportRenderer = new SarifReportRenderer(reportPathPrefix: new ReportPathPrefix('apps/my shop#1'));
+        $auditReport = $this->makeReport($this->makeValidatedVuln(filePath: 'src/Foo.php'));
+
+        $decoded = $this->decodeSarif($auditReport, $sarifReportRenderer);
+
+        self::assertSame('apps/my%20shop%231/src/Foo.php', $decoded['runs'][0]['results'][0]['locations'][0]['physicalLocation']['artifactLocation']['uri']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_percent_encodes_reserved_uri_characters_in_the_artifact_location(): void
     {
         $vulnerability = $this->makeValidatedVuln(filePath: 'src/Controller/Foo#Bar.php');
@@ -808,9 +841,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     }>
      * }
      */
-    private function decodeSarif(AuditReport $auditReport): array
+    private function decodeSarif(AuditReport $auditReport, ?ReportRendererInterface $reportRenderer = null): array
     {
-        $decoded = json_decode($this->renderer->render($auditReport), true);
+        $decoded = json_decode(($reportRenderer ?? $this->renderer)->render($auditReport), true);
         $this->assertSarifShape($decoded);
 
         return $decoded;

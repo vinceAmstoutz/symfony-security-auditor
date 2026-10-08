@@ -24,6 +24,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
 {
     public function __construct(
         private ReportPackage $reportPackage = new ReportPackage(),
+        private ReportPathPrefix $reportPathPrefix = new ReportPathPrefix(),
     ) {}
 
     #[Override]
@@ -128,7 +129,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             'locations' => [
                 [
                     'physicalLocation' => [
-                        'artifactLocation' => ['uri' => $this->encodeArtifactUri($vulnerability->filePath())],
+                        'artifactLocation' => ['uri' => $this->encodeArtifactUri($this->reportPathPrefix->apply($vulnerability->filePath()))],
                         'region' => [
                             'startLine' => $vulnerability->lineStart(),
                             'endLine' => $vulnerability->lineEnd(),

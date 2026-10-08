@@ -210,6 +210,10 @@
               "type": ["string", "null"],
               "description": "Default path the report is written to when --output is not given. Default: null (the report is printed). The --output CLI option overrides this. In the standalone binary a project config may not set it."
             },
+            "report_path_prefix": {
+              "type": ["string", "null"],
+              "description": "Folder, relative to the repository root, the audited project lives in (for example backend for a project-path of backend). Put in front of every file path in the SARIF and github annotation reports, which GitHub resolves from the repository root. Default: null (paths stay relative to the project). The other formats and the JSON report are never prefixed."
+            },
             "since_closure": {
               "enum": ["none", "direct"],
               "description": "When a --since diff-mode run is active, whether to widen the audited file set beyond the raw git diff. none audits exactly the changed files. direct additionally pulls in a changed voter's first-degree dependents (controllers guarded by an #[IsGranted] attribute the voter's supports() accepts) from the full project mapping. Default: profile-dependent (balanced/fast: none, thorough: direct)."
