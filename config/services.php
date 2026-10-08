@@ -621,6 +621,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AuditedProjectPathHolder::class),
             service('logger'),
             service(LockfileHasher::class),
+            service(Clock::class),
         ]);
 
     $defaultsConfigurator->set(SymfonyToolRegistryFactory::class)
