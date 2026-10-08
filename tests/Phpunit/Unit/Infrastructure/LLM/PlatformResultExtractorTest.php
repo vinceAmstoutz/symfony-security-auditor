@@ -22,9 +22,12 @@ use Symfony\AI\Platform\FinishReason\FinishReasonCase;
 use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
+use Symfony\AI\Platform\Result\MultiPartResult;
 use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\RawResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
+use Symfony\AI\Platform\Result\ToolCall;
+use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
@@ -211,6 +214,37 @@ final class PlatformResultExtractorTest extends TestCase
         );
 
         self::assertSame('tool_use', $stopReason);
+    }
+
+    public function test_it_joins_the_tool_calls_of_every_tool_call_part_of_a_multi_part_result(): void
+    {
+        $multiPartResult = new MultiPartResult([
+            new TextResult('thinking'),
+            new ToolCallResult([new ToolCall('call-1', 'record_vulnerability', ['n' => 1])]),
+            new ToolCallResult([new ToolCall('call-2', 'record_vulnerability', ['n' => 2]), new ToolCall('call-3', 'lookup', [])]),
+            new ToolCallResult([new ToolCall('call-4', 'record_vulnerability', ['n' => 4])]),
+        ]);
+
+        $toolCalls = (new PlatformResultExtractor(null))->extractToolCalls($multiPartResult);
+
+        self::assertSame(['call-1', 'call-2', 'call-3', 'call-4'], array_map(static fn (ToolCall $toolCall): string => $toolCall->getId(), $toolCalls));
+    }
+
+    public function test_it_returns_the_tool_calls_of_a_plain_tool_call_result(): void
+    {
+        $toolCallResult = new ToolCallResult([new ToolCall('call-1', 'lookup', []), new ToolCall('call-2', 'lookup', [])]);
+
+        $toolCalls = (new PlatformResultExtractor(null))->extractToolCalls($toolCallResult);
+
+        self::assertSame(['call-1', 'call-2'], array_map(static fn (ToolCall $toolCall): string => $toolCall->getId(), $toolCalls));
+    }
+
+    public function test_it_returns_no_tool_call_for_a_result_without_one(): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        self::assertSame([], $platformResultExtractor->extractToolCalls(new TextResult('done')));
+        self::assertSame([], $platformResultExtractor->extractToolCalls(new MultiPartResult([new TextResult('done')])));
     }
 
     private function deferredResultWithFinishReason(FinishReason $finishReason): DeferredResult

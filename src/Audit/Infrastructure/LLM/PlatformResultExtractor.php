@@ -184,11 +184,14 @@ final readonly class PlatformResultExtractor
         }
 
         if ($result instanceof MultiPartResult) {
+            $toolCalls = [];
             foreach ($result->getContent() as $part) {
                 if ($part instanceof ToolCallResult) {
-                    return array_values($part->getContent());
+                    array_push($toolCalls, ...$part->getContent());
                 }
             }
+
+            return $toolCalls;
         }
 
         return [];
