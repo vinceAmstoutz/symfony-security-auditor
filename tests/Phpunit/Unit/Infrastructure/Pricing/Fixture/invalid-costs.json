@@ -1,0 +1,23 @@
+{
+  "anthropic": {
+    "models": {
+      "valid-probe": { "cost": { "input": 5, "output": 25 } },
+      "free-probe": { "cost": { "input": 0, "output": 0 } },
+      "negative-input-probe": { "cost": { "input": -1, "output": 25 } },
+      "negative-fractional-input-probe": { "cost": { "input": -0.01, "output": 25 } },
+      "infinite-input-probe": { "cost": { "input": 1e999, "output": 25 } },
+      "missing-input-probe": { "cost": { "output": 25 } },
+      "textual-input-probe": { "cost": { "input": "free", "output": 25 } },
+      "negative-output-probe": { "cost": { "input": 5, "output": -0.01 } },
+      "infinite-output-probe": { "cost": { "input": 5, "output": 1e999 } },
+      "negative-cache-read-probe": { "cost": { "input": 5, "output": 25, "cache_read": -0.01 } },
+      "negative-cache-write-probe": { "cost": { "input": 5, "output": 25, "cache_write": -0.01 } },
+      "shadowed-probe": { "cost": { "input": -3, "output": 6 } }
+    }
+  },
+  "openai": {
+    "models": {
+      "shadowed-probe": { "cost": { "input": 3, "output": 6 } }
+    }
+  }
+}

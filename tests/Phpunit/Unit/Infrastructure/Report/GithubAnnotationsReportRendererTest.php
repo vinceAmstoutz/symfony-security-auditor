@@ -58,6 +58,17 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_warns_that_a_scan_found_no_file_to_audit(): void
+    {
+        self::assertSame(
+            '::warning title=Audit incomplete::Audit incomplete: the scan found no file to audit, so this report has no verdict and cannot vouch that the project is free of vulnerabilities.',
+            $this->renderer->render($this->makeReportOfAScanThatFoundNoFile()),
+        );
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
