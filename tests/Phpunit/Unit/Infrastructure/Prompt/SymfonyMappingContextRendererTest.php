@@ -112,6 +112,109 @@ final class SymfonyMappingContextRendererTest extends TestCase
         self::assertStringNotContainsString("\r", $rendered);
     }
 
+    public function test_the_voter_coverage_of_a_voter_with_thousands_of_attributes_stays_within_the_documented_bound(): void
+    {
+        $attributes = array_map(static fn (int $index): string => 'ATTR_'.$index, range(1, 20000));
+        $voterCapability = new VoterCapability('src/Security/Voter.php', 'App\\Security\\Voter', $attributes, []);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(voterCapabilities: [$voterCapability]),
+        );
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
+
+        self::assertLessThanOrEqual(8192, \strlen($rendered));
+        self::assertStringContainsString(',… and 19900 more] — subjects: [(none)]', $rendered);
+    }
+
+    public function test_the_voter_coverage_of_a_voter_with_thousands_of_subjects_stays_within_the_documented_bound(): void
+    {
+        $subjects = array_map(static fn (int $index): string => 'App\\Entity\\E'.$index, range(1, 20000));
+        $voterCapability = new VoterCapability('src/Security/Voter.php', 'App\\Security\\Voter', [], $subjects);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(voterCapabilities: [$voterCapability]),
+        );
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
+
+        self::assertLessThanOrEqual(8192, \strlen($rendered));
+        self::assertStringContainsString('— attributes: [(none)] — subjects: [App\\Entity\\E1,', $rendered);
+        self::assertStringContainsString(',… and 19900 more] — src/Security/Voter.php', $rendered);
+    }
+
+    public function test_a_voter_list_of_exactly_the_item_limit_is_listed_in_full(): void
+    {
+        $attributes = array_map(static fn (int $index): string => 'A'.$index, range(1, 100));
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($this->mappingWithVoterAttributes($attributes));
+
+        self::assertStringContainsString(\sprintf('attributes: [%s] — subjects: [(none)]', implode(',', $attributes)), $rendered);
+    }
+
+    public function test_a_voter_list_one_past_the_item_limit_names_the_omitted_remainder(): void
+    {
+        $attributes = array_map(static fn (int $index): string => 'A'.$index, range(1, 101));
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($this->mappingWithVoterAttributes($attributes));
+
+        self::assertStringContainsString(\sprintf('attributes: [%s,… and 1 more] — subjects: [(none)]', implode(',', \array_slice($attributes, 0, 100))), $rendered);
+    }
+
+    public function test_a_voter_list_filling_the_byte_limit_exactly_is_listed_in_full(): void
+    {
+        $attributes = [str_repeat('a', 1023), str_repeat('b', 1024)];
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($this->mappingWithVoterAttributes($attributes));
+
+        self::assertStringContainsString(\sprintf('attributes: [%s] — subjects: [(none)]', implode(',', $attributes)), $rendered);
+    }
+
+    public function test_a_single_voter_attribute_filling_the_byte_limit_exactly_is_listed(): void
+    {
+        $attribute = str_repeat('a', 2048);
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($this->mappingWithVoterAttributes([$attribute]));
+
+        self::assertStringContainsString(\sprintf('attributes: [%s] — subjects: [(none)]', $attribute), $rendered);
+    }
+
+    public function test_the_byte_limit_counts_every_listed_item_not_only_the_last_one(): void
+    {
+        $attributes = [str_repeat('a', 1000), str_repeat('b', 1000), str_repeat('c', 1000)];
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($this->mappingWithVoterAttributes($attributes));
+
+        self::assertStringContainsString(\sprintf('attributes: [%s,%s,… and 1 more] — subjects: [(none)]', $attributes[0], $attributes[1]), $rendered);
+    }
+
+    public function test_a_voter_list_one_byte_past_the_byte_limit_drops_the_item_that_no_longer_fits(): void
+    {
+        $attributes = [str_repeat('a', 1023), str_repeat('b', 1025), 'c'];
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($this->mappingWithVoterAttributes($attributes));
+
+        self::assertStringContainsString(\sprintf('attributes: [%s,… and 2 more] — subjects: [(none)]', $attributes[0]), $rendered);
+    }
+
+    public function test_a_voter_attribute_longer_than_the_byte_limit_leaves_only_the_omission_notice(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($this->mappingWithVoterAttributes([str_repeat('a', 2049), 'EDIT']));
+
+        self::assertStringContainsString('attributes: [… and 2 more] — subjects: [(none)]', $rendered);
+    }
+
+    /**
+     * @param list<string> $attributes
+     */
+    private function mappingWithVoterAttributes(array $attributes): SymfonyMapping
+    {
+        return SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(voterCapabilities: [new VoterCapability('src/Security/Voter.php', 'App\\Security\\Voter', $attributes, [])]),
+        );
+    }
+
     public function test_an_access_control_pattern_that_does_not_compile_matches_nothing_and_raises_no_warning(): void
     {
         $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);

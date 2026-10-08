@@ -39,6 +39,10 @@ final readonly class SymfonyMappingContextRenderer
      */
     private const array PUBLIC_ACCESS_PSEUDO_ROLES = ['PUBLIC_ACCESS', 'IS_AUTHENTICATED_ANONYMOUSLY', 'PUBLIC'];
 
+    private const int MAX_LISTED_VOTER_ITEMS = 100;
+
+    private const int MAX_LISTED_VOTER_BYTES = 2048;
+
     public static function renderFirewallRules(SymfonyMapping $symfonyMapping): string
     {
         $firewallRules = $symfonyMapping->toApplicationSecurityMap()->perimeterRules();
@@ -65,8 +69,8 @@ final readonly class SymfonyMappingContextRenderer
         $lines = ['## Voter Coverage'];
         $lines[] = 'Each line summarises a `Voter::supports()` body: the attributes it accepts and the subject types it gates. Use this to spot `#[IsGranted(\'ATTR\', $subject)]` calls referencing an attribute or subject type that no voter actually covers — that is a `missing_voter` finding.';
         foreach ($voterCapabilities as $voterCapability) {
-            $attributes = [] === $voterCapability->supportedAttributes() ? '(none)' : implode(',', array_map(self::sanitizeLine(...), $voterCapability->supportedAttributes()));
-            $subjects = [] === $voterCapability->supportedSubjects() ? '(none)' : implode(',', array_map(self::sanitizeLine(...), $voterCapability->supportedSubjects()));
+            $attributes = self::cappedVoterList($voterCapability->supportedAttributes());
+            $subjects = self::cappedVoterList($voterCapability->supportedSubjects());
             $lines[] = \sprintf('- %s — attributes: [%s] — subjects: [%s] — %s', self::sanitizeLine($voterCapability->className()), $attributes, $subjects, self::sanitizeLine($voterCapability->filePath()));
         }
 
@@ -155,6 +159,47 @@ final readonly class SymfonyMappingContextRenderer
             $symfonyMapping->routeAccessControls(),
             static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->hasRouteAttribute(),
         ));
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private static function cappedVoterList(array $values): string
+    {
+        if ([] === $values) {
+            return '(none)';
+        }
+
+        $listed = self::voterItemsWithinCaps($values);
+        $omitted = \count($values) - \count($listed);
+        if (0 < $omitted) {
+            $listed[] = \sprintf('… and %d more', $omitted);
+        }
+
+        return implode(',', $listed);
+    }
+
+    /**
+     * @param list<string> $values
+     *
+     * @return list<string>
+     */
+    private static function voterItemsWithinCaps(array $values): array
+    {
+        $listed = [];
+        $bytes = 0;
+        foreach ($values as $value) {
+            $item = self::sanitizeLine($value);
+            $itemBytes = \strlen($item) + ([] === $listed ? 0 : 1);
+            if (self::MAX_LISTED_VOTER_ITEMS === \count($listed) || self::MAX_LISTED_VOTER_BYTES < $bytes + $itemBytes) {
+                break;
+            }
+
+            $listed[] = $item;
+            $bytes += $itemBytes;
+        }
+
+        return $listed;
     }
 
     /**

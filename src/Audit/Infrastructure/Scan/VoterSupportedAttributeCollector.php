@@ -37,10 +37,10 @@ final readonly class VoterSupportedAttributeCollector
      */
     public function collect(array $body, Class_ $class): array
     {
-        return $this->mergeUnique(
-            $this->collectStringLiterals($body),
-            $this->collectSelfConstantFetches($body, $this->resolveOwnConstants($class)),
-        );
+        return array_values(array_unique([
+            ...$this->collectStringLiterals($body),
+            ...$this->collectSelfConstantFetches($body, $this->resolveOwnConstants($class)),
+        ]));
     }
 
     /**
@@ -53,16 +53,9 @@ final readonly class VoterSupportedAttributeCollector
         $values = [];
         $stringNodes = $this->nodeFinder->findInstanceOf($body, String_::class);
         foreach ($stringNodes as $stringNode) {
-            $value = $stringNode->value;
-            if ('' === $value) {
-                continue;
+            if ('' !== $stringNode->value) {
+                $values[] = $stringNode->value;
             }
-
-            if (\in_array($value, $values, true)) {
-                continue;
-            }
-
-            $values[] = $value;
         }
 
         return $values;
@@ -87,7 +80,7 @@ final readonly class VoterSupportedAttributeCollector
         $values = [];
         $constFetchNodes = $this->nodeFinder->findInstanceOf($body, ClassConstFetch::class);
         foreach ($constFetchNodes as $constFetchNode) {
-            $values = $this->mergeUnique($values, $this->resolvedConstantValues($constFetchNode, $constantValues));
+            array_push($values, ...$this->resolvedConstantValues($constFetchNode, $constantValues));
         }
 
         return $values;
@@ -150,22 +143,5 @@ final readonly class VoterSupportedAttributeCollector
         }
 
         return $values;
-    }
-
-    /**
-     * @param list<string> $first
-     * @param list<string> $second
-     *
-     * @return list<string>
-     */
-    private function mergeUnique(array $first, array $second): array
-    {
-        foreach ($second as $value) {
-            if (!\in_array($value, $first, true)) {
-                $first[] = $value;
-            }
-        }
-
-        return $first;
     }
 }

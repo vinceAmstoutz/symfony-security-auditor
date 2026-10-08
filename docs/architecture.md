@@ -291,7 +291,7 @@ One entry per public controller action emitted by `ControllerAccessControlParser
 
 ### `VoterCapability` — immutable per-voter `supports()` summary
 
-One entry per voter file emitted by `VoterCapabilityParserInterface` (default impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`, `supportedAttributes` (string literals seen inside `supports()`) and `supportedSubjects` (right-hand class names of `instanceof` checks). Helpers `coversAttribute(string)` and `coversSubject(string)` answer "is there a voter that handles this access decision?" so the prompt's `Voter Coverage` block lets the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually backs.
+One entry per voter file emitted by `VoterCapabilityParserInterface` (default impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`, `supportedAttributes` (string literals seen inside `supports()`) and `supportedSubjects` (right-hand class names of `instanceof` checks). Helpers `coversAttribute(string)` and `coversSubject(string)` answer "is there a voter that handles this access decision?" so the prompt's `Voter Coverage` block lets the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually backs. That block is repeated in every chunk prompt, so `SymfonyMappingContextRenderer` lists at most 100 attributes and 100 subjects per voter, and at most 2,048 bytes of each list, and ends a cut list with `… and N more`.
 
 ### `FormBinding` — immutable controller → form-type binding
 
