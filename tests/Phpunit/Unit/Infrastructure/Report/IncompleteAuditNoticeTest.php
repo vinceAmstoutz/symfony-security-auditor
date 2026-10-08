@@ -26,10 +26,11 @@ final class IncompleteAuditNoticeTest extends TestCase
 {
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      */
     public function test_it_counts_the_files_that_were_never_analyzed(): void
     {
-        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $auditContext = $this->contextWithAFile();
         $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
         $auditContext->recordCoverage('attacker', 'src/B.php', 'aborted');
 
@@ -38,11 +39,12 @@ final class IncompleteAuditNoticeTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      */
     #[DataProvider('causesOfAnUnanalyzedFile')]
     public function test_its_reason_holds_whatever_left_the_file_unanalyzed(string $stage, string $status): void
     {
-        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $auditContext = $this->contextWithAFile();
         $auditContext->recordCoverage($stage, 'src/A.php', $status);
 
         self::assertSame(
@@ -64,13 +66,25 @@ final class IncompleteAuditNoticeTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      */
     public function test_it_has_nothing_to_say_about_a_complete_audit(): void
     {
-        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $auditContext = $this->contextWithAFile();
         $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
 
         self::assertNull(IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_says_a_scan_that_found_no_file_has_no_verdict(): void
+    {
+        self::assertSame(
+            'Audit incomplete: the scan found no file to audit, so this report has no verdict and cannot vouch that the project is free of vulnerabilities.',
+            IncompleteAuditNotice::for(AuditReport::fromContext(AuditContext::forProject(sys_get_temp_dir()))),
+        );
     }
 
     /**
@@ -91,5 +105,17 @@ final class IncompleteAuditNoticeTest extends TestCase
             'Audit incomplete: none of the 3 file(s) in scope was analyzed, because a dry run makes no LLM call, so this report cannot vouch that the project is free of vulnerabilities.',
             IncompleteAuditNotice::for(AuditReport::fromContext($auditContext)),
         );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    private function contextWithAFile(): AuditContext
+    {
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $auditContext->setProjectFiles([ProjectFile::create('src/Foo.php', 'src/Foo.php', '<?php')]);
+
+        return $auditContext;
     }
 }

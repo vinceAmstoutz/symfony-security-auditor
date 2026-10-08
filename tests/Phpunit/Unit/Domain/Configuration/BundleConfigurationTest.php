@@ -146,6 +146,40 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
+    public function test_from_array_leaves_the_gate_and_report_settings_unset_when_keys_omitted(): void
+    {
+        $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
+
+        self::assertNull($bundleConfiguration->audit->minScore);
+        self::assertFalse($bundleConfiguration->audit->failOnIncomplete);
+        self::assertSame('console', $bundleConfiguration->audit->format);
+        self::assertNull($bundleConfiguration->audit->output);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_maps_explicit_gate_and_report_settings(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['min_score'] = 80;
+        $config['audit']['fail_on_incomplete'] = true;
+        $config['audit']['format'] = 'sarif';
+        $config['audit']['output'] = 'build/audit.sarif';
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(80, $bundleConfiguration->audit->minScore);
+        self::assertTrue($bundleConfiguration->audit->failOnIncomplete);
+        self::assertSame('sarif', $bundleConfiguration->audit->format);
+        self::assertSame('build/audit.sarif', $bundleConfiguration->audit->output);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_defaults_fail_on_to_critical_when_key_omitted_for_bc(): void
     {
         $config = $this->treeBuilderOutput();

@@ -182,6 +182,50 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame(0.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('claude-weird-cost'));
     }
 
+    #[DataProvider('invalidCostCases')]
+    public function test_a_cost_that_is_not_a_finite_non_negative_price_with_an_input_rate_is_unpriced(string $model): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('invalid-costs.json');
+
+        self::assertFalse($modelsDevPricingProvider->hasModel($model));
+        self::assertSame(0.0, $modelsDevPricingProvider->pricePerMillionInputTokens($model));
+        self::assertSame(0.0, $modelsDevPricingProvider->pricePerMillionOutputTokens($model));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function invalidCostCases(): iterable
+    {
+        yield 'a negative input rate' => ['negative-input-probe'];
+        yield 'a slightly negative input rate' => ['negative-fractional-input-probe'];
+        yield 'an infinite input rate' => ['infinite-input-probe'];
+        yield 'no input rate' => ['missing-input-probe'];
+        yield 'a textual input rate' => ['textual-input-probe'];
+        yield 'a negative output rate' => ['negative-output-probe'];
+        yield 'an infinite output rate' => ['infinite-output-probe'];
+        yield 'a negative cache read rate' => ['negative-cache-read-probe'];
+        yield 'a negative cache write rate' => ['negative-cache-write-probe'];
+    }
+
+    public function test_a_free_model_and_a_paid_model_stay_priced_beside_invalid_costs(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('invalid-costs.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('free-probe'));
+        self::assertSame(0.0, $modelsDevPricingProvider->pricePerMillionInputTokens('free-probe'));
+        self::assertTrue($modelsDevPricingProvider->hasModel('valid-probe'));
+        self::assertSame(5.0, $modelsDevPricingProvider->pricePerMillionInputTokens('valid-probe'));
+        self::assertSame(25.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('valid-probe'));
+    }
+
+    public function test_an_invalid_cost_does_not_hide_a_valid_one_a_later_provider_lists(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('invalid-costs.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('shadowed-probe'));
+        self::assertSame(3.0, $modelsDevPricingProvider->pricePerMillionInputTokens('shadowed-probe'));
+        self::assertSame(6.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('shadowed-probe'));
+    }
+
     public function test_it_resolves_a_slash_namespaced_qualified_id(): void
     {
         $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');
@@ -279,6 +323,71 @@ final class ModelsDevPricingProviderTest extends TestCase
 
         self::assertTrue($modelsDevPricingProvider->hasModel('claude-opus-4-8'));
         self::assertSame([], $this->loggedWarnings);
+    }
+
+    #[DataProvider('unusableOverrideCases')]
+    public function test_an_unusable_override_falls_back_to_the_packaged_catalog(string $fixture, string $expectedReason): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog($fixture, ModelsDevPricingProvider::CATALOG_PACKAGE);
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-opus-4-8'));
+        self::assertSame(5.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-opus-4-8'));
+        self::assertSame(
+            [['Ignoring the unusable pricing catalog override; falling back to the packaged catalog', ['reason' => $expectedReason, 'path' => __DIR__.'/Fixture/'.$fixture]]],
+            $this->loggedWarnings,
+        );
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function unusableOverrideCases(): iterable
+    {
+        yield 'malformed JSON' => ['malformed.json', 'catalog JSON invalid'];
+        yield 'a root that is not an object' => ['not-object.json', 'catalog root is not an object'];
+        yield 'a document that prices no model' => ['no-pricing.json', 'catalog carries no model pricing'];
+    }
+
+    public function test_it_names_the_packaged_catalog_as_the_one_in_use_when_the_override_is_unusable(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('malformed.json', ModelsDevPricingProvider::CATALOG_PACKAGE);
+
+        self::assertNotNull($modelsDevPricingProvider->packagedCatalogPath());
+        self::assertSame($modelsDevPricingProvider->packagedCatalogPath(), $modelsDevPricingProvider->effectiveCatalogPath());
+    }
+
+    public function test_it_names_a_usable_override_as_the_one_in_use(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('catalog.json', ModelsDevPricingProvider::CATALOG_PACKAGE);
+
+        self::assertSame(__DIR__.'/Fixture/catalog.json', $modelsDevPricingProvider->effectiveCatalogPath());
+        self::assertSame([], $this->loggedWarnings);
+    }
+
+    public function test_it_names_the_override_when_neither_catalog_can_be_read(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('does-not-exist.json');
+
+        self::assertSame(__DIR__.'/Fixture/does-not-exist.json', $modelsDevPricingProvider->effectiveCatalogPath());
+    }
+
+    public function test_an_unusable_override_and_an_unusable_packaged_catalog_disable_pricing_naming_the_packaged_one(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('malformed.json', 'vinceamstoutz/symfony-security-auditor');
+
+        self::assertFalse($modelsDevPricingProvider->hasModel('claude-opus-4-8'));
+        self::assertCount(2, $this->loggedWarnings);
+        self::assertSame('Ignoring the unusable pricing catalog override; falling back to the packaged catalog', $this->loggedWarnings[0][0]);
+        self::assertSame(['reason' => 'catalog JSON invalid', 'path' => __DIR__.'/Fixture/malformed.json'], $this->loggedWarnings[0][1]);
+        self::assertSame('models.dev pricing catalog unavailable; cost reporting disabled', $this->loggedWarnings[1][0]);
+        self::assertSame(['reason' => 'catalog file not found or unreadable', 'path' => $modelsDevPricingProvider->packagedCatalogPath()], $this->loggedWarnings[1][1]);
+    }
+
+    public function test_an_unusable_packaged_catalog_is_not_read_a_second_time_as_a_fallback(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('does-not-exist.json', 'vinceamstoutz/symfony-security-auditor');
+
+        self::assertFalse($modelsDevPricingProvider->hasModel('claude-opus-4-8'));
+        self::assertCount(1, $this->loggedWarnings);
+        self::assertSame('models.dev pricing catalog unavailable; cost reporting disabled', $this->loggedWarnings[0][0]);
     }
 
     /**
@@ -418,9 +527,9 @@ final class ModelsDevPricingProviderTest extends TestCase
         return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/platform-listings.json', 'vinceamstoutz/not-a-real-package', $platform);
     }
 
-    private function providerForCatalog(string $fixture): ModelsDevPricingProvider
+    private function providerForCatalog(string $fixture, string $package = 'vinceamstoutz/not-a-real-package'): ModelsDevPricingProvider
     {
-        return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/'.$fixture, 'vinceamstoutz/not-a-real-package');
+        return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/'.$fixture, $package);
     }
 
     private function warningCapturingLogger(): LoggerInterface

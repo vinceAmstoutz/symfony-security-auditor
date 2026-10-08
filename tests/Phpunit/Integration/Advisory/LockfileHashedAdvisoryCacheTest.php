@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
@@ -172,6 +173,57 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(2, $recordingComposerAuditRunner->callCount, 'without a lockfile, every call must hit the inner runner');
         $cacheFiles = glob($this->cacheDir.'/*/*.json');
         self::assertSame([], false !== $cacheFiles ? $cacheFiles : []);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_a_symlinked_lockfile_is_never_cached(): void
+    {
+        file_put_contents($this->projectDir.'/real.lock', '{"lock": "v1"}');
+        symlink($this->projectDir.'/real.lock', $this->projectDir.'/composer.lock');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
+        $lockfileHashedAdvisoryCache = $this->makeCache($recordingComposerAuditRunner);
+
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'a symlinked lockfile must reach the inner runner every time');
+        $cacheFiles = glob($this->cacheDir.'/*/*.json');
+        self::assertSame([], false !== $cacheFiles ? $cacheFiles : []);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    #[DataProvider('payloadsThatAreNotAnAdvisoryDocument')]
+    public function test_a_payload_that_is_not_an_advisory_document_is_returned_but_never_cached(string $payload): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $recordingComposerAuditRunner = $this->recordingRunner($payload);
+        $lockfileHashedAdvisoryCache = $this->makeCache($recordingComposerAuditRunner);
+
+        $first = $lockfileHashedAdvisoryCache->run($this->projectDir);
+        $second = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame($payload, $first);
+        self::assertSame($payload, $second);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'a payload no advisory lookup can use must not be served from cache');
+        $cacheFiles = glob($this->cacheDir.'/*/*.json');
+        self::assertSame([], false !== $cacheFiles ? $cacheFiles : []);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function payloadsThatAreNotAnAdvisoryDocument(): iterable
+    {
+        yield 'text before the JSON document' => ["Warning: something on stdout\n{\"advisories\": {}}"];
+        yield 'invalid JSON' => ['not json at all'];
+        yield 'a scalar' => ['42'];
+        yield 'null' => ['null'];
+        yield 'no advisories key' => ['{"abandoned": {}}'];
+        yield 'advisories that is not a map' => ['{"advisories": "none"}'];
     }
 
     /**

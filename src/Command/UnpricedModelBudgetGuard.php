@@ -17,6 +17,7 @@ use Override;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuardInterface
@@ -55,9 +56,18 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
             return $errorStyle->confirm('Continue anyway, knowing the cost budget will not be enforced?', false);
         }
 
-        $errorStyle->error('Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd.');
+        $errorStyle->error(UnenforceableBudgetException::forUnpricedModels($unpricedModels)->getMessage());
 
         return false;
+    }
+
+    #[Override]
+    public function assertBudgetEnforceable(): void
+    {
+        $unpricedModels = $this->unpricedModels();
+        if (null !== $this->maxCostUsd && [] !== $unpricedModels) {
+            throw UnenforceableBudgetException::forUnpricedModels($unpricedModels);
+        }
     }
 
     /** @return list<string> */

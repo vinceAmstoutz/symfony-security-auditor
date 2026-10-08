@@ -19,6 +19,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevCatalog;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 
 /**
@@ -62,7 +63,7 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
 
         try {
             $this->releaseClient->download(self::CATALOG_URL, $downloadPath);
-            $this->assertValidCatalog($downloadPath);
+            $this->filesystem->dumpFile($downloadPath, $this->validCatalogJson($downloadPath));
             $this->filesystem->rename($downloadPath, \sprintf('%s/%s', $this->cacheDir, self::CATALOG_FILENAME), true);
         } catch (SelfUpdateFailedException|IOExceptionInterface $exception) {
             $this->removeLeftoverDownload($downloadPath);
@@ -96,7 +97,26 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
     /**
      * @throws SelfUpdateFailedException
      */
-    private function assertValidCatalog(string $downloadPath): void
+    private function validCatalogJson(string $downloadPath): string
+    {
+        $catalog = ModelsDevCatalog::withoutInvalidCosts($this->decodedCatalog($downloadPath));
+        if (!ModelsDevCatalog::containsPricedModel($catalog)) {
+            throw SelfUpdateFailedException::forUnrecognizedCatalogDownload(self::CATALOG_URL);
+        }
+
+        try {
+            return json_encode($catalog, \JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw SelfUpdateFailedException::forInvalidCatalogDownload(self::CATALOG_URL);
+        }
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     *
+     * @throws SelfUpdateFailedException
+     */
+    private function decodedCatalog(string $downloadPath): array
     {
         $contents = is_file($downloadPath) ? file_get_contents($downloadPath) : false;
         if (false === $contents) {
@@ -113,41 +133,6 @@ final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefreshe
             throw SelfUpdateFailedException::forInvalidCatalogDownload(self::CATALOG_URL);
         }
 
-        if (!$this->containsAnyModelPrice($decoded)) {
-            throw SelfUpdateFailedException::forUnrecognizedCatalogDownload(self::CATALOG_URL);
-        }
-    }
-
-    /**
-     * @param array<array-key, mixed> $catalog
-     */
-    private function containsAnyModelPrice(array $catalog): bool
-    {
-        foreach ($catalog as $provider) {
-            if (\is_array($provider) && $this->hasPricedModel($provider)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<array-key, mixed> $provider
-     */
-    private function hasPricedModel(array $provider): bool
-    {
-        $models = $provider['models'] ?? null;
-        if (!\is_array($models)) {
-            return false;
-        }
-
-        foreach ($models as $model) {
-            if (\is_array($model) && \is_array($model['cost'] ?? null)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $decoded;
     }
 }

@@ -1,0 +1,4 @@
+{
+  "message": "Not Found",
+  "anthropic": { "models": { "claude-opus-4-8": {} } }
+}

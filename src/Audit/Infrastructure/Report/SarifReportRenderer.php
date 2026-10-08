@@ -44,14 +44,14 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     #[Override]
     public function renderWithSuppressions(AuditReport $auditReport, array $baselinedFingerprints): string
     {
-        $vulnerabilities = $auditReport->vulnerabilities();
+        $notAccepted = $this->notAcceptedByBaseline($auditReport, $baselinedFingerprints);
 
         $results = [];
         $typesByRule = [];
 
-        foreach ($vulnerabilities as $vulnerability) {
+        foreach ($auditReport->vulnerabilities() as $vulnerability) {
             $typesByRule[$vulnerability->type()->owaspReference()][$vulnerability->type()->value] = $vulnerability->type();
-            $results[] = $this->resultFor($vulnerability, $baselinedFingerprints);
+            $results[] = $this->resultFor($vulnerability, !\array_key_exists(spl_object_id($vulnerability), $notAccepted));
         }
 
         $rules = array_values(array_map($this->ruleFor(...), $typesByRule));
@@ -99,11 +99,26 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
+     * An accepted baseline entry accepts one finding, as in
+     * {@see AuditReport::withoutFingerprints()}, which decides here which
+     * findings the baseline does not accept.
+     *
      * @param list<string> $baselinedFingerprints
      *
+     * @return array<int, int> the findings left standing, keyed by object id
+     */
+    private function notAcceptedByBaseline(AuditReport $auditReport, array $baselinedFingerprints): array
+    {
+        return array_flip(array_map(
+            spl_object_id(...),
+            $auditReport->withoutFingerprints($baselinedFingerprints)->vulnerabilities(),
+        ));
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function resultFor(Vulnerability $vulnerability, array $baselinedFingerprints): array
+    private function resultFor(Vulnerability $vulnerability, bool $baselined): array
     {
         $result = [
             'ruleId' => $vulnerability->type()->owaspReference(),
@@ -128,7 +143,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             ],
         ];
 
-        if (\in_array($vulnerability->fingerprint(), $baselinedFingerprints, true)) {
+        if ($baselined) {
             $result['suppressions'] = [['kind' => 'external', 'justification' => 'Accepted via audit baseline']];
         }
 

@@ -88,6 +88,6 @@ final readonly class AttackerChunkCache
         $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
         ChunkCoverageRecorder::record($chunk, 'cached', $coverageRecorder);
 
-        return $this->vulnerabilityFactory->fromList(array_values($cached));
+        return $this->vulnerabilityFactory->fromList(array_values($cached), $chunk);
     }
 }

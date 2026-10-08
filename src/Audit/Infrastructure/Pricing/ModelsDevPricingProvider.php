@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 
 use Composer\InstalledVersions;
-use JsonException;
 use OutOfBoundsException;
 use Override;
 use Psr\Log\LoggerInterface;
@@ -62,6 +61,8 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
 
     /** @var array<string, ?ModelPrice> */
     private array $servingPlatformPricesByModel = [];
+
+    private ?string $loadedCatalogPath = null;
 
     public function __construct(
         private readonly LoggerInterface $logger,
@@ -262,7 +263,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
 
         $cost = $entry['cost'] ?? null;
 
-        return \is_array($cost) ? $cost : null;
+        return ModelsDevCatalog::isPricedCost($cost) ? $cost : null;
     }
 
     /** @param array<array-key, mixed> $cost */
@@ -314,29 +315,47 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /** @return array<array-key, mixed> */
     private function loadCatalog(): array
     {
-        $path = $this->effectiveCatalogPath();
-        $contents = null !== $path && is_file($path) ? file_get_contents($path) : false;
-        if (false === $contents) {
-            return $this->disablePricing('catalog file not found or unreadable', $path);
+        $path = $this->preferredCatalogPath();
+        $catalog = ModelsDevCatalog::fromFile($path);
+        $packagedPath = $this->packagedCatalogPath();
+
+        if (\is_string($catalog) && null !== $packagedPath && $path !== $packagedPath) {
+            $this->logger->warning('Ignoring the unusable pricing catalog override; falling back to the packaged catalog', [
+                'reason' => $catalog,
+                'path' => $path,
+            ]);
+            $path = $packagedPath;
+            $catalog = ModelsDevCatalog::fromFile($path);
         }
 
-        try {
-            $decoded = json_decode($contents, true, flags: \JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return $this->disablePricing('catalog JSON invalid', $path);
+        if (\is_string($catalog)) {
+            return $this->disablePricing($catalog, $path);
         }
 
-        return \is_array($decoded) ? $decoded : $this->disablePricing('catalog root is not an object', $path);
+        $this->loadedCatalogPath = $path;
+
+        return $catalog;
     }
 
     /**
      * The catalog file this provider actually reads, so `doctor` can name it
      * instead of assuming the packaged one — a `self-update` refresh writes an
-     * override that takes precedence. An override that does not exist yet falls
-     * through to the packaged catalog rather than shadowing it, which is what
-     * makes the override location safe to point at before anything writes there.
+     * override that takes precedence, unless it cannot serve as a catalog, in
+     * which case the packaged one is read in its place.
      */
     public function effectiveCatalogPath(): ?string
+    {
+        $this->catalog();
+
+        return $this->loadedCatalogPath ?? $this->preferredCatalogPath();
+    }
+
+    /**
+     * An override that does not exist yet falls through to the packaged
+     * catalog rather than shadowing it, which is what makes the override
+     * location safe to point at before anything writes there.
+     */
+    private function preferredCatalogPath(): ?string
     {
         if (null !== $this->catalogPath && is_file($this->catalogPath)) {
             return $this->catalogPath;

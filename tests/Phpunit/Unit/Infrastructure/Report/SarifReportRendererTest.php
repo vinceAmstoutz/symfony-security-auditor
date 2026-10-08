@@ -103,6 +103,20 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_records_a_scan_that_found_no_file_as_a_failed_invocation(): void
+    {
+        self::assertSame(
+            [[
+                'executionSuccessful' => false,
+                'toolExecutionNotifications' => [['level' => 'error', 'message' => ['text' => 'Audit incomplete: the scan found no file to audit, so this report has no verdict and cannot vouch that the project is free of vulnerabilities.']]],
+            ]],
+            $this->invocationsOf($this->makeReportOfAScanThatFoundNoFile()),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_version_is_2_1_0(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -661,6 +675,60 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * `BaselineProcessor` credits an accepted entry once: one entry accepts one
+     * of several findings that share its fingerprint, so the report carries the
+     * others as the new findings they are.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_with_suppressions_accepts_as_many_findings_as_the_baseline_lists_the_fingerprint(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(lineStart: 10);
+        $second = $this->makeValidatedVuln(lineStart: 30);
+        self::assertSame($vulnerability->fingerprint(), $second->fingerprint());
+
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($vulnerability, $second), [$vulnerability->fingerprint()]);
+
+        self::assertSame([true, false], $this->suppressedFlags($decoded['runs'][0]['results']));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_with_suppressions_accepts_every_finding_the_baseline_lists_the_fingerprint_for(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(lineStart: 10);
+        $second = $this->makeValidatedVuln(lineStart: 30);
+
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($vulnerability, $second), [$vulnerability->fingerprint(), $vulnerability->fingerprint()]);
+
+        self::assertSame([true, true], $this->suppressedFlags($decoded['runs'][0]['results']));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_with_suppressions_spends_the_credit_on_the_most_severe_finding_as_the_baseline_does(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::MEDIUM, lineStart: 10);
+        $critical = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL, lineStart: 30);
+
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($vulnerability, $critical), [$vulnerability->fingerprint()]);
+
+        self::assertSame([30, 10], $this->startLines($decoded['runs'][0]['results']));
+        self::assertSame([true, false], $this->suppressedFlags($decoded['runs'][0]['results']));
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
@@ -802,5 +870,25 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     private function assertSarifShape(mixed $value): void
     {
         self::assertIsArray($value);
+    }
+
+    /**
+     * @param list<array{suppressions?: list<array{kind: string, justification: string}>}> $results
+     *
+     * @return list<bool>
+     */
+    private function suppressedFlags(array $results): array
+    {
+        return array_map(static fn (array $result): bool => \array_key_exists('suppressions', $result), $results);
+    }
+
+    /**
+     * @param list<array{locations: list<array{physicalLocation: array{region: array{startLine: int}}}>}> $results
+     *
+     * @return list<int>
+     */
+    private function startLines(array $results): array
+    {
+        return array_map(static fn (array $result): int => $result['locations'][0]['physicalLocation']['region']['startLine'], $results);
     }
 }

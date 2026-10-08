@@ -168,6 +168,56 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_a_loader_pointed_at_another_project_config_reads_that_file_and_leaves_the_first_loader_alone(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $firstFile = $this->configHome.'/first/.symfony-security-auditor.yaml';
+        $secondFile = $this->configHome.'/second/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($firstFile, "model: first-model\n");
+        $this->filesystem->dumpFile($secondFile, "model: second-model\n");
+
+        $standaloneConfigLoader = $this->loader($firstFile);
+
+        $standaloneConfig = $standaloneConfigLoader->withProjectConfigFile($secondFile)->load();
+
+        self::assertSame(['second-model', $secondFile, 'first-model'], [$standaloneConfig->auditConfig['model'], $standaloneConfig->projectConfigFile, $standaloneConfigLoader->load()->auditConfig['model']]);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_loader_released_from_its_project_config_reads_the_user_config_alone(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "model: project-model\n");
+
+        $standaloneConfig = $this->loader($projectConfigFile)->withProjectConfigFile(null)->load();
+
+        self::assertSame(['user-model', null], [$standaloneConfig->auditConfig['model'], $standaloneConfig->projectConfigFile]);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_every_key_a_project_config_declares_reaches_the_audit_settings(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
@@ -440,6 +490,30 @@ final class StandaloneConfigLoaderTest extends TestCase
         );
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_relative_baseline_of_the_project_config_is_read_from_the_project_not_the_working_directory(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: .security-baseline.json\n");
+
+        self::assertSame(
+            ['baseline' => $this->configHome.'/project/.security-baseline.json'],
+            $this->loader($projectConfigFile)->load()->auditConfig['audit'],
+        );
+    }
+
     private function loader(?string $projectConfigFile = null): StandaloneConfigLoader
     {
         return new StandaloneConfigLoader(
@@ -538,6 +612,73 @@ final class StandaloneConfigLoaderTest extends TestCase
 
         self::assertSame(
             ['audit' => ['fail_on' => 'high'], 'scan' => ['included_paths' => ['app']]],
+            $this->loader($projectConfigFile)->load()->auditConfig,
+        );
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_project_config_may_not_choose_where_the_report_is_written(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  output: ../elsewhere/report.json\n");
+
+        $this->expectException(ProjectConfigUserOnlyKeyException::class);
+        $this->expectExceptionMessage(\sprintf('The project config "%s" declares "audit.output"', $projectConfigFile));
+
+        $this->loader($projectConfigFile)->load();
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_the_user_config_may_set_the_report_output(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\naudit:\n  output: build/report.json\n");
+
+        self::assertSame(['audit' => ['output' => 'build/report.json']], $this->loader($this->configHome.'/project/.symfony-security-auditor.yaml')->load()->auditConfig);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_project_config_may_set_the_report_format_and_the_gates(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  format: sarif\n  min_score: 80\n  fail_on_incomplete: true\n");
+
+        self::assertSame(
+            ['audit' => ['format' => 'sarif', 'min_score' => 80, 'fail_on_incomplete' => true]],
             $this->loader($projectConfigFile)->load()->auditConfig,
         );
     }
@@ -842,7 +983,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: \"Ärger\\tbaseline.json\"\n");
 
-        self::assertSame(['baseline' => "Ärger\tbaseline.json"], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome."/project/Ärger\tbaseline.json"], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
     }
 
     /**
@@ -1197,7 +1338,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $auditConfig = $this->loader($projectConfigFile)->load()->auditConfig;
 
         self::assertSame('claude-haiku-4-5?temperature=0.2', $auditConfig['model']);
-        self::assertSame(['baseline' => 'baseline?v2.json'], $auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome.'/project/baseline?v2.json'], $auditConfig['audit']);
     }
 
     /**
@@ -1218,7 +1359,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: 'baseline-100%.json'\n");
 
-        self::assertSame(['baseline' => 'baseline-100%.json'], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome.'/project/baseline-100%.json'], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
     }
 
     /**
