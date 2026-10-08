@@ -272,6 +272,47 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_strips_terminal_control_sequences_from_finding_content(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Title\x1b]0;pwned\x07 end", 0.9),
+            new CodeLocation("src/\x1b[2JFoo.php", 1, 2),
+            new VulnerabilityNarrative("desc\x1b[31m red\r overwritten\x00", "vec\u{85}tor", 'proof', 'fix'),
+            "\$code\x7f",
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertDoesNotMatchRegularExpression('/[\x{0}-\x{8}\x{B}-\x{1F}\x{7F}-\x{9F}]/u', $output);
+        self::assertStringContainsString('Title]0;pwned end', $output);
+        self::assertStringContainsString('src/[2JFoo.php:1-2', $output);
+        self::assertStringContainsString('desc[31m red overwritten', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_keeps_the_line_breaks_and_tabs_of_a_code_snippet(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Title', 0.9),
+            new CodeLocation('src/Foo.php', 1, 2),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            "if (\$a) {\n\treturn \$q;\n}",
+        )->withReviewerValidation(true);
+
+        self::assertStringContainsString("if (\$a) {\n\treturn \$q;\n}", $this->renderer->render($this->makeReport($vulnerability)));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_strips_bidi_overrides_even_when_a_field_carries_invalid_utf8(): void
     {
         $vulnerability = Vulnerability::of(

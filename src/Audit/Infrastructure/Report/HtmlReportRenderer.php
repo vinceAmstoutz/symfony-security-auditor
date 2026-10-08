@@ -177,21 +177,15 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
     }
 
     /**
-     * `htmlspecialchars()` neutralizes markup injection (`<`, `>`, `&`,
-     * quotes) but a browser still honours the Unicode Bidirectional
-     * Algorithm on the escaped text — a bidi override (`U+202A`-`U+202E`,
-     * `U+2066`-`U+2069`) in an LLM-sourced field can visually reorder the
-     * rendered characters, a Trojan-Source-style spoof of the finding text.
-     * Invalid UTF-8 is repaired with `mb_scrub()` first, the same defense the
-     * sibling console/Markdown/annotation renderers apply: a `/u` regex aborts
-     * (returns `null`) on an invalid subject byte, so without the scrub a
-     * single stray byte would defeat the bidi strip entirely.
+     * Beyond markup, the escaped text carries no bidi override (a Trojan-Source
+     * spoof in a browser) and no raw ANSI escape byte (it reaches a terminal
+     * when the saved report is printed): {@see TerminalTextSanitizer} strips
+     * both and keeps the line breaks and tabs a code snippet needs, after
+     * `mb_scrub()` so an invalid UTF-8 byte cannot make its `/u` regex return
+     * `null`.
      */
     private function escape(string $value): string
     {
-        $scrubbed = mb_scrub($value, 'UTF-8');
-        $withoutBidiOverrides = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $scrubbed) ?? $scrubbed;
-
-        return htmlspecialchars($withoutBidiOverrides, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
+        return htmlspecialchars(TerminalTextSanitizer::stripControlCharacters(mb_scrub($value, 'UTF-8')), \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
     }
 }
