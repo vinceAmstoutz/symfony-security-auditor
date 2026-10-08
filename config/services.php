@@ -80,6 +80,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerA
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHasher;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
@@ -607,11 +608,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(AuditedProjectPathHolder::class)
         ->args([param('kernel.project_dir')]);
 
+    $defaultsConfigurator->set(LockfileHasher::class)
+        ->args([service(Filesystem::class), service('logger')]);
+
     $defaultsConfigurator->set(DeferredAdvisoryDatabase::class)
         ->args([
             service(ComposerAuditRunnerInterface::class),
             service(AuditedProjectPathHolder::class),
             service('logger'),
+            service(LockfileHasher::class),
         ]);
 
     $defaultsConfigurator->set(SymfonyToolRegistryFactory::class)
