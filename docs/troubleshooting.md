@@ -579,7 +579,7 @@ Some models do not support tool/function calling — verify your provider's docs
 
 ### Attacker loops indefinitely on tool calls
 
-Lower `audit.max_tool_iterations` from the default `8`. Once the cap is hit, the Attacker is forced to commit to a final JSON answer.
+Lower `audit.max_tool_iterations` from the default `8` to bound the spend. The last round is announced to the model, which is told to record what it holds and stop (_since 1.22_), and a chunk whose last round does is analyzed and cached like any other. A model that asks to read one more file instead ends the conversation: the findings the Attacker already recorded are kept, but the chunk is recorded as errored and not cached, so the run reports `Audit incomplete` and the next run pays for it again. Raise the cap when chunks keep failing that way: it gives the model more rounds to read, at the price of more rounds (each re-reads the prompt) and of a one-time re-analysis, since the value is part of the attacker cache key.
 
 ### `lookup_advisory` always returns `[]`
 
