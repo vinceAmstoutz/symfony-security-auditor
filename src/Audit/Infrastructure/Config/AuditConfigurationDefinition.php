@@ -82,7 +82,7 @@ final readonly class AuditConfigurationDefinition
                 ->end()
                 ->booleanNode('provider_json_mode')
                     ->defaultFalse()
-                    ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call. Honored by OpenAI/Mistral/Ollama; silently ignored by Anthropic (which has no equivalent knob). Default false because behaviour is provider-dependent — only enable if your provider supports it. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
+                    ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call. Sent only to a Claude/Anthropic-dialect model (its name contains `claude`) and currently a no-op for every other model, for the same bridge-compatibility reason as `max_output_tokens`. Default false. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
                 ->end()
         ;
     }
