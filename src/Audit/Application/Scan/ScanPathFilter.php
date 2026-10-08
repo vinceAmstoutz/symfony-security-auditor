@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan;
 
-use Symfony\Component\String\UnicodeString;
+use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 use function Symfony\Component\String\u;
@@ -73,9 +73,12 @@ final readonly class ScanPathFilter
 
     /**
      * The scan paths in the one form the filter compares and a scanner scans:
-     * trimmed, with forward slashes, without a leading `./` or a trailing
-     * separator, and without the blank entries and the project root itself,
-     * which name no path to narrow to.
+     * trimmed, with forward slashes, and with their `.`, `..` and empty
+     * segments resolved, so `src/../src`, `./src//` and `src` are one path —
+     * the scanner resolves them through the filesystem, and a spelling the
+     * filter read literally would scan a directory while its skipped files
+     * went unrecorded. The project root itself and blank entries name no path
+     * to narrow to and are dropped.
      *
      * @param list<string> $scanPaths
      *
@@ -85,31 +88,21 @@ final readonly class ScanPathFilter
     {
         $normalized = [];
         foreach ($scanPaths as $scanPath) {
-            $trimmed = self::stripLeadingCurrentDirSegment(u($scanPath)->trim()->replace('\\', '/')->trimEnd('/'));
-            if ($trimmed->isEmpty()) {
+            $canonical = self::canonicalize(u($scanPath)->trim()->replace('\\', '/')->toString());
+            if ('' === $canonical) {
                 continue;
             }
 
-            $normalized[] = $trimmed->toString();
+            $normalized[] = $canonical;
         }
 
         return $normalized;
     }
 
-    /**
-     * `Path::makeRelative()` (used to compute every scanned file's relative
-     * path) never produces a leading `./` in its output, so a `--path ./src`
-     * or bare `--path .` CLI filter could otherwise never match any scanned
-     * real relative path — silently scanning zero files instead of the
-     * intended subdirectory (or, for a bare `.`, the whole project).
-     */
-    private static function stripLeadingCurrentDirSegment(UnicodeString $unicodeString): UnicodeString
+    /** Resolved against `./` because `Path::canonicalize()` expands a leading `~` to the home directory. */
+    private static function canonicalize(string $scanPath): string
     {
-        while ($unicodeString->startsWith('./')) {
-            $unicodeString = $unicodeString->after('/');
-        }
-
-        return '.' === $unicodeString->toString() ? u('') : $unicodeString;
+        return Path::canonicalize(\sprintf('./%s', $scanPath));
     }
 
     /**
