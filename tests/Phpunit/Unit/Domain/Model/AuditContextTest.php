@@ -324,6 +324,26 @@ final class AuditContextTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_it_removes_only_the_vulnerability_with_the_given_id(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $vulnerability = $this->makeVulnerability('v1', VulnerabilitySeverity::HIGH);
+        $kept = $this->makeVulnerability('v2', VulnerabilitySeverity::HIGH);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($kept);
+
+        $auditContext->removeVulnerability($vulnerability->id());
+
+        self::assertSame([$kept->id() => $kept], $auditContext->vulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_it_replaces_vulnerability_by_id(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

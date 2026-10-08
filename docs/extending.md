@@ -191,6 +191,7 @@ interface StageInterface
 | `vulnerabilities(): array<string, Vulnerability>` | keyed by id |
 | `addVulnerability(Vulnerability $v): void` | add a new finding |
 | `replaceVulnerability(Vulnerability $v): void` | overwrite an existing id |
+| `removeVulnerability(string $id): void` | drop a finding by id; an unknown id is ignored |
 | `validatedVulnerabilities(): array<string, Vulnerability>` | reviewer-validated subset |
 | `setMeta(string $key, mixed $value): void` | arbitrary stage-to-stage data |
 | `getMeta(string $key, mixed $default = null): mixed` | read stage metadata |
@@ -219,13 +220,14 @@ final class DeduplicationStage implements StageInterface
             $key = $vuln->filePath() . ':' . $vuln->lineStart() . ':' . $vuln->type()->value;
 
             if (array_key_exists($key, $seen)) {
-                // Keep the one with higher confidence; replace lower-confidence duplicate.
+                // Keep the one with higher confidence; drop the lower-confidence duplicate.
                 $existing = $context->vulnerabilities()[$seen[$key]];
                 if ($vuln->confidence() > $existing->confidence()) {
-                    $context->replaceVulnerability($vuln);
+                    $context->removeVulnerability($seen[$key]);
                     $seen[$key] = $id;
+                } else {
+                    $context->removeVulnerability($id);
                 }
-                // Drop the current entry — no API to remove, so overwrite with the winner.
                 continue;
             }
 
@@ -235,7 +237,7 @@ final class DeduplicationStage implements StageInterface
 }
 ```
 
-> `AuditContext` has no `removeVulnerability()` method. If your stage needs to filter findings, collect the survivors and call `replaceVulnerability()` for each, or store a skip-list in metadata with `setMeta()` for a downstream consumer.
+> To drop a finding, call `removeVulnerability()` with its id. To keep a finding out of a downstream consumer without deleting it, store a skip-list in metadata with `setMeta()` instead.
 
 ### Wire — append after AuditStage
 
