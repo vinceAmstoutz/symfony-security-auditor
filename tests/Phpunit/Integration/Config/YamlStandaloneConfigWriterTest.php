@@ -20,6 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFileReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 
 final class YamlStandaloneConfigWriterTest extends TestCase
@@ -60,6 +61,70 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         (new YamlStandaloneConfigWriter())->write($this->configFile, ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-4-8']);
 
         self::assertStringEqualsFile($this->configFile, "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: claude-opus-4-8\n");
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_keeps_the_settings_of_an_existing_configuration_that_it_is_not_given(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile, "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: old-model\nprivacy:\n    offline_only: true\naudit:\n    budget:\n        max_cost_usd: 5.0\n    custom_skills: []\nscan:\n    secret_scrubbing:\n        additional_patterns: ['acme_[a-z0-9]{32}']\ncache:\n    enabled: true\nhttp_timeout: 900\n");
+
+        (new YamlStandaloneConfigWriter())->write($this->configFile, ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4']);
+
+        self::assertSame(
+            [
+                'provider' => 'openai',
+                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
+                'model' => 'gpt-5.4',
+                'privacy' => ['offline_only' => true],
+                'audit' => ['budget' => ['max_cost_usd' => 5.0], 'custom_skills' => []],
+                'scan' => ['secret_scrubbing' => ['additional_patterns' => ['acme_[a-z0-9]{32}']]],
+                'cache' => ['enabled' => true],
+                'http_timeout' => 900,
+            ],
+            Yaml::parseFile($this->configFile),
+        );
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_replaces_a_whole_section_it_is_given_rather_than_merging_into_it(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile, "platform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\n    openai: { api_key: '%env(OPENAI_API_KEY)%' }\n");
+
+        (new YamlStandaloneConfigWriter())->write($this->configFile, ['platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']]]);
+
+        self::assertSame(['platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']]], Yaml::parseFile($this->configFile));
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_replaces_an_existing_file_that_is_not_valid_yaml(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile, "model: [unclosed\n  - : :\n");
+
+        (new YamlStandaloneConfigWriter())->write($this->configFile, ['model' => 'claude-opus-4-8']);
+
+        self::assertSame(['model' => 'claude-opus-4-8'], Yaml::parseFile($this->configFile));
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_replaces_an_existing_file_holding_more_values_than_any_configuration_needs(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile, "model: old-model\nnoise: [".implode(', ', range(1, StandaloneConfigFileReader::VALUE_LIMIT))."]\n");
+
+        (new YamlStandaloneConfigWriter())->write($this->configFile, ['model' => 'claude-opus-4-8']);
+
+        self::assertSame(['model' => 'claude-opus-4-8'], Yaml::parseFile($this->configFile));
     }
 
     /**

@@ -201,6 +201,28 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_keeps_the_settings_it_does_not_manage_when_it_rewrites_an_existing_configuration(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: old-model\nprivacy:\n    offline_only: true\naudit:\n    budget:\n        max_cost_usd: 5.0\ncache:\n    enabled: true\n");
+
+        $this->commandTester()->execute(
+            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'openai',
+                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
+                'model' => 'gpt-5.4',
+                'privacy' => ['offline_only' => true],
+                'audit' => ['budget' => ['max_cost_usd' => 5.0]],
+                'cache' => ['enabled' => true],
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
     public function test_it_rebuilds_the_bridge_of_a_configured_machine_under_no_interaction_when_forced(): void
     {
         (new Filesystem())->dumpFile($this->configFile(), "provider: ollama\nplatform:\n    ollama: { endpoint: 'http://localhost:11434' }\nmodel: llama3.2\n");

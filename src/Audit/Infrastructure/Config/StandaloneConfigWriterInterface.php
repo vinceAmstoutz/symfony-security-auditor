@@ -19,6 +19,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 interface StandaloneConfigWriterInterface
 {
     /**
+     * The settings of an existing file that `$config` does not give are kept.
+     *
      * @param array<string, mixed> $config
      */
     public function write(string $configFile, array $config): void;

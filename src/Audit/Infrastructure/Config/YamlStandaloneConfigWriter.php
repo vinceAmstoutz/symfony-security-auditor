@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
 
@@ -26,6 +27,7 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
 {
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
+        private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
     ) {}
 
     /**
@@ -36,6 +38,7 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
     public function write(string $configFile, array $config): void
     {
         $this->assertSafeToWrite($configFile);
+        $settings = $config + $this->existingSettings($configFile);
 
         try {
             if (!$this->filesystem->exists($configFile)) {
@@ -44,10 +47,22 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
                 $this->filesystem->chmod($configFile, 0o600);
             }
 
-            $this->filesystem->dumpFile($configFile, RoundTripYaml::dump($config, 2, 4));
+            $this->filesystem->dumpFile($configFile, RoundTripYaml::dump($settings, 2, 4));
             $this->filesystem->chmod($configFile, 0o600);
         } catch (IOException $ioException) {
             throw StandaloneConfigWriteException::fromIOException($configFile, $ioException);
+        }
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function existingSettings(string $configFile): array
+    {
+        try {
+            return $this->standaloneConfigFileReader->read($configFile);
+        } catch (MalformedProjectConfigException) {
+            return [];
         }
     }
 
