@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
+use ErrorException;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
@@ -109,5 +110,73 @@ final class SymfonyMappingContextRendererTest extends TestCase
         $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
 
         self::assertStringNotContainsString("\r", $rendered);
+    }
+
+    public function test_an_access_control_pattern_that_does_not_compile_matches_nothing_and_raises_no_warning(): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: ['^/(admin' => ['ROLE_ADMIN']], routeAccessControls: [$routeAccessControl]),
+        );
+
+        error_clear_last();
+        $rendered = $this->renderedWithWarningsThrown(static fn (): string => SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping));
+
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $rendered);
+        self::assertNull(error_get_last());
+    }
+
+    public function test_the_error_handler_in_place_before_matching_is_back_afterwards_and_never_saw_the_pattern_warning(): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: ['^/(admin' => ['ROLE_ADMIN']], routeAccessControls: [$routeAccessControl]),
+        );
+        $received = [];
+        set_error_handler(static function (int $severity, string $message) use (&$received): bool {
+            $received[] = $message;
+
+            return true;
+        });
+
+        try {
+            SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
+            trigger_error('after matching', \E_USER_WARNING);
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame(['after matching'], $received);
+    }
+
+    public function test_a_later_valid_rule_still_covers_the_route_after_a_pattern_that_does_not_compile(): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: ['^/(admin' => ['ROLE_BROKEN'], '^/admin' => ['ROLE_ADMIN']], routeAccessControls: [$routeAccessControl]),
+        );
+
+        $rendered = $this->renderedWithWarningsThrown(static fn (): string => SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping));
+
+        self::assertStringContainsString('COVERED_BY access_control[ROLE_ADMIN]', $rendered);
+    }
+
+    /**
+     * @param callable(): string $render
+     */
+    private function renderedWithWarningsThrown(callable $render): string
+    {
+        set_error_handler(static function (int $severity, string $message): never {
+            throw new ErrorException($message, 0, $severity);
+        });
+
+        try {
+            return $render();
+        } finally {
+            restore_error_handler();
+        }
     }
 }

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **An `access_control` path that is not a valid regular expression no longer aborts the prompt build.** `AccessControlRuleMatcher::rolesForPath()` (`src/Audit/Infrastructure/Prompt/`) ran `preg_match()` on each `access_control` path read from the audited repository's `security.yaml` without checking it compiles, so `path: ^/(admin` raised `preg_match(): Compilation failed: missing closing parenthesis at offset 8` as an `E_WARNING`; under a warning-throwing error handler (Symfony debug, PHPUnit `failOnWarning`, a converting handler in `mcp:serve`) the warning became an exception and the run stopped before any chunk was sent. The match now captures that warning, restores the previous handler and treats the pattern as matching nothing, so the route is tagged `LACKS_ACCESS_CHECK` unless a later valid rule covers it.
+
 ## [1.21.0] — 2026-10-04 — Gateway
 
 A release about reaching the model you actually run, and never mistaking a partial audit for a clean one. `init` now configures any OpenAI-compatible AI gateway, a local Ollama, AWS Bedrock and the new platforms of `symfony/ai` 0.14, keeps the API key for you (`auth:set`), and installs the bridge even for a platform whose block you finish by hand; the standalone binary also serves the auditor over MCP. A run that could not analyze every file now says so in every report format and in the GitHub Action, `--fail-on-incomplete` turns that into a failing exit code, a run that analyzed nothing has no verdict, and an answer cut short, a connection cut off mid-response or a chunk too large for the model is recovered instead of ending the audit. The audited repository's own configuration can no longer weaken the run, and the secret scrubber redacts more credential shapes while no longer hiding the code an audit has to read.

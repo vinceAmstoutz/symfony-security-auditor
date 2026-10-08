@@ -61,12 +61,35 @@ final readonly class AccessControlRuleMatcher
             }
 
             $delimiter = self::delimiterAvoiding($pattern);
-            if (null !== $delimiter && 1 === preg_match($delimiter.$pattern.$delimiter, $routePath)) {
+            if (null !== $delimiter && self::patternMatches($delimiter.$pattern.$delimiter, $routePath)) {
                 return $roles;
             }
         }
 
         return null;
+    }
+
+    /**
+     * `preg_match()` raises a warning for a pattern that does not compile
+     * (`^/(admin`) and returns false; a warning-throwing error handler
+     * (Symfony debug, `mcp:serve`) would abort the prompt build on a pattern
+     * taken from the audited repository, so the warning is captured here and
+     * the pattern simply matches nothing.
+     */
+    private static function patternMatches(string $delimitedPattern, string $routePath): bool
+    {
+        $compilationError = null;
+        set_error_handler(static function (int $severity, string $message) use (&$compilationError): bool {
+            $compilationError = $message;
+
+            return true;
+        });
+
+        try {
+            return 1 === preg_match($delimitedPattern, $routePath);
+        } finally {
+            restore_error_handler();
+        }
     }
 
     /**
