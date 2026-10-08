@@ -256,11 +256,11 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`, `filePat
 
 ### `VulnerabilityType` — backed enum with OWASP and CWE references
 
-49 cases in six categories:
+50 cases in six categories:
 
 | Category | Examples |
 | --- | --- |
-| Injection | `SQL_INJECTION`, `COMMAND_INJECTION`, `TWIG_INJECTION`, … |
+| Injection | `SQL_INJECTION`, `COMMAND_INJECTION`, `TWIG_INJECTION`, `XSS`, … |
 | Broken Access Control | `BROKEN_ACCESS_CONTROL`, `MISSING_VOTER`, `MISSING_CSRF_PROTECTION`, … |
 | Logic Flaw | `BUSINESS_LOGIC_FLAW`, `RACE_CONDITION`, `STATE_MACHINE_BYPASS`, … |
 | Symfony-Specific | `MASS_ASSIGNMENT`, `UNSAFE_PARAMETER_BINDING`, `MISCONFIGURED_FIREWALL`, … |

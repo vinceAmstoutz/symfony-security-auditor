@@ -30,9 +30,9 @@ Output is a validated vulnerability report in your console, as JSON, or as SARIF
 
 ### What kinds of vulnerabilities does it catch?
 
-49 types across six categories (OWASP-aligned):
+50 types across six categories (OWASP-aligned):
 
-- **Injection** — SQL, command, LDAP, XPath, Twig, header.
+- **Injection** — SQL, command, LDAP, XPath, Twig, header, cross-site scripting (XSS).
 - **Broken Access Control** — missing Voter, Voter bypass, role escalation, IDOR, missing CSRF.
 - **Logic Flaw** — business logic, race condition, state machine bypass, price manipulation, insecure workflow.
 - **Symfony-Specific** — mass assignment, insecure deserialization, unsafe parameter binding, misconfigured firewall, insecure redirect, exposed internal service.

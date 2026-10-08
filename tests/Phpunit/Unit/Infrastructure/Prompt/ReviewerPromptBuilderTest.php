@@ -283,6 +283,40 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString($typeValue, $prompt);
     }
 
+    public function test_system_prompt_corrected_type_list_is_exactly_the_vulnerability_type_enum(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertSame($this->expectedTypeValues(), $this->correctedTypesListedIn($prompt));
+    }
+
+    public function test_batch_system_prompt_corrected_type_list_is_exactly_the_vulnerability_type_enum(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertSame($this->expectedTypeValues(), $this->correctedTypesListedIn($prompt));
+    }
+
+    /** @return list<string> */
+    private function expectedTypeValues(): array
+    {
+        $expected = array_map(static fn (VulnerabilityType $vulnerabilityType): string => $vulnerabilityType->value, VulnerabilityType::cases());
+        sort($expected);
+
+        return $expected;
+    }
+
+    /** @return list<string> */
+    private function correctedTypesListedIn(string $prompt): array
+    {
+        self::assertSame(1, preg_match('/same enum the attacker uses\):\n(.+?)\n\n/s', $prompt, $matches));
+        $listed = preg_split('/[\s,]+/', trim($matches[1]));
+        self::assertIsArray($listed);
+        sort($listed);
+
+        return $listed;
+    }
+
     /** @return iterable<string, array{string}> */
     public static function vulnerabilityTypeValues(): iterable
     {
