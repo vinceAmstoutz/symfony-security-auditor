@@ -52,6 +52,6 @@ final readonly class EchoedFilePath
 
     private static function comparable(string $path): string
     {
-        return u($path)->replace('\\', '/')->replaceMatches('#^(?:\./|/)+#', '')->toString();
+        return u(mb_scrub($path, 'UTF-8'))->replace('\\', '/')->replaceMatches('#^(?:\./|/)+#', '')->toString();
     }
 }
