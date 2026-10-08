@@ -79,8 +79,11 @@ final readonly class ProcessComposerAvailabilityChecker implements ComposerAvail
             $report = b($process->getOutput())->trim();
         }
 
+        $exitCode = $process->getExitCode();
+        \assert(null !== $exitCode, 'A process that has run has an exit code');
+
         return $report->isEmpty()
-            ? \sprintf('"composer --version" exited with code %d', $process->getExitCode())
+            ? \sprintf('"composer --version" exited with code %d', $exitCode)
             : $this->printable($report->toString());
     }
 
