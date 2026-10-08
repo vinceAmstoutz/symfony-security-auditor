@@ -142,6 +142,24 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
 
     /**
      * @throws InvalidAuditContextException
+     */
+    public function test_a_scan_that_found_no_file_errors_the_completeness_testcase(): void
+    {
+        $domDocument = $this->decodeJunit($this->makeReportOfAScanThatFoundNoFile());
+
+        $testsuite = $domDocument->getElementsByTagName('testsuite')->item(0);
+        self::assertNotNull($testsuite);
+        self::assertSame('1', $testsuite->getAttribute('tests'));
+        self::assertSame('1', $testsuite->getAttribute('errors'));
+
+        $error = $domDocument->getElementsByTagName('error')->item(0);
+        self::assertNotNull($error);
+        self::assertSame('incomplete', $error->getAttribute('type'));
+        self::assertSame('Audit incomplete: the scan found no file to audit, so this report has no verdict and cannot vouch that the project is free of vulnerabilities.', $error->textContent);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
     public function test_the_completeness_error_of_a_cost_estimate_states_the_notice(): void

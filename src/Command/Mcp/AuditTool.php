@@ -29,7 +29,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRende
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
 /** @internal not part of the BC promise — the MCP tool *name* (`audit`) is public, but the PHP class itself is for internal use only. */
 final readonly class AuditTool
@@ -41,6 +43,7 @@ final readonly class AuditTool
         private BaselineProcessorInterface $baselineProcessor,
         private FindingTypeFilterInterface $findingTypeFilter,
         private ReviewerFeedbackHolder $reviewerFeedbackHolder,
+        private UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard,
     ) {}
 
     /**
@@ -70,8 +73,11 @@ final readonly class AuditTool
      * Runs the audit as `audit:run` does without options: the configured
      * baseline's reasons reach the reviewer and the findings it accepts skip
      * the reviewer and leave the report, the muted finding types leave it too,
-     * and a run with no verdict returns no report.
+     * and a run with no verdict returns no report. A budgeted run on a model
+     * with no published price is refused before it spends anything, as
+     * `audit:run` refuses it under `--no-interaction`.
      *
+     * @throws UnenforceableBudgetException
      * @throws AuditAbortedByBudgetException
      * @throws AuditAbortedByProviderException
      * @throws AuditWithoutVerdictException
@@ -81,6 +87,7 @@ final readonly class AuditTool
      */
     private function auditReport(string $projectPath): AuditReport
     {
+        $this->unpricedModelBudgetGuard->assertBudgetEnforceable();
         $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback(null));
 
         $auditReport = $this->findingTypeFilter->apply(

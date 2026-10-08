@@ -408,6 +408,71 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame(['derived/Generated.php', 'src/App.php'], $paths);
     }
 
+    public function test_a_directory_inside_another_scanned_directory_is_not_read_twice(): void
+    {
+        mkdir($this->tmpDir.'/src/Controller', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Controller/HomeController.php', '<?php');
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        $reads = [];
+        $reader = static function (SplFileInfo $splFile) use (&$reads): string {
+            $reads[] = $splFile->getFilename();
+
+            return $splFile->getContents();
+        };
+
+        $files = (new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'src/Controller'], fileReader: $reader))->scan($this->tmpDir);
+
+        sort($reads);
+        self::assertSame(['App.php', 'HomeController.php'], $reads);
+        self::assertCount(2, $files);
+    }
+
+    public function test_a_directory_listed_twice_is_read_once(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        $reads = 0;
+        $reader = static function (SplFileInfo $splFile) use (&$reads): string {
+            ++$reads;
+
+            return $splFile->getContents();
+        };
+
+        (new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'src/', './src'], fileReader: $reader))->scan($this->tmpDir);
+
+        self::assertSame(1, $reads);
+    }
+
+    public function test_a_sibling_directory_sharing_a_name_prefix_is_not_taken_for_a_nested_one(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        mkdir($this->tmpDir.'/src-extra', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        file_put_contents($this->tmpDir.'/src-extra/Extra.php', '<?php');
+
+        $paths = array_map(
+            static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
+            (new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'src-extra']))->scan($this->tmpDir),
+        );
+
+        self::assertSame(['src-extra/Extra.php', 'src/App.php'], $paths);
+    }
+
+    public function test_a_file_reached_by_two_scan_paths_is_the_first_one_read(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        $reads = 0;
+        $reader = static function (SplFileInfo $splFile) use (&$reads): string {
+            return \sprintf('<?php // read %d', ++$reads);
+        };
+
+        $files = (new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'src/App.php'], fileReader: $reader))->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertStringEndsWith('read 1', $files[0]->content());
+    }
+
     public function test_default_constructor_does_not_respect_gitignore(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);

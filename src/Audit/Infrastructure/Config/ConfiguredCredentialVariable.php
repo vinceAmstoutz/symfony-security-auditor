@@ -13,8 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
-use Symfony\Component\Yaml\Exception\ParseException;
-use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 
 /**
@@ -29,6 +28,7 @@ final readonly class ConfiguredCredentialVariable
 {
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
+        private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
     ) {}
 
     /**
@@ -85,11 +85,9 @@ final readonly class ConfiguredCredentialVariable
         }
 
         try {
-            $parsed = Yaml::parseFile($configFile);
-        } catch (ParseException) {
+            return $this->standaloneConfigFileReader->read($configFile);
+        } catch (MalformedProjectConfigException) {
             return [];
         }
-
-        return \is_array($parsed) ? $parsed : [];
     }
 }

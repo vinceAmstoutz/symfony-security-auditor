@@ -25,6 +25,7 @@ use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
 final class UnpricedModelBudgetGuardTest extends TestCase
@@ -63,6 +64,22 @@ final class UnpricedModelBudgetGuardTest extends TestCase
         self::assertStringContainsString('mystery-model', $rendered);
         self::assertStringContainsString('audit.budget.max_cost_usd', $rendered);
         self::assertStringContainsString('non-interactive', $rendered);
+        self::assertStringContainsString('Unpriced model(s): mystery-model.', $rendered);
+    }
+
+    public function test_it_refuses_a_budgeted_run_on_an_unpriced_model_without_asking_anyone(): void
+    {
+        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8', 'mystery-model', 'other-model', 'mystery-model'], 10.0);
+
+        try {
+            $unpricedModelBudgetGuard->assertBudgetEnforceable();
+            self::fail('An unenforceable cost budget must be refused.');
+        } catch (UnenforceableBudgetException $unenforceableBudgetException) {
+            self::assertSame(
+                'Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd. Unpriced model(s): mystery-model, other-model.',
+                $unenforceableBudgetException->getMessage(),
+            );
+        }
     }
 
     public function test_it_permits_the_run_when_the_user_confirms_interactively(): void

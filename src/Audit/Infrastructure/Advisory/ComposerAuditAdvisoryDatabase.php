@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
-use JsonException;
 use Override;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -36,25 +35,34 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
  * Failure modes (composer missing, lock file absent, malformed JSON) degrade
  * gracefully to an empty database — `lookup()` always returns a list, never
  * propagates an exception, so the orchestrator and the tool layer stay
- * resilient.
+ * resilient. {@see self::hasFailedToLoad()} tells that empty database from
+ * the snapshot of a project with no advisory.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseInterface
 {
-    private const string IGNORED_ADVISORIES_KEY = 'ignored-advisories';
-
     /**
      * @var array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>>
      */
     private array $entriesByPackage;
+
+    private bool $loadFailed;
 
     public function __construct(
         ComposerAuditRunnerInterface $composerAuditRunner,
         AuditedProjectPathHolder $auditedProjectPathHolder,
         LoggerInterface $logger,
     ) {
-        $this->entriesByPackage = $this->load($composerAuditRunner, $auditedProjectPathHolder->path(), $logger);
+        $entriesByPackage = $this->load($composerAuditRunner, $auditedProjectPathHolder->path(), $logger);
+        $this->entriesByPackage = $entriesByPackage ?? [];
+
+        $this->loadFailed = null === $entriesByPackage;
+    }
+
+    public function hasFailedToLoad(): bool
+    {
+        return $this->loadFailed;
     }
 
     #[Override]
@@ -64,13 +72,13 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
     }
 
     /**
-     * @return array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>>
+     * @return array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>>|null null when the audit could not be loaded
      */
     private function load(
         ComposerAuditRunnerInterface $composerAuditRunner,
         string $projectPath,
         LoggerInterface $logger,
-    ): array {
+    ): ?array {
         try {
             $json = $composerAuditRunner->run($projectPath);
 
@@ -81,21 +89,21 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
                 'error' => $exception->getMessage(),
             ]);
 
-            return [];
+            return null;
         } catch (MalformedAdvisoryPayloadException $exception) {
             $logger->warning('composer audit payload was unparseable; advisory lookups disabled', [
                 'project' => $projectPath,
                 'error' => $exception->getMessage(),
             ]);
 
-            return [];
+            return null;
         } catch (Throwable $exception) {
             $logger->warning('Unexpected composer audit failure; advisory lookups disabled', [
                 'project' => $projectPath,
                 'error' => $exception->getMessage(),
             ]);
 
-            return [];
+            return null;
         }
     }
 
@@ -106,25 +114,11 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
      */
     private function parse(string $json): array
     {
-        try {
-            $decoded = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
-        } catch (JsonException $jsonException) {
-            throw MalformedAdvisoryPayloadException::forInvalidJson($jsonException);
-        }
-
-        if (!\is_array($decoded)) {
-            throw MalformedAdvisoryPayloadException::forNonArrayPayload($decoded);
-        }
-
-        if (!\array_key_exists('advisories', $decoded) || !\is_array($decoded['advisories'])) {
-            throw MalformedAdvisoryPayloadException::forMissingAdvisoriesKey();
-        }
-
-        $ignoredAdvisories = $decoded[self::IGNORED_ADVISORIES_KEY] ?? [];
+        $advisoryPayload = AdvisoryPayload::fromJson($json);
 
         return $this->withAdvisories(
-            $this->withAdvisories([], $decoded['advisories']),
-            \is_array($ignoredAdvisories) ? $ignoredAdvisories : [],
+            $this->withAdvisories([], $advisoryPayload->advisories),
+            $advisoryPayload->ignoredAdvisories,
         );
     }
 

@@ -114,6 +114,29 @@ final class InitRefusalTest extends TestCase
         yield 'a platform whose key the bundle leaves optional, asked for none' => ['ollama', self::input(endpoint: 'http://localhost:11434', noApiKey: true)];
     }
 
+    #[DataProvider('namedInstanceCases')]
+    public function test_it_reports_what_is_wrong_with_the_instance_name_it_was_given(string $provider, ?string $expected): void
+    {
+        $refusal = InitRefusal::forNamedInstance(ProviderKey::of($provider), $provider);
+
+        null === $expected
+            ? self::assertNull($refusal)
+            : self::assertStringContainsString($expected, (string) $refusal);
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null}>
+     */
+    public static function namedInstanceCases(): iterable
+    {
+        yield 'an environment placeholder cannot name an instance' => ['generic.%env(X)%', '"generic.%env(X)%" uses an instance name holding "%...%"'];
+        yield 'a container parameter cannot name an instance' => ['generic.%gw%', '"generic.%gw%" uses an instance name holding "%...%"'];
+        yield 'an escaped percent sign cannot name an instance' => ['generic.a%%b', '"generic.a%%b" uses an instance name holding "%...%"'];
+        yield 'a hand-written platform refuses a placeholder the same way' => ['azure.%env(X)%', '"azure.%env(X)%" uses an instance name holding "%...%"'];
+        yield 'a lone percent sign is plain text' => ['generic.gw%', null];
+        yield 'a plain instance is accepted' => ['generic.my_gateway', null];
+    }
+
     #[DataProvider('resolvedEndpointCases')]
     public function test_it_reports_what_is_wrong_with_the_endpoint_it_resolved(string $provider, ?string $endpoint, ?string $expected): void
     {

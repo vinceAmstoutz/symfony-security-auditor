@@ -27,7 +27,7 @@ Every key under `symfony_security_auditor:` documented in [`docs/configuration.m
 - `model`, `attacker_model`, `reviewer_model`, `max_output_tokens`, `attacker_max_output_tokens`, `reviewer_max_output_tokens`, `provider_json_mode`
 - `scan.included_paths`, `scan.respect_gitignore`, `scan.max_file_size_kb`, `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`, `scan.custom_risk_patterns`, `scan.import_sarif`
 - `profile`
-- `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`, `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_structured_collection`, `audit.stable_system_prompt`, `audit.max_tool_iterations`, `audit.reviewer_tools_enabled`, `audit.reviewer_max_tool_iterations`, `audit.reviewer_max_concurrent`, `audit.attacker_max_concurrent`, `audit.static_prescan.enabled`, `audit.static_prescan.lean_mode`, `audit.chunking.strategy`, `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`, `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`, `audit.fix_synthesis.enabled`, `audit.fix_synthesis.severity_floor`, `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`, `audit.triage_memory`, `audit.fail_on`, `audit.since_closure`, `audit.excluded_types`, `audit.included_types`, `audit.custom_skills`, `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`, `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`, `audit.budget.max_tokens`, `audit.budget.max_cost_usd`, `audit.rate_limit.requests_per_minute`, `audit.rate_limit.input_tokens_per_minute`, `audit.rate_limit.output_tokens_per_minute`
+- `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`, `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_structured_collection`, `audit.stable_system_prompt`, `audit.max_tool_iterations`, `audit.reviewer_tools_enabled`, `audit.reviewer_max_tool_iterations`, `audit.reviewer_max_concurrent`, `audit.attacker_max_concurrent`, `audit.static_prescan.enabled`, `audit.static_prescan.lean_mode`, `audit.chunking.strategy`, `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`, `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`, `audit.fix_synthesis.enabled`, `audit.fix_synthesis.severity_floor`, `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`, `audit.triage_memory`, `audit.fail_on`, `audit.min_score`, `audit.fail_on_incomplete`, `audit.format`, `audit.output`, `audit.since_closure`, `audit.excluded_types`, `audit.included_types`, `audit.custom_skills`, `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`, `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`, `audit.budget.max_tokens`, `audit.budget.max_cost_usd`, `audit.rate_limit.requests_per_minute`, `audit.rate_limit.input_tokens_per_minute`, `audit.rate_limit.output_tokens_per_minute`
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated since 1.7** — see [Deprecation policy](#deprecation-policy) — still accepted but ignored)
 - `privacy.offline_only`
 
@@ -43,7 +43,8 @@ Default values for these keys are also part of the contract. Changing a default 
 - The `--baseline` and `--generate-baseline` options (baseline suppression of accepted findings).
 - The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`), including its accepted values (`safe`, `low`, `medium`, `high`, `critical`).
 - The `--min-score` option (since 1.19) — a second, independent CI gate on the normalized 0-100 score. The audit exits `1` when either gate trips.
-- The `--fail-on-incomplete` option (since 1.21) — exits `3` when some file could not be fully analyzed and no gate tripped.
+- The `--fail-on-incomplete` option (since 1.21) — exits `3` when some file could not be fully analyzed and no gate tripped — and its negation `--no-fail-on-incomplete` (since 1.22), which switches a configured `audit.fail_on_incomplete` off for one run.
+- The `--no-output` option (since 1.22) — prints the report instead of writing it, which switches a configured `audit.output` off for one run; it cannot be combined with `--output`.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit ran to its end; aggregate risk level is below the `fail_on` threshold (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default) and, when `--min-score` is given, the normalized score is at or above it.
   - `1` — aggregate risk level is at or above the `fail_on` threshold (default `critical`), the normalized score is below `--min-score`, no file in scope could be analyzed and nothing was found (since 1.21), or the audit itself failed.
@@ -100,6 +101,7 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 - `BatchCapableLLMClientInterface` — opt-in extension of `LLMClientInterface` for clients that resolve several prompts concurrently. Consumers check `instanceof` and fall back to looping `complete()`, so it never breaks an existing client.
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
+- `ScopedProjectFileScannerInterface` — opt-in extension of `ProjectFileScannerInterface` for scanners that can be told which paths to scan, so that `--path` replaces the configured scope. Consumers check `instanceof` and fall back to narrowing the result of `scan()`, so it never breaks an existing scanner.
 - `AttackerCacheInterface`
 - `ReviewerCacheInterface` — host applications may implement this and alias it to back the reviewer-verdict cache with their own store (Redis, a shared filesystem, …).
 - `StaticPreScannerInterface` — host applications may implement this and alias it to supply their own deterministic risk-marker scan.
@@ -117,7 +119,7 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 - Configuration value objects in `Audit\Domain\Configuration\*` (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
 - Domain exceptions: `LLMProviderException` (signals non-transient platform failure; callers may catch this to detect misconfigured or retired models) and its subclass `LLMRequestTooLargeException` (since 1.21; a prompt the model cannot fit, which a custom `LLMClientInterface` throws to have the chunk split — see [`docs/extending.md`](extending.md#contract))
-- `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
+- `Tool\ToolInterface`, `Tool\RecordingToolInterface` (since 1.22), `Tool\ToolRegistryFactoryInterface`
 - `Pipeline\PipelineInterface`, `Pipeline\StageInterface`, `Pipeline\CoverageRecorderInterface`
 
 ### Domain models and exceptions

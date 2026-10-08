@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\MeasuringTokenEstimator;
 
 final class EstimateAuditCostUseCaseTest extends TestCase
@@ -446,6 +447,26 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         $estimateAuditCostUseCase->execute($this->tmpDir, ['apps/api']);
 
         self::assertSame(2, $measuringTokenEstimator->lastInputLength);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_scan_paths_replace_the_configured_scan_for_a_scanner_that_can_take_them(): void
+    {
+        $measuringTokenEstimator = $this->measuringEstimator();
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [$this->makeProjectFile('src/Configured.php', 'cccccccc')],
+            [$this->makeProjectFile('apps/api/src/Outside.php', 'ooo')],
+        );
+        $estimateAuditCostUseCase = $this->makeUseCase(['scanner' => $recordingScopedScanner, 'tokenEstimator' => $measuringTokenEstimator]);
+
+        $estimateAuditCostUseCase->execute($this->tmpDir, ['apps/api']);
+
+        self::assertSame(3, $measuringTokenEstimator->lastInputLength);
+        self::assertSame([['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
     }
 
     /**
@@ -982,6 +1003,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      *     toolsEnabled?: bool,
      *     toolRoundTripRatio?: float,
      *     maxToolIterations?: int,
+     *     scanner?: ProjectFileScannerInterface,
      * } $overrides
      */
     private function makeUseCase(array $overrides = []): EstimateAuditCostUseCase
@@ -1004,7 +1026,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         $maxToolIterations = $overrides['maxToolIterations'] ?? AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS;
 
         return new EstimateAuditCostUseCase(
-            $this->fixedScanner($files),
+            $overrides['scanner'] ?? $this->fixedScanner($files),
             $tokenEstimator,
             new CostCalculator($pricingProvider),
             $logger,
