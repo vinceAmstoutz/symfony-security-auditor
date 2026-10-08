@@ -48,6 +48,7 @@ final class ComposerSetupAdviceTest extends TestCase
         yield 'a shebang resolving php, curly quotes' => ["/usr/bin/env: \u{2018}php\u{2019}: No such file or directory"];
         yield 'the Windows command prompt' => ["'php' is not recognized as an internal or external command,"];
         yield 'the Windows command prompt, naming the executable' => ['php.exe is not recognized as an internal or external command,'];
+        yield 'the Windows command prompt, in capitals' => ["'PHP.EXE' is not recognized as an internal or external command,"];
     }
 
     #[DataProvider('failuresNotNamingPhp')]

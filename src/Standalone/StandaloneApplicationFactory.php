@@ -70,6 +70,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerPreflight;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
@@ -270,7 +271,7 @@ final readonly class StandaloneApplicationFactory
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->bridgeInstaller,
-            $this->composerAvailabilityChecker(),
+            new ComposerPreflight($this->composerAvailabilityChecker()),
             $this->credentialStore,
         );
     }

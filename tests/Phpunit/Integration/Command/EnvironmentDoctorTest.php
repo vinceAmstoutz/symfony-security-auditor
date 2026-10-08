@@ -425,6 +425,25 @@ final class EnvironmentDoctorTest extends TestCase
         );
     }
 
+    public function test_it_prints_what_composer_reported_as_written(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::unavailable('<error>boom</error>'));
+        $xdgConfigPathResolver = $this->resolver();
+
+        $results = (new EnvironmentDoctor(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            $composerAvailabilityChecker,
+            self::createStub(AuditPreflightInterface::class),
+            new ModelsDevPricingProvider(new NullLogger()),
+        ))->diagnose();
+
+        self::assertSame('Not usable (\\<error\\>boom\\</error\\>) — needed only to run "init" or switch providers, not to audit. "init" lists how to install it.', $results[2]->detail);
+    }
+
     /**
      * @param array<string, string> $environment
      */

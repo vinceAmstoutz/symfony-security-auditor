@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerPreflight;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerSetupAdvice;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
@@ -430,7 +431,7 @@ final class InitCommandTest extends TestCase
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             new FailingBridgeInstaller(),
-            $this->availableComposer(),
+            new ComposerPreflight($this->availableComposer()),
             new FilesystemCredentialStore($xdgConfigPathResolver),
         );
         $commandTester = new CommandTester($initCommand);
@@ -1804,9 +1805,8 @@ final class InitCommandTest extends TestCase
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->recordingBridgeInstaller,
-            $composerAvailabilityChecker,
+            new ComposerPreflight($composerAvailabilityChecker, $composerSetupAdvice),
             new FilesystemCredentialStore($xdgConfigPathResolver),
-            composerSetupAdvice: $composerSetupAdvice,
         ));
     }
 
@@ -1826,7 +1826,7 @@ final class InitCommandTest extends TestCase
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->recordingBridgeInstaller,
-            $this->availableComposer(),
+            new ComposerPreflight($this->availableComposer()),
             new FilesystemCredentialStore($xdgConfigPathResolver),
         );
 
@@ -1891,7 +1891,7 @@ final class InitCommandTest extends TestCase
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->recordingBridgeInstaller,
-            $this->availableComposer(),
+            new ComposerPreflight($this->availableComposer()),
             new FilesystemCredentialStore($xdgConfigPathResolver),
             credentialPrompt: new UnhideableCredentialPrompt(),
         ));
