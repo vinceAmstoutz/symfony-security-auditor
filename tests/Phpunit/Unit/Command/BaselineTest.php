@@ -131,6 +131,23 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_save_writes_non_ascii_text_as_written_so_the_file_stays_readable(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+
+        (new Baseline($this->filesystem))->save($path, [[...$this->entry('SSA-AAA'), 'title' => 'Injection dans le dépôt', 'reason' => 'Paramètres liés — 日本語']]);
+
+        $contents = file_get_contents($path);
+        self::assertIsString($contents);
+        self::assertStringContainsString('"title": "Injection dans le dépôt"', $contents);
+        self::assertStringContainsString('"reason": "Paramètres liés — 日本語"', $contents);
+        self::assertStringNotContainsString('\\u', $contents);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
      */
     public function test_load_throws_when_the_file_is_not_valid_json(): void
     {

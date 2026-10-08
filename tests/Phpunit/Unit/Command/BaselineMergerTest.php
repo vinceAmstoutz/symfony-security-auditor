@@ -375,6 +375,24 @@ final class BaselineMergerTest extends TestCase
      * @throws ReportFileNotReadableException
      * @throws UnsafeBaselineWriteException
      */
+    public function test_commit_keeps_the_non_ascii_text_of_a_kept_entry_as_it_was_written(): void
+    {
+        $report = $this->writeReport([$this->finding('SQL Injection')]);
+        $baseline = $this->tmpDir.'/baseline.json';
+        $entry = [...$this->baselineEntry('SQL Injection'), 'reason' => 'Les paramètres sont liés par le dépôt — 日本語'];
+        $this->filesystem->dumpFile($baseline, json_encode([$entry], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR));
+
+        $this->baselineMerger->commit($baseline, $this->baselineMerger->plan($report, $baseline, false), []);
+
+        self::assertStringContainsString('"reason": "Les paramètres sont liés par le dépôt — 日本語"', (string) file_get_contents($baseline));
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     * @throws UnsafeBaselineWriteException
+     */
     public function test_commit_appends_a_dated_entry_for_each_new_finding(): void
     {
         $report = $this->writeReport([$this->finding('XSS')]);

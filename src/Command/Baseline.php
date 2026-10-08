@@ -217,7 +217,7 @@ final readonly class Baseline implements BaselineInterface
         try {
             $this->filesystem->dumpFile(
                 $path,
-                json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR).\PHP_EOL,
+                json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR).\PHP_EOL,
             );
         } catch (JsonException $jsonException) {
             throw MalformedBaselineFileException::fromEncodingException($path, $jsonException);
