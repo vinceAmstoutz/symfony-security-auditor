@@ -84,6 +84,7 @@ final readonly class ContainerParameterRegistrar
             'audit.fail_on_incomplete' => $audit->failOnIncomplete,
             'audit.format' => $audit->format,
             'audit.output' => $audit->output,
+            'audit.report_path_prefix' => $audit->reportPathPrefix,
             'audit.since_closure' => $audit->sinceClosure,
             'audit.excluded_types' => $audit->excludedTypes,
             'audit.included_types' => $audit->includedTypes,

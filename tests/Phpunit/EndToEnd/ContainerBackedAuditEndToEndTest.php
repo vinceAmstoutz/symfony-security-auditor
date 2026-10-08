@@ -165,6 +165,24 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         );
     }
 
+    #[DataProvider('repositoryRootFormatCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_configured_report_path_prefix_reaches_the_formats_a_repository_host_resolves_from_its_root(string $format, string $expected): void
+    {
+        self::assertStringContainsString(
+            $expected,
+            $this->renderToFile(['model' => 'gpt-4o', 'audit' => ['report_path_prefix' => 'backend']], $format),
+        );
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function repositoryRootFormatCases(): iterable
+    {
+        yield 'sarif' => ['sarif', '"uri": "backend/src/Controller/AdminController.php"'];
+        yield 'github' => ['github', '::error file=backend/src/Controller/AdminController.php,line=1,'];
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function textReportFormatCases(): iterable
     {

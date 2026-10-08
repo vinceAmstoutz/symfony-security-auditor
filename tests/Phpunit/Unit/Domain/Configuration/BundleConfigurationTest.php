@@ -154,6 +154,19 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->failOnIncomplete);
         self::assertSame('console', $bundleConfiguration->audit->format);
         self::assertNull($bundleConfiguration->audit->output);
+        self::assertNull($bundleConfiguration->audit->reportPathPrefix);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_maps_the_folder_the_project_lives_in(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['report_path_prefix'] = 'apps/shop';
+
+        self::assertSame('apps/shop', BundleConfiguration::fromArray($config)->audit->reportPathPrefix);
     }
 
     /**

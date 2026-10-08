@@ -60,6 +60,7 @@ final readonly class AuditExecutionConfiguration
         public bool $failOnIncomplete = false,
         public string $format = 'console',
         public ?string $output = null,
+        public ?string $reportPathPrefix = null,
     ) {
         if (!is_finite($minConfidence) || $minConfidence < 0.0 || $minConfidence > 1.0) {
             throw InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence($minConfidence);

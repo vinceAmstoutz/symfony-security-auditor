@@ -695,6 +695,30 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_a_project_config_may_set_the_folder_the_project_lives_in(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  report_path_prefix: apps/shop\n");
+
+        self::assertSame(
+            ['audit' => ['report_path_prefix' => 'apps/shop']],
+            $this->loader($projectConfigFile)->load()->auditConfig,
+        );
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_a_project_config_may_tighten_the_budget(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\naudit:\n  budget:\n    max_cost_usd: 10\n");

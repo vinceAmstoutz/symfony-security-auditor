@@ -1571,6 +1571,14 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.fail_on_incomplete'));
         self::assertSame('console', $containerBuilder->getParameter('symfony_security_auditor.audit.format'));
         self::assertNull($containerBuilder->getParameter('symfony_security_auditor.audit.output'));
+        self::assertNull($containerBuilder->getParameter('symfony_security_auditor.audit.report_path_prefix'));
+    }
+
+    public function test_bundle_exposes_the_folder_the_project_lives_in(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['report_path_prefix' => 'apps/shop']]);
+
+        self::assertSame('apps/shop', $containerBuilder->getParameter('symfony_security_auditor.audit.report_path_prefix'));
     }
 
     public function test_bundle_exposes_the_configured_gate_and_report_settings(): void

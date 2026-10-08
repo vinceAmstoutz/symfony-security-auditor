@@ -155,6 +155,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPathPrefix;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
@@ -385,6 +386,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReviewerFeedbackProviderInterface::class),
         ]);
     $defaultsConfigurator->alias(ReviewerPromptBuilderInterface::class, ReviewerPromptBuilder::class);
+
+    $defaultsConfigurator->set(ReportPathPrefix::class)
+        ->args([param('symfony_security_auditor.audit.report_path_prefix')]);
 
     $defaultsConfigurator->set(ConsoleReportRenderer::class);
     $defaultsConfigurator->set(JsonReportRenderer::class);

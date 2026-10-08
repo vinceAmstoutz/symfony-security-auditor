@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPathPrefix;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
 final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTestCase
@@ -138,6 +139,38 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
         $output = $this->renderer->render($this->makeReport($vulnerability));
 
         self::assertSame('::error file=src/Repo.php,line=12,title=Test Vuln::desc%0A%0ARemediation: fix', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_puts_the_configured_folder_before_the_annotated_file(): void
+    {
+        $githubAnnotationsReportRenderer = new GithubAnnotationsReportRenderer(new ReportPathPrefix('backend'));
+        $vulnerability = $this->makeValidatedVuln(filePath: 'src/Repo.php', lineStart: 12);
+
+        $output = $githubAnnotationsReportRenderer->render($this->makeReport($vulnerability));
+
+        self::assertStringStartsWith('::error file=backend/src/Repo.php,line=12,', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_escapes_the_configured_folder_as_part_of_the_file_property(): void
+    {
+        $githubAnnotationsReportRenderer = new GithubAnnotationsReportRenderer(new ReportPathPrefix("apps/a,b:c\nd"));
+        $vulnerability = $this->makeValidatedVuln(filePath: 'src/Repo.php');
+
+        $output = $githubAnnotationsReportRenderer->render($this->makeReport($vulnerability));
+
+        self::assertStringStartsWith('::error file=apps/a%2Cb%3Ac%0Ad/src/Repo.php,line=1,', $output);
     }
 
     /**
