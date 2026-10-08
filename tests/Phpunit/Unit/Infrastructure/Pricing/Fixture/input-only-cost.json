@@ -1,0 +1,11 @@
+{
+  "anthropic": {
+    "models": {
+      "claude-input-only": {
+        "cost": {
+          "input": 3
+        }
+      }
+    }
+  }
+}

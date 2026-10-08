@@ -30,6 +30,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ServingPlatformPricin
  * price is resolved once per run and remembered, since every call asks for it
  * several times.
  *
+ * @phpstan-import-type PricedCost from ModelsDevCatalog
+ *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterface, ServingPlatformPricingProviderInterface
@@ -243,7 +245,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return $zeroPriceFallback;
     }
 
-    /** @return array<array-key, mixed>|null */
+    /** @return PricedCost|null */
     private function costEntry(int|string $provider, string $model): ?array
     {
         $providerData = $this->catalog()[$provider] ?? null;
@@ -266,10 +268,10 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return ModelsDevCatalog::isPricedCost($cost) ? $cost : null;
     }
 
-    /** @param array<array-key, mixed> $cost */
+    /** @param PricedCost $cost */
     private function toModelPrice(array $cost): ModelPrice
     {
-        $input = $this->numericOr($cost['input'] ?? null, 0.0);
+        $input = $cost['input'];
         $output = $this->numericOr($cost['output'] ?? null, 0.0);
         $cacheRead = $this->numericOr($cost['cache_read'] ?? null, $input);
         $cacheCreation = $this->numericOr($cost['cache_write'] ?? null, $input);

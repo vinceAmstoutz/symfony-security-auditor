@@ -20,6 +20,8 @@ use JsonException;
  * price a call from it: one definition shared by the refresh that writes the
  * override and the provider that reads whichever catalog is in place.
  *
+ * @phpstan-type PricedCost array{input: float|int, output?: mixed, cache_read?: mixed, cache_write?: mixed}
+ *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ModelsDevCatalog
@@ -27,7 +29,7 @@ final readonly class ModelsDevCatalog
     private const array OPTIONAL_RATES = ['output', 'cache_read', 'cache_write'];
 
     /**
-     * @phpstan-assert-if-true array<array-key, mixed> $cost
+     * @phpstan-assert-if-true PricedCost $cost
      */
     public static function isPricedCost(mixed $cost): bool
     {

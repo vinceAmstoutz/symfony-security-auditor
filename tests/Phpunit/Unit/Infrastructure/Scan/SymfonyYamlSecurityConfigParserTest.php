@@ -417,6 +417,25 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    public function test_a_section_without_access_control_keeps_every_rule_an_earlier_section_recorded(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/admin, roles: ROLE_ADMIN }
+                    - { path: ^/api, roles: ROLE_USER }
+            when@prod:
+                security:
+                    firewalls:
+                        main: { lazy: true }
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_ADMIN'], '^/api' => ['ROLE_USER']],
+            $accessControl,
+        );
+    }
+
     public function test_it_keeps_collecting_entries_after_one_without_a_path(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

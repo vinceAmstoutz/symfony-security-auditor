@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Stringable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentStructuredReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewOutcomeRecorder;
@@ -136,11 +138,16 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
         $reviewerCache->expects(self::exactly(2))->method('store');
         $reviewerVerdictCache = new ReviewerVerdictCache($reviewerCache, new NullLogger());
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
+        $warnings = [];
+        $outcomeLogger = self::createStub(LoggerInterface::class);
+        $outcomeLogger->method('warning')->willReturnCallback(static function (string|Stringable $message, array $context = []) use (&$warnings): void {
+            $warnings[] = [(string) $message, $context];
+        });
         $concurrentStructuredReviewAnalyzer = new ConcurrentStructuredReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(useStructuredCollection: true),
             $reviewerVerdictCache,
-            new ReviewOutcomeRecorder(new VerdictApplier(new NullLogger()), $reviewerVerdictCache, new NullLogger(), new NullProgressReporter()),
+            new ReviewOutcomeRecorder(new VerdictApplier(new NullLogger()), $reviewerVerdictCache, $outcomeLogger, new NullProgressReporter()),
             new RecordReviewToolFactory(),
             new NullLogger(),
             4,
@@ -158,6 +165,13 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
                 ['stage' => 'reviewer', 'filePath' => 'src/D.php', 'status' => 'errored'],
             ],
             $recordingCoverageRecorder->coverage,
+        );
+        self::assertSame(
+            [
+                ['Reviewer response was cut short; the finding is recorded as errored and left out of the cache', ['vulnerability_id' => $vulnerabilities[1]->id(), 'stop_reason' => 'max_tool_iterations']],
+                ['Reviewer reached no verdict for the finding; it is recorded as errored and left out of the cache', ['vulnerability_id' => $vulnerabilities[3]->id()]],
+            ],
+            $warnings,
         );
     }
 

@@ -172,9 +172,14 @@ final class BatchReviewAnalyzerTest extends TestCase
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturn(null);
         $reviewerCache->expects(self::once())->method('store')->with($first, self::anything(), self::anything());
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Reviewer batch response was cut short; the findings it never reached are recorded as errored',
+            ['batch_size' => 2, 'stop_reason' => 'max_tool_iterations', 'verdicts_kept' => 1],
+        );
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $this->analyzer($llmClient, $reviewerCache)->analyze([$first, $second], [], new ReviewBatchSettings(5, true, false, $recordingCoverageRecorder, null));
+        $this->analyzer($llmClient, $reviewerCache, $logger)->analyze([$first, $second], [], new ReviewBatchSettings(5, true, false, $recordingCoverageRecorder, null));
 
         self::assertSame(['rejected', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));
     }
@@ -251,9 +256,11 @@ final class BatchReviewAnalyzerTest extends TestCase
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturn(null);
         $reviewerCache->expects(self::once())->method('store')->with($first, self::anything(), self::anything());
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('warning');
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $reviewed = $this->analyzer($llmClient, $reviewerCache)->analyze([$first, $second], [], new ReviewBatchSettings(5, true, false, $recordingCoverageRecorder, null));
+        $reviewed = $this->analyzer($llmClient, $reviewerCache, $logger)->analyze([$first, $second], [], new ReviewBatchSettings(5, true, false, $recordingCoverageRecorder, null));
 
         self::assertSame([true, false], array_map(static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(), $reviewed));
         self::assertSame(['validated', 'errored'], array_column($recordingCoverageRecorder->coverage, 'status'));

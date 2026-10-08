@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
@@ -119,9 +120,42 @@ final class StructuredReviewAnalyzerTest extends TestCase
         $reviewerCache->expects(self::never())->method('store');
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('', 'm', 'max_tool_iterations', TokenUsageSnapshot::of(1, 1)));
+        $vulnerability = $this->vulnerabilityAt('src/A.php');
+        $outcomeLogger = $this->createMock(LoggerInterface::class);
+        $outcomeLogger->expects(self::once())->method('warning')->with(
+            'Reviewer response was cut short; the finding is recorded as errored and left out of the cache',
+            ['vulnerability_id' => $vulnerability->id(), 'stop_reason' => 'max_tool_iterations'],
+        );
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $reviewed = $this->analyzer($llmClient, new ReviewerVerdictCache($reviewerCache, new NullLogger()))->analyze([$this->vulnerabilityAt('src/A.php')], [], $recordingCoverageRecorder, false);
+        $reviewed = $this->analyzer($llmClient, new ReviewerVerdictCache($reviewerCache, new NullLogger()), $outcomeLogger)->analyze([$vulnerability], [], $recordingCoverageRecorder, false);
+
+        self::assertFalse($reviewed[0]->isReviewerValidated());
+        self::assertSame([['stage' => 'reviewer', 'filePath' => 'src/A.php', 'status' => 'errored']], $recordingCoverageRecorder->coverage);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_review_that_ended_normally_without_a_verdict_is_errored_as_unjudged_not_as_cut_short(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+        $vulnerability = $this->vulnerabilityAt('src/A.php');
+        $outcomeLogger = $this->createMock(LoggerInterface::class);
+        $outcomeLogger->expects(self::once())->method('warning')->with(
+            'Reviewer reached no verdict for the finding; it is recorded as errored and left out of the cache',
+            ['vulnerability_id' => $vulnerability->id()],
+        );
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $reviewed = $this->analyzer($llmClient, new ReviewerVerdictCache(null, new NullLogger()), $outcomeLogger)->analyze([$vulnerability], [], $recordingCoverageRecorder, false);
 
         self::assertFalse($reviewed[0]->isReviewerValidated());
         self::assertSame([['stage' => 'reviewer', 'filePath' => 'src/A.php', 'status' => 'errored']], $recordingCoverageRecorder->coverage);
@@ -186,7 +220,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
         self::assertSame(['errored', 'validated'], array_column($recordingCoverageRecorder->coverage, 'status'));
     }
 
-    private function analyzer(LLMClientInterface $llmClient, ReviewerVerdictCache $reviewerVerdictCache): StructuredReviewAnalyzer
+    private function analyzer(LLMClientInterface $llmClient, ReviewerVerdictCache $reviewerVerdictCache, ?LoggerInterface $outcomeLogger = null): StructuredReviewAnalyzer
     {
         $verdictApplier = new VerdictApplier(new NullLogger());
 
@@ -194,7 +228,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
             $llmClient,
             new ReviewerPromptBuilder(useStructuredCollection: true),
             $reviewerVerdictCache,
-            new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, new NullLogger(), new NullProgressReporter()),
+            new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $outcomeLogger ?? new NullLogger(), new NullProgressReporter()),
             new RecordReviewToolFactory(),
             new NullLogger(),
             4,
