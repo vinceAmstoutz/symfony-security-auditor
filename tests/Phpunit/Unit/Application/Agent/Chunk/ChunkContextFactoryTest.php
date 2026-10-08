@@ -43,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilder
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\CountingAttackerPromptBuilder;
 
 final class ChunkContextFactoryTest extends TestCase
 {
@@ -332,6 +333,52 @@ final class ChunkContextFactoryTest extends TestCase
         self::assertStringContainsString('## Candidate Findings From a First-Pass Model', $withCandidates->userMessage);
         self::assertStringContainsString('- sql_injection: src/Controller/A.php:1-2', $withCandidates->userMessage);
         self::assertNotSame($chunkContext->contextKey, $withCandidates->contextKey);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidCodeLocationException
+     */
+    #[DataProvider('cacheCoordinatesCases')]
+    public function test_the_cache_coordinates_are_the_key_and_cacheability_the_context_carries(bool $withMarker, bool $withPreviousFinding, bool $bypassCache, bool $cacheIsContextAware): void
+    {
+        $chunkContextFactory = new ChunkContextFactory(new AttackerPromptBuilder(), new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver());
+        $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
+        $chunk = [$projectFile];
+        $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $bypassCache, $withPreviousFinding ? [$this->makeVulnerability()] : []);
+        $riskMarkerIndex = new RiskMarkerIndex($withMarker ? [RiskMarker::create($projectFile->relativePath(), 1, 'sql_injection', 'raw query concatenation')] : []);
+
+        $chunkContext = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $cacheIsContextAware);
+        $chunkCacheCoordinates = $chunkContextFactory->cacheCoordinates($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $cacheIsContextAware);
+
+        self::assertSame([$chunkContext->contextKey, $chunkContext->cacheable], [$chunkCacheCoordinates->contextKey, $chunkCacheCoordinates->cacheable]);
+    }
+
+    /** @return iterable<string, array{bool, bool, bool, bool}> */
+    public static function cacheCoordinatesCases(): iterable
+    {
+        yield 'a chunk with no context' => [false, false, false, false];
+        yield 'a chunk with risk markers' => [true, false, false, true];
+        yield 'a chunk with confirmed findings' => [false, true, false, true];
+        yield 'a context a cache that ignores context cannot key' => [true, true, false, false];
+        yield 'a run that bypasses the cache' => [false, false, true, true];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_cache_coordinates_are_known_without_building_a_prompt(): void
+    {
+        $countingAttackerPromptBuilder = new CountingAttackerPromptBuilder();
+        $chunkContextFactory = new ChunkContextFactory($countingAttackerPromptBuilder, new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver());
+        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
+
+        $chunkContextFactory->cacheCoordinates($chunk, new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new RiskMarkerIndex([]), true);
+
+        self::assertSame(0, $countingAttackerPromptBuilder->userMessagesBuilt);
     }
 
     /**
