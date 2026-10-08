@@ -23,6 +23,8 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -610,6 +612,56 @@ final class ProjectFileScannerTest extends TestCase
         $files = $projectFileScanner->scan($this->tmpDir);
 
         self::assertSame([], $files);
+    }
+
+    public function test_it_reports_the_files_it_left_out_for_being_over_the_size_limit_in_path_order(): void
+    {
+        mkdir($this->tmpDir.'/src/Zed', 0o777, true);
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Small.php', '<?php');
+        file_put_contents($this->tmpDir.'/src/Zed/Big.php', str_repeat('a', (2 * 1024) + 1));
+        file_put_contents($this->tmpDir.'/src/Big.php', str_repeat('a', (2 * 1024) + 1));
+        file_put_contents($this->tmpDir.'/public/index.php', str_repeat('a', (2 * 1024) + 1));
+
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame(['src/Small.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files));
+        self::assertSame(
+            [['public/index.php', SkippedFileReason::TooLarge], ['src/Big.php', SkippedFileReason::TooLarge], ['src/Zed/Big.php', SkippedFileReason::TooLarge]],
+            array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles),
+        );
+    }
+
+    public function test_it_names_a_file_left_out_for_its_size_with_the_replacement_character_for_invalid_utf8_in_its_name(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir."/src/Fo\xFFo.php", str_repeat('a', (2 * 1024) + 1));
+
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame(["src/Fo\u{FFFD}o.php"], array_map(static fn (SkippedFile $skippedFile): string => $skippedFile->relativePath, $projectFileScan->skippedFiles));
+    }
+
+    public function test_it_reports_a_file_it_could_not_read_as_skipped_and_unreadable(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Unreadable.php', '<?php');
+        $reader = static fn (SplFileInfo $splFile): string => throw new RuntimeException('disk read error');
+
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), fileReader: $reader))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame([], $projectFileScan->files);
+        self::assertCount(1, $projectFileScan->skippedFiles);
+        self::assertSame('src/Unreadable.php', $projectFileScan->skippedFiles[0]->relativePath);
+        self::assertSame(SkippedFileReason::Unreadable, $projectFileScan->skippedFiles[0]->reason);
+    }
+
+    public function test_it_reports_nothing_skipped_for_a_project_without_included_paths(): void
+    {
+        $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame([], $projectFileScan->files);
+        self::assertSame([], $projectFileScan->skippedFiles);
     }
 
     public function test_it_keeps_explicit_file_at_exact_max_size_boundary(): void

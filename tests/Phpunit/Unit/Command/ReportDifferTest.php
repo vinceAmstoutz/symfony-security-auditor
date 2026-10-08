@@ -645,6 +645,7 @@ final class ReportDifferTest extends TestCase
         yield 'a file outside the --path scope' => [['complete' => true, 'scope' => ['since' => null, 'paths' => ['src/Controller']]]];
         yield 'a file the lean pre-scan skipped' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'skipped'], $anotherFileAnalyzed]]];
         yield 'a file the ledger lists under the path the attacker echoed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => './src/Foo.php', 'status' => 'skipped'], $anotherFileAnalyzed]]];
+        yield 'a file the scan left out for being over the size limit' => [['complete' => false, 'scope' => $fullScope, 'coverage' => [['stage' => 'scan', 'file' => 'src/Foo.php', 'status' => 'errored'], $anotherFileAnalyzed]]];
         yield 'a file a host stage listed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'secret_scrubbing', 'file' => 'src/Foo.php', 'status' => 'analyzed'], $anotherFileAnalyzed]]];
         yield 'a report written before the scope existed' => [['complete' => true]];
         yield 'a scope that is not an object' => [['complete' => true, 'scope' => 'everything']];

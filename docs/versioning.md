@@ -102,6 +102,7 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
 - `ScopedProjectFileScannerInterface` — opt-in extension of `ProjectFileScannerInterface` for scanners that can be told which paths to scan, so that `--path` replaces the configured scope. Consumers check `instanceof` and fall back to narrowing the result of `scan()`, so it never breaks an existing scanner.
+- `SkippedFileReportingProjectFileScannerInterface` — opt-in extension of `ProjectFileScannerInterface` (since 1.22) for scanners that know which files they matched and still left out, because they were over the size limit or could not be read. `IngestionStage` checks `instanceof` and records each as a file the run did not analyze (`errored` under the `scan` stage), so the report is incomplete; a scanner that does not implement it keeps working and reports nothing.
 - `AttackerCacheInterface`
 - `ReviewerCacheInterface` — host applications may implement this and alias it to back the reviewer-verdict cache with their own store (Redis, a shared filesystem, …).
 - `StaticPreScannerInterface` — host applications may implement this and alias it to supply their own deterministic risk-marker scan.

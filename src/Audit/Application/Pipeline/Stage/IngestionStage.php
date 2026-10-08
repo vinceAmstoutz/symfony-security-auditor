@@ -15,18 +15,24 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class IngestionStage implements StageInterface
 {
     private const string SECRET_SCRUBBING = 'secret_scrubbing';
+
+    private const string SCAN = 'scan';
 
     public function __construct(
         private ProjectFileScannerInterface $projectFileScanner,
@@ -47,13 +53,11 @@ final readonly class IngestionStage implements StageInterface
             'path' => $auditContext->projectPath(),
         ]);
 
-        $scannedFiles = ScopedScan::files($this->projectFileScanner, $auditContext->projectPath(), $auditContext->scanPaths());
+        $projectFileScan = $this->scanProject($auditContext->projectPath(), $auditContext->scanPaths());
+        $scannedFiles = $projectFileScan->files;
 
-        $files = $scannedFiles;
-        $diffSinceRef = $auditContext->diffSinceRef();
-        if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
-            $files = $this->filterByGitDiff($auditContext->projectPath(), $diffSinceRef, $scannedFiles);
-        }
+        $changed = $this->changedFiles($auditContext);
+        $files = null === $changed ? $scannedFiles : $this->filterByGitDiff($auditContext, $changed, $scannedFiles);
 
         if ([] === $files) {
             $this->logger->warning('No files found in project', [
@@ -65,6 +69,7 @@ final readonly class IngestionStage implements StageInterface
         $auditContext->setFilesDiscovered(\count($scannedFiles));
         $auditContext->setMappingFiles(ScopedScan::mappingFiles($this->projectFileScanner, $auditContext->projectPath(), $auditContext->scanPaths(), $scannedFiles));
         $this->recordWithheldFiles($files, $auditContext);
+        $this->recordSkippedFiles($projectFileScan->skippedFiles, $auditContext, $changed);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
             array_map(static fn (ProjectFile $projectFile): int => $projectFile->linesCount(), $files),
@@ -95,13 +100,72 @@ final readonly class IngestionStage implements StageInterface
     }
 
     /**
+     * @param list<string> $scanPaths as given on the command line
+     */
+    private function scanProject(string $projectPath, array $scanPaths): ProjectFileScan
+    {
+        if ($this->projectFileScanner instanceof SkippedFileReportingProjectFileScannerInterface) {
+            return $this->projectFileScanner->scanReportingSkippedFiles($projectPath, ScanPathFilter::normalize($scanPaths));
+        }
+
+        return new ProjectFileScan(ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths), []);
+    }
+
+    /**
+     * A file the scan matched and still left out — over the size limit, or
+     * unreadable — has nothing of it analyzed, so it is recorded as errored,
+     * which marks the report incomplete instead of letting an oversized
+     * controller pass as a clean file. Only the files the run was asked to
+     * cover count: those under the `--path` scope and, for a `--since` run,
+     * those changed since the ref.
+     *
+     * @param list<SkippedFile> $skippedFiles
+     * @param ?list<string>     $changed      the files changed since the ref; null for a run that is not a `--since` run
+     */
+    private function recordSkippedFiles(array $skippedFiles, AuditContext $auditContext, ?array $changed): void
+    {
+        $changedSet = null === $changed ? null : array_flip($changed);
+        foreach ($skippedFiles as $skippedFile) {
+            if ($this->isInScope($skippedFile->relativePath, $auditContext, $changedSet)) {
+                $auditContext->recordCoverage(self::SCAN, $skippedFile->relativePath, 'errored');
+                $this->logger->warning('The scan left a file out, so it is not analyzed', [
+                    'file' => $skippedFile->relativePath,
+                    'reason' => $skippedFile->reason->description(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param ?array<string, int> $changedSet
+     */
+    private function isInScope(string $relativePath, AuditContext $auditContext, ?array $changedSet): bool
+    {
+        return ScanPathFilter::includes($relativePath, $auditContext->scanPaths())
+            && (null === $changedSet || \array_key_exists($relativePath, $changedSet));
+    }
+
+    /**
+     * @return ?list<string> null when the run is not a `--since` run
+     */
+    private function changedFiles(AuditContext $auditContext): ?array
+    {
+        $diffSinceRef = $auditContext->diffSinceRef();
+        if (null === $diffSinceRef || !$this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
+            return null;
+        }
+
+        return $this->gitChangedFilesResolver->changedSince($auditContext->projectPath(), $diffSinceRef);
+    }
+
+    /**
+     * @param list<string>      $changed
      * @param list<ProjectFile> $files
      *
      * @return list<ProjectFile>
      */
-    private function filterByGitDiff(string $projectPath, string $ref, array $files): array
+    private function filterByGitDiff(AuditContext $auditContext, array $changed, array $files): array
     {
-        $changed = $this->gitChangedFilesResolver?->changedSince($projectPath, $ref) ?? [];
         $changedSet = array_flip($changed);
 
         $filtered = array_values(array_filter(
@@ -110,7 +174,7 @@ final readonly class IngestionStage implements StageInterface
         ));
 
         $this->logger->info('Diff filter applied', [
-            'ref' => $ref,
+            'ref' => $auditContext->diffSinceRef(),
             'changed_in_diff' => \count($changed),
             'kept_after_intersection' => \count($filtered),
             'dropped' => \count($files) - \count($filtered),
