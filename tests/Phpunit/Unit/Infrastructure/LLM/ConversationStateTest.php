@@ -56,6 +56,26 @@ final class ConversationStateTest extends TestCase
         self::assertSame([0, 0, 0, 0], [$conversationState->input, $conversationState->output, $conversationState->cacheRead, $conversationState->cacheCreation]);
         self::assertFalse($conversationState->toolsRan);
         self::assertNull($conversationState->response);
+        self::assertSame(0, $conversationState->roundsLeft);
+    }
+
+    public function test_entering_a_round_tells_every_conversation_how_many_rounds_it_has_left_itself_included(): void
+    {
+        $entered = ConversationState::enterRound([3 => $this->state(null), 7 => $this->state(null)], 2, 5);
+
+        self::assertSame([3 => 3, 7 => 3], array_map(static fn (ConversationState $conversationState): int => $conversationState->roundsLeft, $entered));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_the_rounds_left_survive_every_transition_of_a_conversation(): void
+    {
+        $entered = ConversationState::enterRound([$this->state(null)], 1, 4)[0];
+
+        $conversationState = $entered->withRecordedTokens(1, 1, 1, 1)->withExecutedTools(10)->withResponse(LLMResponse::of('done', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+
+        self::assertSame(3, $conversationState->roundsLeft);
     }
 
     /**

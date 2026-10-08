@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
@@ -35,9 +35,10 @@ final readonly class ListScannedFilesUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative subdirectories
-     *                                   to restrict the listing to; empty list
-     *                                   (the default) lists every scanned file
+     * @param list<string> $scanPaths    optional project-relative paths to list
+     *                                   instead of the configured scan surface;
+     *                                   empty list (the default) lists every
+     *                                   scanned file
      * @param ?string      $diffSinceRef when set, mirrors `EstimateAuditCostUseCase`/
      *                                   `IngestionStage` by narrowing the listing to
      *                                   files changed against this git ref, matching
@@ -47,7 +48,7 @@ final readonly class ListScannedFilesUseCase
      */
     public function execute(string $projectPath, array $scanPaths = [], ?string $diffSinceRef = null): array
     {
-        $files = ScanPathFilter::apply($this->projectFileScanner->scan($projectPath), $scanPaths);
+        $files = ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths);
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             return $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
         }

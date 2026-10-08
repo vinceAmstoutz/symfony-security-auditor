@@ -18,11 +18,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\FailureReasonRecorderInterface;
 
 /**
  * Forwards everything to the recorder it wraps and remembers the attacker's
  * last status per file, so the escalating agent can tell which files the
- * expensive pass actually judged once that pass returns.
+ * expensive pass actually judged once that pass returns, and why a file that
+ * ended errored did.
  *
  * Mutable by design: it accumulates the pass's coverage while the pass runs,
  * so it opts out of the final readonly rule as a per-run accumulator (see
@@ -30,12 +32,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface
+final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface, FailureReasonRecorderInterface
 {
     private const array ANALYZED_STATUSES = ['analyzed', 'cached'];
 
     /** @var array<string, string> */
     private array $lastAttackerStatus = [];
+
+    /** @var array<string, string> */
+    private array $failureReasons = [];
 
     public function __construct(
         private readonly CoverageRecorderInterface $coverageRecorder,
@@ -48,6 +53,19 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface
 
         if (AgentRole::Attacker->value === $stage) {
             $this->lastAttackerStatus[$filePath] = $status;
+            unset($this->failureReasons[$filePath]);
+        }
+    }
+
+    #[Override]
+    public function recordFailureReason(string $stage, string $filePath, string $reason): void
+    {
+        if ($this->coverageRecorder instanceof FailureReasonRecorderInterface) {
+            $this->coverageRecorder->recordFailureReason($stage, $filePath, $reason);
+        }
+
+        if (AgentRole::Attacker->value === $stage) {
+            $this->failureReasons[$filePath] = $reason;
         }
     }
 
@@ -93,6 +111,24 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface
         }
 
         return 'analyzed';
+    }
+
+    /**
+     * Why the chunk ended errored, as the first of its files left unanalyzed
+     * that has a recorded reason says; null for a chunk that was analyzed or
+     * whose failure named no reason.
+     *
+     * @param list<ProjectFile> $chunk
+     */
+    public function chunkFailureReason(array $chunk): ?string
+    {
+        foreach ($chunk as $projectFile) {
+            if (\array_key_exists($projectFile->relativePath(), $this->failureReasons)) {
+                return $this->failureReasons[$projectFile->relativePath()];
+            }
+        }
+
+        return null;
     }
 
     /**
