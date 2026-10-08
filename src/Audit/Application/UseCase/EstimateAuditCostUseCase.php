@@ -135,6 +135,7 @@ final readonly class EstimateAuditCostUseCase
         }
 
         $auditContext->setProjectFiles($files);
+        $auditContext->setFilesDiscovered(\count($scannedFiles));
 
         $fileContentPerRoundInput = 0;
         foreach ($files as $file) {
