@@ -26,6 +26,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
@@ -101,6 +104,8 @@ final readonly class EstimateAuditCostUseCase
         private bool $toolsEnabled = true,
         private float $toolRoundTripRatio = self::DEFAULT_TOOL_ROUND_TRIP_RATIO,
         private int $maxToolIterations = AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS,
+        private ?AttackerPromptBuilderInterface $attackerPromptBuilder = null,
+        private ?StageInterface $mappingStage = null,
     ) {}
 
     /**
@@ -123,7 +128,8 @@ final readonly class EstimateAuditCostUseCase
         $auditContext = AuditContext::forProject($projectPath, $scanPaths, diffSinceRef: $diffSinceRef);
         $auditContext->markAsCostEstimate();
 
-        $files = ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths);
+        $scannedFiles = ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths);
+        $files = $scannedFiles;
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             $files = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
         }
@@ -135,7 +141,8 @@ final readonly class EstimateAuditCostUseCase
             $fileContentPerRoundInput += $this->tokenEstimator->estimateTokens($file->content(), $this->primaryModel);
         }
 
-        $attackerPerRoundInput = $fileContentPerRoundInput + $this->skillPromptTokensAcrossChunks($files);
+        $chunks = $this->fileChunker->chunk($files);
+        $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scannedFiles));
 
         if ($this->toolsEnabled) {
             $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * $this->toolRoundTripMultiplier());
@@ -196,23 +203,50 @@ final readonly class EstimateAuditCostUseCase
     }
 
     /**
-     * The real run renders the skill block per chunk, filtered to that
-     * chunk's own file types (`AttackerPromptBuilder::skillsForFiles()`).
-     * Summing a per-chunk render here, instead of rendering once from the
-     * whole project's type union and multiplying by the chunk count, keeps
-     * the estimate accurate when `stable_system_prompt` is `false` and each
-     * chunk pulls in a smaller skill subset than the project as a whole.
+     * What the system prompt of each chunk adds to the files it carries. With a
+     * prompt builder, the prompt the real run sends: its base text and the
+     * skill blocks of that chunk's own file types. Without one, the skill
+     * blocks alone.
      *
-     * @param list<ProjectFile> $files
+     * @param list<list<ProjectFile>> $chunks
      */
-    private function skillPromptTokensAcrossChunks(array $files): int
+    private function systemPromptTokens(array $chunks): int
     {
         $total = 0;
-        foreach ($this->fileChunker->chunk($files) as $chunkFiles) {
-            $total += $this->skillPromptTokens($chunkFiles);
+        foreach ($chunks as $chunk) {
+            $total += $this->attackerPromptBuilder instanceof AttackerPromptBuilderInterface
+                ? $this->tokenEstimator->estimateTokens($this->attackerPromptBuilder->buildSystemPrompt($chunk), $this->primaryModel)
+                : $this->skillPromptTokens($chunk);
         }
 
         return $total;
+    }
+
+    /**
+     * The project mapping every chunk's user message carries — the firewall,
+     * route access-control, voter and form sections — which grows with the
+     * routes of the project, not with the chunk. The pipeline maps every file
+     * it scanned, however a git diff then narrows the files to audit.
+     *
+     * @param list<ProjectFile> $scannedFiles
+     *
+     * @throws InvalidAuditContextException
+     */
+    private function mappingPromptTokens(string $projectPath, array $scannedFiles): int
+    {
+        if (!$this->attackerPromptBuilder instanceof AttackerPromptBuilderInterface || !$this->mappingStage instanceof StageInterface) {
+            return 0;
+        }
+
+        $auditContext = AuditContext::forProject($projectPath);
+        $auditContext->setProjectFiles($scannedFiles);
+
+        $this->mappingStage->process($auditContext);
+        $symfonyMapping = $auditContext->mapping();
+
+        return $symfonyMapping instanceof SymfonyMapping
+            ? $this->tokenEstimator->estimateTokens($this->attackerPromptBuilder->buildUserMessage([], $symfonyMapping), $this->primaryModel)
+            : 0;
     }
 
     /**

@@ -50,12 +50,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipelin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
@@ -349,6 +351,16 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $escalatingAttackerFirstArgument = $containerBuilder->getDefinition(EscalatingAttackerAgent::class)->getArgument(0);
         self::assertInstanceOf(Reference::class, $escalatingAttackerFirstArgument);
         self::assertSame('security_auditor.cheap_attacker', (string) $escalatingAttackerFirstArgument);
+    }
+
+    public function test_bundle_gives_the_cost_estimate_the_prompt_builder_and_the_mapping_stage_of_a_real_run(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $arguments = $containerBuilder->getDefinition(EstimateAuditCostUseCase::class)->getArguments();
+
+        self::assertEquals(new Reference(AttackerPromptBuilderInterface::class), $arguments[16]);
+        self::assertEquals(new Reference(MappingStage::class), $arguments[17]);
     }
 
     public function test_bundle_wires_escalation_attacker_agent_from_the_same_argument_shape_as_the_primary_one(): void
