@@ -250,6 +250,38 @@ final class AuditContextTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_files_discovered_falls_back_to_the_count_of_mapping_files_when_never_explicitly_set(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setMappingFiles([
+            ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
+            ProjectFile::create('src/B.php', '/app/src/B.php', '<?php'),
+        ]);
+
+        self::assertSame(2, $auditContext->filesDiscovered());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_files_discovered_can_be_set_independently_of_the_mapping_files(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setMappingFiles([
+            ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
+            ProjectFile::create('src/B.php', '/app/src/B.php', '<?php'),
+        ]);
+
+        $auditContext->setFilesDiscovered(0);
+
+        self::assertSame(0, $auditContext->filesDiscovered());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      */
     public function test_it_accepts_mapping(): void
     {

@@ -27,6 +27,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     /** @var ?list<ProjectFile> */
     private ?array $mappingFiles = null;
 
+    private ?int $filesDiscovered = null;
+
     private ?SymfonyMapping $symfonyMapping = null;
 
     /** @var array<string, Vulnerability> keyed by vulnerability id */
@@ -228,6 +230,18 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
         return $this->mappingFiles ?? $this->projectFiles;
     }
 
+    /**
+     * How many files the scan found in the run's scope, before a `--since`
+     * diff narrowed them — what the report calls the files discovered. Falls
+     * back to the count of {@see self::mappingFiles()} when `IngestionStage`
+     * never calls {@see self::setFilesDiscovered()}, since a `--path`-less
+     * run maps exactly the files its scan found.
+     */
+    public function filesDiscovered(): int
+    {
+        return $this->filesDiscovered ?? \count($this->mappingFiles());
+    }
+
     public function mapping(): ?SymfonyMapping
     {
         return $this->symfonyMapping;
@@ -258,6 +272,11 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     public function setMappingFiles(array $files): void
     {
         $this->mappingFiles = $files;
+    }
+
+    public function setFilesDiscovered(int $filesDiscovered): void
+    {
+        $this->filesDiscovered = $filesDiscovered;
     }
 
     public function setMapping(SymfonyMapping $symfonyMapping): void

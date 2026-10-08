@@ -176,7 +176,7 @@ final class StagesTest extends TestCase
         (new IngestionStage($recordingScopedScanner, new NullLogger()))->process($auditContext);
 
         self::assertSame(['apps/api/src/Outside.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
-        self::assertSame([['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
+        self::assertSame([['scanWithin', ['apps/api']], ['scan', null]], $recordingScopedScanner->calls);
     }
 
     /**

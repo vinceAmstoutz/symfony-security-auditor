@@ -62,7 +62,8 @@ final readonly class IngestionStage implements StageInterface
         }
 
         $auditContext->setProjectFiles($files);
-        $auditContext->setMappingFiles($scannedFiles);
+        $auditContext->setFilesDiscovered(\count($scannedFiles));
+        $auditContext->setMappingFiles(ScopedScan::mappingFiles($this->projectFileScanner, $auditContext->projectPath(), $auditContext->scanPaths(), $scannedFiles));
         $this->recordWithheldFiles($files, $auditContext);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
