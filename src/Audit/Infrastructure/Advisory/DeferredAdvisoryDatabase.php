@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
 use Override;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 
@@ -21,8 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  * Defers constructing {@see ComposerAuditAdvisoryDatabase} — and therefore
  * running `composer audit` — until the first {@see self::lookup()} call,
  * memoizing the result for as long as the holder's path and the content of the
- * project's `composer.lock` stay unchanged. A load that failed is never
- * memoized: the next lookup tries `composer audit` again.
+ * project's `composer.lock` stay unchanged. A load that failed is memoized for
+ * `FAILED_LOAD_RETRY_SECONDS` only: a timeout is not paid again on every
+ * lookup, and a transient failure does not silence the lookup for good.
  *
  * `ComposerAuditAdvisoryDatabase` is `final readonly`, so it cannot be a
  * Symfony `->lazy()` service: proxy generation requires either a native PHP
@@ -41,15 +43,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  */
 final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
 {
-    private ?ComposerAuditAdvisoryDatabase $composerAuditAdvisoryDatabase = null;
+    private const int FAILED_LOAD_RETRY_SECONDS = 300;
 
-    private ?string $memoizedSnapshotKey = null;
+    private ?AdvisorySnapshot $advisorySnapshot = null;
 
     public function __construct(
         private readonly ComposerAuditRunnerInterface $composerAuditRunner,
         private readonly AuditedProjectPathHolder $auditedProjectPathHolder,
         private readonly LoggerInterface $logger,
         private readonly LockfileHasher $lockfileHasher,
+        private readonly ClockInterface $clock,
     ) {}
 
     #[Override]
@@ -61,17 +64,13 @@ final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
     private function innerDatabase(): AdvisoryDatabaseInterface
     {
         $snapshotKey = $this->snapshotKey();
-        if ($this->composerAuditAdvisoryDatabase instanceof ComposerAuditAdvisoryDatabase && $snapshotKey === $this->memoizedSnapshotKey) {
-            return $this->composerAuditAdvisoryDatabase;
+        $now = $this->clock->now()->getTimestamp();
+        if ($this->advisorySnapshot instanceof AdvisorySnapshot && $this->advisorySnapshot->serves($snapshotKey, $now)) {
+            return $this->advisorySnapshot->composerAuditAdvisoryDatabase;
         }
 
         $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->composerAuditRunner, $this->auditedProjectPathHolder, $this->logger);
-        if ($composerAuditAdvisoryDatabase->hasFailedToLoad()) {
-            return $composerAuditAdvisoryDatabase;
-        }
-
-        $this->composerAuditAdvisoryDatabase = $composerAuditAdvisoryDatabase;
-        $this->memoizedSnapshotKey = $snapshotKey;
+        $this->advisorySnapshot = new AdvisorySnapshot($snapshotKey, $composerAuditAdvisoryDatabase, $composerAuditAdvisoryDatabase->hasFailedToLoad() ? $now + self::FAILED_LOAD_RETRY_SECONDS : null);
 
         return $composerAuditAdvisoryDatabase;
     }

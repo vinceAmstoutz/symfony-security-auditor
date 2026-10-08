@@ -555,7 +555,7 @@ Causes (each logs a `warning` via `LoggerInterface`, except the deliberate `offl
 - **`composer` not in `PATH`** — install Composer 2.4+ on the audit host.
 - **`composer.lock` missing** — run `composer install` first; advisory data comes from the lockfile.
 - **Malformed JSON output** — corrupted `composer.lock`. Regenerate it.
-- **Process error** — network failure to Packagist. Retry: a lookup after a failed `composer audit` runs it again, and so does one after `composer.lock` changes.
+- **Process error** — network failure to Packagist. Retry: a lookup five minutes after a failed `composer audit` runs it again, and so does one after `composer.lock` changes; lookups in between answer with no advisory at once instead of waiting on a `composer audit` that timed out again.
 - **`privacy.offline_only: true`** — the advisory feed is intentionally replaced by an empty in-memory database, so `composer audit` never runs; no warning is logged since this is configured behavior, not a failure.
 
 When `lookup_advisory` returns empty, the audit continues without CVE data — no audit failure.
