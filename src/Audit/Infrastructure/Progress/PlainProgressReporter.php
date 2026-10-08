@@ -79,11 +79,14 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     /** @param array<string, mixed> $context */
     private function chunkDoneLine(array $context): string
     {
+        $failed = 'errored' === ProgressContext::string($context, 'status');
+
         return \sprintf(
-            'errored' === ProgressContext::string($context, 'status') ? '  ✗ chunk %d/%d failed%s' : '  ✓ chunk %d/%d done%s',
+            $failed ? '  ✗ chunk %d/%d failed%s%s' : '  ✓ chunk %d/%d done%s',
             ProgressContext::int($context, 'chunk'),
             ProgressContext::int($context, 'total_chunks'),
             ProgressContext::durationSuffix($context, 'elapsed_seconds'),
+            $failed ? ProgressContext::failureReasonSuffix($context) : '',
         );
     }
 

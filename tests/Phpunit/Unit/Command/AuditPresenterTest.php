@@ -1036,17 +1036,42 @@ final class AuditPresenterTest extends TestCase
         self::assertStringEndsWith("1 file(s) in scope.\n\n", $bufferedOutput->fetch());
     }
 
-    public function test_scanned_files_warns_when_nothing_matched(): void
+    public function test_no_files_matched_names_the_project_and_the_paths_it_applied(): void
     {
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
-        $this->auditPresenter->scannedFiles($symfonyStyle, []);
+        $this->auditPresenter->noFilesMatched($symfonyStyle, '/work/demo', ['src/Command', 'lib']);
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
-        self::assertStringContainsString('No files matched.', $flattened);
-        self::assertStringContainsString('included_paths', $flattened);
+        self::assertStringContainsString('No files matched under "/work/demo" for --path src/Command, lib.', $flattened);
+        self::assertStringContainsString('Check that each --path exists in the project, relative to its root, and holds PHP, Twig, YAML or XML files.', $flattened);
+        self::assertStringNotContainsString('included_paths', $flattened);
         self::assertStringNotContainsString('file(s) in scope', $flattened);
+    }
+
+    public function test_no_files_matched_without_a_path_filter_names_only_the_project(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->noFilesMatched($symfonyStyle, '/work/demo', []);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('No files matched under "/work/demo". Check your included_paths configuration.', $flattened);
+        self::assertStringNotContainsString('--path', $flattened);
+    }
+
+    public function test_no_files_matched_prints_the_paths_it_names_on_one_line_without_terminal_control_characters(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->noFilesMatched($symfonyStyle, "/work/de\x1b[2Jmo", ["src\n##[error]forged"]);
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringNotContainsString("\x1b", $rendered);
+        self::assertStringNotContainsString('##[', $rendered);
     }
 
     public function test_scanned_files_hint_points_to_the_flag_with_the_file_count(): void
