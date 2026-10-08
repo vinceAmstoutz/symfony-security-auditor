@@ -50,6 +50,8 @@ final readonly class ConcurrentChunkAnalyzer
 {
     private OversizedChunkRecovery $oversizedChunkRecovery;
 
+    private ChunkOutcomeRecorder $chunkOutcomeRecorder;
+
     public function __construct(
         private ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient,
         private ChunkContextFactory $chunkContextFactory,
@@ -62,6 +64,7 @@ final readonly class ConcurrentChunkAnalyzer
         private int $maxConcurrent,
     ) {
         $this->oversizedChunkRecovery = new OversizedChunkRecovery($logger, $attackerChunkCache, $vulnerabilityFactory);
+        $this->chunkOutcomeRecorder = new ChunkOutcomeRecorder($attackerChunkCache, $logger);
     }
 
     /**
@@ -158,22 +161,12 @@ final readonly class ConcurrentChunkAnalyzer
         foreach (array_keys($chunks) as $index) {
             $chunkResult = $chunkResults[$index];
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
-            $this->reportChunkCompleted($index, $totalChunks, $statusTrackingCoverageRecorder->chunkStatus($chunks[$index]));
+            $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, ChunkCompletionContext::of($index, $totalChunks, 0.0, $statusTrackingCoverageRecorder, $chunks[$index]));
             array_push($allVulnerabilities, ...$chunkResult->vulnerabilities());
             $totalDropsByReason = $this->mergeDrops($totalDropsByReason, $chunkResult->dropsByReason());
         }
 
         return [$allVulnerabilities, $totalDropsByReason];
-    }
-
-    private function reportChunkCompleted(int $index, int $totalChunks, string $status): void
-    {
-        $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
-            'chunk' => $index + 1,
-            'total_chunks' => $totalChunks,
-            'elapsed_seconds' => 0.0,
-            'status' => $status,
-        ]);
     }
 
     /**
@@ -225,7 +218,7 @@ final readonly class ConcurrentChunkAnalyzer
                     'error' => $throwable->getMessage(),
                 ]);
 
-                $results += $this->failWindow($window, 'errored', $coverageRecorder);
+                $results += $this->failWindow($window, 'errored', $coverageRecorder, ChunkFailureReason::fromThrowable($throwable));
             }
         }
 
@@ -310,7 +303,7 @@ final readonly class ConcurrentChunkAnalyzer
             $this->logger->warning('Finalizing an attacker chunk result failed; the chunk is recorded as errored and its siblings in the same window are preserved.', [
                 'error' => $throwable->getMessage(),
             ]);
-            ChunkCoverageRecorder::record($pendingChunk->chunk, 'errored', $coverageRecorder);
+            ChunkCoverageRecorder::recordErrored($pendingChunk->chunk, ChunkFailureReason::fromThrowable($throwable), $coverageRecorder);
 
             return $this->vulnerabilityFactory->fromList([]);
         }
@@ -389,14 +382,17 @@ final readonly class ConcurrentChunkAnalyzer
      * threw and — for a fatal budget/provider abort — every window after it.
      *
      * @param array<int, PendingChunk> $window
+     * @param ?string                  $reason why the window failed, when it did so as `errored` for a reason worth showing
      *
      * @return array<int, VulnerabilityHydrationResult>
      */
-    private function failWindow(array $window, string $status, CoverageRecorderInterface $coverageRecorder): array
+    private function failWindow(array $window, string $status, CoverageRecorderInterface $coverageRecorder, ?string $reason = null): array
     {
         $results = [];
         foreach ($window as $index => $pendingChunk) {
-            ChunkCoverageRecorder::record($pendingChunk->chunk, $status, $coverageRecorder);
+            null === $reason
+                ? ChunkCoverageRecorder::record($pendingChunk->chunk, $status, $coverageRecorder)
+                : ChunkCoverageRecorder::recordErrored($pendingChunk->chunk, $reason, $coverageRecorder);
             $this->recordDrainedFindings($pendingChunk->session, $coverageRecorder);
             $results[$index] = $this->vulnerabilityFactory->fromList([]);
         }
@@ -425,9 +421,8 @@ final readonly class ConcurrentChunkAnalyzer
     private function finalize(PendingChunk $pendingChunk, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
         $rawData = $pendingChunk->session->drain();
-        $this->recordOutcome($pendingChunk, $llmResponse, $rawData, $coverageRecorder);
-
         $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData);
+        $this->recordOutcome($pendingChunk, $llmResponse, $rawData, $vulnerabilityHydrationResult, $coverageRecorder);
         $this->recordFoundVulnerabilities($vulnerabilityHydrationResult, $coverageRecorder);
 
         return $vulnerabilityHydrationResult;
@@ -443,7 +438,7 @@ final readonly class ConcurrentChunkAnalyzer
      *
      * @param list<array<string, mixed>> $rawData
      */
-    private function recordOutcome(PendingChunk $pendingChunk, LLMResponse $llmResponse, array $rawData, CoverageRecorderInterface $coverageRecorder): void
+    private function recordOutcome(PendingChunk $pendingChunk, LLMResponse $llmResponse, array $rawData, VulnerabilityHydrationResult $vulnerabilityHydrationResult, CoverageRecorderInterface $coverageRecorder): void
     {
         if ($llmResponse->isDegraded()) {
             $this->logger->warning('Attacker response was cut short; the chunk is recorded as errored and left out of the cache', [
@@ -451,15 +446,11 @@ final readonly class ConcurrentChunkAnalyzer
                 'files' => array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $pendingChunk->chunk),
                 'findings_kept' => \count($rawData),
             ]);
-            ChunkCoverageRecorder::record($pendingChunk->chunk, 'errored', $coverageRecorder);
+            ChunkCoverageRecorder::recordErrored($pendingChunk->chunk, ChunkFailureReason::fromStopReason($llmResponse->stopReason()), $coverageRecorder);
 
             return;
         }
 
-        if ($pendingChunk->chunkContext->cacheable) {
-            $this->attackerChunkCache->store($pendingChunk->chunk, $pendingChunk->chunkContext->contextKey, $rawData);
-        }
-
-        ChunkCoverageRecorder::record($pendingChunk->chunk, 'analyzed', $coverageRecorder);
+        $this->chunkOutcomeRecorder->record($pendingChunk->chunk, $pendingChunk->chunkContext, $rawData, $vulnerabilityHydrationResult, $coverageRecorder);
     }
 }

@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\Concurren
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -33,7 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\Re
 
 final class ConcurrentChunkAnalyzerHarness
 {
-    public static function analyzer(ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient, int $maxConcurrent, ?AttackerCacheInterface $attackerCache = null, ?LoggerInterface $logger = null): ConcurrentChunkAnalyzer
+    public static function analyzer(ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient, int $maxConcurrent, ?AttackerCacheInterface $attackerCache = null, ?LoggerInterface $logger = null, ?ProgressReporterInterface $progressReporter = null): ConcurrentChunkAnalyzer
     {
         return new ConcurrentChunkAnalyzer(
             $toolBatchCapableLLMClient,
@@ -41,7 +42,7 @@ final class ConcurrentChunkAnalyzerHarness
             new AttackerChunkCache($attackerCache ?? new NullAttackerCache(), ChunkAnalysisInputs::vulnerabilityFactory(), new NullLogger()),
             ChunkAnalysisInputs::vulnerabilityFactory(),
             $logger ?? new NullLogger(),
-            new NullProgressReporter(),
+            $progressReporter ?? new NullProgressReporter(),
             3,
             new RecordVulnerabilityToolFactory(),
             $maxConcurrent,

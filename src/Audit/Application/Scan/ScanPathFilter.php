@@ -41,7 +41,7 @@ final readonly class ScanPathFilter
      */
     public static function apply(array $files, array $scanPaths): array
     {
-        $normalized = self::normalizePrefixes($scanPaths);
+        $normalized = self::normalize($scanPaths);
 
         if ([] === $normalized) {
             return $files;
@@ -66,17 +66,22 @@ final readonly class ScanPathFilter
      */
     public static function includes(string $relativePath, array $scanPaths): bool
     {
-        $normalized = self::normalizePrefixes($scanPaths);
+        $normalized = self::normalize($scanPaths);
 
         return [] === $normalized || self::matchesAnyPrefix($relativePath, $normalized);
     }
 
     /**
+     * The scan paths in the one form the filter compares and a scanner scans:
+     * trimmed, with forward slashes, without a leading `./` or a trailing
+     * separator, and without the blank entries and the project root itself,
+     * which name no path to narrow to.
+     *
      * @param list<string> $scanPaths
      *
      * @return list<string>
      */
-    private static function normalizePrefixes(array $scanPaths): array
+    public static function normalize(array $scanPaths): array
     {
         $normalized = [];
         foreach ($scanPaths as $scanPath) {

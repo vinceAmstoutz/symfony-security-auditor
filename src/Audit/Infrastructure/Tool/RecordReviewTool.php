@@ -18,8 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
 /**
  * Provider-agnostic schema-enforced collection seam for reviewer verdicts.
@@ -31,7 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class RecordReviewTool implements ToolInterface
+final readonly class RecordReviewTool implements RecordingToolInterface
 {
     public function __construct(
         private ReviewCollector $reviewCollector,
@@ -53,6 +53,11 @@ final readonly class RecordReviewTool implements ToolInterface
     #[Override]
     public function execute(array $arguments): string
     {
+        $violation = RequiredArguments::violation($this->buildSchema(), $arguments);
+        if (null !== $violation) {
+            return $violation;
+        }
+
         $this->reviewCollector->add($arguments);
 
         return 'recorded';

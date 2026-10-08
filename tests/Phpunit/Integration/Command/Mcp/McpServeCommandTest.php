@@ -20,6 +20,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
@@ -31,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\FailingMcpTransportFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\PreloadedStdioTransportFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\SingleFileAuditPipeline;
@@ -108,7 +110,7 @@ final class McpServeCommandTest extends TestCase
     private function command(?McpTransportFactoryInterface $mcpTransportFactory = null): McpServeCommand
     {
         $mcpServerFactory = new McpServerFactory(
-            new AuditTool(new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()), new JsonReportRenderer(), new AuditedProjectPathHolder('/default/project/dir'), new BaselineProcessor(new Baseline()), new FindingTypeFilter(), new ReviewerFeedbackHolder()),
+            new AuditTool(new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()), new JsonReportRenderer(), new AuditedProjectPathHolder('/default/project/dir'), new BaselineProcessor(new Baseline()), new FindingTypeFilter(), new ReviewerFeedbackHolder(), new UnpricedModelBudgetGuard(self::createStub(PricingProviderInterface::class), [])),
             new ReportPackage(),
         );
 
