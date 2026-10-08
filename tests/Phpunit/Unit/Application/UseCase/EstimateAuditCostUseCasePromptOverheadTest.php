@@ -35,6 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\MappingSettingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\RecordingAttackerPromptBuilder;
 
@@ -133,6 +134,80 @@ final class EstimateAuditCostUseCasePromptOverheadTest extends TestCase
 
         self::assertSame([['a.php', 'b.php']], $mappingSettingStage->mappedFiles);
         self::assertSame(3 + \strlen(self::SYSTEM_PROMPT) + \strlen(self::MAPPING_MESSAGE), $inputTokens);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_path_narrows_the_audited_files_and_not_the_files_the_mapping_is_built_from(): void
+    {
+        $mappingSettingStage = new MappingSettingStage(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [$this->file('config/packages/security.yaml', 'yaml'), $this->file('src/Controller/A.php', 'aaa'), $this->file('src/Security/PostVoter.php', 'vvv')],
+            [$this->file('src/Controller/A.php', 'aaa')],
+        );
+        $recordingAttackerPromptBuilder = new RecordingAttackerPromptBuilder(self::SYSTEM_PROMPT, self::MAPPING_MESSAGE);
+        $estimateAuditCostUseCase = $this->useCaseOver($recordingScopedScanner, $mappingSettingStage, $recordingAttackerPromptBuilder);
+
+        $inputTokens = $estimateAuditCostUseCase->execute($this->projectDir, ['src/Controller'])->cost()->byRole()['attacker']['input_tokens'];
+
+        self::assertSame([['config/packages/security.yaml', 'src/Controller/A.php', 'src/Security/PostVoter.php']], $mappingSettingStage->mappedFiles);
+        self::assertSame([['src/Controller/A.php']], $recordingAttackerPromptBuilder->systemPromptFiles);
+        self::assertSame(3 + \strlen(self::SYSTEM_PROMPT) + \strlen(self::MAPPING_MESSAGE), $inputTokens);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_path_and_a_since_ref_map_the_whole_scope_and_the_configured_files_though_the_diff_narrows_the_audit(): void
+    {
+        $mappingSettingStage = new MappingSettingStage(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [$this->file('config/packages/security.yaml', 'yaml')],
+            [$this->file('apps/api/A.php', 'aaa'), $this->file('apps/api/B.php', 'bbb')],
+        );
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['apps/api/A.php']);
+        $estimateAuditCostUseCase = $this->useCaseOver(
+            $recordingScopedScanner,
+            $mappingSettingStage,
+            new RecordingAttackerPromptBuilder(self::SYSTEM_PROMPT, self::MAPPING_MESSAGE),
+            $gitChangedFilesResolver,
+        );
+
+        $inputTokens = $estimateAuditCostUseCase->execute($this->projectDir, ['apps/api'], 'main')->cost()->byRole()['attacker']['input_tokens'];
+
+        self::assertSame([['config/packages/security.yaml', 'apps/api/A.php', 'apps/api/B.php']], $mappingSettingStage->mappedFiles);
+        self::assertSame(3 + \strlen(self::SYSTEM_PROMPT) + \strlen(self::MAPPING_MESSAGE), $inputTokens);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_path_does_not_scan_the_configured_files_when_no_mapping_is_priced(): void
+    {
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [$this->file('config/packages/security.yaml', 'yaml')],
+            [$this->file('src/Controller/A.php', 'aaa')],
+        );
+        $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
+            $recordingScopedScanner,
+            $this->lengthEchoingEstimator(),
+            new CostCalculator($this->zeroPricing()),
+            new NullLogger(),
+            new FileChunker(ChunkingStrategy::Type, chunkSize: 1),
+            $this->skillPromptRenderer('SKILLS'),
+        );
+
+        $estimateAuditCostUseCase->execute($this->projectDir, ['src/Controller']);
+
+        self::assertSame([['scanWithin', ['src/Controller']]], $recordingScopedScanner->calls);
     }
 
     /**
@@ -258,6 +333,28 @@ final class EstimateAuditCostUseCasePromptOverheadTest extends TestCase
             $withToolRoundTrips ? 2 : 1,
             gitChangedFilesResolver: $gitChangedFilesResolver,
             toolsEnabled: $withToolRoundTrips,
+            attackerPromptBuilder: $attackerPromptBuilder,
+            mappingStage: $mappingStage,
+        );
+    }
+
+    private function useCaseOver(
+        ProjectFileScannerInterface $projectFileScanner,
+        StageInterface $mappingStage,
+        AttackerPromptBuilderInterface $attackerPromptBuilder,
+        ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
+    ): EstimateAuditCostUseCase {
+        return new EstimateAuditCostUseCase(
+            $projectFileScanner,
+            $this->lengthEchoingEstimator(),
+            new CostCalculator($this->zeroPricing()),
+            new NullLogger(),
+            new FileChunker(ChunkingStrategy::Type, chunkSize: 1),
+            $this->skillPromptRenderer('SKILLS'),
+            'gpt-4o',
+            1,
+            gitChangedFilesResolver: $gitChangedFilesResolver,
+            toolsEnabled: false,
             attackerPromptBuilder: $attackerPromptBuilder,
             mappingStage: $mappingStage,
         );
