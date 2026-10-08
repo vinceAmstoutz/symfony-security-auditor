@@ -22,7 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  * Defers constructing {@see ComposerAuditAdvisoryDatabase} — and therefore
  * running `composer audit` — until the first {@see self::lookup()} call,
  * memoizing the result for as long as the holder's path and the content of the
- * project's `composer.lock` stay unchanged. A load that failed is memoized for
+ * project's `composer.lock` stay unchanged, and no longer than the on-disk
+ * advisory cache keeps an entry (`LockfileHashedAdvisoryCache::TTL_SECONDS`):
+ * a service instance reused for days (`mcp:serve`) must see the advisories
+ * disclosed since. A load that failed is memoized for
  * `FAILED_LOAD_RETRY_SECONDS` only: a timeout is not paid again on every
  * lookup, and a transient failure does not silence the lookup for good.
  *
@@ -70,7 +73,7 @@ final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
         }
 
         $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->composerAuditRunner, $this->auditedProjectPathHolder, $this->logger);
-        $this->advisorySnapshot = new AdvisorySnapshot($snapshotKey, $composerAuditAdvisoryDatabase, $composerAuditAdvisoryDatabase->hasFailedToLoad() ? $now + self::FAILED_LOAD_RETRY_SECONDS : null);
+        $this->advisorySnapshot = new AdvisorySnapshot($snapshotKey, $composerAuditAdvisoryDatabase, $now + ($composerAuditAdvisoryDatabase->hasFailedToLoad() ? self::FAILED_LOAD_RETRY_SECONDS : LockfileHashedAdvisoryCache::TTL_SECONDS));
 
         return $composerAuditAdvisoryDatabase;
     }

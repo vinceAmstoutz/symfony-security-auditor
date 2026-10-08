@@ -170,7 +170,7 @@ final class DeferredAdvisoryDatabaseTest extends TestCase
         self::assertCount(1, $deferredAdvisoryDatabase->lookup('vendor/b-pkg', '1.0.0'));
     }
 
-    public function test_a_successful_load_is_not_repeated_however_much_time_passes(): void
+    public function test_a_successful_load_is_not_repeated_one_second_before_the_advisory_ttl_ends(): void
     {
         $composerAuditRunner = $this->createMock(ComposerAuditRunnerInterface::class);
         $composerAuditRunner->expects(self::once())->method('run')->willReturn($this->advisoryPayloadFor('vendor/foo'));
@@ -179,9 +179,27 @@ final class DeferredAdvisoryDatabaseTest extends TestCase
 
         $deferredAdvisoryDatabase->lookup('vendor/foo', '1.0.0');
 
-        $mockClock->sleep(86_400);
+        $mockClock->sleep(86_399);
 
         self::assertCount(1, $deferredAdvisoryDatabase->lookup('vendor/foo', '1.0.0'));
+    }
+
+    public function test_a_successful_load_is_repeated_once_the_advisory_ttl_has_passed(): void
+    {
+        $composerAuditRunner = $this->createMock(ComposerAuditRunnerInterface::class);
+        $composerAuditRunner->expects(self::exactly(2))->method('run')->willReturnOnConsecutiveCalls(
+            $this->advisoryPayloadFor('vendor/foo'),
+            $this->advisoryPayloadFor('vendor/bar'),
+        );
+        $mockClock = new MockClock();
+        $deferredAdvisoryDatabase = new DeferredAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger(), $this->lockfileHasher(), $mockClock);
+
+        $beforeTheTtl = $deferredAdvisoryDatabase->lookup('vendor/bar', '1.0.0');
+        $mockClock->sleep(86_400);
+        $afterTheTtl = $deferredAdvisoryDatabase->lookup('vendor/bar', '1.0.0');
+
+        self::assertSame([], $beforeTheTtl);
+        self::assertCount(1, $afterTheTtl);
     }
 
     public function test_a_changed_lockfile_runs_composer_audit_again(): void

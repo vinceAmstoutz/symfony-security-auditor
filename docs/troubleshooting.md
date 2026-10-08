@@ -568,7 +568,7 @@ When `lookup_advisory` returns empty, the audit continues without CVE data — n
 
 ### `composer audit` is slow
 
-Within a run it executes **once** and the result is cached for the lifetime of the request. Across runs, with `cache.enabled: true` (default), `LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h, keyed by a SHA-256 hash of `composer.lock` — an unchanged lockfile skips `composer audit` entirely on the next run. A `composer.lock` that is a symlink or larger than 8 MiB is never read for that hash, so its run is not cached, and an output that is not a JSON document with an `advisories` map is never stored. If it's still the bottleneck, you can pre-warm it before the audit or override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing a baked snapshot.
+Within a run it executes **once** and the result is cached for the lifetime of the request (a long-lived `mcp:serve` runs it again after 24h, so it sees the advisories disclosed since). Across runs, with `cache.enabled: true` (default), `LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h, keyed by a SHA-256 hash of `composer.lock` — an unchanged lockfile skips `composer audit` entirely on the next run. A `composer.lock` that is a symlink or larger than 8 MiB is never read for that hash, so its run is not cached, and an output that is not a JSON document with an `advisories` map is never stored. If it's still the bottleneck, you can pre-warm it before the audit or override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing a baked snapshot.
 
 ### Override the advisory source
 

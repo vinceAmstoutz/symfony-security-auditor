@@ -21,11 +21,11 @@ final readonly class AdvisorySnapshot
     public function __construct(
         public string $key,
         public ComposerAuditAdvisoryDatabase $composerAuditAdvisoryDatabase,
-        public ?int $expiresAt,
+        public int $expiresAt,
     ) {}
 
     public function serves(string $key, int $now): bool
     {
-        return $this->key === $key && (null === $this->expiresAt || $now < $this->expiresAt);
+        return $this->key === $key && $now < $this->expiresAt;
     }
 }
