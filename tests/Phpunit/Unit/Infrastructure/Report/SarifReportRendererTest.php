@@ -103,6 +103,20 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_records_a_scan_that_found_no_file_as_a_failed_invocation(): void
+    {
+        self::assertSame(
+            [[
+                'executionSuccessful' => false,
+                'toolExecutionNotifications' => [['level' => 'error', 'message' => ['text' => 'Audit incomplete: the scan found no file to audit, so this report has no verdict and cannot vouch that the project is free of vulnerabilities.']]],
+            ]],
+            $this->invocationsOf($this->makeReportOfAScanThatFoundNoFile()),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_version_is_2_1_0(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
