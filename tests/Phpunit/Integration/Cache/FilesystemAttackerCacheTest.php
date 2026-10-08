@@ -23,9 +23,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem\Fixture\AssertsOwnerOnlyAccessTrait;
 
 final class FilesystemAttackerCacheTest extends TestCase
 {
+    use AssertsOwnerOnlyAccessTrait;
+
     private string $cacheDir;
 
     private FilesystemAttackerCache $filesystemAttackerCache;
@@ -812,6 +815,22 @@ final class FilesystemAttackerCacheTest extends TestCase
             chdir($workingDirectory);
             (new Filesystem())->remove($base);
         }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_stored_entry_and_the_directories_made_for_it_are_owner_only(): void
+    {
+        $this->filesystemAttackerCache->store([ProjectFile::create('a.php', '/app/a.php', '<?php')], [['title' => 'SQL injection']]);
+
+        $entries = glob($this->cacheDir.'/*/*.json');
+        self::assertIsArray($entries);
+        self::assertCount(1, $entries);
+        self::assertOwnerOnlyFile($entries[0]);
+        self::assertOwnerOnlyDirectory(\dirname($entries[0]));
+        self::assertOwnerOnlyDirectory($this->cacheDir);
     }
 
     /**

@@ -29,9 +29,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory\Fixture\RecordingComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory\Fixture\ThrowingComposerAuditRunner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem\Fixture\AssertsOwnerOnlyAccessTrait;
 
 final class LockfileHashedAdvisoryCacheTest extends TestCase
 {
+    use AssertsOwnerOnlyAccessTrait;
+
     private string $projectDir;
 
     private string $cacheDir;
@@ -809,6 +812,23 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             chdir($workingDirectory);
             (new Filesystem())->remove($base);
         }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_a_stored_payload_and_the_directories_made_for_it_are_owner_only(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+
+        $this->makeCache($this->recordingRunner('{"advisories": {}}'))->run($this->projectDir);
+
+        $entries = glob($this->cacheDir.'/*/*.json');
+        self::assertIsArray($entries);
+        self::assertCount(1, $entries);
+        self::assertOwnerOnlyFile($entries[0]);
+        self::assertOwnerOnlyDirectory(\dirname($entries[0]));
+        self::assertOwnerOnlyDirectory($this->cacheDir);
     }
 
     #[Override]

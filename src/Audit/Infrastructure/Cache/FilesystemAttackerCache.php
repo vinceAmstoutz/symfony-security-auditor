@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\PrivateFileWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 
 use function Symfony\Component\String\u;
@@ -107,8 +108,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         try {
             $this->assertSafeToWrite($path);
             $encoded = json_encode($rawVulnerabilities, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
-            $this->filesystem->mkdir(\dirname($path));
-            $this->filesystem->dumpFile($path, $encoded);
+            PrivateFileWriter::write($this->filesystem, $path, $encoded);
             $this->logger->debug('Attacker cache stored', ['path' => $path]);
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to write attacker cache entry', [

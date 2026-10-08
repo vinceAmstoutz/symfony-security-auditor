@@ -21,6 +21,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\MalformedAdvisoryPayloadException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\UnsafeAdvisoryCacheWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\PrivateFileWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 
 use function Symfony\Component\String\u;
@@ -156,8 +157,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
 
         try {
             $this->assertSafeToWrite($path);
-            $this->filesystem->mkdir(\dirname($path));
-            $this->filesystem->dumpFile($path, $json);
+            PrivateFileWriter::write($this->filesystem, $path, $json);
             // Stamped via $this->clock, not left to the OS, so isExpired()'s subtraction never mixes two different time sources.
             $this->filesystem->touch($path, $this->clock->now()->getTimestamp());
             $this->logger->debug('Advisory cache stored', ['lockfile_hash' => $hash]);
