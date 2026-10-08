@@ -262,6 +262,46 @@ final class ConcurrentChunkAnalyzerOversizedChunkTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
+    public function test_the_findings_of_the_first_half_survive_a_budget_abort_in_the_second_half(): void
+    {
+        $calls = 0;
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatchWithTools')->willReturnCallback(static function (array $requests) use (&$calls): array {
+            if (1 === ++$calls) {
+                return [self::tooLarge()];
+            }
+
+            if (2 === $calls) {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('from B'));
+
+                return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+            }
+
+            throw BudgetExceededException::forTokens(150, 100);
+        });
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+        $caught = null;
+
+        try {
+            $this->makeAnalyzer($llmClient, 2)->analyze(
+                [[$this->makeFile('src/B.php'), $this->makeFile('src/C.php')]],
+                $this->request(),
+                $recordingCoverageRecorder,
+                new RiskMarkerIndex([]),
+            );
+        } catch (BudgetExceededException $budgetExceededException) {
+            $caught = $budgetExceededException;
+        }
+
+        self::assertInstanceOf(BudgetExceededException::class, $caught);
+        self::assertSame(['from B'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->drainFoundVulnerabilities()));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
     public function test_a_budget_abort_while_splitting_a_chunk_keeps_the_status_of_its_already_finalized_sibling(): void
     {
         $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);

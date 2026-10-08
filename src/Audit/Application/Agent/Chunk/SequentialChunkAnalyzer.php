@@ -99,7 +99,6 @@ final readonly class SequentialChunkAnalyzer
                 throw $llmProviderException;
             }
 
-            $this->recordFindings($chunkResult->vulnerabilities(), $coverageRecorder);
             $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, ChunkCompletionContext::of($index, \count($chunks), microtime(true) - $start, $statusTrackingCoverageRecorder, $chunk));
             array_push($allVulnerabilities, ...$chunkResult->vulnerabilities());
 
@@ -149,11 +148,11 @@ final readonly class SequentialChunkAnalyzer
         $servedFromCache = $this->servedFromCacheOrNull($chunk, $chunkContext->cacheable, $chunkContext->contextKey, $coverageRecorder);
 
         if ($servedFromCache instanceof VulnerabilityHydrationResult) {
-            return $servedFromCache;
+            return $this->recordedFindings($servedFromCache, $coverageRecorder);
         }
 
         try {
-            return $this->analyzeChunkThroughLlm($chunk, $chunkContext, $coverageRecorder, $toolRegistry);
+            return $this->recordedFindings($this->analyzeChunkThroughLlm($chunk, $chunkContext, $coverageRecorder, $toolRegistry), $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
             // Budget exhaustion is a deliberate abort, not an LLM failure;
             // let it bubble up so RunAuditUseCase can wrap it with a partial report.
@@ -348,6 +347,18 @@ final readonly class SequentialChunkAnalyzer
     private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, array $chunk, CoverageRecorderInterface $coverageRecorder): void
     {
         $this->recordFindings($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain(), $chunk)->vulnerabilities(), $coverageRecorder);
+    }
+
+    /**
+     * A chunk split in two reaches this once per half, as each half is
+     * analyzed — not once for the merged chunk — so the findings of a first
+     * half are already in the recorder's buffer when an abort ends the second.
+     */
+    private function recordedFindings(VulnerabilityHydrationResult $vulnerabilityHydrationResult, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    {
+        $this->recordFindings($vulnerabilityHydrationResult->vulnerabilities(), $coverageRecorder);
+
+        return $vulnerabilityHydrationResult;
     }
 
     /**

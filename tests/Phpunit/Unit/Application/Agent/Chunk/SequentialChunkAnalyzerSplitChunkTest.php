@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\SequentialChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
@@ -271,6 +273,83 @@ final class SequentialChunkAnalyzerSplitChunkTest extends TestCase
             ],
             $recordingCoverageRecorder->coverage,
         );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_the_findings_of_a_cached_half_are_recorded_when_the_cache_serves_it(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user): LLMResponse {
+            throw new LLMRequestTooLargeException('prompt is too long');
+        });
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturnCallback(
+            static fn (array $chunk): ?array => 1 === \count($chunk) ? [self::finding('cached '.self::pathsOf($chunk)[0])] : null,
+        );
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->analyzer($llmClient, $attackerCache, false)->analyze(
+            [[$this->makeFile('src/A.php'), $this->makeFile('src/B.php')]],
+            $this->request(),
+            $recordingCoverageRecorder,
+            null,
+            new RiskMarkerIndex([]),
+        );
+
+        self::assertSame(['cached src/A.php', 'cached src/B.php'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->found));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('abortsOfTheSecondHalf')]
+    public function test_the_findings_of_the_first_half_survive_an_abort_in_the_second_half(Throwable $throwable): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use ($throwable): LLMResponse {
+            if (str_contains($user, 'src/A.php') && str_contains($user, 'src/B.php')) {
+                throw new LLMRequestTooLargeException('prompt is too long');
+            }
+
+            if (str_contains($user, 'src/A.php')) {
+                return self::jsonAnswer('from A');
+            }
+
+            throw $throwable;
+        });
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+        $caught = null;
+
+        try {
+            $this->analyzer($llmClient, new NullAttackerCache(), false)->analyze(
+                [[$this->makeFile('src/A.php'), $this->makeFile('src/B.php')]],
+                $this->request(),
+                $recordingCoverageRecorder,
+                null,
+                new RiskMarkerIndex([]),
+            );
+        } catch (BudgetExceededException|LLMProviderException $exception) {
+            $caught = $exception;
+        }
+
+        self::assertSame($throwable, $caught);
+        self::assertSame(['from A'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->drainFoundVulnerabilities()));
+    }
+
+    /**
+     * @return iterable<string, array{Throwable}>
+     */
+    public static function abortsOfTheSecondHalf(): iterable
+    {
+        yield 'a budget abort' => [BudgetExceededException::forTokens(150, 100)];
+        yield 'a provider abort' => [new LLMProviderException('platform gone')];
     }
 
     /**
