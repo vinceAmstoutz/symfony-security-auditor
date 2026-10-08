@@ -14,12 +14,14 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
 use Closure;
+use FilesystemIterator;
 use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
+use UnexpectedValueException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
@@ -177,9 +179,30 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
             ->files()
             ->in($directories)
             ->name($this->finderNamePatterns())
-            ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
+            ->size(\sprintf('<= %dKi', $this->maxFileSizeKb))
+            ->filter($this->entersReadableDirectory(...), true);
 
         return $this->collectFilesFrom($finder, $projectPath, $reader);
+    }
+
+    private function entersReadableDirectory(SplFileInfo $splFile): bool
+    {
+        if (!$splFile->isDir()) {
+            return true;
+        }
+
+        try {
+            new FilesystemIterator($splFile->getPathname());
+        } catch (UnexpectedValueException $unexpectedValueException) {
+            $this->logger->warning('Skipped unreadable directory', [
+                'path' => $splFile->getPathname(),
+                'error' => $unexpectedValueException->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        return true;
     }
 
     /**

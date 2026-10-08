@@ -599,6 +599,7 @@ Both tools only search the files `ProjectFileScanner` already loaded into memory
 
 - The file falls outside `scan.included_paths`, is excluded by `scan.respect_gitignore`, or exceeds `scan.max_file_size_kb`.
 - The file, or one of its `scan.included_paths` ancestors, is a symlink. `ProjectFileScanner` skips symlinks unconditionally regardless of where they point (logged as `Skipped symlinked file` / `Skipped symlinked included path`) — a symlink pointing back inside the project is skipped too, not just one pointing outside it.
+- The file sits under a directory the process cannot list — a root-owned or `chmod 700` directory, such as a docker data directory under a `--path .` scan. `ProjectFileScanner` skips that directory with a `Skipped unreadable directory` warning naming it and the operating system's reason, and scans everything else.
 - `read_file`'s `relative_path` argument must match `ProjectFile::relativePath()` exactly (e.g. `src/Controller/UserController.php`). It has no absolute-path fallback — an absolute path never matches and returns `Error: file "..." is not part of the audited project.`
 
 ## CI Failures
