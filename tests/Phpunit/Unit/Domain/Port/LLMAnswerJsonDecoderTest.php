@@ -37,6 +37,25 @@ final class LLMAnswerJsonDecoderTest extends TestCase
         yield 'the first complete object of a truncated array' => ['[{"id": 1}, {"id": 2}, {"id":', ['id' => 1]];
     }
 
+    public function test_it_recovers_a_block_opened_after_sixty_three_unclosed_openers(): void
+    {
+        self::assertSame(['a' => 1], LLMAnswerJsonDecoder::decode('Findings: '.str_repeat('[', 63).'{"a": 1}'));
+    }
+
+    public function test_it_gives_up_on_a_block_opened_after_sixty_four_unclosed_openers(): void
+    {
+        $this->expectException(JsonException::class);
+
+        LLMAnswerJsonDecoder::decode('Findings: '.str_repeat('[', 64).'{"a": 1}');
+    }
+
+    public function test_it_rethrows_the_json_error_of_an_answer_that_is_all_unclosed_openers(): void
+    {
+        $this->expectException(JsonException::class);
+
+        LLMAnswerJsonDecoder::decode('Findings: '.str_repeat('[', 10_000));
+    }
+
     public function test_it_rethrows_the_json_error_when_no_block_decodes(): void
     {
         $this->expectException(JsonException::class);
