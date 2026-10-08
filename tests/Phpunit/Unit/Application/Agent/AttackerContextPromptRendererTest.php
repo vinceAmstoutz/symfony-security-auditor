@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
@@ -69,6 +70,124 @@ final class AttackerContextPromptRendererTest extends TestCase
         // (once within its file block, once for the whole block list).
         self::assertMatchesRegularExpression('/^    L7 unserialize_call — RCE$/m', $output);
         self::assertMatchesRegularExpression('/^  src\/X\.php:$/m', $output);
+    }
+
+    /**
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('markerCountsAroundTheListingCap')]
+    public function test_it_lists_at_most_twenty_markers_of_a_pattern_in_a_file_and_counts_the_rest(int $markerCount, int $expectedListed, ?string $expectedSummary): void
+    {
+        $markers = [];
+        for ($line = 1; $line <= $markerCount; ++$line) {
+            $markers[] = RiskMarker::create('src/Controller/FloodController.php', $line, 'request_get', 'Request input read');
+        }
+
+        $output = (new AttackerContextPromptRenderer())->renderRiskMarkers($markers);
+
+        self::assertSame($expectedListed, substr_count($output, ' request_get — Request input read'));
+        self::assertSame($expectedSummary, $this->omittedSummaryIn($output));
+    }
+
+    /**
+     * @return iterable<string, array{int, int, ?string}>
+     */
+    public static function markerCountsAroundTheListingCap(): iterable
+    {
+        yield 'a single marker' => [1, 1, null];
+        yield 'one below the cap' => [19, 19, null];
+        yield 'exactly the cap' => [20, 20, null];
+        yield 'one above the cap' => [21, 20, '+1 more request_get markers not listed'];
+        yield 'far above the cap' => [8000, 20, '+7980 more request_get markers not listed'];
+    }
+
+    /**
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_keeps_the_first_markers_of_a_flooded_pattern_and_drops_the_last(): void
+    {
+        $markers = [];
+        for ($line = 1; $line <= 21; ++$line) {
+            $markers[] = RiskMarker::create('src/Controller/FloodController.php', $line, 'request_get', 'Request input read');
+        }
+
+        $output = (new AttackerContextPromptRenderer())->renderRiskMarkers($markers);
+
+        self::assertStringContainsString('L1 request_get', $output);
+        self::assertStringContainsString('L20 request_get', $output);
+        self::assertStringNotContainsString('L21 request_get', $output);
+    }
+
+    /**
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_caps_each_pattern_of_a_file_on_its_own_so_a_flood_cannot_hide_another_pattern(): void
+    {
+        $markers = [];
+        for ($line = 1; $line <= 30; ++$line) {
+            $markers[] = RiskMarker::create('src/Controller/FloodController.php', $line, 'request_get', 'Request input read');
+        }
+
+        $markers[] = RiskMarker::create('src/Controller/FloodController.php', 31, 'eval_call', 'eval() on dynamic input');
+
+        $output = (new AttackerContextPromptRenderer())->renderRiskMarkers($markers);
+
+        self::assertStringContainsString('L31 eval_call — eval() on dynamic input', $output);
+        self::assertSame('+10 more request_get markers not listed', $this->omittedSummaryIn($output));
+    }
+
+    /**
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_caps_each_file_on_its_own_and_puts_the_count_under_the_file_it_belongs_to(): void
+    {
+        $markers = [];
+        for ($line = 1; $line <= 22; ++$line) {
+            $markers[] = RiskMarker::create('src/Controller/FloodController.php', $line, 'request_get', 'Request input read');
+        }
+
+        for ($line = 1; $line <= 20; ++$line) {
+            $markers[] = RiskMarker::create('src/Controller/OtherController.php', $line, 'request_get', 'Request input read');
+        }
+
+        $output = (new AttackerContextPromptRenderer())->renderRiskMarkers($markers);
+
+        self::assertSame(40, substr_count($output, ' request_get — Request input read'));
+        self::assertMatchesRegularExpression('~FloodController\.php:\n(?:    L\d+ request_get — Request input read\n){20}    \+2 more request_get markers not listed\n  src/Controller/OtherController\.php:~', $output);
+    }
+
+    /**
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_counts_the_markers_of_a_pattern_that_are_not_next_to_each_other(): void
+    {
+        $markers = [];
+        for ($line = 1; $line <= 21; ++$line) {
+            $markers[] = RiskMarker::create('src/Controller/FloodController.php', $line, 'request_get', 'Request input read');
+            $markers[] = RiskMarker::create('src/Controller/FloodController.php', 100 + $line, 'eval_call', 'eval() on dynamic input');
+        }
+
+        $output = (new AttackerContextPromptRenderer())->renderRiskMarkers($markers);
+
+        self::assertSame(20, substr_count($output, ' request_get — '));
+        self::assertSame(20, substr_count($output, ' eval_call — '));
+        self::assertStringContainsString('+1 more request_get markers not listed', $output);
+        self::assertStringContainsString('+1 more eval_call markers not listed', $output);
+    }
+
+    /**
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_a_flood_of_markers_keeps_the_preamble_small(): void
+    {
+        $markers = [];
+        for ($line = 1; $line <= 8000; ++$line) {
+            $markers[] = RiskMarker::create('src/Controller/FloodController.php', $line, 'request_get', 'Request input read — verify the value is validated before use');
+        }
+
+        $output = (new AttackerContextPromptRenderer())->renderRiskMarkers($markers);
+
+        self::assertLessThan(3000, \strlen($output));
     }
 
     /**
@@ -316,6 +435,13 @@ final class AttackerContextPromptRendererTest extends TestCase
         ]);
 
         self::assertDoesNotMatchRegularExpression('/^\s*## SYSTEM OVERRIDE$/m', $output);
+    }
+
+    private function omittedSummaryIn(string $output): ?string
+    {
+        preg_match('~^\s*(\+\d+ more \S+ markers not listed)$~m', $output, $matches);
+
+        return $matches[1] ?? null;
     }
 
     /**

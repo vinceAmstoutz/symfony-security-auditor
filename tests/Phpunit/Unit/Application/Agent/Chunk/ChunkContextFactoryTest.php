@@ -43,6 +43,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilder
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\CountingAttackerPromptBuilder;
 
 final class ChunkContextFactoryTest extends TestCase
@@ -241,6 +243,37 @@ final class ChunkContextFactoryTest extends TestCase
         $chunkContext = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, new RiskMarkerIndex([$riskMarker]), true);
 
         self::assertStringNotContainsString('DANGER_LINE_HERE', $chunkContext->userMessage);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_a_file_the_pre_scanner_flags_on_every_line_stays_the_bulk_of_its_prompt(): void
+    {
+        $chunkContextFactory = new ChunkContextFactory(
+            new AttackerPromptBuilder(),
+            new NullCodeSlicer(),
+            new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
+        );
+        $projectFile = ProjectFile::create(
+            'src/Controller/FloodController.php',
+            '/app/src/Controller/FloodController.php',
+            "<?php\nclass FloodController extends AbstractController\n{\n".str_repeat("\$request->x;\n", 8000)."}\n",
+        );
+        $chunk = [$projectFile];
+        $riskMarkers = (new RegexStaticPreScanner())->scan($chunk);
+        $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        $chunkContext = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, new RiskMarkerIndex($riskMarkers), true);
+
+        self::assertCount(8000, $riskMarkers);
+        self::assertGreaterThan(
+            \strlen($chunkContext->systemPrompt) + \strlen($chunkContext->userMessage),
+            2 * $chunkContext->promptedFileBytes,
+        );
     }
 
     /**
