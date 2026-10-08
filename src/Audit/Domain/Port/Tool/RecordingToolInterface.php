@@ -16,6 +16,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool;
 /**
  * A tool that hands the model's answer to the collector (a finding, a verdict)
  * instead of reading anything back: a conversation whose last allowed round
- * calls one has concluded.
+ * made a call one took in has concluded.
+ *
+ * A call the tool took in is answered with `RECORDED`; any other answer (an
+ * `Error: …` text) is a refusal the model reads and may retry, which is not a
+ * recording.
  */
-interface RecordingToolInterface extends ToolInterface {}
+interface RecordingToolInterface extends ToolInterface
+{
+    public const string RECORDED = 'recorded';
+}

@@ -17,14 +17,16 @@ use Symfony\AI\Platform\Result\ToolCall;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
  * The last round a tool-using conversation is allowed. The tool result that
  * precedes it carries a notice saying so — a tool result, not a message of its
  * own, because a provider may refuse a user turn right after one — and a last
- * round that records its answer ends the conversation instead of asking for
- * one more round to say it is done.
+ * round that records its answer (a recording tool took the call in, rather than
+ * refusing it) ends the conversation instead of asking for one more round to
+ * say it is done.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -47,14 +49,18 @@ final readonly class FinalRound
         return \sprintf("%s\n\n%s", $toolResult, self::NOTICE);
     }
 
-    public static function isConcludedBy(int $roundsLeft, ToolRegistry $toolRegistry, ToolCall ...$toolCalls): bool
+    /**
+     * @param list<ToolCall> $toolCalls
+     * @param list<string>   $toolResults the answer to each call, in the same order
+     */
+    public static function isConcludedBy(int $roundsLeft, ToolRegistry $toolRegistry, array $toolCalls, array $toolResults): bool
     {
         if (!self::isLast($roundsLeft)) {
             return false;
         }
 
-        foreach ($toolCalls as $toolCall) {
-            if ($toolRegistry->isRecording($toolCall->getName())) {
+        foreach ($toolCalls as $position => $toolCall) {
+            if ($toolRegistry->isRecording($toolCall->getName()) && RecordingToolInterface::RECORDED === $toolResults[$position]) {
                 return true;
             }
         }

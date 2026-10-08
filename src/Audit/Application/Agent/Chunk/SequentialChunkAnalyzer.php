@@ -48,6 +48,8 @@ final readonly class SequentialChunkAnalyzer
 
     private OversizedChunkRecovery $oversizedChunkRecovery;
 
+    private RefusedRecordingRecorder $refusedRecordingRecorder;
+
     private ChunkOutcomeRecorder $chunkOutcomeRecorder;
 
     public function __construct(
@@ -62,6 +64,7 @@ final readonly class SequentialChunkAnalyzer
         private ?RecordVulnerabilityToolFactoryInterface $recordVulnerabilityToolFactory,
     ) {
         $this->oversizedChunkRecovery = new OversizedChunkRecovery($logger, $attackerChunkCache, $vulnerabilityFactory);
+        $this->refusedRecordingRecorder = new RefusedRecordingRecorder($logger);
         $this->chunkOutcomeRecorder = new ChunkOutcomeRecorder($attackerChunkCache, $logger);
     }
 
@@ -277,6 +280,13 @@ final readonly class SequentialChunkAnalyzer
 
         if ($llmResponse->isDegraded()) {
             return $this->hydrateIncompleteResponse($chunk, $llmResponse, $rawData, $coverageRecorder);
+        }
+
+        $refusedCalls = $structuredVulnerabilityCollectionSession->unsettledRefusals();
+        if ($refusedCalls > 0) {
+            $this->refusedRecordingRecorder->record($chunk, \count($rawData), $refusedCalls, $coverageRecorder);
+
+            return $this->vulnerabilityFactory->fromList($rawData, $chunk);
         }
 
         return $this->settleChunk($chunk, $chunkContext, $rawData, $coverageRecorder);

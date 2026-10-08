@@ -91,11 +91,12 @@ final readonly class SequentialToolLoop
                 return $this->textResponseAndLog($conversationState, $deferredResult, $platformResult, $iteration);
             }
 
-            $roundsLeft = $maxToolIterations - $iteration;
-            $conversationState = $this->runToolCalls($conversationState, $toolCalls, $toolRegistry, $iteration, $roundsLeft);
-            if (FinalRound::isConcludedBy($roundsLeft, $toolRegistry, ...$toolCalls)) {
-                return FinalRound::answer($this->model, $conversationState->tokenUsage());
+            $afterToolCalls = $this->runToolCalls($conversationState, $toolCalls, $toolRegistry, $iteration, $maxToolIterations - $iteration);
+            if ($afterToolCalls instanceof LLMResponse) {
+                return $afterToolCalls;
             }
+
+            $conversationState = $afterToolCalls;
         }
 
         return $this->iterationCapResponseAndLog($conversationState, $maxToolIterations);
@@ -196,9 +197,14 @@ final readonly class SequentialToolLoop
     }
 
     /**
+     * The conversation after the round's tool calls ran, or the response that
+     * ends it when they were the last round's recording calls.
+     *
      * @param list<ToolCall> $toolCalls
+     *
+     * @throws InvalidTokenUsageException
      */
-    private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolRegistry $toolRegistry, int $iteration, int $roundsLeft): ConversationState
+    private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolRegistry $toolRegistry, int $iteration, int $roundsLeft): ConversationState|LLMResponse
     {
         $conversationState->bag->add(new AssistantMessage(...$toolCalls));
 
@@ -213,7 +219,11 @@ final readonly class SequentialToolLoop
             ]);
         }
 
-        return $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+
+        return FinalRound::isConcludedBy($roundsLeft, $toolRegistry, $toolCalls, $toolResults)
+            ? FinalRound::answer($this->model, $conversationState->tokenUsage())
+            : $conversationState;
     }
 
     /**
