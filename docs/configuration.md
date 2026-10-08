@@ -646,7 +646,7 @@ Running against [Ollama](#supported-platforms) needs no credential. Pair it with
 
 ## CLI Reference
 
-The bundle registers the `audit:run` console command, also reachable through the shorter `audit` alias (`bin/console audit`), plus the `audit:diff` command for comparing two previously generated reports. The standalone CLI exposes the same commands.
+The bundle registers the `audit:run` console command, also reachable through the shorter `audit` alias (`bin/console audit`), plus `audit:diff`, `audit:trend` and `audit:baseline` for working with previously generated reports. The standalone CLI exposes the same commands, run as `symfony-security-auditor audit:diff …`, and the three report commands need neither a configuration nor an API key.
 
 ```bash
 bin/console audit:run [<project-path>] [options]

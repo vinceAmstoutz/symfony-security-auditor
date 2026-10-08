@@ -23,7 +23,9 @@ use Symfony\Component\Console\Command\LazyCommand;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\ApplicationTester;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
@@ -137,6 +139,62 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'set' => ['auth:set'];
         yield 'status' => ['auth:status'];
         yield 'remove' => ['auth:remove'];
+    }
+
+    #[DataProvider('reportCommandNames')]
+    public function test_it_registers_the_report_commands(string $commandName): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertTrue($standaloneApplication->has($commandName));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function reportCommandNames(): iterable
+    {
+        yield 'diff' => ['audit:diff'];
+        yield 'trend' => ['audit:trend'];
+        yield 'baseline' => ['audit:baseline'];
+    }
+
+    public function test_the_report_commands_run_without_any_configuration(): void
+    {
+        $filesystem = new Filesystem();
+        $reportsDir = $this->cacheHome.'/reports';
+        $finding = ['type' => 'sql_injection', 'file' => 'src/A.php', 'title' => 'SQL Injection', 'severity' => 'high', 'fingerprint' => Vulnerability::fingerprintOf('sql_injection', 'src/A.php', 'SQL Injection')];
+        $filesystem->dumpFile($reportsDir.'/before.json', json_encode(['vulnerabilities' => []], \JSON_THROW_ON_ERROR));
+        $filesystem->dumpFile($reportsDir.'/after.json', json_encode(['vulnerabilities' => [$finding]], \JSON_THROW_ON_ERROR));
+
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'SSA_NO_UPDATE_CHECK' => '1',
+        ])->create();
+
+        $arguments = [
+            'audit:diff' => ['previous-report' => $reportsDir.'/before.json', 'current-report' => $reportsDir.'/after.json'],
+            'audit:trend' => ['reports' => [$reportsDir.'/before.json', $reportsDir.'/after.json']],
+            'audit:baseline' => ['report' => $reportsDir.'/after.json', 'baseline' => $reportsDir.'/baseline.json'],
+        ];
+
+        $exitCodes = [];
+        $outputs = [];
+        foreach ($arguments as $command => $commandArguments) {
+            $commandTester = new CommandTester($standaloneApplication->find($command));
+            $exitCodes[$command] = $commandTester->execute($commandArguments);
+            $outputs[$command] = $commandTester->getDisplay();
+        }
+
+        self::assertSame(['audit:diff' => Command::SUCCESS, 'audit:trend' => Command::SUCCESS, 'audit:baseline' => Command::SUCCESS], $exitCodes);
+        self::assertStringContainsString('Summary: 1 new, 0 fixed, 0 persisting.', $outputs['audit:diff']);
+        $baseline = json_decode((string) file_get_contents($reportsDir.'/baseline.json'), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($baseline);
+        self::assertSame([$finding['fingerprint']], array_column($baseline, 'fingerprint'));
     }
 
     public function test_it_registers_the_self_update_command(): void
