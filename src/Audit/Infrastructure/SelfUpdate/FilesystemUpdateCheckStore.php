@@ -119,7 +119,7 @@ final readonly class FilesystemUpdateCheckStore implements UpdateCheckStoreInter
         $checkedAt = $decoded[self::CHECKED_AT_KEY] ?? null;
         $latestVersion = $decoded[self::LATEST_VERSION_KEY] ?? null;
 
-        if (!\is_int($checkedAt) || !\is_string($latestVersion) || '' === $latestVersion) {
+        if (!\is_int($checkedAt) || !\is_string($latestVersion) || !ReleaseTag::isValid($latestVersion)) {
             return null;
         }
 

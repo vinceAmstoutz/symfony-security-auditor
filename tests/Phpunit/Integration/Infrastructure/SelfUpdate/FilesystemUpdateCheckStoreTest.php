@@ -86,6 +86,33 @@ final class FilesystemUpdateCheckStoreTest extends TestCase
         yield 'latest_version is empty' => ['{"checked_at":1700000000,"latest_version":""}'];
     }
 
+    #[DataProvider('hostileLatestVersions')]
+    public function test_it_rejects_a_latest_version_that_is_not_a_release_version(string $latestVersion): void
+    {
+        $this->filesystem->dumpFile($this->cacheFile(), json_encode(['checked_at' => 1700000000, 'latest_version' => $latestVersion], \JSON_THROW_ON_ERROR));
+
+        self::assertNull($this->resolvableStore()->read());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function hostileLatestVersions(): iterable
+    {
+        yield 'a path traversal' => ['../../x'];
+        yield 'a url' => ['https://evil.test/2.0.0'];
+        yield 'a terminal escape' => ["2.0.0\x1b[2J"];
+        yield 'a newline' => ["2.0.0\nrun this"];
+        yield 'a formatter tag' => ['2.0.0</comment><error>'];
+    }
+
+    public function test_it_reads_a_pre_release_latest_version(): void
+    {
+        $this->filesystem->dumpFile($this->cacheFile(), '{"checked_at":1700000000,"latest_version":"2.0.0-rc.1"}');
+
+        self::assertEquals(new UpdateCheckState(new DateTimeImmutable('@1700000000'), '2.0.0-rc.1'), $this->resolvableStore()->read());
+    }
+
     public function test_it_neither_reads_nor_writes_when_the_cache_path_is_unresolvable(): void
     {
         $filesystemUpdateCheckStore = $this->unresolvableStore();

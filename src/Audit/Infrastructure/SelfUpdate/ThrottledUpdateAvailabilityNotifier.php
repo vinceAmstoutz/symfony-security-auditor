@@ -53,7 +53,7 @@ final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvaila
 
         $latestVersion = $this->latestVersion($currentVersion);
 
-        if (!version_compare($latestVersion, $currentVersion, '>')) {
+        if (!ReleaseTag::isValid($latestVersion) || !version_compare($latestVersion, $currentVersion, '>')) {
             return null;
         }
 
