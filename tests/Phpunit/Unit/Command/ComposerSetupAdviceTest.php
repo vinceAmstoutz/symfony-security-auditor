@@ -108,7 +108,7 @@ final class ComposerSetupAdviceTest extends TestCase
     {
         $problem = (new ComposerSetupAdvice('Linux'))->problem(ComposerProbe::unavailable('<error>boom</error>'));
 
-        self::assertStringContainsString('  It reported: <error>boom</error>', (new OutputFormatter())->format($problem));
+        self::assertStringContainsString('  It reported: <error>boom</error>', (string) (new OutputFormatter())->format($problem));
     }
 
     public function test_it_defaults_to_the_operating_system_it_runs_on(): void
