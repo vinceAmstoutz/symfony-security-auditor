@@ -380,6 +380,24 @@ final class BaselineProcessorTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_apply_leaves_the_report_a_list_of_what_it_suppressed(): void
+    {
+        $vulnerability = $this->makeVuln('src/Keep.php');
+        $dropped = $this->makeVuln('src/Drop.php');
+        $baseline = self::createStub(BaselineInterface::class);
+        $baseline->method('load')->willReturn([$dropped->fingerprint()]);
+
+        $baselineResult = (new BaselineProcessor($baseline))->apply($this->makeReport($vulnerability, $dropped), '/baseline.json');
+
+        self::assertSame([$dropped->fingerprint()], $baselineResult->report->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
      * `AuditOrchestrator::withoutBaselineAccepted()` already spent this
      * baseline credit skipping a different, never-reviewed finding before the
      * reviewer ever ran this run — re-applying the same credit here against a

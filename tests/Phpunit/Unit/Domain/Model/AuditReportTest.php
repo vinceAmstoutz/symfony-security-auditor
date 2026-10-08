@@ -1111,4 +1111,148 @@ final class AuditReportTest extends TestCase
         yield 'the whole project over its whole history' => [[], null];
         yield 'two --path scopes since a git ref' => [['src/Controller', 'config'], 'origin/main'];
     }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_array_form_lists_no_suppressed_fingerprint_when_nothing_was_withheld(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('a', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
+
+        self::assertSame([], AuditReport::fromContext($auditContext)->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_array_form_lists_the_baseline_credits_spent_before_the_review(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA', 'SSA-BBB', 'SSA-CCC']);
+        $auditContext->consumeBaselineCredit('SSA-BBB');
+        $auditContext->consumeBaselineCredit('SSA-AAA');
+
+        self::assertSame(['SSA-BBB', 'SSA-AAA'], AuditReport::fromContext($auditContext)->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_array_form_lists_a_finding_the_baseline_removed_but_not_one_it_kept(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('keep', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
+
+        $vulnerability = $this->makeVulnerability('drop', VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_array_form_lists_a_shared_fingerprint_once_per_occurrence_the_baseline_removed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->sameFingerprintVuln(1)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($this->sameFingerprintVuln(2)->withReviewerValidation(true));
+        $auditContext->addVulnerability($this->sameFingerprintVuln(3)->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        $suppressed = $auditReport->withoutFingerprints([$vulnerability->fingerprint(), $vulnerability->fingerprint()])->toArray()['suppressed_fingerprints'];
+
+        self::assertSame([$vulnerability->fingerprint(), $vulnerability->fingerprint()], $suppressed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_array_form_lists_a_finding_the_type_filter_removed_but_not_one_it_kept(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('muted', VulnerabilitySeverity::HIGH, VulnerabilityType::SQL_INJECTION)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($this->makeVulnerability('shown', VulnerabilitySeverity::HIGH, VulnerabilityType::SSRF)->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext)->filteredByTypes([], [VulnerabilityType::SQL_INJECTION]);
+
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_array_form_lists_the_findings_an_allowlist_left_out(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('left-out', VulnerabilitySeverity::HIGH, VulnerabilityType::SQL_INJECTION)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($this->makeVulnerability('listed', VulnerabilitySeverity::HIGH, VulnerabilityType::SSRF)->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext)->filteredByTypes([VulnerabilityType::SSRF], []);
+
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_array_form_lists_every_withheld_finding_in_the_order_the_run_withheld_it(): void
+    {
+        $vulnerability = $this->makeVulnerability('muted', VulnerabilitySeverity::HIGH, VulnerabilityType::SSRF)->withReviewerValidation(true);
+        $accepted = $this->makeVulnerability('accepted', VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-SKIPPED']);
+        $auditContext->consumeBaselineCredit('SSA-SKIPPED');
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($accepted);
+
+        $auditReport = AuditReport::fromContext($auditContext)
+            ->filteredByTypes([], [VulnerabilityType::SSRF])
+            ->withoutFingerprints([$accepted->fingerprint()]);
+
+        self::assertSame(['SSA-SKIPPED', $vulnerability->fingerprint(), $accepted->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_finding_removed_after_the_review_leaves_the_baseline_credits_spent_before_it_alone(): void
+    {
+        $vulnerability = $this->makeVulnerability('removed', VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-SKIPPED']);
+        $auditContext->consumeBaselineCredit('SSA-SKIPPED');
+        $auditContext->addVulnerability($vulnerability);
+
+        $auditReport = AuditReport::fromContext($auditContext)
+            ->filteredByTypes([], [VulnerabilityType::SQL_INJECTION])
+            ->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame(['SSA-SKIPPED'], $auditReport->consumedBaselineFingerprints());
+    }
 }

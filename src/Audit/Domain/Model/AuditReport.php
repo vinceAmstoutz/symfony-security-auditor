@@ -25,13 +25,12 @@ final readonly class AuditReport
 
     /**
      * @param list<array{stage: string, file: string, status: string}> $coverage
-     * @param list<string>                                             $consumedBaselineFingerprints
      */
     private function __construct(
         private ReportIdentity $reportIdentity,
         private array $coverage,
         ?AuditCost $auditCost,
-        private array $consumedBaselineFingerprints,
+        private SuppressedFindings $suppressedFindings,
         Vulnerability ...$vulnerabilities,
     ) {
         $this->vulnerabilities = $this->orderedMostSevereFirst(array_values($vulnerabilities));
@@ -69,7 +68,7 @@ final readonly class AuditReport
             ),
             $auditContext->coverage(),
             $auditCost,
-            $auditContext->consumedBaselineFingerprints(),
+            new SuppressedFindings($auditContext->consumedBaselineFingerprints()),
             ...$auditContext->validatedVulnerabilities(),
         );
     }
@@ -84,7 +83,7 @@ final readonly class AuditReport
      */
     public function consumedBaselineFingerprints(): array
     {
-        return $this->consumedBaselineFingerprints;
+        return $this->suppressedFindings->acceptedBeforeReview;
     }
 
     public function auditId(): string
@@ -215,10 +214,12 @@ final readonly class AuditReport
         $remainingByFingerprint = array_count_values($fingerprints);
 
         $kept = [];
+        $removed = [];
         foreach ($this->vulnerabilities as $vulnerability) {
             $fingerprint = $vulnerability->fingerprint();
             if (\array_key_exists($fingerprint, $remainingByFingerprint) && $remainingByFingerprint[$fingerprint] > 0) {
                 --$remainingByFingerprint[$fingerprint];
+                $removed[] = $vulnerability;
 
                 continue;
             }
@@ -230,7 +231,7 @@ final readonly class AuditReport
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
-            $this->consumedBaselineFingerprints,
+            $this->suppressedFindings->withRemoved($removed),
             ...$kept,
         );
     }
@@ -256,7 +257,7 @@ final readonly class AuditReport
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
-            $this->consumedBaselineFingerprints,
+            $this->suppressedFindings->withRemoved(array_diff_key($this->vulnerabilities, $kept)),
             ...$kept,
         );
     }
@@ -366,6 +367,7 @@ final readonly class AuditReport
                 'paths' => $this->reportIdentity->scanPaths,
             ],
             'coverage' => $this->coverage,
+            'suppressed_fingerprints' => $this->suppressedFindings->fingerprints(),
         ];
     }
 }
