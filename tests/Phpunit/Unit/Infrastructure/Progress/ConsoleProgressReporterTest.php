@@ -169,6 +169,29 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringNotContainsString('✓ chunk', $rendered);
     }
 
+    public function test_it_names_why_a_chunk_failed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored', 'reason' => 'tool-call limit reached (audit.max_tool_iterations)']);
+
+        self::assertStringContainsString('✗ chunk 2/3 failed (12s) — tool-call limit reached (audit.max_tool_iterations)', $this->bufferedOutput->fetch());
+    }
+
+    public function test_a_forged_console_tag_in_a_failure_reason_is_not_rendered_as_console_markup(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored', 'reason' => "</> <fg=green>[ALL CLEAR]</>\x1b[2J"]);
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringContainsString('[ALL CLEAR]</>', $rendered);
+        self::assertStringNotContainsString("\x1b[2J", $rendered);
+    }
+
     public function test_it_marks_an_analyzed_chunk_as_analyzed(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);

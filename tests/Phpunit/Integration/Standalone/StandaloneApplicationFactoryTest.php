@@ -390,6 +390,28 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    public function test_the_audit_command_reads_the_config_that_ships_with_the_project_it_names(): void
+    {
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'SSA_NO_UPDATE_CHECK' => '1',
+        ])->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $statusCode = $applicationTester->run(['command' => AuditCommand::ALIAS, 'project-path' => $projectDirectory]);
+
+        self::assertSame(
+            [Command::FAILURE, true],
+            [$statusCode, str_contains((string) preg_replace('/\s+/', '', $applicationTester->getDisplay()), $projectDirectory.'/.symfony-security-auditor.yaml')],
+            $applicationTester->getDisplay(),
+        );
+    }
+
     public function test_there_is_no_bridge_tree_to_load_without_a_data_directory(): void
     {
         self::assertNull(StandaloneApplicationFactory::loadBridgeTree([], self::BUNDLED_RELEASE));
