@@ -47,6 +47,7 @@ final readonly class ChunkContextFactory
         private CodeSlicerInterface $codeSlicer,
         private AttackerContextPromptRenderer $attackerContextPromptRenderer,
         private ChunkContextKeyDeriver $chunkContextKeyDeriver,
+        private RiskMarkerLineRestorer $riskMarkerLineRestorer = new RiskMarkerLineRestorer(),
     ) {
         $this->weakMap = new WeakMap();
     }
@@ -171,8 +172,9 @@ final readonly class ChunkContextFactory
      * down to security-relevant lines. The slicer preserves the original line
      * count by replacing elided lines with a `// elided` placeholder, so the
      * line-numbering protocol in the prompt stays accurate against the source.
-     * Any line the static pre-scanner already flagged as a risk marker is
-     * restored verbatim afterward, since the slicer's own keyword list is
+     * Any line the static pre-scanner already flagged as a risk marker, and the
+     * rest of the call it leaves open, is restored verbatim afterward by
+     * {@see RiskMarkerLineRestorer}, since the slicer's own keyword list is
      * independently maintained and can miss patterns the pre-scanner catches.
      *
      * @param list<ProjectFile> $chunk
@@ -183,7 +185,7 @@ final readonly class ChunkContextFactory
     {
         $sliced = [];
         foreach ($chunk as $file) {
-            $newContent = $this->restoreRiskMarkerLines($file, $this->codeSlicer->slice($file), $riskMarkerIndex->forChunk([$file]));
+            $newContent = $this->riskMarkerLineRestorer->restore($file, $this->codeSlicer->slice($file), $riskMarkerIndex->forChunk([$file]));
 
             if ($newContent === $file->content()) {
                 $sliced[] = $file;
@@ -195,23 +197,5 @@ final readonly class ChunkContextFactory
         }
 
         return $sliced;
-    }
-
-    /**
-     * @param list<RiskMarker> $markers
-     */
-    private function restoreRiskMarkerLines(ProjectFile $projectFile, string $slicedContent, array $markers): string
-    {
-        $originalLines = explode("\n", $projectFile->content());
-        $slicedLines = explode("\n", $slicedContent);
-
-        foreach ($markers as $marker) {
-            $index = $marker->line() - 1;
-            if (\array_key_exists($index, $slicedLines) && \array_key_exists($index, $originalLines)) {
-                $slicedLines[$index] = $originalLines[$index];
-            }
-        }
-
-        return implode("\n", $slicedLines);
     }
 }

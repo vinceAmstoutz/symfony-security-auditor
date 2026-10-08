@@ -244,6 +244,47 @@ final class ChunkContextFactoryTest extends TestCase
 
     /**
      * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_a_risk_marker_restores_the_multi_line_call_it_opens_up_to_its_closing_parenthesis(): void
+    {
+        $codeSlicer = self::createStub(CodeSlicerInterface::class);
+        $codeSlicer->method('slice')->willReturn(implode("\n", ['<?php', ...array_fill(0, 5, '// elided')]));
+
+        $chunkContextFactory = new ChunkContextFactory(
+            new AttackerPromptBuilder(),
+            $codeSlicer,
+            new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
+        );
+
+        $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', implode("\n", [
+            '<?php',
+            'INERT_BEFORE_CALL',
+            '$rows = $this->connection->fetchFirstColumn(',
+            '    "SELECT id FROM users WHERE name = \'" . $name . "\'"',
+            ');',
+            'INERT_AFTER_CALL',
+        ]));
+        $chunk = [$projectFile];
+        $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        $riskMarker = RiskMarker::create($projectFile->relativePath(), 3, 'sql_injection', 'raw query concatenation');
+        $chunkContext = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, new RiskMarkerIndex([$riskMarker]), true);
+
+        $expectedBody = implode("\n", [
+            '  1 | <?php',
+            '  2 | // elided',
+            '  3 | $rows = $this->connection->fetchFirstColumn(',
+            '  4 |     "SELECT id FROM users WHERE name = \'" . $name . "\'"',
+            '  5 | );',
+            '  6 | // elided',
+        ]);
+        self::assertStringContainsString($expectedBody."\n</file>", $chunkContext->userMessage);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
      */
     public function test_a_file_without_risk_markers_keeps_the_slicer_output_verbatim(): void
     {

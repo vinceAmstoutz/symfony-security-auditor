@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfigura
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
 /**
@@ -225,6 +226,6 @@ final readonly class ContainerParameterRegistrar
             return 'off';
         }
 
-        return \sprintf('on-%d', $bundleConfiguration->audit->codeSlicingMinLines);
+        return \sprintf('v%d-on-%d', RegexCodeSlicer::CACHE_VERSION, $bundleConfiguration->audit->codeSlicingMinLines);
     }
 }
