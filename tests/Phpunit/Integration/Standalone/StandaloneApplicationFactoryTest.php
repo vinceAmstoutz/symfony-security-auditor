@@ -276,6 +276,16 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    public function test_pricing_catalog_refresher_is_null_when_offline_only_is_spelled_with_a_hyphen(): void
+    {
+        $xdgConfigPathResolver = $this->resolverForConfig("privacy:\n    offline-only: true\n");
+
+        self::assertInstanceOf(
+            NullPricingCatalogRefresher::class,
+            StandaloneApplicationFactory::pricingCatalogRefresher($xdgConfigPathResolver),
+        );
+    }
+
     public function test_pricing_catalog_refresher_downloads_when_offline_only_is_disabled(): void
     {
         $xdgConfigPathResolver = $this->resolverForConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
