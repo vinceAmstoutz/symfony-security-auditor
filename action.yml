@@ -94,7 +94,7 @@ outputs:
     description: Total number of findings in the report. Only populated when format is json (empty for other formats). When complete is "false" it counts only the findings in the files analyzed.
     value: ${{ steps.audit.outputs.findings-count }}
   highest-severity:
-    description: The report's aggregate risk level (safe, low, medium, high, critical). Only populated when format is json (empty for other formats). When complete is "false" it covers only the files analyzed, so read it together with complete.
+    description: The report's aggregate risk level, in capitals as the JSON report writes it (SAFE, LOW, MEDIUM, HIGH, CRITICAL; fail-on takes them in lowercase). Only populated when format is json (empty for other formats). When complete is "false" it covers only the files analyzed, so read it together with complete.
     value: ${{ steps.audit.outputs.highest-severity }}
   grade:
     description: The report's A-F security grade. Only populated when format is json (empty for other formats). When complete is "false" it covers only the files analyzed, so read it together with complete.
