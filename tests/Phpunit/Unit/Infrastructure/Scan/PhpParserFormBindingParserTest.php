@@ -14,10 +14,14 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
+use PhpParser\Node;
+use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan\Fixture\CountingNodeFinder;
 
 final class PhpParserFormBindingParserTest extends TestCase
 {
@@ -678,5 +682,67 @@ final class PhpParserFormBindingParserTest extends TestCase
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_binds_a_form_created_in_a_helper_reached_along_two_paths_once(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class UserController {
+                public function edit(): void {
+                    $this->left();
+                    $this->right();
+                }
+                private function left(): void { $this->build(); }
+                private function right(): void { $this->build(); }
+                private function build(): void { $form = $this->createForm(UserType::class); }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('edit', $bindings[0]->controllerMethod());
+        self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chain_of_public_actions_costs_a_bounded_number_of_tree_walks(): void
+    {
+        $actionCount = 400;
+        $source = $this->chainOfPublicActionsEndingInAForm($actionCount);
+        $countingNodeFinder = new CountingNodeFinder();
+        $phpParserFormBindingParser = new PhpParserFormBindingParser(new ThisCallReachability($countingNodeFinder), $countingNodeFinder);
+
+        $bindings = $phpParserFormBindingParser->parse(ProjectFile::create('src/Controller/ChainController.php', '/app/x', $source));
+
+        self::assertCount($actionCount + 1, $bindings);
+        self::assertSame('m0', $bindings[0]->controllerMethod());
+        self::assertLessThan(8 * $this->nodeCount($source), $countingNodeFinder->visitedNodes);
+    }
+
+    private function chainOfPublicActionsEndingInAForm(int $actionCount): string
+    {
+        $source = "<?php\nnamespace App\\Controller;\nuse App\\Form\\ItemType;\nfinal class ChainController extends AbstractController {\n";
+        for ($i = 0; $i < $actionCount; ++$i) {
+            $source .= \sprintf("public function m%d() { return \$this->m%d(); }\n", $i, $i + 1);
+        }
+
+        return $source.\sprintf("public function m%d() { return \$this->createForm(ItemType::class); }\n}\n", $actionCount);
+    }
+
+    private function nodeCount(string $source): int
+    {
+        $ast = (new ParserFactory())->createForNewestSupportedVersion()->parse($source) ?? [];
+
+        return \count((new CountingNodeFinder())->findInstanceOf($ast, Node::class));
     }
 }

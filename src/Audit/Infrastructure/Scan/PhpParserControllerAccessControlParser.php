@@ -18,6 +18,7 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
+use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
@@ -109,7 +110,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         $classLevelIsGranted = $this->isGrantedAttributeParser->extractValues($class->attrGroups);
         $classConstants = $this->classConstantStrings($class);
         $classRouteData = $this->routeAttributeParser->extract($class->attrGroups, $classConstants)[0];
-        $methodsByName = $this->methodsByName($class);
+        $reachableCallIndex = $this->denyAccessCallIndex($class);
 
         $entries = [];
         foreach ($class->getMethods() as $classMethod) {
@@ -117,12 +118,12 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 continue;
             }
 
-            $denyAccessCalls = $this->denyAccessCalls($classMethod, $methodsByName);
+            $reachableDenyAccessCalls = $reachableCallIndex->callsFrom($classMethod);
             $accessFlags = [
                 'classHasIsGranted' => $classHasIsGranted,
                 'classLevelIsGranted' => $classLevelIsGranted,
-                'methodHasDenyAccess' => [] !== $denyAccessCalls,
-                'denyAccessAttributes' => $this->attributesFromCalls($denyAccessCalls),
+                'methodHasDenyAccess' => [] !== $reachableDenyAccessCalls,
+                'denyAccessAttributes' => $this->attributesFromCalls($reachableDenyAccessCalls),
             ];
 
             foreach ($this->buildEntries($filePath, $classMethod, $accessFlags, $classRouteData, $classConstants) as $entry) {
@@ -274,28 +275,15 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * The reachable `denyAccessUnlessGranted()`/`isGranted()` calls of an action
-     * — including ones moved behind a shared private/protected helper (a common
+     * The `denyAccessUnlessGranted()`/`isGranted()` calls an action reaches —
+     * including ones moved behind a shared private/protected helper (a common
      * refactor for a repeated check), which would otherwise be invisible since
      * the action method's own body only calls the helper, never the guard
      * directly.
-     *
-     * @param array<string, ClassMethod> $methodsByName
-     *
-     * @return list<MethodCall|NullsafeMethodCall>
      */
-    private function denyAccessCalls(ClassMethod $classMethod, array $methodsByName): array
+    private function denyAccessCallIndex(Class_ $class): ReachableCallIndex
     {
-        $body = $this->thisCallReachability->reachableBody($classMethod, $methodsByName);
-        $methodCalls = [
-            ...$this->nodeFinder->findInstanceOf($body, MethodCall::class),
-            ...$this->nodeFinder->findInstanceOf($body, NullsafeMethodCall::class),
-        ];
-
-        return array_values(array_filter(
-            $methodCalls,
-            fn (MethodCall|NullsafeMethodCall $methodCall): bool => $this->isDenyAccessCall($methodCall),
-        ));
+        return $this->thisCallReachability->indexCalls($this->methodsByName($class), $this->isDenyAccessCall(...));
     }
 
     /**
@@ -306,7 +294,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * paths are only resolved from literals. Duplicates are collapsed once,
      * across every guard form, by {@see RouteAccessControl::guardAttributes()}.
      *
-     * @param list<MethodCall|NullsafeMethodCall> $denyAccessCalls
+     * @param list<MethodCall|NullsafeMethodCall|StaticCall> $denyAccessCalls
      *
      * @return list<string>
      */
@@ -333,9 +321,9 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * Symfony idiom to the shorthand `denyAccessUnlessGranted()`, used
      * whenever the action wants a custom denial message.
      */
-    private function isDenyAccessCall(MethodCall|NullsafeMethodCall $methodCall): bool
+    private function isDenyAccessCall(MethodCall|NullsafeMethodCall|StaticCall $methodCall): bool
     {
-        if ($methodCall->isFirstClassCallable()) {
+        if ($methodCall instanceof StaticCall || $methodCall->isFirstClassCallable()) {
             return false;
         }
 

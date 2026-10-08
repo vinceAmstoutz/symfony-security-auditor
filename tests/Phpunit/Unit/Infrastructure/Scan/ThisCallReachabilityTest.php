@@ -16,6 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PhpParser\Node;
+use PhpParser\Node\Arg;
+use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\NullsafeMethodCall;
+use PhpParser\Node\Expr\StaticCall;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -23,6 +28,7 @@ use PhpParser\NodeFinder;
 use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan\Fixture\CountingNodeFinder;
 
 final class ThisCallReachabilityTest extends TestCase
 {
@@ -147,6 +153,23 @@ final class ThisCallReachabilityTest extends TestCase
         $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
 
         self::assertSame([], $this->stringLiteralsIn($body));
+    }
+
+    public function test_it_ignores_a_this_call_to_a_method_the_class_does_not_declare(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    echo 'own-body';
+                    $this->inheritedHelper();
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame(['own-body'], $this->stringLiteralsIn($body));
     }
 
     public function test_it_ignores_a_static_call_to_another_classs_method(): void
@@ -294,6 +317,116 @@ final class ThisCallReachabilityTest extends TestCase
         self::assertSame([], $this->stringLiteralsIn($body));
     }
 
+    public function test_it_indexes_the_relevant_calls_an_action_reaches_through_its_helpers(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    $this->probe('own');
+                    $this->helper();
+                }
+                private function helper(): void {
+                    $this->probe('helper');
+                    $this->logger->info('ignored');
+                }
+                private function unreachable(): void {
+                    $this->probe('unreachable');
+                }
+            }
+            PHP);
+
+        $calls = $this->thisCallReachability
+            ->indexCalls($this->methodsByName($class), $this->isProbe(...))
+            ->callsFrom($this->methodNamed($class, 'action'));
+
+        self::assertSame(['own', 'helper'], $this->labelsOf($calls));
+    }
+
+    public function test_it_indexes_relevant_calls_of_every_call_kind(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    Other::probe('static');
+                    $this?->probe('nullsafe');
+                    $this->probe('plain');
+                }
+            }
+            PHP);
+
+        $calls = $this->thisCallReachability
+            ->indexCalls($this->methodsByName($class), $this->isProbe(...))
+            ->callsFrom($this->methodNamed($class, 'action'));
+
+        self::assertSame(['plain', 'nullsafe', 'static'], $this->labelsOf($calls));
+    }
+
+    public function test_it_indexes_relevant_calls_behind_helpers_called_through_every_call_kind(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    $this?->viaNullsafe();
+                    self::viaSelf();
+                    static::viaStatic();
+                    $callback = $this->viaCallable(...);
+                }
+                private function viaNullsafe(): void { $this->probe('nullsafe'); }
+                private static function viaSelf(): void { self::probe('self'); }
+                private static function viaStatic(): void { static::probe('static'); }
+                private function viaCallable(): void { $this->probe('callable'); }
+                public function probe(string $label): void {}
+            }
+            PHP);
+
+        $calls = $this->thisCallReachability
+            ->indexCalls($this->methodsByName($class), $this->isProbe(...))
+            ->callsFrom($this->methodNamed($class, 'action'));
+
+        self::assertSame(['nullsafe', 'self', 'static'], $this->labelsOf($calls));
+    }
+
+    public function test_it_indexes_the_relevant_calls_of_each_action_separately(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function first(): void { $this->shared(); }
+                public function second(): void { $this->probe('second'); }
+                private function shared(): void { $this->probe('shared'); }
+            }
+            PHP);
+
+        $reachableCallIndex = $this->thisCallReachability->indexCalls($this->methodsByName($class), $this->isProbe(...));
+
+        self::assertSame(['shared'], $this->labelsOf($reachableCallIndex->callsFrom($this->methodNamed($class, 'first'))));
+        self::assertSame(['second'], $this->labelsOf($reachableCallIndex->callsFrom($this->methodNamed($class, 'second'))));
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_long_chain_of_actions_walks_each_syntax_node_a_bounded_number_of_times(): void
+    {
+        $chainLength = 500;
+        $methods = '';
+        for ($i = 0; $i < $chainLength; ++$i) {
+            $methods .= \sprintf("public function action%d(): void { \$this->action%d(); }\n", $i, $i + 1);
+        }
+
+        $methods .= \sprintf("public function action%d(): void { \$this->probe('end'); }\n", $chainLength);
+        $class = $this->parseClass("<?php\nfinal class Example {\n{$methods}}\n");
+        $countingNodeFinder = new CountingNodeFinder();
+
+        $calls = (new ThisCallReachability($countingNodeFinder))
+            ->indexCalls($this->methodsByName($class), $this->isProbe(...))
+            ->callsFrom($this->methodNamed($class, 'action0'));
+
+        self::assertSame(['end'], $this->labelsOf($calls));
+        self::assertLessThan(4 * \count((new CountingNodeFinder())->findInstanceOf([$class], Node::class)), $countingNodeFinder->visitedNodes);
+    }
+
     #[MaximumDuration(4000)]
     public function test_a_long_chain_of_helper_calls_resolves_in_near_linear_time(): void
     {
@@ -314,6 +447,27 @@ final class ThisCallReachabilityTest extends TestCase
 
         self::assertCount($chainLength, $this->stringLiteralsIn($body));
         self::assertLessThan(3.0, $elapsed);
+    }
+
+    private function isProbe(MethodCall|NullsafeMethodCall|StaticCall $call): bool
+    {
+        return $call->name instanceof Identifier && 'probe' === $call->name->toString();
+    }
+
+    /**
+     * @param list<MethodCall|NullsafeMethodCall|StaticCall> $calls
+     *
+     * @return list<string>
+     */
+    private function labelsOf(array $calls): array
+    {
+        return array_map(static function (MethodCall|NullsafeMethodCall|StaticCall $call): string {
+            $argument = $call->args[0];
+            self::assertInstanceOf(Arg::class, $argument);
+            self::assertInstanceOf(String_::class, $argument->value);
+
+            return $argument->value->value;
+        }, $calls);
     }
 
     private function parseClass(string $source): Class_
