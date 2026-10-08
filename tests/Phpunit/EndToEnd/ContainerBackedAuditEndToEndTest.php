@@ -23,6 +23,7 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -369,6 +370,151 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         yield 'the configured level alone, at the risk' => ['low', null, 1];
         yield 'a flag that lowers the level below the risk' => ['critical', 'low', 1];
         yield 'a flag that raises the level above the risk' => ['low', 'critical', 0];
+    }
+
+    #[DataProvider('minScorePrecedenceCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_min_score_flag_wins_over_the_configured_min_score(int $configured, ?int $flag, int $expectedExitCode): void
+    {
+        $commandTester = new CommandTester($this->auditCommand($this->boot(['model' => 'gpt-4o', 'audit' => ['min_score' => $configured]])));
+        $arguments = ['project-path' => $this->fixtureDir, '--format' => 'json'];
+
+        self::assertSame($expectedExitCode, $commandTester->execute(null === $flag ? $arguments : [...$arguments, '--min-score' => $flag]));
+    }
+
+    /**
+     * @return iterable<string, array{int, ?int, int}>
+     */
+    public static function minScorePrecedenceCases(): iterable
+    {
+        yield 'the configured score alone, above the score of the run' => [95, null, 1];
+        yield 'the configured score alone, below the score of the run' => [50, null, 0];
+        yield 'a flag that lowers the score below the run' => [95, 50, 0];
+        yield 'a flag that raises the score above the run' => [50, 95, 1];
+    }
+
+    /**
+     * @param list<string> $flags
+     */
+    #[DataProvider('failOnIncompletePrecedenceCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_fail_on_incomplete_flag_wins_over_the_configured_setting(bool $configured, array $flags, int $expectedExitCode): void
+    {
+        (new Filesystem())->dumpFile($this->fixtureDir.'/src/Service/Binary.php', "<?php // \xC3\x28\n");
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'scan' => ['secret_scrubbing' => ['enabled' => true, 'additional_patterns' => ['/NEVER_MATCHES/u']]],
+            'audit' => ['fail_on_incomplete' => $configured],
+        ]);
+        $commandTester = new CommandTester($this->auditCommand($kernel));
+
+        $exitCode = $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => 'json', ...array_fill_keys($flags, true)]);
+
+        self::assertFalse($this->decode($commandTester->getDisplay())['complete']);
+        self::assertSame($expectedExitCode, $exitCode);
+    }
+
+    /**
+     * @return iterable<string, array{bool, list<string>, int}>
+     */
+    public static function failOnIncompletePrecedenceCases(): iterable
+    {
+        yield 'configured, no flag' => [true, [], 3];
+        yield 'not configured, no flag' => [false, [], 0];
+        yield 'configured, switched off by the flag' => [true, ['--no-fail-on-incomplete'], 0];
+        yield 'not configured, switched on by the flag' => [false, ['--fail-on-incomplete'], 3];
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_format_flag_wins_over_the_configured_format_even_when_it_names_the_default(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json']]);
+
+        $commandTester = $this->auditCommandTester($kernel);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        $overridden = $this->auditCommandTester($kernel);
+        $overridden->execute(['project-path' => $this->fixtureDir, '--format' => 'console']);
+
+        self::assertSame(3, $this->decode($commandTester->getDisplay())['files_scanned']);
+        self::assertStringContainsString('RISK LEVEL', $overridden->getDisplay());
+        self::assertStringNotContainsString('"files_scanned"', $overridden->getDisplay());
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_format_flag_clustered_with_other_flags_wins_over_the_configured_format(): void
+    {
+        $application = new Application();
+        $application->addCommand($this->auditCommand($this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'sarif']])));
+
+        $bufferedOutput = new BufferedOutput();
+
+        $application->find('audit:run')->run(new StringInput(\sprintf('audit:run %s -nf json', escapeshellarg($this->fixtureDir))), $bufferedOutput);
+
+        self::assertSame(3, $this->decode($bufferedOutput->fetch())['files_scanned']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_dry_run_leaves_the_configured_output_alone(): void
+    {
+        $configuredOutput = $this->fixtureDir.'/configured.json';
+        (new Filesystem())->dumpFile($configuredOutput, 'last real report');
+        $commandTester = $this->auditCommandTester($this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json', 'output' => $configuredOutput]]));
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--dry-run' => true]);
+
+        self::assertSame('last real report', file_get_contents($configuredOutput));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_an_output_flag_wins_over_the_configured_output(): void
+    {
+        $configuredOutput = $this->fixtureDir.'/configured.json';
+        $flagOutput = $this->fixtureDir.'/flag.json';
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json', 'output' => $configuredOutput]]);
+
+        $this->auditCommandTester($kernel)->execute(['project-path' => $this->fixtureDir, '--output' => $flagOutput]);
+
+        self::assertFileExists($flagOutput);
+        self::assertFileDoesNotExist($configuredOutput);
+
+        $this->auditCommandTester($kernel)->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertFileExists($configuredOutput);
+        self::assertSame(3, $this->decode((string) file_get_contents($configuredOutput))['files_scanned']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_no_output_flag_prints_the_report_although_an_output_is_configured(): void
+    {
+        $configuredOutput = $this->fixtureDir.'/configured.json';
+        $commandTester = $this->auditCommandTester($this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json', 'output' => $configuredOutput]]));
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--no-output' => true]);
+
+        self::assertFileDoesNotExist($configuredOutput);
+        self::assertSame(3, $this->decode($commandTester->getDisplay())['files_scanned']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_no_output_flag_and_an_output_flag_together_are_refused_before_the_audit_runs(): void
+    {
+        $output = $this->fixtureDir.'/flag.json';
+        $commandTester = $this->auditCommandTester($this->boot(['model' => 'gpt-4o']));
+
+        $exitCode = $commandTester->execute(['project-path' => $this->fixtureDir, '--no-output' => true, '--output' => $output]);
+
+        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertStringContainsString('--output and --no-output cannot be combined', preg_replace('/\s+/', ' ', $commandTester->getDisplay()) ?? '');
+        self::assertFileDoesNotExist($output);
     }
 
     #[RunInSeparateProcess]

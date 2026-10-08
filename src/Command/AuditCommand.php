@@ -76,6 +76,7 @@ final readonly class AuditCommand
         private RiskLevel $riskLevel = RiskLevel::Critical,
         private bool $pocSynthesisEnabled = false,
         private bool $fixSynthesisEnabled = false,
+        private AuditCommandDefaults $auditCommandDefaults = new AuditCommandDefaults(),
     ) {}
 
     /**
@@ -87,6 +88,8 @@ final readonly class AuditCommand
         SymfonyStyle $symfonyStyle,
         #[MapInput] AuditCommandInput $auditCommandInput,
     ): int {
+        $auditCommandInput->applyDefaults($this->auditCommandDefaults, GivenFormatOption::in($input));
+
         $projectPath = $auditCommandInput->resolvedProjectPath();
         $this->auditedProjectPathHolder->set($projectPath);
 
@@ -325,7 +328,7 @@ final readonly class AuditCommand
             $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
         }
 
-        $exitCode = $auditCommandInput->failOnIncomplete && !$auditReport->isComplete() ? ExitCode::Incomplete->value : ExitCode::Success->value;
+        $exitCode = $auditCommandInput->failsOnIncomplete() && !$auditReport->isComplete() ? ExitCode::Incomplete->value : ExitCode::Success->value;
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
             $this->auditPresenter->baselineGenerated($symfonyStyle, $generateBaseline, $fingerprintCount);
@@ -355,7 +358,7 @@ final readonly class AuditCommand
             $baselineResult->report,
             $auditCommandInput->failOn ?? $this->riskLevel,
             $auditCommandInput->minScore,
-            $auditCommandInput->failOnIncomplete,
+            $auditCommandInput->failsOnIncomplete(),
         );
 
         if ($auditCommandInput->isMachineReadableToStdout()) {

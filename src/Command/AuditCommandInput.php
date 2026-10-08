@@ -41,6 +41,9 @@ final class AuditCommandInput
     #[Option(description: 'Output file path (any format)', shortcut: 'o')]
     public ?string $output = null;
 
+    #[Option(description: 'Print the report instead of writing it to a file, whatever audit.output says. Cannot be combined with --output.', name: 'no-output')]
+    public bool $noOutput = false;
+
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
     public bool $dryRun = false;
 
@@ -71,8 +74,29 @@ final class AuditCommandInput
     #[Option(description: 'Minimum normalized score (0-100) below which the command exits 1. Independent of --fail-on: the audit fails when either gate trips. Omit to gate on the risk level alone.', name: 'min-score')]
     public ?int $minScore = null;
 
-    #[Option(description: 'Exit 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning.', name: 'fail-on-incomplete')]
-    public bool $failOnIncomplete = false;
+    #[Option(description: 'Exit 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning unless audit.fail_on_incomplete is set; --no-fail-on-incomplete turns that off for this run.', name: 'fail-on-incomplete')]
+    public ?bool $failOnIncomplete = null;
+
+    /**
+     * Fills what the command line left unset from the configuration, so a flag
+     * always wins over its `audit.*` key. A format has a default on the
+     * command line itself, so whether it was given is told by the caller.
+     */
+    public function applyDefaults(AuditCommandDefaults $auditCommandDefaults, bool $formatGiven): void
+    {
+        $this->minScore ??= $auditCommandDefaults->minScore;
+        $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
+        $this->output ??= $this->noOutput || $this->dryRun ? null : $auditCommandDefaults->output;
+
+        if (!$formatGiven) {
+            $this->format = $auditCommandDefaults->format;
+        }
+    }
+
+    public function failsOnIncomplete(): bool
+    {
+        return true === $this->failOnIncomplete;
+    }
 
     /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
@@ -130,15 +154,19 @@ final class AuditCommandInput
     }
 
     /**
-     * `--generate-baseline` requires a real audit run to have real findings
-     * to write to the baseline file, but `--dry-run` and `--show-scanned`
-     * both exit before the LLM is ever invoked — combined, one silently wins
-     * over the other with no file written and no diagnostic.
+     * `--output` with `--no-output` asks for opposite things, and
+     * `--generate-baseline` needs a real audit run while `--dry-run` and
+     * `--show-scanned` exit before the LLM is ever invoked — combined, one
+     * silently wins over the other with no file written and no diagnostic.
      *
      * @throws ConflictingCommandOptionsException
      */
     public function assertNoConflictingOptions(): void
     {
+        if ($this->noOutput && null !== $this->output) {
+            throw ConflictingCommandOptionsException::forOutputWithNoOutput();
+        }
+
         if (null === $this->generateBaseline) {
             return;
         }

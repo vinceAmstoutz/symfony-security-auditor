@@ -628,6 +628,73 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_a_project_config_may_not_choose_where_the_report_is_written(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  output: ../elsewhere/report.json\n");
+
+        $this->expectException(ProjectConfigUserOnlyKeyException::class);
+        $this->expectExceptionMessage(\sprintf('The project config "%s" declares "audit.output"', $projectConfigFile));
+
+        $this->loader($projectConfigFile)->load();
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_the_user_config_may_set_the_report_output(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\naudit:\n  output: build/report.json\n");
+
+        self::assertSame(['audit' => ['output' => 'build/report.json']], $this->loader($this->configHome.'/project/.symfony-security-auditor.yaml')->load()->auditConfig);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_project_config_may_set_the_report_format_and_the_gates(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  format: sarif\n  min_score: 80\n  fail_on_incomplete: true\n");
+
+        self::assertSame(
+            ['audit' => ['format' => 'sarif', 'min_score' => 80, 'fail_on_incomplete' => true]],
+            $this->loader($projectConfigFile)->load()->auditConfig,
+        );
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_a_project_config_may_tighten_the_budget(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\naudit:\n  budget:\n    max_cost_usd: 10\n");
