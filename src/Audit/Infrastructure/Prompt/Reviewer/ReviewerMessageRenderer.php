@@ -82,6 +82,10 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     }
 
     /**
+     * A file several findings share is given once, with the first of them; the
+     * others point to it, so a batch costs one copy of each file instead of
+     * one per finding.
+     *
      * @param list<Vulnerability>   $vulnerabilities
      * @param array<string, string> $codeContexts
      */
@@ -89,64 +93,83 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     public function renderBatch(array $vulnerabilities, array $codeContexts, bool $useStructuredCollection): string
     {
         $sections = [];
+        $firstFindingOfFile = [];
         foreach ($vulnerabilities as $index => $vulnerability) {
-            $data = $vulnerability->toArray();
-            $filePath = $this->sanitizeFilePath($data['file']);
+            $findingNumber = $index + 1;
+            $filePath = $this->sanitizeFilePath($vulnerability->toArray()['file']);
             $codeContext = $codeContexts[$vulnerability->id()] ?? '';
-            $sections[] = \sprintf(
-                <<<'MSG'
-                    ### Finding %d
-                    ID: %s
-                    Type: %s
-                    Severity: %s
-                    Title: %s
-                    File: %s (lines %d-%d)
+            $firstFindingOfFile[$filePath][$codeContext] ??= $findingNumber;
+            $carryingFinding = $firstFindingOfFile[$filePath][$codeContext];
 
-                    #### Description
-                    %s
-
-                    #### Vulnerable Code
-                    ```
-                    %s
-                    ```
-
-                    #### Attack Vector
-                    %s
-
-                    #### Proof of Concept
-                    %s
-
-                    #### Remediation
-                    %s
-
-                    #### Confidence
-                    %s
-
-                    #### Full File Context
-                    <file path="%s">
-                    %s
-                    </file>
-                    MSG,
-                $index + 1,
-                $data['id'],
-                $data['type'],
-                $data['severity'],
-                $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
-                $filePath,
-                $data['line_start'],
-                $data['line_end'],
-                $this->escapeFences($data['description']),
-                $this->escapeFences($data['vulnerable_code']),
-                $this->escapeFences($data['attack_vector']),
-                $this->escapeFences($data['proof']),
-                $this->escapeFences($data['remediation']),
-                number_format($data['confidence'], 2, '.', ''),
-                $filePath,
-                $this->numberLines($codeContext),
+            $sections[] = $this->renderBatchSection(
+                $vulnerability,
+                $findingNumber,
+                '' === $codeContext || $carryingFinding === $findingNumber
+                    ? $this->renderFile($filePath, $codeContext)
+                    : \sprintf('The full source of %s is given with Finding %d above.', $filePath, $carryingFinding),
             );
         }
 
         return \sprintf("## Vulnerability Reports to Review\n\n%s%s", implode("\n\n", $sections), $this->batchClosingInstruction($useStructuredCollection));
+    }
+
+    private function renderFile(string $filePath, string $codeContext): string
+    {
+        return \sprintf("<file path=\"%s\">\n%s\n</file>", $filePath, $this->numberLines($codeContext));
+    }
+
+    private function renderBatchSection(Vulnerability $vulnerability, int $findingNumber, string $fileContext): string
+    {
+        $data = $vulnerability->toArray();
+
+        return \sprintf(
+            <<<'MSG'
+                ### Finding %d
+                ID: %s
+                Type: %s
+                Severity: %s
+                Title: %s
+                File: %s (lines %d-%d)
+
+                #### Description
+                %s
+
+                #### Vulnerable Code
+                ```
+                %s
+                ```
+
+                #### Attack Vector
+                %s
+
+                #### Proof of Concept
+                %s
+
+                #### Remediation
+                %s
+
+                #### Confidence
+                %s
+
+                #### Full File Context
+                %s
+                MSG,
+            $findingNumber,
+            $data['id'],
+            $data['type'],
+            $data['severity'],
+            $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
+            $this->sanitizeFilePath($data['file']),
+            $data['line_start'],
+            $data['line_end'],
+            $this->escapeFences($data['description']),
+            $this->escapeFences($data['vulnerable_code']),
+            $this->escapeFences($data['attack_vector']),
+            $this->escapeFences($data['proof']),
+            $this->escapeFences($data['remediation']),
+            number_format($data['confidence'], 2, '.', ''),
+            $fileContext,
+        );
     }
 
     private function singleClosingInstruction(bool $useStructuredCollection): string

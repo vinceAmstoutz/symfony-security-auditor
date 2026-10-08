@@ -291,6 +291,115 @@ final class ReviewerMessageRendererTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_batch_gives_a_file_once_for_the_findings_that_share_it(): void
+    {
+        $file = "<?php\nclass Big {}";
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/Big.php', 10), $this->makeVulnerabilityAt('src/Big.php', 20), $this->makeVulnerabilityAt('src/Big.php', 30)];
+
+        $rendered = $this->reviewerMessageRenderer->renderBatch($vulnerabilities, $this->contextsOf($vulnerabilities, $file), true);
+
+        self::assertSame(1, substr_count($rendered, '<file path="src/Big.php">'));
+        self::assertSame(1, substr_count($rendered, '  2 | class Big {}'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_batch_points_each_later_finding_of_a_file_to_the_finding_that_carries_it(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/Other.php', 10), $this->makeVulnerabilityAt('src/Big.php', 10), $this->makeVulnerabilityAt('src/Big.php', 20), $this->makeVulnerabilityAt('src/Big.php', 30)];
+
+        $rendered = $this->reviewerMessageRenderer->renderBatch($vulnerabilities, $this->contextsOf($vulnerabilities, 'code'), true);
+
+        self::assertSame(2, substr_count($rendered, 'The full source of src/Big.php is given with Finding 2 above.'));
+        self::assertStringNotContainsString('given with Finding 1 above', $rendered);
+        self::assertStringNotContainsString('given with Finding 3 above', $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_batch_gives_each_file_of_the_batch_its_own_context(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/A.php', 10), $this->makeVulnerabilityAt('src/B.php', 10)];
+
+        $rendered = $this->reviewerMessageRenderer->renderBatch($vulnerabilities, $this->contextsOf($vulnerabilities, 'code'), true);
+
+        self::assertSame(1, substr_count($rendered, '<file path="src/A.php">'));
+        self::assertSame(1, substr_count($rendered, '<file path="src/B.php">'));
+        self::assertStringNotContainsString('is given with Finding', $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_batch_gives_a_path_again_when_its_context_differs(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/Big.php', 10), $this->makeVulnerabilityAt('src/Big.php', 20)];
+
+        $rendered = $this->reviewerMessageRenderer->renderBatch($vulnerabilities, [$vulnerabilities[0]->id() => 'first version', $vulnerabilities[1]->id() => 'second version'], true);
+
+        self::assertSame(2, substr_count($rendered, '<file path="src/Big.php">'));
+        self::assertStringContainsString('1 | first version', $rendered);
+        self::assertStringContainsString('1 | second version', $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_batch_keeps_an_empty_file_context_with_every_finding(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/Missing.php', 10), $this->makeVulnerabilityAt('src/Missing.php', 20)];
+
+        $rendered = $this->reviewerMessageRenderer->renderBatch($vulnerabilities, [], true);
+
+        self::assertSame(2, substr_count($rendered, '<file path="src/Missing.php">'));
+        self::assertStringNotContainsString('is given with Finding', $rendered);
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     *
+     * @return array<string, string>
+     */
+    private function contextsOf(array $vulnerabilities, string $context): array
+    {
+        $contexts = [];
+        foreach ($vulnerabilities as $vulnerability) {
+            $contexts[$vulnerability->id()] = $context;
+        }
+
+        return $contexts;
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeVulnerabilityAt(string $filePath, int $line): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Test finding', 0.9),
+            new CodeLocation($filePath, $line, $line + 1),
+            new VulnerabilityNarrative('desc', 'attack vector', 'proof', 'remediation'),
+            'vulnerable code',
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     private function makeVulnerability(string $filePath): Vulnerability
     {
         return Vulnerability::of(
