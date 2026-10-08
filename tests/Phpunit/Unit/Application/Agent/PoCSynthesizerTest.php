@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -286,6 +287,47 @@ final class PoCSynthesizerTest extends TestCase
         $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNull($enriched[0]->synthesizedPoC());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('degradedStopReasons')]
+    public function test_it_keeps_original_when_the_answer_was_cut_short(string $stopReason): void
+    {
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of(
+            "```sh\ncurl -X POST https://app.test/login -d 'user=",
+            'test',
+            $stopReason,
+            TokenUsageSnapshot::of(10, 4096),
+        ));
+
+        $bufferingLogger = new BufferingLogger();
+        $enriched = (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$vulnerability]);
+
+        self::assertNull($enriched[0]->synthesizedPoC());
+        $entry = $bufferingLogger->cleanLogs()[0] ?? null;
+        self::assertIsArray($entry);
+        self::assertSame('warning', $entry[0]);
+        self::assertSame('PoC synthesis answer was cut short; keeping original proof', $entry[1]);
+        self::assertIsArray($entry[2]);
+        self::assertSame($vulnerability->id(), $entry[2]['vulnerability_id']);
+        self::assertSame($stopReason, $entry[2]['stop_reason']);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function degradedStopReasons(): iterable
+    {
+        yield 'output token limit' => ['length'];
+        yield 'content filter' => ['content-filter'];
     }
 
     /**

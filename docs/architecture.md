@@ -326,7 +326,7 @@ The three AST parsers (`PhpParserControllerAccessControlParser`, `PhpParserVoter
 
 **`AuditStage`** — delegates entirely to `AuditOrchestrator::orchestrate(AuditContext)`.
 
-**`PoCSynthesisStage`** — optional final stage (off by default). When enabled, synthesizes a concrete reproduction artifact (the `synthesized_poc` report field) for validated findings at or above the configured severity floor, delegating to `PoCSynthesizer`.
+**`PoCSynthesisStage`** — optional final stage (off by default). When enabled, synthesizes a concrete reproduction artifact (the `synthesized_poc` report field) for validated findings at or above the configured severity floor, delegating to `PoCSynthesizer`. An answer cut short by the output token limit or a content filter (`LLMResponse::isDegraded()`) is never attached — the same holds for `FixSynthesizer` — so a truncated patch or payload cannot reach a report as if it were complete.
 
 ### `AuditOrchestrator`
 
