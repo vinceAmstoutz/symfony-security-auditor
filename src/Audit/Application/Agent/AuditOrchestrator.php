@@ -332,7 +332,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 continue;
             }
 
-            if ($auditContext->consumeBaselineCredit($finding->fingerprint())) {
+            if ($auditContext->consumeBaselineCreditFor($finding)) {
                 $auditContext->recordBaselineSkippedFinding($finding);
                 $this->recordBaselineSkip($finding, $auditContext);
 

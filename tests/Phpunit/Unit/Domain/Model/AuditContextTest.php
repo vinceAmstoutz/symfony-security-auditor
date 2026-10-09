@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
@@ -125,6 +126,66 @@ final class AuditContextTest extends TestCase
         self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
         self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
         self::assertSame(['SSA-AAA', 'SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('typesXssWasReportedAsBefore')]
+    public function test_it_consumes_the_credit_an_xss_finding_has_in_a_baseline_under_the_type_it_was_reported_as_before(VulnerabilityType $vulnerabilityType): void
+    {
+        $accepted = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, $vulnerabilityType)->fingerprint();
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$accepted]);
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS);
+
+        self::assertTrue($auditContext->consumeBaselineCreditFor($vulnerability));
+        self::assertSame([$accepted], $auditContext->consumedBaselineFingerprints());
+        self::assertFalse($auditContext->consumeBaselineCreditFor($vulnerability));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_consumes_the_own_credit_of_an_xss_finding_before_the_one_of_a_former_type(): void
+    {
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS);
+        $former = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::TWIG_INJECTION);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$former->fingerprint(), $vulnerability->fingerprint()]);
+
+        self::assertTrue($auditContext->consumeBaselineCreditFor($vulnerability));
+        self::assertTrue($auditContext->consumeBaselineCreditFor($vulnerability));
+        self::assertFalse($auditContext->consumeBaselineCreditFor($vulnerability));
+        self::assertSame([$vulnerability->fingerprint(), $former->fingerprint()], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_consumes_nothing_for_a_finding_of_a_former_type_a_baseline_holds_under_xss(): void
+    {
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$vulnerability->fingerprint()]);
+
+        self::assertFalse($auditContext->consumeBaselineCreditFor($this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::TWIG_INJECTION)));
+        self::assertSame([], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @return iterable<string, array{VulnerabilityType}>
+     */
+    public static function typesXssWasReportedAsBefore(): iterable
+    {
+        yield 'twig_injection' => [VulnerabilityType::TWIG_INJECTION];
+        yield 'sensitive_data_exposure' => [VulnerabilityType::SENSITIVE_DATA_EXPOSURE];
     }
 
     /**
@@ -635,10 +696,10 @@ final class AuditContextTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function makeVulnerability(string $discriminator, VulnerabilitySeverity $vulnerabilitySeverity): Vulnerability
+    private function makeVulnerability(string $discriminator, VulnerabilitySeverity $vulnerabilitySeverity, VulnerabilityType $vulnerabilityType = VulnerabilityType::SQL_INJECTION): Vulnerability
     {
         return Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, $vulnerabilitySeverity, 'Test '.$discriminator, 0.9),
+            new VulnerabilityClassification($vulnerabilityType, $vulnerabilitySeverity, 'Test '.$discriminator, 0.9),
             new CodeLocation('src/'.$discriminator.'.php', 1, 5),
             new VulnerabilityNarrative('Test', 'Inject SQL', "' OR 1=1--", 'Use prepared statements'),
             '$query',

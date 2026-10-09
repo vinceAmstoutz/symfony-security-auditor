@@ -310,6 +310,43 @@ final class AuditOrchestratorTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
+    #[DataProvider('typesXssWasReportedAsBefore')]
+    public function test_it_skips_an_xss_finding_a_baseline_holds_under_the_type_it_was_reported_as_before(string $formerType): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([['type' => 'xss'] + $this->vulnPayload()]),
+        );
+        $reviewerLlm->expects(self::never())->method('complete');
+        $accepted = Vulnerability::fingerprintOf($formerType, 'src/Controller/FooController.php', 'Vuln');
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$accepted]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertEmpty($auditContext->vulnerabilities());
+        self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
+        self::assertSame([$accepted], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function typesXssWasReportedAsBefore(): iterable
+    {
+        yield 'twig_injection' => ['twig_injection'];
+        yield 'sensitive_data_exposure' => ['sensitive_data_exposure'];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_non_baselined_findings_still_reach_the_reviewer_when_others_are_skipped(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
