@@ -18,7 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 
-use function Symfony\Component\String\u;
+use function Symfony\Component\String\b;
 
 /**
  * Renders an audit report as GitHub Actions workflow-command annotations — one
@@ -106,9 +106,8 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
 
     private function escapeData(string $value): string
     {
-        $encoded = u(mb_scrub($value, 'UTF-8'))
+        $encoded = b(mb_scrub($value, 'UTF-8'))
             ->replace('%', '%25')
-            ->replace("\r\n", '%0D%0A')
             ->replace("\r", '%0D')
             ->replace("\n", '%0A')
             ->toString();
@@ -118,7 +117,7 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
 
     private function escapeProperty(string $value): string
     {
-        return u($this->escapeData($value))
+        return b($this->escapeData($value))
             ->replace(':', '%3A')
             ->replace(',', '%2C')
             ->toString();

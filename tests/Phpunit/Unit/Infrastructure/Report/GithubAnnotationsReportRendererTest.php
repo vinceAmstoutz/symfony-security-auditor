@@ -99,7 +99,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
 
         $output = $this->renderer->render($this->makeReport($vulnerability));
 
-        self::assertStringStartsWith('::error ', $output);
+        self::assertSame('::error file=src/Foo.php,line=1,endLine=5,title=Bad?Title::desc%0A%0ARemediation: fix', $output);
     }
 
     /**
@@ -382,5 +382,71 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
         self::assertStringNotContainsString("\u{202D}", $output);
         self::assertStringContainsString('title=[31mTitlerev', $output);
         self::assertStringContainsString('::[2Kdesc%0A%0ARemediation: fix', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('invisibleCharactersBetweenACarriageReturnAndALineFeed')]
+    public function test_it_escapes_a_carriage_return_and_a_line_feed_separated_by_an_invisible_character(string $invisible): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::TWIG_INJECTION, VulnerabilitySeverity::MEDIUM, "t\r".$invisible."\nt", 0.9),
+            new CodeLocation('src/Tpl.php', 3, 3),
+            new VulnerabilityNarrative("a\r".$invisible."\nb", 'vector', 'proof', 'fix'),
+            '{{ raw }}',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertSame('::warning file=src/Tpl.php,line=3,title=t%0D'.$invisible.'%0At::a%0D'.$invisible.'%0Ab%0A%0ARemediation: fix', $output);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invisibleCharactersBetweenACarriageReturnAndALineFeed(): iterable
+    {
+        yield 'zero width space' => ["\u{200B}"];
+        yield 'byte order mark' => ["\u{FEFF}"];
+        yield 'word joiner' => ["\u{2060}"];
+        yield 'soft hyphen' => ["\u{00AD}"];
+        yield 'left-to-right mark' => ["\u{200E}"];
+        yield 'variation selector' => ["\u{FE0F}"];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('delimitersFollowedByACombiningMark')]
+    public function test_it_escapes_a_delimiter_followed_by_a_combining_mark(string $delimiter, string $escapedInTitle, string $escapedInMessage): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::TWIG_INJECTION, VulnerabilitySeverity::MEDIUM, 'a'.$delimiter."\u{0300}b", 0.9),
+            new CodeLocation('src/Tpl.php', 3, 3),
+            new VulnerabilityNarrative('d'.$delimiter."\u{0301}e", 'vector', 'proof', 'fix'),
+            '{{ raw }}',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertSame('::warning file=src/Tpl.php,line=3,title=a'.$escapedInTitle."\u{0300}b::d".$escapedInMessage."\u{0301}e%0A%0ARemediation: fix", $output);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function delimitersFollowedByACombiningMark(): iterable
+    {
+        yield 'line feed' => ["\n", '%0A', '%0A'];
+        yield 'percent sign' => ['%', '%25', '%25'];
+        yield 'comma' => [',', '%2C', ','];
+        yield 'colon' => [':', '%3A', ':'];
     }
 }
