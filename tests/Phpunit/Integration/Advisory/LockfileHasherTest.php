@@ -32,6 +32,27 @@ final class LockfileHasherTest extends TestCase
         self::assertSame(hash('sha256', '{"lock": "v1"}'), $this->hasher()->hash($this->projectDir));
     }
 
+    public function test_it_hashes_the_lockfile_of_a_project_whose_name_is_not_valid_utf8(): void
+    {
+        $project = $this->projectDir."/jos\xE9/";
+        mkdir($project, 0o777, true);
+        file_put_contents($project.'composer.lock', '{"lock": "v1"}');
+
+        self::assertSame(hash('sha256', '{"lock": "v1"}'), $this->hasher()->hash($project));
+    }
+
+    public function test_a_trailing_slash_on_the_project_path_does_not_double_the_separator_before_the_lockfile(): void
+    {
+        $target = $this->projectDir.'/elsewhere.lock';
+        file_put_contents($target, '{"lock": "v1"}');
+        symlink($target, $this->projectDir.'/composer.lock');
+        $warningRecordingLogger = new WarningRecordingLogger();
+
+        $this->hasher($warningRecordingLogger)->hash($this->projectDir.'//');
+
+        self::assertSame([['composer.lock is a symlink; skipping advisory cache', ['path' => $this->projectDir.'/composer.lock']]], $warningRecordingLogger->warnings);
+    }
+
     public function test_it_has_no_hash_for_a_project_without_a_lockfile(): void
     {
         self::assertNull($this->hasher()->hash($this->projectDir));

@@ -74,6 +74,11 @@ final class ScanPathFilterTest extends TestCase
         yield 'a parent segment that leaves the project' => [['../shared'], ['../shared']];
         yield 'parent segments that climb above the start' => [['a/b/../../..'], ['..']];
         yield 'a name starting with a tilde' => [['~cache/src'], ['~cache/src']];
+        yield 'a name that is not valid UTF-8' => [["src/caf\xE9"], ["src/caf\xE9"]];
+        yield 'whitespace, a trailing separator and an empty segment around a name that is not valid UTF-8' => [[" src//caf\xE9/ "], ["src/caf\xE9"]];
+        yield 'backslashes and a parent segment around a name that is not valid UTF-8' => [["lib\\..\\src\\caf\xE9"], ["src/caf\xE9"]];
+        yield 'a name that is not valid UTF-8 beside a valid one' => [["caf\xE9", 'src'], ["caf\xE9", 'src']];
+        yield 'a decomposed accent' => [["cafe\u{0301}"], ["caf\u{E9}"]];
         yield 'the project root' => [['.'], []];
         yield 'the project root reached through a parent segment' => [['src/..'], []];
         yield 'a separator alone' => [['/'], []];

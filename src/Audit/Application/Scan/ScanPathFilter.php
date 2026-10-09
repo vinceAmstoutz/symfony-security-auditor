@@ -88,7 +88,7 @@ final readonly class ScanPathFilter
     {
         $normalized = [];
         foreach ($scanPaths as $scanPath) {
-            $canonical = self::canonicalize(u($scanPath)->trim()->replace('\\', '/')->toString());
+            $canonical = self::canonicalize(PathText::of($scanPath)->trim()->replace('\\', '/')->toString());
             if ('' === $canonical) {
                 continue;
             }

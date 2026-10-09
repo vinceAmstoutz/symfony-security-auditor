@@ -111,6 +111,31 @@ final class AuditCommandShowScannedTest extends TestCase
         self::assertStringContainsString('src/Repo.php', preg_replace('/\s+/', ' ', $commandTester->getDisplay()) ?? '');
     }
 
+    public function test_it_audits_an_explicit_project_path_whose_name_is_not_valid_utf8(): void
+    {
+        $project = $this->fixtureDir."/jos\xE9";
+        mkdir($project.'/src', 0o777, true);
+        file_put_contents($project.'/src/Repo.php', '<?php class Repo {}');
+        $commandTester = $this->makeCommandTester();
+
+        $commandTester->execute(['project-path' => $project, '--show-scanned' => true]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('src/Repo.php', preg_replace('/\s+/', ' ', $commandTester->getDisplay()) ?? '');
+    }
+
+    public function test_it_accepts_a_scan_path_whose_name_is_not_valid_utf8(): void
+    {
+        mkdir($this->fixtureDir."/src/caf\xE9", 0o777, true);
+        file_put_contents($this->fixtureDir."/src/caf\xE9/Repo.php", '<?php class Repo {}');
+        $commandTester = $this->makeCommandTester();
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ["src/caf\xE9"], '--show-scanned' => true]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('1 file(s) in scope', preg_replace('/\s+/', ' ', $commandTester->getDisplay()) ?? '');
+    }
+
     private function makeCommandTester(): CommandTester
     {
         $pricingCatalog = __DIR__.'/../UseCase/Fixture/pricing-catalog.json';

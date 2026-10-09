@@ -223,6 +223,55 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame('/custom/cwd', $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
+    #[DataProvider('projectPathsThatAreNotValidUtf8')]
+    public function test_resolved_project_path_accepts_a_path_that_is_not_valid_utf8(string $projectPath, string $expected): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->projectPath = $projectPath;
+
+        self::assertSame($expected, $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function projectPathsThatAreNotValidUtf8(): iterable
+    {
+        yield 'an absolute path' => ["/srv/caf\xE9", "/srv/caf\xE9"];
+        yield 'an absolute path with surrounding whitespace' => [" \t/srv/caf\xE9\n ", "/srv/caf\xE9"];
+        yield 'a relative path' => ["caf\xE9", "/custom/cwd/caf\xE9"];
+        yield 'a relative path with surrounding whitespace' => [" caf\xE9 ", "/custom/cwd/caf\xE9"];
+    }
+
+    /**
+     * @param list<string> $paths
+     * @param list<string> $expected
+     */
+    #[DataProvider('scanPathsThatAreNotValidUtf8')]
+    public function test_scan_paths_accept_paths_that_are_not_valid_utf8(array $paths, array $expected): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = $paths;
+
+        self::assertSame($expected, $auditCommandInput->scanPaths());
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, list<string>}>
+     */
+    public static function scanPathsThatAreNotValidUtf8(): iterable
+    {
+        yield 'a plain path' => [["src/caf\xE9"], ["src/caf\xE9"]];
+        yield 'surrounding whitespace' => [[" src/caf\xE9 "], ["src/caf\xE9"]];
+        yield 'trailing separators' => [["src/caf\xE9//"], ["src/caf\xE9"]];
+        yield 'a leading current directory segment' => [["./src/caf\xE9"], ["src/caf\xE9"]];
+        yield 'a doubled leading current directory segment' => [[".//./caf\xE9"], ["caf\xE9"]];
+        yield 'a blank entry between two paths' => [["caf\xE9", '  ', "src/caf\xE9"], ["caf\xE9", "src/caf\xE9"]];
+    }
+
     public function test_default_paths_is_empty_list(): void
     {
         $auditCommandInput = new AuditCommandInput();

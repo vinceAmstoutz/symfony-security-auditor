@@ -87,6 +87,21 @@ final class IsolatedComposerAuditRunnerTest extends TestCase
     /**
      * @throws AdvisorySourceUnavailableException
      */
+    public function test_it_copies_the_lockfile_of_a_project_whose_name_is_not_valid_utf8(): void
+    {
+        $project = $this->projectDir."/jos\xE9/";
+        mkdir($project, 0o777, true);
+        file_put_contents($project.'composer.lock', '{"packages": []}');
+        $workspaceInspectingComposerAuditRunner = new WorkspaceInspectingComposerAuditRunner();
+
+        (new IsolatedComposerAuditRunner($workspaceInspectingComposerAuditRunner, new Filesystem()))->run($project);
+
+        self::assertSame('{"packages": []}', $workspaceInspectingComposerAuditRunner->lockfile);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_each_run_gets_a_directory_of_its_own(): void
     {
         $workspaceInspectingComposerAuditRunner = new WorkspaceInspectingComposerAuditRunner();

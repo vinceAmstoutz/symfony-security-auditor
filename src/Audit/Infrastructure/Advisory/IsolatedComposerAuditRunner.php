@@ -18,7 +18,7 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 
-use function Symfony\Component\String\u;
+use function Symfony\Component\String\b;
 
 /**
  * Runs the decorated `composer audit` outside the audited project. Composer
@@ -71,7 +71,7 @@ final readonly class IsolatedComposerAuditRunner implements ComposerAuditRunnerI
      */
     private function lockfileOf(string $projectPath): string
     {
-        $lockfilePath = \sprintf('%s/composer.lock', u($projectPath)->trimEnd('/')->toString());
+        $lockfilePath = \sprintf('%s/composer.lock', b($projectPath)->trimEnd('/')->toString());
 
         if (!$this->filesystem->exists($lockfilePath)) {
             throw AdvisorySourceUnavailableException::forUnusableLockfile($projectPath, 'composer.lock does not exist');
