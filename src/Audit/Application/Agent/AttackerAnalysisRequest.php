@@ -45,7 +45,8 @@ final readonly class AttackerAnalysisRequest
      * @param ?list<ProjectFile>  $toolFiles         the files the investigation tools may open when they
      *                                               are not the files to analyze — every scanned file on a
      *                                               run narrowed by `--since`, `--path` or the escalation
-     *                                               deep pass; null means `files`
+     *                                               deep pass, with `audit.tools_scope: scanned`; null
+     *                                               means `files`, those of the deep pass included
      */
     public function __construct(
         public array $files,
@@ -71,6 +72,6 @@ final readonly class AttackerAnalysisRequest
      */
     public function withFilesAndCandidateFindings(array $files, array $candidateFindings): self
     {
-        return new self($files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, $candidateFindings, $this->filesForTools());
+        return new self($files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, $candidateFindings, $this->toolFiles);
     }
 }

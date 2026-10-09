@@ -47,6 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
@@ -520,6 +521,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             inline_service(AuditLoopSettings::class)->args([
                 param('symfony_security_auditor.audit.max_iterations'),
                 param('symfony_security_auditor.audit.min_confidence'),
+                inline_service(ToolsScope::class)
+                    ->factory([ToolsScope::class, 'from'])
+                    ->args([param('symfony_security_auditor.audit.tools_scope')]),
             ]),
             service(ProgressReporterInterface::class),
         ]);

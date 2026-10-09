@@ -159,7 +159,7 @@ final class AttackerAnalysisRequestTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_with_files_and_candidate_findings_keeps_the_files_the_tools_read(): void
+    public function test_with_files_and_candidate_findings_keeps_the_scope_the_tools_were_given_and_leaves_an_unnamed_one_to_the_new_files(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', '<?php');
         $b = ProjectFile::create('src/B.php', '/app/src/B.php', '<?php');
@@ -170,7 +170,8 @@ final class AttackerAnalysisRequestTest extends TestCase
         $derivedFromUnnamedToolFiles = (new AttackerAnalysisRequest([$projectFile, $b], $symfonyMapping))->withFilesAndCandidateFindings([$projectFile], []);
 
         self::assertSame([$projectFile, $b, $c], $attackerAnalysisRequest->filesForTools());
-        self::assertSame([$projectFile, $b], $derivedFromUnnamedToolFiles->filesForTools());
+        self::assertSame([$projectFile], $derivedFromUnnamedToolFiles->filesForTools());
+        self::assertNull($derivedFromUnnamedToolFiles->toolFiles);
         self::assertSame([$projectFile], $derivedFromUnnamedToolFiles->files);
     }
 

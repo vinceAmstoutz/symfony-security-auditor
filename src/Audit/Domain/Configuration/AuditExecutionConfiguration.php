@@ -61,6 +61,7 @@ final readonly class AuditExecutionConfiguration
         public string $format = 'console',
         public ?string $output = null,
         public ?string $reportPathPrefix = null,
+        public ToolsScope $toolsScope = ToolsScope::Audited,
     ) {
         if (!is_finite($minConfidence) || $minConfidence < 0.0 || $minConfidence > 1.0) {
             throw InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence($minConfidence);

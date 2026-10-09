@@ -133,7 +133,7 @@ final class EscalatingAttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('toolScopes')]
-    public function test_the_deep_pass_analyzes_the_flagged_files_but_its_tools_keep_the_reach_of_the_request(?array $toolPaths, array $expectedToolPaths): void
+    public function test_the_deep_pass_analyzes_the_flagged_files_and_its_tools_keep_the_reach_the_request_names_or_else_the_flagged_files(?array $toolPaths, array $expectedToolPaths): void
     {
         $files = [
             $this->makeFile('src/Controller/A.php'),
@@ -166,7 +166,7 @@ final class EscalatingAttackerAgentTest extends TestCase
             ['src/Controller/A.php', 'src/Controller/B.php', 'src/Controller/C.php', 'src/Service/Clean.php'],
             ['src/Controller/A.php', 'src/Controller/B.php', 'src/Controller/C.php', 'src/Service/Clean.php'],
         ];
-        yield 'not given, so the files to analyze' => [null, ['src/Controller/A.php', 'src/Controller/B.php', 'src/Controller/C.php']];
+        yield 'not given, so the flagged files the deep pass analyzes' => [null, ['src/Controller/A.php']];
     }
 
     /**

@@ -138,6 +138,10 @@
               "type": "boolean",
               "description": "Give the attacker cross-file investigation tools. Default: true."
             },
+            "tools_scope": {
+              "enum": ["audited", "scanned"],
+              "description": "Which files read_file, grep and list_files may open. audited limits them to the files the run audits (the narrowed set on a --since, --path or escalated run). scanned lets them open every file the scan found, which sends those files to the provider on request. Default: audited."
+            },
             "structured_collection": {
               "type": "boolean",
               "description": "Attacker records findings via the schema-enforced record_vulnerability tool. Default: true."
