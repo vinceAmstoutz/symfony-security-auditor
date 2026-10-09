@@ -621,6 +621,55 @@ final class StagesTest extends TestCase
         self::assertStringContainsString('- POST /admin/users/{id}/delete — src/Controller/AdminUserController.php::delete — LACKS_ACCESS_CHECK', SymfonyMappingContextRenderer::renderRouteAccessControlMap($mapping));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_route_guarded_only_by_public_access_lacks_an_access_check(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new PhpParserControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Controller/AdminController.php', '/app/src/Controller/AdminController.php', <<<'PHP'
+                <?php
+
+                namespace App\Controller;
+
+                use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+                use Symfony\Component\HttpFoundation\Response;
+                use Symfony\Component\Routing\Attribute\Route;
+                use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+                final class AdminController extends AbstractController
+                {
+                    #[Route('/admin/delete-all', methods: ['POST'])]
+                    #[IsGranted('PUBLIC_ACCESS')]
+                    public function wipe(): Response
+                    {
+                        return $this->redirect('/admin');
+                    }
+
+                    #[Route('/admin/export')]
+                    public function export(): Response
+                    {
+                        $this->denyAccessUnlessGranted('IS_AUTHENTICATED_ANONYMOUSLY');
+
+                        return $this->redirect('/admin');
+                    }
+                }
+                PHP),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertSame(2, $auditContext->getMeta('mapping.routes_without_access_check'));
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($mapping);
+        self::assertStringContainsString('- POST /admin/delete-all — src/Controller/AdminController.php::wipe — LACKS_ACCESS_CHECK', $rendered);
+        self::assertStringContainsString('- ANY /admin/export — src/Controller/AdminController.php::export — LACKS_ACCESS_CHECK', $rendered);
+    }
+
     /** @return iterable<string, array{0: string, 1: string}> */
     public static function accessControlTheProductionKernelNeverLoadsCases(): iterable
     {

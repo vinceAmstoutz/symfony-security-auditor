@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\AttributeGroup;
@@ -24,12 +25,26 @@ use PhpParser\Node\Scalar\String_;
  * `#[IsGranted]`'s value parameter is `$attribute`, `#[Security]`'s is
  * `$expression`; both are resolved the same way, matched by name when the
  * call uses named arguments (so a reordered call still yields the right
- * argument) or by position otherwise.
+ * argument) or by position otherwise. A value naming only `PUBLIC_ACCESS` or
+ * `IS_AUTHENTICATED_ANONYMOUSLY` is no access check: it lets everyone in.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class IsGrantedAttributeParser
 {
+    /** @var list<string> */
+    private const array PUBLIC_ACCESS_ATTRIBUTES = ['PUBLIC_ACCESS', 'IS_AUTHENTICATED_ANONYMOUSLY'];
+
+    /**
+     * @param array<Node> $args the arguments of a `denyAccessUnlessGranted()`/`isGranted()` call
+     */
+    public function grantsOnlyPublicAccess(array $args): bool
+    {
+        $firstArgument = $args[0] ?? null;
+
+        return $firstArgument instanceof Arg && $this->isPublicAccessLiteral($firstArgument);
+    }
+
     /**
      * @param array<AttributeGroup> $attributeGroups
      *
@@ -82,7 +97,7 @@ final readonly class IsGrantedAttributeParser
             }
 
             $attributeArg = $this->attributeArgValue($attribute->args, $valueArgName);
-            if (null !== $attributeArg) {
+            if (null !== $attributeArg && !$this->isPublicAccess($attributeArg)) {
                 $values[] = $attributeArg;
             }
         }
@@ -138,12 +153,22 @@ final readonly class IsGrantedAttributeParser
     private function attributeHasMatchingArg(array $args, string $valueArgName): bool
     {
         foreach ($args as $index => $arg) {
-            if ($this->isMatchingArg($arg, $index, $valueArgName)) {
+            if ($this->isMatchingArg($arg, $index, $valueArgName) && !$this->isPublicAccessLiteral($arg)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function isPublicAccessLiteral(Arg $arg): bool
+    {
+        return $arg->value instanceof String_ && $this->isPublicAccess($arg->value->value);
+    }
+
+    private function isPublicAccess(string $attribute): bool
+    {
+        return \in_array($attribute, self::PUBLIC_ACCESS_ATTRIBUTES, true);
     }
 
     private function isMatchingArg(Arg $arg, int $index, string $valueArgName): bool
