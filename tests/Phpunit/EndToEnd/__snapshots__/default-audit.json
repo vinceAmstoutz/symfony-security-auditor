@@ -115,5 +115,6 @@
             "file": "src/Controller/AdminController.php",
             "status": "validated"
         }
-    ]
+    ],
+    "suppressed_fingerprints": []
 }

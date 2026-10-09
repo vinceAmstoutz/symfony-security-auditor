@@ -68,7 +68,7 @@ final readonly class BaselineMerger implements BaselineMergerInterface
      */
     private function pruned(array $entries, LoadedReport $loadedReport): array
     {
-        $remaining = $this->fingerprintCounts($loadedReport->findings);
+        $remaining = $this->fingerprintCounts($loadedReport);
         $keptEntries = [];
         $prunedCount = 0;
 
@@ -145,18 +145,17 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     }
 
     /**
-     * @param list<DiffFinding> $findings
+     * Every occurrence the run found, whether its report lists the finding or
+     * leaves it out because the baseline accepted it or its type is muted.
      *
      * @return array<string, int>
      */
-    private function fingerprintCounts(array $findings): array
+    private function fingerprintCounts(LoadedReport $loadedReport): array
     {
-        $counts = [];
-        foreach ($findings as $finding) {
-            $counts[$finding->fingerprint] = ($counts[$finding->fingerprint] ?? 0) + 1;
-        }
-
-        return $counts;
+        return array_count_values([
+            ...array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->fingerprint, $loadedReport->findings),
+            ...$loadedReport->suppressedFingerprints,
+        ]);
     }
 
     /**

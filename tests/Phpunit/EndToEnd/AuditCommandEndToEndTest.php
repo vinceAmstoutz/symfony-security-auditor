@@ -74,11 +74,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
@@ -526,6 +530,68 @@ final class AuditCommandEndToEndTest extends TestCase
 
     /**
      * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_every_accepted_entry_of_a_report_written_under_the_baseline(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        $reportFile = $this->fixtureDir.'/report.json';
+
+        $attackerPayload = $this->criticalAttackerPayload('src/Controller/HomeController.php');
+
+        $this->makeCommandTester($attackerPayload, '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+        $this->makeCommandTester($attackerPayload, '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'json',
+            '--output' => $reportFile,
+        ]);
+
+        $baselineMergePlan = (new BaselineMerger(new ReportFindingsLoader(), new Baseline()))->plan($reportFile, $baselineFile, true);
+
+        self::assertSame(0, $baselineMergePlan->prunedCount);
+        self::assertCount(1, $baselineMergePlan->keptEntries);
+        self::assertSame([], $baselineMergePlan->newFindings);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_every_accepted_entry_of_a_type_the_report_was_muted_for(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        $reportFile = $this->fixtureDir.'/report.json';
+
+        $attackerPayload = $this->criticalAttackerPayload('src/Controller/HomeController.php');
+
+        $this->makeCommandTester($attackerPayload, '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+        $this->makeCommandTester($attackerPayload, '{"accepted": true}', ['excludedTypes' => ['sql_injection']])->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+            '--output' => $reportFile,
+        ]);
+
+        $baselineMergePlan = (new BaselineMerger(new ReportFindingsLoader(), new Baseline()))->plan($reportFile, $baselineFile, true);
+
+        self::assertSame(0, $baselineMergePlan->prunedCount);
+        self::assertCount(1, $baselineMergePlan->keptEntries);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
      */
     public function test_sarif_format_marks_baselined_findings_as_suppressed_results_and_clears_the_exit_code(): void
     {
@@ -940,7 +1006,7 @@ final class AuditCommandEndToEndTest extends TestCase
         return (string) json_encode($vulns);
     }
 
-    private function criticalAttackerPayload(): string
+    private function criticalAttackerPayload(string $filePathFormat = 'src/Repo%d.php'): string
     {
         $vulns = [];
         for ($i = 1; $i <= 5; ++$i) {
@@ -949,7 +1015,7 @@ final class AuditCommandEndToEndTest extends TestCase
                 'severity' => 'critical',
                 'title' => \sprintf('Critical SQL Injection #%d', $i),
                 'description' => 'Raw query with user input',
-                'file_path' => \sprintf('src/Repo%d.php', $i),
+                'file_path' => \sprintf($filePathFormat, $i),
                 'line_start' => 1,
                 'line_end' => 5,
                 'vulnerable_code' => '$q',

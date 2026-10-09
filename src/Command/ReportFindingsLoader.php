@@ -59,15 +59,29 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
         }
 
         $coverage = $this->coverageIn($decoded);
-        $analyzedFiles = null === $coverage ? null : AnalyzedFiles::in($coverage);
 
         return new LoadedReport(
             $findings,
-            UnanalyzedFiles::in($coverage ?? []),
-            $analyzedFiles,
-            array_column($coverage ?? [], 'file'),
-            $this->completeRunScanPathsIn($decoded, $analyzedFiles ?? []),
+            $this->suppressedFingerprintsIn($decoded),
+            $coverage,
+            $this->completeRunScanPathsIn($decoded, AnalyzedFiles::in($coverage ?? [])),
         );
+    }
+
+    /**
+     * The findings the run found and its report leaves out — accepted by the
+     * baseline or muted by type — as the fingerprints it lists them under.
+     * Empty for a report written before the key existed.
+     *
+     * @param array<array-key, mixed> $decoded
+     *
+     * @return list<string>
+     */
+    private function suppressedFingerprintsIn(array $decoded): array
+    {
+        $suppressed = $decoded['suppressed_fingerprints'] ?? null;
+
+        return \is_array($suppressed) ? array_values(array_filter($suppressed, \is_string(...))) : [];
     }
 
     /**

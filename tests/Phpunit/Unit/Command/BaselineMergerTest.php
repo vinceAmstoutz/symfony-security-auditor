@@ -309,6 +309,91 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
+     * A run under a baseline leaves the findings it accepted out of its report,
+     * so the report lists them by fingerprint instead: their entries, and the
+     * reasons a maintainer wrote for them, outlive a prune.
+     *
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_an_entry_whose_finding_the_report_lists_as_suppressed(): void
+    {
+        $report = $this->writeReportWithSuppressed([], [$this->fingerprint('SQL Injection')]);
+        $baseline = $this->writeBaseline([$this->baselineEntry('SQL Injection')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(0, $baselineMergePlan->prunedCount);
+        self::assertCount(1, $baselineMergePlan->keptEntries);
+        self::assertSame([], $baselineMergePlan->newFindings);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_still_drops_an_entry_no_suppressed_finding_matches(): void
+    {
+        $report = $this->writeReportWithSuppressed([], [$this->fingerprint('SQL Injection')]);
+        $baseline = $this->writeBaseline([$this->baselineEntry('SQL Injection'), $this->baselineEntry('Long Fixed')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(1, $baselineMergePlan->prunedCount);
+        self::assertCount(1, $baselineMergePlan->keptEntries);
+        self::assertSame($this->fingerprint('SQL Injection'), $baselineMergePlan->keptEntries[0]->fingerprint);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_an_entry_through_its_attacker_fingerprint_when_the_report_lists_that_one_as_suppressed(): void
+    {
+        $report = $this->writeReportWithSuppressed([], [$this->fingerprint('SQL Injection')]);
+        $baseline = $this->writeBaseline([
+            [...$this->baselineEntry('Corrected Title'), 'attacker_fingerprint' => $this->fingerprint('SQL Injection')],
+        ]);
+
+        self::assertSame(0, $this->baselineMerger->plan($report, $baseline, true)->prunedCount);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_counts_each_suppressed_occurrence_once(): void
+    {
+        $report = $this->writeReportWithSuppressed([], [$this->fingerprint('SQL Injection')]);
+        $baseline = $this->writeBaseline([$this->baselineEntry('SQL Injection'), $this->baselineEntry('SQL Injection')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(1, $baselineMergePlan->prunedCount);
+        self::assertCount(1, $baselineMergePlan->keptEntries);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_counts_a_suppressed_occurrence_beside_a_listed_one(): void
+    {
+        $report = $this->writeReportWithSuppressed([$this->finding('SQL Injection')], [$this->fingerprint('SQL Injection')]);
+        $baseline = $this->writeBaseline([$this->baselineEntry('SQL Injection'), $this->baselineEntry('SQL Injection')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(0, $baselineMergePlan->prunedCount);
+        self::assertCount(2, $baselineMergePlan->keptEntries);
+    }
+
+    /**
      * @throws MalformedBaselineFileException
      * @throws MalformedReportFileException
      * @throws ReportFileNotReadableException
@@ -493,6 +578,24 @@ final class BaselineMergerTest extends TestCase
     {
         $path = $this->tmpDir.'/report.json';
         $this->filesystem->dumpFile($path, json_encode(['vulnerabilities' => $vulnerabilities, 'coverage' => $coverage], \JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    /**
+     * The ledger says the run analyzed `src/Foo.php`, so a finding missing from
+     * the report would be gone for good were it not listed as suppressed.
+     *
+     * @param list<array<string, string>> $vulnerabilities
+     */
+    private function writeReportWithSuppressed(array $vulnerabilities, mixed $suppressed): string
+    {
+        $path = $this->tmpDir.'/report.json';
+        $this->filesystem->dumpFile($path, json_encode([
+            'vulnerabilities' => $vulnerabilities,
+            'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'analyzed']],
+            'suppressed_fingerprints' => $suppressed,
+        ], \JSON_THROW_ON_ERROR));
 
         return $path;
     }

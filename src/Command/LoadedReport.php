@@ -15,14 +15,17 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AnalyzedFiles;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\UnanalyzedFiles;
 
 /**
- * What a JSON audit report tells a comparison: its findings, the files it
- * could not fully analyze, and — when it carries a coverage ledger — the files
- * its attacker analyzed or served from its cache, the files its ledger names
- * at all, and the scan scope of a complete run over the whole history. Only in
- * the files it analyzed, or in a file such a run no longer lists, can the
- * absence of a finding prove anything.
+ * What a JSON audit report tells a comparison: its findings, the fingerprints
+ * of the findings it left out because the baseline accepted them or their type
+ * is muted, the files it could not fully analyze, and — when it carries a
+ * coverage ledger — the files its attacker analyzed or served from its cache,
+ * the files its ledger names at all, and the scan scope of a complete run over
+ * the whole history. Only in the files it analyzed, or in a file such a run no
+ * longer lists, can the absence of a finding prove anything.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -38,24 +41,22 @@ final readonly class LoadedReport
     private array $ledger;
 
     /**
-     * @param list<DiffFinding> $findings
-     * @param list<string>      $unanalyzedFiles
-     * @param list<string>|null $analyzedFiles        null for a report written before the coverage ledger existed
-     * @param list<string>      $ledgerFiles          every file the ledger names, whatever its stage or status
-     * @param list<string>|null $completeRunScanPaths the `--path` scopes of a complete run over the whole history
-     *                                                (no `--since`); null when the report records no scope or ran
-     *                                                otherwise
+     * @param list<DiffFinding>                                             $findings
+     * @param list<string>                                                  $suppressedFingerprints one entry per occurrence the report left out
+     * @param list<array{stage: string, file: string, status: string}>|null $coverage               null for a report written before the coverage ledger existed
+     * @param list<string>|null                                             $completeRunScanPaths   the `--path` scopes of a complete run over the whole history
+     *                                                                                              (no `--since`); null when the report records no scope or ran
+     *                                                                                              otherwise
      */
     public function __construct(
         public array $findings,
-        public array $unanalyzedFiles = [],
-        public ?array $analyzedFiles = null,
-        array $ledgerFiles = [],
+        public array $suppressedFingerprints = [],
+        ?array $coverage = null,
         private ?array $completeRunScanPaths = null,
     ) {
-        $this->unanalyzed = array_flip(array_map(EchoedFilePath::normalize(...), $unanalyzedFiles));
-        $this->analyzed = null === $analyzedFiles ? null : array_flip(array_map(EchoedFilePath::normalize(...), $analyzedFiles));
-        $this->ledger = array_flip(array_map(EchoedFilePath::normalize(...), $ledgerFiles));
+        $this->unanalyzed = array_flip(array_map(EchoedFilePath::normalize(...), UnanalyzedFiles::in($coverage ?? [])));
+        $this->analyzed = null === $coverage ? null : array_flip(array_map(EchoedFilePath::normalize(...), AnalyzedFiles::in($coverage)));
+        $this->ledger = array_flip(array_map(EchoedFilePath::normalize(...), array_column($coverage ?? [], 'file')));
     }
 
     /**
