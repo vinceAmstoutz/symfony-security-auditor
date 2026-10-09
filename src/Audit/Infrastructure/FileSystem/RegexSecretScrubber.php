@@ -55,6 +55,10 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
 
     private const string STATEMENT_CLOSERS = ';:,\'")]';
 
+    private const string STATEMENT_CLOSERS_AND_A_BRACE = ';:,\'")]}';
+
+    private const string STATEMENT_CLOSERS_BUT_A_BRACKET = ';:,\'")}';
+
     private const int MINIMUM_SECRET_LENGTH = 4;
 
     /**
@@ -158,8 +162,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
             SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+@~i',
             SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\r\n])*+(?:\4|(?=\r?$))|\S+)/m', $envCredentialName),
-            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++)?))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS),
-            SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', $inlineCredentialKey),
+            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++[\]}]?)?))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS),
+            SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n([ \t]*)(["\'])((?:\\\\.|(?!\3)[^\n]){4,}+)\3/mi', $inlineCredentialKey),
             SecretPatternLabel::BlockScalar->value => \sprintf('/^([ \t]*+)(-[ \t]++)?(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?[ \t]*:[ \t]*[|>][+-]?[0-9]?[+-]?[ \t]*(?:#[^\n]*)?)\r?\n((?:\1(?(2)[ \t]{3,}|[ \t]+)[^\n]*(?:\n|\z)|[ \t]*\r?\n)++)/mi', $inlineCredentialKey),
             SecretPatternLabel::CallArgument->value => \sprintf('/(?|((?:->|::)(?:(?:set|with)[A-Za-z0-9_]{0,24}?)?%1$s[ \t]*\([ \t]*)(["\'])%2$s\2|(\([ \t]*["\'][\w.$:\-]{0,64}%3$s[\w.$:\-]{0,64}["\'][ \t]*,[ \t]*)(["\'])%2$s\2|(new[ \t]+\\\\?PDO[ \t]*\([^,\n]{1,200},[^,\n]{1,100},[ \t]*)(["\'])%2$s\2|((?:\$|->)[A-Za-z_]*key[ \t]*=[ \t]*\\\\?(?:hex2bin|sodium_hex2bin|base64_decode|sodium_base642bin)[ \t]*+\([ \t]*+)(["\'])((?:\\\\.|(?!\2)[^\n]){16,}+)\2|(\bpassword_(?:hash|verify)[ \t]*+\([ \t]*+)(["\'])%2$s\2)/i', $callCredentialName, self::QUOTED_BODY_OF_GROUP_TWO, $inlineCredentialKey),
             SecretPatternLabel::XmlParameter->value => \sprintf('~(<(?:parameter|argument)\b[^>]{0,256}?\bkey=(["\'])[^"\'<>]{0,256}?%s[^"\'<>]{0,256}?\2[^>]{0,256}>)(?!\*\*\*REDACTED:)([^<\n]{4,}+)(?=</(?:parameter|argument)>)~i', $inlineCredentialKey),
@@ -294,13 +298,26 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     {
         $quote = $match[2] ?? '';
         $value = ($match[3] ?? '').($match[4] ?? '');
-        $secret = '' === $quote ? rtrim($value, self::STATEMENT_CLOSERS) : $value;
+        $secret = '' === $quote ? rtrim($value, $this->closersAfter($value)) : $value;
 
         if ($this->isKeptReadable($secret, $value, '' !== $quote)) {
             return $match[0];
         }
 
         return \sprintf('%s%s***REDACTED:%s***%s%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote, substr($value, \strlen($secret)));
+    }
+
+    /**
+     * A `}` ends a flow mapping around the value (`{password: x}`) unless the value opens a brace of its
+     * own (`${password}`), and a `]` ends a flow sequence unless the value is the sequence (`[a, b]`).
+     */
+    private function closersAfter(string $value): string
+    {
+        return match (true) {
+            str_starts_with($value, '[') => self::STATEMENT_CLOSERS_BUT_A_BRACKET,
+            str_contains($value, '{') => self::STATEMENT_CLOSERS,
+            default => self::STATEMENT_CLOSERS_AND_A_BRACE,
+        };
     }
 
     private function isKeptReadable(string $secret, string $value, bool $quoted): bool
@@ -328,14 +345,14 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private function redactMultilineAssignment(array $match): string
     {
-        $quote = $match[2] ?? '';
-        $value = $match[3] ?? '';
+        $quote = $match[3] ?? '';
+        $value = $match[4] ?? '';
 
         if ($this->isConfigPlaceholder($value) || $this->isCode($value, true)) {
             return $match[0];
         }
 
-        return \sprintf("%s\n%s***REDACTED:%s***%s", $match[1], $quote, SecretPatternLabel::MultilineAssignment->value, $quote);
+        return \sprintf("%s\n%s%s***REDACTED:%s***%s", $match[1], $match[2], $quote, SecretPatternLabel::MultilineAssignment->value, $quote);
     }
 
     /**

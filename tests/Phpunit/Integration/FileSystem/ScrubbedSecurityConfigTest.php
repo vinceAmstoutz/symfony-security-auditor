@@ -57,6 +57,18 @@ final class ScrubbedSecurityConfigTest extends TestCase
             "security:\n    providers:\n        memory:\n            memory:\n                users:\n                    admin: { password: hunter2supersecure, roles: [ROLE_ADMIN] }\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            lazy: true\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\n",
             'hunter2supersecure',
         ];
+        yield 'a closing brace glued to a password' => [
+            "security:\n    providers:\n        memory:\n            memory:\n                users:\n                    admin: {roles: [ROLE_ADMIN], password: hunter2supersecure}\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            lazy: true\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\n",
+            'hunter2supersecure',
+        ];
+        yield 'a password held in a flow sequence' => [
+            "security:\n    providers:\n        memory:\n            memory:\n                users:\n                    admin:\n                        roles: [ROLE_ADMIN]\n                        password: [hunter2supersecure, second2secretvalue]\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            lazy: true\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\n",
+            'hunter2supersecure',
+        ];
+        yield 'a password quoted on the next line' => [
+            "security:\n    providers:\n        memory:\n            memory:\n                users:\n                    admin:\n                        roles: [ROLE_ADMIN]\n                        password:\n                            \"hunter2 supersecure\"\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            lazy: true\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\n",
+            'hunter2 supersecure',
+        ];
         yield 'a null password and a false flag next to a real secret' => [
             "security:\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            remember_me:\n                secret: null\n                persist-credentials: false\n                signature_properties: [password]\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\nparameters:\n    app_secret: xk9LmN3pQ7rS5tU8\n",
             'xk9LmN3pQ7rS5tU8',

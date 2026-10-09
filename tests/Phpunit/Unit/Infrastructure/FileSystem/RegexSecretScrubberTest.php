@@ -276,8 +276,10 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a double-quoted mixed-case word' => ['password: "$uperS3cret"', 'password: "***REDACTED:inline_assignment***"'];
         yield 'a php array entry holding a mixed-case word' => ["'password' => '\$ecretValue',", "'password' => '***REDACTED:inline_assignment***',"];
         yield 'a braced mixed-case word' => ['password = ${uperS3cret}', 'password = ***REDACTED:inline_assignment***'];
+        yield 'a value holding a brace pair' => ['password: pa{ss}word', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a value ending in a brace pair' => ['password: pass{word}', 'password: "***REDACTED:inline_assignment***"'];
         yield 'a braced lower-case word in quotes' => ["api_key: '\${dbPassword}'", "api_key: '***REDACTED:inline_assignment***'"];
-        yield 'a wrapped quoted mixed-case word' => ["'password' =>\n    '\$ecretValue',", "'password' =>\n'***REDACTED:multiline_assignment***',"];
+        yield 'a wrapped quoted mixed-case word' => ["'password' =>\n    '\$ecretValue',", "'password' =>\n    '***REDACTED:multiline_assignment***',"];
     }
 
     #[DataProvider('codeTheAuditorMustReadCases')]
@@ -509,6 +511,31 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a list of tokens' => ["tokens:\n    - ".self::GHP.'_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij', "tokens:\n    - \"***REDACTED:github_token***\""];
         yield 'a bearer header' => ['Authorization: Bearer '.str_repeat('a1B2', 8), 'Authorization: "***REDACTED:bearer_token***"'];
         yield 'a jwt' => ['jwt: '.self::JWT.'hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c', 'jwt: "***REDACTED:jwt***"'];
+    }
+
+    #[DataProvider('compactFlowYamlAroundACredentialCases')]
+    public function test_compact_flow_yaml_around_a_credential_is_redacted_without_breaking_the_document(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertNotNull(Yaml::parse($output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function compactFlowYamlAroundACredentialCases(): iterable
+    {
+        yield 'a closing brace glued to the value' => ['admin: {roles: [ROLE_ADMIN], password: adminpass}', 'admin: {roles: [ROLE_ADMIN], password: "***REDACTED:inline_assignment***"}'];
+        yield 'a closing brace after a first entry' => ['admin: {password: adminpass}', 'admin: {password: "***REDACTED:inline_assignment***"}'];
+        yield 'a closing brace after a nested mapping' => ['users: {admin: {password: adminpass}}', 'users: {admin: {password: "***REDACTED:inline_assignment***"}}'];
+        yield 'a flow sequence of several values' => ["a:\n  password: [abcd, efgh]\n", "a:\n  password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a flow sequence of one value' => ["a:\n  password: [abcdefgh]\n", "a:\n  password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a flow sequence closing a flow mapping' => ['admin: {password: [abcdefgh]}', 'admin: {password: "***REDACTED:inline_assignment***"}'];
+        yield 'a flow sequence in a flow mapping' => ['admin: {password: [abcd, efgh], roles: [ROLE_ADMIN]}', 'admin: {password: "***REDACTED:inline_assignment***", roles: [ROLE_ADMIN]}'];
+        yield 'a flow sequence last in a flow mapping' => ['admin: {roles: [ROLE_ADMIN], password: [abcd, efgh]}', 'admin: {roles: [ROLE_ADMIN], password: "***REDACTED:inline_assignment***"}'];
+        yield 'a value on the next indented line in double quotes' => ["a:\n  secret:\n    \"quoted value\"\n", "a:\n  secret:\n    \"***REDACTED:multiline_assignment***\"\n"];
+        yield 'a value on the next indented line in single quotes' => ["a:\n  secret:\n    'quoted value'\n", "a:\n  secret:\n    '***REDACTED:multiline_assignment***'\n"];
+        yield 'a value on the next indented line of a list item' => ["a:\n  - password:\n      \"quoted value\"\n    name: b\n", "a:\n  - password:\n      \"***REDACTED:multiline_assignment***\"\n    name: b\n"];
     }
 
     #[DataProvider('redactedValuesThatAreNoYamlScalarCases')]
@@ -1115,21 +1142,21 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub("\$config = [\n    'password' =>\n        'SuperSecretValue1234',\n];");
 
-        self::assertSame("\$config = [\n    'password' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
+        self::assertSame("\$config = [\n    'password' =>\n        '***REDACTED:multiline_assignment***',\n];", $output);
     }
 
     public function test_a_wrapped_quoted_literal_shaped_like_php_code_is_still_redacted(): void
     {
         $output = $this->regexSecretScrubber->scrub("\$config = [\n    'password' =>\n        '\$Pa55->w0rd1234',\n];");
 
-        self::assertSame("\$config = [\n    'password' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
+        self::assertSame("\$config = [\n    'password' =>\n        '***REDACTED:multiline_assignment***',\n];", $output);
     }
 
     public function test_a_wrapped_value_under_a_credential_key_with_trailing_segments_is_still_redacted(): void
     {
         $output = $this->regexSecretScrubber->scrub("\$config = [\n    'client_secret_value' =>\n        'SuperSecretValue1234',\n];");
 
-        self::assertSame("\$config = [\n    'client_secret_value' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
+        self::assertSame("\$config = [\n    'client_secret_value' =>\n        '***REDACTED:multiline_assignment***',\n];", $output);
     }
 
     #[DataProvider('multilineAssignmentLayoutCases')]
@@ -1148,8 +1175,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a break before the delimiter only' => ["'password'\n=> 'SuperSecretValue1234'", "'password'\n=> '***REDACTED:inline_assignment***'"];
         yield 'a break before a fat arrow and another after it' => ["'password'\n=>\n'SuperSecretValue1234'", "'password'\n=>\n'***REDACTED:multiline_assignment***'"];
         yield 'two breaks before the delimiter' => ["secret\n\n=\n'SuperSecretValue1234'", "secret\n\n=\n'***REDACTED:multiline_assignment***'"];
-        yield 'a break after the delimiter only' => ["password:\n  'SuperSecretValue1234'", "password:\n'***REDACTED:multiline_assignment***'"];
-        yield 'windows line endings' => ["password:\r\n  'SuperSecretValue1234'", "password:\n'***REDACTED:multiline_assignment***'"];
+        yield 'a break after the delimiter only' => ["password:\n  'SuperSecretValue1234'", "password:\n  '***REDACTED:multiline_assignment***'"];
+        yield 'windows line endings' => ["password:\r\n  'SuperSecretValue1234'", "password:\n  '***REDACTED:multiline_assignment***'"];
     }
 
     public function test_a_symfony_placeholder_wrapped_to_the_next_line_is_left_unmodified(): void
@@ -1165,14 +1192,14 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub("password:\n  \"abcd\\\"efgh\"\n");
 
-        self::assertSame("password:\n\"***REDACTED:multiline_assignment***\"\n", $output);
+        self::assertSame("password:\n  \"***REDACTED:multiline_assignment***\"\n", $output);
     }
 
     public function test_a_value_wrapped_to_the_next_line_containing_an_unescaped_apostrophe_is_fully_redacted(): void
     {
         $output = $this->regexSecretScrubber->scrub("password:\n  \"don't tell anyone\"\n");
 
-        self::assertSame("password:\n\"***REDACTED:multiline_assignment***\"\n", $output);
+        self::assertSame("password:\n  \"***REDACTED:multiline_assignment***\"\n", $output);
     }
 
     public function test_redacting_a_value_wrapped_to_the_next_line_preserves_the_total_line_count(): void
@@ -1467,6 +1494,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'placeholder openings after colons' => [str_repeat(': ***REDACTED:x', 34952)];
         yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
         yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
+        yield 'a credential key followed by a line of blanks' => ["secret:\n".str_repeat(' ', 524288)];
+        yield 'credential keys followed by indented words' => [str_repeat("secret:\n    word\n", 29000)];
     }
 
     #[DataProvider('hostileContentWithTheJitCases')]
@@ -1484,6 +1513,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'credential key openings' => [str_repeat("('db_password', ", 32768)];
         yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
         yield 'password function openings' => [str_repeat('password_hash(', 37449)];
+        yield 'a credential key followed by a line of blanks' => ["secret:\n".str_repeat(' ', 524288)];
     }
 
     #[DataProvider('hostileContentRedactedCases')]
@@ -1519,6 +1549,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a block scalar of a hundred thousand lines' => ["secret: |\n".str_repeat("  x\n", 100000), "secret: |\n  ***REDACTED:block_scalar***".str_repeat("\n", 100000)];
         yield 'a private key cut after thirty thousand lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("MIIEowIBAAKCAQEAx\n", 30000), '***REDACTED:pem_private_key***'.str_repeat("\n", 30001)];
         yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
+        yield 'a quoted value after half a megabyte of indentation' => ["secret:\n".str_repeat(' ', 524280)."'abcd'", "secret:\n".str_repeat(' ', 524280)."'***REDACTED:multiline_assignment***'"];
+        yield 'a flow sequence of thousands of words' => ['password: [abcd'.str_repeat(' a', 49997).']', 'password: "***REDACTED:inline_assignment***"'];
     }
 
     #[RunInSeparateProcess]
