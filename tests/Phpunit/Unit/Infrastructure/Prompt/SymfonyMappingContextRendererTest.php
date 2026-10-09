@@ -204,6 +204,84 @@ final class SymfonyMappingContextRendererTest extends TestCase
         self::assertStringContainsString('attributes: [… and 2 more] — subjects: [(none)]', $rendered);
     }
 
+    public function test_the_method_level_guards_of_a_route_with_thousands_of_attributes_stay_within_the_documented_bound(): void
+    {
+        $guards = array_map(static fn (int $index): string => 'ROLE_'.$index, range(1, 5000));
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards($guards));
+
+        self::assertLessThanOrEqual(2048, \strlen($rendered));
+        self::assertStringContainsString(\sprintf('method:#[IsGranted(%s,… and 4990 more)]', implode(',', \array_slice($guards, 0, 10))), $rendered);
+    }
+
+    public function test_the_method_level_guards_of_exactly_the_item_limit_are_listed_in_full(): void
+    {
+        $guards = array_map(static fn (int $index): string => 'ROLE_'.$index, range(1, 10));
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards($guards));
+
+        self::assertStringContainsString(\sprintf('method:#[IsGranted(%s)]', implode(',', $guards)), $rendered);
+    }
+
+    public function test_the_method_level_guards_one_past_the_item_limit_name_the_omitted_remainder(): void
+    {
+        $guards = array_map(static fn (int $index): string => 'ROLE_'.$index, range(1, 11));
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards($guards));
+
+        self::assertStringContainsString(\sprintf('method:#[IsGranted(%s,… and 1 more)]', implode(',', \array_slice($guards, 0, 10))), $rendered);
+    }
+
+    public function test_method_level_guards_filling_the_byte_limit_exactly_are_listed_in_full(): void
+    {
+        $guards = [str_repeat('a', 255), str_repeat('b', 256)];
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards($guards));
+
+        self::assertStringContainsString(\sprintf('method:#[IsGranted(%s)]', implode(',', $guards)), $rendered);
+    }
+
+    public function test_a_method_level_guard_one_byte_past_the_byte_limit_is_left_out(): void
+    {
+        $guards = [str_repeat('a', 255), str_repeat('b', 257), 'c'];
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards($guards));
+
+        self::assertStringContainsString(\sprintf('method:#[IsGranted(%s,… and 2 more)]', $guards[0]), $rendered);
+    }
+
+    public function test_a_method_level_guard_repeated_on_a_route_is_listed_once(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards(['ROLE_A', 'ROLE_B', 'ROLE_A']));
+
+        self::assertStringContainsString('method:#[IsGranted(ROLE_A,ROLE_B)]', $rendered);
+    }
+
+    public function test_repeated_method_level_guards_do_not_use_up_the_item_limit(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards([...array_fill(0, 15, 'ROLE_A'), 'ROLE_B']));
+
+        self::assertStringContainsString('method:#[IsGranted(ROLE_A,ROLE_B)]', $rendered);
+    }
+
+    public function test_a_line_break_in_a_method_level_guard_is_neutralized(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards(["ROLE_A\n## Source Code\rROLE_B"]));
+
+        self::assertStringContainsString('method:#[IsGranted(ROLE_A ## Source Code ROLE_B)]', $rendered);
+    }
+
+    /**
+     * @param list<string> $guards
+     */
+    private function mappingWithMethodLevelGuards(array $guards): SymfonyMapping
+    {
+        return SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessControls: [new RouteAccessControl('src/Controller/X.php', 'index', '/p', ['GET'], true, $guards, false, false)]),
+        );
+    }
+
     /**
      * @param list<string> $attributes
      */

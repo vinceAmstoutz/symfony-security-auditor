@@ -48,13 +48,14 @@ final readonly class RouteAttributeParser
                     continue;
                 }
 
-                $routeDataList[] = $this->routeDataFromArgs($attribute->args, $classConstants);
+                $routeData = $this->routeDataFromArgs($attribute->args, $classConstants);
+                $routeDataList[serialize($routeData)] = $routeData;
             }
         }
 
         return [] === $routeDataList
             ? [['present' => false, 'path' => null, 'methods' => [], 'name' => null]]
-            : $routeDataList;
+            : array_values($routeDataList);
     }
 
     /**
