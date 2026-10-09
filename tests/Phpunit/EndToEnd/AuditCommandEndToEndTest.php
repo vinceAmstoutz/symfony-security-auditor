@@ -86,6 +86,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
 
 final class AuditCommandEndToEndTest extends TestCase
 {
@@ -365,6 +366,34 @@ final class AuditCommandEndToEndTest extends TestCase
         $display = $commandTester->getDisplay();
         self::assertStringContainsString('Baseline written to', $display);
         self::assertStringContainsString('SYMFONY LLM AUDIT REPORT', $display);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_output_and_generate_baseline_to_a_character_device_discard_the_files_and_leave_the_device_in_place(): void
+    {
+        $this->createProjectDir();
+        $deviceDirectory = sys_get_temp_dir().'/cmd_e2e_device_'.uniqid('', true);
+        mkdir($deviceDirectory, 0o777, true);
+        $device = DiscardDevice::in($deviceDirectory);
+
+        try {
+            $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+            $commandTester->execute([
+                'project-path' => $this->fixtureDir,
+                '--format' => 'json',
+                '--output' => $device,
+                '--generate-baseline' => $device,
+            ]);
+
+            self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+            self::assertSame('char', filetype($device));
+            self::assertStringContainsString(\sprintf('Report saved to %s', $device), $commandTester->getDisplay());
+            self::assertStringContainsString('Baseline written to', $commandTester->getDisplay());
+        } finally {
+            (new Filesystem())->remove($deviceDirectory);
+        }
     }
 
     /**

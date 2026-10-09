@@ -66,7 +66,7 @@ final readonly class ReportWriter implements ReportWriterInterface
 
         try {
             $this->assertSafeToWrite($outputFile, $auditReport->projectPath());
-            $this->filesystem->dumpFile($outputFile, $content);
+            WritableFilePath::dump($this->filesystem, $outputFile, $content);
         } catch (UnsafeReportWriteException $unsafeReportWriteException) {
             $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
 
