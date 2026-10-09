@@ -147,6 +147,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     /**
      * @param list<Vulnerability> $vulnerabilities
      * @param list<ProjectFile>   $projectFiles
+     * @param ?list<ProjectFile>  $toolFiles
      *
      * @return list<Vulnerability>
      *
@@ -155,14 +156,14 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      * @throws InvalidToolRegistryException
      */
     #[Override]
-    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array
+    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, ?array $toolFiles = null): array
     {
         if ([] === $vulnerabilities) {
             return [];
         }
 
         $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
-        $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($projectFiles) : null;
+        $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($toolFiles ?? $projectFiles) : null;
         $structuredEligible = $this->isStructuredEligible($useTools);
         $structuredConcurrent = $this->structuredConcurrentAnalyzer($structuredEligible);
         $useStructuredCollection = $this->shouldUseStructuredCollection($structuredEligible, $structuredConcurrent instanceof ConcurrentStructuredReviewAnalyzer);

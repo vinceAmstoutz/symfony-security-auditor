@@ -161,7 +161,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     private function reviewPersistingOnAbort(array $findings, array $files, AuditContext $auditContext): array
     {
         try {
-            return $this->reviewerAgent->review($findings, $files, $auditContext, $auditContext->isCacheBypassed());
+            return $this->reviewerAgent->review($findings, $files, $auditContext, $auditContext->isCacheBypassed(), $auditContext->mappingFiles());
         } catch (BudgetExceededException|LLMProviderException $exception) {
             $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
 
@@ -205,6 +205,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                     bypassCache: $auditContext->isCacheBypassed(),
                     previousFindings: $previousFindings,
                     rejectedFindings: $rejectedFindings,
+                    toolFiles: $auditContext->mappingFiles(),
                 ),
                 $auditContext,
             );
@@ -266,7 +267,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         ]);
 
         try {
-            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
+            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed(), $auditContext->mappingFiles());
         } catch (BudgetExceededException|LLMProviderException) {
             $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
 

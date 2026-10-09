@@ -23,8 +23,10 @@ interface ReviewerAgentInterface
     /**
      * @param list<Vulnerability> $vulnerabilities
      * @param list<ProjectFile>   $projectFiles
+     * @param ?list<ProjectFile>  $toolFiles       the files the investigation tools may open when they are not
+     *                                             the audited files; null means `$projectFiles`
      *
      * @return list<Vulnerability>
      */
-    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array;
+    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, ?array $toolFiles = null): array;
 }

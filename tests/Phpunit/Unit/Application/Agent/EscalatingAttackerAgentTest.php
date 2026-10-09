@@ -124,6 +124,52 @@ final class EscalatingAttackerAgentTest extends TestCase
     }
 
     /**
+     * @param ?list<string> $toolPaths
+     * @param list<string>  $expectedToolPaths
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('toolScopes')]
+    public function test_the_deep_pass_analyzes_the_flagged_files_but_its_tools_keep_the_reach_of_the_request(?array $toolPaths, array $expectedToolPaths): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+            $this->makeFile('src/Controller/C.php'),
+        ];
+        $toolFiles = null === $toolPaths ? null : array_map($this->makeFile(...), $toolPaths);
+        $recordingAttackerAgent = $this->makeRecordingAttacker([]);
+        $escalatingAttackerAgent = new EscalatingAttackerAgent(
+            $this->makeRecordingAttacker([$this->makeVulnerability('src/Controller/A.php')]),
+            $recordingAttackerAgent,
+            new NullLogger(),
+        );
+
+        $escalatingAttackerAgent->analyze(
+            new AttackerAnalysisRequest($files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), toolFiles: $toolFiles),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertSame(['src/Controller/A.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $recordingAttackerAgent->lastFiles));
+        self::assertSame($expectedToolPaths, array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $recordingAttackerAgent->lastToolFiles));
+    }
+
+    /**
+     * @return iterable<string, array{?list<string>, list<string>}>
+     */
+    public static function toolScopes(): iterable
+    {
+        yield 'wider than the files to analyze' => [
+            ['src/Controller/A.php', 'src/Controller/B.php', 'src/Controller/C.php', 'src/Service/Clean.php'],
+            ['src/Controller/A.php', 'src/Controller/B.php', 'src/Controller/C.php', 'src/Service/Clean.php'],
+        ];
+        yield 'not given, so the files to analyze' => [null, ['src/Controller/A.php', 'src/Controller/B.php', 'src/Controller/C.php']];
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidProjectFileException

@@ -2729,6 +2729,62 @@ final class ReviewerAgentTest extends TestCase
         self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => true, 'structured_collection' => false]], $infoLogs[0]);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_its_tools_open_the_files_named_for_them_instead_of_the_audited_files(): void
+    {
+        $audited = [$this->makeFile('src/A.php')];
+        $toolFiles = [...$audited, $this->makeFile('src/Service/Clean.php')];
+        $toolFactory = $this->createMock(ToolRegistryFactoryInterface::class);
+        $toolFactory->expects(self::once())->method('forProjectFiles')->with($toolFiles)->willReturn(new ToolRegistry([], new NullLogger()));
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('{"accepted": true}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $reviewed = $this->toolEnabledReviewerAgent($llmClient, $toolFactory)->review([$this->makeVulnerabilityAt('src/A.php')], $audited, new NullCoverageRecorder(), toolFiles: $toolFiles);
+
+        self::assertCount(1, $reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_its_tools_open_the_audited_files_when_no_other_files_are_named(): void
+    {
+        $audited = [$this->makeFile('src/A.php')];
+        $toolFactory = $this->createMock(ToolRegistryFactoryInterface::class);
+        $toolFactory->expects(self::once())->method('forProjectFiles')->with($audited)->willReturn(new ToolRegistry([], new NullLogger()));
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('{"accepted": true}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $reviewed = $this->toolEnabledReviewerAgent($llmClient, $toolFactory)->review([$this->makeVulnerabilityAt('src/A.php')], $audited, new NullCoverageRecorder());
+
+        self::assertCount(1, $reviewed);
+    }
+
+    private function toolEnabledReviewerAgent(LLMClientInterface $llmClient, ToolRegistryFactoryInterface $toolRegistryFactory): ReviewerAgent
+    {
+        return new ReviewerAgent(
+            new ReviewerAgentCollaborators($llmClient, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(toolsEnabled: true, useStructuredCollection: false),
+            toolRegistryFactory: $toolRegistryFactory,
+        );
+    }
+
     private function makeReviewerAgent(LLMClientInterface $llmClient): ReviewerAgent
     {
         return ReviewerAgentHarness::reviewerAgent($llmClient);

@@ -157,7 +157,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         $this->logStartingAnalysis($files, $effectiveFiles, $markers, $useTools, $attackerAnalysisRequest);
 
-        $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($files) : null;
+        $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($attackerAnalysisRequest->filesForTools()) : null;
 
         $chunks = $this->fileChunker->chunk($effectiveFiles);
 
