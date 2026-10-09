@@ -148,6 +148,84 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    #[DataProvider('invisibleFormatCharacters')]
+    public function test_save_escapes_the_bidirectional_and_invisible_characters_of_a_finding(string $character, string $escaped): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $entry = [...$this->entry('SSA-AAA'), 'file' => 'src/a'.$character.'b.php', 'title' => 'Safe '.$character.'check'];
+
+        (new Baseline($this->filesystem))->save($path, [$entry]);
+
+        $contents = file_get_contents($path);
+        self::assertIsString($contents);
+        self::assertStringNotContainsString($character, $contents);
+        self::assertStringContainsString('"file": "src/a'.$escaped.'b.php"', $contents);
+        self::assertStringContainsString('"title": "Safe '.$escaped.'check"', $contents);
+        self::assertSame([$entry], json_decode($contents, true, flags: \JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function invisibleFormatCharacters(): iterable
+    {
+        yield 'arabic letter mark' => ["\u{061C}", '\u061c'];
+        yield 'zero width space' => ["\u{200B}", '\u200b'];
+        yield 'zero width non-joiner' => ["\u{200C}", '\u200c'];
+        yield 'left-to-right mark' => ["\u{200E}", '\u200e'];
+        yield 'right-to-left mark' => ["\u{200F}", '\u200f'];
+        yield 'line separator' => ["\u{2028}", '\u2028'];
+        yield 'paragraph separator' => ["\u{2029}", '\u2029'];
+        yield 'left-to-right embedding' => ["\u{202A}", '\u202a'];
+        yield 'right-to-left override' => ["\u{202E}", '\u202e'];
+        yield 'word joiner' => ["\u{2060}", '\u2060'];
+        yield 'left-to-right isolate' => ["\u{2066}", '\u2066'];
+        yield 'pop directional isolate' => ["\u{2069}", '\u2069'];
+        yield 'nominal digit shapes' => ["\u{206F}", '\u206f'];
+        yield 'byte order mark' => ["\u{FEFF}", '\ufeff'];
+        yield 'first tag character' => ["\u{E0000}", '\udb40\udc00'];
+        yield 'tag latin capital letter a' => ["\u{E0041}", '\udb40\udc41'];
+        yield 'cancel tag' => ["\u{E007F}", '\udb40\udc7f'];
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    #[DataProvider('visibleCharactersNextToTheInvisibleOnes')]
+    public function test_save_keeps_the_characters_next_to_the_invisible_ones_as_written(string $character): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+
+        (new Baseline($this->filesystem))->save($path, [[...$this->entry('SSA-AAA'), 'title' => 'a'.$character.'b']]);
+
+        $contents = file_get_contents($path);
+        self::assertIsString($contents);
+        self::assertStringContainsString('"title": "a'.$character.'b"', $contents);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function visibleCharactersNextToTheInvisibleOnes(): iterable
+    {
+        yield 'arabic semicolon, before the arabic letter mark' => ["\u{061B}"];
+        yield 'arabic question mark, after the arabic letter mark' => ["\u{061D}"];
+        yield 'hair space, before the zero width space' => ["\u{200A}"];
+        yield 'hyphen, after the right-to-left mark' => ["\u{2010}"];
+        yield 'narrow no-break space, after the right-to-left override' => ["\u{202F}"];
+        yield 'medium mathematical space, before the word joiner' => ["\u{205F}"];
+        yield 'superscript zero, after the nominal digit shapes' => ["\u{2070}"];
+        yield 'arabic presentation form, before the byte order mark' => ["\u{FEFE}"];
+        yield 'halfwidth form, after the byte order mark' => ["\u{FF00}"];
+        yield 'last character before the tags' => ["\u{DFFFF}"];
+        yield 'first character after the tags' => ["\u{E0080}"];
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
      */
     public function test_load_throws_when_the_file_is_not_valid_json(): void
     {
