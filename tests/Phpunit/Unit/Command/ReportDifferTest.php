@@ -816,4 +816,131 @@ final class ReportDifferTest extends TestCase
         self::assertSame([], $reportDiff->fixedFindings);
         self::assertCount(1, $reportDiff->unverifiedFindings);
     }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_keeps_a_finding_the_current_report_lists_as_suppressed_apart_from_the_fixed_ones(): void
+    {
+        $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
+        $current = $this->writeSuppressingReport('current.json', [], [$this->vulnerability('SQL Injection')['fingerprint']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertSame(['SQL Injection'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->unverifiedFindings));
+        self::assertSame([], $reportDiff->newFindings);
+        self::assertSame([], $reportDiff->persistingFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_still_calls_a_finding_fixed_when_only_another_finding_is_suppressed(): void
+    {
+        $suppressed = $this->vulnerability('SQL Injection');
+        $fixed = $this->vulnerability('Mass Assignment');
+        $previous = $this->writeReport('previous.json', [$suppressed, $fixed]);
+        $current = $this->writeSuppressingReport('current.json', [], [$suppressed['fingerprint']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame(['Mass Assignment'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->fixedFindings));
+        self::assertSame(['SQL Injection'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->unverifiedFindings));
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_pairs_off_a_suppressed_fingerprint_by_count(): void
+    {
+        $vulnerability = $this->vulnerability('SQL Injection');
+        $previous = $this->writeReport('previous.json', [$vulnerability, $vulnerability, $vulnerability]);
+        $current = $this->writeSuppressingReport('current.json', [], [$vulnerability['fingerprint'], $vulnerability['fingerprint']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertCount(2, $reportDiff->unverifiedFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_does_not_spend_a_suppressed_occurrence_on_a_finding_the_current_report_still_lists(): void
+    {
+        $vulnerability = $this->vulnerability('SQL Injection');
+        $previous = $this->writeReport('previous.json', [$vulnerability, $vulnerability]);
+        $current = $this->writeSuppressingReport('current.json', [$vulnerability], [$vulnerability['fingerprint']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->persistingFindings);
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertCount(1, $reportDiff->unverifiedFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_lists_the_suppressed_findings_before_the_ones_whose_file_was_not_analyzed(): void
+    {
+        $inUnanalyzedFile = [
+            'type' => 'mass_assignment',
+            'file' => 'src/Bar.php',
+            'title' => 'Mass Assignment',
+            'severity' => 'medium',
+            'fingerprint' => Vulnerability::fingerprintOf('mass_assignment', 'src/Bar.php', 'Mass Assignment'),
+        ];
+        $suppressed = $this->vulnerability('SQL Injection');
+        $previous = $this->writeReport('previous.json', [$inUnanalyzedFile, $suppressed]);
+        $current = $this->writeSuppressingReport('current.json', [], [$suppressed['fingerprint']]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->fixedFindings);
+        self::assertSame(['SQL Injection', 'Mass Assignment'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->unverifiedFindings));
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_series_keeps_a_finding_a_later_report_lists_as_suppressed_apart_from_the_fixed_ones(): void
+    {
+        $vulnerability = $this->vulnerability('SQL Injection');
+        $first = $this->writeReport('first.json', [$vulnerability]);
+        $second = $this->writeSuppressingReport('second.json', [], [$vulnerability['fingerprint']]);
+        $third = $this->writeReport('third.json', []);
+
+        $reportDiffs = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diffSeries([$first, $second, $third]);
+
+        self::assertCount(2, $reportDiffs);
+        self::assertSame([], $reportDiffs[0]->fixedFindings);
+        self::assertCount(1, $reportDiffs[0]->unverifiedFindings);
+        self::assertSame([], $reportDiffs[1]->fixedFindings);
+        self::assertSame([], $reportDiffs[1]->unverifiedFindings);
+    }
+
+    /**
+     * @param list<array<string, string>> $vulnerabilities
+     * @param list<string>                $suppressedFingerprints
+     */
+    private function writeSuppressingReport(string $filename, array $vulnerabilities, array $suppressedFingerprints): string
+    {
+        $path = $this->tmpDir.'/'.$filename;
+        $this->filesystem->dumpFile($path, json_encode([
+            'complete' => true,
+            'vulnerabilities' => $vulnerabilities,
+            'suppressed_fingerprints' => $suppressedFingerprints,
+            'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'analyzed']],
+        ], \JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
 }
