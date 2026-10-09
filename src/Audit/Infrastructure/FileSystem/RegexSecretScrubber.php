@@ -53,6 +53,12 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private const string UNQUOTED_YAML_PLACEHOLDER = '/([:\-][ \t]++)(\*\*\*REDACTED:[a-z0-9_]++\*\*\*)(?=[ \t]*+(?:[,})\]#]|\r?$))/m';
 
+    /**
+     * A closer that ends a YAML block entry is part of its plain scalar (`password: S3cr3t;`), so it is
+     * redacted with the value instead of being left behind the quoted placeholder, where YAML cannot read it.
+     */
+    private const string YAML_ENTRY_ENDING_IN_CLOSERS = '/^([ \t]*+(?:-[ \t]++)?(?:"[\w.\-]++"|\'[\w.\-]++\'|[\w.\-]++):[ \t]++)(\*\*\*REDACTED:inline_assignment\*\*\*)[;:"\']++(?=(?:[ \t]++#[^\n]*)?\r?$)/m';
+
     private const string STATEMENT_CLOSERS = ';:,\'")]';
 
     private const int MINIMUM_SECRET_LENGTH = 4;
@@ -218,7 +224,9 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             $content = $result;
         }
 
-        return preg_replace(self::UNQUOTED_YAML_PLACEHOLDER, '$1"$2"', $content) ?? $content;
+        $quoted = preg_replace(self::YAML_ENTRY_ENDING_IN_CLOSERS, '$1"$2"', $content) ?? $content;
+
+        return preg_replace(self::UNQUOTED_YAML_PLACEHOLDER, '$1"$2"', $quoted) ?? $quoted;
     }
 
     /**

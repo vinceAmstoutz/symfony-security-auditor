@@ -57,6 +57,10 @@ final class ScrubbedSecurityConfigTest extends TestCase
             "security:\n    providers:\n        memory:\n            memory:\n                users:\n                    admin: { password: hunter2supersecure, roles: [ROLE_ADMIN] }\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            lazy: true\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\n",
             'hunter2supersecure',
         ];
+        yield 'an ldap password ending in a semicolon' => [
+            "security:\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            form_login_ldap:\n                search_password: s3cretValue99;\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\n",
+            's3cretValue99',
+        ];
         yield 'a null password and a false flag next to a real secret' => [
             "security:\n    firewalls:\n        dev:\n            pattern: ^/_profiler\n            security: false\n        main:\n            remember_me:\n                secret: null\n                persist-credentials: false\n                signature_properties: [password]\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\nparameters:\n    app_secret: xk9LmN3pQ7rS5tU8\n",
             'xk9LmN3pQ7rS5tU8',

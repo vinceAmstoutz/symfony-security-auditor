@@ -463,11 +463,11 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a comma before more words' => ['password: hunter2xx, and more words', 'password: "***REDACTED:inline_assignment***"'];
         yield 'a core of exactly four characters' => ['$password = abcd;', '$password = ***REDACTED:inline_assignment***;'];
         yield 'a bare number in yaml' => ['password: 12345678', 'password: "***REDACTED:inline_assignment***"'];
-        yield 'a word starting like null' => ['password: nullable1234;', 'password: ***REDACTED:inline_assignment***;'];
-        yield 'a word starting like true' => ['password: true1234;', 'password: ***REDACTED:inline_assignment***;'];
-        yield 'a word ending like false' => ['password: notfalse;', 'password: ***REDACTED:inline_assignment***;'];
-        yield 'a number followed by letters' => ['password: 1234abcd;', 'password: ***REDACTED:inline_assignment***;'];
-        yield 'letters followed by a number' => ['password: abcd1234;', 'password: ***REDACTED:inline_assignment***;'];
+        yield 'a word starting like null' => ['$password = nullable1234;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'a word starting like true' => ['$password = true1234;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'a word ending like false' => ['$password = notfalse;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'a number followed by letters' => ['$password = 1234abcd;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'letters followed by a number' => ['$password = abcd1234;', '$password = ***REDACTED:inline_assignment***;'];
         yield 'a cast before a quoted literal' => ["\$password = (string) 'hunter2hunter2';", "\$password = (string) '***REDACTED:inline_assignment***';"];
         yield 'a cast before an unquoted literal' => ['$password = (int) hunter2xx;', '$password = (int) ***REDACTED:inline_assignment***;'];
     }
@@ -509,6 +509,31 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a list of tokens' => ["tokens:\n    - ".self::GHP.'_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij', "tokens:\n    - \"***REDACTED:github_token***\""];
         yield 'a bearer header' => ['Authorization: Bearer '.str_repeat('a1B2', 8), 'Authorization: "***REDACTED:bearer_token***"'];
         yield 'a jwt' => ['jwt: '.self::JWT.'hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c', 'jwt: "***REDACTED:jwt***"'];
+    }
+
+    #[DataProvider('yamlScalarsEndingInACloserCases')]
+    public function test_a_yaml_scalar_ending_in_a_closer_is_redacted_whole_so_the_document_still_parses(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertNotNull(Yaml::parse($output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function yamlScalarsEndingInACloserCases(): iterable
+    {
+        yield 'a semicolon' => ["a:\n  password: S3cr3t;\n", "a:\n  password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a colon' => ["a:\n  password: Adm1n:pw:\n", "a:\n  password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a double quote' => ["a:\n  password: S3cr3t\"\n", "a:\n  password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a single quote' => ["a:\n  password: S3cr3t'\n", "a:\n  password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a run of closers' => ["a:\n  password: S3cr3t;:\"';\n", "a:\n  password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a closer before a comment' => ["a:\n  password: S3cr3t; # the database\n", "a:\n  password: \"***REDACTED:inline_assignment***\" # the database\n"];
+        yield 'a closer at the end of the file' => ["a:\n  password: S3cr3t;", "a:\n  password: \"***REDACTED:inline_assignment***\""];
+        yield 'a closer before a windows line ending' => ["a:\r\n  password: S3cr3t;\r\n", "a:\r\n  password: \"***REDACTED:inline_assignment***\"\r\n"];
+        yield 'a closer on a list item' => ["a:\n  - password: S3cr3t;\n", "a:\n  - password: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a closer on a quoted key' => ["a:\n  'password': S3cr3t;\n", "a:\n  'password': \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a closer on a dotted key at the top of the document' => ["app.secret: S3cr3t;\nb: 1\n", "app.secret: \"***REDACTED:inline_assignment***\"\nb: 1\n"];
     }
 
     #[DataProvider('redactedValuesThatAreNoYamlScalarCases')]
@@ -1467,6 +1492,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'placeholder openings after colons' => [str_repeat(': ***REDACTED:x', 34952)];
         yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
         yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
+        yield 'a placeholder entry followed by closers and a word' => ['k: ***REDACTED:inline_assignment***'.str_repeat(';', 524288).'x'];
+        yield 'placeholder entries followed by words' => [str_repeat("k: ***REDACTED:inline_assignment***;x\n", 13000)];
     }
 
     #[DataProvider('hostileContentWithTheJitCases')]
@@ -1484,6 +1511,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'credential key openings' => [str_repeat("('db_password', ", 32768)];
         yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
         yield 'password function openings' => [str_repeat('password_hash(', 37449)];
+        yield 'a placeholder entry followed by closers and a word' => ['k: ***REDACTED:inline_assignment***'.str_repeat(';', 524288).'x'];
     }
 
     #[DataProvider('hostileContentRedactedCases')]
@@ -1519,6 +1547,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a block scalar of a hundred thousand lines' => ["secret: |\n".str_repeat("  x\n", 100000), "secret: |\n  ***REDACTED:block_scalar***".str_repeat("\n", 100000)];
         yield 'a private key cut after thirty thousand lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("MIIEowIBAAKCAQEAx\n", 30000), '***REDACTED:pem_private_key***'.str_repeat("\n", 30001)];
         yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
+        yield 'a yaml entry ending in half a megabyte of closers' => ['password: abcd'.str_repeat(';', 524288), 'password: "***REDACTED:inline_assignment***"'];
+        yield 'yaml entries ending in a closer' => [str_repeat("password: abcd;\n", 30000), str_repeat("password: \"***REDACTED:inline_assignment***\"\n", 30000)];
     }
 
     #[RunInSeparateProcess]
