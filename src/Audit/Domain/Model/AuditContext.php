@@ -17,9 +17,10 @@ use DateTimeImmutable;
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\FindingReviewRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRecorderInterface;
 
-final class AuditContext implements CoverageRecorderInterface, RejectedFindingRecorderInterface
+final class AuditContext implements CoverageRecorderInterface, RejectedFindingRecorderInterface, FindingReviewRecorderInterface
 {
     /** @var list<ProjectFile> */
     private array $projectFiles = [];
@@ -37,8 +38,11 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     /** @var array<string, mixed> */
     private array $metadata = [];
 
-    /** @var list<array{stage: string, file: string, status: string}> */
+    /** @var array<int, array{stage: string, file: string, status: string}> */
     private array $coverage = [];
+
+    /** @var array<string, list<int>> the ledger positions of the review failures recorded for a finding, by vulnerability id */
+    private array $reviewFailurePositions = [];
 
     /** @var list<Vulnerability> */
     private array $pendingReviewedFindings = [];
@@ -341,7 +345,21 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     #[Override]
     public function recordCoverage(string $stage, string $filePath, string $status): void
     {
-        $this->coverage[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];
+        $this->appendCoverage($stage, $filePath, $status);
+    }
+
+    #[Override]
+    public function recordFindingReview(Vulnerability $vulnerability, string $status): void
+    {
+        $position = $this->appendCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), $status);
+
+        if ('validated' === $status || 'rejected' === $status) {
+            $this->supersedeReviewFailures($vulnerability);
+
+            return;
+        }
+
+        $this->reviewFailurePositions[$vulnerability->id()][] = $position;
     }
 
     /**
@@ -349,7 +367,21 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
      */
     public function coverage(): array
     {
-        return $this->coverage;
+        return array_values($this->coverage);
+    }
+
+    private function appendCoverage(string $stage, string $filePath, string $status): int
+    {
+        $this->coverage[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];
+
+        return array_key_last($this->coverage);
+    }
+
+    private function supersedeReviewFailures(Vulnerability $vulnerability): void
+    {
+        foreach ($this->reviewFailurePositions[$vulnerability->id()] ?? [] as $position) {
+            unset($this->coverage[$position]);
+        }
     }
 
     #[Override]

@@ -17,6 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\FindingReviewRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
@@ -36,7 +37,8 @@ final readonly class ReviewerCoverageRecorder
         CoverageRecorderInterface $coverageRecorder,
         ProgressReporterInterface $progressReporter,
     ): void {
-        $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), $status);
+        self::recordEntry($vulnerability, $status, $coverageRecorder);
+
         if ('rejected' === $status && $coverageRecorder instanceof RejectedFindingRecorderInterface) {
             $coverageRecorder->recordRejectedFinding($vulnerability);
         }
@@ -48,5 +50,16 @@ final readonly class ReviewerCoverageRecorder
             'file' => $vulnerability->filePath(),
             'line' => $vulnerability->lineStart(),
         ]);
+    }
+
+    private static function recordEntry(Vulnerability $vulnerability, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        if ($coverageRecorder instanceof FindingReviewRecorderInterface) {
+            $coverageRecorder->recordFindingReview($vulnerability, $status);
+
+            return;
+        }
+
+        $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), $status);
     }
 }
