@@ -21,43 +21,33 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
  */
 final readonly class BlockCommentStripper
 {
-    public function __construct(
-        private StringLiteralMasker $stringLiteralMasker = new StringLiteralMasker(),
-    ) {}
-
     /**
      * @return array{line: string, inside_block_comment: bool}
      */
     public function strip(string $line, bool $insideBlockComment): array
     {
-        $kept = '';
-        $remaining = $line;
-
-        while (null !== $remaining) {
-            if ($insideBlockComment) {
-                $remaining = $this->textAfterCommentEnd($remaining);
-                $insideBlockComment = false;
-
-                continue;
-            }
-
-            $openOffset = strpos($this->stringLiteralMasker->mask($remaining), '/*');
-            if (false === $openOffset) {
-                return ['line' => $kept.$remaining, 'inside_block_comment' => false];
-            }
-
-            $kept .= substr($remaining, 0, $openOffset);
-            $remaining = substr($remaining, $openOffset + 2);
-            $insideBlockComment = true;
-        }
-
-        return ['line' => $kept, 'inside_block_comment' => true];
+        return $insideBlockComment || str_contains($line, '/*')
+            ? $this->scan($line, $insideBlockComment)
+            : ['line' => $line, 'inside_block_comment' => false];
     }
 
-    private function textAfterCommentEnd(string $text): ?string
+    /**
+     * @return array{line: string, inside_block_comment: bool}
+     */
+    private function scan(string $line, bool $insideBlockComment): array
     {
-        $closeOffset = strpos($text, '*/');
+        $closingLimits = LiteralScanState::closingLimits($line);
+        $state = CommentScanState::start($line, $insideBlockComment);
+        $kept = '';
 
-        return false === $closeOffset ? null : substr($text, $closeOffset + 2);
+        foreach (str_split($line) as $offset => $char) {
+            $state = $state->advance($line, $offset, $char, $closingLimits);
+
+            if (!$state->swallows($offset)) {
+                $kept .= $char;
+            }
+        }
+
+        return ['line' => $kept, 'inside_block_comment' => $state->endsInsideComment()];
     }
 }

@@ -37,7 +37,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 31;
+    public const int CACHE_VERSION = 32;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -146,7 +146,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'File I/O sink — verify the path is not built from user input (path traversal, LFI, arbitrary read/write/delete)',
             ],
             'dynamic_file_inclusion' => [
-                'regex' => '/\b(?:require_once|require|include_once|include)\b[^;]*\$/',
+                'regex' => '/\b(?:require_once|require|include_once|include)\b[^;]{0,512}\$/',
                 'description' => 'include/require with a variable path — verify the included path is not user-controlled (LFI / RCE)',
             ],
             'upload_handling' => [
@@ -246,7 +246,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::LIVE_COMPONENT->value => [
             'live_prop_writable' => [
-                'regex' => '/#\[\s*LiveProp\s*\([^)]*writable\s*:\s*true/',
+                'regex' => '/#\[\s*LiveProp\s*\([^)]{0,512}writable\s*:\s*true/',
                 'description' => 'Writable LiveProp — client-controlled before any action runs; verify it is not a privileged or owned-resource field',
             ],
             'live_action_endpoint' => [
@@ -318,7 +318,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'A credential-shaped value was redacted here before analysis — a real secret is committed in this file',
             ],
             'trusted_proxies_wildcard' => [
-                'regex' => '/(?:trusted_proxies\s*:|TRUSTED_PROXIES\s*=)[^\n]*(?:0\.0\.0\.0\/0|::\/0)|trusted_proxies\s*:[^\S\n]*\n(?:[^\S\n]*-[^\n]*\n)*?[^\S\n]*-[^\n]*(?:0\.0\.0\.0\/0|::\/0)/is',
+                'regex' => '/(?:trusted_proxies\s*:|TRUSTED_PROXIES\s*=)[^\n]{0,512}(?:0\.0\.0\.0\/0|::\/0)|trusted_proxies\s*:[^\S\n]*\n(?:[^\S\n]*-[^\n]*\n)*?[^\S\n]*-[^\n]*(?:0\.0\.0\.0\/0|::\/0)/is',
                 'description' => 'trusted_proxies set to a wildcard CIDR (0.0.0.0/0, ::/0) — any client can spoof X-Forwarded-* headers, defeating IP allowlists and rate limiters',
             ],
             'weak_password_hasher_algorithm' => [
@@ -338,7 +338,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => "Content-Security-Policy directive allows 'unsafe-inline'/'unsafe-eval' — defeats CSP's main protection against script injection",
             ],
             'hsts_disabled' => [
-                'regex' => '/forced_ssl\s*:[^\n]*\benabled\s*:\s*false\b|^(\h*)forced_ssl\s*:[^\n]*+(?:\n\1\h++[^\n]*+)*?\n\1\h++enabled\s*:\s*false\b/sm',
+                'regex' => '/forced_ssl\s*:[^\n]{0,512}\benabled\s*:\s*false\b|^(\h*)forced_ssl\s*:[^\n]*+(?:\n\1\h++[^\n]*+)*?\n\1\h++enabled\s*:\s*false\b/sm',
                 'description' => 'NelmioSecurity forced_ssl.enabled: false — HSTS not enforced, leaving the app open to SSL-stripping on the first plaintext request',
             ],
             'app_debug_enabled' => [
@@ -360,13 +360,13 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'SelfValidatingPassport — skips credential check; verify the flow is OAuth/token, not password',
             ],
             'supports_returns_null' => [
-                'regex' => '/public\s+function\s+supports\s*\([^)]*\)\s*:\s*\??bool\s*\{[\s\S]{0,500}?return\s+null\s*;/s',
+                'regex' => '/public\s+function\s+supports\s*\([^)]{0,512}\)\s*:\s*\??bool\s*\{[\s\S]{0,500}?return\s+null\s*;/s',
                 'description' => 'supports() returning null — Symfony treats null as "supports", silently letting non-matching paths through',
             ],
         ],
         ProjectFileType::LDAP_SERVICE->value => [
             'ldap_unescaped_filter_concat' => [
-                'regex' => '/->query\s*\([^)]*[\'"][^\'"]*\.\s*\$|ldap_search\s*\([^)]*\.\s*\$/',
+                'regex' => '/->query\s*\([^)]{0,512}[\'"][^\'"]{0,512}\.\s*\$|ldap_search\s*\([^)]{0,512}\.\s*\$/',
                 'description' => 'LDAP filter built with string concatenation — verify the interpolated value is passed through ldap_escape() first (LDAP injection)',
             ],
             'ldap_bind_variable_password' => [
