@@ -292,6 +292,66 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_a_rule_scores_only_the_findings_the_baseline_leaves_open(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Accepted.php');
+        $open = $this->makeValidatedVuln(VulnerabilityType::XSS, VulnerabilitySeverity::LOW, 'src/Open.php');
+
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($vulnerability, $open), [$vulnerability->fingerprint()]);
+
+        $rules = $decoded['runs'][0]['tool']['driver']['rules'];
+        self::assertCount(1, $rules);
+        self::assertSame('3.1', array_values($rules)[0]['properties']['security-severity'] ?? null);
+        self::assertSame(['9.3', '3.1'], array_map(static fn (array $result): string => $result['properties']['security-severity'], $decoded['runs'][0]['results']));
+        self::assertSame([true, false], $this->suppressedFlags($decoded['runs'][0]['results']));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_rule_carries_the_highest_score_among_the_findings_the_baseline_leaves_open(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Accepted.php');
+        $high = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'src/High.php');
+        $low = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW, 'src/Low.php');
+
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($low, $vulnerability, $high), [$vulnerability->fingerprint()]);
+
+        self::assertSame('8.1', array_values($decoded['runs'][0]['tool']['driver']['rules'])[0]['properties']['security-severity'] ?? null);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_rule_whose_findings_are_all_accepted_by_the_baseline_carries_no_security_severity(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Accepted.php');
+        $open = $this->makeValidatedVuln(VulnerabilityType::BROKEN_ACCESS_CONTROL, VulnerabilitySeverity::LOW, 'src/Open.php');
+
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($vulnerability, $open), [$vulnerability->fingerprint()]);
+
+        $rules = $decoded['runs'][0]['tool']['driver']['rules'];
+        self::assertSame(
+            [VulnerabilityType::SQL_INJECTION->owaspReference(), VulnerabilityType::BROKEN_ACCESS_CONTROL->owaspReference()],
+            array_map(static fn (array $rule): mixed => $rule['id'], $rules),
+        );
+        self::assertSame(['external/cwe/cwe-89', 'security'], $rules[0]['properties']['tags'] ?? null);
+        self::assertArrayNotHasKey('security-severity', $rules[0]['properties']);
+        self::assertSame('3.1', $rules[1]['properties']['security-severity'] ?? null);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_a_rule_shared_by_two_types_carries_both_cwe_tags(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -915,8 +975,8 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
-     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
-     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>, suppressions?: list<array{kind: string, justification: string}>}>,
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, properties: array{tags: list<string>, 'security-severity'?: string}}>}},
+     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>, properties: array{'security-severity': string}, suppressions?: list<array{kind: string, justification: string}>}>,
      *         properties?: array<string, mixed>
      *     }>
      * }
@@ -925,7 +985,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     {
         self::assertInstanceOf(BaselineSuppressingReportRendererInterface::class, $this->renderer);
         $decoded = json_decode($this->renderer->renderWithSuppressions($auditReport, $baselinedFingerprints), true);
-        $this->assertSarifShape($decoded);
+        $this->assertSuppressedSarifShape($decoded);
 
         return $decoded;
     }
@@ -960,6 +1020,22 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * } $value
      */
     private function assertSarifShape(mixed $value): void
+    {
+        self::assertIsArray($value);
+    }
+
+    /**
+     * @phpstan-assert array{
+     *     "$schema": string,
+     *     version: string,
+     *     runs: list<array{
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, properties: array{tags: list<string>, 'security-severity'?: string}}>}},
+     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>, properties: array{'security-severity': string}, suppressions?: list<array{kind: string, justification: string}>}>,
+     *         properties?: array<string, mixed>
+     *     }>
+     * } $value
+     */
+    private function assertSuppressedSarifShape(mixed $value): void
     {
         self::assertIsArray($value);
     }
