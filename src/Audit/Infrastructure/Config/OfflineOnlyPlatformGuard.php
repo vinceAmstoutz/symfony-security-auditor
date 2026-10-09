@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
-use Uri\Rfc3986\Uri;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 
 /**
@@ -45,15 +44,15 @@ final readonly class OfflineOnlyPlatformGuard
      */
     private function assertProviderIsLocal(string $provider, array $providerConfig): void
     {
-        $urls = $this->urlsIn($providerConfig);
+        $endpoints = $this->endpointsIn($providerConfig);
 
-        if ([] === $urls) {
+        if ([] === $endpoints) {
             throw NonLocalPlatformEndpointException::forProviderWithoutEndpoint($provider);
         }
 
-        foreach ($urls as $url) {
-            if (!$this->isLocal($url)) {
-                throw NonLocalPlatformEndpointException::forProvider($provider, $url);
+        foreach ($endpoints as $endpoint) {
+            if (!$this->isLocal($endpoint)) {
+                throw NonLocalPlatformEndpointException::forProvider($provider, $endpoint->origin());
             }
         }
     }
@@ -61,51 +60,39 @@ final readonly class OfflineOnlyPlatformGuard
     /**
      * @param array<array-key, mixed> $providerConfig
      *
-     * @return list<string>
+     * @return list<PlatformEndpoint>
      */
-    private function urlsIn(array $providerConfig): array
+    private function endpointsIn(array $providerConfig): array
     {
-        $urls = [];
-        foreach ($providerConfig as $value) {
+        $endpoints = [];
+        foreach ($providerConfig as $key => $value) {
             if (\is_array($value)) {
-                $urls = [...$urls, ...$this->urlsIn($value)];
+                $endpoints = [...$endpoints, ...$this->endpointsIn($value)];
 
                 continue;
             }
 
-            $url = $this->endpointIn($value);
-            if (null !== $url) {
-                $urls[] = $url;
+            $endpoint = $this->endpointIn($key, $value);
+            if ($endpoint instanceof PlatformEndpoint) {
+                $endpoints[] = $endpoint;
             }
         }
 
-        return $urls;
+        return $endpoints;
     }
 
-    private function endpointIn(mixed $value): ?string
+    private function endpointIn(int|string $key, mixed $value): ?PlatformEndpoint
     {
-        if (!\is_string($value)) {
+        if (PlatformApiKey::names($key) || !\is_string($value)) {
             return null;
         }
 
-        $url = ContainerParameterSyntax::unescape($value);
-
-        return $this->isEndpoint($url) ? $url : null;
+        return PlatformEndpoint::tryFrom(ContainerParameterSyntax::unescape($value));
     }
 
-    private function isEndpoint(string $value): bool
+    private function isLocal(PlatformEndpoint $platformEndpoint): bool
     {
-        return null !== Uri::parse($value)?->getScheme();
-    }
-
-    private function isLocal(string $url): bool
-    {
-        $host = Uri::parse($url)?->getHost();
-        if (null === $host || '' === $host) {
-            return false;
-        }
-
-        $host = trim($host, '[]');
+        $host = trim($platformEndpoint->host, '[]');
 
         if ('localhost' === $host || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
             return true;
