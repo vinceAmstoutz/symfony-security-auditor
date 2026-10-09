@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsag
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -272,6 +273,132 @@ final class AuditOrchestratorSeverityPrecedenceTest extends TestCase
     }
 
     /**
+     * @param list<array{VulnerabilitySeverity, int, int}> $reportedFirst    severity, line start and line end of each finding the first iteration reports
+     * @param array{VulnerabilitySeverity, int, int}       $reportedLater    the finding the second iteration reports, at the line start of the first
+     * @param list<array{int, int, string}>                $expectedFindings line start, line end and severity of the validated findings the report keeps
+     *
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    #[DataProvider('sameStartReReports')]
+    public function test_a_re_report_at_the_start_line_of_a_validated_finding_collapses_with_the_validated_findings_it_now_overlaps(array $reportedFirst, array $reportedLater, array $expectedFindings): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            AuditOrchestratorHarness::attackerResponse(array_map($this->payloadAt(...), $reportedFirst)),
+            AuditOrchestratorHarness::attackerResponse([$this->payloadAt($reportedLater)]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn(AuditOrchestratorHarness::reviewerAcceptResponse());
+
+        $auditContext = AuditOrchestratorHarness::contextWithMapping($this->tmpDir);
+
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertSame($expectedFindings, $this->validatedFindingsOf($auditContext));
+    }
+
+    /**
+     * @return iterable<string, array{list<array{VulnerabilitySeverity, int, int}>, array{VulnerabilitySeverity, int, int}, list<array{int, int, string}>}>
+     */
+    public static function sameStartReReports(): iterable
+    {
+        yield 'widened over a validated neighbour it outranks' => [
+            [[VulnerabilitySeverity::HIGH, 11, 12], [VulnerabilitySeverity::MEDIUM, 13, 14]],
+            [VulnerabilitySeverity::CRITICAL, 11, 14],
+            [[11, 14, 'critical']],
+        ];
+        yield 'widened over a validated neighbour that outranks it' => [
+            [[VulnerabilitySeverity::MEDIUM, 11, 12], [VulnerabilitySeverity::CRITICAL, 13, 14]],
+            [VulnerabilitySeverity::HIGH, 11, 14],
+            [[11, 12, 'medium'], [13, 14, 'critical']],
+        ];
+        yield 'widened short of a validated neighbour' => [
+            [[VulnerabilitySeverity::MEDIUM, 11, 12], [VulnerabilitySeverity::MEDIUM, 30, 31]],
+            [VulnerabilitySeverity::HIGH, 11, 14],
+            [[11, 14, 'high'], [30, 31, 'medium']],
+        ];
+        yield 'raised in place with no neighbour' => [
+            [[VulnerabilitySeverity::MEDIUM, 11, 12]],
+            [VulnerabilitySeverity::HIGH, 11, 12],
+            [[11, 12, 'high']],
+        ];
+    }
+
+    /**
+     * @param list<array{VulnerabilitySeverity, int, int}> $reportedFirst
+     * @param array{VulnerabilitySeverity, int, int}       $reportedLater
+     *
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    #[DataProvider('sameSeverityReReports')]
+    public function test_a_re_report_that_absorbs_a_validated_neighbour_asks_for_another_attacker_pass(array $reportedFirst, array $reportedLater, int $expectedIterations): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            AuditOrchestratorHarness::attackerResponse(array_map($this->payloadAt(...), $reportedFirst)),
+            AuditOrchestratorHarness::attackerResponse([[...$this->payloadAt($reportedLater), 'confidence' => 0.95]]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn(AuditOrchestratorHarness::reviewerAcceptResponse());
+
+        $auditContext = AuditOrchestratorHarness::contextWithMapping($this->tmpDir);
+
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertSame($expectedIterations, $auditContext->getMeta('audit.iterations'));
+    }
+
+    /**
+     * @return iterable<string, array{list<array{VulnerabilitySeverity, int, int}>, array{VulnerabilitySeverity, int, int}, int}>
+     */
+    public static function sameSeverityReReports(): iterable
+    {
+        yield 'a neighbour of another severity is absorbed' => [[[VulnerabilitySeverity::HIGH, 11, 12], [VulnerabilitySeverity::MEDIUM, 13, 14]], [VulnerabilitySeverity::HIGH, 11, 14], 3];
+        yield 'nothing else is absorbed' => [[[VulnerabilitySeverity::HIGH, 11, 12]], [VulnerabilitySeverity::HIGH, 11, 14], 2];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_finding_the_reviewer_rejected_earlier_is_not_validated_beside_a_validated_finding_that_covers_its_range(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            AuditOrchestratorHarness::attackerResponse([$this->payloadAt([VulnerabilitySeverity::MEDIUM, 14, 14])]),
+            AuditOrchestratorHarness::attackerResponse([$this->payloadAt([VulnerabilitySeverity::HIGH, 12, 15])]),
+            AuditOrchestratorHarness::attackerResponse([$this->payloadAt([VulnerabilitySeverity::MEDIUM, 14, 14])]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            LLMResponse::of((string) json_encode(['accepted' => false]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+            AuditOrchestratorHarness::reviewerAcceptResponse(),
+            AuditOrchestratorHarness::reviewerAcceptResponse(),
+        );
+
+        $auditContext = AuditOrchestratorHarness::contextWithMapping($this->tmpDir);
+
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertSame([[12, 15, 'high']], $this->validatedFindingsOf($auditContext));
+        self::assertSame(7, $auditContext->riskScore());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
@@ -501,6 +628,20 @@ final class AuditOrchestratorSeverityPrecedenceTest extends TestCase
             new VulnerabilityNarrative('d', 'a', 'p', 'r'),
             'c',
         );
+    }
+
+    /**
+     * @return list<array{int, int, string}> line start, line end and severity of each validated finding, ordered by line start
+     */
+    private function validatedFindingsOf(AuditContext $auditContext): array
+    {
+        $findings = array_map(
+            static fn (Vulnerability $vulnerability): array => [$vulnerability->lineStart(), $vulnerability->lineEnd(), $vulnerability->severity()->value],
+            array_values($auditContext->validatedVulnerabilities()),
+        );
+        usort($findings, static fn (array $left, array $right): int => $left[0] <=> $right[0]);
+
+        return $findings;
     }
 
     /**

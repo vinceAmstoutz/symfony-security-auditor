@@ -445,17 +445,18 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * type (e.g. a reviewer's `adjusted_severity`/`corrected_type` applied on
      * re-discovery) — a verdict never lowers the severity already reported.
      *
-     * A finding at a new id that overlaps validated findings of the same file
-     * and type collapses with them: it is admitted only when it outranks every
-     * one of them, and then takes their place.
+     * A finding that overlaps other validated findings of the same file and
+     * type, whether it sits at a new id or replaces the finding of its own id,
+     * collapses with them: it is admitted only when it outranks every one of
+     * them, and then takes their place.
      *
-     * @return list<Vulnerability>|null the findings the admitted one replaces, null when it is a duplicate
+     * @return list<Vulnerability>|null the validated findings the admitted one replaces, null when it is a duplicate
      */
     private function admit(Vulnerability $vulnerability, AuditContext $auditContext): ?array
     {
         $existingById = $auditContext->vulnerabilities()[$vulnerability->id()] ?? null;
-        if ($existingById instanceof Vulnerability) {
-            return $this->isSameIdDuplicate($existingById, $vulnerability) ? null : [$existingById];
+        if ($existingById instanceof Vulnerability && $this->isSameIdDuplicate($existingById, $vulnerability)) {
+            return null;
         }
 
         $overlapped = $this->overlappingValidated($vulnerability, $auditContext);
