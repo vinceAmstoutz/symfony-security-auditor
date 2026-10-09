@@ -524,6 +524,15 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame(['password' => '***REDACTED:inline_assignment***', 'roles' => ['ROLE_USER']], Yaml::parse($output));
     }
 
+    public function test_a_php_file_holding_a_flood_of_unmatched_closers_is_scrubbed_as_text(): void
+    {
+        $closers = str_repeat(')', 16000);
+
+        $output = $this->regexSecretScrubber->scrub("<?php \$api_key = SOMEVALUE12;\n".$closers);
+
+        self::assertSame("<?php \$api_key = ***REDACTED:inline_assignment***;\n".$closers, $output);
+    }
+
     #[DataProvider('unquotedCredentialsFollowedByCodeCases')]
     public function test_an_unquoted_credential_is_redacted_without_the_closing_syntax_that_follows_it(string $input, string $expected): void
     {

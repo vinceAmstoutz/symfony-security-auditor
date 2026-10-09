@@ -1786,6 +1786,25 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_skips_a_file_holding_a_flood_of_unmatched_closing_brackets(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route('/admin')]
+                public function dashboard() { return 1; }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source.str_repeat(')', 16000));
+
+        self::assertSame([], $this->phpParserControllerAccessControlParser->parse($projectFile));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $relativePath, string $content): ProjectFile
     {
         return ProjectFile::create($relativePath, '/app/'.$relativePath, $content);

@@ -54,6 +54,46 @@ final class NestingDepthGuardTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('closersPastTheLimit')]
+    public function test_it_refuses_a_file_holding_a_flood_of_unmatched_closers_and_names_it_in_a_warning(string $closer): void
+    {
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('unmatched closing brackets'),
+                self::identicalTo(['file' => 'src/Controller/X.php', 'max_unmatched_closers' => 1000]),
+            );
+
+        $admitted = (new NestingDepthGuard($logger))->admits($this->fileWith(str_repeat($closer, 16000)));
+
+        self::assertFalse($admitted);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function closersPastTheLimit(): iterable
+    {
+        yield 'parentheses' => [')'];
+        yield 'square brackets' => [']'];
+        yield 'curly braces' => ['}'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_admits_a_file_holding_as_many_unmatched_closers_as_the_limit_and_refuses_one_more(): void
+    {
+        $nestingDepthGuard = new NestingDepthGuard();
+
+        self::assertTrue($nestingDepthGuard->admits($this->fileWith(str_repeat(')', 1000))));
+        self::assertFalse($nestingDepthGuard->admits($this->fileWith(str_repeat(')', 1001))));
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function nestingConstructsPastTheLimit(): iterable
