@@ -1,0 +1,10 @@
+{
+  "anthropic": {
+    "models": {
+      "claude-old": {
+        "cost": { "input": 1, "output": 2 },
+        "last_updated": "2020-01-01"
+      }
+    }
+  }
+}

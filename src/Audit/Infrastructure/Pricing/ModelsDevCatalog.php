@@ -71,6 +71,48 @@ final readonly class ModelsDevCatalog
     }
 
     /**
+     * Whether the catalog in `$path` is a strictly newer snapshot than the one
+     * in `$otherPath`. One that cannot be read, or whose models carry no date,
+     * is neither newer nor older than anything.
+     */
+    public static function isFileNewer(?string $path, ?string $otherPath): bool
+    {
+        $update = self::newestUpdateInFile($path);
+        $otherUpdate = self::newestUpdateInFile($otherPath);
+
+        if (null === $update || null === $otherUpdate) {
+            return false;
+        }
+
+        return 0 < strcmp($update, $otherUpdate);
+    }
+
+    /**
+     * The newest `last_updated` any model of the catalog carries: how fresh a
+     * snapshot is, since the file itself holds no version. A catalog whose
+     * models carry none has no date.
+     *
+     * @param array<array-key, mixed> $catalog
+     */
+    public static function newestUpdate(array $catalog): ?string
+    {
+        $updates = [];
+
+        foreach ($catalog as $provider) {
+            array_push($updates, ...self::providerUpdates($provider));
+        }
+
+        return [] === $updates ? null : max($updates);
+    }
+
+    private static function newestUpdateInFile(?string $path): ?string
+    {
+        $catalog = self::fromFile($path);
+
+        return \is_array($catalog) ? self::newestUpdate($catalog) : null;
+    }
+
+    /**
      * A model whose cost is not a priced one keeps its entry but loses the
      * cost, which leaves it unpriced instead of billed at a rate nobody set.
      *
@@ -115,6 +157,27 @@ final readonly class ModelsDevCatalog
         }
 
         return $model;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function providerUpdates(mixed $provider): array
+    {
+        $models = \is_array($provider) ? ($provider['models'] ?? null) : null;
+        if (!\is_array($models)) {
+            return [];
+        }
+
+        $updates = [];
+        foreach ($models as $model) {
+            $update = \is_array($model) ? ($model['last_updated'] ?? null) : null;
+            if (\is_string($update)) {
+                $updates[] = $update;
+            }
+        }
+
+        return $updates;
     }
 
     /**

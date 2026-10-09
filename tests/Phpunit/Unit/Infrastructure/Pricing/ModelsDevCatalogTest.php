@@ -64,6 +64,40 @@ final class ModelsDevCatalogTest extends TestCase
         yield 'an infinite cache write rate' => [['input' => 5, 'cache_write' => \INF]];
     }
 
+    /** @param array<array-key, mixed> $catalog */
+    #[DataProvider('catalogsWithUpdates')]
+    public function test_it_reads_the_newest_update_any_model_carries(array $catalog, ?string $expected): void
+    {
+        self::assertSame($expected, ModelsDevCatalog::newestUpdate($catalog));
+    }
+
+    /** @return iterable<string, array{array<array-key, mixed>, ?string}> */
+    public static function catalogsWithUpdates(): iterable
+    {
+        yield 'the last of several in ascending order' => [['p' => ['models' => ['a' => ['last_updated' => '2026-01-01'], 'b' => ['last_updated' => '2026-03-05']]]], '2026-03-05'];
+        yield 'the first of several in descending order' => [['p' => ['models' => ['a' => ['last_updated' => '2026-03-05'], 'b' => ['last_updated' => '2026-01-01']]]], '2026-03-05'];
+        yield 'the newest of the middle' => [['p' => ['models' => ['a' => ['last_updated' => '2026-01-01'], 'b' => ['last_updated' => '2026-03-05'], 'c' => ['last_updated' => '2026-02-02']]]], '2026-03-05'];
+        yield 'one provider after another' => [['p' => ['models' => ['a' => ['last_updated' => '2026-03-05']]], 'q' => ['models' => ['b' => ['last_updated' => '2026-04-01']]], 'r' => ['models' => ['c' => ['last_updated' => '2026-02-02']]]], '2026-04-01'];
+        yield 'a day after the same month alone' => [['p' => ['models' => ['a' => ['last_updated' => '2026-06'], 'b' => ['last_updated' => '2026-06-09']]]], '2026-06-09'];
+        yield 'a month alone before the same month, a day later' => [['p' => ['models' => ['a' => ['last_updated' => '2026-06-09'], 'b' => ['last_updated' => '2026-06']]]], '2026-06-09'];
+        yield 'only a model with a date string counts' => [['p' => ['models' => [
+            'none' => ['id' => 'none'],
+            'null' => ['last_updated' => null],
+            'number' => ['last_updated' => 20261231],
+            'list' => ['last_updated' => ['2026-12-31']],
+            'text' => 'not a model',
+            'dated' => ['last_updated' => '2026-01-01'],
+        ]]], '2026-01-01'];
+        yield 'providers without models are skipped' => [[
+            'notes' => 'not a provider',
+            'bare' => ['name' => 'Bare'],
+            'listing' => ['models' => 'not a map'],
+            'dated' => ['models' => ['a' => ['last_updated' => '2026-01-01']]],
+        ], '2026-01-01'];
+        yield 'no model carries a date' => [['p' => ['models' => ['a' => ['id' => 'a']]]], null];
+        yield 'an empty catalog' => [[], null];
+    }
+
     public function test_it_drops_only_the_costs_that_are_not_priced(): void
     {
         $catalog = [

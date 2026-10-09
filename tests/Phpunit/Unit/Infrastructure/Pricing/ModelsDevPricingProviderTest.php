@@ -13,17 +13,31 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Pricing;
 
+use DateTimeImmutable;
 use JsonException;
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Stringable;
+use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevCatalog;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 
 final class ModelsDevPricingProviderTest extends TestCase
 {
     /** @var list<array{0: string, 1: array<array-key, mixed>}> */
     private array $loggedWarnings = [];
+
+    private ?string $overrideDirectory = null;
+
+    #[Override]
+    protected function tearDown(): void
+    {
+        if (null !== $this->overrideDirectory) {
+            (new Filesystem())->remove($this->overrideDirectory);
+        }
+    }
 
     public function test_it_prices_a_known_first_party_model(): void
     {
@@ -372,6 +386,58 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame([], $this->loggedWarnings);
     }
 
+    public function test_a_refreshed_catalog_older_than_the_packaged_one_gives_way_to_it(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('updated-2020-catalog.json', ModelsDevPricingProvider::CATALOG_PACKAGE);
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-opus-4-8'));
+        self::assertFalse($modelsDevPricingProvider->hasModel('claude-old'));
+        self::assertSame($modelsDevPricingProvider->packagedCatalogPath(), $modelsDevPricingProvider->effectiveCatalogPath());
+        self::assertSame([], $this->loggedWarnings);
+    }
+
+    public function test_a_refreshed_catalog_newer_than_the_packaged_one_is_kept(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('updated-2999-catalog.json', ModelsDevPricingProvider::CATALOG_PACKAGE);
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-old'));
+        self::assertFalse($modelsDevPricingProvider->hasModel('claude-opus-4-8'));
+        self::assertSame(__DIR__.'/Fixture/updated-2999-catalog.json', $modelsDevPricingProvider->effectiveCatalogPath());
+    }
+
+    public function test_a_dated_refreshed_catalog_is_kept_when_the_packaged_one_cannot_be_read(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('updated-2020-catalog.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-old'));
+        self::assertSame(__DIR__.'/Fixture/updated-2020-catalog.json', $modelsDevPricingProvider->effectiveCatalogPath());
+    }
+
+    #[DataProvider('daysFromThePackagedCatalog')]
+    public function test_the_packaged_catalog_wins_only_when_it_is_strictly_newer_than_the_refreshed_one(string $offset, bool $packagedWins): void
+    {
+        $packagedCatalogPath = (new ModelsDevPricingProvider($this->warningCapturingLogger()))->packagedCatalogPath();
+        $packagedCatalog = ModelsDevCatalog::fromFile($packagedCatalogPath);
+        self::assertIsArray($packagedCatalog);
+        $packagedUpdate = ModelsDevCatalog::newestUpdate($packagedCatalog);
+        self::assertIsString($packagedUpdate);
+        $overridePath = $this->writeOverrideUpdatedOn((new DateTimeImmutable($packagedUpdate))->modify($offset)->format('Y-m-d'));
+
+        $modelsDevPricingProvider = new ModelsDevPricingProvider($this->warningCapturingLogger(), $overridePath);
+
+        self::assertSame($packagedWins, $modelsDevPricingProvider->hasModel('claude-opus-4-8'));
+        self::assertSame(!$packagedWins, $modelsDevPricingProvider->hasModel('claude-old'));
+        self::assertSame($packagedWins ? $packagedCatalogPath : $overridePath, $modelsDevPricingProvider->effectiveCatalogPath());
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function daysFromThePackagedCatalog(): iterable
+    {
+        yield 'a day older' => ['-1 day', true];
+        yield 'the same day' => ['+0 days', false];
+        yield 'a day newer' => ['+1 day', false];
+    }
+
     public function test_it_names_the_override_when_neither_catalog_can_be_read(): void
     {
         $modelsDevPricingProvider = $this->providerForCatalog('does-not-exist.json');
@@ -535,6 +601,16 @@ final class ModelsDevPricingProviderTest extends TestCase
     private function providerServedBy(string $platform): ModelsDevPricingProvider
     {
         return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/platform-listings.json', 'vinceamstoutz/not-a-real-package', $platform);
+    }
+
+    private function writeOverrideUpdatedOn(string $date): string
+    {
+        $this->overrideDirectory = sys_get_temp_dir().'/ssa-pricing-'.bin2hex(random_bytes(6));
+        $overridePath = $this->overrideDirectory.'/models-dev.json';
+        $catalog = ['anthropic' => ['models' => ['claude-old' => ['cost' => ['input' => 1, 'output' => 2], 'last_updated' => $date]]]];
+        (new Filesystem())->dumpFile($overridePath, json_encode($catalog, \JSON_THROW_ON_ERROR));
+
+        return $overridePath;
     }
 
     private function providerForCatalog(string $fixture, string $package = 'vinceamstoutz/not-a-real-package'): ModelsDevPricingProvider
