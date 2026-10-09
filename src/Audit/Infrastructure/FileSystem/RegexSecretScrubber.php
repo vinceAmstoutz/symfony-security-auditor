@@ -108,6 +108,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     public function __construct(
         array $additionalPatterns = [],
         private LoggerInterface $logger = new NullLogger(),
+        private NonSecretValue $nonSecretValue = new NonSecretValue(),
     ) {
         $patterns = $this->defaultPatterns();
         foreach ($additionalPatterns as $index => $pattern) {
@@ -296,7 +297,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         $value = ($match[3] ?? '').($match[4] ?? '');
         $secret = '' === $quote ? rtrim($value, self::STATEMENT_CLOSERS) : $value;
 
-        if ($this->isKeptReadable($secret, $value, '' !== $quote)) {
+        if ($this->isKeptReadable($secret, $value, '' !== $quote) || $this->nonSecretValue->holdsNoSecret($match[1], $secret)) {
             return $match[0];
         }
 

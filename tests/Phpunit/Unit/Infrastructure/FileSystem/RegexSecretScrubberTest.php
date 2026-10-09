@@ -358,6 +358,65 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a token built by nested calls' => ['$token = unserialize(serialize(new TestBrowserToken()));'];
     }
 
+    #[DataProvider('valuesThatCannotBeASecretCases')]
+    public function test_a_value_that_cannot_be_a_secret_is_left_readable_under_a_credential_key(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function valuesThatCannotBeASecretCases(): iterable
+    {
+        yield 'a refresh token entity class' => ['refresh_token_class: App\\Entity\\RefreshToken'];
+        yield 'an access token entity class' => ['access_token_class: App\\Entity\\AccessToken'];
+        yield 'a class name with escaped separators in quotes' => ["refresh_token_class: 'App\\\\Entity\\\\RefreshToken'"];
+        yield 'a class name in a php array' => ["'refresh_token_class' => App\\Entity\\RefreshToken::class,"];
+        yield 'a class name starting at the root namespace' => ['access_token_class: \\App\\Entity\\AccessToken'];
+        yield 'a private key path built from a parameter' => ["secret_key: '%kernel.project_dir%/config/jwt/private.pem'"];
+        yield 'a path built from an environment variable' => ['password_file: "%env(CONFIG_DIR)%/pw.txt"'];
+        yield 'a private key absolute path' => ['private_key: /var/oauth/private.key'];
+        yield 'a private key relative path' => ['private_key: ./config/jwt/private.pem'];
+        yield 'a private key path in the parent directory' => ['private_key: ../config/jwt/private.pem'];
+        yield 'a private key path in the home directory' => ['private_key: ~/keys/private.pem'];
+        yield 'a quoted private key path' => ["private_key: '/var/oauth/private.key'"];
+        yield 'a token url' => ['access_token_url: https://github.com/login/oauth/access_token'];
+        yield 'a quoted token url' => ["access_token_url: 'https://github.com/login/oauth/access_token'"];
+        yield 'a token url without a path' => ['access_token_url: https://github.com'];
+        yield 'a token url over plain http' => ['access_token_uri: http://localhost:8080/token'];
+        yield 'a token endpoint' => ['access_token_endpoint: https://api.example.com/oauth/token'];
+        yield 'a validity in seconds' => ['reset_password_code_validity: 14400'];
+        yield 'a ttl' => ['access_token_ttl: 3600'];
+        yield 'a lifetime' => ['refresh_token_lifetime: 2592000'];
+        yield 'an expiry' => ['refresh_token_expiry: 2592000'];
+        yield 'a length' => ['secret_length: 32'];
+    }
+
+    #[DataProvider('valuesThatMayBeASecretCases')]
+    public function test_a_value_that_may_be_a_secret_is_still_redacted_under_a_credential_key(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function valuesThatMayBeASecretCases(): iterable
+    {
+        yield 'a word that is no class name' => ['refresh_token_class: abcdefgh', 'refresh_token_class: "***REDACTED:inline_assignment***"'];
+        yield 'a name with a single segment' => ['password: AppEntity', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a name with a dash between segments' => ['password: App\\Entity-Token', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a url with a query string' => ['access_token_url: https://example.com/cb?token=abcdef', 'access_token_url: "***REDACTED:inline_assignment***"'];
+        yield 'a url with a fragment' => ['access_token_url: https://example.com/cb#abcdef', 'access_token_url: "***REDACTED:inline_assignment***"'];
+        yield 'a url with a user part' => ['access_token_url: https://user@example.com/cb', 'access_token_url: "***REDACTED:inline_assignment***"'];
+        yield 'a url under a key that is no url key' => ['access_token: https://example.com/abcdef', 'access_token: "***REDACTED:inline_assignment***"'];
+        yield 'a word under a url key' => ['access_token_url: abcdefgh', 'access_token_url: "***REDACTED:inline_assignment***"'];
+        yield 'a number under a key that is no duration key' => ['password: 12345678', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a number followed by letters under a duration key' => ['access_token_ttl: 3600abc', 'access_token_ttl: "***REDACTED:inline_assignment***"'];
+        yield 'a decimal number under a duration key' => ['access_token_ttl: 36.00', 'access_token_ttl: "***REDACTED:inline_assignment***"'];
+        yield 'a path with a single segment' => ['private_key: /abcdefgh', 'private_key: "***REDACTED:inline_assignment***"'];
+        yield 'a path with a space' => ['private_key: /var/my key', 'private_key: "***REDACTED:inline_assignment***"'];
+        yield 'a word holding a percent pair' => ["secret: 'Pa%ss%word'", "secret: '***REDACTED:inline_assignment***'"];
+        yield 'a word holding a malformed parameter' => ["secret: 'Pa%ss.%word%'", "secret: '***REDACTED:inline_assignment***'"];
+    }
+
     #[DataProvider('credentialWrittenTheSymfonyOrPhpWayCases')]
     public function test_it_redacts_a_credential_written_the_way_a_symfony_or_php_file_does(string $input, string $expected): void
     {
@@ -1519,6 +1578,10 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a block scalar of a hundred thousand lines' => ["secret: |\n".str_repeat("  x\n", 100000), "secret: |\n  ***REDACTED:block_scalar***".str_repeat("\n", 100000)];
         yield 'a private key cut after thirty thousand lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("MIIEowIBAAKCAQEAx\n", 30000), '***REDACTED:pem_private_key***'.str_repeat("\n", 30001)];
         yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
+        yield 'a class name of a quarter of a million segments never completed' => ['refresh_token_class: '.str_repeat('a\\', 262144), 'refresh_token_class: "***REDACTED:inline_assignment***"'];
+        yield 'a path of a quarter of a million segments never completed' => ['private_key: '.str_repeat('/a', 262144).'!', 'private_key: "***REDACTED:inline_assignment***"'];
+        yield 'parameter openings that never close' => ['secret: '.str_repeat('%a.', 174762), 'secret: "***REDACTED:inline_assignment***"'];
+        yield 'a url of half a megabyte with a query string' => ['access_token_url: https://example.com/'.str_repeat('a', 524200).'?a=b', 'access_token_url: "***REDACTED:inline_assignment***"'];
     }
 
     #[RunInSeparateProcess]
