@@ -20,6 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AccessContr
 
 final class AccessControlRuleMatcherTest extends TestCase
 {
+    private const string BACKTRACKING_RULE = '^/(?:(a+)+z|a+)$';
+
     /**
      * @param list<string>                $routeMethods
      * @param array<string, list<string>> $routeAccessMap
@@ -51,5 +53,23 @@ final class AccessControlRuleMatcherTest extends TestCase
         yield 'route methods are compared case-insensitively' => ['/admin', ['get'], null, ['^/admin' => ['ROLE_ADMIN', 'methods: GET']], ['ROLE_ADMIN', 'methods: GET']];
         yield 'pattern holding a delimiter candidate' => ['/a#b', ['GET'], null, ['^/a#b$' => ['ROLE_HASH']], ['ROLE_HASH']];
         yield 'pattern holding every delimiter candidate' => ['/#~!%@', ['GET'], null, ['#~!%@' => ['ROLE_ALL']], null];
+        yield 'rule that backtracks within the match bound still governs the route' => ['/'.str_repeat('a', 9), ['GET'], null, [self::BACKTRACKING_RULE => ['ROLE_SLOW']], ['ROLE_SLOW']];
+        yield 'rule that backtracks beyond the match bound governs nothing' => ['/'.str_repeat('a', 17), ['GET'], null, [self::BACKTRACKING_RULE => ['ROLE_SLOW']], null];
+        yield 'rule that backtracks beyond the match bound leaves the route to the next rule' => ['/'.str_repeat('a', 17), ['GET'], null, [self::BACKTRACKING_RULE => ['ROLE_SLOW'], '^/a' => ['ROLE_NEXT']], ['ROLE_NEXT']];
+    }
+
+    public function test_the_backtrack_limit_in_place_before_matching_is_back_afterwards(): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/'.str_repeat('a', 17), ['GET'], true, [], false, false);
+        $previousLimit = ini_set('pcre.backtrack_limit', '123456');
+
+        try {
+            AccessControlRuleMatcher::rolesFor($routeAccessControl, [self::BACKTRACKING_RULE => ['ROLE_SLOW']]);
+            $limitAfterwards = \ini_get('pcre.backtrack_limit');
+        } finally {
+            ini_set('pcre.backtrack_limit', (string) $previousLimit);
+        }
+
+        self::assertSame('123456', $limitAfterwards);
     }
 }

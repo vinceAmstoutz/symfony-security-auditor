@@ -816,6 +816,34 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('COVERED_BY access_control', $message);
     }
 
+    public function test_the_access_control_map_of_a_mapping_is_evaluated_once_across_chunks(): void
+    {
+        $symfonyMapping = $this->mappingWithBacktrackingRule();
+
+        $this->attackerPromptBuilder->buildUserMessage([], $symfonyMapping);
+        $errorAfterFirstChunk = preg_last_error();
+        preg_match('//', '');
+        $this->attackerPromptBuilder->buildUserMessage([], $symfonyMapping);
+
+        self::assertSame([\PREG_BACKTRACK_LIMIT_ERROR, \PREG_NO_ERROR], [$errorAfterFirstChunk, preg_last_error()]);
+    }
+
+    public function test_another_mapping_gets_its_own_access_control_map(): void
+    {
+        $this->attackerPromptBuilder->buildUserMessage([], $this->mappingWithBacktrackingRule());
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(
+                routeAccessMap: ['^/a' => ['ROLE_SECOND']],
+                routeAccessControls: [new RouteAccessControl('src/Controller/X.php', 'index', '/a', ['GET'], true, [], false, false)],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([], $symfonyMapping);
+
+        self::assertStringContainsString('COVERED_BY access_control[ROLE_SECOND]', $message);
+    }
+
     /**
      * @throws InvalidProjectFileException
      */
@@ -2340,5 +2368,16 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertLessThan($scopePosition, $rubricsPosition);
         self::assertLessThan($examplePosition, $scopePosition);
         self::assertLessThan($rulesPosition, $examplePosition);
+    }
+
+    private function mappingWithBacktrackingRule(): SymfonyMapping
+    {
+        return SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(
+                routeAccessMap: ['^/(?:(a+)+z|a+)$' => ['ROLE_SLOW']],
+                routeAccessControls: [new RouteAccessControl('src/Controller/X.php', 'index', '/'.str_repeat('a', 17), ['GET'], true, [], false, false)],
+            ),
+        );
     }
 }

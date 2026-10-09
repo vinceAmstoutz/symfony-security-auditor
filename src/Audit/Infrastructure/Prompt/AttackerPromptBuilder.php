@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
+use WeakMap;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInterface
@@ -35,11 +36,23 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
     public const bool DEFAULT_EMIT_ALL_SKILLS = false;
 
+    /**
+     * The route access-control section of every mapping this builder has
+     * rendered, dropped with it: it is the same for every chunk and iteration
+     * of a run, and matching every route against every `access_control` rule
+     * is the costly part of a prompt.
+     *
+     * @var WeakMap<SymfonyMapping, string>
+     */
+    private WeakMap $weakMap;
+
     public function __construct(
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
         private bool $emitAllSkills = self::DEFAULT_EMIT_ALL_SKILLS,
         private AttackerSkillRegistry $attackerSkillRegistry = new AttackerSkillRegistry(),
-    ) {}
+    ) {
+        $this->weakMap = new WeakMap();
+    }
 
     /**
      * @param list<ProjectFile> $files
@@ -73,7 +86,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         ));
 
         $firewallRules = SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping);
-        $accessControlMap = SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
+        $accessControlMap = $this->routeAccessControlMap($symfonyMapping);
         $voterCoverage = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
         $formBindings = SymfonyMappingContextRenderer::renderFormBindings($symfonyMapping);
         $closingInstruction = $this->closingInstruction();
@@ -92,6 +105,15 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
             {$closingInstruction}
             PROMPT;
+    }
+
+    private function routeAccessControlMap(SymfonyMapping $symfonyMapping): string
+    {
+        if (!$this->weakMap->offsetExists($symfonyMapping)) {
+            $this->weakMap[$symfonyMapping] = SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
+        }
+
+        return $this->weakMap[$symfonyMapping];
     }
 
     private function closingInstruction(): string

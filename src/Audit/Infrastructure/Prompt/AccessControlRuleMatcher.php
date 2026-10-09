@@ -24,6 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
  */
 final readonly class AccessControlRuleMatcher
 {
+    private const string BACKTRACK_LIMIT = '10000';
+
     private const string DELIMITER_CANDIDATES = '#~!%@';
 
     /**
@@ -74,7 +76,10 @@ final readonly class AccessControlRuleMatcher
      * (`^/(admin`) and returns false; a warning-throwing error handler
      * (Symfony debug, `mcp:serve`) would abort the prompt build on a pattern
      * taken from the audited repository, so the warning is captured here and
-     * the pattern simply matches nothing.
+     * the pattern simply matches nothing. A pattern from that repository can
+     * also backtrack catastrophically (`^/(a+)+$`), so the evaluation runs
+     * under {@see self::BACKTRACK_LIMIT}: a rule that exhausts it matches
+     * nothing either.
      */
     private static function patternMatches(string $delimitedPattern, string $routePath): bool
     {
@@ -85,9 +90,12 @@ final readonly class AccessControlRuleMatcher
             return true;
         });
 
+        $previousLimit = ini_set('pcre.backtrack_limit', self::BACKTRACK_LIMIT);
+
         try {
             return 1 === preg_match($delimitedPattern, $routePath);
         } finally {
+            ini_set('pcre.backtrack_limit', $previousLimit);
             restore_error_handler();
         }
     }
