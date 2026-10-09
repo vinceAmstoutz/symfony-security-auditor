@@ -92,6 +92,51 @@ final class AuditConfigurationDefinitionTest extends TestCase
     }
 
     /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('modelOverrideKeys')]
+    public function test_a_blank_model_override_is_refused_naming_the_key(array $path): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('The path "symfony_security_auditor.%s" cannot contain an empty value, but got "".', implode('.', $path)));
+
+        $this->process([self::nested($path, '')]);
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('modelOverrideKeys')]
+    public function test_an_explicit_null_model_override_is_accepted_as_null(array $path): void
+    {
+        $processed = $this->process([self::nested($path, null)]);
+
+        self::assertNull($this->valueAt($processed, $path));
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('modelOverrideKeys')]
+    public function test_a_model_override_that_is_not_text_is_refused_naming_the_key(array $path): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "string", but got "int".', implode('.', $path)));
+
+        $this->process([self::nested($path, 4)]);
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>}>
+     */
+    public static function modelOverrideKeys(): iterable
+    {
+        yield 'attacker_model' => [['attacker_model']];
+        yield 'reviewer_model' => [['reviewer_model']];
+        yield 'audit.escalation.cheap_model' => [['audit', 'escalation', 'cheap_model']];
+    }
+
+    /**
      * @return iterable<string, array{non-empty-list<string>}>
      */
     public static function nullableNumericKeys(): iterable

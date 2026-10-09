@@ -23,10 +23,12 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\NodeInterface;
 use Symfony\Component\Config\Definition\PrototypedArrayNode;
 use Symfony\Component\DependencyInjection\Compiler\MergeExtensionConfigurationPass;
+use Symfony\Component\DependencyInjection\Compiler\ValidateEnvPlaceholdersPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 final class EnvPlaceholderOnTypedSettingTest extends TestCase
@@ -66,6 +68,55 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
         yield 'the failing risk level' => [['audit' => ['fail_on' => '%env(SSA_FAIL_ON)%']], 'symfony_security_auditor.audit.fail_on'];
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('choicesCheckedAgainstAFixedList')]
+    public function test_a_placeholder_on_a_choice_checked_against_a_fixed_list_is_refused_naming_the_key(array $config, string $path): void
+    {
+        $this->expectException(TypedNodeEnvPlaceholderException::class);
+        $this->expectExceptionMessage(\sprintf('"%s"', $path));
+
+        $this->mergeConfiguration($config);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function choicesCheckedAgainstAFixedList(): iterable
+    {
+        yield 'the default report format' => [['audit' => ['format' => '%env(SSA_FORMAT)%']], 'symfony_security_auditor.audit.format'];
+        yield 'the since closure' => [['audit' => ['since_closure' => '%env(SSA_CLOSURE)%']], 'symfony_security_auditor.audit.since_closure'];
+        yield 'an excluded type' => [['audit' => ['excluded_types' => ['sql_injection', '%env(SSA_TYPE)%']]], 'symfony_security_auditor.audit.excluded_types.1'];
+        yield 'an included type' => [['audit' => ['included_types' => ['%env(SSA_TYPE)%']]], 'symfony_security_auditor.audit.included_types.0'];
+        yield 'the chunking strategy' => [['audit' => ['chunking' => ['strategy' => '%env(SSA_STRATEGY)%']]], 'symfony_security_auditor.audit.chunking.strategy'];
+        yield 'the PoC severity floor' => [['audit' => ['poc_synthesis' => ['severity_floor' => '%env(SSA_FLOOR)%']]], 'symfony_security_auditor.audit.poc_synthesis.severity_floor'];
+        yield 'the fix severity floor' => [['audit' => ['fix_synthesis' => ['severity_floor' => '%env(SSA_FLOOR)%']]], 'symfony_security_auditor.audit.fix_synthesis.severity_floor'];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('modelSettings')]
+    public function test_a_placeholder_on_a_model_setting_is_taken_and_left_for_the_container_to_resolve(array $config, string $parameter): void
+    {
+        $containerBuilder = $this->mergeConfiguration($config);
+
+        $value = $containerBuilder->getParameter($parameter);
+        self::assertIsString($value);
+        self::assertStringContainsString('env_', $value);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function modelSettings(): iterable
+    {
+        yield 'the attacker model' => [['attacker_model' => self::PLACEHOLDER], 'symfony_security_auditor.attacker_model'];
+        yield 'the reviewer model' => [['reviewer_model' => self::PLACEHOLDER], 'symfony_security_auditor.reviewer_model'];
+        yield 'the cheap escalation model' => [['audit' => ['escalation' => ['enabled' => true, 'cheap_model' => self::PLACEHOLDER]]], 'symfony_security_auditor.cache.cheap_attacker_key_salt'];
+    }
+
     public function test_a_placeholder_on_a_string_setting_is_left_for_the_container_to_resolve(): void
     {
         $containerBuilder = $this->mergeConfiguration(['model' => '%env(SSA_MODEL)%']);
@@ -79,7 +130,7 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
      * @param array<string, mixed> $config
      */
     #[DataProvider('everySetting')]
-    public function test_a_placeholder_on_any_setting_is_either_taken_or_refused_with_a_configuration_error(array $config): void
+    public function test_a_placeholder_on_any_setting_is_either_taken_or_refused_by_name(array $config): void
     {
         $failure = null;
 
@@ -89,7 +140,7 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
             $failure = $throwable;
         }
 
-        self::assertThat($failure, self::logicalOr(self::isNull(), self::isInstanceOf(InvalidConfigurationException::class)));
+        self::assertThat($failure, self::logicalOr(self::isNull(), self::isInstanceOf(TypedNodeEnvPlaceholderException::class)));
     }
 
     /**
@@ -147,6 +198,10 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
             $configuration += ['file_type' => 'controller', 'instructions' => 'Look for secrets.'];
         }
 
+        if ('custom_risk_patterns' === ($path[1] ?? null)) {
+            $configuration += ['regex' => '/unserialize/', 'description' => 'Unserializes input.'];
+        }
+
         foreach (array_reverse($path) as $key) {
             $configuration = [$key => $configuration];
         }
@@ -172,6 +227,7 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
         $containerBuilder->loadFromExtension('symfony_security_auditor', $config);
 
         (new MergeExtensionConfigurationPass())->process($containerBuilder);
+        (new ValidateEnvPlaceholdersPass())->process($containerBuilder);
 
         return $containerBuilder;
     }

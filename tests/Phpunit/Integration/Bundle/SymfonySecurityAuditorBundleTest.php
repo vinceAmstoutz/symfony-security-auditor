@@ -480,6 +480,35 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $this->boot(['model' => 'gpt-4o', 'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => '']]]);
     }
 
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_bundle_boots_with_env_placeholders_on_the_model_settings_and_reads_them_when_it_runs(): void
+    {
+        putenv('SSA_ATTACKER_MODEL=attacker-from-env');
+        putenv('SSA_REVIEWER_MODEL=reviewer-from-env');
+        putenv('SSA_CHEAP_MODEL=cheap-from-env');
+
+        try {
+            $kernel = $this->boot([
+                'attacker_model' => '%env(SSA_ATTACKER_MODEL)%',
+                'reviewer_model' => '%env(SSA_REVIEWER_MODEL)%',
+                'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => '%env(SSA_CHEAP_MODEL)%']],
+            ]);
+
+            $container = $kernel->getContainer();
+            self::assertSame('attacker-from-env', $container->getParameter('symfony_security_auditor.attacker_model'));
+            self::assertSame('reviewer-from-env', $container->getParameter('symfony_security_auditor.reviewer_model'));
+            self::assertSame(
+                ['attacker-from-env', 'reviewer-from-env', 'cheap-from-env'],
+                $container->getParameter('symfony_security_auditor.audit.models_requiring_pricing'),
+            );
+        } finally {
+            putenv('SSA_ATTACKER_MODEL');
+            putenv('SSA_REVIEWER_MODEL');
+            putenv('SSA_CHEAP_MODEL');
+        }
+    }
+
     public function test_bundle_accepts_a_null_attacker_model_falling_back_to_model(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'attacker_model' => null]);

@@ -24,7 +24,7 @@ final class TypedNodeEnvPlaceholderException extends InvalidConfigurationExcepti
     public static function forPaths(array $paths): self
     {
         return new self(\sprintf(
-            'Invalid configuration for path %s: an environment variable placeholder ("%%env(...)%%") is not supported on this setting, which the bundle reads while the container is built, before the variable has a value. Set a literal value instead.',
+            'Invalid configuration for path %s: an environment variable placeholder ("%%env(...)%%") is not supported on this setting, which the bundle reads or checks while the container is built, before the variable has a value. Set a literal value instead.',
             implode(', ', array_map(static fn (string $path): string => \sprintf('"%s"', $path), $paths)),
         ));
     }

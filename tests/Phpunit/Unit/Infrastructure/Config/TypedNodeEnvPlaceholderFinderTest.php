@@ -47,6 +47,9 @@ final class TypedNodeEnvPlaceholderFinderTest extends TestCase
         yield 'a flag in another section' => [['cache' => ['enabled' => null]], ['symfony_security_auditor.cache.enabled']];
         yield 'a choice read as a PHP enum' => [['audit' => ['fail_on' => null]], ['symfony_security_auditor.audit.fail_on']];
         yield 'the profile' => [['profile' => null], ['symfony_security_auditor.profile']];
+        yield 'a choice checked against a fixed list of text values' => [['audit' => ['format' => null]], ['symfony_security_auditor.audit.format']];
+        yield 'a choice checked against a fixed list, in a nested section' => [['audit' => ['chunking' => ['strategy' => null]]], ['symfony_security_auditor.audit.chunking.strategy']];
+        yield 'a list of choices checked against a fixed list' => [['audit' => ['excluded_types' => [null, null]]], ['symfony_security_auditor.audit.excluded_types.0', 'symfony_security_auditor.audit.excluded_types.1']];
         yield 'a number inside a keyed list' => [['audit' => ['custom_skills' => ['xss' => ['priority' => null]]]], ['symfony_security_auditor.audit.custom_skills.xss.priority']];
         yield 'a choice read as a PHP enum inside a keyed list' => [['audit' => ['custom_skills' => ['xss' => ['file_type' => null]]]], ['symfony_security_auditor.audit.custom_skills.xss.file_type']];
         yield 'a whole section' => [['audit' => null], ['symfony_security_auditor.audit']];
@@ -82,8 +85,7 @@ final class TypedNodeEnvPlaceholderFinderTest extends TestCase
         yield 'the model' => [['model' => null]];
         yield 'a nested string' => [['audit' => ['escalation' => ['cheap_model' => null]]]];
         yield 'a list of strings' => [['scan' => ['included_paths' => [null]]]];
-        yield 'a choice kept as text' => [['audit' => ['format' => null]]];
-        yield 'a list of choices kept as text' => [['audit' => ['excluded_types' => [null]]]];
+        yield 'a model override' => [['attacker_model' => null]];
     }
 
     /**
