@@ -50,7 +50,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
      * useful within a single working day against missing newly-disclosed
      * advisories for longer than necessary.
      */
-    private const int TTL_SECONDS = 86_400;
+    public const int TTL_SECONDS = 86_400;
 
     private LockfileHasher $lockfileHasher;
 
