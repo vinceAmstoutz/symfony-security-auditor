@@ -21,7 +21,6 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
-use Symfony\AI\Platform\Exception\UnexpectedResultTypeException;
 use Symfony\AI\Platform\FinishReason\FinishReason;
 use Symfony\AI\Platform\FinishReason\FinishReasonCase;
 use Symfony\AI\Platform\Message\AssistantMessage;
@@ -907,7 +906,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_complete_releases_the_rate_limiter_reservation_when_the_result_has_no_text(): void
+    public function test_complete_answers_a_result_with_no_text_as_empty_content_and_settles_the_rate_limiter_reservation(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
         $platform = $this->scriptedPlatform([new MultiPartResult([new ToolCallResult([new ToolCall('1', 'someTool')])])]);
@@ -917,16 +916,11 @@ final class SymfonyAiLLMClientTest extends TestCase
             platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
-        $threw = false;
-        try {
-            $symfonyAiLLMClient->complete('s', 'u');
-        } catch (UnexpectedResultTypeException) {
-            $threw = true;
-        }
+        $llmResponse = $symfonyAiLLMClient->complete('s', 'u');
 
-        self::assertTrue($threw);
+        self::assertSame('', $llmResponse->content());
         self::assertCount(1, $fakeRateLimiter->acquired);
-        self::assertSame([[0, 0]], $fakeRateLimiter->recorded);
+        self::assertCount(1, $fakeRateLimiter->recorded);
     }
 
     /**
