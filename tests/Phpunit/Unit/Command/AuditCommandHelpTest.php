@@ -13,11 +13,30 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
+use Symfony\Component\Console\Attribute\Option;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandHelp;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 
 final class AuditCommandHelpTest extends TestCase
 {
+    #[DataProvider('outputFormats')]
+    public function test_the_help_lists_every_output_format(OutputFormat $outputFormat): void
+    {
+        self::assertMatchesRegularExpression($this->standaloneWord($outputFormat), AuditCommandHelp::HELP);
+    }
+
+    #[DataProvider('outputFormats')]
+    public function test_the_format_option_description_names_every_output_format(OutputFormat $outputFormat): void
+    {
+        $option = (new ReflectionProperty(AuditCommandInput::class, 'format'))->getAttributes(Option::class)[0]->newInstance();
+
+        self::assertMatchesRegularExpression($this->standaloneWord($outputFormat), $option->description);
+    }
+
     public function test_exit_code_two_documentation_covers_the_preflight_unpriced_model_abort_with_no_report_emitted(): void
     {
         self::assertStringContainsString('an unpriced model', AuditCommandHelp::HELP);
@@ -42,6 +61,21 @@ final class AuditCommandHelpTest extends TestCase
     public function test_the_output_documentation_names_the_flag_that_prints_a_configured_report(): void
     {
         self::assertStringContainsString('switched off for one run by --no-output, which prints the report', $this->flattened());
+    }
+
+    /**
+     * @return iterable<string, array{OutputFormat}>
+     */
+    public static function outputFormats(): iterable
+    {
+        foreach (OutputFormat::cases() as $outputFormat) {
+            yield $outputFormat->value => [$outputFormat];
+        }
+    }
+
+    private function standaloneWord(OutputFormat $outputFormat): string
+    {
+        return \sprintf('/(?<![\w-])%s(?![\w-])/', preg_quote($outputFormat->value, '/'));
     }
 
     private function flattened(): string

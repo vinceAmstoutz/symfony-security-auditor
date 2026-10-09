@@ -40,7 +40,7 @@ final class AuditCommandInput
     #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory.')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit or github', shortcut: 'f')]
+    #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit, github or github-comment', shortcut: 'f')]
     public OutputFormat $format = OutputFormat::Console;
 
     #[Option(description: 'Output file path (any format)', shortcut: 'o')]
