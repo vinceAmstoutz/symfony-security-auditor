@@ -31,7 +31,8 @@ interface SkippedFileReportingProjectFileScannerInterface extends ProjectFileSca
      * returns for the same project, or what
      * {@see ScopedProjectFileScannerInterface::scanWithin()} returns when
      * `$scanPaths` is given: project-relative paths that replace the
-     * configured scan surface, as the `--path` values of a run do.
+     * configured scan surface, as the `--path` values of a run do when that
+     * surface holds nothing under them.
      *
      * @param list<string> $scanPaths none scans the configured paths
      */

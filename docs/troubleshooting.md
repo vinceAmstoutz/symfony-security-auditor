@@ -204,7 +204,7 @@ To audit part of a project, name the project and give the part with `--path`, re
 symfony-security-auditor audit /path/to/project --path src/Command
 ```
 
-An absolute `--path` inside the project is accepted, and one outside it is refused. _Since 1.22_ `--path` replaces `scan.included_paths` for the run, so it reaches a folder the configured scope does not (`--path apps/api` on a monorepo); it still has to exist in the project and hold PHP, Twig, YAML or XML files. If a scan still lists nothing, the warning names the project and the `--path` values it applied: `No files matched under "/home/me" for --path src/Command.`
+An absolute `--path` inside the project is accepted, and one outside it is refused. `--path` narrows `scan.included_paths` to the part under it; _since 1.22_, when the configured scope holds nothing under the path, the path itself is scanned, so it reaches a folder the configured scope leaves out (`--path apps/api` on a monorepo). Either way it has to exist in the project and hold PHP, Twig, YAML or XML files. If a scan still lists nothing, the warning names the project and the `--path` values it applied: `No files matched under "/home/me" for --path src/Command.`
 
 ### `[ERROR] Project does not look like a Symfony app`
 

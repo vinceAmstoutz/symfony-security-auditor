@@ -142,7 +142,7 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
-    public function test_a_path_the_configured_scan_does_not_reach_is_scanned_because_the_flag_wins(): void
+    public function test_a_path_the_configured_scan_does_not_reach_is_scanned_itself(): void
     {
         $process = $this->audit([$this->project, '--path', 'apps/api', '--show-scanned'], $this->elsewhere);
 
@@ -169,7 +169,7 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
-    public function test_a_path_wins_over_an_included_paths_that_the_user_config_narrowed(): void
+    public function test_a_path_outside_an_included_paths_that_the_user_config_narrowed_is_scanned_itself(): void
     {
         $this->filesystem->dumpFile(
             $this->base.'/config/symfony-security-auditor/config.yaml',
@@ -186,7 +186,24 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
-    public function test_a_path_wins_over_a_project_config_which_wins_over_the_user_config(): void
+    public function test_a_path_wider_than_the_included_paths_of_the_user_config_audits_only_the_configured_part(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->base.'/config/symfony-security-auditor/config.yaml',
+            "platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\nmodel: 'gpt-4'\nscan:\n  included_paths:\n    - src/Controller\n",
+        );
+
+        $process = $this->audit([$this->project, '--path', 'src', '--show-scanned'], $this->elsewhere);
+        $widerPathAndOneOutside = $this->audit([$this->project, '--path', 'src', '--path', 'apps/api', '--show-scanned'], $this->elsewhere);
+
+        self::assertSame(0, $process->getExitCode());
+        self::assertSame(0, $widerPathAndOneOutside->getExitCode());
+        $this->assertListsExactly(['src/Controller/BlogController.php'], $this->displayOf($process));
+        $this->assertListsExactly(['src/Controller/BlogController.php'], $this->displayOf($widerPathAndOneOutside));
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_path_outside_a_project_config_which_wins_over_the_user_config_is_scanned_itself(): void
     {
         $this->filesystem->dumpFile(
             $this->base.'/config/symfony-security-auditor/config.yaml',

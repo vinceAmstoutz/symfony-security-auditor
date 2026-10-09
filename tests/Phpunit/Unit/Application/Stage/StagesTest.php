@@ -166,7 +166,7 @@ final class StagesTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      */
-    public function test_ingestion_stage_scans_the_context_scan_paths_instead_of_the_configured_ones_when_the_scanner_can_take_them(): void
+    public function test_ingestion_stage_scans_a_context_scan_path_the_configured_scan_does_not_reach_when_the_scanner_can_take_it(): void
     {
         $recordingScopedScanner = new RecordingScopedScanner(
             [ProjectFile::create('src/Configured.php', '/app/src/Configured.php', '<?php')],
@@ -177,7 +177,28 @@ final class StagesTest extends TestCase
         (new IngestionStage($recordingScopedScanner, new NullLogger()))->process($auditContext);
 
         self::assertSame(['apps/api/src/Outside.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
-        self::assertSame([['scanWithin', ['apps/api']], ['scan', null]], $recordingScopedScanner->calls);
+        self::assertSame([['scan', null], ['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_ingestion_stage_audits_the_configured_files_under_a_context_scan_path_without_scanning_it_again(): void
+    {
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [
+                ProjectFile::create('src/Configured.php', '/app/src/Configured.php', '<?php'),
+                ProjectFile::create('config/services.yaml', '/app/config/services.yaml', 'services: {}'),
+            ],
+            [ProjectFile::create('src/Configured.php', '/app/src/Configured.php', '<?php'), ProjectFile::create('src/Unconfigured.php', '/app/src/Unconfigured.php', '<?php')],
+        );
+        $auditContext = AuditContext::forProject($this->tmpDir, ['src']);
+
+        (new IngestionStage($recordingScopedScanner, new NullLogger()))->process($auditContext);
+
+        self::assertSame(['src/Configured.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
+        self::assertSame([['scan', null]], $recordingScopedScanner->calls);
     }
 
     /**

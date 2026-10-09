@@ -53,7 +53,7 @@ final class AuditCommandInput
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
     public bool $dryRun = false;
 
-    #[Option(description: 'List the files that would be audited (the configured included_paths, or the --path values that replace them) and exit, without invoking the LLM. Use it to confirm your scan scope. Combine with --dry-run to also print the cost estimate.', name: 'show-scanned')]
+    #[Option(description: 'List the files that would be audited (those of the configured included_paths under any --path, or the --path values themselves when the configured scope holds nothing under them) and exit, without invoking the LLM. Use it to confirm your scan scope. Combine with --dry-run to also print the cost estimate.', name: 'show-scanned')]
     public bool $showScanned = false;
 
     #[Option(description: 'Bypass the attacker and reviewer caches for this run: skip cache reads so every chunk and verdict hits the LLM, and skip cache writes so existing entries stay untouched. Useful after upgrading the auditor or when you need to force a fresh analysis.', name: 'no-cache')]
@@ -62,7 +62,7 @@ final class AuditCommandInput
     /**
      * @var list<string>
      */
-    #[Option(description: 'Scan these directories or files of the project (relative to the project root) instead of the configured scan.included_paths. Repeat the option to give several. Useful for monorepos where only one app should be audited. By default the configured scope is scanned.', name: 'path', shortcut: 'p')]
+    #[Option(description: 'Narrow the scan to these directories or files of the project (relative to the project root): only the files of scan.included_paths under them are audited, and when it holds none, the paths themselves are scanned. Repeat the option to give several. Useful for monorepos where only one app should be audited. By default the configured scope is scanned.', name: 'path', shortcut: 'p')]
     public array $paths = [];
 
     #[Option(description: 'Diff mode: audit only files changed against the given git ref (e.g. main, origin/main, abc1234). Honors both committed changes (ref...HEAD) and uncommitted working-tree changes. Designed for CI on pull requests; the cache stays warm for unchanged files.', name: 'since')]
