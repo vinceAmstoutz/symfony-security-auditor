@@ -434,7 +434,7 @@ Diagnostic order:
 3. **Raise `audit.max_iterations`** to `5` — the loop stops early when no new findings emerge; a stronger pass can surface more.
 4. **Switch to a stronger model** — Claude Opus and GPT-5.6 consistently outperform small models.
 5. **Check the file actually got scanned** — run with `--show-scanned` to list the files in scope (the progress line `Auditing N file(s)` gives the count, and `chunk i/M` the chunks); in a Symfony application, `-vv` also logs the ingested file and chunk counts.
-6. **`scan.respect_gitignore: true`** silently skips files in `.gitignore`. Set to `false` to include them.
+6. **`scan.respect_gitignore: true`** silently skips untracked files in `.gitignore` (a file git tracks is still scanned). Set to `false` to include them.
 7. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files. Each file it drops is listed in the report as not analyzed, so the run reports itself incomplete.
 
 ### Report has too many false positives
