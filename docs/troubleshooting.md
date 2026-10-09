@@ -560,7 +560,7 @@ symfony_security_auditor:
 Causes (each logs a `warning` via `LoggerInterface`, except the deliberate `offline_only` case below):
 
 - **`composer` not in `PATH`** — install Composer 2.4+ on the audit host.
-- **`composer.lock` missing, a symlink or over 8 MiB** — run `composer install` first; advisory data comes from the lockfile, which is copied into a private directory for the audit and refused when it is not a regular file of at most 8 MiB.
+- **`composer.lock` missing, over 8 MiB, or a symlink out of the project** — run `composer install` first; advisory data comes from the lockfile, which is copied into a private directory for the audit and refused when it is not a regular file of at most 8 MiB. A `composer.lock` that is a symlink is followed when it leads to a regular file inside the project (a shared lockfile in a sub-directory, for instance), and refused when it points outside the project or at anything but a regular file.
 - **Malformed JSON output** — corrupted `composer.lock`. Regenerate it.
 - **Advisories of a private repository missing** — `composer audit` no longer reads the audited project's `composer.json`, so its `repositories` and `auth.json` do not apply; configure them in Composer's global configuration (`COMPOSER_HOME`) of the user running the audit.
 - **Process error** — network failure to Packagist. Retry: a lookup five minutes after a failed `composer audit` runs it again, and so does one after `composer.lock` changes; lookups in between answer with no advisory at once instead of waiting on a `composer audit` that timed out again.
@@ -570,7 +570,7 @@ When `lookup_advisory` returns empty, the audit continues without CVE data — n
 
 ### `composer audit` is slow
 
-Within a run it executes **once** and the result is cached for the lifetime of the request (a long-lived `mcp:serve` runs it again after 24h, so it sees the advisories disclosed since). Across runs, with `cache.enabled: true` (default), `LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h, keyed by a SHA-256 hash of `composer.lock` — an unchanged lockfile skips `composer audit` entirely on the next run. A `composer.lock` that is a symlink or larger than 8 MiB is never read for that hash, so its run is not cached, and an output that is not a JSON document with an `advisories` map is never stored. If it's still the bottleneck, you can pre-warm it before the audit or override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing a baked snapshot.
+Within a run it executes **once** and the result is cached for the lifetime of the request (a long-lived `mcp:serve` runs it again after 24h, so it sees the advisories disclosed since). Across runs, with `cache.enabled: true` (default), `LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h, keyed by a SHA-256 hash of `composer.lock` — an unchanged lockfile skips `composer audit` entirely on the next run. A `composer.lock` that is larger than 8 MiB, or a symlink out of the project or to anything but a regular file, is never read for that hash, so its run is not cached (a symlink to a regular file inside the project is hashed by its content), and an output that is not a JSON document with an `advisories` map is never stored. If it's still the bottleneck, you can pre-warm it before the audit or override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing a baked snapshot.
 
 ### Override the advisory source
 

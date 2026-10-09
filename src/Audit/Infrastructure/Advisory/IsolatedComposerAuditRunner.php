@@ -31,9 +31,10 @@ use function Symfony\Component\String\b;
  * `composer.json`, removed once the audit is done. The user's own Composer
  * configuration (`COMPOSER_HOME`) still applies.
  *
- * A lockfile that is missing, a symlink or larger than `MAX_LOCKFILE_BYTES` is
- * refused before it is read: the project is untrusted, and a `composer.lock`
- * symlinked to `/dev/zero` must not be copied.
+ * A lockfile that is missing, a symlink that does not lead to a regular file
+ * inside the project (`LockfileSymlinkResolver`) or larger than
+ * `MAX_LOCKFILE_BYTES` is refused before it is read: the project is untrusted,
+ * and a `composer.lock` symlinked to `/dev/zero` must not be copied.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -77,11 +78,12 @@ final readonly class IsolatedComposerAuditRunner implements ComposerAuditRunnerI
             throw AdvisorySourceUnavailableException::forUnusableLockfile($projectPath, 'composer.lock does not exist');
         }
 
-        if (is_link($lockfilePath)) {
-            throw AdvisorySourceUnavailableException::forUnusableLockfile($projectPath, 'composer.lock is a symlink');
+        $readablePath = LockfileSymlinkResolver::resolve($lockfilePath, $projectPath);
+        if (null === $readablePath) {
+            throw AdvisorySourceUnavailableException::forUnusableLockfile($projectPath, 'composer.lock is a symlink that does not lead to a regular file inside the project');
         }
 
-        $bytes = filesize($lockfilePath);
+        $bytes = filesize($readablePath);
         \assert(false !== $bytes, 'filesize() must succeed for a path exists() already confirmed present');
 
         if ($bytes > self::MAX_LOCKFILE_BYTES) {
@@ -89,7 +91,7 @@ final readonly class IsolatedComposerAuditRunner implements ComposerAuditRunnerI
         }
 
         try {
-            return $this->filesystem->readFile($lockfilePath);
+            return $this->filesystem->readFile($readablePath);
         } catch (IOException $ioException) {
             throw AdvisorySourceUnavailableException::forUnusableLockfile($projectPath, $ioException->getMessage(), $ioException);
         }
