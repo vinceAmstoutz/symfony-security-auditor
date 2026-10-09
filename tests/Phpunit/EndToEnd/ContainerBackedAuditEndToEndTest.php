@@ -590,11 +590,12 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
-    public function test_the_tools_of_a_scoped_run_read_a_scanned_file_outside_the_path(): void
+    #[DataProvider('toolScopeCases')]
+    public function test_the_tools_of_a_scoped_run_read_a_scanned_file_outside_the_path_only_in_the_scanned_scope(string $toolsScope, bool $readsTheScannedFile): void
     {
         FileReadingAuditPlatform::$answers = [];
         $kernel = $this->boot(
-            ['model' => 'gpt-4o', 'audit' => ['reviewer_tools_enabled' => true, 'reviewer_structured_collection' => false]],
+            ['model' => 'gpt-4o', 'audit' => ['reviewer_tools_enabled' => true, 'reviewer_structured_collection' => false, 'tools_scope' => $toolsScope]],
             FileReadingAuditPlatform::class,
         );
         $commandTester = $this->auditCommandTester($kernel);
@@ -602,10 +603,19 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $commandTester->execute(['project-path' => $this->fixtureDir, '--path' => ['src/Controller'], '--format' => 'json']);
 
         $report = $this->decode($commandTester->getDisplay());
-        $cleanService = (string) file_get_contents($this->fixtureDir.'/src/Service/Clean.php');
+        $answer = $readsTheScannedFile
+            ? (string) file_get_contents($this->fixtureDir.'/src/Service/Clean.php')
+            : 'Error: file "src/Service/Clean.php" is not part of the audited project.';
         self::assertSame(['src/Controller/AdminController.php'], $this->analyzedFiles($report));
-        self::assertSame(['attacker' => $cleanService, 'reviewer' => $cleanService], FileReadingAuditPlatform::$answers);
+        self::assertSame(['attacker' => $answer, 'reviewer' => $answer], FileReadingAuditPlatform::$answers);
         self::assertSame(['src/Controller/AdminController.php'], $this->filesWithFindings($report));
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function toolScopeCases(): iterable
+    {
+        yield 'the audited files, by default' => ['audited', false];
+        yield 'every scanned file, on request' => ['scanned', true];
     }
 
     #[RunInSeparateProcess]

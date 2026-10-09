@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
@@ -180,6 +182,39 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('console', $bundleConfiguration->audit->format);
         self::assertNull($bundleConfiguration->audit->output);
         self::assertNull($bundleConfiguration->audit->reportPathPrefix);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_keeps_the_tools_on_the_audited_files_when_the_key_is_omitted(): void
+    {
+        $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
+
+        self::assertSame(ToolsScope::Audited, $bundleConfiguration->audit->toolsScope);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    #[DataProvider('toolsScopes')]
+    public function test_from_array_maps_the_files_the_tools_may_open(string $configured, ToolsScope $toolsScope): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['tools_scope'] = $configured;
+
+        self::assertSame($toolsScope, BundleConfiguration::fromArray($config)->audit->toolsScope);
+    }
+
+    /**
+     * @return iterable<string, array{string, ToolsScope}>
+     */
+    public static function toolsScopes(): iterable
+    {
+        yield 'the audited files' => ['audited', ToolsScope::Audited];
+        yield 'every scanned file' => ['scanned', ToolsScope::Scanned];
     }
 
     /**

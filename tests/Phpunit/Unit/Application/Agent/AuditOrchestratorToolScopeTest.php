@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Validator\Validation;
@@ -28,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
@@ -68,6 +70,8 @@ final class AuditOrchestratorToolScopeTest extends TestCase
 
     private const string UNCHANGED_CONTENT = '<?php class FooRepository { /* unchanged-file-marker */ }';
 
+    private const string UNCHANGED_REFUSAL = 'Error: file "src/Repository/FooRepository.php" is not part of the audited project.';
+
     /**
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
@@ -75,7 +79,8 @@ final class AuditOrchestratorToolScopeTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    public function test_the_attackers_tools_read_a_scanned_file_the_narrowed_run_does_not_audit(): void
+    #[DataProvider('toolScopes')]
+    public function test_the_attackers_tools_read_a_scanned_file_the_narrowed_run_does_not_audit_only_in_the_scanned_scope(ToolsScope $toolsScope, string $expectedAnswer): void
     {
         $toolAnswers = [];
         $userMessages = [];
@@ -89,9 +94,9 @@ final class AuditOrchestratorToolScopeTest extends TestCase
             },
         );
 
-        $this->orchestrator($attackerLlm, self::createStub(LLMClientInterface::class), new ReviewerModeConfiguration())->orchestrate($this->narrowedContext());
+        $this->orchestrator($attackerLlm, self::createStub(LLMClientInterface::class), new ReviewerModeConfiguration(), $toolsScope)->orchestrate($this->narrowedContext());
 
-        self::assertSame([self::UNCHANGED_CONTENT], $toolAnswers);
+        self::assertSame([$expectedAnswer], $toolAnswers);
         self::assertStringNotContainsString('unchanged-file-marker', $userMessages[0]);
     }
 
@@ -102,7 +107,8 @@ final class AuditOrchestratorToolScopeTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    public function test_the_reviewers_tools_read_a_scanned_file_the_narrowed_run_does_not_audit(): void
+    #[DataProvider('toolScopes')]
+    public function test_the_reviewers_tools_read_a_scanned_file_the_narrowed_run_does_not_audit_only_in_the_scanned_scope(ToolsScope $toolsScope, string $expectedAnswer): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('completeWithTools')->willReturn(AuditOrchestratorHarness::attackerResponse([
@@ -118,9 +124,9 @@ final class AuditOrchestratorToolScopeTest extends TestCase
             },
         );
 
-        $this->orchestrator($attackerLlm, $reviewerLlm, new ReviewerModeConfiguration(toolsEnabled: true, useStructuredCollection: false))->orchestrate($this->narrowedContext());
+        $this->orchestrator($attackerLlm, $reviewerLlm, new ReviewerModeConfiguration(toolsEnabled: true, useStructuredCollection: false), $toolsScope)->orchestrate($this->narrowedContext());
 
-        self::assertSame([self::UNCHANGED_CONTENT], $toolAnswers);
+        self::assertSame([$expectedAnswer], $toolAnswers);
     }
 
     /**
@@ -130,7 +136,8 @@ final class AuditOrchestratorToolScopeTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    public function test_the_reviewer_sees_the_code_of_a_finding_in_a_scanned_file_the_narrowed_run_does_not_audit(): void
+    #[DataProvider('reviewerCodeScopes')]
+    public function test_the_reviewer_sees_the_code_of_a_finding_in_a_scanned_file_the_narrowed_run_does_not_audit_only_in_the_scanned_scope(ToolsScope $toolsScope, bool $seesTheCode): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('completeWithTools')->willReturn(AuditOrchestratorHarness::attackerResponse([
@@ -147,10 +154,10 @@ final class AuditOrchestratorToolScopeTest extends TestCase
         );
 
         $auditContext = $this->narrowedContext();
-        $this->orchestrator($attackerLlm, $reviewerLlm, new ReviewerModeConfiguration())->orchestrate($auditContext);
+        $this->orchestrator($attackerLlm, $reviewerLlm, new ReviewerModeConfiguration(), $toolsScope)->orchestrate($auditContext);
 
         self::assertCount(1, $reviewerMessages);
-        self::assertStringContainsString('unchanged-file-marker', $reviewerMessages[0]);
+        self::assertSame($seesTheCode, str_contains($reviewerMessages[0], 'unchanged-file-marker'));
         self::assertSame([self::AUDITED_PATH], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
     }
 
@@ -163,7 +170,8 @@ final class AuditOrchestratorToolScopeTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      * @throws LLMProviderException
      */
-    public function test_the_tools_of_the_review_that_follows_an_attacker_abort_read_a_scanned_file_the_narrowed_run_does_not_audit(): void
+    #[DataProvider('toolScopes')]
+    public function test_the_tools_of_the_review_that_follows_an_attacker_abort_read_a_scanned_file_the_narrowed_run_does_not_audit_only_in_the_scanned_scope(ToolsScope $toolsScope, string $expectedAnswer): void
     {
         $toolAnswers = [];
         $reviewerLlm = self::createStub(LLMClientInterface::class);
@@ -178,16 +186,34 @@ final class AuditOrchestratorToolScopeTest extends TestCase
 
         $aborted = false;
         try {
-            $this->orchestratorWith($recordingAttackerAgent, $reviewerLlm, new ReviewerModeConfiguration(toolsEnabled: true, useStructuredCollection: false))->orchestrate($this->narrowedContext());
+            $this->orchestratorWith($recordingAttackerAgent, $reviewerLlm, new ReviewerModeConfiguration(toolsEnabled: true, useStructuredCollection: false), $toolsScope)->orchestrate($this->narrowedContext());
         } catch (BudgetExceededException) {
             $aborted = true;
         }
 
         self::assertTrue($aborted);
-        self::assertSame([self::UNCHANGED_CONTENT], $toolAnswers);
+        self::assertSame([$expectedAnswer], $toolAnswers);
     }
 
-    private function orchestrator(LLMClientInterface $attackerLlm, LLMClientInterface $reviewerLlm, ReviewerModeConfiguration $reviewerModeConfiguration): AuditOrchestrator
+    /**
+     * @return iterable<string, array{ToolsScope, string}>
+     */
+    public static function toolScopes(): iterable
+    {
+        yield 'the audited files, by default' => [ToolsScope::Audited, self::UNCHANGED_REFUSAL];
+        yield 'every scanned file, on request' => [ToolsScope::Scanned, self::UNCHANGED_CONTENT];
+    }
+
+    /**
+     * @return iterable<string, array{ToolsScope, bool}>
+     */
+    public static function reviewerCodeScopes(): iterable
+    {
+        yield 'the audited files, by default' => [ToolsScope::Audited, false];
+        yield 'every scanned file, on request' => [ToolsScope::Scanned, true];
+    }
+
+    private function orchestrator(LLMClientInterface $attackerLlm, LLMClientInterface $reviewerLlm, ReviewerModeConfiguration $reviewerModeConfiguration, ToolsScope $toolsScope): AuditOrchestrator
     {
         return $this->orchestratorWith(
             new AttackerAgent(
@@ -198,10 +224,11 @@ final class AuditOrchestratorToolScopeTest extends TestCase
             ),
             $reviewerLlm,
             $reviewerModeConfiguration,
+            $toolsScope,
         );
     }
 
-    private function orchestratorWith(AttackerAgentInterface $attackerAgent, LLMClientInterface $llmClient, ReviewerModeConfiguration $reviewerModeConfiguration): AuditOrchestrator
+    private function orchestratorWith(AttackerAgentInterface $attackerAgent, LLMClientInterface $llmClient, ReviewerModeConfiguration $reviewerModeConfiguration, ToolsScope $toolsScope): AuditOrchestrator
     {
         return new AuditOrchestrator(
             $attackerAgent,
@@ -211,7 +238,7 @@ final class AuditOrchestratorToolScopeTest extends TestCase
                 $this->toolRegistryFactory(),
             ),
             new NullLogger(),
-            new AuditLoopSettings(maxIterations: 1),
+            new AuditLoopSettings(maxIterations: 1, toolsScope: $toolsScope),
             new NullProgressReporter(),
         );
     }

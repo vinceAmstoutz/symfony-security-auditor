@@ -16,10 +16,36 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 
 final class AuditExecutionConfigurationTest extends TestCase
 {
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_the_tools_open_the_audited_files_unless_told_otherwise(): void
+    {
+        $default = new AuditExecutionConfiguration(
+            maxIterations: 3,
+            minConfidence: 0.6,
+            reviewerBatchSize: 5,
+            toolsEnabled: true,
+            maxToolIterations: 5,
+        );
+        $scanned = new AuditExecutionConfiguration(
+            maxIterations: 3,
+            minConfidence: 0.6,
+            reviewerBatchSize: 5,
+            toolsEnabled: true,
+            maxToolIterations: 5,
+            toolsScope: ToolsScope::Scanned,
+        );
+
+        self::assertSame(ToolsScope::Audited, $default->toolsScope);
+        self::assertSame(ToolsScope::Scanned, $scanned->toolsScope);
+    }
+
     /**
      * A computed `min_confidence` (e.g. `fdiv($x, $y)` with `$y = 0`, a
      * common "safe division" idiom in a PHP-format config file) can produce

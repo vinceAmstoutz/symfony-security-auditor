@@ -46,6 +46,7 @@ final class TypedNodeEnvPlaceholderFinderTest extends TestCase
         yield 'a flag' => [['audit' => ['tools_enabled' => null]], ['symfony_security_auditor.audit.tools_enabled']];
         yield 'a flag in another section' => [['cache' => ['enabled' => null]], ['symfony_security_auditor.cache.enabled']];
         yield 'a choice read as a PHP enum' => [['audit' => ['fail_on' => null]], ['symfony_security_auditor.audit.fail_on']];
+        yield 'the files the tools may open, read as a PHP enum' => [['audit' => ['tools_scope' => null]], ['symfony_security_auditor.audit.tools_scope']];
         yield 'the profile' => [['profile' => null], ['symfony_security_auditor.profile']];
         yield 'a number inside a keyed list' => [['audit' => ['custom_skills' => ['xss' => ['priority' => null]]]], ['symfony_security_auditor.audit.custom_skills.xss.priority']];
         yield 'a choice read as a PHP enum inside a keyed list' => [['audit' => ['custom_skills' => ['xss' => ['file_type' => null]]]], ['symfony_security_auditor.audit.custom_skills.xss.file_type']];

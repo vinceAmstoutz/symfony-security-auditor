@@ -45,6 +45,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
@@ -55,6 +57,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
@@ -1307,6 +1310,53 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $this->expectException(Throwable::class);
 
         $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'feature']]);
+    }
+
+    public function test_bundle_keeps_the_tools_on_the_audited_files_by_default(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertSame('audited', $containerBuilder->getParameter('symfony_security_auditor.audit.tools_scope'));
+    }
+
+    public function test_bundle_accepts_the_scanned_tools_scope(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['tools_scope' => 'scanned']]);
+
+        self::assertSame('scanned', $containerBuilder->getParameter('symfony_security_auditor.audit.tools_scope'));
+    }
+
+    public function test_bundle_rejects_an_invalid_tools_scope(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['tools_scope' => 'everything']]);
+    }
+
+    /**
+     * @param array<string, mixed> $audit
+     */
+    #[DataProvider('toolsScopeWirings')]
+    public function test_bundle_hands_the_orchestrator_the_configured_tools_scope(array $audit, ToolsScope $expected): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => $audit]);
+
+        $auditLoopSettings = $containerBuilder->getDefinition(AuditOrchestrator::class)->getArgument(3);
+        self::assertInstanceOf(Definition::class, $auditLoopSettings);
+        self::assertSame(AuditLoopSettings::class, $auditLoopSettings->getClass());
+        $toolsScope = $auditLoopSettings->getArgument(2);
+        self::assertInstanceOf(Definition::class, $toolsScope);
+        self::assertSame(ToolsScope::class, $toolsScope->getClass());
+        self::assertSame([$expected->value], $containerBuilder->getParameterBag()->resolveValue($toolsScope->getArguments()));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, ToolsScope}>
+     */
+    public static function toolsScopeWirings(): iterable
+    {
+        yield 'the audited files, by default' => [[], ToolsScope::Audited];
+        yield 'every scanned file, on request' => [['tools_scope' => 'scanned'], ToolsScope::Scanned];
     }
 
     public function test_bundle_derives_advisory_cache_dir_from_cache_dir(): void

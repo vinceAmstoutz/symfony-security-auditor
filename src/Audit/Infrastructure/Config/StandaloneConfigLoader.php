@@ -37,10 +37,11 @@ final readonly class StandaloneConfigLoader
      * What a run spends, trusts and writes is the user's to decide: the
      * audited repository may tune what is audited and how, not lift the
      * budget cap, switch secret scrubbing or the offline guard off, put words
-     * in the attacker's system prompt or in the risk markers it is handed, or
-     * aim the cache at files it ships.
+     * in the attacker's system prompt or in the risk markers it is handed,
+     * widen the files the model's tools may open, or aim the cache at files it
+     * ships.
      */
-    private const array USER_ONLY_PATHS = ['cache', 'privacy', 'audit.custom_skills', 'audit.output', 'scan.secret_scrubbing', 'scan.custom_risk_patterns'];
+    private const array USER_ONLY_PATHS = ['cache', 'privacy', 'audit.custom_skills', 'audit.output', 'audit.tools_scope', 'scan.secret_scrubbing', 'scan.custom_risk_patterns'];
 
     private const array BUDGET_CAPS = ['max_tokens', 'max_cost_usd'];
 
