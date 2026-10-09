@@ -497,7 +497,7 @@ Extends `AbstractBundle`. All wiring lives directly in this class — no separat
 
 Nested sections:
 
-- `scan.*` — `included_paths`, `respect_gitignore`, `max_file_size_kb`, `secret_scrubbing.enabled`, `secret_scrubbing.additional_patterns` (file discovery + credential redaction)
+- `scan.*` — `included_paths`, `respect_gitignore`, `include_tracked_ignored`, `max_file_size_kb`, `secret_scrubbing.enabled`, `secret_scrubbing.additional_patterns` (file discovery + credential redaction)
 - `audit.*` — `max_iterations`, `min_confidence`, `reviewer_batch_size`, `tools_enabled`, `max_tool_iterations` (orchestrator knobs); `budget.max_tokens`, `budget.max_cost_usd` (abort limits); `retry.max_attempts`, `retry.initial_delay_ms`, `retry.backoff_multiplier`, `retry.jitter_ratio` (LLM resilience)
 - `cache.*` — `enabled`, `dir` (chunk cache). `prompt_caching` is deprecated since 1.7 and ignored; provider-side prompt caching is configured on the `symfony/ai` platform (`cache_retention` in `ai.yaml` for Anthropic; automatic for OpenAI/Gemini).
 

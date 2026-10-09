@@ -719,6 +719,30 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_a_project_config_may_set_what_a_gitignore_hides_like_the_other_scan_keys(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "scan:\n  respect_gitignore: true\n  include_tracked_ignored: true\n");
+
+        self::assertSame(
+            ['scan' => ['respect_gitignore' => true, 'include_tracked_ignored' => true]],
+            $this->loader($projectConfigFile)->load()->auditConfig,
+        );
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_a_project_config_may_tighten_the_budget(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\naudit:\n  budget:\n    max_cost_usd: 10\n");

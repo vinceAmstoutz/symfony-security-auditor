@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
@@ -526,7 +527,7 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('src/App.php', $files[0]->relativePath());
     }
 
-    public function test_it_scans_a_file_git_tracks_although_a_gitignore_pattern_matches_it(): void
+    public function test_it_skips_every_file_a_gitignore_pattern_matches_including_the_ones_git_tracks(): void
     {
         mkdir($this->tmpDir.'/src/Generated', 0o777, true);
         file_put_contents($this->tmpDir.'/.gitignore', "src/Evil.php\nsrc/Untracked.php\nsrc/Generated/\n");
@@ -539,10 +540,57 @@ final class ProjectFileScannerTest extends TestCase
 
         $files = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true))->scan($this->tmpDir);
 
+        self::assertSame(['src/Ok.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
+    }
+
+    public function test_it_skips_an_explicitly_included_file_a_gitignore_pattern_matches_although_git_tracks_it(): void
+    {
+        file_put_contents($this->tmpDir.'/.gitignore', ".env.local\n.env.dev\n");
+        file_put_contents($this->tmpDir.'/.env.local', 'APP_ENV=prod');
+        file_put_contents($this->tmpDir.'/.env.dev', 'APP_ENV=dev');
+        file_put_contents($this->tmpDir.'/.env', 'APP_ENV=test');
+        (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
+        (new Process(['git', 'add', '--force', '.env.local', '.env'], $this->tmpDir))->mustRun();
+
+        $files = (new ProjectFileScanner(new NullLogger(), ['.env', '.env.local', '.env.dev'], respectGitignore: true))->scan($this->tmpDir);
+
+        self::assertSame(['.env'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
+    }
+
+    public function test_it_scans_a_file_git_tracks_although_a_gitignore_pattern_matches_it_when_asked_to(): void
+    {
+        mkdir($this->tmpDir.'/src/Generated', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "src/Evil.php\nsrc/Untracked.php\nsrc/Generated/\n");
+        file_put_contents($this->tmpDir.'/src/Evil.php', '<?php class Evil { function run($c) { system($c); } }');
+        file_put_contents($this->tmpDir.'/src/Untracked.php', '<?php class Untracked {}');
+        file_put_contents($this->tmpDir.'/src/Generated/Cache.php', '<?php class Cache {}');
+        file_put_contents($this->tmpDir.'/src/Ok.php', '<?php class Ok {}');
+        (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
+        (new Process(['git', 'add', '--force', 'src/Evil.php', 'src/Ok.php'], $this->tmpDir))->mustRun();
+
+        $files = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true, gitTrackedIgnoredFiles: new GitTrackedIgnoredFiles(new NullLogger())))->scan($this->tmpDir);
+
         self::assertSame(['src/Evil.php', 'src/Ok.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
     }
 
-    public function test_it_scans_an_explicitly_included_file_git_tracks_although_a_gitignore_pattern_matches_it(): void
+    public function test_it_asks_git_once_per_scan_for_the_tracked_ignored_files(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        $listedIn = [];
+        $gitTrackedIgnoredFiles = new GitTrackedIgnoredFiles(new NullLogger(), static function (string $projectPath) use (&$listedIn): Process {
+            $listedIn[] = $projectPath;
+
+            return new Process([\PHP_BINARY, '-r', '']);
+        });
+
+        $files = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true, gitTrackedIgnoredFiles: $gitTrackedIgnoredFiles))->scan($this->tmpDir);
+
+        self::assertSame([$this->tmpDir], $listedIn);
+        self::assertSame(['src/App.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
+    }
+
+    public function test_it_scans_an_explicitly_included_file_git_tracks_although_a_gitignore_pattern_matches_it_when_asked_to(): void
     {
         file_put_contents($this->tmpDir.'/.gitignore', ".env.local\n.env.dev\n");
         file_put_contents($this->tmpDir.'/.env.local', 'APP_ENV=prod');
@@ -550,12 +598,27 @@ final class ProjectFileScannerTest extends TestCase
         (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
         (new Process(['git', 'add', '--force', '.env.local'], $this->tmpDir))->mustRun();
 
-        $files = (new ProjectFileScanner(new NullLogger(), ['.env.local', '.env.dev'], respectGitignore: true))->scan($this->tmpDir);
+        $files = (new ProjectFileScanner(new NullLogger(), ['.env.local', '.env.dev'], respectGitignore: true, gitTrackedIgnoredFiles: new GitTrackedIgnoredFiles(new NullLogger())))->scan($this->tmpDir);
 
         self::assertSame(['.env.local'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
     }
 
-    public function test_it_reports_a_tracked_file_a_gitignore_pattern_matches_as_skipped_when_it_is_over_the_size_limit(): void
+    public function test_it_neither_scans_nor_reports_as_skipped_a_tracked_file_a_gitignore_pattern_matches_by_default(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "src/BigTracked.php\nsrc/Tracked.php\n");
+        file_put_contents($this->tmpDir.'/src/BigTracked.php', str_repeat('a', (2 * 1024) + 1));
+        file_put_contents($this->tmpDir.'/src/Tracked.php', '<?php class Tracked {}');
+        (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
+        (new Process(['git', 'add', '--force', 'src/BigTracked.php', 'src/Tracked.php'], $this->tmpDir))->mustRun();
+
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true, maxFileSizeKb: 2))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame([], $projectFileScan->files);
+        self::assertSame([], $projectFileScan->skippedFiles);
+    }
+
+    public function test_it_reports_a_tracked_file_a_gitignore_pattern_matches_as_skipped_when_it_is_over_the_size_limit_and_tracked_files_are_asked_for(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir.'/.gitignore', "src/BigTracked.php\nsrc/BigUntracked.php\n");
@@ -564,7 +627,7 @@ final class ProjectFileScannerTest extends TestCase
         (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
         (new Process(['git', 'add', '--force', 'src/BigTracked.php'], $this->tmpDir))->mustRun();
 
-        $projectFileScan = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true, maxFileSizeKb: 2))->scanReportingSkippedFiles($this->tmpDir);
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true, maxFileSizeKb: 2, gitTrackedIgnoredFiles: new GitTrackedIgnoredFiles(new NullLogger())))->scanReportingSkippedFiles($this->tmpDir);
 
         self::assertSame([], $projectFileScan->files);
         self::assertSame(
@@ -573,7 +636,7 @@ final class ProjectFileScannerTest extends TestCase
         );
     }
 
-    public function test_it_scans_a_tracked_file_a_gitignore_pattern_matches_in_a_project_inside_a_larger_repository(): void
+    public function test_it_scans_a_tracked_file_a_gitignore_pattern_matches_in_a_project_inside_a_larger_repository_when_asked_to(): void
     {
         mkdir($this->tmpDir.'/apps/api/src', 0o777, true);
         file_put_contents($this->tmpDir.'/.gitignore', "Evil.php\n");
@@ -581,7 +644,7 @@ final class ProjectFileScannerTest extends TestCase
         (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
         (new Process(['git', 'add', '--force', 'apps/api/src/Evil.php'], $this->tmpDir))->mustRun();
 
-        $files = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true))->scan($this->tmpDir.'/apps/api');
+        $files = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true, gitTrackedIgnoredFiles: new GitTrackedIgnoredFiles(new NullLogger())))->scan($this->tmpDir.'/apps/api');
 
         self::assertSame(['src/Evil.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
     }

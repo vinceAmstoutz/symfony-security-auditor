@@ -71,8 +71,9 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     ];
 
     /**
-     * @param list<string>                  $includedPaths project-relative directories and files to scan; defaults to the Symfony skeleton layout
-     * @param ?Closure(SplFileInfo): string $fileReader    defaults to SplFileInfo::getContents; tests inject a stub
+     * @param list<string>                  $includedPaths          project-relative directories and files to scan; defaults to the Symfony skeleton layout
+     * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents; tests inject a stub
+     * @param ?GitTrackedIgnoredFiles       $gitTrackedIgnoredFiles the files git tracks although a `.gitignore` pattern matches them are scanned too, so pass it only with `$respectGitignore`; none runs no git process
      */
     public function __construct(
         private LoggerInterface $logger,
@@ -81,6 +82,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         private int $maxFileSizeKb = self::DEFAULT_MAX_FILE_SIZE_KB,
         private ?Closure $fileReader = null,
         private ?SecretScrubberInterface $secretScrubber = null,
+        private ?GitTrackedIgnoredFiles $gitTrackedIgnoredFiles = null,
     ) {}
 
     /**
@@ -134,7 +136,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
 
-        $trackedIgnored = $this->respectGitignore ? (new GitTrackedIgnoredFiles($this->logger))->in($projectPath) : [];
+        $trackedIgnored = $this->gitTrackedIgnoredFiles?->in($projectPath) ?? [];
         $directoryScan = $this->scanDirectories($directories, $projectPath, $reader, $trackedIgnored);
         $explicitFileScan = $this->scanExplicitFiles($explicitFiles, $projectPath, $reader, $trackedIgnored);
 

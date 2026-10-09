@@ -66,6 +66,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerPa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TypedNodeEnvPlaceholderFinder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
@@ -133,6 +134,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $this->registerRateLimiter($services, $bundleConfiguration);
         $this->registerLlmClients($services, $bundleConfiguration);
         $this->registerImplementationAliases($services, $bundleConfiguration);
+        $this->registerTrackedIgnoredFiles($services, $bundleConfiguration);
         $this->registerCustomSkills($services, $bundleConfiguration);
         $this->registerEscalation($services, $bundleConfiguration);
     }
@@ -149,6 +151,23 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         if ([] !== $paths) {
             throw TypedNodeEnvPlaceholderException::forPaths($paths);
         }
+    }
+
+    /**
+     * The scan lists the files git tracks although a `.gitignore` pattern
+     * matches them only when `scan.include_tracked_ignored` asks for it under
+     * `scan.respect_gitignore`; otherwise no such service exists, the scanner
+     * is handed none, and no git process runs.
+     */
+    private function registerTrackedIgnoredFiles(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        if (!$bundleConfiguration->scan->respectGitignore || !$bundleConfiguration->scan->includeTrackedIgnored) {
+            return;
+        }
+
+        $servicesConfigurator->set(GitTrackedIgnoredFiles::class)
+            ->private()
+            ->args([service('logger')]);
     }
 
     /**

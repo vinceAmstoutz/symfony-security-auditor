@@ -59,6 +59,10 @@
               "type": "boolean",
               "description": "Skip files ignored by .gitignore."
             },
+            "include_tracked_ignored": {
+              "type": "boolean",
+              "description": "Effective only with respect_gitignore: true. Also audit a file git tracks although a .gitignore pattern matches it (runs git ls-files in the project). Default: false."
+            },
             "max_file_size_kb": {
               "type": "integer",
               "minimum": 1,
