@@ -55,6 +55,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
 
     private const string STATEMENT_CLOSERS = ';:,\'")]';
 
+    private const string ENDS_IN_ESCAPE = '/(?<!\\\\)(?:\\\\\\\\)*+\\\\\z/';
+
     private const int MINIMUM_SECRET_LENGTH = 4;
 
     /**
@@ -108,6 +110,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     public function __construct(
         array $additionalPatterns = [],
         private LoggerInterface $logger = new NullLogger(),
+        private OffsetCaptureReplacer $offsetCaptureReplacer = new OffsetCaptureReplacer(),
     ) {
         $patterns = $this->defaultPatterns();
         foreach ($additionalPatterns as $index => $pattern) {
@@ -157,7 +160,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
             SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
             SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+@~i',
-            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\r\n])*+(?:\4|(?=\r?$))|\S+)/m', $envCredentialName),
+            SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?|case\s+)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\r\n])*+(?:\4|(?=\r?$))|\S+)/m', $envCredentialName),
             SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++)?))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS),
             SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', $inlineCredentialKey),
             SecretPatternLabel::BlockScalar->value => \sprintf('/^([ \t]*+)(-[ \t]++)?(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?[ \t]*:[ \t]*[|>][+-]?[0-9]?[+-]?[ \t]*(?:#[^\n]*)?)\r?\n((?:\1(?(2)[ \t]{3,}|[ \t]+)[^\n]*(?:\n|\z)|[ \t]*\r?\n)++)/mi', $inlineCredentialKey),
@@ -200,8 +203,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     {
         foreach ($this->patterns as $label => $pattern) {
             $result = match (SecretPatternLabel::tryFrom($label)) {
-                SecretPatternLabel::EnvAssignment => preg_replace_callback($pattern, $this->redactEnvAssignment(...), $content),
-                SecretPatternLabel::InlineAssignment => preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content),
+                SecretPatternLabel::EnvAssignment => $this->redactEnvAssignments($pattern, $content),
+                SecretPatternLabel::InlineAssignment => $this->redactInlineAssignments($pattern, $content),
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
                 SecretPatternLabel::BlockScalar => preg_replace_callback($pattern, $this->redactBlockScalar(...), $content),
                 SecretPatternLabel::CallArgument => preg_replace_callback($pattern, $this->redactCallArgument(...), $content),
@@ -218,7 +221,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             $content = $result;
         }
 
-        return preg_replace(self::UNQUOTED_YAML_PLACEHOLDER, '$1"$2"', $content) ?? $content;
+        return PhpDataMask::opensWithPhpTag($content) ? $content : (preg_replace(self::UNQUOTED_YAML_PLACEHOLDER, '$1"$2"', $content) ?? $content);
     }
 
     /**
@@ -265,42 +268,92 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             : 1 === preg_match(self::PHP_EXPRESSION, explode(' ', strtr($value, "\t", ' '))[0]);
     }
 
+    private function redactEnvAssignments(string $pattern, string $content): ?string
+    {
+        $phpDataMask = PhpDataMask::of($content);
+
+        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactEnvAssignment($match, $phpDataMask));
+    }
+
     /**
      * A shell or dotenv assignment is rewritten to `NAME=***REDACTED***`. A PHP
      * constant declaration is no such assignment: it keeps its spacing, its
      * quotes and its terminator, and a value that is no string literal is code.
      *
-     * @param array<int|string, string> $match
+     * @param array<int|string, array{0: string, 1: int}> $match
      */
-    private function redactEnvAssignment(array $match): string
+    private function redactEnvAssignment(array $match, PhpDataMask $phpDataMask): string
     {
-        $isConstantDeclaration = '' !== ($match[2] ?? '');
-        if (!$isConstantDeclaration) {
-            return \sprintf('%s=%s', $match[1], SecretPatternLabel::EnvAssignment->placeholder());
+        $prefixLength = \strlen($match[1][0]) + \strlen($match[3][0]);
+        $valueOffset = $match[3][1] + \strlen($match[3][0]);
+        $value = substr($match[0][0], $prefixLength);
+
+        if ('' !== ($match[2][0] ?? '')) {
+            return $this->redactConstantDeclaration($match, $phpDataMask, $valueOffset, \strlen($value));
         }
 
-        $quote = $match[4] ?? '';
-        if ('' === $quote) {
-            return $match[0];
+        $redactable = $phpDataMask->textLength($valueOffset, \strlen($value));
+        if (0 === $redactable) {
+            return $match[0][0];
         }
 
-        return \sprintf('%s%s%s%s%s', $match[1], $match[3], $quote, SecretPatternLabel::EnvAssignment->placeholder(), $quote);
+        return \sprintf('%s=%s%s', $match[1][0], SecretPatternLabel::EnvAssignment->placeholder(), substr($value, $redactable));
     }
 
     /**
-     * @param array<int|string, string> $match
+     * @param array<int|string, array{0: string, 1: int}> $match
      */
-    private function redactInlineAssignment(array $match): string
+    private function redactConstantDeclaration(array $match, PhpDataMask $phpDataMask, int $valueOffset, int $valueLength): string
     {
-        $quote = $match[2] ?? '';
-        $value = ($match[3] ?? '').($match[4] ?? '');
-        $secret = '' === $quote ? rtrim($value, self::STATEMENT_CLOSERS) : $value;
-
-        if ($this->isKeptReadable($secret, $value, '' !== $quote)) {
-            return $match[0];
+        $quote = $match[4][0] ?? '';
+        $lastOffset = $valueOffset + $valueLength - 1;
+        if ('' === $quote || !$phpDataMask->isStringLiteral($valueOffset, $lastOffset)) {
+            return $match[0][0];
         }
 
-        return \sprintf('%s%s***REDACTED:%s***%s%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote, substr($value, \strlen($secret)));
+        return \sprintf('%s%s%s%s%s', $match[1][0], $match[3][0], $quote, SecretPatternLabel::EnvAssignment->placeholder(), $quote);
+    }
+
+    private function redactInlineAssignments(string $pattern, string $content): ?string
+    {
+        $phpDataMask = PhpDataMask::of($content);
+
+        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactInlineAssignment($match, $phpDataMask));
+    }
+
+    /**
+     * Only text is ever redacted, never code: a placeholder written over a constant, a call or a
+     * parameter default would leave a file PHP can no longer parse, and none of those is a literal
+     * secret. A value reaching past the text it starts in is cut where that text ends.
+     *
+     * @param array<int|string, array{0: string, 1: int}> $match
+     */
+    private function redactInlineAssignment(array $match, PhpDataMask $phpDataMask): string
+    {
+        $quote = $match[2][0] ?? '';
+        $value = ($match[3][0] ?? '').($match[4][0] ?? '');
+        $length = \strlen($value);
+        $redactable = '' === $quote ? $phpDataMask->textLength($match[4][1], $length) : $phpDataMask->literalLength($match[2][1], $length);
+        $candidate = substr($value, 0, $redactable);
+        $secret = '' === $quote ? $this->secretBeforeItsClosers($candidate) : $candidate;
+
+        if ($this->isKeptReadable($secret, $candidate, '' !== $quote)) {
+            return $match[0][0];
+        }
+
+        return \sprintf('%s%s***REDACTED:%s***%s%s', $match[1][0], $quote, SecretPatternLabel::InlineAssignment->value, $quote, substr($value, \strlen($secret)));
+    }
+
+    private function secretBeforeItsClosers(string $candidate): string
+    {
+        $secret = rtrim($candidate, self::STATEMENT_CLOSERS);
+
+        return $secret !== $candidate && $this->endsInEscape($secret) ? substr($candidate, 0, \strlen($secret) + 1) : $secret;
+    }
+
+    private function endsInEscape(string $text): bool
+    {
+        return 1 === preg_match(self::ENDS_IN_ESCAPE, $text);
     }
 
     private function isKeptReadable(string $secret, string $value, bool $quoted): bool

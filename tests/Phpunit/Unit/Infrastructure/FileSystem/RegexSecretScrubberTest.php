@@ -434,6 +434,96 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a constant at the top of a namespace' => ["<?php\nconst DB_PW = 'hunter2supersecure';\n", "<?php\nconst DB_PW = '***REDACTED:env_assignment***';\n"];
     }
 
+    #[DataProvider('phpCodeNamingACredentialCases')]
+    public function test_php_code_that_merely_names_a_credential_is_left_as_written_and_still_parses(string $code): void
+    {
+        $this->assertParsesAsPhp($code);
+
+        $output = $this->regexSecretScrubber->scrub($code);
+
+        self::assertSame($code, $output);
+        $this->assertParsesAsPhp($output);
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function phpCodeNamingACredentialCases(): iterable
+    {
+        yield 'a credential parameter defaulted to null before a typed parameter' => ['<?php class C { public function __construct(private ?string $apiKey = null, private LoggerInterface $logger) {} }'];
+        yield 'a credential parameter defaulted to null before a scalar parameter' => ['<?php class C { public function show(?string $token = null, int $page = 1) {} }'];
+        yield 'a credential parameter defaulted to null before an array parameter' => ['<?php class C { public function __construct(?string $passphrase = null, array $additional = []) {} }'];
+        yield 'a static property read with an offset' => ['<?php class C { function f($id) { $token = self::$cache[$id] ?? null; } }'];
+        yield 'a call followed by an operator' => ["<?php class C { function f() { return ['access_token_expires_at' => time() + 3600]; } }"];
+        yield 'a global constant' => ['<?php class C { function f() { $password = DEFAULT_PASSWORD; } }'];
+        yield 'a class name constant in an array' => ["<?php class C { function f() { return ['request_password_repository' => Repo::class,]; } }"];
+        yield 'a late static class name' => ['<?php class C { function f() { $secret = static::class; } }'];
+        yield 'a heredoc opening' => ["<?php class C { function f() { \$apiKey = <<<EOT\nplain text\nEOT;\n } }"];
+        yield 'a condition between parentheses' => ['<?php class C { function f($a) { $newPassword = (empty($a) || strlen($a) < 4) ? 1 : 2; } }'];
+        yield 'a clone expression' => ['<?php class C { function f($tokens) { $accessToken = clone $tokens[0]; } }'];
+        yield 'an include expression' => ["<?php class C { function f() { \$encryptionKey = (string) include \$this->pathPrefix.'encrypt.public.php'; } }"];
+        yield 'a call opening a multi-line argument list' => ["<?php class C { function f() { \$token = JWT::encode(\n['a' => 1],\n'k'); } }"];
+        yield 'an enum case read through a class' => ["<?php class C { function f() { return ['invalid-credentials' => ErrorType::InvalidCredentials,]; } }"];
+        yield 'a dotenv-like string closed right after the name' => ['<?php class C { function f($data, $filename) { return $filename ? \'// SYMFONY_DECRYPTION_SECRET=\'.base64_encode($data)."\\n" : \'\'; } }'];
+        yield 'a credential key inside an interpolated string that ends right after it' => ['<?php class C { function f($a, $y) { return "{$a}_password=" . $y . "abcd"; } }'];
+        yield 'a string closed before a quote opened by the next one' => [<<<'PHP'
+            <?php class C { function f() { return isset($_SERVER[$pwd = '\\' === \DIRECTORY_SEPARATOR ? 'CD' : 'PWD']); } }
+            PHP];
+        yield 'a quote of a text paired with the opening quote of a string' => ['<?php class C { function f($x) { return "password: \'abcdef" . $x . \'tail\'; } }'];
+        yield 'a dotenv name closing a string' => ["<?php class C { function f(\$value) { return 'x APP_SECRET='.\$value; } }"];
+        yield 'a constant holding a string over several lines' => ["<?php class C { private const KEY_REGEX = '\n  (?P<owner>[a-z]+) # owner\n  (?P<repo>[a-z]+)\n'; }"];
+        yield 'a constant declaration closing a string' => ["<?php class C { function f(\$a) { return 'x const API_KEY='.\$a.'xyz'; } }"];
+        yield 'a quote of a text paired with the opening quote of a string without a concatenation' => ["<?php class C { function f() { return \"password: 'abcdef\" . 'tail'; } }"];
+        yield 'a closing quote paired with a quote inside a text' => ['<?php class C { function f() { return \'x_password=\' . "abcdef \'ghij\'"; } }'];
+        yield 'a constant read as an array key' => ['<?php class C { function f() { return [1, API_KEY => API_VALUE]; } }'];
+    }
+
+    #[DataProvider('phpHoldingACredentialCases')]
+    public function test_php_holding_a_credential_has_it_redacted_and_still_parses(string $code, string $expected): void
+    {
+        $this->assertParsesAsPhp($code);
+
+        $output = $this->regexSecretScrubber->scrub($code);
+
+        self::assertSame($expected, $output);
+        $this->assertParsesAsPhp($output);
+        self::assertSame($output, $this->regexSecretScrubber->scrub($output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function phpHoldingACredentialCases(): iterable
+    {
+        yield 'a string literal assigned to a credential variable' => ["<?php \$password = 'hunter2hunter2';", "<?php \$password = '***REDACTED:inline_assignment***';"];
+        yield 'an interpolated string assigned to a credential variable' => ['<?php $password = "hunter2{$x}hunter2";', '<?php $password = "***REDACTED:inline_assignment***";'];
+        yield 'a string literal assigned to a constant read as an array key' => ["<?php return [1, API_KEY => 'abcd1234efgh'];", "<?php return [1, API_KEY => '***REDACTED:inline_assignment***'];"];
+        yield 'a string literal under an enum case' => ["<?php enum E: string { case API_KEY = 'zzz999aaa111'; }", "<?php enum E: string { case API_KEY = '***REDACTED:env_assignment***'; }"];
+        yield 'a credential key inside a string that ends right after it' => ["<?php class C { function f(\$enc, \$content) { return str_replace('_password='.\$enc, '_password=******', \$content); } }", "<?php class C { function f(\$enc, \$content) { return str_replace('_password='.\$enc, '_password=***REDACTED:inline_assignment***', \$content); } }"];
+        yield 'a header inside a single-quoted string' => ["<?php \$h = 'x-api-key: hunter2xx'.\$extra;", "<?php \$h = 'x-api-key: ***REDACTED:inline_assignment***'.\$extra;"];
+        yield 'a header inside a double-quoted string' => ['<?php $h = "x-api-key: hunter2xx" . $extra;', '<?php $h = "x-api-key: ***REDACTED:inline_assignment***" . $extra;'];
+        yield 'a header inside an interpolated string' => ['<?php $h = "password: hunter2xx{$b}";', '<?php $h = "password: ***REDACTED:inline_assignment***{$b}";'];
+        yield 'a quoted literal inside a string' => ['<?php $h = "password: \'hunter2hunter2\'";', '<?php $h = "password: \'***REDACTED:inline_assignment***\'";'];
+        yield 'a number inside a string' => ["<?php \$h = 'password: 12345678';", "<?php \$h = 'password: ***REDACTED:inline_assignment***';"];
+        yield 'a dotenv line inside a string' => ["<?php \$cmd = 'export APP_SECRET=abcdef12345';", "<?php \$cmd = 'export APP_SECRET=***REDACTED:env_assignment***';"];
+        yield 'a quoted dotenv value inside a string' => ["<?php \$cmd = 'export APP_SECRET=\"a b c\"';", "<?php \$cmd = 'export APP_SECRET=***REDACTED:env_assignment***';"];
+        yield 'a line comment' => ["<?php // password: hunter2xx\n\$a = 1;", "<?php // password: ***REDACTED:inline_assignment***\n\$a = 1;"];
+        yield 'a block comment closed right after the value' => ['<?php /*password:hunter2xx*/ $a = 1;', '<?php /*password:***REDACTED:inline_assignment****/ $a = 1;'];
+        yield 'a heredoc holding yaml' => ["<?php \$yaml = <<<YAML\nsecurity:\n    password: hunter2xx\nYAML;\n", "<?php \$yaml = <<<YAML\nsecurity:\n    password: ***REDACTED:inline_assignment***\nYAML;\n"];
+        yield 'a quoted value inside a single-quoted string' => ["<?php \$h = 'password: \\'hunter2xx\\'';", "<?php \$h = 'password: ***REDACTED:inline_assignment***';"];
+        yield 'a quoted value ending in a backslash inside a single-quoted string' => ["<?php \$h = 'password: \\'hunter2xx\\\\\\'';", "<?php \$h = 'password: ***REDACTED:inline_assignment***';"];
+        yield 'a header closed by a parenthesis inside a double-quoted string' => ['<?php $h = "x-api-key: hunter2xx)";', '<?php $h = "x-api-key: ***REDACTED:inline_assignment***)";'];
+        yield 'a header closed by a bracket inside a double-quoted string' => ['<?php $h = "[password: hunter2xx]";', '<?php $h = "[password: ***REDACTED:inline_assignment***]";'];
+        yield 'a header followed by a comment mark inside a double-quoted string' => ['<?php $h = "password: hunter2xx # c";', '<?php $h = "password: ***REDACTED:inline_assignment*** # c";'];
+        yield 'a header closed by a parenthesis inside a single-quoted string' => ["<?php \$h = 'password: hunter2xx)';", "<?php \$h = 'password: ***REDACTED:inline_assignment***)';"];
+        yield 'a file opening with a byte order mark and a shebang' => ["\xEF\xBB\xBF#!/usr/bin/env php\n<?php \$h = 'password: hunter2xx';", "\xEF\xBB\xBF#!/usr/bin/env php\n<?php \$h = 'password: ***REDACTED:inline_assignment***';"];
+        yield 'markup before a tag' => ['<?php $a = 1; ?>password: hunter2xx<?php $b = 2;', '<?php $a = 1; ?>password: ***REDACTED:inline_assignment***<?php $b = 2;'];
+    }
+
+    public function test_a_yaml_document_that_merely_mentions_a_php_tag_is_scrubbed_as_yaml(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("# render with <?php echo 1; ?>\npassword: hunter2xx\nroles: [ROLE_USER]\n");
+
+        self::assertSame("# render with <?php echo 1; ?>\npassword: \"***REDACTED:inline_assignment***\"\nroles: [ROLE_USER]\n", $output);
+        self::assertSame(['password' => '***REDACTED:inline_assignment***', 'roles' => ['ROLE_USER']], Yaml::parse($output));
+    }
+
     #[DataProvider('unquotedCredentialsFollowedByCodeCases')]
     public function test_an_unquoted_credential_is_redacted_without_the_closing_syntax_that_follows_it(string $input, string $expected): void
     {
@@ -461,6 +551,14 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a double quote before more words' => ['"x-api-key: hunter2xx" and more', '"x-api-key: ***REDACTED:inline_assignment***" and more'];
         yield 'a comma before a hyphenated key' => ['{ password: hunter2xx, role-name: admin }', '{ password: "***REDACTED:inline_assignment***", role-name: admin }'];
         yield 'a comma before more words' => ['password: hunter2xx, and more words', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a constant declaration holding a bare value outside php' => ['const DEFAULT_PASSWORD = hunter2xx;', 'const DEFAULT_PASSWORD = ***REDACTED:inline_assignment***;'];
+        yield 'a value holding a backslash before a closer' => ['$password = hunter\\2xxx;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'a value ending in a backslash' => ['password: hunter2xx\\', 'password: "***REDACTED:inline_assignment***"'];
+        yield 'a value ending in an escaped closer' => ['$password = hunter2xx\\;', '$password = ***REDACTED:inline_assignment***'];
+        yield 'a value ending in an escaped closer and a second closer' => ['$password = hunter2xx\\;;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'a value ending in two backslashes and a closer' => ['$password = hunter2xx\\\\;', '$password = ***REDACTED:inline_assignment***;'];
+        yield 'an escaped quote before more words' => ["'x-api-key: hunter2xx\\' and more", "'x-api-key: ***REDACTED:inline_assignment*** and more"];
+        yield 'an escaped backslash before a closing quote' => ["'x-api-key: hunter2xx\\\\' and more", "'x-api-key: ***REDACTED:inline_assignment***' and more"];
         yield 'a core of exactly four characters' => ['$password = abcd;', '$password = ***REDACTED:inline_assignment***;'];
         yield 'a bare number in yaml' => ['password: 12345678', 'password: "***REDACTED:inline_assignment***"'];
         yield 'a word starting like null' => ['password: nullable1234;', 'password: ***REDACTED:inline_assignment***;'];
@@ -891,6 +989,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a quote with lines around it' => ["A=1\nAPP_SECRET=\"a b c\nOTHER=2\n", "A=1\nAPP_SECRET=***REDACTED:env_assignment***\nOTHER=2\n"];
         yield 'a quote with an escaped quote inside' => ['APP_SECRET="a \\" b', 'APP_SECRET=***REDACTED:env_assignment***'];
         yield 'a quote followed by a windows line ending' => ["APP_SECRET=\"a b c\r\nOTHER=2", "APP_SECRET=***REDACTED:env_assignment***\r\nOTHER=2"];
+        yield 'a constant declaration outside php' => ["const APP_SECRET = 'a b c", "const APP_SECRET = '***REDACTED:env_assignment***'"];
         yield 'a closed quote is still redacted on its own' => ['APP_SECRET="a b c" # note', 'APP_SECRET=***REDACTED:env_assignment*** # note'];
     }
 
@@ -1467,6 +1566,10 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'placeholder openings after colons' => [str_repeat(': ***REDACTED:x', 34952)];
         yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
         yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
+        yield 'case keywords with no name' => [str_repeat('case ', 104857)];
+        yield 'enum cases named like credentials with no value' => [str_repeat('case SECRET_KEY ', 32768)];
+        yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 24000)];
+        yield 'php strings closing right after a credential name' => ['<?php '.str_repeat("'x_password='", 40000)];
     }
 
     #[DataProvider('hostileContentWithTheJitCases')]
@@ -1484,6 +1587,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'credential key openings' => [str_repeat("('db_password', ", 32768)];
         yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
         yield 'password function openings' => [str_repeat('password_hash(', 37449)];
+        yield 'enum cases named like credentials with no value' => [str_repeat('case SECRET_KEY ', 32768)];
+        yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 24000)];
     }
 
     #[DataProvider('hostileContentRedactedCases')]
@@ -1519,6 +1624,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a block scalar of a hundred thousand lines' => ["secret: |\n".str_repeat("  x\n", 100000), "secret: |\n  ***REDACTED:block_scalar***".str_repeat("\n", 100000)];
         yield 'a private key cut after thirty thousand lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("MIIEowIBAAKCAQEAx\n", 30000), '***REDACTED:pem_private_key***'.str_repeat("\n", 30001)];
         yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
+        yield 'php strings holding a credential' => ['<?php '.str_repeat("\$h = 'password: abcdef';\n", 16000), '<?php '.str_repeat("\$h = 'password: ***REDACTED:inline_assignment***';\n", 16000)];
     }
 
     #[RunInSeparateProcess]
