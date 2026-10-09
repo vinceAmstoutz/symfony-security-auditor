@@ -31,9 +31,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unco
  * gateway refusing a request as too large answers HTTP 413, often with an
  * HTML page the bridges cannot decode (`Syntax error`), so its status is read
  * too. Any other HTTP client error is a refusal as well, whatever its body:
- * a gateway's `{"detail":"Not Found"}` reads as `Response does not contain
- * choices.`, which would pass for a model that answered with nothing. Only
- * the failure to convert that very answer is read against it.
+ * nothing was served, so it is booked as nothing, while the bridge's own
+ * message still decides how the run goes on (a gateway's
+ * `{"detail":"Not Found"}` reads as `Response does not contain choices.`, an
+ * empty answer for that chunk). Only the failure to convert that very answer
+ * is read against it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

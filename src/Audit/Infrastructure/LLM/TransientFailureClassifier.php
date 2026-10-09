@@ -207,13 +207,15 @@ final readonly class TransientFailureClassifier
      * show it in its raw answer (`UnconvertedAnswerException`). That raw
      * answer has the last word: a request it shows refused as too large was
      * never answered, whatever the bridge made of the body that came with the
-     * refusal (`Response does not contain choices.`). Null for any other
-     * failure.
+     * refusal (`Response does not contain choices.`). A request refused with
+     * any other client error is read by the bridge's message alone, as the
+     * same failure without a status: an empty answer there, a failure that
+     * aborts the run where the bridge named one. Null for any other failure.
      */
     public function degradedStopReason(Throwable $throwable): ?string
     {
         $unconvertedAnswerException = $this->firstInChain($throwable, UnconvertedAnswerException::class);
-        if ($unconvertedAnswerException instanceof UnconvertedAnswerException) {
+        if ($unconvertedAnswerException instanceof UnconvertedAnswerException && !$unconvertedAnswerException->refusedWithClientError) {
             return $unconvertedAnswerException->stopReason;
         }
 
@@ -235,10 +237,15 @@ final readonly class TransientFailureClassifier
      * in and answered it, with nothing usable (the degraded stop reason) or
      * with a tool call whose arguments are not valid JSON
      * (`malformed_tool_call`). Null for a failure it never answered, which
-     * spent nothing the budget or the rate window has to hold.
+     * spent nothing the budget or the rate window has to hold, and neither
+     * does a request it refused with a client error: nothing was served.
      */
     public function billedStopReason(Throwable $throwable): ?string
     {
+        if (true === $this->firstInChain($throwable, UnconvertedAnswerException::class)?->refusedWithClientError) {
+            return null;
+        }
+
         return $this->degradedStopReason($throwable)
             ?? ($this->hasInChain($throwable, MalformedToolCallException::class) ? self::MALFORMED_TOOL_CALL_STOP_REASON : null);
     }
@@ -339,12 +346,19 @@ final readonly class TransientFailureClassifier
         return null;
     }
 
+    /**
+     * An `UnconvertedAnswerException` only restates the message of the bridge
+     * failure it wraps, so the classification reads that one.
+     */
     private function joinMessages(Throwable $throwable): string
     {
         $messages = [];
         $current = $throwable;
         while ($current instanceof Throwable) {
-            $messages[] = u($current->getMessage())->lower()->toString();
+            if (!$current instanceof UnconvertedAnswerException) {
+                $messages[] = u($current->getMessage())->lower()->toString();
+            }
+
             $current = $current->getPrevious();
         }
 
