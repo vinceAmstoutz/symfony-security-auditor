@@ -13,7 +13,7 @@ End-to-end demonstrations and configuration recipes for `vinceamstoutz/symfony-s
 | [`configs/ci-optimized.yaml`](configs/ci-optimized.yaml) | Split-model (large attacker, fast reviewer) for scheduled CI runs. Cache + prompt caching on. Targets accuracy at moderate cost. |
 | [`configs/cost-aware.yaml`](configs/cost-aware.yaml) | One small model, single iteration, tools disabled. Smallest possible bill. Use when you need rough triage of a large monorepo. |
 | [`configs/dev-fast.yaml`](configs/dev-fast.yaml) | Local Ollama backend (no API key, no spend). Higher recall via lower `min_confidence` for exploratory development scans. |
-| [`vulnerable-app/`](vulnerable-app/) | Tiny Symfony 7 skeleton with deliberate flaws (broken access control, IDOR, SQL injection by concatenation, mass assignment). |
+| [`vulnerable-app/`](vulnerable-app/) | Tiny Symfony 7 skeleton with deliberate flaws (broken access control, IDOR, JSON hijacking, SQL injection by concatenation, mass assignment). |
 
 ## Reproducing each example
 
@@ -29,15 +29,16 @@ Expect: a console report whose risk level depends on what your codebase actually
 
 ### Vulnerable demo app
 
+The demo ships no `bin/console` and no kernel: it is a source tree to audit, not an application to boot. Audit it with the [standalone binary](../README.md#standalone-tool-binary), after the one-time `init` that picks a provider and stores its API key:
+
 ```bash
-cd examples/vulnerable-app
-composer install
-export ANTHROPIC_API_KEY=…           # or set up Ollama and uncomment the
-                                     # ollama: block in config/packages/ai.yaml
-bin/console audit:run
+symfony-security-auditor init
+symfony-security-auditor audit examples/vulnerable-app
 ```
 
-Expect: a non-zero exit code and a report listing roughly four findings — one broken-access-control on `UserController::deleteAction()`, one IDOR on `UserController::showAction()`, one SQL-injection on `SearchController::queryAction()`, and one mass-assignment on the `User` entity. Exact wording and severity vary by model.
+From a Symfony project that has the bundle installed, `bin/console audit:run path/to/examples/vulnerable-app` audits it the same way.
+
+Expect: a non-zero exit code and a report listing roughly five findings — one broken-access-control on `UserController::deleteAction()`, one IDOR on `UserController::showAction()`, one JSON hijacking on `UserController::listAction()`, one SQL-injection on `SearchController::queryAction()`, and one mass-assignment on the `User` entity. Exact wording and severity vary by model.
 
 ## Files in this directory are not shipped to Packagist
 

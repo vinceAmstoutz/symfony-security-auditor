@@ -45,7 +45,7 @@ body:
     attributes:
       label: Environment
       description: |
-        Fill in versions. Get the auditor version from `composer show symfony-security-auditor`.
+        Fill in versions. Get the auditor version from `composer show vinceamstoutz/symfony-security-auditor`, or from `symfony-security-auditor --version` for the standalone binary.
       value: |
         - Auditor version:
         - PHP version:

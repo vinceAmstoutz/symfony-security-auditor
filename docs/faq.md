@@ -123,7 +123,7 @@ That's a harder problem — LLMs miss things. Options:
 
 1. Raise `audit.max_iterations` from `3` to `5` (more passes).
 2. Switch to a stronger model.
-3. Drop `audit.min_confidence` to `0.3` and review unvalidated findings manually.
+3. Drop `audit.min_confidence` to `0.3` so more borderline candidates reach the Reviewer.
 4. [File an issue](https://github.com/vinceamstoutz/symfony-security-auditor/issues) with the file/snippet — we update prompts based on real misses.
 
 ### Can a comment in the audited code tell the model what to report?

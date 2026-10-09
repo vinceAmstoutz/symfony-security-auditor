@@ -34,7 +34,7 @@ interface LLMClientInterface
 
 `completeWithTools()` drives an autonomous tool-using conversation: as long as the model emits tool calls (and the iteration cap is not reached), the client executes them via the supplied `ToolRegistry` (also under `Audit\Domain\Port\Tool\`) and feeds the results back. Stub implementations may delegate to `complete()` when they don't need tool support.
 
-The default implementation (`SymfonyAiLLMClient`) delegates to `symfony/ai`'s `AgentInterface`. Replace it when you need direct HTTP calls, custom retry logic, token tracking, or a provider that `symfony/ai` does not support.
+The default implementation (`SymfonyAiLLMClient`) delegates to `symfony/ai`'s `PlatformInterface`. Replace it when you need direct HTTP calls, custom retry logic, token tracking, or a provider that `symfony/ai` does not support.
 
 `LLMResponse` is an immutable value object built via its `of()` factory, with the token counts grouped into a `TokenUsageSnapshot`:
 
@@ -282,7 +282,7 @@ $report->riskLevel(): string                         // SAFE|LOW|MEDIUM|HIGH|CRI
 $report->toArray(): array<string, mixed>             // fully serializable; includes 'cost' key
 ```
 
-`Vulnerability::toArray()` keys: `id`, `type`, `category`, `owasp`, `severity`, `severity_score`, `title`, `description`, `file`, `line_start`, `line_end`, `vulnerable_code`, `attack_vector`, `proof`, `remediation`, `confidence`, `reviewer_validated`, `detected_at`, `synthesized_poc`.
+`Vulnerability::toArray()` keys: `id`, `fingerprint`, `type`, `category`, `owasp`, `cwe`, `severity`, `severity_score`, `title`, `description`, `file`, `line_start`, `line_end`, `vulnerable_code`, `attack_vector`, `proof`, `remediation`, `confidence`, `reviewer_validated`, `detected_at`, `synthesized_poc`, `suggested_fix`, `cvss`.
 
 ### Built-in formats
 

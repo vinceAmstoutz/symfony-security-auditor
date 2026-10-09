@@ -8,11 +8,11 @@ Tune the audit for speed, token spend, and provider rate limits. The quickest kn
 
 `profile` presets the cost/speed/depth levers in a single line. A profile only fills the keys you leave unset — any explicitly configured key always wins, so you can start from a preset and override just what you need.
 
-| Profile | Iterations | Lean pre-scan | Code slicing | Concurrency (attacker / reviewer) | PoC synthesis | Best for |
-| --- | --- | --- | --- | --- | --- | --- |
-| `fast` | 1 | ✅ | ✅ | 4× / 4× | — | PR / pre-commit feedback, large repos |
-| `balanced` _(default)_ | 3 | — | — | 1× / 1× | — | Nightly CI, most projects |
-| `thorough` | 3 | — | — | 1× / 1× | ✅ | Release gates, deep audits |
+| Profile | Iterations | Lean pre-scan | Code slicing | Concurrency (attacker / reviewer) | PoC synthesis | `audit.since_closure` | Best for |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `fast` | 1 | ✅ | ✅ | 4× / 4× | — | `none` | PR / pre-commit feedback, large repos |
+| `balanced` _(default)_ | 3 | — | — | 1× / 1× | — | `none` | Nightly CI, most projects |
+| `thorough` | 3 | — | — | 1× / 1× | ✅ | `direct` | Release gates, deep audits |
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml

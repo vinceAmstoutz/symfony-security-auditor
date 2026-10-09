@@ -64,14 +64,14 @@ src/
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
 │   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
-│   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, DependencyExpansionStage, AuditStage, PoCSynthesisStage}
+│   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, DependencyExpansionStage, AuditStage, PoCSynthesisStage, FixSynthesisStage}
 │   │   └── Agent/       # AttackerAgent (+ Chunk/* collaborators),
 │   │                      ReviewerAgent (+ Review/* collaborators),
 │   │                      EscalatingAttackerAgent,
 │   │                      AuditOrchestrator, VulnerabilityFactory,
 │   │                      VulnerabilityCollector + RecordVulnerabilityToolFactoryInterface,
 │   │                      ReviewCollector + RecordReviewToolFactoryInterface,
-│   │                      PoCSynthesizer, Chunking/FileChunker
+│   │                      PoCSynthesizer, FixSynthesizer, Chunking/FileChunker
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop,
 │       │                  BatchWindowResolver, ToolConversationWavefront, InFlightRequestCanceller,
@@ -103,7 +103,7 @@ src/
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
 │       │                  SymfonyToolRegistryFactory, RecordVulnerabilityTool + Factory,
 │       │                  RecordReviewTool + Factory
-│       └── Report/      # ReportRenderer (console / JSON / SARIF + Template/*.txt)
+│       └── Report/      # ReportRendererInterface + one *ReportRenderer per format (console, executive, JSON, SARIF, HTML, Markdown, JUnit, GitHub annotations, GitHub comment) + Template/*
 ├── Command/             # AuditCommand + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat
 └── SymfonySecurityAuditorBundle.php  # Bundle class with configure() + loadExtension()
 ```
@@ -130,7 +130,7 @@ graph LR
         CACHE["FilesystemAttackerCache · FilesystemReviewerCache\n(+ Null* twins)"]
         ADVISORY["ComposerAuditAdvisoryDatabase\nInMemoryAdvisoryDatabase\nIsolatedComposerAuditRunner\nSymfonyProcessComposerAuditRunner"]
         TOOLS["ReadFile · Grep · ListFiles · LookupAdvisory tools\nSymfonyToolRegistryFactory"]
-        RENDERER["ReportRenderer"]
+        RENDERER["ReportRendererInterface\n(one renderer per format)"]
     end
 
     CMD --> APP
@@ -171,7 +171,7 @@ flowchart TD
     LOOP{"no new findings\nOR 3 iterations?"}
     POC["PoCSynthesisStage (optional)\nsynthesize PoC for\nhigh-severity validated findings"]
     RPT["AuditReport::fromContext()\nvalidated vulnerabilities only\ncapture completedAt"]
-    RENDER["ReportRenderer\nrenderConsole() or renderJson()"]
+    RENDER["ReportRendererInterface\nrender() for the selected --format"]
 
     CLI --> CMD --> UC
     UC --> ING --> MAP --> DEP --> AUD --> ATK
@@ -238,7 +238,7 @@ All properties are `readonly`. State changes return new instances:
 - `withReviewerValidation(bool): self` — called by `ReviewerAgent`
 - `withElevatedSeverity(VulnerabilitySeverity): self` — called when reviewer adjusts severity
 
-The `id` is deterministic: `VULN-{sha1(type+filePath+lineStart)[0..7]}`.
+The `id` is deterministic: `VULN-` plus the first 8 characters, upper-cased, of `sha1(sha1(type) . sha1(filePath) . sha1(lineStart))`, where `type` is the enum value and each input is hashed on its own so no digits shift between `filePath` and `lineStart`.
 
 Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`, `filePath`, `lineStart`, `lineEnd`, `vulnerableCode`, `attackVector`, `proof`, `remediation`, `confidence` (0.0–1.0), `reviewerValidated`, `detectedAt`.
 
@@ -326,7 +326,9 @@ The three AST parsers (`PhpParserControllerAccessControlParser`, `PhpParserVoter
 
 **`AuditStage`** — delegates entirely to `AuditOrchestrator::orchestrate(AuditContext)`.
 
-**`PoCSynthesisStage`** — optional final stage (off by default). When enabled, synthesizes a concrete reproduction artifact (the `synthesized_poc` report field) for validated findings at or above the configured severity floor, delegating to `PoCSynthesizer`. An answer cut short by the output token limit or a content filter (`LLMResponse::isDegraded()`) is never attached — the same holds for `FixSynthesizer` — so a truncated patch or payload cannot reach a report as if it were complete.
+**`PoCSynthesisStage`** — optional stage after the audit (off by default). When enabled, synthesizes a concrete reproduction artifact (the `synthesized_poc` report field) for validated findings at or above the configured severity floor, delegating to `PoCSynthesizer`. An answer cut short by the output token limit or a content filter (`LLMResponse::isDegraded()`) is never attached — the same holds for `FixSynthesizer` — so a truncated patch or payload cannot reach a report as if it were complete.
+
+**`FixSynthesisStage`** — optional stage after `PoCSynthesisStage` (off by default: `audit.fix_synthesis.enabled`, which no profile turns on). When enabled, attaches a minimal unified-diff patch (the `suggested_fix` report field) to validated findings at or above `audit.fix_synthesis.severity_floor`, delegating to `FixSynthesizer`.
 
 ### `AuditOrchestrator`
 
@@ -359,14 +361,29 @@ Duplicate detection: two vulnerabilities are duplicates when their IDs match, or
 
 Sorts files by security priority before chunking:
 
-| Priority | File type       |
-| -------- | --------------- |
-| 0        | Controllers     |
-| 1        | Voters          |
-| 2        | Entities        |
-| 3        | Repositories    |
-| 4        | Forms           |
-| 5        | Everything else |
+| Priority | File type                  |
+| -------- | -------------------------- |
+| 0        | Controllers                |
+| 1        | API Platform resources     |
+| 2        | Live components            |
+| 3        | Authenticators             |
+| 4        | LDAP services              |
+| 5        | Sonata admins              |
+| 6        | EasyAdmin CRUD controllers |
+| 7        | Voters                     |
+| 8        | Webhook consumers          |
+| 9        | Messenger handlers         |
+| 10       | Event subscribers          |
+| 11       | Normalizers                |
+| 12       | Entities                   |
+| 13       | Repositories               |
+| 14       | Forms                      |
+| 15       | Schedulers                 |
+| 16       | Templates                  |
+| 17       | Twig extensions            |
+| 18       | Configuration              |
+| 19       | Other PHP files            |
+| 20       | Everything else            |
 
 `analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping, `bypassCache`, `previousFindings`, `rejectedFindings`, and the `candidateFindings` an escalation deep pass receives from the cheap sweep) plus a `CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan, optional lean-mode filtering, chunking, strategy selection, and the start/complete logging — delegating the per-chunk work to `Chunk\` collaborators it builds at construction time: `ChunkContextFactory` assembles each chunk's prompts (markers + cross-iteration preambles, code slicing) and derives the cache key/cacheability into a `ChunkContext` — the key folds in a fingerprint of the mapping's access-control data (firewall rules, route access-control map, voter capabilities, form bindings, controllers without a voter) alongside the marker/rejected/previous preambles, so a `security.yaml` edit or a voter added elsewhere invalidates a chunk's cached verdict even though the chunk's own file content never changed; `AttackerChunkCache` adapts `AttackerCacheInterface` (context-aware key when supported) and turns a hit into a hydrated result; `SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are the two analysis strategies, and both build their structured-collection round (a fresh collector wired into a single-tool `record_vulnerability` registry, whose recording tool is wrapped in `RefusalTrackingRecordingTool` so a call it refuses reaches the collector) through the shared `StructuredVulnerabilityCollectionSession::begin()`, and both record a chunk that ends with a refused call the model never repeated in full (the same file and title, or the same file, type and line, as far as the refused call stated them) as errored and out of the cache through `RefusedRecordingRecorder`, keeping the findings recorded; `ChunkCoverageRecorder` records per-file coverage. The chunk-priority ordering above is defined once on `FileChunker` over `ProjectFileType` cases. Risk markers are indexed by `RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt preambles are rendered by `AttackerContextPromptRenderer`.
 
@@ -418,7 +435,7 @@ This is the sole seam between Application and LLM I/O. Application agents never 
 
 ### `SymfonyAiLLMClient`
 
-Adapter implementing `LLMClientInterface`. Wraps `Symfony\AI\Agent\AgentInterface` (from `symfony/ai`). Builds a `MessageBag` with a system message and a user message per call, invokes `$agent->call($messages, ['stream' => false])`, and wraps the string result in `LLMResponse`.
+Adapter implementing `LLMClientInterface`. Wraps `Symfony\AI\Platform\PlatformInterface` (from `symfony/ai-platform`). Builds a `MessageBag` with a system message and a user message per call, invokes `PlatformInterface::invoke()` with the configured model and options through `RetryingPlatformInvoker`, and wraps the text result in `LLMResponse`.
 
 Token usage (input, output tokens) is read from the platform response via `symfony/ai`'s `TokenUsageInterface` and forwarded to the shared `TokenUsageRecorder` so `RunAuditUseCase` can attribute cumulative usage to the final `AuditReport`. A provider that reports no usage with an answer (Bedrock's InvokeModel route, a gateway that omits `usage`), or a usage object with no prompt tokens (an empty one, or a prompt of zero with no cache read or write counted apart), is booked at the call's estimated input tokens, the output it produced counted as it reported it, or as none, so the budget, the report and the rate-limit window still see its spend. `BudgetTracker` receives the same counts to enforce `audit.budget.*` limits; it throws `BudgetExceededException` when a limit is breached, triggering a clean abort with exit code `2`.
 
@@ -473,13 +490,9 @@ With `audit.reviewer_structured_collection: true` (the default), the same fields
 
 It includes a Symfony-specific false-positive playbook (Doctrine `setParameter()`, default CSRF, `mapped: false`, hardcoded-argv `Process`, etc.) so the reviewer rejects known non-issues with a one-line note. The single- and batch-mode system prompts share a single core-instructions block to prevent drift.
 
-### `ReportRenderer`
+### `ReportRendererInterface`
 
-Three render methods:
-
-- `renderConsole(AuditReport): string` — human-readable terminal output
-- `renderJson(AuditReport): string` — delegates to `AuditReport::toArray()` then `json_encode`
-- `renderSarif(AuditReport): string` — SARIF 2.1.0; `tool.driver.version` sourced dynamically from installed Composer metadata
+Each output format is its own class implementing `ReportRendererInterface` (`format(): string` + `render(AuditReport): string`) under `Audit\Infrastructure\Report\`; the nine bundled renderers are listed in [Extending → Built-in formats](extending.md#built-in-formats). `JsonReportRenderer` delegates to `AuditReport::toArray()` then `json_encode`; `SarifReportRenderer` emits SARIF 2.1.0 with `tool.driver.version` sourced dynamically from installed Composer metadata. `Command\ReportWriter` indexes the tagged renderers by `format()` and dispatches the selected `--format`.
 
 ## Bundle Wiring (`SymfonySecurityAuditorBundle`)
 
@@ -542,7 +555,7 @@ Console command `audit:run` (alias `audit`). Arguments and options:
 | `project-path` | argument | `getcwd()` | Path to target project; defaults to CWD |
 | `--format / -f` | option | `console` | Any `OutputFormat` value: `console`, `executive`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`, `github-comment` |
 | `--output / -o` | option | `null` | Write JSON/SARIF report to file |
-| `--dry-run` | option | `false` | Estimate cost without invoking the LLM; exits `0` |
+| `--dry-run` | option | `false` | Estimate cost without invoking the LLM; exits `0` once the inputs are valid |
 
 Input mapping and resolution live in `AuditCommandInput`; output writing in `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
@@ -560,7 +573,7 @@ Exit codes: `0` when the aggregate risk level is below the `fail_on` threshold (
 
 **Add new severity levels** — add a case to `VulnerabilitySeverity` with `score()`, `label()`, `isExploitable()` implementations, and update the `riskLevel()` thresholds in `AuditReport` accordingly.
 
-**Custom report format** — add a case to `Command\OutputFormat`, add a `render*` method to `ReportRenderer`, and add the matching `match` arm in `ReportWriter`.
+**Custom report format** — add a case to `Command\OutputFormat` and a `<Name>ReportRenderer` implementing `ReportRendererInterface`; autoconfiguration tags it and `ReportWriter` picks it up, so there is no `match` arm to edit. See [Extending → Adding a new format](extending.md#adding-a-new-format).
 
 **Replace advisory source** — implement `Audit\Domain\Port\AdvisoryDatabaseInterface` and override the alias in `config/services.yaml` to wire a custom CVE feed (Snyk, internal database, …).
 

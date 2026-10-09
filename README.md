@@ -34,7 +34,7 @@ Scans files and estimates token usage and cost without calling the LLM. Use this
 bin/console audit:run --dry-run
 ```
 
-No LLM calls are made; exit code is always `0`.
+No LLM calls are made; it exits `0` once the inputs are valid (a missing project directory, a conflicting option or an unwritable `--output` still exit `1`).
 
 ### Console mode
 

@@ -137,7 +137,7 @@ bin/castor lint
 bin/castor lint:fix
 ```
 
-This runs: **Prettier** ([prettier](https://prettier.io/)) → **Markdown lint** ([markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)) → `composer normalize` → PHP CS Fixer (@PER-CS3x0, @Symfony) → Rector → PHPStan max → PHPUnit → Infection.
+This runs: **Prettier** ([prettier](https://prettier.io/)) → **Markdown lint** ([markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)) → `composer normalize` → PHP CS Fixer (@PER-CS3x0, @Symfony) → Rector → PHPStan max → Deptrac → Swiss Knife → install-script and pull-request-check shell tests → PHPUnit → Infection.
 
 Prettier and Markdown lint both run via Docker (`tmknom/prettier`, `davidanson/markdownlint-cli2`) so no local Node installation is required. Configs: [`.prettierrc.json`](.prettierrc.json), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc).
 
@@ -196,10 +196,10 @@ Do not point documentation or examples at a `raw.githubusercontent.com/.../main/
 ### Add a new vulnerability type
 
 1. Add a case to `Audit/Domain/Model/VulnerabilityType`.
-2. Extend `category()` and `owaspReference()` with the new case.
+2. Extend `category()`, `owaspReference()`, `owaspReferenceUrl()` and `cwe()` with the new case: each is an exhaustive `match`, so a missing arm throws `UnhandledMatchError`.
 3. Update `AttackerPromptBuilder` to mention the new type so the LLM emits it.
-4. Add a fixture in `tests/Phpunit/Fixtures/` that exercises the new case.
-5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-references).
+4. Pin the new case in the data providers of `tests/Phpunit/Unit/Domain/Model/VulnerabilityTypeTest.php`: category, OWASP reference, OWASP URL and CWE.
+5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-and-cwe-references).
 
 ### Add a new pipeline stage
 
@@ -208,8 +208,8 @@ Implement `Audit/Domain/Pipeline/StageInterface`. Stages are auto-tagged via `sy
 ### Add a new output format
 
 1. Add a case to `Command/OutputFormat`.
-2. Add a `render<Name>(AuditReport): string` method to `Audit/Infrastructure/Report/ReportRenderer`.
-3. Add the matching arm in `Command/ReportWriter::write()`.
+2. Add a `<Name>ReportRenderer` class to `Audit/Infrastructure/Report/` implementing `ReportRendererInterface`, returning the case's wire value from `format()`.
+3. Register it in `config/services.php`: autoconfiguration tags it and `Command/ReportWriter` picks it up, so there is no `match` arm to edit. See [Extending → Adding a new format](docs/extending.md#adding-a-new-format).
 
 ### Add a new advisory source (CVE feed)
 
@@ -235,7 +235,7 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
      sh .github/scripts/check-pull-request.sh
    ```
 
-The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1) → **Mutation** (Infection 100% MSI). All six must pass before merging.
+The CI pipeline runs seven jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script and pull-request-check shell tests) → **zizmor** (GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1, then Infection 100% MSI) → **Pull request target** (title, description and base branch). All seven must pass before merging.
 
 Details: [`docs/ci.md`](docs/ci.md).
 

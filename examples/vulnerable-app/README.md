@@ -4,7 +4,7 @@
 >
 > **This application is intentionally vulnerable.** It exists to demonstrate `vinceamstoutz/symfony-security-auditor` against realistic-looking flaws. **Do not deploy it. Do not import any of its source files into a real project.**
 
-A tiny Symfony 7 skeleton with deliberate flaws across four OWASP categories. Run the auditor against it and observe the report.
+A tiny Symfony 7 skeleton with deliberate flaws across three OWASP categories. Run the auditor against it and observe the report.
 
 ## Embedded flaws
 
@@ -18,19 +18,21 @@ A tiny Symfony 7 skeleton with deliberate flaws across four OWASP categories. Ru
 
 ## Running the auditor against it
 
+This directory has no `bin/console` and no kernel: it is a source tree to audit, not an application to boot. Audit it with the [standalone binary](../../README.md#standalone-tool-binary), after the one-time `init` that picks a provider and stores its API key:
+
 ```bash
-cd examples/vulnerable-app
-composer install
-export ANTHROPIC_API_KEY=…             # or configure another platform
-bin/console audit:run
+symfony-security-auditor init
+symfony-security-auditor audit examples/vulnerable-app
 ```
+
+From a Symfony project that has the bundle installed, `bin/console audit:run path/to/examples/vulnerable-app` audits it the same way.
 
 Expected outcome:
 
 - Exit code **1** (risk level `CRITICAL` once the controller findings are validated).
 - Report lists ≈ 5 findings, one per row of the table above. Severity and wording vary by model.
 
-To try a different provider, edit [`config/packages/ai.yaml`](config/packages/ai.yaml).
+To try a different provider, run `symfony-security-auditor init` again, or edit the `platform:` block of your [standalone configuration](../../docs/configuration.md#standalone-configuration).
 
 ## What this app does **not** demonstrate
 

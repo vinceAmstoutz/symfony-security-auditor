@@ -45,6 +45,11 @@ Default values for these keys are also part of the contract. Changing a default 
 - The `--min-score` option (since 1.19) — a second, independent CI gate on the normalized 0-100 score. The audit exits `1` when either gate trips.
 - The `--fail-on-incomplete` option (since 1.21) — exits `3` when some file could not be fully analyzed and no gate tripped — and its negation `--no-fail-on-incomplete` (since 1.22), which switches a configured `audit.fail_on_incomplete` off for one run.
 - The `--no-output` option (since 1.22) — prints the report instead of writing it, which switches a configured `audit.output` off for one run; it cannot be combined with `--output`.
+- The `--dry-run` option — estimates token usage and cost without invoking the LLM.
+- The `--show-scanned` option — lists the files that would be audited and exits, without invoking the LLM.
+- The `--no-cache` option — bypasses the attacker and reviewer caches for one run.
+- The `--path` (`-p`) option — repeatable; scans the given directories or files instead of the configured `scan.included_paths`.
+- The `--since` option — diff mode: audits only the files changed against a git ref.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit ran to its end; aggregate risk level is below the `fail_on` threshold (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default) and, when `--min-score` is given, the normalized score is at or above it.
   - `1` — aggregate risk level is at or above the `fail_on` threshold (default `critical`), the normalized score is below `--min-score`, no file in scope could be analyzed and nothing was found (since 1.21), or the audit itself failed.
