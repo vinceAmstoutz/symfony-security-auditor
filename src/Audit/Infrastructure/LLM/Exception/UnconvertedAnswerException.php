@@ -23,7 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageR
  * `LLMResponse` does (`length`, `content-filter`), keeping the bridge's
  * message; a request refused as too large with an HTTP 413, whose body the
  * bridge could not make sense of; or a request refused with any other HTTP
- * client error, whose body the bridge read as an empty answer.
+ * client error, which names its status for the log and books nothing, while
+ * the bridge's message alone decides how it is classified.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -34,6 +35,7 @@ final class UnconvertedAnswerException extends RuntimeException
         Throwable $previous,
         public readonly ?string $stopReason = null,
         public readonly bool $refusedAsTooLarge = false,
+        public readonly bool $refusedWithClientError = false,
     ) {
         parent::__construct($message, previous: $previous);
     }
@@ -50,6 +52,6 @@ final class UnconvertedAnswerException extends RuntimeException
 
     public static function refusedWithStatus(Throwable $throwable, int $status): self
     {
-        return new self(\sprintf('The provider refused the request (HTTP %d): %s', $status, ProviderMessageRedactor::redact($throwable->getMessage())), $throwable);
+        return new self(\sprintf('The provider refused the request (HTTP %d): %s', $status, ProviderMessageRedactor::redact($throwable->getMessage())), $throwable, refusedWithClientError: true);
     }
 }

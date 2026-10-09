@@ -41,6 +41,7 @@ final class ConversionFailureExplainerTest extends TestCase
 
         self::assertInstanceOf(UnconvertedAnswerException::class, $throwable);
         self::assertSame('content-filter', $throwable->stopReason);
+        self::assertFalse($throwable->refusedWithClientError);
         self::assertSame(self::AZURE_FILTERED, $throwable->getMessage());
         self::assertSame($badRequestException, $throwable->getPrevious());
     }
@@ -104,6 +105,7 @@ final class ConversionFailureExplainerTest extends TestCase
 
         self::assertInstanceOf(UnconvertedAnswerException::class, $throwable);
         self::assertTrue($throwable->refusedAsTooLarge);
+        self::assertFalse($throwable->refusedWithClientError);
         self::assertSame('The provider refused the request as too large (HTTP 413): Syntax error for "https://gw.example.com/v1/chat/completions".', $throwable->getMessage());
     }
 
@@ -118,6 +120,7 @@ final class ConversionFailureExplainerTest extends TestCase
         self::assertInstanceOf(UnconvertedAnswerException::class, $throwable);
         self::assertNull($throwable->stopReason);
         self::assertFalse($throwable->refusedAsTooLarge);
+        self::assertTrue($throwable->refusedWithClientError);
         self::assertSame(\sprintf('The provider refused the request (HTTP %d): Response does not contain choices.', $status), $throwable->getMessage());
         self::assertSame($runtimeException, $throwable->getPrevious());
     }

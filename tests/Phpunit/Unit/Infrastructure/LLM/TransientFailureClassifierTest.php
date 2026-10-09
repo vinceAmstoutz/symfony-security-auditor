@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Symfony\AI\Platform\Exception\AuthenticationException;
 use Symfony\AI\Platform\Exception\BadRequestException;
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
@@ -94,6 +95,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'symfony_failed_sending_data' => [self::transportFailure('Failed sending data to the peer')];
         yield 'symfony_empty_reply_from_server' => [self::transportFailure('Empty reply from server')];
         yield 'symfony_send_failure_broken_pipe' => [self::transportFailure('Send failure: Broken pipe')];
+        yield 'request_refused_with_a_client_error_whose_bridge_message_reads_as_transient' => [UnconvertedAnswerException::refusedWithStatus(new RuntimeException('Gateway temporarily unavailable'), 403)];
     }
 
     #[DataProvider('connectionCutCarryingAStatusLikeTokenCases')]
@@ -197,6 +199,8 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'symfony_client_error_status' => [new RuntimeException('HTTP 401 returned for "https://gw.example.com/v1/chat/completions".')];
         yield 'symfony_untrusted_certificate' => [self::transportFailure('SSL certificate problem: unable to get local issuer certificate')];
         yield 'symfony_tls_alert_while_reading' => [self::transportFailure('OpenSSL SSL_read: error:0A000412:SSL routines::sslv3 alert bad certificate, errno 0')];
+        yield 'request_refused_with_a_client_error_the_bridge_named_as_a_failure' => [UnconvertedAnswerException::refusedWithStatus(new AuthenticationException('Unauthorized'), 401)];
+        yield 'request_refused_with_a_client_error_whose_bridge_message_names_no_cause' => [UnconvertedAnswerException::refusedWithStatus(new RuntimeException('Response does not contain choices.'), 409)];
     }
 
     #[DataProvider('degradedStopReasonCases')]
@@ -227,7 +231,10 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'request_its_raw_answer_shows_refused_as_too_large' => [UnconvertedAnswerException::refusedAsTooLarge(new RuntimeException('Syntax error')), null];
         yield 'request_refused_as_too_large_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain choices.')), null];
         yield 'request_refused_as_too_large_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain any content.'))), null];
-        yield 'request_refused_with_a_client_error_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 404), null];
+        yield 'request_refused_with_a_client_error_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 404), 'empty_content'];
+        yield 'request_refused_with_a_client_error_whose_body_the_bridge_read_as_empty_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 422)), 'empty_content'];
+        yield 'request_refused_with_a_client_error_the_bridge_named_as_a_failure' => [UnconvertedAnswerException::refusedWithStatus(new AuthenticationException('Unauthorized'), 401), null];
+        yield 'request_refused_with_a_client_error_the_bridge_worded_as_a_content_filter' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Unsupported finish reason "content_filter".'), 400), 'content-filter'];
     }
 
     #[DataProvider('billedStopReasonCases')]
@@ -247,6 +254,8 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'failure_the_provider_never_answered' => [new RuntimeException('HTTP 503 Service Unavailable'), null];
         yield 'request_refused_as_too_large_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedAsTooLarge(new PlatformRuntimeException('Response does not contain choices.')), null];
         yield 'request_refused_with_a_client_error_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 404), null];
+        yield 'request_refused_with_a_client_error_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 403)), null];
+        yield 'request_refused_with_a_client_error_the_bridge_worded_as_a_content_filter' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Unsupported finish reason "content_filter".'), 400), null];
     }
 
     #[DataProvider('emptyContentCases')]
