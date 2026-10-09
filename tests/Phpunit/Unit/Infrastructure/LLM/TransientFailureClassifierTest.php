@@ -21,6 +21,7 @@ use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
+use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Symfony\Component\HttpClient\Exception\TransportException;
@@ -50,6 +51,9 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'http_529_overloaded' => [new RuntimeException('HTTP 529: Overloaded')];
         yield 'overloaded_phrasing' => [new RuntimeException('The Anthropic API is currently overloaded, please retry')];
         yield 'rate_limit_phrasing' => [new RuntimeException('Rate limit exceeded')];
+        yield 'quota_exceeded_per_minute_with_a_suggested_wait' => [new RateLimitExceededException(null, 'You exceeded your current quota, please check your plan and billing details. * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 15. Please retry in 41.8s.')];
+        yield 'quota_exceeded_with_a_retry_after_wait' => [new RateLimitExceededException(null, 'You exceeded your current quota. Retry after 30 seconds.')];
+        yield 'quota_exceeded_with_a_try_again_wait' => [new RateLimitExceededException(null, 'You exceeded your current quota, try again in 20s.')];
         yield 'timeout_phrasing' => [new RuntimeException('Request timed out after 30s')];
         yield 'temporarily_unavailable' => [new RuntimeException('Provider temporarily unavailable')];
         yield 'connection_reset' => [new RuntimeException('Connection reset by peer')];
@@ -181,6 +185,9 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'http_400_at_sentence_end' => [new RuntimeException('The provider rejected the request with HTTP 400.')];
         yield 'non_transient_code_with_embedded_transient_digits' => [new RuntimeException('HTTP 401 Unauthorized (client waited 5001 ms)')];
         yield 'invalid_api_key' => [new RuntimeException('Invalid API key provided')];
+        yield 'openai_billing_quota_exhausted' => [new RateLimitExceededException(null, 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.')];
+        yield 'insufficient_quota_code_in_the_message' => [new RuntimeException('HTTP 429: {"error":{"type":"insufficient_quota","code":"insufficient_quota"}}')];
+        yield 'insufficient_quota_beneath_a_wrapper' => [new RuntimeException('call failed', previous: new RateLimitExceededException(null, 'insufficient_quota'))];
         yield 'authentication_failed' => [new RuntimeException('authentication failed')];
         yield 'unknown_error_phrasing' => [new RuntimeException('Something went wrong without identifiable signal')];
         yield 'non_transient_wins_over_transient_in_chain' => [

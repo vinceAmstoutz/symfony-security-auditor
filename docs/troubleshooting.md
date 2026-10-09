@@ -241,6 +241,8 @@ docker compose exec -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" php bin/console au
 
 ### `Rate limit exceeded` / `429`
 
+A `429` that says the quota is used up (OpenAI's `You exceeded your current quota, please check your plan and billing details.`, `insufficient_quota`) is not a rate limit: the audit stops on it at once instead of retrying, since waiting cannot help. Add credit or raise the plan's limit, then run again. A `429` that suggests a wait (`Please retry in 41.8s.`) is a rate limit and is retried.
+
 Configure `audit.rate_limit.requests_per_minute` / `input_tokens_per_minute` / `output_tokens_per_minute` to your provider tier's limits so the auditor throttles proactively instead of hitting a `429`. Otherwise, reduce concurrent load:
 
 - Lower `audit.max_iterations` (default `3`) to `1`.
