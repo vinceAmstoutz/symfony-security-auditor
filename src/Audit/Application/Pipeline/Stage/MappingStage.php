@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LoadOrderAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProductionAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
@@ -184,17 +185,39 @@ final readonly class MappingStage implements StageInterface
         $routeAccessMap = [];
         $firewallRules = [];
 
-        foreach ($files as $file) {
-            if (!$this->isLoadedInProduction($file)) {
-                continue;
-            }
-
-            $content = $file->content();
+        foreach ($this->configurationFilesInLoadOrder($files) as $projectFile) {
+            $content = $projectFile->content();
             $routeAccessMap = $this->mergeRouteAccessMaps($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
             $firewallRules = [...$firewallRules, ...$this->securityConfigParser->parseFirewallRules($content)];
         }
 
         return [$routeAccessMap, $firewallRules];
+    }
+
+    /**
+     * Rules apply first-match-wins in the order the application loads them,
+     * which is not the order the scan lists the files in.
+     *
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function configurationFilesInLoadOrder(array $files): array
+    {
+        $loaded = array_values(array_filter($files, $this->isLoadedInProduction(...)));
+
+        if ($this->securityConfigParser instanceof LoadOrderAwareSecurityConfigParserInterface) {
+            usort($loaded, fn (ProjectFile $left, ProjectFile $right): int => $this->loadsBefore($this->securityConfigParser, $left, $right));
+        }
+
+        return $loaded;
+    }
+
+    private function loadsBefore(LoadOrderAwareSecurityConfigParserInterface $loadOrderAwareSecurityConfigParser, ProjectFile $left, ProjectFile $right): int
+    {
+        $byRank = $loadOrderAwareSecurityConfigParser->loadRank($left->relativePath()) <=> $loadOrderAwareSecurityConfigParser->loadRank($right->relativePath());
+
+        return 0 !== $byRank ? $byRank : strcmp($left->relativePath(), $right->relativePath());
     }
 
     /**

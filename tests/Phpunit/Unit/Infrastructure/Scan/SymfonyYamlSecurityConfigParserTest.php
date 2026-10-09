@@ -322,6 +322,20 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         yield 'staging' => ['staging'];
     }
 
+    #[DataProvider('loadRankCases')]
+    public function test_it_ranks_the_configuration_files_in_the_order_the_kernel_loads_them(string $relativePath, int $rank): void
+    {
+        self::assertSame($rank, $this->symfonyYamlSecurityConfigParser->loadRank($relativePath));
+    }
+
+    /** @return iterable<string, array{0: string, 1: int}> */
+    public static function loadRankCases(): iterable
+    {
+        yield 'the security package' => ['config/packages/security.yaml', 0];
+        yield 'a production package' => ['config/packages/prod/security.yaml', 1];
+        yield 'a nested production package' => ['config/packages/prod/security/firewalls.yaml', 1];
+    }
+
     #[DataProvider('configurationFileCases')]
     public function test_it_tells_which_configuration_files_the_production_kernel_loads(string $relativePath, bool $loaded): void
     {
@@ -415,6 +429,21 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
             ['^/admin' => ['ROLE_ADMIN'], '^/metrics' => ['ROLE_MONITOR']],
             $accessControl,
         );
+    }
+
+    public function test_the_root_section_precedes_the_production_override_wherever_the_document_writes_it(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            when@prod:
+                security:
+                    access_control:
+                        - { path: ^/api, roles: ROLE_USER }
+            security:
+                access_control:
+                    - { path: ^/api/docs, roles: PUBLIC_ACCESS }
+            YAML);
+
+        self::assertSame(['^/api/docs', '^/api'], array_keys($accessControl));
     }
 
     public function test_a_section_without_access_control_keeps_every_rule_an_earlier_section_recorded(): void

@@ -18,10 +18,10 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProductionAwareSecurityConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LoadOrderAwareSecurityConfigParserInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SymfonyYamlSecurityConfigParser implements ProductionAwareSecurityConfigParserInterface
+final readonly class SymfonyYamlSecurityConfigParser implements LoadOrderAwareSecurityConfigParserInterface
 {
     private const string PRODUCTION_ENVIRONMENT_BLOCK = 'when@prod';
 
@@ -49,6 +49,16 @@ final readonly class SymfonyYamlSecurityConfigParser implements ProductionAwareS
     public function isLoadedInProduction(string $relativePath): bool
     {
         return 1 === preg_match('~\Aconfig/packages/(?:prod/.+|security)\.ya?ml\z~', $relativePath);
+    }
+
+    /**
+     * The kernel imports `config/packages/*.yaml` and then
+     * `config/packages/<environment>/*.yaml`.
+     */
+    #[Override]
+    public function loadRank(string $relativePath): int
+    {
+        return str_starts_with($relativePath, 'config/packages/prod/') ? 1 : 0;
     }
 
     #[Override]
@@ -127,9 +137,10 @@ final readonly class SymfonyYamlSecurityConfigParser implements ProductionAwareS
     }
 
     /**
-     * The `security` blocks of the document the production kernel reads: the
-     * root one plus the `when@prod` override — a `when@test` or `when@dev`
-     * block protects nothing in production. A bare root-level
+     * The `security` blocks of the document the production kernel reads, in the
+     * order it loads them: the root one, then the `when@prod` override,
+     * wherever the document writes them — a `when@test` or `when@dev` block
+     * protects nothing in production. A bare root-level
      * `access_control`/`firewalls` document (an imported partial) also counts
      * as a section.
      *
@@ -144,10 +155,10 @@ final readonly class SymfonyYamlSecurityConfigParser implements ProductionAwareS
             $sections[] = $document;
         }
 
-        foreach ($document as $key => $value) {
-            $block = $this->securityBlockOf($key, $value);
-            if (null !== $block) {
-                $sections[] = $block;
+        $productionOverride = $this->mapOf($document[self::PRODUCTION_ENVIRONMENT_BLOCK] ?? null);
+        foreach ([$document['security'] ?? null, $productionOverride['security'] ?? null] as $security) {
+            if (\is_array($security)) {
+                $sections[] = $this->mapOf($security);
             }
         }
 
@@ -165,24 +176,6 @@ final readonly class SymfonyYamlSecurityConfigParser implements ProductionAwareS
 
             return null;
         }
-    }
-
-    /**
-     * @return ?array<string, mixed>
-     */
-    private function securityBlockOf(string $key, mixed $value): ?array
-    {
-        if ('security' === $key) {
-            return \is_array($value) ? $this->mapOf($value) : null;
-        }
-
-        if (self::PRODUCTION_ENVIRONMENT_BLOCK !== $key) {
-            return null;
-        }
-
-        $security = $this->mapOf($value)['security'] ?? null;
-
-        return \is_array($security) ? $this->mapOf($security) : null;
     }
 
     /**

@@ -59,6 +59,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProductionAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
@@ -1198,6 +1199,67 @@ final class StagesTest extends TestCase
         $routeMap = $mapping->routeAccessMap();
         self::assertArrayHasKey('^/admin', $routeMap);
         self::assertArrayHasKey('^/api', $routeMap);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_orders_access_control_as_the_kernel_loads_it_whatever_order_the_scan_lists_the_files(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/packages/prod/security.yaml', '/app/config/packages/prod/security.yaml', "security:\n    access_control:\n        - { path: ^/api, roles: ROLE_USER }\n"),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', "security:\n    access_control:\n        - { path: ^/api/docs, roles: PUBLIC_ACCESS }\n"),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        self::assertSame(['^/api/docs', '^/api'], array_keys($auditContext->mapping()?->routeAccessMap() ?? []));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_loads_configuration_files_of_the_same_rank_in_path_order(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/packages/prod/b.yaml', '/app/config/packages/prod/b.yaml', "access_control:\n    - { path: ^/b, roles: ROLE_B }\n"),
+            ProjectFile::create('config/packages/prod/c.yaml', '/app/config/packages/prod/c.yaml', "access_control:\n    - { path: ^/c, roles: ROLE_C }\n"),
+            ProjectFile::create('config/packages/prod/a.yaml', '/app/config/packages/prod/a.yaml', "access_control:\n    - { path: ^/a, roles: ROLE_A }\n"),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', "security:\n    access_control:\n        - { path: ^/s, roles: ROLE_S }\n"),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        self::assertSame(['^/s', '^/a', '^/b', '^/c'], array_keys($auditContext->mapping()?->routeAccessMap() ?? []));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_keeps_the_scan_order_for_a_parser_that_does_not_know_the_load_order(): void
+    {
+        $securityConfigParser = self::createStub(ProductionAwareSecurityConfigParserInterface::class);
+        $securityConfigParser->method('isLoadedInProduction')->willReturn(true);
+        $securityConfigParser->method('parseAccessControl')->willReturnCallback(static fn (string $configContent): array => [$configContent => ['ROLE_ANY']]);
+        $securityConfigParser->method('parseFirewallRules')->willReturn([]);
+
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), $securityConfigParser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/packages/prod/security.yaml', '/app/config/packages/prod/security.yaml', 'prod'),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', 'root'),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        self::assertSame(['prod', 'root'], array_keys($auditContext->mapping()?->routeAccessMap() ?? []));
     }
 
     /**
