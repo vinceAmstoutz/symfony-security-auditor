@@ -18,6 +18,7 @@ use Symfony\Component\Filesystem\Path;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedExceptionInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
@@ -36,6 +37,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterfa
 /** @internal not part of the BC promise — the MCP tool *name* (`audit`) is public, but the PHP class itself is for internal use only. */
 final readonly class AuditTool
 {
+    private const string FAILURE_WITH_PARTIAL_REPORT = "%s\n\nPartial report of the run that stopped early:\n%s";
+
     public function __construct(
         private RunAuditUseCase $runAuditUseCase,
         private ReportRendererInterface $reportRenderer,
@@ -51,7 +54,9 @@ final readonly class AuditTool
      * `ToolCallException` with a bare "Error while executing tool", so every
      * failure — a relative path, an exhausted budget, a refused credential, a
      * run with no verdict — is rethrown as one, and its reason reaches the
-     * client that asked.
+     * client that asked. A run a budget cap or a provider failure stopped
+     * keeps the findings it had validated: its reason is followed by the
+     * partial report, as `audit:run` still writes it.
      *
      * @throws ToolCallException
      */
@@ -59,8 +64,24 @@ final readonly class AuditTool
     {
         try {
             return $this->reportRenderer->render($this->auditReport($this->canonicalPath($path)));
+        } catch (AuditAbortedExceptionInterface $auditAbortedException) {
+            throw $this->abortedRunFailure($auditAbortedException);
         } catch (Throwable $throwable) {
             throw $this->toolCallFailure($throwable);
+        }
+    }
+
+    private function abortedRunFailure(AuditAbortedExceptionInterface $auditAbortedException): ToolCallException
+    {
+        try {
+            $partialReport = $this->baselineProcessor->apply($this->findingTypeFilter->apply($auditAbortedException->partialReport()), null)->report;
+
+            return new ToolCallException(
+                \sprintf(self::FAILURE_WITH_PARTIAL_REPORT, $auditAbortedException->getMessage(), $this->reportRenderer->render($partialReport)),
+                previous: $auditAbortedException,
+            );
+        } catch (Throwable) {
+            return $this->toolCallFailure($auditAbortedException);
         }
     }
 
