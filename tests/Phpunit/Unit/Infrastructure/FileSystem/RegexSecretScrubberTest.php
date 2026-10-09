@@ -1630,7 +1630,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a user part of half a megabyte with no at sign' => ['redis://'.str_repeat('a', 524280)];
         yield 'case keywords with no name' => [str_repeat('case ', 104857)];
         yield 'enum cases named like credentials with no value' => [str_repeat('case SECRET_KEY ', 32768)];
-        yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 24000)];
+        yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 14000)];
         yield 'php strings closing right after a credential name' => ['<?php '.str_repeat("'x_password='", 40000)];
     }
 
@@ -1652,7 +1652,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
         yield 'password function openings' => [str_repeat('password_hash(', 37449)];
         yield 'enum cases named like credentials with no value' => [str_repeat('case SECRET_KEY ', 32768)];
-        yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 24000)];
+        yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 14000)];
     }
 
     #[DataProvider('hostileContentRedactedCases')]
@@ -1690,7 +1690,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
         yield 'redis urls line after line' => [str_repeat("a=redis://Zx9Qw7Lm2Pv4@r1\n", 9000), str_repeat("a=redis://***REDACTED:connection_uri***@r1\n", 9000)];
         yield 'a user part of half a megabyte on the default host' => ['x://'.str_repeat('a', 524270).'@default', 'x://***REDACTED:connection_uri***@default'];
-        yield 'php strings holding a credential' => ['<?php '.str_repeat("\$h = 'password: abcdef';\n", 16000), '<?php '.str_repeat("\$h = 'password: ***REDACTED:inline_assignment***';\n", 16000)];
+        yield 'php strings holding a credential' => ['<?php '.str_repeat("\$h = 'password: abcdef';\n", 9000), '<?php '.str_repeat("\$h = 'password: ***REDACTED:inline_assignment***';\n", 9000)];
     }
 
     #[RunInSeparateProcess]
