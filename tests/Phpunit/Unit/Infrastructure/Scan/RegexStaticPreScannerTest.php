@@ -1972,6 +1972,37 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @param callable(int): string $content builds the file with the given number of characters between the two ends of the span
+     *
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('boundedSpanCases')]
+    public function test_a_span_between_the_two_ends_of_a_pattern_is_bounded(string $path, string $label, callable $content): void
+    {
+        $labelsAt = fn (int $span): array => array_map(
+            static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(),
+            $this->regexStaticPreScanner->scan([ProjectFile::create($path, '/app/'.$path, $content($span))]),
+        );
+
+        self::assertContains($label, $labelsAt(512));
+        self::assertNotContains($label, $labelsAt(513));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string, 2: callable(int): string}> */
+    public static function boundedSpanCases(): iterable
+    {
+        yield 'include up to the variable' => ['src/Service/Loader.php', 'dynamic_file_inclusion', static fn (int $span): string => "<?php\ninclude ".str_repeat('a', $span - 1).'$x;'];
+        yield 'LiveProp up to writable' => ['src/Twig/Components/Counter.php', 'live_prop_writable', static fn (int $span): string => "<?php\n#[AsLiveComponent]\n#[LiveProp(".str_repeat('a', $span).'writable: true)]'];
+        yield 'supports() parameters' => ['src/Security/FooAuthenticator.php', 'supports_returns_null', static fn (int $span): string => "<?php\nclass FooAuthenticator implements AuthenticatorInterface\n{ public function supports(".str_repeat('a', $span).') : bool { return null; } }'];
+        yield 'trusted_proxies up to the wildcard' => ['config/packages/framework.yaml', 'trusted_proxies_wildcard', static fn (int $span): string => 'trusted_proxies:'.str_repeat(' ', $span).'0.0.0.0/0'];
+        yield 'forced_ssl up to enabled' => ['config/packages/nelmio_security.yaml', 'hsts_disabled', static fn (int $span): string => 'forced_ssl:'.str_repeat(' ', $span).'enabled: false'];
+        yield 'ldap_search up to the concatenation' => ['src/Ldap/Directory.php', 'ldap_unescaped_filter_concat', static fn (int $span): string => "<?php\nldap_search(".str_repeat('a', $span).'.$name'];
+        yield 'query up to the quote' => ['src/Ldap/Directory.php', 'ldap_unescaped_filter_concat', static fn (int $span): string => "<?php\n\$ldap->query(".str_repeat('a', $span)."'.\$name"];
+        yield 'query after the quote' => ['src/Ldap/Directory.php', 'ldap_unescaped_filter_concat', static fn (int $span): string => "<?php\n\$ldap->query('".str_repeat('a', $span).'.$name'];
+    }
+
+    /**
      * @param callable(): list<RiskMarker> $scan
      *
      * @return list<RiskMarker>

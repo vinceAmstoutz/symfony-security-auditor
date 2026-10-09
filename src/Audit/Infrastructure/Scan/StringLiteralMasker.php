@@ -18,19 +18,31 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
  */
 final readonly class StringLiteralMasker
 {
-    private const string STRING_LITERAL_PATTERN = '/\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*"/';
-
     public function mask(string $line): string
     {
-        return preg_replace_callback(
-            self::STRING_LITERAL_PATTERN,
-            static fn (array $matches): string => str_repeat('x', \strlen($matches[0])),
-            $line,
-        ) ?? $line;
+        return $this->replaceLiterals($line, 'x');
     }
 
     public function strip(string $line): string
     {
-        return preg_replace(self::STRING_LITERAL_PATTERN, '', $line) ?? $line;
+        return $this->replaceLiterals($line, '');
+    }
+
+    /**
+     * @param string $replacement stands for each character of a literal, quotes included
+     */
+    private function replaceLiterals(string $line, string $replacement): string
+    {
+        $closingLimits = LiteralScanState::closingLimits($line);
+        $state = LiteralScanState::outside();
+        $result = '';
+
+        foreach (str_split($line) as $offset => $char) {
+            $wasInside = $state->isInside();
+            $state = $state->next($char, $offset, $closingLimits);
+            $result .= $wasInside || $state->isInside() ? $replacement : $char;
+        }
+
+        return $result;
     }
 }
