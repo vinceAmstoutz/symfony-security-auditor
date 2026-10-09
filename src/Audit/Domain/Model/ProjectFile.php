@@ -17,6 +17,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 
 final readonly class ProjectFile
 {
+    /**
+     * A guard opener that is not followed by `PUBLIC_ACCESS` or
+     * `IS_AUTHENTICATED_ANONYMOUSLY` as its attribute: those two let everyone
+     * in, so a file guarded by nothing else has no security annotation.
+     */
+    private const string REAL_GUARD_PATTERN = '/(?:#\[IsGranted|@IsGranted|\$this->denyAccessUnlessGranted)(?!\(\s*(?:attribute:\s*)?([\'"])(?:PUBLIC_ACCESS|IS_AUTHENTICATED_ANONYMOUSLY)\1)/';
+
     private function __construct(
         private string $relativePath,
         private string $absolutePath,
@@ -314,19 +321,8 @@ final readonly class ProjectFile
 
     public function hasSecurityAnnotations(): bool
     {
-        if ($this->containsKeyword('#[IsGranted')) {
-            return true;
-        }
-
-        if ($this->containsKeyword('@IsGranted')) {
-            return true;
-        }
-
-        if ($this->containsKeyword('$this->denyAccessUnlessGranted')) {
-            return true;
-        }
-
-        return $this->containsKeyword('security:');
+        return 1 === preg_match(self::REAL_GUARD_PATTERN, $this->content)
+            || $this->containsKeyword('security:');
     }
 
     /**

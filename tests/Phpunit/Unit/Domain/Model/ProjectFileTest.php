@@ -722,6 +722,69 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    #[DataProvider('publicAccessGuardSnippets')]
+    public function test_a_guard_granting_only_public_access_is_no_security_annotation(string $guard): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/HomeController.php',
+            '/app/src/Controller/HomeController.php',
+            \sprintf("<?php\nclass HomeController {\n    %s\n}", $guard),
+        );
+
+        self::assertFalse($projectFile->hasSecurityAnnotations());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function publicAccessGuardSnippets(): iterable
+    {
+        yield 'an attribute naming PUBLIC_ACCESS' => ["#[IsGranted('PUBLIC_ACCESS')]"];
+        yield 'an attribute naming IS_AUTHENTICATED_ANONYMOUSLY' => ['#[IsGranted("IS_AUTHENTICATED_ANONYMOUSLY")]'];
+        yield 'an attribute naming PUBLIC_ACCESS by argument name' => ["#[IsGranted(attribute: 'PUBLIC_ACCESS', statusCode: 404)]"];
+        yield 'an attribute naming PUBLIC_ACCESS on its own line' => ["#[IsGranted(\n        'PUBLIC_ACCESS'\n    )]"];
+        yield 'a doc comment annotation naming PUBLIC_ACCESS' => ['/** @IsGranted("PUBLIC_ACCESS") */'];
+        yield 'a denyAccessUnlessGranted call for PUBLIC_ACCESS' => ["\$this->denyAccessUnlessGranted('PUBLIC_ACCESS');"];
+        yield 'a denyAccessUnlessGranted call for IS_AUTHENTICATED_ANONYMOUSLY' => ['$this->denyAccessUnlessGranted("IS_AUTHENTICATED_ANONYMOUSLY", $post);'];
+        yield 'several guards that all grant public access' => ["#[IsGranted('PUBLIC_ACCESS')]\n    #[IsGranted('IS_AUTHENTICATED_ANONYMOUSLY')]\n    \$this->denyAccessUnlessGranted('PUBLIC_ACCESS');"];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('realGuardSnippets')]
+    public function test_a_guard_granting_more_than_public_access_is_a_security_annotation(string $guard): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            \sprintf("<?php\nclass AdminController {\n    %s\n}", $guard),
+        );
+
+        self::assertTrue($projectFile->hasSecurityAnnotations());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function realGuardSnippets(): iterable
+    {
+        yield 'a role attribute' => ["#[IsGranted('ROLE_ADMIN')]"];
+        yield 'an attribute without arguments' => ['#[IsGranted]'];
+        yield 'an attribute naming a role that starts like PUBLIC_ACCESS' => ["#[IsGranted('PUBLIC_ACCESS_ADMIN')]"];
+        yield 'an attribute naming a role that ends like PUBLIC_ACCESS' => ["#[IsGranted('NOT_PUBLIC_ACCESS')]"];
+        yield 'an attribute on a subject' => ["#[IsGranted('PUBLIC_ACCESS_EDIT', subject: 'post')]"];
+        yield 'an attribute whose value is not a literal' => ['#[IsGranted(Role::Admin)]'];
+        yield 'a doc comment annotation naming a role' => ['/** @IsGranted("ROLE_ADMIN") */'];
+        yield 'a denyAccessUnlessGranted call for a role' => ["\$this->denyAccessUnlessGranted('ROLE_ADMIN');"];
+        yield 'a role guard after a public access guard' => ["#[IsGranted('PUBLIC_ACCESS')]\n    #[IsGranted('ROLE_ADMIN')]"];
+        yield 'a role guard before a public access guard' => ["#[IsGranted('ROLE_ADMIN')]\n    #[IsGranted('PUBLIC_ACCESS')]"];
+        yield 'a denyAccessUnlessGranted call for a role after a public access attribute' => ["#[IsGranted('PUBLIC_ACCESS')]\n    \$this->denyAccessUnlessGranted('ROLE_ADMIN');"];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_absolute_path_returns_the_absolute_path_passed_at_creation(): void
     {
         $projectFile = ProjectFile::create(

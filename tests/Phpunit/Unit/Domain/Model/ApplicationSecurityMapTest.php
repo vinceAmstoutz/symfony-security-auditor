@@ -131,6 +131,22 @@ final class ApplicationSecurityMapTest extends TestCase
         self::assertSame([$projectFile], $applicationSecurityMap->entrypointsWithoutAuthorizationRule());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_reports_an_entrypoint_guarded_only_by_public_access_as_left_without_an_authorization_rule(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/HomeController.php', '/app/src/Controller/HomeController.php', "<?php\n#[IsGranted('PUBLIC_ACCESS')]\nclass HomeController {}");
+        $guardedController = ProjectFile::create('src/Controller/AdminController.php', '/app/src/Controller/AdminController.php', "<?php\n#[IsGranted('ROLE_ADMIN')]\nclass AdminController {}");
+
+        $applicationSecurityMap = ApplicationSecurityMap::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile, $guardedController]]),
+            new AccessControlMap(),
+        );
+
+        self::assertSame([$projectFile], $applicationSecurityMap->entrypointsWithoutAuthorizationRule());
+    }
+
     public function test_it_exposes_the_perimeter_rules_and_the_entrypoint_access_map(): void
     {
         $routeAccessControl = new RouteAccessControl(
