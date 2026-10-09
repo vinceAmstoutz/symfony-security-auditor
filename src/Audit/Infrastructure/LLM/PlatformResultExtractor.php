@@ -88,11 +88,12 @@ final readonly class PlatformResultExtractor
     private function tokenCounts(TokenUsageInterface $tokenUsage): array
     {
         $promptTokens = $tokenUsage->getPromptTokens() ?? 0;
+        $completionTokens = $tokenUsage->getCompletionTokens() ?? 0;
         $cachedInsidePrompt = $this->cachedTokensInsidePrompt($tokenUsage, $promptTokens);
 
         return [
             $promptTokens - $cachedInsidePrompt,
-            $tokenUsage->getCompletionTokens() ?? 0,
+            $completionTokens + $this->thinkingTokensCountedApart($tokenUsage, $promptTokens, $completionTokens),
             0 === $cachedInsidePrompt ? $tokenUsage->getCacheReadTokens() ?? 0 : $cachedInsidePrompt,
             $tokenUsage->getCacheCreationTokens() ?? 0,
         ];
@@ -114,6 +115,26 @@ final readonly class PlatformResultExtractor
         $cachedTokens = $tokenUsage->getCacheReadTokens() ?? $tokenUsage->getCachedTokens() ?? 0;
 
         return $cachedTokens <= $promptTokens ? $cachedTokens : 0;
+    }
+
+    /**
+     * Gemini and Vertex AI bill their thought tokens as output yet report
+     * them apart from the candidates, so the total is the sum of the three;
+     * OpenAI-style providers count their reasoning tokens inside the
+     * completion, so adding them would bill the same tokens twice. Only a
+     * total that has room for the thinking tokens next to the prompt and the
+     * completion shows they were counted apart.
+     */
+    private function thinkingTokensCountedApart(TokenUsageInterface $tokenUsage, int $promptTokens, int $completionTokens): int
+    {
+        $thinkingTokens = $tokenUsage->getThinkingTokens() ?? 0;
+        $totalTokens = $tokenUsage->getTotalTokens();
+
+        if (null === $totalTokens || $promptTokens + $completionTokens + $thinkingTokens > $totalTokens) {
+            return 0;
+        }
+
+        return $thinkingTokens;
     }
 
     /**

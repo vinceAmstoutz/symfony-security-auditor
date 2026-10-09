@@ -185,6 +185,32 @@ final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws NegativeTokenCountException
      */
+    public function test_complete_books_the_thinking_tokens_a_provider_counts_apart_from_the_completion_against_the_budget(): void
+    {
+        $budgetTracker = $this->tokenBudget();
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding(new ScriptedTokenUsagePlatform([new TextResult('answer')], [new TokenUsage(promptTokens: 20, completionTokens: 10, thinkingTokens: 80, totalTokens: 110)]), 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(budgetTracker: $budgetTracker),
+        );
+
+        $message = null;
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+        } catch (BudgetExceededException $budgetExceededException) {
+            $message = $budgetExceededException->getMessage();
+        }
+
+        self::assertSame(\sprintf(self::BUDGET_EXCEEDED_MESSAGE_FORMAT, 110), $message);
+        self::assertSame(110, $budgetTracker->tokensUsed());
+    }
+
+    /**
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws InvalidRetryConfigurationException
+     * @throws NegativeTokenCountException
+     */
     public function test_complete_batch_records_every_dispatched_response_before_aborting_on_the_budget(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();

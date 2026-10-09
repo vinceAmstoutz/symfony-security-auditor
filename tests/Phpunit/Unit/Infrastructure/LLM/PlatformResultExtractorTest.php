@@ -83,6 +83,34 @@ final class PlatformResultExtractorTest extends TestCase
     }
 
     /**
+     * @param array{int, int, int, int} $expectedTokens input, output, cache read, cache creation
+     *
+     * @throws NegativeTokenCountException
+     */
+    #[DataProvider('thinkingTokenCases')]
+    public function test_it_books_thinking_tokens_as_output_only_when_the_provider_counts_them_apart_from_the_completion(TokenUsage $tokenUsage, array $expectedTokens): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage)));
+    }
+
+    /** @return iterable<string, array{TokenUsage, array{int, int, int, int}}> */
+    public static function thinkingTokenCases(): iterable
+    {
+        yield 'thought tokens a Gemini-style provider counts apart from the candidates' => [new TokenUsage(promptTokens: 20000, completionTokens: 1000, thinkingTokens: 4000, totalTokens: 25000), [20000, 5000, 0, 0]];
+        yield 'thought tokens next to tool-use prompt tokens the total also counts' => [new TokenUsage(promptTokens: 20000, completionTokens: 1000, thinkingTokens: 4000, toolTokens: 300, totalTokens: 25300), [20000, 5000, 0, 0]];
+        yield 'reasoning tokens an OpenAI-style provider counts inside the completion' => [new TokenUsage(promptTokens: 20000, completionTokens: 5000, thinkingTokens: 4000, totalTokens: 25000), [20000, 5000, 0, 0]];
+        yield 'a thinking token the total leaves no room for' => [new TokenUsage(promptTokens: 20000, completionTokens: 5000, thinkingTokens: 1, totalTokens: 25000), [20000, 5000, 0, 0]];
+        yield 'a thinking token the total has room for' => [new TokenUsage(promptTokens: 20000, completionTokens: 5000, thinkingTokens: 1, totalTokens: 25001), [20000, 5001, 0, 0]];
+        yield 'thinking tokens with no total to show where they sit' => [new TokenUsage(promptTokens: 20000, completionTokens: 5000, thinkingTokens: 4000), [20000, 5000, 0, 0]];
+        yield 'no thinking tokens' => [new TokenUsage(promptTokens: 20000, completionTokens: 5000, totalTokens: 25000), [20000, 5000, 0, 0]];
+        yield 'no thinking tokens next to a total with room to spare' => [new TokenUsage(promptTokens: 20000, completionTokens: 5000, totalTokens: 26000), [20000, 5000, 0, 0]];
+        yield 'reasoning tokens next to cached tokens inside the prompt' => [new TokenUsage(promptTokens: 20000, completionTokens: 5000, thinkingTokens: 4000, cachedTokens: 15000, totalTokens: 25000), [5000, 5000, 15000, 0]];
+        yield 'thought tokens next to cached tokens inside the prompt' => [new TokenUsage(promptTokens: 20000, completionTokens: 1000, thinkingTokens: 4000, cachedTokens: 15000, totalTokens: 25000), [5000, 5000, 15000, 0]];
+    }
+
+    /**
      * A negative count is a compromised or malfunctioning provider response.
      * `$tokenUsageRecorder` is optional and defaults to `null`
      * ({@see PlatformAccountingConfig}),
@@ -134,6 +162,17 @@ final class PlatformResultExtractorTest extends TestCase
         self::assertInstanceOf(TokenUsageSnapshot::class, $billedUsage);
         self::assertSame([10, 5, 3, 2], [$billedUsage->inputTokens(), $billedUsage->outputTokens(), $billedUsage->cacheReadTokens(), $billedUsage->cacheCreationTokens()]);
         self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_reads_the_thinking_tokens_of_an_answer_its_bridge_failed_to_convert_as_output(): void
+    {
+        $billedUsage = (new PlatformResultExtractor(null))->extractBilledUsage(self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), new TokenUsage(promptTokens: 10, completionTokens: 5, thinkingTokens: 4, totalTokens: 19)));
+
+        self::assertInstanceOf(TokenUsageSnapshot::class, $billedUsage);
+        self::assertSame([10, 9], [$billedUsage->inputTokens(), $billedUsage->outputTokens()]);
     }
 
     #[DataProvider('answersReportingNoBilledUsageCases')]
