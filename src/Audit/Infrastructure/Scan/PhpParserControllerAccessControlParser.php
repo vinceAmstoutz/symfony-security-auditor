@@ -328,6 +328,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         }
 
         return $methodCall->name instanceof Identifier
-            && \in_array($methodCall->name->toString(), ['denyAccessUnlessGranted', 'isGranted'], true);
+            && \in_array($methodCall->name->toString(), ['denyAccessUnlessGranted', 'isGranted'], true)
+            && !$this->isGrantedAttributeParser->grantsOnlyPublicAccess($methodCall->args);
     }
 }
