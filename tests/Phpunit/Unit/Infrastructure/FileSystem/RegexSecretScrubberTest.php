@@ -1413,6 +1413,55 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('DATABASE_URL=postgres://***REDACTED:connection_uri***@db.internal:5432/app', $output);
     }
 
+    #[DataProvider('passwordOnlyUserinfoCases')]
+    public function test_a_url_whose_user_part_is_a_password_alone_is_redacted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function passwordOnlyUserinfoCases(): iterable
+    {
+        yield 'a redis url in a dotenv file' => ['REDIS_URL=redis://Zx9Qw7Lm2Pv4@redis:6379', 'REDIS_URL=redis://***REDACTED:connection_uri***@redis:6379'];
+        yield 'a redis url in yaml' => ["default_redis_provider: 'redis://Zx9Qw7Lm2Pv4@localhost'", "default_redis_provider: 'redis://***REDACTED:connection_uri***@localhost'"];
+        yield 'a mailer dsn in yaml' => ["framework.mailer.dsn: 'sendgrid://Zx9Qw7Lm2Pv4@default'", "framework.mailer.dsn: 'sendgrid://***REDACTED:connection_uri***@default'"];
+        yield 'a messenger transport in yaml' => ["messenger.transports.async: 'redis://Zx9Qw7Lm2Pv4@redis:6379/messages'", "messenger.transports.async: 'redis://***REDACTED:connection_uri***@redis:6379/messages'"];
+        yield 'a redis url in a php call' => ["RedisAdapter::createConnection('redis://Zx9Qw7Lm2Pv4@redis:6379')", "RedisAdapter::createConnection('redis://***REDACTED:connection_uri***@redis:6379')"];
+        yield 'a tls redis url' => ['REDIS_URL=rediss://Zx9Qw7Lm2Pv4@redis:6379', 'REDIS_URL=rediss://***REDACTED:connection_uri***@redis:6379'];
+        yield 'a valkey url' => ['CACHE=valkey://Zx9Qw7Lm2Pv4@valkey', 'CACHE=valkey://***REDACTED:connection_uri***@valkey'];
+        yield 'a tls valkey url' => ['CACHE=valkeys://Zx9Qw7Lm2Pv4@valkey', 'CACHE=valkeys://***REDACTED:connection_uri***@valkey'];
+        yield 'a mailer api dsn' => ['postmark+api://Zx9Qw7Lm2Pv4@default', 'postmark+api://***REDACTED:connection_uri***@default'];
+        yield 'a mailer api dsn with a dotted scheme' => ['mail.x+api://Zx9Qw7Lm2Pv4@mail.example.com', 'mail.x+api://***REDACTED:connection_uri***@mail.example.com'];
+        yield 'a notifier dsn on the default host' => ['ntfy://Zx9Qw7Lm2Pv4@default?topic=a', 'ntfy://***REDACTED:connection_uri***@default?topic=a'];
+        yield 'a redis password of four characters' => ['redis://abcd@host', 'redis://***REDACTED:connection_uri***@host'];
+        yield 'a password with a dash and a dot' => ['redis://Zx9-Qw7.Lm2@host', 'redis://***REDACTED:connection_uri***@host'];
+        yield 'an upper-case scheme' => ['REDIS://Zx9Qw7Lm2Pv4@host', 'REDIS://***REDACTED:connection_uri***@host'];
+        yield 'two urls on a line' => ['a=redis://Zx9Qw7Lm2Pv4@r1 b=sendgrid://Zx9Qw7Lm2Pv4@default', 'a=redis://***REDACTED:connection_uri***@r1 b=sendgrid://***REDACTED:connection_uri***@default'];
+    }
+
+    #[DataProvider('urlsHoldingNoPasswordAloneCases')]
+    public function test_a_url_whose_user_part_is_no_password_alone_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function urlsHoldingNoPasswordAloneCases(): iterable
+    {
+        yield 'a redis url without a user part' => ['REDIS_URL=redis://redis:6379/messages'];
+        yield 'a redis url with a reference' => ['REDIS_URL=redis://%env(REDIS_PASSWORD)%@redis:6379'];
+        yield 'a redis url with a shell variable' => ['REDIS_URL=redis://${REDIS_PASSWORD}@redis:6379'];
+        yield 'a redis url with a bare shell variable' => ['REDIS_URL=redis://$REDIS_PASSWORD@redis:6379'];
+        yield 'a redis user part of three characters' => ['redis://abc@host'];
+        yield 'a mailer placeholder of three characters' => ['sendgrid://KEY@default'];
+        yield 'a bare username on https' => ['https://deploy-bot@example.com/repo.git'];
+        yield 'a bare username on ssh' => ['ssh://Zx9Qw7Lm2Pv4@github.com/org/repo.git'];
+        yield 'a bare username on smtp' => ['smtp://Zx9Qw7Lm2Pv4@localhost'];
+        yield 'a host that merely starts with default' => ['ntfy://Zx9Qw7Lm2Pv4@defaults?topic=a'];
+        yield 'an api scheme without a user part' => ['postmark+api://default'];
+        yield 'an email address' => ['contact: webmaster@example.com'];
+    }
+
     public function test_connection_uri_redaction_covers_a_password_containing_an_at_sign(): void
     {
         $output = $this->regexSecretScrubber->scrub('DATABASE_URL=postgres://appuser:p@ssw0rd@db.example.com:5432/appdb');
@@ -1566,6 +1615,10 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'placeholder openings after colons' => [str_repeat(': ***REDACTED:x', 34952)];
         yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
         yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
+        yield 'redis schemes with no at sign' => [str_repeat('redis://aaaa', 43690)];
+        yield 'user parts that never reach the default host' => [str_repeat('x://aaaa@defaul ', 32768)];
+        yield 'dotted words that never reach an api scheme' => [str_repeat('a.', 262144)];
+        yield 'a user part of half a megabyte with no at sign' => ['redis://'.str_repeat('a', 524280)];
         yield 'case keywords with no name' => [str_repeat('case ', 104857)];
         yield 'enum cases named like credentials with no value' => [str_repeat('case SECRET_KEY ', 32768)];
         yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 24000)];
@@ -1583,6 +1636,8 @@ final class RegexSecretScrubberTest extends TestCase
     {
         yield 'a private key header followed by blank lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("\n", 524288)];
         yield 'an xml argument whose body is never closed' => ['<argument key="password">'.str_repeat('a', 524288)];
+        yield 'redis schemes with no at sign' => [str_repeat('redis://aaaa', 43690)];
+        yield 'a user part of half a megabyte with no at sign' => ['redis://'.str_repeat('a', 524280)];
         yield 'a block scalar header over blank lines' => ["secret: |\n".str_repeat("  \n", 170000)];
         yield 'credential key openings' => [str_repeat("('db_password', ", 32768)];
         yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
@@ -1624,6 +1679,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a block scalar of a hundred thousand lines' => ["secret: |\n".str_repeat("  x\n", 100000), "secret: |\n  ***REDACTED:block_scalar***".str_repeat("\n", 100000)];
         yield 'a private key cut after thirty thousand lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("MIIEowIBAAKCAQEAx\n", 30000), '***REDACTED:pem_private_key***'.str_repeat("\n", 30001)];
         yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
+        yield 'redis urls line after line' => [str_repeat("a=redis://Zx9Qw7Lm2Pv4@r1\n", 9000), str_repeat("a=redis://***REDACTED:connection_uri***@r1\n", 9000)];
+        yield 'a user part of half a megabyte on the default host' => ['x://'.str_repeat('a', 524270).'@default', 'x://***REDACTED:connection_uri***@default'];
         yield 'php strings holding a credential' => ['<?php '.str_repeat("\$h = 'password: abcdef';\n", 16000), '<?php '.str_repeat("\$h = 'password: ***REDACTED:inline_assignment***';\n", 16000)];
     }
 
