@@ -427,8 +427,9 @@ final readonly class StandaloneApplicationFactory
 
     /**
      * The configuration file that ships with the project being audited — the
-     * one the command line names, or the working directory's when it names
-     * none (null here, which keeps the loader's own).
+     * one the command line names — or null when it names none or the project
+     * holds none, which keeps the loader's own: the working directory's, as
+     * before the project was read at all.
      *
      * @throws WorkingDirectoryUnavailableException
      */
@@ -437,7 +438,13 @@ final readonly class StandaloneApplicationFactory
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->projectPath = $standaloneApplication->projectPathGivenTo($this->standaloneConsoleCommandFactory->describe(AuditCommand::class));
 
-        return null === $auditCommandInput->projectPath ? null : self::projectConfigFileIn($auditCommandInput->resolvedProjectPath());
+        if (null === $auditCommandInput->projectPath) {
+            return null;
+        }
+
+        $projectConfigFile = self::projectConfigFileIn($auditCommandInput->resolvedProjectPath());
+
+        return is_file($projectConfigFile) || is_link($projectConfigFile) ? $projectConfigFile : null;
     }
 
     /**
