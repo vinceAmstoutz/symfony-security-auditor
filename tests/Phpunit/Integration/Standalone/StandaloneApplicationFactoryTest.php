@@ -376,6 +376,24 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    /**
+     * @return array{int, string} the exit code and the display without whitespace, so a wrapped path still matches
+     */
+    private function auditFailure(string $projectDirectory): array
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'SSA_NO_UPDATE_CHECK' => '1',
+        ])->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+        $statusCode = $applicationTester->run(['command' => AuditCommand::ALIAS, 'project-path' => $projectDirectory]);
+
+        return [$statusCode, (string) preg_replace('/\s+/', '', $applicationTester->getDisplay())];
+    }
+
     private function applicationTesterWithoutConfiguration(): ApplicationTester
     {
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
@@ -468,6 +486,54 @@ final class StandaloneApplicationFactoryTest extends TestCase
             [$statusCode, str_contains((string) preg_replace('/\s+/', '', $applicationTester->getDisplay()), $projectDirectory.'/.symfony-security-auditor.yaml')],
             $applicationTester->getDisplay(),
         );
+    }
+
+    #[RunInSeparateProcess]
+    public function test_the_audit_command_reads_the_config_of_the_working_directory_when_the_project_it_names_ships_none(): void
+    {
+        $workingDirectory = $this->configHome.'/working';
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($workingDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
+        (new Filesystem())->mkdir($projectDirectory);
+        chdir($workingDirectory);
+
+        [$statusCode, $display] = $this->auditFailure($projectDirectory);
+
+        self::assertSame(Command::FAILURE, $statusCode, $display);
+        self::assertStringContainsString($workingDirectory.'/.symfony-security-auditor.yaml', $display);
+    }
+
+    #[RunInSeparateProcess]
+    public function test_the_audit_command_reads_the_config_of_the_project_it_names_before_the_one_of_the_working_directory(): void
+    {
+        $workingDirectory = $this->configHome.'/working';
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($workingDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
+        chdir($workingDirectory);
+
+        [$statusCode, $display] = $this->auditFailure($projectDirectory);
+
+        self::assertSame(Command::FAILURE, $statusCode, $display);
+        self::assertStringContainsString($projectDirectory.'/.symfony-security-auditor.yaml', $display);
+        self::assertStringNotContainsString($workingDirectory.'/.symfony-security-auditor.yaml', $display);
+    }
+
+    #[RunInSeparateProcess]
+    public function test_the_audit_command_refuses_a_project_config_that_is_a_dangling_symlink_instead_of_reading_the_one_of_the_working_directory(): void
+    {
+        $workingDirectory = $this->configHome.'/working';
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($workingDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
+        (new Filesystem())->mkdir($projectDirectory);
+        (new Filesystem())->symlink($this->configHome.'/missing.yaml', $projectDirectory.'/.symfony-security-auditor.yaml');
+        chdir($workingDirectory);
+
+        [$statusCode, $display] = $this->auditFailure($projectDirectory);
+
+        self::assertSame(Command::FAILURE, $statusCode, $display);
+        self::assertStringContainsString($projectDirectory.'/.symfony-security-auditor.yaml', $display);
+        self::assertStringContainsString('isasymboliclink', $display);
     }
 
     public function test_there_is_no_bridge_tree_to_load_without_a_data_directory(): void
