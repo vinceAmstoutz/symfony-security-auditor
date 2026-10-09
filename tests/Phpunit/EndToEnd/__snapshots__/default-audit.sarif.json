@@ -18,8 +18,10 @@
                             "helpUri": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/",
                             "properties": {
                                 "tags": [
-                                    "external/cwe/cwe-284"
-                                ]
+                                    "external/cwe/cwe-284",
+                                    "security"
+                                ],
+                                "security-severity": "9.3"
                             }
                         }
                     ]

@@ -22,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class SarifReportRenderer implements ReportRendererInterface, BaselineSuppressingReportRendererInterface
 {
+    private const string SECURITY_TAG = 'security';
+
     public function __construct(
         private ReportPackage $reportPackage = new ReportPackage(),
         private ReportPathPrefix $reportPathPrefix = new ReportPathPrefix(),
@@ -48,14 +50,14 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         $notAccepted = $this->notAcceptedByBaseline($auditReport, $baselinedFingerprints);
 
         $results = [];
-        $typesByRule = [];
+        $vulnerabilitiesByRule = [];
 
         foreach ($auditReport->vulnerabilities() as $vulnerability) {
-            $typesByRule[$vulnerability->type()->owaspReference()][$vulnerability->type()->value] = $vulnerability->type();
+            $vulnerabilitiesByRule[$vulnerability->type()->owaspReference()][] = $vulnerability;
             $results[] = $this->resultFor($vulnerability, !\array_key_exists(spl_object_id($vulnerability), $notAccepted));
         }
 
-        $rules = array_values(array_map($this->ruleFor(...), $typesByRule));
+        $rules = array_values(array_map($this->ruleFor(...), $vulnerabilitiesByRule));
 
         $cost = $auditReport->cost();
         $sarif = [
@@ -139,7 +141,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             ],
             // `security-severity` is the numeric score GitHub Code Scanning ranks alerts by; the CVSS vector rides alongside for consumers that display it.
             'properties' => [
-                'security-severity' => \sprintf('%.1f', $vulnerability->cvssEstimate()->baseScore()),
+                'security-severity' => $this->securitySeverity($vulnerability->cvssEstimate()->baseScore()),
                 'cvssV4_0Vector' => $vulnerability->cvssEstimate()->vector(),
             ],
         ];
@@ -192,12 +194,17 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
      * it stays stable across runs instead of following whichever finding
      * happens to be most severe.
      *
-     * @param non-empty-array<string, VulnerabilityType> $contributingTypes
+     * @param non-empty-list<Vulnerability> $contributingVulnerabilities
      *
      * @return array<string, mixed>
      */
-    private function ruleFor(array $contributingTypes): array
+    private function ruleFor(array $contributingVulnerabilities): array
     {
+        $contributingTypes = [];
+        foreach ($contributingVulnerabilities as $contributingVulnerability) {
+            $contributingTypes[$contributingVulnerability->type()->value] = $contributingVulnerability->type();
+        }
+
         ksort($contributingTypes);
         $vulnerabilityType = reset($contributingTypes);
 
@@ -206,8 +213,24 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             'name' => $vulnerabilityType->value,
             'shortDescription' => ['text' => $vulnerabilityType->category()],
             'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
-            'properties' => ['tags' => array_values(array_unique(array_map($this->cweTag(...), $contributingTypes)))],
+            'properties' => [
+                'tags' => [...array_values(array_unique(array_map($this->cweTag(...), $contributingTypes))), self::SECURITY_TAG],
+                'security-severity' => $this->securitySeverity($this->highestBaseScore($contributingVulnerabilities)),
+            ],
         ];
+    }
+
+    /**
+     * @param non-empty-list<Vulnerability> $vulnerabilities
+     */
+    private function highestBaseScore(array $vulnerabilities): float
+    {
+        return max(array_map(static fn (Vulnerability $vulnerability): float => $vulnerability->cvssEstimate()->baseScore(), $vulnerabilities));
+    }
+
+    private function securitySeverity(float $baseScore): string
+    {
+        return \sprintf('%.1f', $baseScore);
     }
 
     private function cweTag(VulnerabilityType $vulnerabilityType): string
