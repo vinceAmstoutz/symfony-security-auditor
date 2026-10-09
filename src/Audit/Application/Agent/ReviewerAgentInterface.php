@@ -23,8 +23,9 @@ interface ReviewerAgentInterface
     /**
      * @param list<Vulnerability> $vulnerabilities
      * @param list<ProjectFile>   $projectFiles
-     * @param ?list<ProjectFile>  $toolFiles       the files the investigation tools may open when they are not
-     *                                             the audited files; null means `$projectFiles`
+     * @param ?list<ProjectFile>  $toolFiles       the files the investigation tools may open, and whose code a
+     *                                             finding in them is reviewed against, when they are not the
+     *                                             audited files; null means `$projectFiles`
      *
      * @return list<Vulnerability>
      */

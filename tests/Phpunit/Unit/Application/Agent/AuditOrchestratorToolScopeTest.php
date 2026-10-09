@@ -127,6 +127,37 @@ final class AuditOrchestratorToolScopeTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      * @throws InvalidTokenUsageException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_the_reviewer_sees_the_code_of_a_finding_in_a_scanned_file_the_narrowed_run_does_not_audit(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('completeWithTools')->willReturn(AuditOrchestratorHarness::attackerResponse([
+            AuditOrchestratorHarness::vulnerabilityPayload(filePath: self::UNCHANGED_PATH),
+        ]));
+        $reviewerMessages = [];
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturnCallback(
+            static function (string $systemPrompt, string $userMessage) use (&$reviewerMessages): LLMResponse {
+                $reviewerMessages[] = $userMessage;
+
+                return AuditOrchestratorHarness::reviewerAcceptResponse();
+            },
+        );
+
+        $auditContext = $this->narrowedContext();
+        $this->orchestrator($attackerLlm, $reviewerLlm, new ReviewerModeConfiguration())->orchestrate($auditContext);
+
+        self::assertCount(1, $reviewerMessages);
+        self::assertStringContainsString('unchanged-file-marker', $reviewerMessages[0]);
+        self::assertSame([self::AUDITED_PATH], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException

@@ -163,6 +163,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         }
 
         $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
+        $codeContextFiles = [...$projectFiles, ...($toolFiles ?? [])];
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($toolFiles ?? $projectFiles) : null;
         $structuredEligible = $this->isStructuredEligible($useTools);
         $structuredConcurrent = $this->structuredConcurrentAnalyzer($structuredEligible);
@@ -178,11 +179,11 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         ]);
 
         $reviewed = match (true) {
-            $this->batchSize > 1 => $this->batchReviewAnalyzer->analyze($vulnerabilities, $projectFiles, new ReviewBatchSettings($this->batchSize, $useStructuredCollection, $bypassCache, $coverageRecorder, $toolRegistry)),
-            $structuredConcurrent instanceof ConcurrentStructuredReviewAnalyzer => $structuredConcurrent->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache),
-            $structured instanceof StructuredReviewAnalyzer => $structured->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache),
-            $concurrent instanceof ConcurrentReviewAnalyzer => $concurrent->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache),
-            default => $this->sequentialReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry, $bypassCache),
+            $this->batchSize > 1 => $this->batchReviewAnalyzer->analyze($vulnerabilities, $codeContextFiles, new ReviewBatchSettings($this->batchSize, $useStructuredCollection, $bypassCache, $coverageRecorder, $toolRegistry)),
+            $structuredConcurrent instanceof ConcurrentStructuredReviewAnalyzer => $structuredConcurrent->analyze($vulnerabilities, $codeContextFiles, $coverageRecorder, $bypassCache),
+            $structured instanceof StructuredReviewAnalyzer => $structured->analyze($vulnerabilities, $codeContextFiles, $coverageRecorder, $bypassCache),
+            $concurrent instanceof ConcurrentReviewAnalyzer => $concurrent->analyze($vulnerabilities, $codeContextFiles, $coverageRecorder, $bypassCache),
+            default => $this->sequentialReviewAnalyzer->analyze($vulnerabilities, $codeContextFiles, $coverageRecorder, $toolRegistry, $bypassCache),
         };
 
         $accepted = array_filter($reviewed, static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated());
