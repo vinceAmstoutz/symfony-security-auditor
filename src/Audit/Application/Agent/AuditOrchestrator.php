@@ -105,8 +105,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $previousFindings = array_values($auditContext->validatedVulnerabilities());
         $rejectedFindings = $this->rejectedFindings($auditContext);
         $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
-        $rawFindings = $this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext);
-        $filtered = $this->filterByConfidence($rawFindings);
+        $filtered = $this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext);
 
         if ([] === $filtered) {
             $this->logger->info('Attacker found no new findings, stopping');
@@ -139,7 +138,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
         $this->logger->info('Iteration complete', [
             'iteration' => $iteration,
-            'attacker_found' => \count($rawFindings),
+            'attacker_found' => \count($filtered),
             'reviewer_accepted' => $acceptedCount,
             'new_unique' => $newFindings,
             'total' => \count($auditContext->vulnerabilities()),
@@ -190,7 +189,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * @param list<Vulnerability> $rejectedFindings
      * @param list<ProjectFile>   $files
      *
-     * @return list<Vulnerability>
+     * @return list<Vulnerability> the findings at or above the confidence floor, one per id: a copy below the floor is dropped before the copies collapse, so it cannot hide a confident one
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
@@ -215,7 +214,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             throw $attackerException;
         }
 
-        return $this->mergeRecoveredFindings($rawFindings, $auditContext->drainFoundVulnerabilities());
+        return $this->mergeRecoveredFindings(
+            $this->filterByConfidence($rawFindings),
+            $this->filterByConfidence($auditContext->drainFoundVulnerabilities()),
+        );
     }
 
     /**

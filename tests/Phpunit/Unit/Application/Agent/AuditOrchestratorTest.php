@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -200,6 +201,46 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($auditContext);
 
         self::assertEmpty($auditContext->vulnerabilities());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    #[DataProvider('copiesOfOneLocationAroundTheConfidenceFloor')]
+    public function test_a_confident_copy_of_a_location_is_reviewed_whatever_the_rank_of_the_copy_below_the_confidence_floor(string $doubtfulSeverity, string $confidentSeverity, bool $doubtfulFirst): void
+    {
+        $doubtful = [...$this->vulnPayload(title: 'doubtful', confidence: 0.4), 'severity' => $doubtfulSeverity];
+        $confident = [...$this->vulnPayload(title: 'confident', confidence: 0.9), 'severity' => $confidentSeverity];
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse($doubtfulFirst ? [$doubtful, $confident] : [$confident, $doubtful]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->expects(self::once())->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditContext = $this->makeContextWithMapping();
+
+        $this->makeOrchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        $validated = array_values($auditContext->validatedVulnerabilities());
+        self::assertCount(1, $validated);
+        self::assertSame('confident', $validated[0]->title());
+        self::assertSame($confidentSeverity, $validated[0]->severity()->value);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, bool}>
+     */
+    public static function copiesOfOneLocationAroundTheConfidenceFloor(): iterable
+    {
+        yield 'a higher severity below the floor reported first' => ['high', 'medium', true];
+        yield 'a higher severity below the floor reported last' => ['high', 'medium', false];
+        yield 'the same severity below the floor' => ['medium', 'medium', true];
     }
 
     /**
