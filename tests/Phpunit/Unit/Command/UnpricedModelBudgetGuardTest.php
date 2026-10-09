@@ -25,8 +25,8 @@ use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
 
 final class UnpricedModelBudgetGuardTest extends TestCase
 {
@@ -64,22 +64,43 @@ final class UnpricedModelBudgetGuardTest extends TestCase
         self::assertStringContainsString('mystery-model', $rendered);
         self::assertStringContainsString('audit.budget.max_cost_usd', $rendered);
         self::assertStringContainsString('non-interactive', $rendered);
-        self::assertStringContainsString('Unpriced model(s): mystery-model.', $rendered);
+        $unwrapped = (string) preg_replace('/\s+/', ' ', $rendered);
+        self::assertStringContainsString('[ERROR] Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd.', $unwrapped);
+        self::assertStringNotContainsString('Unpriced model(s)', $unwrapped);
     }
 
-    public function test_it_refuses_a_budgeted_run_on_an_unpriced_model_without_asking_anyone(): void
+    public function test_it_warns_in_the_log_of_a_budget_it_cannot_enforce_on_unpriced_models_without_asking_anyone(): void
     {
-        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8', 'mystery-model', 'other-model', 'mystery-model'], 10.0);
+        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8', 'mystery-model', 'other-model', 'mystery-model'], 10.5);
+        $warningCollectingLogger = new WarningCollectingLogger();
 
-        try {
-            $unpricedModelBudgetGuard->assertBudgetEnforceable();
-            self::fail('An unenforceable cost budget must be refused.');
-        } catch (UnenforceableBudgetException $unenforceableBudgetException) {
-            self::assertSame(
-                'Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd. Unpriced model(s): mystery-model, other-model.',
-                $unenforceableBudgetException->getMessage(),
-            );
-        }
+        $unpricedModelBudgetGuard->warnWhenBudgetCannotBeEnforced($warningCollectingLogger);
+
+        self::assertSame(
+            [[
+                'The cost budget audit.budget.max_cost_usd = 10.5 cannot be enforced for the unpriced model(s) mystery-model, other-model: the audit runs, and its real spend may exceed it.',
+                ['models' => ['mystery-model', 'other-model'], 'max_cost_usd' => 10.5],
+            ]],
+            $warningCollectingLogger->warnings,
+        );
+    }
+
+    public function test_it_does_not_warn_in_the_log_without_a_cost_budget(): void
+    {
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        (new UnpricedModelBudgetGuard($this->pricingKnowing(), ['mystery-model']))->warnWhenBudgetCannotBeEnforced($warningCollectingLogger);
+
+        self::assertSame([], $warningCollectingLogger->warnings);
+    }
+
+    public function test_it_does_not_warn_in_the_log_when_every_model_is_priced(): void
+    {
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        (new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8'], 10.0))->warnWhenBudgetCannotBeEnforced($warningCollectingLogger);
+
+        self::assertSame([], $warningCollectingLogger->warnings);
     }
 
     public function test_it_permits_the_run_when_the_user_confirms_interactively(): void

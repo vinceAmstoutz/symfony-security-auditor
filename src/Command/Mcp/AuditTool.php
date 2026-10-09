@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp;
 
 use Mcp\Exception\ToolCallException;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Path;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
@@ -30,7 +32,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRende
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
@@ -47,6 +48,7 @@ final readonly class AuditTool
         private FindingTypeFilterInterface $findingTypeFilter,
         private ReviewerFeedbackHolder $reviewerFeedbackHolder,
         private UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard,
+        private LoggerInterface $logger = new NullLogger(),
     ) {}
 
     /**
@@ -95,10 +97,10 @@ final readonly class AuditTool
      * baseline's reasons reach the reviewer and the findings it accepts skip
      * the reviewer and leave the report, the muted finding types leave it too,
      * and a run with no verdict returns no report. A budgeted run on a model
-     * with no published price is refused before it spends anything, as
-     * `audit:run` refuses it under `--no-interaction`.
+     * with no published price still runs, as it always did, and the log says
+     * the cap cannot be enforced; `audit:run` refuses it under
+     * `--no-interaction`.
      *
-     * @throws UnenforceableBudgetException
      * @throws AuditAbortedByBudgetException
      * @throws AuditAbortedByProviderException
      * @throws AuditWithoutVerdictException
@@ -108,7 +110,7 @@ final readonly class AuditTool
      */
     private function auditReport(string $projectPath): AuditReport
     {
-        $this->unpricedModelBudgetGuard->assertBudgetEnforceable();
+        $this->unpricedModelBudgetGuard->warnWhenBudgetCannotBeEnforced($this->logger);
         $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback(null));
 
         $auditReport = $this->findingTypeFilter->apply(
