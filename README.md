@@ -57,7 +57,26 @@ The auditor ships two maintained ways to run it — pick the one that fits:
 
 ## Standalone tool (binary)
 
-Run the auditor like PHPStan or Psalm — one install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** that bundles its own PHP runtime (nothing to install on the host) for Linux, macOS, and Windows.
+Run the auditor like PHPStan or Psalm — one install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** that bundles its own PHP runtime (nothing to install on the host to run audits — see [Requirements](#requirements)) for Linux, macOS, and Windows.
+
+### Requirements
+
+**Running audits needs nothing but the binary.** It bundles its own PHP runtime, so there is no PHP, Composer or Symfony to install, whatever the audited project uses — only an API key for your provider (not even that for a local model such as [Ollama](#supported-platforms)).
+
+**The one-time [`init`](#2-configure--the-guided-init) is the exception: it needs `composer`, and the PHP it runs on, on your machine**, because it downloads the package that talks to your AI provider. It checks for both before asking you anything and, when one is missing, says which. Install them once, with network access to `packagist.org` and `github.com`:
+
+| System | Install PHP and Composer |
+| --- | --- |
+| Debian, Ubuntu, WSL | `sudo apt update && sudo apt install -y php-cli php-curl php-mbstring php-xml unzip composer` |
+| macOS | `brew install composer` (installs PHP with it) |
+| Windows | PHP from <https://windows.php.net/download/>, then the Composer installer from <https://getcomposer.org/download/>; open a new terminal afterwards |
+| Other Linux | the `php-cli`, `composer` and `unzip` packages of your package manager |
+
+> [!NOTE]
+>
+> **On WSL, install them inside WSL.** A Windows Composer reached through `/mnt/c/…` cannot run there: it looks for a PHP of its own and finds none (`…/composer: 14: php: not found`).
+
+Two features use a tool of their own: `--since` needs `git`, and the live CVE lookups of an audit use `composer audit` when `composer` is present — without it the audit runs without advisory data.
 
 ### 1. Install
 
@@ -77,7 +96,7 @@ irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/mai
 
 > [!TIP]
 >
-> **One command, installed _and_ configured.** Set `SSA_INIT=1` and the installer runs the guided [`init`](#2-configure--the-guided-init) for you right after downloading, so you skip step 2. With a terminal attached it prompts for your provider and offers to store your API key at the end, leaving you ready to audit; in a pipe or CI it takes the Anthropic defaults and stores no key, so export one or run `auth:set` before auditing. `init` fetches the provider bridge with `composer`, so composer must be available for this combined step.
+> **One command, installed _and_ configured.** Set `SSA_INIT=1` and the installer runs the guided [`init`](#2-configure--the-guided-init) for you right after downloading, so you skip step 2. With a terminal attached it prompts for your provider and offers to store your API key at the end, leaving you ready to audit; in a pipe or CI it takes the Anthropic defaults and stores no key, so export one or run `auth:set` before auditing. `init` fetches the provider bridge with `composer`, so composer must be available for this combined step; it checks that first, before asking anything, and when composer does not run it says why and how to install it on macOS, Linux or Windows.
 >
 > ```bash
 > curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
@@ -105,7 +124,7 @@ sha256sum -c symfony-security-auditor-linux-x86_64.sha256
 symfony-security-auditor init
 ```
 
-Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows), downloads the provider bridge you pick, and finally asks for your API key — pasted invisibly, never echoed, never in your shell history. `init` fetches that bridge with `composer`, so composer must be available for this one-time setup step; running audits afterward needs only the binary. The file is rootless (the same keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:` block handed verbatim to `symfony/ai`. See [configuration](docs/configuration.md#standalone-configuration) for the format and provider switching.
+Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows), downloads the provider bridge you pick, and finally asks for your API key — pasted invisibly, never echoed, never in your shell history. `init` fetches that bridge with `composer`, so composer must be available for this one-time setup step — `init` checks that first, before asking anything, and when composer does not run it says why and how to install it on macOS, Linux or Windows; running audits afterward needs only the binary. The file is rootless (the same keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:` block handed verbatim to `symfony/ai`. See [configuration](docs/configuration.md#standalone-configuration) for the format and provider switching.
 
 Press Enter at the key prompt to skip it — you can store the key any time with `auth:set`, or keep using an environment variable and store nothing at all.
 
@@ -165,7 +184,7 @@ symfony-security-auditor self-update --check  # only report whether a newer vers
 
 ### 1. Install — Symfony Flex wires everything
 
-Installing the bundle requires **PHP 8.3+ and Symfony 7.4+** in the host application (see [`composer.json`](composer.json)) — the standalone binary has no such requirement, since it bundles its own runtime.
+Installing the bundle requires **PHP 8.3+ and Symfony 7.4+** in the host application (see [`composer.json`](composer.json)) — the standalone binary needs no PHP to audit, since it bundles its own runtime (only its one-time `init` needs PHP and Composer, see its [requirements](#requirements)).
 
 ```bash
 composer require --dev vinceamstoutz/symfony-security-auditor

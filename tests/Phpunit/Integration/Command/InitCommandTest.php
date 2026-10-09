@@ -27,6 +27,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerPreflight;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerProbe;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerSetupAdvice;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
@@ -500,6 +504,7 @@ final class InitCommandTest extends TestCase
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             new FailingBridgeInstaller(),
+            new ComposerPreflight($this->availableComposer()),
             new FilesystemCredentialStore($xdgConfigPathResolver),
         );
         $commandTester = new CommandTester($initCommand);
@@ -1824,6 +1829,68 @@ final class InitCommandTest extends TestCase
         self::assertSame([['azure.prod', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
     }
 
+    public function test_it_stops_before_asking_anything_when_composer_cannot_run(): void
+    {
+        $commandTester = $this->commandTesterWithoutComposer('php: not found');
+
+        $exitCode = $commandTester->execute([], ['interactive' => true]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringNotContainsString('Which AI provider', $commandTester->getDisplay());
+    }
+
+    public function test_it_says_why_composer_cannot_run(): void
+    {
+        $commandTester = $this->commandTesterWithoutComposer('/mnt/c/ProgramData/ComposerSetup/bin/composer: 14: php: not found');
+
+        $commandTester->execute(['--provider' => 'openai', '--model' => 'gpt-5.4'], ['interactive' => false]);
+
+        self::assertStringContainsString('/mnt/c/ProgramData/ComposerSetup/bin/composer: 14: php: not found', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_tells_how_to_install_composer_on_the_operating_system_it_runs_on(): void
+    {
+        $commandTester = $this->commandTesterWithoutComposer('not found', new ComposerSetupAdvice('Windows'));
+
+        $commandTester->execute(['--provider' => 'openai', '--model' => 'gpt-5.4'], ['interactive' => false]);
+
+        self::assertStringContainsString('https://windows.php.net/download/', $commandTester->getDisplay());
+    }
+
+    public function test_it_installs_and_writes_nothing_when_composer_cannot_run(): void
+    {
+        $commandTester = $this->commandTesterWithoutComposer('php: not found');
+
+        $commandTester->execute(['--provider' => 'openai', '--model' => 'gpt-5.4'], ['interactive' => false]);
+
+        self::assertSame([], $this->recordingBridgeInstaller->installations);
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    private function commandTesterWithoutComposer(string $failure, ComposerSetupAdvice $composerSetupAdvice = new ComposerSetupAdvice()): CommandTester
+    {
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::unavailable($failure));
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
+
+        return new CommandTester(new InitCommand(
+            $xdgConfigPathResolver,
+            new StandaloneConfigFactory(),
+            new YamlStandaloneConfigWriter(),
+            $this->recordingBridgeInstaller,
+            new ComposerPreflight($composerAvailabilityChecker, $composerSetupAdvice),
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+        ));
+    }
+
+    private function availableComposer(): ComposerAvailabilityCheckerInterface
+    {
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
+
+        return $composerAvailabilityChecker;
+    }
+
     private function commandTester(): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
@@ -1832,6 +1899,7 @@ final class InitCommandTest extends TestCase
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->recordingBridgeInstaller,
+            new ComposerPreflight($this->availableComposer()),
             new FilesystemCredentialStore($xdgConfigPathResolver),
         );
 
@@ -1901,6 +1969,7 @@ final class InitCommandTest extends TestCase
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->recordingBridgeInstaller,
+            new ComposerPreflight($this->availableComposer()),
             new FilesystemCredentialStore($xdgConfigPathResolver),
             credentialPrompt: new UnhideableCredentialPrompt(),
         ));

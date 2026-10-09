@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
@@ -177,9 +178,11 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
 
     private function composerCheck(): DoctorCheckResult
     {
-        return $this->composerAvailabilityChecker->isAvailable()
+        $composerProbe = $this->composerAvailabilityChecker->probe();
+
+        return $composerProbe->isAvailable
             ? new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.')
-            : new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not found — needed only to run "init" or switch providers, not to audit.');
+            : new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, \sprintf('Not usable (%s) — needed only to run "init" or switch providers, not to audit. "init" lists how to install it.', OutputFormatter::escape($composerProbe->failure)));
     }
 
     /**

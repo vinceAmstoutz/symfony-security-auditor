@@ -58,6 +58,7 @@ final readonly class InitCommand
         private StandaloneConfigFactoryInterface $standaloneConfigFactory,
         private StandaloneConfigWriterInterface $standaloneConfigWriter,
         private BridgeInstallerInterface $bridgeInstaller,
+        private ComposerPreflight $composerPreflight,
         private CredentialStoreInterface $credentialStore,
         private Filesystem $filesystem = new Filesystem(),
         private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
@@ -72,6 +73,15 @@ final readonly class InitCommand
         SymfonyStyle $symfonyStyle,
         #[MapInput] InitCommandInput $initCommandInput,
     ): int {
+        return $this->composerPreflight->refusal($symfonyStyle) ?? $this->configure($symfonyStyle, $initCommandInput);
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws BridgeInstallationFailedException
+     */
+    private function configure(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput): int
+    {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
         $provider = b($initCommandInput->provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama, or generic.my_gateway for an AI gateway)', 'anthropic'))->trim()->toString();

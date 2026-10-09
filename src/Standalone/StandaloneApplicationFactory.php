@@ -69,6 +69,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerPreflight;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
@@ -269,8 +271,14 @@ final readonly class StandaloneApplicationFactory
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->bridgeInstaller,
+            new ComposerPreflight($this->composerAvailabilityChecker()),
             $this->credentialStore,
         );
+    }
+
+    private function composerAvailabilityChecker(): ComposerAvailabilityCheckerInterface
+    {
+        return new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::defaultProcessBuilder());
     }
 
     private function configuredCredentialVariable(): ConfiguredCredentialVariable
@@ -385,7 +393,7 @@ final readonly class StandaloneApplicationFactory
             new EnvironmentDoctor(
                 $this->standaloneConfigLoader,
                 $this->xdgConfigPathResolver,
-                new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::defaultProcessBuilder()),
+                $this->composerAvailabilityChecker(),
                 new StandaloneAuditPreflight(
                     $this->standaloneConfigLoader,
                     $this->xdgConfigPathResolver,
