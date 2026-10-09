@@ -265,6 +265,20 @@ final class AuditExitCodeResolverTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     */
+    public function test_a_report_whose_scan_left_a_file_out_passes_when_asked_to_fail_on_an_incomplete_one(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
+        $auditContext->recordCoverage('scan', 'src/Big.php', 'skipped');
+        $auditContext->recordCoverage('attacker', 'src/Audited.php', 'analyzed');
+
+        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve(AuditReport::fromContext($auditContext), RiskLevel::Critical, null, true));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityNarrativeException

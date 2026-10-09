@@ -920,6 +920,31 @@ final class AuditReportTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_file_the_scan_left_out_is_listed_in_the_coverage_and_leaves_the_report_complete(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->recordCoverage('scan', 'src/Big.php', 'skipped');
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'analyzed');
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame(
+            [
+                ['stage' => 'scan', 'file' => 'src/Big.php', 'status' => 'skipped'],
+                ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+            ],
+            $auditReport->coverage(),
+        );
+        self::assertSame([], $auditReport->unanalyzedFiles());
+        self::assertTrue($auditReport->isComplete());
+        self::assertFalse($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      */
     public function test_a_file_the_attacker_failed_on_a_later_iteration_counts_as_unanalyzed(): void
     {

@@ -117,7 +117,7 @@ final class IngestionStagePathIntersectionTest extends TestCase
 
         $auditContext = $this->ingest(['src/Controller'], ['src/Service', 'src/Controller'], 1);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'src/Controller/Big.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/Controller/Big.php', 'status' => 'skipped']], $auditContext->coverage());
         self::assertSame(['src/Controller/A.php'], $this->relativePaths($auditContext->projectFiles()));
     }
 
@@ -130,7 +130,7 @@ final class IngestionStagePathIntersectionTest extends TestCase
 
         $auditContext = $this->ingest(['src'], ['apps/api'], 1);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'apps/api/src/Big.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'apps/api/src/Big.php', 'status' => 'skipped']], $auditContext->coverage());
         self::assertSame(['apps/api/src/ApiController.php'], $this->relativePaths($auditContext->projectFiles()));
     }
 

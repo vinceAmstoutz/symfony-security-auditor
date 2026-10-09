@@ -40,7 +40,7 @@ final class IngestionStageSkippedFilesTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_a_file_over_the_size_limit_is_recorded_as_errored_and_makes_the_report_incomplete(): void
+    public function test_a_file_over_the_size_limit_is_recorded_as_skipped_and_leaves_the_report_complete(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir.'/src/Small.php', '<?php class Small {}');
@@ -50,9 +50,9 @@ final class IngestionStageSkippedFilesTest extends TestCase
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 512), new NullLogger()))->process($auditContext);
 
         $auditReport = AuditReport::fromContext($auditContext);
-        self::assertSame([['stage' => 'scan', 'file' => 'src/Big.php', 'status' => 'errored']], $auditContext->coverage());
-        self::assertSame(['src/Big.php'], $auditReport->unanalyzedFiles());
-        self::assertFalse($auditReport->isComplete());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/Big.php', 'status' => 'skipped']], $auditContext->coverage());
+        self::assertSame([], $auditReport->unanalyzedFiles());
+        self::assertTrue($auditReport->isComplete());
     }
 
     /**
@@ -82,14 +82,14 @@ final class IngestionStageSkippedFilesTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger()))->process($auditContext);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'src/OneByteOver.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/OneByteOver.php', 'status' => 'skipped']], $auditContext->coverage());
         self::assertSame(['src/AtLimit.php'], $this->analyzedPaths($auditContext));
     }
 
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_an_explicit_file_over_the_size_limit_is_recorded_as_errored(): void
+    public function test_an_explicit_file_over_the_size_limit_is_recorded_as_skipped(): void
     {
         mkdir($this->tmpDir.'/public', 0o777, true);
         file_put_contents($this->tmpDir.'/public/index.php', str_repeat('a', (2 * 1024) + 1));
@@ -97,13 +97,13 @@ final class IngestionStageSkippedFilesTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger()))->process($auditContext);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'public/index.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'public/index.php', 'status' => 'skipped']], $auditContext->coverage());
     }
 
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_a_file_the_scanner_could_not_read_is_recorded_as_errored(): void
+    public function test_a_file_the_scanner_could_not_read_is_recorded_as_skipped_and_leaves_the_report_complete(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir.'/src/Readable.php', '<?php');
@@ -120,15 +120,16 @@ final class IngestionStageSkippedFilesTest extends TestCase
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), fileReader: $reader), new NullLogger()))->process($auditContext);
 
         $auditReport = AuditReport::fromContext($auditContext);
-        self::assertSame([['stage' => 'scan', 'file' => 'src/Unreadable.php', 'status' => 'errored']], $auditContext->coverage());
-        self::assertSame(['src/Unreadable.php'], $auditReport->unanalyzedFiles());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/Unreadable.php', 'status' => 'skipped']], $auditContext->coverage());
+        self::assertSame([], $auditReport->unanalyzedFiles());
+        self::assertTrue($auditReport->isComplete());
         self::assertSame(['src/Readable.php'], $this->analyzedPaths($auditContext));
     }
 
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_two_files_whose_names_are_the_same_once_repaired_leave_the_report_incomplete_and_say_why(): void
+    public function test_two_files_whose_names_are_the_same_once_repaired_leave_the_report_complete_and_say_why(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir."/src/caf\xE9.php", '<?php class A {}');
@@ -139,9 +140,9 @@ final class IngestionStageSkippedFilesTest extends TestCase
         (new IngestionStage(new ProjectFileScanner(new NullLogger()), $bufferingLogger))->process($auditContext);
 
         $auditReport = AuditReport::fromContext($auditContext);
-        self::assertSame([['stage' => 'scan', 'file' => "src/caf\u{FFFD}.php", 'status' => 'errored']], $auditContext->coverage());
-        self::assertSame(["src/caf\u{FFFD}.php"], $auditReport->unanalyzedFiles());
-        self::assertFalse($auditReport->isComplete());
+        self::assertSame([['stage' => 'scan', 'file' => "src/caf\u{FFFD}.php", 'status' => 'skipped']], $auditContext->coverage());
+        self::assertSame([], $auditReport->unanalyzedFiles());
+        self::assertTrue($auditReport->isComplete());
         self::assertSame(["src/caf\u{FFFD}.php"], $this->analyzedPaths($auditContext));
         self::assertContains(
             ['warning', 'The scan left a file out, so it is not analyzed', ['file' => "src/caf\u{FFFD}.php", 'reason' => "its name is the same as another file's once the bytes that are not valid UTF-8 are replaced"]],
@@ -225,7 +226,7 @@ final class IngestionStageSkippedFilesTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir, ['src/Admin']);
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger()))->process($auditContext);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'src/Admin/Big.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/Admin/Big.php', 'status' => 'skipped']], $auditContext->coverage());
     }
 
     /**
@@ -241,7 +242,7 @@ final class IngestionStageSkippedFilesTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir, ['./apps/api/']);
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger()))->process($auditContext);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'apps/api/Big.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'apps/api/Big.php', 'status' => 'skipped']], $auditContext->coverage());
     }
 
     /**
@@ -260,10 +261,10 @@ final class IngestionStageSkippedFilesTest extends TestCase
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger()))->process($auditContext);
 
         $auditReport = AuditReport::fromContext($auditContext);
-        self::assertSame([['stage' => 'scan', 'file' => 'src/Admin/Big.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/Admin/Big.php', 'status' => 'skipped']], $auditContext->coverage());
         self::assertSame(['src/Admin/Small.php'], $this->analyzedPaths($auditContext));
-        self::assertSame(['src/Admin/Big.php'], $auditReport->unanalyzedFiles());
-        self::assertFalse($auditReport->isComplete());
+        self::assertSame([], $auditReport->unanalyzedFiles());
+        self::assertTrue($auditReport->isComplete());
     }
 
     /** @return iterable<string, array{string}> */
@@ -290,7 +291,7 @@ final class IngestionStageSkippedFilesTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir, ['', ' ']);
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger()))->process($auditContext);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'src/Big.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/Big.php', 'status' => 'skipped']], $auditContext->coverage());
     }
 
     /**
@@ -307,7 +308,7 @@ final class IngestionStageSkippedFilesTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir, diffSinceRef: 'origin/main');
         (new IngestionStage(new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2), new NullLogger(), $gitChangedFilesResolver))->process($auditContext);
 
-        self::assertSame([['stage' => 'scan', 'file' => 'src/ChangedBig.php', 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame([['stage' => 'scan', 'file' => 'src/ChangedBig.php', 'status' => 'skipped']], $auditContext->coverage());
     }
 
     /**

@@ -660,6 +660,33 @@ final class ReportDifferTest extends TestCase
     }
 
     /**
+     * The scan lists a file it left out — over the size limit, unreadable — in
+     * the ledger for information only: a comparison reads it as it read the
+     * ledger of a scan that listed nothing, and calls a finding that vanished
+     * from the file fixed.
+     *
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_calls_a_finding_fixed_when_the_scan_left_its_file_out(): void
+    {
+        $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
+        $current = $this->writeScopedReport('current.json', [
+            'complete' => true,
+            'scope' => ['since' => null, 'paths' => []],
+            'coverage' => [
+                ['stage' => 'scan', 'file' => 'src/Foo.php', 'status' => 'skipped'],
+                ['stage' => 'attacker', 'file' => 'src/Other.php', 'status' => 'analyzed'],
+            ],
+        ]);
+
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertSame([], $reportDiff->unverifiedFindings);
+    }
+
+    /**
      * @return iterable<string, array{array<string, mixed>}>
      */
     public static function scopesHoldingTheFile(): iterable
@@ -702,7 +729,7 @@ final class ReportDifferTest extends TestCase
         yield 'a file outside the --path scope' => [['complete' => true, 'scope' => ['since' => null, 'paths' => ['src/Controller']]]];
         yield 'a file the lean pre-scan skipped' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'skipped'], $anotherFileAnalyzed]]];
         yield 'a file the ledger lists under the path the attacker echoed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'attacker', 'file' => './src/Foo.php', 'status' => 'skipped'], $anotherFileAnalyzed]]];
-        yield 'a file the scan left out for being over the size limit' => [['complete' => false, 'scope' => $fullScope, 'coverage' => [['stage' => 'scan', 'file' => 'src/Foo.php', 'status' => 'errored'], $anotherFileAnalyzed]]];
+        yield 'a file a scan recorded as errored' => [['complete' => false, 'scope' => $fullScope, 'coverage' => [['stage' => 'scan', 'file' => 'src/Foo.php', 'status' => 'errored'], $anotherFileAnalyzed]]];
         yield 'a file a host stage listed' => [['complete' => true, 'scope' => $fullScope, 'coverage' => [['stage' => 'secret_scrubbing', 'file' => 'src/Foo.php', 'status' => 'analyzed'], $anotherFileAnalyzed]]];
         yield 'a report written before the scope existed' => [['complete' => true]];
         yield 'a scope that is not an object' => [['complete' => true, 'scope' => 'everything']];
