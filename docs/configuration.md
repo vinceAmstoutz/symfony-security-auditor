@@ -68,6 +68,8 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 > ```
 >
 > This gives key completion, type checking, and inline docs as you edit. The example files under [`examples/configs/`](../examples/configs/) include the modeline. The URL tracks the `main` branch so it always resolves to the current schema — no per-release bump needed.
+>
+> **Environment variables.** A `%env(VAR)%` placeholder is accepted on the settings that stay text, such as `model`, `attacker_model`, `reviewer_model` and `cache.dir`. A number, a switch, a list or a choice read as a PHP enum (`audit.budget.max_cost_usd`, `audit.min_score`, `audit.tools_enabled`, `cache.enabled`, `privacy.offline_only`, `audit.fail_on`, …) is read while the container is built, before the variable has a value, so a placeholder there stops the build with a configuration error that names the key: set a literal value.
 
 ### Top-level
 
