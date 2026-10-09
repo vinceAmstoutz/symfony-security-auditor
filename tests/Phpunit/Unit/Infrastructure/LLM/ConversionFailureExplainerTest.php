@@ -164,6 +164,39 @@ final class ConversionFailureExplainerTest extends TestCase
         self::assertSame(self::AZURE_FILTERED, $throwable->getMessage());
     }
 
+    public function test_a_refusal_as_too_large_does_not_repeat_a_credential_the_failure_quoted(): void
+    {
+        $runtimeException = new RuntimeException('Syntax error for "https://gw.example.com/v1/chat?key=AIzaSECRET".');
+        $payloadTooLarge = self::createStub(ResponseInterface::class);
+        $payloadTooLarge->method('getStatusCode')->willReturn(413);
+        $deferredResult = new DeferredResult(new FailingResultConverter($runtimeException), new RawHttpResult($payloadTooLarge));
+        $this->expectConversionToFailWith($runtimeException, $deferredResult);
+
+        $throwable = (new ConversionFailureExplainer())->explain($runtimeException, $deferredResult);
+
+        self::assertSame('The provider refused the request as too large (HTTP 413): Syntax error for "https://gw.example.com/v1/chat?key=***REDACTED***".', $throwable->getMessage());
+        self::assertSame($runtimeException, $throwable->getPrevious());
+        self::assertSame('Syntax error for "https://gw.example.com/v1/chat?key=AIzaSECRET".', $runtimeException->getMessage());
+    }
+
+    public function test_a_refusal_with_a_client_error_does_not_repeat_a_credential_the_failure_quoted(): void
+    {
+        $runtimeException = new RuntimeException('Response does not contain choices for "https://gw.example.com/v1/chat?alt=sse&api_key=AIzaSECRET".');
+
+        $throwable = (new ConversionFailureExplainer())->explain($runtimeException, $this->failedConversionWithStatus($runtimeException, 403, ['detail' => 'Forbidden']));
+
+        self::assertSame('The provider refused the request (HTTP 403): Response does not contain choices for "https://gw.example.com/v1/chat?alt=sse&api_key=***REDACTED***".', $throwable->getMessage());
+    }
+
+    public function test_an_answer_cut_short_does_not_repeat_a_credential_the_failure_quoted(): void
+    {
+        $badRequestException = new BadRequestException('Filtered for "https://gw.example.com/v1/chat?token=AIzaSECRET".');
+
+        $throwable = (new ConversionFailureExplainer())->explain($badRequestException, $this->failedConversion($badRequestException, $this->azureContentFilterBody()));
+
+        self::assertSame('Filtered for "https://gw.example.com/v1/chat?token=***REDACTED***".', $throwable->getMessage());
+    }
+
     public function test_a_raw_answer_that_cannot_be_read_leaves_the_failure_as_it_is(): void
     {
         $badRequestException = new BadRequestException('Bad Request');

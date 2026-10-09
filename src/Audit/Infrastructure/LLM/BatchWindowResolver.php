@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
@@ -289,10 +290,11 @@ final readonly class BatchWindowResolver
      */
     private function tooLargeResponse(Throwable $throwable): LLMResponse
     {
+        $refusal = ProviderMessageRedactor::redact($throwable->getMessage());
         $this->logger->debug('Batch request refused as too large for the model; it is answered as request_too_large so the caller can act on that request alone', [
-            'error' => $throwable->getMessage(),
+            'error' => $refusal,
         ]);
 
-        return LLMResponse::of($throwable->getMessage(), $this->model, 'request_too_large', TokenUsageSnapshot::of(0, 0));
+        return LLMResponse::of($refusal, $this->model, 'request_too_large', TokenUsageSnapshot::of(0, 0));
     }
 }

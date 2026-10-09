@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 
 use RuntimeException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 
 /**
  * An answer the provider delivered but its bridge failed to convert, as its
@@ -39,16 +40,16 @@ final class UnconvertedAnswerException extends RuntimeException
 
     public static function cutShort(Throwable $throwable, string $stopReason): self
     {
-        return new self($throwable->getMessage(), $throwable, $stopReason);
+        return new self(ProviderMessageRedactor::redact($throwable->getMessage()), $throwable, $stopReason);
     }
 
     public static function refusedAsTooLarge(Throwable $throwable): self
     {
-        return new self(\sprintf('The provider refused the request as too large (HTTP 413): %s', $throwable->getMessage()), $throwable, refusedAsTooLarge: true);
+        return new self(\sprintf('The provider refused the request as too large (HTTP 413): %s', ProviderMessageRedactor::redact($throwable->getMessage())), $throwable, refusedAsTooLarge: true);
     }
 
     public static function refusedWithStatus(Throwable $throwable, int $status): self
     {
-        return new self(\sprintf('The provider refused the request (HTTP %d): %s', $status, $throwable->getMessage()), $throwable);
+        return new self(\sprintf('The provider refused the request (HTTP %d): %s', $status, ProviderMessageRedactor::redact($throwable->getMessage())), $throwable);
     }
 }

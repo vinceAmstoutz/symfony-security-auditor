@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final class NonTransientLLMFailureException extends LLMProviderException
@@ -22,7 +23,7 @@ final class NonTransientLLMFailureException extends LLMProviderException
     public static function from(Throwable $throwable): self
     {
         return new self(
-            \sprintf('LLM call failed with non-transient error: %s', $throwable->getMessage()),
+            \sprintf('LLM call failed with non-transient error: %s', ProviderMessageRedactor::redact($throwable->getMessage())),
             previous: $throwable,
         );
     }
