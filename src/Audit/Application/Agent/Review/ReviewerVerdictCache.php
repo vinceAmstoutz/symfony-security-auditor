@@ -46,7 +46,7 @@ final readonly class ReviewerVerdictCache
         }
 
         $cached = $this->reviewerCache->get($vulnerability, $codeContext);
-        if (null === $cached) {
+        if (!$this->judges($cached)) {
             return null;
         }
 
@@ -60,7 +60,7 @@ final readonly class ReviewerVerdictCache
      */
     public function store(Vulnerability $vulnerability, string $codeContext, ?array $verdict): void
     {
-        if (null === ($verdict['accepted'] ?? null) || !$this->reviewerCache instanceof ReviewerCacheInterface) {
+        if (!$this->judges($verdict) || !$this->reviewerCache instanceof ReviewerCacheInterface) {
             return;
         }
 
@@ -72,5 +72,15 @@ final readonly class ReviewerVerdictCache
                 'error' => $throwable->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param array<string, mixed>|null $verdict
+     *
+     * @phpstan-assert-if-true array<string, mixed> $verdict
+     */
+    private function judges(?array $verdict): bool
+    {
+        return null !== AcceptedFlag::read($verdict['accepted'] ?? null);
     }
 }
