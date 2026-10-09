@@ -78,7 +78,7 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->register('logger', NullLogger::class);
         $containerBuilder->register('http_client', HttpClientInterface::class)
             ->setFactory([HttpClient::class, 'create'])
-            ->setArguments([['timeout' => $standaloneConfig->httpTimeout, 'max_duration' => 0]]);
+            ->setArguments([$this->httpClientOptions($standaloneConfig)]);
 
         try {
             $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
@@ -99,6 +99,16 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    /**
+     * @return array<string, float|int|string>
+     */
+    private function httpClientOptions(StandaloneConfig $standaloneConfig): array
+    {
+        $options = ['timeout' => $standaloneConfig->httpTimeout, 'max_duration' => 0];
+
+        return $standaloneConfig->offlineOnly() ? [...$options, 'no_proxy' => '*'] : $options;
     }
 
     /**
