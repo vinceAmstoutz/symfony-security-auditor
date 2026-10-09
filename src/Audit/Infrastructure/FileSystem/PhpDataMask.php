@@ -16,12 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 use Override;
 use PhpToken;
 use Stringable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\UnmatchedClosers;
 
 /**
  * Tells, byte by byte, what a PHP file is made of: code that PHP runs, or text it only carries (the
  * inside of a string, a comment, a heredoc body, the markup around a tag). A file that does not open
  * with a PHP tag — a YAML, dotenv or Twig file, even one that mentions `<?php` further down — is text
- * from end to end.
+ * from end to end, and so is a file with so many unmatched closing brackets that PHP's tokenizer would
+ * stall on it ({@see UnmatchedClosers}): more is redacted in it, never less.
  *
  * A placeholder written over code the parser needs — a constant, a call, a parameter default — leaves
  * a file that no longer parses; one written over text never does.
@@ -50,7 +52,7 @@ final readonly class PhpDataMask implements Stringable
 
     public static function of(string $content): self
     {
-        if (!self::opensWithPhpTag($content)) {
+        if (!self::opensWithPhpTag($content) || UnmatchedClosers::exceedLimit($content)) {
             return new self(str_repeat(self::TEXT, \strlen($content)));
         }
 

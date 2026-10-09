@@ -727,4 +727,23 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_skips_a_file_holding_a_flood_of_unmatched_closing_brackets(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class PostVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return $attribute === 'EDIT';
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source.str_repeat(')', 16000));
+
+        self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
+    }
 }

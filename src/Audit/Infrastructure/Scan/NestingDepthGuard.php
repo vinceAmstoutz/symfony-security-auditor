@@ -28,7 +28,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * The depth is read from PHP's own token stream, so brackets inside string
  * literals, comments and inline HTML are not counted. Operator chains such as
  * `1+1+1+…` and `$a->b->c->…` nest the AST without nesting any bracket and
- * are not measured here.
+ * are not measured here. A file holding more unmatched closing brackets than
+ * {@see UnmatchedClosers::LIMIT} is refused before it is tokenized at all, since
+ * PHP's own lexer takes seconds on a few thousand of them and minutes on a few
+ * tens of thousands.
  */
 final readonly class NestingDepthGuard
 {
@@ -44,6 +47,15 @@ final readonly class NestingDepthGuard
 
     public function admits(ProjectFile $projectFile): bool
     {
+        if (UnmatchedClosers::exceedLimit($projectFile->content())) {
+            $this->logger->warning('Skipping a file holding too many unmatched closing brackets to tokenize safely', [
+                'file' => $projectFile->relativePath(),
+                'max_unmatched_closers' => UnmatchedClosers::LIMIT,
+            ]);
+
+            return false;
+        }
+
         if (!$this->nestsTooDeeply($projectFile->content())) {
             return true;
         }

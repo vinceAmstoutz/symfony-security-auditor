@@ -52,6 +52,40 @@ final class PhpDataMaskTest extends TestCase
         yield 'a string never closed' => ["<?php 'abc", 'cccccctttt'];
     }
 
+    #[DataProvider('closerFloods')]
+    public function test_it_reads_a_flood_of_unmatched_closing_brackets_as_text_without_tokenizing_it(string $closer): void
+    {
+        $content = '<?php '.str_repeat($closer, 16000);
+
+        self::assertSame(\strlen($content), PhpDataMask::of($content)->textLength(0, \strlen($content)));
+    }
+
+    public function test_it_still_tells_code_from_text_in_a_file_holding_as_many_unmatched_closers_as_the_limit(): void
+    {
+        $content = "<?php 'a'".str_repeat(')', 1000);
+
+        $phpDataMask = PhpDataMask::of($content);
+
+        self::assertSame(1, $phpDataMask->textLength(7, 1000));
+        self::assertSame(0, $phpDataMask->textLength(0, 1000));
+        self::assertSame(0, $phpDataMask->textLength(9, 1000));
+    }
+
+    public function test_it_reads_a_file_holding_one_unmatched_closer_past_the_limit_as_text(): void
+    {
+        $content = "<?php 'a'".str_repeat(')', 1001);
+
+        self::assertSame(\strlen($content), PhpDataMask::of($content)->textLength(0, \strlen($content)));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function closerFloods(): iterable
+    {
+        yield 'parentheses' => [')'];
+        yield 'square brackets' => [']'];
+        yield 'curly braces' => ['}'];
+    }
+
     #[DataProvider('phpFileCases')]
     public function test_it_tells_a_file_opening_with_a_php_tag_from_any_other(string $content, bool $isPhp): void
     {
