@@ -394,6 +394,90 @@ final class StandaloneContainerFactoryTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed>            $platform
+     * @param array<string, float|int|string> $expectedOptions
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('offlineOnlyPlatformCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_offline_only_leaves_the_proxy_of_the_environment_to_an_endpoint_that_is_not_on_the_loopback_interface(array $platform, array $expectedOptions): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(['privacy' => ['offline_only' => true]], new StandalonePlatformConfig($platform, 'ollama')),
+            $this->cacheDir,
+        );
+
+        self::assertSame([$expectedOptions], $containerBuilder->getDefinition('http_client')->getArguments());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, array<string, float|int|string>}>
+     */
+    public static function offlineOnlyPlatformCases(): iterable
+    {
+        $withoutBypass = ['timeout' => 600.0, 'max_duration' => 0];
+        $withBypass = ['timeout' => 600.0, 'max_duration' => 0, 'no_proxy' => '*'];
+
+        yield 'a loopback name' => [['ollama' => ['endpoint' => 'http://localhost:11434']], $withBypass];
+        yield 'a loopback ipv4 address' => [['ollama' => ['endpoint' => 'http://127.0.0.1:11434']], $withBypass];
+        yield 'a loopback ipv6 address' => [['ollama' => ['endpoint' => 'http://[::1]:11434']], $withBypass];
+        yield 'two loopback endpoints' => [['ollama' => ['endpoint' => 'http://localhost:11434'], 'generic' => ['gw' => ['base_url' => 'http://127.0.0.1:8080']]], $withBypass];
+        yield 'a private-range address' => [['ollama' => ['endpoint' => 'http://192.168.1.50:11434']], $withoutBypass];
+        yield 'a private network name' => [['ollama' => ['endpoint' => 'http://workstation.local:11434']], $withoutBypass];
+        yield 'a private-range address beside a loopback endpoint' => [['ollama' => ['endpoint' => 'http://localhost:11434'], 'generic' => ['gw' => ['base_url' => 'http://10.0.0.2:8080']]], $withoutBypass];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_offline_only_still_reaches_a_private_range_endpoint_through_the_proxy_of_the_environment(): void
+    {
+        $proxy = stream_socket_server('tcp://127.0.0.1:0');
+        self::assertIsResource($proxy);
+        $proxyAddress = stream_socket_get_name($proxy, false);
+        self::assertIsString($proxyAddress);
+        $_SERVER['http_proxy'] = \sprintf('http://%s', $proxyAddress);
+        $_SERVER['no_proxy'] = '';
+        $_SERVER['NO_PROXY'] = '';
+
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['privacy' => ['offline_only' => true]],
+                new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://192.168.1.50:11434']], 'ollama'),
+            ),
+            $this->cacheDir,
+        );
+        $options = $containerBuilder->getDefinition('http_client')->getArguments()[0];
+        self::assertIsArray($options);
+
+        try {
+            HttpClient::create($options)->request('GET', 'http://192.168.1.50:11434/', ['timeout' => 0.5])->getStatusCode();
+        } catch (TransportExceptionInterface) {
+            $readable = [$proxy];
+            $write = null;
+            $except = null;
+
+            self::assertSame(1, stream_select($readable, $write, $except, 0), 'the request did not reach the proxy');
+
+            return;
+        }
+
+        self::fail('the proxy never answered, so the request cannot have succeeded');
+    }
+
+    /**
      * @param array<string, mixed> $platform
      *
      * @throws AmbiguousPlatformException

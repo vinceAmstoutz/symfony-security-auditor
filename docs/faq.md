@@ -189,7 +189,7 @@ symfony_security_auditor:
     model: 'llama3.3'  # or any model from `ollama pull`
 ```
 
-No data leaves your machine. Add [`privacy.offline_only: true`](configuration.md#privacy--data-egress) to have the auditor enforce that rather than rely on it: it drops the advisory feed (no `composer audit`) and, in standalone mode, aborts before the audit boots if a configured platform endpoint is not loopback or private-range and sends the prompts straight to the endpoint, ignoring any `http_proxy` in your environment.
+No data leaves your machine. Add [`privacy.offline_only: true`](configuration.md#privacy--data-egress) to have the auditor enforce that rather than rely on it: it drops the advisory feed (no `composer audit`) and, in standalone mode, aborts before the audit boots if a configured platform endpoint is not loopback or private-range, and sends the prompts straight to the endpoint, ignoring any `http_proxy` in your environment, when every endpoint is on the loopback interface (an endpoint on your private network keeps using that proxy, so unset it if the prompts must not pass through it).
 
 ### How do I verify that nothing leaves my machine?
 

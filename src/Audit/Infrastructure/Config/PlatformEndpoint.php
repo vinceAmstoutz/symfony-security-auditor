@@ -24,6 +24,8 @@ use Uri\Rfc3986\Uri;
  */
 final readonly class PlatformEndpoint
 {
+    private const string IPV6_LOOPBACK = '::1';
+
     private function __construct(
         public string $scheme,
         public string $host,
@@ -41,6 +43,22 @@ final readonly class PlatformEndpoint
         $host = $uri->getHost();
 
         return null === $scheme || null === $host ? null : new self($scheme, $host, $uri->getPort());
+    }
+
+    /**
+     * Whether a request to it never leaves this machine's loopback interface:
+     * `localhost`, an address of `127.0.0.0/8` or `::1`.
+     */
+    public function isLoopback(): bool
+    {
+        $host = trim($this->host, '[]');
+        if ('localhost' === $host) {
+            return true;
+        }
+
+        $packed = inet_pton($host);
+
+        return false !== $packed && (inet_pton(self::IPV6_LOOPBACK) === $packed || (4 === \strlen($packed) && "\x7f" === $packed[0]));
     }
 
     public function origin(): string
