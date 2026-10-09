@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+
 /**
  * A value written into the standalone config reaches the container verbatim,
  * where `ParameterBag` reads `%name%` as a parameter reference and `%%` as an
@@ -29,6 +31,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 final readonly class ContainerParameterSyntax
 {
     private const string REFERENCE_PATTERN = '/%%|%[^%\s]++%/';
+
+    private const string ESCAPE_OR_REFERENCE_PATTERN = '/%%|%([^%\s]++)%/';
+
+    private const string ENV_REFERENCE_NAME = '/^env\(.+\)$/';
 
     private const string PERCENT_NOT_STARTING_AN_OCTET = '/%(?![0-9A-Fa-f]{2})/';
 
@@ -84,6 +90,23 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
+     * Text that happens to hold a `%…%` pair — a regex such as
+     * `/sprintf\(.*%s.*%d/`, a range such as `50%-60%` — must reach the
+     * setting as typed, while a reference the container can resolve
+     * (`%env(VAR)%`, `%kernel.project_dir%`) and a doubled `%%` keep their
+     * meaning. A pair naming a parameter the bag lacks would abort the run
+     * with "non-existent parameter", so it is escaped to the text it was.
+     */
+    public static function escapeUnresolvable(string $value, ParameterBagInterface $parameterBag): string
+    {
+        return preg_replace_callback(
+            self::ESCAPE_OR_REFERENCE_PATTERN,
+            static fn (array $match): string => \array_key_exists(1, $match) && !self::isResolvable($match[1], $parameterBag) ? self::escape($match[0]) : $match[0],
+            $value,
+        ) ?? $value;
+    }
+
+    /**
      * The spelling the container reads back as `$value`: a whole-value
      * `%env(VAR)%` stays a placeholder for the resolver to substitute, and
      * anything else has every `%` doubled.
@@ -91,5 +114,10 @@ final readonly class ContainerParameterSyntax
     public static function literal(string $value): string
     {
         return EnvPlaceholder::in($value) instanceof EnvPlaceholder ? $value : self::escape($value);
+    }
+
+    private static function isResolvable(string $name, ParameterBagInterface $parameterBag): bool
+    {
+        return 1 === preg_match(self::ENV_REFERENCE_NAME, $name) || $parameterBag->has($name);
     }
 }

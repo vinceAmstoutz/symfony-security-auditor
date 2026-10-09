@@ -21,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
@@ -166,6 +167,101 @@ final class StandaloneContainerFactoryTest extends TestCase
         yield 'a pair naming no parameter' => ['/tmp/%x%/cache'];
         yield 'a doubled percent sign' => ['/tmp/a%%b/cache'];
         yield 'an environment placeholder' => ['/tmp/%env(HOME)%/cache'];
+    }
+
+    /**
+     * @param array<array-key, mixed> $auditConfig
+     * @param non-empty-list<string>  $path
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('freeTextHoldingPercentSigns')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_takes_free_text_holding_an_unresolvable_percent_pair_literally(array $auditConfig, string $parameter, array $path, string $expected): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig($auditConfig, new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+
+        $value = $containerBuilder->getParameter($parameter);
+        foreach ($path as $key) {
+            self::assertIsArray($value);
+            $value = $value[$key];
+        }
+
+        self::assertSame($expected, $value);
+    }
+
+    /**
+     * @return iterable<string, array{array<array-key, mixed>, string, non-empty-list<string>, string}>
+     */
+    public static function freeTextHoldingPercentSigns(): iterable
+    {
+        $pattern = static fn (string $regex, string $description): array => ['scan' => ['custom_risk_patterns' => ['php' => ['sprintf_sql' => ['regex' => $regex, 'description' => $description]]]]];
+
+        yield 'a risk pattern matching printf placeholders' => [$pattern('/sprintf\(.*%s.*%d/', 'sql built with sprintf'), 'symfony_security_auditor.scan.custom_risk_patterns', ['php', 'sprintf_sql', 'regex'], '/sprintf\(.*%s.*%d/'];
+        yield 'a risk pattern description' => [$pattern('/x/', 'a discount between 50%-60% is fine'), 'symfony_security_auditor.scan.custom_risk_patterns', ['php', 'sprintf_sql', 'description'], 'a discount between 50%-60% is fine'];
+        yield 'an additional scrubbing pattern' => [['scan' => ['secret_scrubbing' => ['additional_patterns' => ['/key=%secret%/']]]], 'symfony_security_auditor.scan.secret_scrubbing.additional_patterns', ['0'], '/key=%secret%/'];
+        yield 'a doubled percent sign, which the container still reads as one' => [$pattern('/100%%/', 'd'), 'symfony_security_auditor.scan.custom_risk_patterns', ['php', 'sprintf_sql', 'regex'], '/100%/'];
+        yield 'a reference to a parameter the container has' => [$pattern('/x/', 'in %kernel.project_dir%'), 'symfony_security_auditor.scan.custom_risk_patterns', ['php', 'sprintf_sql', 'description'], 'in '.getcwd()];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_still_reads_an_environment_placeholder_in_free_text(): void
+    {
+        putenv('SSA_FREE_TEXT_TEAM=platform');
+
+        try {
+            $containerBuilder = (new StandaloneContainerFactory())->create(
+                new StandaloneConfig(
+                    ['scan' => ['secret_scrubbing' => ['additional_patterns' => ['/%env(SSA_FREE_TEXT_TEAM)%-%x%/']]]],
+                    new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+                ),
+                $this->cacheDir,
+            );
+
+            self::assertSame(['/platform-%x%/'], $containerBuilder->getParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns'));
+        } finally {
+            putenv('SSA_FREE_TEXT_TEAM');
+        }
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_takes_custom_skill_instructions_holding_an_unresolvable_percent_pair_literally(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['audit' => ['custom_skills' => ['pricing' => ['file_type' => 'controller', 'instructions' => 'A discount between 50%-60% is fine.']]]],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+            ),
+            $this->cacheDir,
+        );
+
+        $configuredAttackerSkill = $containerBuilder->getDefinition('security_auditor.custom_skill.0')->getArgument(0);
+        self::assertInstanceOf(Definition::class, $configuredAttackerSkill);
+        self::assertSame('A discount between 50%-60% is fine.', $containerBuilder->getParameterBag()->unescapeValue($configuredAttackerSkill->getArgument(2)));
     }
 
     /**

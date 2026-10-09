@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
 
 final class ContainerParameterSyntaxTest extends TestCase
@@ -118,5 +119,53 @@ final class ContainerParameterSyntaxTest extends TestCase
         yield 'a value without a percent' => ['https://gw.example', 'https://gw.example'];
         yield 'every percent is doubled' => ['https://gw.example/v1%2Fx%3Fy', 'https://gw.example/v1%%2Fx%%3Fy'];
         yield 'a whole-value env placeholder is left for the resolver' => ['%env(GATEWAY_URL)%', '%env(GATEWAY_URL)%'];
+    }
+
+    #[DataProvider('unresolvableCases')]
+    public function test_it_escapes_the_percent_pairs_the_container_could_not_resolve(string $value, string $expected): void
+    {
+        self::assertSame($expected, ContainerParameterSyntax::escapeUnresolvable($value, new ParameterBag(['kernel.project_dir' => '/srv/app'])));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function unresolvableCases(): iterable
+    {
+        yield 'two pairs naming no parameter' => ['/sprintf\(.*%s.*%d/', '/sprintf\(.*%%s.*%%d/'];
+        yield 'a range of percentages' => ['a discount between 50%-60% is fine', 'a discount between 50%%-60%% is fine'];
+        yield 'a reference to a parameter that exists' => ['%kernel.project_dir%/src', '%kernel.project_dir%/src'];
+        yield 'an environment placeholder' => ['%env(HOME)%/src', '%env(HOME)%/src'];
+        yield 'an environment placeholder with a processor' => ['%env(file:TOKEN)%', '%env(file:TOKEN)%'];
+        yield 'an empty environment placeholder' => ['%env()%', '%%env()%%'];
+        yield 'a name merely containing an environment call' => ['%my.env(HOME)%', '%%my.env(HOME)%%'];
+        yield 'a name with text after the environment call' => ['%env(HOME)x%', '%%env(HOME)x%%'];
+        yield 'an escaped percent' => ['/100%%/', '/100%%/'];
+        yield 'an escaped pair' => ['%%x%%', '%%x%%'];
+        yield 'a lone percent' => ['5% of it', '5% of it'];
+        yield 'a pair spanning whitespace' => ['50% off 20%', '50% off 20%'];
+        yield 'a known reference beside an unknown one' => ['%kernel.project_dir%/%x%', '%kernel.project_dir%/%%x%%'];
+        yield 'two unknown pairs side by side' => ['%a%%b%', '%%a%%%%b%%'];
+        yield 'no percent at all' => ['plain text', 'plain text'];
+        yield 'nothing' => ['', ''];
+    }
+
+    #[DataProvider('readBackCases')]
+    public function test_the_container_reads_an_escaped_unresolvable_value_back_as_written(string $value): void
+    {
+        $parameterBag = new ParameterBag(['text' => ContainerParameterSyntax::escapeUnresolvable($value, new ParameterBag())]);
+        $parameterBag->resolve();
+
+        self::assertSame($value, $parameterBag->get('text'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function readBackCases(): iterable
+    {
+        yield 'two pairs naming no parameter' => ['/sprintf\(.*%s.*%d/'];
+        yield 'a range of percentages' => ['a discount between 50%-60% is fine'];
+        yield 'two unknown pairs side by side' => ['%a%%b%'];
     }
 }
