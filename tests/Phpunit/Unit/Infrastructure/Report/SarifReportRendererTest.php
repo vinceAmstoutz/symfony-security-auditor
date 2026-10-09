@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Composer\InstalledVersions;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
@@ -228,6 +229,64 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * @param list<VulnerabilitySeverity> $severities
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('ruleSecuritySeverityCases')]
+    public function test_a_rule_carries_the_highest_cvss_score_of_its_findings_as_security_severity(array $severities, string $expected): void
+    {
+        $vulnerabilities = [];
+        foreach ($severities as $index => $severity) {
+            $vulnerabilities[] = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, $severity, \sprintf('src/File%d.php', $index));
+        }
+
+        $decoded = $this->decodeSarif($this->makeReport(...$vulnerabilities));
+
+        $rules = $decoded['runs'][0]['tool']['driver']['rules'];
+        self::assertCount(1, $rules);
+        self::assertSame($expected, array_values($rules)[0]['properties']['security-severity']);
+    }
+
+    /**
+     * @return iterable<string, array{list<VulnerabilitySeverity>, string}>
+     */
+    public static function ruleSecuritySeverityCases(): iterable
+    {
+        yield 'a single critical finding' => [[VulnerabilitySeverity::CRITICAL], '9.3'];
+        yield 'a single info finding' => [[VulnerabilitySeverity::INFO], '0.0'];
+        yield 'a low finding then a critical one' => [[VulnerabilitySeverity::LOW, VulnerabilitySeverity::CRITICAL], '9.3'];
+        yield 'a critical finding then a low one' => [[VulnerabilitySeverity::CRITICAL, VulnerabilitySeverity::LOW], '9.3'];
+        yield 'a medium, a high and a low finding' => [[VulnerabilitySeverity::MEDIUM, VulnerabilitySeverity::HIGH, VulnerabilitySeverity::LOW], '8.1'];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_each_rule_carries_the_score_of_its_own_findings_only(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL);
+        $low = $this->makeValidatedVuln(VulnerabilityType::BROKEN_ACCESS_CONTROL, VulnerabilitySeverity::LOW, 'src/Bar.php', 10);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability, $low));
+
+        $scores = [];
+        foreach ($decoded['runs'][0]['tool']['driver']['rules'] as $rule) {
+            $scores[$rule['id']] = $rule['properties']['security-severity'];
+        }
+
+        self::assertSame([
+            VulnerabilityType::SQL_INJECTION->owaspReference() => '9.3',
+            VulnerabilityType::BROKEN_ACCESS_CONTROL->owaspReference() => '3.1',
+        ], $scores);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
@@ -241,7 +300,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
 
         $rules = $decoded['runs'][0]['tool']['driver']['rules'];
         self::assertCount(1, $rules);
-        self::assertSame(['external/cwe/cwe-78', 'external/cwe/cwe-89'], array_values($rules)[0]['properties']['tags']);
+        self::assertSame(['external/cwe/cwe-78', 'external/cwe/cwe-89', 'security'], array_values($rules)[0]['properties']['tags']);
     }
 
     /**
@@ -275,7 +334,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         $decoded = $this->decodeSarif($this->makeReport($vulnerability, $vuln2));
 
         $rules = $decoded['runs'][0]['tool']['driver']['rules'];
-        self::assertSame(['external/cwe/cwe-89'], array_values($rules)[0]['properties']['tags']);
+        self::assertSame(['external/cwe/cwe-89', 'security'], array_values($rules)[0]['properties']['tags']);
     }
 
     /**
@@ -292,7 +351,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
 
         $rules = $decoded['runs'][0]['tool']['driver']['rules'];
         self::assertCount(1, $rules);
-        self::assertSame(['external/cwe/cwe-841'], array_values($rules)[0]['properties']['tags']);
+        self::assertSame(['external/cwe/cwe-841', 'security'], array_values($rules)[0]['properties']['tags']);
     }
 
     /**
@@ -636,13 +695,13 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_render_rule_properties_tags_include_the_cwe_reference(): void
+    public function test_render_rule_properties_tags_include_the_cwe_reference_then_the_security_tag(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
         $decoded = $this->decodeSarif($this->makeReport($vulnerability));
 
         $firstRule = array_values($decoded['runs'][0]['tool']['driver']['rules'])[0];
-        self::assertSame(['external/cwe/cwe-89'], $firstRule['properties']['tags']);
+        self::assertSame(['external/cwe/cwe-89', 'security'], $firstRule['properties']['tags']);
     }
 
     /**
@@ -835,7 +894,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
-     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>}}>}},
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>, 'security-severity': string}}>}},
      *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>, properties?: array<string, string>}>,
      *         properties?: array<string, mixed>
      *     }>
@@ -895,7 +954,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
-     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>}}>}},
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>, 'security-severity': string}}>}},
      *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>
      *     }>
      * } $value
