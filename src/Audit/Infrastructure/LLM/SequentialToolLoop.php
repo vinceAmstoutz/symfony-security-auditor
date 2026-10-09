@@ -14,14 +14,12 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Psr\Log\LoggerInterface;
-use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\Content\Text;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\ResultInterface;
-use Symfony\AI\Platform\Result\ToolCall;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -86,12 +84,11 @@ final readonly class SequentialToolLoop
 
             $platformResult = $deferredResult->getResult();
             $conversationState = $this->bookIteration($conversationState, $deferredResult);
-            $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
-            if ([] === $toolCalls) {
+            if ([] === $this->platformResultExtractor->extractToolCalls($platformResult)) {
                 return $this->textResponseAndLog($conversationState, $deferredResult, $platformResult, $iteration);
             }
 
-            $afterToolCalls = $this->runToolCalls($conversationState, $toolCalls, $toolRegistry, $iteration, $maxToolIterations - $iteration);
+            $afterToolCalls = $this->runToolCalls($conversationState, $platformResult, $toolRegistry, $iteration, $maxToolIterations - $iteration);
             if ($afterToolCalls instanceof LLMResponse) {
                 return $afterToolCalls;
             }
@@ -200,13 +197,12 @@ final readonly class SequentialToolLoop
      * The conversation after the round's tool calls ran, or the response that
      * ends it when they were the last round's recording calls.
      *
-     * @param list<ToolCall> $toolCalls
-     *
      * @throws InvalidTokenUsageException
      */
-    private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolRegistry $toolRegistry, int $iteration, int $roundsLeft): ConversationState|LLMResponse
+    private function runToolCalls(ConversationState $conversationState, ResultInterface $platformResult, ToolRegistry $toolRegistry, int $iteration, int $roundsLeft): ConversationState|LLMResponse
     {
-        $conversationState->bag->add(new AssistantMessage(...$toolCalls));
+        $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
+        $conversationState->bag->add($this->platformResultExtractor->extractAssistantMessage($platformResult));
 
         $toolResults = [];
         foreach ($toolCalls as $position => $toolCall) {
