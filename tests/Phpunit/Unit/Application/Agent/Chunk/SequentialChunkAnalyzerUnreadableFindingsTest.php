@@ -68,6 +68,34 @@ final class SequentialChunkAnalyzerUnreadableFindingsTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      */
+    public function test_a_json_answer_with_a_confidence_that_cannot_be_read_keeps_the_others_but_is_errored_and_not_cached(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of(
+            (string) json_encode([SequentialChunkAnalyzerHarness::finding('readable'), [...SequentialChunkAnalyzerHarness::finding('unreadable'), 'confidence' => '90%']]),
+            'm',
+            'end_turn',
+            TokenUsageSnapshot::of(1, 1),
+        ));
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $attackerCache->expects(self::never())->method('store');
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        [$vulnerabilities, $drops] = SequentialChunkAnalyzerHarness::analyzer($llmClient, $attackerCache, false)->analyze([[ChunkAnalysisInputs::file('src/A.php')]], ChunkAnalysisInputs::request(), $recordingCoverageRecorder, null, new RiskMarkerIndex([]));
+
+        self::assertSame(['readable'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+        self::assertSame(['hydration_failed' => 1], $drops);
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/A.php', 'status' => 'errored']], $recordingCoverageRecorder->coverage);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
     public function test_a_json_answer_holding_a_bare_string_among_its_findings_is_errored_and_not_cached(): void
     {
         $llmClient = self::createStub(LLMClientInterface::class);
