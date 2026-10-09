@@ -740,7 +740,30 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $vulnerabilities = $decoded['vulnerabilities'];
         $decoded['vulnerabilities'] = $this->stampTimestamps($vulnerabilities);
 
-        return $decoded;
+        return $this->withoutPricedAmounts($decoded);
+    }
+
+    /**
+     * A price comes from the model catalog the run resolves, which moves with
+     * every release of it, so the golden master pins the token counts and
+     * leaves the amounts out.
+     *
+     * @param array<array-key, mixed> $node
+     *
+     * @return array<array-key, mixed>
+     */
+    private function withoutPricedAmounts(array $node): array
+    {
+        $unpriced = [];
+        foreach ($node as $key => $value) {
+            $unpriced[$key] = match (true) {
+                'estimated_cost_usd' === $key => 'COST',
+                \is_array($value) => $this->withoutPricedAmounts($value),
+                default => $value,
+            };
+        }
+
+        return $unpriced;
     }
 
     /**
@@ -765,7 +788,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $decoded = $this->decode($report);
         $decoded['runs'][0]['tool']['driver']['version'] = 'VERSION';
 
-        return $decoded;
+        return $this->withoutPricedAmounts($decoded);
     }
 
     /**

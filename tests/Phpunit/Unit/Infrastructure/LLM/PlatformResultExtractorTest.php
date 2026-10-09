@@ -101,6 +101,78 @@ final class PlatformResultExtractorTest extends TestCase
     }
 
     /**
+     * @param array{int, int, int, int} $expectedTokens input, output, cache read, cache creation
+     *
+     * @throws NegativeTokenCountException
+     */
+    #[DataProvider('usageWithoutPromptTokensCases')]
+    public function test_it_books_the_estimated_input_tokens_when_the_usage_reports_no_prompt_tokens(TokenUsage $tokenUsage, array $expectedTokens): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage), self::ESTIMATED_INPUT_TOKENS));
+    }
+
+    /** @return iterable<string, array{TokenUsage, array{int, int, int, int}}> */
+    public static function usageWithoutPromptTokensCases(): iterable
+    {
+        yield 'an empty usage object' => [new TokenUsage(), [self::ESTIMATED_INPUT_TOKENS, 0, 0, 0]];
+        yield 'a completion count alone' => [new TokenUsage(completionTokens: 40), [self::ESTIMATED_INPUT_TOKENS, 40, 0, 0]];
+        yield 'a completion and cache reads without the prompt' => [new TokenUsage(completionTokens: 40, cacheReadTokens: 100), [self::ESTIMATED_INPUT_TOKENS, 40, 100, 0]];
+        yield 'a prompt of zero beside a completion of zero' => [new TokenUsage(promptTokens: 0, completionTokens: 0), [self::ESTIMATED_INPUT_TOKENS, 0, 0, 0]];
+        yield 'a prompt of zero beside a completion' => [new TokenUsage(promptTokens: 0, completionTokens: 40), [self::ESTIMATED_INPUT_TOKENS, 40, 0, 0]];
+        yield 'a prompt of zero beside cache counts of zero' => [new TokenUsage(promptTokens: 0, completionTokens: 40, cacheCreationTokens: 0, cacheReadTokens: 0), [self::ESTIMATED_INPUT_TOKENS, 40, 0, 0]];
+    }
+
+    /**
+     * @param array{int, int, int, int} $expectedTokens input, output, cache read, cache creation
+     *
+     * @throws NegativeTokenCountException
+     */
+    #[DataProvider('uncachedInputOfZeroCases')]
+    public function test_it_books_an_input_of_zero_when_the_cache_counts_account_for_the_prompt(TokenUsage $tokenUsage, array $expectedTokens): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage), self::ESTIMATED_INPUT_TOKENS));
+    }
+
+    /** @return iterable<string, array{TokenUsage, array{int, int, int, int}}> */
+    public static function uncachedInputOfZeroCases(): iterable
+    {
+        yield 'a prompt read entirely from the cache and counted apart' => [new TokenUsage(promptTokens: 0, completionTokens: 200, cacheReadTokens: 9000), [0, 200, 9000, 0]];
+        yield 'a prompt written entirely to the cache and counted apart' => [new TokenUsage(promptTokens: 0, completionTokens: 200, cacheCreationTokens: 9000, cacheReadTokens: 0), [0, 200, 0, 9000]];
+        yield 'a prompt of one token' => [new TokenUsage(promptTokens: 1, completionTokens: 200), [1, 200, 0, 0]];
+    }
+
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_books_the_estimated_input_tokens_beside_the_completion_the_provider_reported(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platformResultExtractor = new PlatformResultExtractor($tokenUsageRecorder);
+
+        $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage(new TokenUsage(completionTokens: 40)), 1234);
+
+        self::assertSame([1234, 40, 0, 0], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens(), $tokenUsageRecorder->snapshot()->cacheReadTokens(), $tokenUsageRecorder->snapshot()->cacheCreationTokens()]);
+    }
+
+    /**
+     * @throws NegativeTokenCountException
+     */
+    public function test_it_says_in_the_debug_log_that_the_input_it_books_is_estimated_because_the_usage_has_no_prompt_tokens(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('debug')
+            ->with('The provider reported no prompt tokens for an answer; its input is booked at the estimated input tokens, since the provider bills the request it accepted', ['estimated_input_tokens' => 1234]);
+
+        (new PlatformResultExtractor(null, $logger))->extractTokens($this->deferredResultWithTokenUsage(new TokenUsage(promptTokens: 0, completionTokens: 40)), 1234);
+    }
+
+    /**
      * @throws NegativeTokenCountException
      */
     public function test_it_says_in_the_debug_log_that_the_usage_it_books_is_estimated(): void

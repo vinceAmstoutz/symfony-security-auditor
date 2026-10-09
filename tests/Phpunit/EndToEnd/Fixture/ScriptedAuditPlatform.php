@@ -256,7 +256,7 @@ final class ScriptedAuditPlatform implements PlatformInterface
         );
 
         $deferredResult = new DeferredResult(new PlainConverter($result), $rawResult, $options);
-        $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 0, completionTokens: 0));
+        $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 1, completionTokens: 0));
 
         return $deferredResult;
     }

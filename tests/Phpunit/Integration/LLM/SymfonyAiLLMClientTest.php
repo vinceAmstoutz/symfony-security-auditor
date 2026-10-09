@@ -1927,7 +1927,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_complete_returns_zero_tokens_when_token_usage_prompt_and_completion_are_null(): void
+    public function test_complete_books_the_estimated_input_tokens_when_token_usage_prompt_and_completion_are_null(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
         $platform = $this->scriptedPlatformWithTokenUsage(
@@ -1936,14 +1936,15 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             new PlatformBinding($platform, 'm', new NullLogger()),
+            new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(100)),
             platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
 
-        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(200, $llmResponse->inputTokens());
         self::assertSame(0, $llmResponse->outputTokens());
-        self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+        self::assertSame(200, $tokenUsageRecorder->snapshot()->totalTokens());
     }
 
     /**
