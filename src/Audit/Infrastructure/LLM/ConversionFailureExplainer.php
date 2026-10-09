@@ -30,7 +30,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unco
  * API — says it was cut off, so asking again would hit the same limit. A
  * gateway refusing a request as too large answers HTTP 413, often with an
  * HTML page the bridges cannot decode (`Syntax error`), so its status is read
- * too. Only the failure to convert that very answer is read against it.
+ * too. Any other HTTP client error is a refusal as well, whatever its body:
+ * a gateway's `{"detail":"Not Found"}` reads as `Response does not contain
+ * choices.`, which would pass for a model that answered with nothing. Only
+ * the failure to convert that very answer is read against it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -44,19 +47,41 @@ final readonly class ConversionFailureExplainer
 
     private const int PAYLOAD_TOO_LARGE_STATUS = 413;
 
+    private const int FIRST_CLIENT_ERROR_STATUS = 400;
+
+    private const int LAST_CLIENT_ERROR_STATUS = 499;
+
+    /** @var list<int> */
+    private const array RETRIED_CLIENT_ERROR_STATUSES = [408, 425, 429];
+
     public function explain(Throwable $throwable, ?DeferredResult $deferredResult): Throwable
     {
         if (!$deferredResult instanceof DeferredResult || !$this->isConversionFailure($throwable, $deferredResult)) {
             return $throwable;
         }
 
-        if (self::PAYLOAD_TOO_LARGE_STATUS === $this->statusCode($deferredResult)) {
+        $status = $this->statusCode($deferredResult);
+        if (self::PAYLOAD_TOO_LARGE_STATUS === $status) {
             return UnconvertedAnswerException::refusedAsTooLarge($throwable);
         }
 
         $stopReason = $this->stopReasonOf($this->rawAnswer($deferredResult));
+        if (null !== $stopReason) {
+            return UnconvertedAnswerException::cutShort($throwable, $stopReason);
+        }
 
-        return null === $stopReason ? $throwable : UnconvertedAnswerException::cutShort($throwable, $stopReason);
+        return $this->isRefusal($status) ? UnconvertedAnswerException::refusedWithStatus($throwable, $status) : $throwable;
+    }
+
+    /**
+     * @phpstan-assert-if-true int $status
+     */
+    private function isRefusal(?int $status): bool
+    {
+        return null !== $status
+            && $status >= self::FIRST_CLIENT_ERROR_STATUS
+            && $status <= self::LAST_CLIENT_ERROR_STATUS
+            && !\in_array($status, self::RETRIED_CLIENT_ERROR_STATUSES, true);
     }
 
     private function isConversionFailure(Throwable $throwable, DeferredResult $deferredResult): bool

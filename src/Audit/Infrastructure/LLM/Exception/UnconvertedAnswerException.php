@@ -20,8 +20,9 @@ use Throwable;
  * An answer the provider delivered but its bridge failed to convert, as its
  * raw answer shows it: cut short, which `$stopReason` names the way
  * `LLMResponse` does (`length`, `content-filter`), keeping the bridge's
- * message; or a request refused as too large with an HTTP 413, whose body the
- * bridge could not make sense of.
+ * message; a request refused as too large with an HTTP 413, whose body the
+ * bridge could not make sense of; or a request refused with any other HTTP
+ * client error, whose body the bridge read as an empty answer.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -44,5 +45,10 @@ final class UnconvertedAnswerException extends RuntimeException
     public static function refusedAsTooLarge(Throwable $throwable): self
     {
         return new self(\sprintf('The provider refused the request as too large (HTTP 413): %s', $throwable->getMessage()), $throwable, refusedAsTooLarge: true);
+    }
+
+    public static function refusedWithStatus(Throwable $throwable, int $status): self
+    {
+        return new self(\sprintf('The provider refused the request (HTTP %d): %s', $status, $throwable->getMessage()), $throwable);
     }
 }
