@@ -19,7 +19,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandDefaults;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidMinScoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 
@@ -477,17 +476,14 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->assertNoConflictingOptions();
     }
 
-    /**
-     * @throws InvalidMinScoreException
-     */
     #[DataProvider('scoresWithinTheRange')]
-    public function test_assert_min_score_in_range_allows_a_score_from_zero_to_one_hundred(?int $minScore): void
+    public function test_a_score_from_zero_to_one_hundred_is_neither_below_nor_above_the_range(?int $minScore): void
     {
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->minScore = $minScore;
 
-        $auditCommandInput->assertMinScoreInRange();
-
+        self::assertNull($auditCommandInput->minScoreBelowRange());
+        self::assertNull($auditCommandInput->minScoreAboveRange());
         self::assertSame($minScore, $auditCommandInput->minScore);
     }
 
@@ -502,28 +498,42 @@ final class AuditCommandInputTest extends TestCase
         yield 'the ceiling' => [100];
     }
 
-    /**
-     * @throws InvalidMinScoreException
-     */
-    #[DataProvider('scoresOutsideTheRange')]
-    public function test_assert_min_score_in_range_rejects_a_score_the_normalized_range_cannot_hold(int $minScore): void
+    #[DataProvider('scoresBelowTheRange')]
+    public function test_a_score_below_zero_is_returned_as_below_the_range_and_kept(int $minScore): void
     {
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->minScore = $minScore;
 
-        $this->expectException(InvalidMinScoreException::class);
-        $this->expectExceptionMessage(\sprintf('--min-score must be between 0 and 100, got %d.', $minScore));
-
-        $auditCommandInput->assertMinScoreInRange();
+        self::assertSame($minScore, $auditCommandInput->minScoreBelowRange());
+        self::assertNull($auditCommandInput->minScoreAboveRange());
+        self::assertSame($minScore, $auditCommandInput->minScore);
     }
 
     /**
      * @return iterable<string, array{int}>
      */
-    public static function scoresOutsideTheRange(): iterable
+    public static function scoresBelowTheRange(): iterable
     {
         yield 'just below the floor' => [-1];
         yield 'far below the floor' => [-50];
+    }
+
+    #[DataProvider('scoresAboveTheRange')]
+    public function test_a_score_above_one_hundred_is_returned_as_above_the_range_and_kept(int $minScore): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->minScore = $minScore;
+
+        self::assertSame($minScore, $auditCommandInput->minScoreAboveRange());
+        self::assertNull($auditCommandInput->minScoreBelowRange());
+        self::assertSame($minScore, $auditCommandInput->minScore);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function scoresAboveTheRange(): iterable
+    {
         yield 'just above the ceiling' => [101];
         yield 'far above the ceiling' => [150];
     }

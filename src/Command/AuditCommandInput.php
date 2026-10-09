@@ -20,7 +20,6 @@ use Symfony\Component\String\AbstractString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\PathText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidMinScoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 use function Symfony\Component\String\u;
@@ -188,16 +187,21 @@ final class AuditCommandInput
 
     /**
      * `--min-score` gates on the normalized score, which only spans 0 to 100: a
-     * value outside it fails every run or gates none, so it is refused rather
-     * than silently honored.
-     *
-     * @throws InvalidMinScoreException
+     * value below it gates none. It is honored all the same, as it always was,
+     * so the caller says so instead of refusing it.
      */
-    public function assertMinScoreInRange(): void
+    public function minScoreBelowRange(): ?int
     {
-        if (null !== $this->minScore && ($this->minScore < self::LOWEST_MIN_SCORE || $this->minScore > self::HIGHEST_MIN_SCORE)) {
-            throw InvalidMinScoreException::forScoreOutsideRange($this->minScore, self::LOWEST_MIN_SCORE, self::HIGHEST_MIN_SCORE);
-        }
+        return null !== $this->minScore && $this->minScore < self::LOWEST_MIN_SCORE ? $this->minScore : null;
+    }
+
+    /**
+     * A value above the normalized score range fails every run, and is honored
+     * as such.
+     */
+    public function minScoreAboveRange(): ?int
+    {
+        return null !== $this->minScore && $this->minScore > self::HIGHEST_MIN_SCORE ? $this->minScore : null;
     }
 
     /**

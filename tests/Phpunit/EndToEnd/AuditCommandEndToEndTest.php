@@ -990,6 +990,82 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    #[DataProvider('minScoresOutsideTheNormalizedRange')]
+    public function test_cli_min_score_outside_the_normalized_range_still_gates_the_run_and_warns(string $minScore, int $expectedExitCode, string $expectedWarning): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--min-score' => $minScore,
+        ]);
+
+        $display = preg_replace('/\s+/', ' ', str_replace('!', '', $commandTester->getDisplay())) ?? '';
+        self::assertSame($expectedExitCode, $commandTester->getStatusCode());
+        self::assertStringContainsString(\sprintf('--min-score %s %s', $minScore, $expectedWarning), $display);
+        self::assertStringContainsString('Use a value from 0 to 100.', $display);
+        self::assertStringContainsString('Running audit pipeline', $display);
+    }
+
+    /**
+     * @return iterable<string, array{string, int, string}>
+     */
+    public static function minScoresOutsideTheNormalizedRange(): iterable
+    {
+        yield 'just below the floor never gates' => ['-1', Command::SUCCESS, 'is below 0, the lowest normalized score, so it never fails a run.'];
+        yield 'far below the floor never gates' => ['-50', Command::SUCCESS, 'is below 0, the lowest normalized score, so it never fails a run.'];
+        yield 'just above the ceiling always gates' => ['101', Command::FAILURE, 'is above 100, the highest normalized score, so it fails every run.'];
+        yield 'far above the ceiling always gates' => ['150', Command::FAILURE, 'is above 100, the highest normalized score, so it fails every run.'];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('minScoresOutsideTheNormalizedRange')]
+    public function test_cli_min_score_outside_the_normalized_range_warns_on_standard_error(string $minScore, int $expectedExitCode, string $expectedWarning): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--min-score' => $minScore], ['capture_stderr_separately' => true]);
+
+        self::assertSame($expectedExitCode, $commandTester->getStatusCode());
+        self::assertStringContainsString(\sprintf('--min-score %s %s', $minScore, $expectedWarning), preg_replace('/\s+/', ' ', str_replace('!', '', $commandTester->getErrorOutput())) ?? '');
+        self::assertStringNotContainsString('--min-score', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('minScoresWithinTheNormalizedRange')]
+    public function test_cli_min_score_within_the_normalized_range_runs_without_a_warning(string $minScore): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--min-score' => $minScore,
+        ]);
+
+        self::assertStringContainsString('Running audit pipeline', $commandTester->getDisplay());
+        self::assertStringNotContainsString('--min-score', $commandTester->getDisplay());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function minScoresWithinTheNormalizedRange(): iterable
+    {
+        yield 'the floor' => ['0'];
+        yield 'a middle score' => ['50'];
+        yield 'the ceiling' => ['100'];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_excluded_type_is_dropped_from_report_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();

@@ -66,6 +66,18 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     #[Override]
+    public function minScoreBelowRange(SymfonyStyle $symfonyStyle, int $minScore): void
+    {
+        $symfonyStyle->getErrorStyle()->warning(\sprintf('--min-score %d is below 0, the lowest normalized score, so it never fails a run. Use a value from 0 to 100.', $minScore));
+    }
+
+    #[Override]
+    public function minScoreAboveRange(SymfonyStyle $symfonyStyle, int $minScore): void
+    {
+        $symfonyStyle->getErrorStyle()->warning(\sprintf('--min-score %d is above 100, the highest normalized score, so it fails every run. Use a value from 0 to 100.', $minScore));
+    }
+
+    #[Override]
     public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void
     {
         $unsupportedModels = $this->unsupportedModels($auditReport->cost());

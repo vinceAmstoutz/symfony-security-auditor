@@ -495,6 +495,32 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('second notice about batching', $flattened);
     }
 
+    public function test_min_score_below_range_says_the_value_never_fails_a_run(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->minScoreBelowRange($symfonyStyle, -7);
+
+        self::assertStringContainsString(
+            '--min-score -7 is below 0, the lowest normalized score, so it never fails a run. Use a value from 0 to 100.',
+            preg_replace('/\s+/', ' ', str_replace('!', '', $bufferedOutput->fetch())) ?? '',
+        );
+    }
+
+    public function test_min_score_above_range_says_the_value_fails_every_run(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->minScoreAboveRange($symfonyStyle, 101);
+
+        self::assertStringContainsString(
+            '--min-score 101 is above 100, the highest normalized score, so it fails every run. Use a value from 0 to 100.',
+            preg_replace('/\s+/', ' ', str_replace('!', '', $bufferedOutput->fetch())) ?? '',
+        );
+    }
+
     public function test_baseline_generated_reports_the_path_and_count(): void
     {
         $bufferedOutput = new BufferedOutput();

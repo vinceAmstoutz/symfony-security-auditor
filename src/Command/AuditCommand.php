@@ -106,8 +106,22 @@ final readonly class AuditCommand
         }
 
         $this->auditPresenter->preflightWarnings($displayStyle, $this->secretScrubbingEnabled, $this->configNotices);
+        $this->warnAboutMinScoreOutsideRange($displayStyle, $auditCommandInput);
 
         return $this->runAuditFlow($input, $symfonyStyle, $auditCommandInput, $projectPath, $scanPaths);
+    }
+
+    private function warnAboutMinScoreOutsideRange(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): void
+    {
+        $belowRange = $auditCommandInput->minScoreBelowRange();
+        if (null !== $belowRange) {
+            $this->auditPresenter->minScoreBelowRange($symfonyStyle, $belowRange);
+        }
+
+        $aboveRange = $auditCommandInput->minScoreAboveRange();
+        if (null !== $aboveRange) {
+            $this->auditPresenter->minScoreAboveRange($symfonyStyle, $aboveRange);
+        }
     }
 
     /**
@@ -141,7 +155,6 @@ final readonly class AuditCommand
         try {
             try {
                 $auditCommandInput->assertNoConflictingOptions();
-                $auditCommandInput->assertMinScoreInRange();
                 $this->assertOutputsWritable($auditCommandInput, $projectPath);
 
                 if ($auditCommandInput->showScanned) {
