@@ -74,6 +74,10 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
 {
     public const int DEFAULT_TIMEOUT_SECONDS = 60;
 
+    private const int UNKNOWN_REF_EXIT_CODE = 1;
+
+    private const string NOT_A_REPOSITORY = 'not a git repository';
+
     /**
      * @param ?Closure(list<string>, string): Process $gitDiffProcessFactory defaults to a plain `new Process(...)`; tests inject a stub to make a `git diff` call deterministically slow
      */
@@ -110,33 +114,61 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      */
     private function isInsideGitTree(string $projectPath): bool
     {
-        $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $projectPath);
+        $process = $this->revParse($projectPath, ['--is-inside-work-tree'], \sprintf('determine whether "%s" is a git working tree', $projectPath));
 
-        try {
-            $process->setTimeout($this->timeoutSeconds);
-            $process->run();
-        } catch (ExceptionInterface $exception) {
-            throw GitChangedFilesUnavailableException::forProcessFailure(\sprintf('determine whether "%s" is a git working tree', $projectPath), $exception);
-        }
-
-        return $process->isSuccessful() && 'true' === u($process->getOutput())->trim()->toString();
+        return $this->gitAnswered($process, $projectPath) && 'true' === u($process->getOutput())->trim()->toString();
     }
 
     /**
+     * `--verify --quiet` exits 1 for a ref that names no object; any other
+     * failure is git refusing the repository, not the ref.
+     *
      * @throws GitChangedFilesUnavailableException
      */
     private function refExists(string $projectPath, string $ref): bool
     {
-        $process = new Process(['git', 'rev-parse', '--verify', '--quiet', $ref], $projectPath);
+        $process = $this->revParse($projectPath, ['--verify', '--quiet', $ref], \sprintf('verify git ref "%s"', $ref));
+
+        return self::UNKNOWN_REF_EXIT_CODE !== $process->getExitCode() && $this->gitAnswered($process, $projectPath);
+    }
+
+    /**
+     * False when git found no repository at all; a failure for any other
+     * reason — a repository owned by another user, one it cannot read —
+     * carries git's own message.
+     *
+     * @throws GitChangedFilesUnavailableException
+     */
+    private function gitAnswered(Process $process, string $projectPath): bool
+    {
+        if ($process->isSuccessful()) {
+            return true;
+        }
+
+        if (str_contains($process->getErrorOutput(), self::NOT_A_REPOSITORY)) {
+            return false;
+        }
+
+        throw GitChangedFilesUnavailableException::forRefusedRepository($projectPath, $process->getErrorOutput());
+    }
+
+    /**
+     * @param list<string> $argv
+     *
+     * @throws GitChangedFilesUnavailableException
+     */
+    private function revParse(string $projectPath, array $argv, string $operation): Process
+    {
+        $process = new Process(['git', 'rev-parse', ...$argv], $projectPath);
 
         try {
             $process->setTimeout($this->timeoutSeconds);
             $process->run();
         } catch (ExceptionInterface $exception) {
-            throw GitChangedFilesUnavailableException::forProcessFailure(\sprintf('verify git ref "%s"', $ref), $exception);
+            throw GitChangedFilesUnavailableException::forProcessFailure($operation, $exception);
         }
 
-        return $process->isSuccessful();
+        return $process;
     }
 
     /**

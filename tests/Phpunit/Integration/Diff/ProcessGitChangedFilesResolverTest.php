@@ -288,6 +288,41 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
+     * Git refuses a repository it considers unsafe — owned by another user, or
+     * using an extension it does not know — with its own reason and exit code
+     * 128: that reason, not a claim that the ref is missing, is what the user
+     * has to act on.
+     *
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_surfaces_the_reason_git_refuses_the_repository_instead_of_blaming_the_ref(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+        $this->makeGitRefuseTheRepository();
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessageMatches('/^Git refused the repository of "'.preg_quote($this->tmpDir, '/').'": .*foobar/s');
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_surfaces_the_reason_git_refuses_the_repository_of_an_audited_subdirectory(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+        $this->makeGitRefuseTheRepository();
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessageMatches('/^Git refused the repository of "'.preg_quote($this->tmpDir.'/src', '/').'": .*foobar/s');
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'main');
+    }
+
+    /**
      * @throws GitChangedFilesUnavailableException
      */
     public function test_it_throws_for_a_path_inside_the_git_directory_not_the_work_tree(): void
@@ -508,6 +543,12 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->writeFile($relativePath, $content);
         $this->stage($relativePath);
         $this->runGit(['git', 'commit', '-m', $message]);
+    }
+
+    private function makeGitRefuseTheRepository(): void
+    {
+        $this->runGit(['git', 'config', 'extensions.foobar', 'true']);
+        $this->runGit(['git', 'config', 'core.repositoryformatversion', '1']);
     }
 
     private function createBranch(string $name): void
