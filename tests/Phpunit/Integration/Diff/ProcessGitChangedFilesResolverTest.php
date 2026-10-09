@@ -358,6 +358,38 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_lists_the_changed_files_although_a_file_is_named_head(): void
+    {
+        $this->initRepo();
+        $this->commit('src/A.php', '<?php', 'init');
+        $this->createBranch('feature');
+        $this->commit('HEAD', '', 'add a file named like the head');
+        $this->commit('src/B.php', '<?php', 'add b');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertSame(['HEAD', 'src/B.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_lists_the_changed_files_although_a_file_is_named_like_the_revision_range(): void
+    {
+        $this->initRepo();
+        $this->commit('src/A.php', '<?php', 'init');
+        $this->createBranch('feature');
+        $this->commit('main...HEAD', '', 'add a file named like the range');
+        $this->commit('src/B.php', '<?php', 'add b');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertSame(['main...HEAD', 'src/B.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_wraps_a_process_setup_failure_while_verifying_the_ref(): void
     {
         $this->initRepo();

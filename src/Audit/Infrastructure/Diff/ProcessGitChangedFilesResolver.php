@@ -185,13 +185,15 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      * control characters alike — `core.quotepath=off` alone only covers the former.
      * `core.fsmonitor=` neutralizes the audited (untrusted) repo's own local config:
      * otherwise a hostile `core.fsmonitor` hook set in its `.git/config` runs as an
-     * arbitrary command on this working-tree comparison.
+     * arbitrary command on this working-tree comparison. `--` ends the revisions: a
+     * file of the audited repo named `HEAD` or `main...HEAD` would otherwise make git
+     * refuse the argument as both a revision and a filename.
      *
      * @param list<string> $argv
      */
     private function buildDefaultGitDiffProcess(array $argv, string $projectPath): Process
     {
-        return new Process(['git', '-c', 'core.quotepath=off', '-c', 'core.fsmonitor=', ...$argv, '-z'], $projectPath);
+        return new Process(['git', '-c', 'core.quotepath=off', '-c', 'core.fsmonitor=', ...$argv, '-z', '--'], $projectPath);
     }
 
     /**
