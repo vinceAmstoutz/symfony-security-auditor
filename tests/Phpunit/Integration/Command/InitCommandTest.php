@@ -223,6 +223,79 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_drops_the_models_bound_to_the_previous_provider_when_it_switches_provider(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
+
+        $this->commandTester()->execute(
+            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'openai',
+                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
+                'model' => 'gpt-5.4',
+                'audit' => ['escalation' => ['enabled' => true], 'budget' => ['max_cost_usd' => 5.0]],
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_names_the_models_it_dropped_when_it_switches_provider(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
+
+        $commandTester = $this->commandTester();
+        $commandTester->execute(
+            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString(
+            'Removed attacker_model, reviewer_model, audit.escalation.cheap_model: they named models of the previous provider, not of "openai". Set them again to split the models.',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_shows_the_provider_it_switched_to_as_written_when_it_names_the_models_it_dropped(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
+
+        $commandTester = $this->commandTester();
+        $commandTester->execute(
+            ['--provider' => 'generic.x<info>y', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example', '--force' => true],
+            ['interactive' => false],
+        );
+
+        self::assertStringContainsString('not of "generic.x<info>y"', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_keeps_the_models_when_the_provider_is_unchanged(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
+
+        $commandTester = $this->commandTester();
+        $commandTester->execute(
+            ['--provider' => 'anthropic', '--model' => 'claude-opus-4-8', '--force' => true],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            [
+                'provider' => 'anthropic',
+                'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']],
+                'model' => 'claude-opus-4-8',
+                'attacker_model' => 'claude-opus-4-8',
+                'reviewer_model' => 'claude-haiku-4-5',
+                'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'claude-haiku-4-5'], 'budget' => ['max_cost_usd' => 5.0]],
+            ],
+            Yaml::parseFile($this->configFile()),
+        );
+        self::assertStringNotContainsString('Removed', $this->unwrappedDisplay($commandTester));
+    }
+
     public function test_it_rebuilds_the_bridge_of_a_configured_machine_under_no_interaction_when_forced(): void
     {
         (new Filesystem())->dumpFile($this->configFile(), "provider: ollama\nplatform:\n    ollama: { endpoint: 'http://localhost:11434' }\nmodel: llama3.2\n");
@@ -1763,6 +1836,11 @@ final class InitCommandTest extends TestCase
         );
 
         return new CommandTester($initCommand);
+    }
+
+    private function anthropicConfigurationWithSplitModels(): string
+    {
+        return "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: claude-opus-4-8\nattacker_model: claude-opus-4-8\nreviewer_model: claude-haiku-4-5\naudit:\n    escalation:\n        enabled: true\n        cheap_model: claude-haiku-4-5\n    budget:\n        max_cost_usd: 5.0\n";
     }
 
     private function unwrappedDisplay(CommandTester $commandTester): string
