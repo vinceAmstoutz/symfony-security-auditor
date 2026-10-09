@@ -190,7 +190,7 @@ final class EstimateAuditCostUseCasePromptOverheadTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
-    public function test_a_path_does_not_scan_the_configured_files_when_no_mapping_is_priced(): void
+    public function test_a_path_the_configured_scope_does_not_reach_is_scanned_after_the_configured_files_when_no_mapping_is_priced(): void
     {
         $recordingScopedScanner = new RecordingScopedScanner(
             [$this->file('config/packages/security.yaml', 'yaml')],
@@ -207,7 +207,7 @@ final class EstimateAuditCostUseCasePromptOverheadTest extends TestCase
 
         $estimateAuditCostUseCase->execute($this->projectDir, ['src/Controller']);
 
-        self::assertSame([['scanWithin', ['src/Controller']]], $recordingScopedScanner->calls);
+        self::assertSame([['scan', null], ['scanWithin', ['src/Controller']]], $recordingScopedScanner->calls);
     }
 
     /**

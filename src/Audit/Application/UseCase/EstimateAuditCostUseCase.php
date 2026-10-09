@@ -109,10 +109,10 @@ final readonly class EstimateAuditCostUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative subdirectories
-     *                                   to restrict the estimate to; empty list
-     *                                   (the default) estimates over the whole
-     *                                   project
+     * @param list<string> $scanPaths    optional project-relative paths to narrow
+     *                                   the estimate to, as a run does; empty list
+     *                                   (the default) estimates over the configured
+     *                                   scan surface
      * @param ?string      $diffSinceRef when set, mirrors `IngestionStage` by
      *                                   narrowing the estimate to files changed
      *                                   against this git ref, matching what an
@@ -128,7 +128,8 @@ final readonly class EstimateAuditCostUseCase
         $auditContext = AuditContext::forProject($projectPath, $scanPaths, diffSinceRef: $diffSinceRef);
         $auditContext->markAsCostEstimate();
 
-        $scannedFiles = ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths);
+        $scopedScanResult = ScopedScan::resolve($this->projectFileScanner, $projectPath, $scanPaths);
+        $scannedFiles = $scopedScanResult->audited->files;
         $files = $scannedFiles;
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             $files = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
@@ -143,7 +144,7 @@ final readonly class EstimateAuditCostUseCase
         }
 
         $chunks = $this->fileChunker->chunk($files);
-        $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scanPaths, $scannedFiles));
+        $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scopedScanResult->mappingFiles));
 
         if ($this->toolsEnabled) {
             $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * $this->toolRoundTripMultiplier());
@@ -230,19 +231,18 @@ final readonly class EstimateAuditCostUseCase
      * it scanned, however a git diff then narrows the files to audit, and the
      * configured scope besides when `--path` narrows the scan.
      *
-     * @param list<string>      $scanPaths    as given on the command line
-     * @param list<ProjectFile> $scannedFiles
+     * @param list<ProjectFile> $mappingFiles
      *
      * @throws InvalidAuditContextException
      */
-    private function mappingPromptTokens(string $projectPath, array $scanPaths, array $scannedFiles): int
+    private function mappingPromptTokens(string $projectPath, array $mappingFiles): int
     {
         if (!$this->attackerPromptBuilder instanceof AttackerPromptBuilderInterface || !$this->mappingStage instanceof StageInterface) {
             return 0;
         }
 
         $auditContext = AuditContext::forProject($projectPath);
-        $auditContext->setMappingFiles(ScopedScan::mappingFiles($this->projectFileScanner, $projectPath, $scanPaths, $scannedFiles));
+        $auditContext->setMappingFiles($mappingFiles);
 
         $this->mappingStage->process($auditContext);
         $symfonyMapping = $auditContext->mapping();

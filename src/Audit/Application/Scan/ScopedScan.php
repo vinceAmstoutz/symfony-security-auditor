@@ -13,15 +13,19 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
 /**
  * The files a run covers, given its `--path` values. Without a path it is the
- * configured scan surface. With paths, a command line flag wins over the
- * configuration: a scanner that can be told where to look scans exactly those
- * paths, and one that cannot has its result narrowed to them, as before.
+ * configured scan surface. With paths, it is the part of that surface under
+ * them, and nothing else: a path only narrows what `scan.included_paths`
+ * reaches. Only when no file of the configured surface lies under any of the
+ * paths — a monorepo folder the configuration leaves out — are the paths
+ * scanned themselves, by a scanner that can be told where to look, so a run
+ * that would find nothing audits what was asked for.
  * The files the Symfony mapping is read from are a wider set: `--path` only
  * narrows what is audited, so the configured scope still supplies the security
  * configuration, voters and forms that decide how each audited route is guarded.
@@ -32,41 +36,48 @@ final readonly class ScopedScan
 {
     /**
      * @param list<string> $scanPaths as given on the command line
-     *
-     * @return list<ProjectFile>
      */
-    public static function files(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $scanPaths): array
+    public static function resolve(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $scanPaths): ScopedScanResult
     {
+        $configured = self::configured($projectFileScanner, $projectPath);
         $paths = ScanPathFilter::normalize($scanPaths);
 
         if ([] === $paths) {
-            return $projectFileScanner->scan($projectPath);
+            return new ScopedScanResult($configured, $configured->files);
         }
 
-        if ($projectFileScanner instanceof ScopedProjectFileScannerInterface) {
-            return $projectFileScanner->scanWithin($projectPath, $paths);
+        $narrowed = ScanPathFilter::apply($configured->files, $paths);
+        if ([] !== $narrowed) {
+            return new ScopedScanResult(new ProjectFileScan($narrowed, $configured->skippedFiles), $configured->files);
         }
 
-        return ScanPathFilter::apply($projectFileScanner->scan($projectPath), $paths);
+        $within = self::within($projectFileScanner, $projectPath, $paths);
+
+        return new ScopedScanResult($within, [...$configured->files, ...$within->files]);
+    }
+
+    private static function configured(ProjectFileScannerInterface $projectFileScanner, string $projectPath): ProjectFileScan
+    {
+        if ($projectFileScanner instanceof SkippedFileReportingProjectFileScannerInterface) {
+            return $projectFileScanner->scanReportingSkippedFiles($projectPath);
+        }
+
+        return new ProjectFileScan($projectFileScanner->scan($projectPath), []);
     }
 
     /**
-     * @param list<string>      $scanPaths   as given on the command line
-     * @param list<ProjectFile> $scopedFiles what {@see self::files()} returned for the same paths
-     *
-     * @return list<ProjectFile>
+     * @param non-empty-list<string> $paths
      */
-    public static function mappingFiles(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $scanPaths, array $scopedFiles): array
+    private static function within(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $paths): ProjectFileScan
     {
-        if ([] === ScanPathFilter::normalize($scanPaths)) {
-            return $scopedFiles;
+        if ($projectFileScanner instanceof SkippedFileReportingProjectFileScannerInterface) {
+            return $projectFileScanner->scanReportingSkippedFiles($projectPath, $paths);
         }
 
-        $byRelativePath = [];
-        foreach ([...$projectFileScanner->scan($projectPath), ...$scopedFiles] as $file) {
-            $byRelativePath[$file->relativePath()] ??= $file;
+        if ($projectFileScanner instanceof ScopedProjectFileScannerInterface) {
+            return new ProjectFileScan($projectFileScanner->scanWithin($projectPath, $paths), []);
         }
 
-        return array_values($byRelativePath);
+        return new ProjectFileScan([], []);
     }
 }

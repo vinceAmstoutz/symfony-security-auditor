@@ -44,9 +44,13 @@ final readonly class RunAuditUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths            optional project-relative subdirectories
-     *                                           to restrict the scan to; empty list (the
-     *                                           default) audits the whole project
+     * @param list<string> $scanPaths            optional project-relative paths to narrow
+     *                                           the scan to: the files of the configured
+     *                                           scan surface under them are audited and no
+     *                                           others, and only when it holds nothing
+     *                                           under any of them are the paths scanned
+     *                                           themselves; empty list (the default)
+     *                                           audits the configured scan surface
      * @param bool         $bypassCache          when true, agents skip the attacker and
      *                                           reviewer caches entirely (no reads, no
      *                                           writes)

@@ -20,12 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class IngestionStage implements StageInterface
@@ -53,7 +51,8 @@ final readonly class IngestionStage implements StageInterface
             'path' => $auditContext->projectPath(),
         ]);
 
-        $projectFileScan = $this->scanProject($auditContext->projectPath(), $auditContext->scanPaths());
+        $scopedScanResult = ScopedScan::resolve($this->projectFileScanner, $auditContext->projectPath(), $auditContext->scanPaths());
+        $projectFileScan = $scopedScanResult->audited;
         $scannedFiles = $projectFileScan->files;
 
         $changed = $this->changedFiles($auditContext);
@@ -67,7 +66,7 @@ final readonly class IngestionStage implements StageInterface
 
         $auditContext->setProjectFiles($files);
         $auditContext->setFilesDiscovered(\count($scannedFiles));
-        $auditContext->setMappingFiles(ScopedScan::mappingFiles($this->projectFileScanner, $auditContext->projectPath(), $auditContext->scanPaths(), $scannedFiles));
+        $auditContext->setMappingFiles($scopedScanResult->mappingFiles);
         $this->recordWithheldFiles($files, $auditContext);
         $this->recordSkippedFiles($projectFileScan->skippedFiles, $auditContext, $changed);
         $auditContext->setMeta('ingestion.file_count', \count($files));
@@ -97,18 +96,6 @@ final readonly class IngestionStage implements StageInterface
                 $this->logger->warning('Secret scrubbing could not scan a file, so its content was withheld and the file is not analyzed', ['file' => $file->relativePath()]);
             }
         }
-    }
-
-    /**
-     * @param list<string> $scanPaths as given on the command line
-     */
-    private function scanProject(string $projectPath, array $scanPaths): ProjectFileScan
-    {
-        if ($this->projectFileScanner instanceof SkippedFileReportingProjectFileScannerInterface) {
-            return $this->projectFileScanner->scanReportingSkippedFiles($projectPath, ScanPathFilter::normalize($scanPaths));
-        }
-
-        return new ProjectFileScan(ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths), []);
     }
 
     /**

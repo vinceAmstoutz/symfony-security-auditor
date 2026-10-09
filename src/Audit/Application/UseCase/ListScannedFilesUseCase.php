@@ -35,10 +35,9 @@ final readonly class ListScannedFilesUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative paths to list
-     *                                   instead of the configured scan surface;
-     *                                   empty list (the default) lists every
-     *                                   scanned file
+     * @param list<string> $scanPaths    optional project-relative paths to narrow
+     *                                   the listing to, as a run does; empty list
+     *                                   (the default) lists every scanned file
      * @param ?string      $diffSinceRef when set, mirrors `EstimateAuditCostUseCase`/
      *                                   `IngestionStage` by narrowing the listing to
      *                                   files changed against this git ref, matching
@@ -48,7 +47,7 @@ final readonly class ListScannedFilesUseCase
      */
     public function execute(string $projectPath, array $scanPaths = [], ?string $diffSinceRef = null): array
     {
-        $files = ScopedScan::files($this->projectFileScanner, $projectPath, $scanPaths);
+        $files = ScopedScan::resolve($this->projectFileScanner, $projectPath, $scanPaths)->audited->files;
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             return $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
         }

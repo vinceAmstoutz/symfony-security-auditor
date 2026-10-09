@@ -45,7 +45,7 @@ final class ListScannedFilesUseCaseTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_scan_paths_replace_the_configured_scan_for_a_scanner_that_can_take_them(): void
+    public function test_lists_a_scan_path_the_configured_scan_does_not_reach_for_a_scanner_that_can_take_it(): void
     {
         $recordingScopedScanner = new RecordingScopedScanner(
             [$this->makeProjectFile('src/Configured.php')],
@@ -55,7 +55,23 @@ final class ListScannedFilesUseCaseTest extends TestCase
         $files = (new ListScannedFilesUseCase($recordingScopedScanner))->execute('/project', ['apps/api']);
 
         self::assertSame(['apps/api/src/Outside.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
-        self::assertSame([['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
+        self::assertSame([['scan', null], ['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_lists_only_the_configured_files_under_a_scan_path_the_configured_scan_reaches(): void
+    {
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [$this->makeProjectFile('src/Configured.php'), $this->makeProjectFile('config/services.yaml')],
+            [$this->makeProjectFile('src/Configured.php'), $this->makeProjectFile('src/Unconfigured.php')],
+        );
+
+        $files = (new ListScannedFilesUseCase($recordingScopedScanner))->execute('/project', ['src']);
+
+        self::assertSame(['src/Configured.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
+        self::assertSame([['scan', null]], $recordingScopedScanner->calls);
     }
 
     /**

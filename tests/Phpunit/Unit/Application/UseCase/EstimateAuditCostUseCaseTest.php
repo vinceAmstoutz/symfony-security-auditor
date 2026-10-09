@@ -454,19 +454,37 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
-    public function test_scan_paths_replace_the_configured_scan_for_a_scanner_that_can_take_them(): void
+    public function test_a_scan_path_the_configured_scan_does_not_reach_is_estimated_from_a_scanner_that_can_take_it(): void
     {
-        $measuringTokenEstimator = $this->measuringEstimator();
         $recordingScopedScanner = new RecordingScopedScanner(
             [$this->makeProjectFile('src/Configured.php', 'cccccccc')],
             [$this->makeProjectFile('apps/api/src/Outside.php', 'ooo')],
         );
-        $estimateAuditCostUseCase = $this->makeUseCase(['scanner' => $recordingScopedScanner, 'tokenEstimator' => $measuringTokenEstimator]);
+        $estimateAuditCostUseCase = $this->makeUseCase(['scanner' => $recordingScopedScanner, 'tokenEstimator' => $this->lengthEchoingEstimator(), 'maxIterations' => 1]);
 
-        $estimateAuditCostUseCase->execute($this->tmpDir, ['apps/api']);
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir, ['apps/api']);
 
-        self::assertSame(3, $measuringTokenEstimator->lastInputLength);
-        self::assertSame([['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
+        self::assertSame(3, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        self::assertSame([['scan', null], ['scanWithin', ['apps/api']]], $recordingScopedScanner->calls);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_scan_path_the_configured_scan_reaches_is_estimated_from_the_configured_files_under_it(): void
+    {
+        $recordingScopedScanner = new RecordingScopedScanner(
+            [$this->makeProjectFile('src/Configured.php', 'cccccccc'), $this->makeProjectFile('config/services.yaml', 'yy')],
+            [$this->makeProjectFile('src/Configured.php', 'cccccccc'), $this->makeProjectFile('src/Unconfigured.php', 'uuuuuuuuuuuu')],
+        );
+        $estimateAuditCostUseCase = $this->makeUseCase(['scanner' => $recordingScopedScanner, 'tokenEstimator' => $this->lengthEchoingEstimator(), 'maxIterations' => 1]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir, ['src']);
+
+        self::assertSame(8, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        self::assertSame([['scan', null]], $recordingScopedScanner->calls);
     }
 
     /**
