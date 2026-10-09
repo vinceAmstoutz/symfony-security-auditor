@@ -66,6 +66,13 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private const string CREDENTIAL_FREE_DSN_ASSIGNMENT = '(?:[A-Z][A-Z0-9]*_){0,8}DSN(?:_[A-Z0-9]+){0,8}\s*=[ \t]*["\']?[a-z][a-z0-9+.\-]{0,31}:\/\/(?![^\s"\'@?;]{0,256}+[?;][^\s"\'@]{0,256}(?i:auth|key|token|secret|pass|pwd|cred))[^@\s"\']{0,256}+(?:["\']|\s|\z)';
 
+    /**
+     * A user part followed by a colon holds a password. One without a colon is a username on most schemes
+     * (`https://deploy@host`), but the password itself on a Redis or Valkey URL, on a mailer API DSN
+     * (`postmark+api://TOKEN@default`) and on any DSN whose host is `default` (`ntfy://TOKEN@default`).
+     */
+    private const string CONNECTION_URI = '~\b(?|([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+|((?:rediss?|valkeys?|sendgrid|[a-z0-9.\-]{1,31}\+api)://)(?![%$])[^:@/\s]{4,}+|([a-z][a-z0-9+.\-]{0,31}://)(?![%$])[^:@/\s]{4,}+(?=@default\b))@~i';
+
     private const string PRIVATE_KEY_LABEL = '(?:(?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY|PGP PRIVATE KEY BLOCK)';
 
     /**
@@ -159,7 +166,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}(?![0-9A-Za-z_\-])/',
             SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
             SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
-            SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+@~i',
+            SecretPatternLabel::ConnectionUri->value => self::CONNECTION_URI,
             SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?|case\s+)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\r\n])*+(?:\4|(?=\r?$))|\S+)/m', $envCredentialName),
             SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++)?))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS),
             SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', $inlineCredentialKey),
