@@ -57,7 +57,7 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
 
     private function headline(AuditReport $auditReport): string
     {
-        if ($auditReport->hasNoVerdict()) {
+        if ($auditReport->isWithoutVerdict()) {
             return '## Security audit: incomplete (no file was analyzed)';
         }
 
