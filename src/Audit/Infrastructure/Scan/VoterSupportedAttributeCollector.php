@@ -78,30 +78,43 @@ final readonly class VoterSupportedAttributeCollector
     private function collectSelfConstantFetches(array $body, array $constantValues): array
     {
         $values = [];
-        $constFetchNodes = $this->nodeFinder->findInstanceOf($body, ClassConstFetch::class);
-        foreach ($constFetchNodes as $constFetchNode) {
-            array_push($values, ...$this->resolvedConstantValues($constFetchNode, $constantValues));
+        foreach (array_keys($this->fetchedConstantNames($body)) as $name) {
+            array_push($values, ...($constantValues[$name] ?? []));
         }
 
         return $values;
     }
 
     /**
-     * @param array<string, list<string>> $constantValues
+     * The names of the own constants `$body` fetches, each once, in the order
+     * they are first fetched — so a constant fetched thousands of times is
+     * expanded once, not once per fetch.
      *
-     * @return list<string>
+     * @param array<Node> $body
+     *
+     * @return array<string, true>
      */
-    private function resolvedConstantValues(ClassConstFetch $classConstFetch, array $constantValues): array
+    private function fetchedConstantNames(array $body): array
+    {
+        $names = [];
+        $constFetchNodes = $this->nodeFinder->findInstanceOf($body, ClassConstFetch::class);
+        foreach ($constFetchNodes as $constFetchNode) {
+            $name = $this->selfConstantName($constFetchNode);
+            if (null !== $name) {
+                $names[$name] = true;
+            }
+        }
+
+        return $names;
+    }
+
+    private function selfConstantName(ClassConstFetch $classConstFetch): ?string
     {
         if (!$classConstFetch->class instanceof Name || !\in_array($classConstFetch->class->toString(), ['self', 'static'], true)) {
-            return [];
+            return null;
         }
 
-        if (!$classConstFetch->name instanceof Identifier) {
-            return [];
-        }
-
-        return $constantValues[$classConstFetch->name->toString()] ?? [];
+        return $classConstFetch->name instanceof Identifier ? $classConstFetch->name->toString() : null;
     }
 
     /**
