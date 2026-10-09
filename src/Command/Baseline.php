@@ -218,7 +218,7 @@ final readonly class Baseline implements BaselineInterface
         $this->assertSafeToWrite($path, $projectPath);
 
         try {
-            $this->filesystem->dumpFile($path, $this->encode($entries).\PHP_EOL);
+            WritableFilePath::dump($this->filesystem, $path, $this->encode($entries).\PHP_EOL);
         } catch (JsonException $jsonException) {
             throw MalformedBaselineFileException::fromEncodingException($path, $jsonException);
         } catch (IOException $ioException) {

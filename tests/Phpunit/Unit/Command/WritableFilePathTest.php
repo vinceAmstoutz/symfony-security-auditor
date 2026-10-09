@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\WritableFilePath;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
 
 final class WritableFilePathTest extends TestCase
 {
@@ -63,6 +64,52 @@ final class WritableFilePathTest extends TestCase
         posix_mkfifo($this->tmpDir.'/report.pipe', 0o600);
 
         self::assertFalse(WritableFilePath::canBeWritten($this->tmpDir.'/report.pipe'));
+    }
+
+    public function test_a_character_device_can_be_written(): void
+    {
+        self::assertTrue(WritableFilePath::canBeWritten(DiscardDevice::in($this->tmpDir)));
+    }
+
+    public function test_a_character_device_is_told_from_every_other_kind_of_path(): void
+    {
+        file_put_contents($this->tmpDir.'/report.json', 'previous run');
+        posix_mkfifo($this->tmpDir.'/report.pipe', 0o600);
+
+        self::assertTrue(WritableFilePath::isCharacterDevice(DiscardDevice::in($this->tmpDir)));
+        self::assertFalse(WritableFilePath::isCharacterDevice($this->tmpDir.'/report.json'));
+        self::assertFalse(WritableFilePath::isCharacterDevice($this->tmpDir));
+        self::assertFalse(WritableFilePath::isCharacterDevice($this->tmpDir.'/report.pipe'));
+        self::assertFalse(WritableFilePath::isCharacterDevice($this->tmpDir.'/missing.json'));
+    }
+
+    public function test_dumping_to_a_character_device_writes_to_the_device_and_leaves_it_in_place(): void
+    {
+        $device = DiscardDevice::in($this->tmpDir);
+
+        WritableFilePath::dump(new Filesystem(), $device, 'a report');
+
+        self::assertSame('char', filetype($device));
+    }
+
+    public function test_dumping_to_a_character_device_appends_to_it_instead_of_replacing_it(): void
+    {
+        $device = DiscardDevice::in($this->tmpDir);
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->expects(self::once())->method('appendToFile')->with($device, 'a report');
+        $filesystem->expects(self::never())->method('dumpFile');
+
+        WritableFilePath::dump($filesystem, $device, 'a report');
+    }
+
+    public function test_dumping_to_any_other_path_replaces_the_file_through_a_temporary_file(): void
+    {
+        $path = $this->tmpDir.'/report.json';
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->expects(self::once())->method('dumpFile')->with($path, 'a report');
+        $filesystem->expects(self::never())->method('appendToFile');
+
+        WritableFilePath::dump($filesystem, $path, 'a report');
     }
 
     #[Override]

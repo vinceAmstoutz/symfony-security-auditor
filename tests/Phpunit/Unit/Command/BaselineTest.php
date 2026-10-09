@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
 
 final class BaselineTest extends TestCase
 {
@@ -714,6 +715,32 @@ final class BaselineTest extends TestCase
         $this->expectExceptionMessage('choose a --generate-baseline path that is a writable file');
 
         (new Baseline($this->filesystem))->assertWritable($pipe, $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeBaselineWriteException
+     * @throws BaselineWriteFailedException
+     */
+    public function test_assert_writable_accepts_a_character_device_such_as_dev_null_as_the_baseline_file(): void
+    {
+        $device = DiscardDevice::in($this->tmpDir);
+
+        (new Baseline($this->filesystem))->assertWritable($device, $this->tmpDir);
+
+        self::assertSame('char', filetype($device));
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_a_baseline_saved_to_a_character_device_goes_to_the_device_and_leaves_it_in_place(): void
+    {
+        $device = DiscardDevice::in($this->tmpDir);
+
+        (new Baseline($this->filesystem))->save($device, [$this->entry('SSA-AAA')]);
+
+        self::assertSame('char', filetype($device));
     }
 
     /**

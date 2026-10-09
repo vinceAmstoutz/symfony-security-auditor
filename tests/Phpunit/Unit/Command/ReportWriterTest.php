@@ -45,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputForm
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
 
 final class ReportWriterTest extends TestCase
 {
@@ -678,6 +679,36 @@ final class ReportWriterTest extends TestCase
         $this->expectExceptionMessage('before the audit spends anything');
 
         $this->reportWriter->assertWritable($pipe, $this->tmpDir);
+    }
+
+    /**
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_assert_writable_accepts_a_character_device_such_as_dev_null_as_the_output_file(): void
+    {
+        $device = DiscardDevice::in($this->tmpDir);
+
+        $this->reportWriter->assertWritable($device, $this->tmpDir);
+
+        self::assertSame('char', filetype($device));
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_report_written_to_a_character_device_goes_to_the_device_and_leaves_it_in_place(): void
+    {
+        $device = DiscardDevice::in($this->tmpDir);
+        $bufferedOutput = new BufferedOutput();
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $device, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertSame('char', filetype($device));
+        self::assertStringContainsString(\sprintf('Report saved to %s', $device), $bufferedOutput->fetch());
     }
 
     /**
