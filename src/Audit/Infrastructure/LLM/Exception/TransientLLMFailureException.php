@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 
 /**
  * Thrown when every retry attempt for a transient LLM error is exhausted
@@ -36,7 +37,7 @@ final class TransientLLMFailureException extends LLMProviderException
 
     public static function afterExhaustedAttempts(int $attempts, Throwable $throwable): self
     {
-        return new self(\sprintf('LLM call failed after %d attempts: %s', $attempts, $throwable->getMessage()), $throwable, $attempts);
+        return new self(\sprintf('LLM call failed after %d attempts: %s', $attempts, ProviderMessageRedactor::redact($throwable->getMessage())), $throwable, $attempts);
     }
 
     /**

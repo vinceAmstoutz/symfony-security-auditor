@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 
 use RuntimeException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 
 /**
  * The model answered with nothing usable. `$stopReason` names the outcome the
@@ -34,7 +35,7 @@ final class EmptyLLMResponseException extends RuntimeException
     public static function from(Throwable $throwable, string $stopReason = 'empty_content'): self
     {
         return new self(
-            \sprintf('LLM returned a response with no content: %s', $throwable->getMessage()),
+            \sprintf('LLM returned a response with no content: %s', ProviderMessageRedactor::redact($throwable->getMessage())),
             $throwable,
             $stopReason,
         );

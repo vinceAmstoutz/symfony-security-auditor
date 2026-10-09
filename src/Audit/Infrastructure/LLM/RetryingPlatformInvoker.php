@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
@@ -150,7 +151,7 @@ final readonly class RetryingPlatformInvoker
             'attempt' => $attempt,
             'max_attempts' => $maxAttempts,
             'delay_ms' => $delay,
-            'error' => $throwable->getMessage(),
+            'error' => ProviderMessageRedactor::redact($throwable->getMessage()),
         ]);
         $this->sleeper->sleep($delay);
     }

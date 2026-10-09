@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -518,7 +519,7 @@ final readonly class ToolConversationWavefront
             'stop_reason' => $stopReason,
             'input_tokens' => $conversationState->input,
             'output_tokens' => $conversationState->output,
-            'error' => $throwable->getMessage(),
+            'error' => ProviderMessageRedactor::redact($throwable->getMessage()),
         ]);
 
         return $conversationState->withResponse(LLMResponse::of(
@@ -541,22 +542,23 @@ final readonly class ToolConversationWavefront
     private function endOversizedConversation(ConversationState $conversationState, Throwable $throwable): ConversationState
     {
         $tokenUsageSnapshot = $conversationState->tokenUsage();
+        $refusal = ProviderMessageRedactor::redact($throwable->getMessage());
 
         if ($conversationState->toolsRan) {
             $this->logger->warning('Concurrent tool-using conversation outgrew the model input limit after tool results were appended; it ends as an empty response and keeps the tool results already recorded', [
                 'input_tokens' => $conversationState->input,
                 'output_tokens' => $conversationState->output,
-                'error' => $throwable->getMessage(),
+                'error' => $refusal,
             ]);
 
             return $conversationState->withResponse(LLMResponse::of('', $this->model, 'empty_content', $tokenUsageSnapshot));
         }
 
         $this->logger->debug('Concurrent tool-using conversation refused as too large for the model before any tool ran; its chunk is handed back to be split', [
-            'error' => $throwable->getMessage(),
+            'error' => $refusal,
         ]);
 
-        return $conversationState->withResponse(LLMResponse::of($throwable->getMessage(), $this->model, 'request_too_large', $tokenUsageSnapshot));
+        return $conversationState->withResponse(LLMResponse::of($refusal, $this->model, 'request_too_large', $tokenUsageSnapshot));
     }
 
     /**

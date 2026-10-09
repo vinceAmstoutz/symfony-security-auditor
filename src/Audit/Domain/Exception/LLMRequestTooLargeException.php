@@ -31,6 +31,6 @@ class LLMRequestTooLargeException extends LLMProviderException
 {
     public static function fromProviderRejection(Throwable $throwable): self
     {
-        return new self(\sprintf('The model cannot fit the request: %s', $throwable->getMessage()), previous: $throwable);
+        return new self(\sprintf('The model cannot fit the request: %s', ProviderMessageRedactor::redact($throwable->getMessage())), previous: $throwable);
     }
 }
