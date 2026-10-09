@@ -126,6 +126,30 @@ final class IngestionStageSkippedFilesTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_two_files_whose_names_are_the_same_once_repaired_leave_the_report_incomplete_and_say_why(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir."/src/caf\xE9.php", '<?php class A {}');
+        file_put_contents($this->tmpDir."/src/caf\xE8.php", '<?php class B {}');
+
+        $bufferingLogger = new BufferingLogger();
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        (new IngestionStage(new ProjectFileScanner(new NullLogger()), $bufferingLogger))->process($auditContext);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+        self::assertSame([['stage' => 'scan', 'file' => "src/caf\u{FFFD}.php", 'status' => 'errored']], $auditContext->coverage());
+        self::assertSame(["src/caf\u{FFFD}.php"], $auditReport->unanalyzedFiles());
+        self::assertFalse($auditReport->isComplete());
+        self::assertSame(["src/caf\u{FFFD}.php"], $this->analyzedPaths($auditContext));
+        self::assertContains(
+            ['warning', 'The scan left a file out, so it is not analyzed', ['file' => "src/caf\u{FFFD}.php", 'reason' => "its name is the same as another file's once the bytes that are not valid UTF-8 are replaced"]],
+            $bufferingLogger->cleanLogs(),
+        );
+    }
+
+    /**
      * @param callable(string): void $arrange builds the excluded file(s) under the project root
      *
      * @throws InvalidAuditContextException

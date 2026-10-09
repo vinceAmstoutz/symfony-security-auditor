@@ -154,16 +154,40 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     private function eachFileOnce(ProjectFileScan $projectFileScan): ProjectFileScan
     {
         $files = [];
-        foreach ($projectFileScan->files as $file) {
-            $files[$file->relativePath()] ??= $file;
+        $sharingAName = [];
+        foreach ($this->eachRealFileOnce($projectFileScan->files) as $projectFile) {
+            if (\array_key_exists($projectFile->relativePath(), $files)) {
+                $sharingAName[] = new SkippedFile($projectFile->relativePath(), SkippedFileReason::AmbiguousName);
+
+                continue;
+            }
+
+            $files[$projectFile->relativePath()] = $projectFile;
         }
 
         $skippedFiles = [];
-        foreach ($projectFileScan->skippedFiles as $skippedFile) {
+        foreach ([...$projectFileScan->skippedFiles, ...$sharingAName] as $skippedFile) {
             $skippedFiles[$skippedFile->relativePath] ??= $skippedFile;
         }
 
         return new ProjectFileScan(array_values($files), array_values($skippedFiles));
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile> in byte order of their absolute path
+     */
+    private function eachRealFileOnce(array $files): array
+    {
+        $byRealPath = [];
+        foreach ($files as $file) {
+            $byRealPath[Path::canonicalize($file->absolutePath())] ??= $file;
+        }
+
+        ksort($byRealPath, \SORT_STRING);
+
+        return array_values($byRealPath);
     }
 
     /**
