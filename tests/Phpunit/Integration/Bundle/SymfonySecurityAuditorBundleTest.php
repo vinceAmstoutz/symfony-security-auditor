@@ -25,6 +25,7 @@ use Symfony\AI\Platform\Test\InMemoryPlatform;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\Config\Definition\Exception\InvalidTypeException;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -38,6 +39,7 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\DependencyInjection\TypedReference;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
+use Symfony\Component\Process\Process;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
@@ -83,6 +85,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
@@ -554,6 +557,41 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(1024, $containerBuilder->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
     }
 
+    public function test_bundle_lists_no_tracked_ignored_files_by_default(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.scan.respect_gitignore'));
+        self::assertFalse($containerBuilder->hasDefinition(GitTrackedIgnoredFiles::class));
+    }
+
+    #[DataProvider('trackedIgnoredSettings')]
+    public function test_bundle_lists_the_tracked_ignored_files_only_when_gitignore_is_respected_and_they_are_asked_for(bool $respectGitignore, bool $includeTrackedIgnored, bool $listed): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'scan' => ['respect_gitignore' => $respectGitignore, 'include_tracked_ignored' => $includeTrackedIgnored],
+        ]);
+
+        self::assertSame($listed, $containerBuilder->hasDefinition(GitTrackedIgnoredFiles::class));
+    }
+
+    /** @return iterable<string, array{bool, bool, bool}> */
+    public static function trackedIgnoredSettings(): iterable
+    {
+        yield 'gitignore respected and the tracked files asked for' => [true, true, true];
+        yield 'gitignore respected, the tracked files not asked for' => [true, false, false];
+        yield 'gitignore not respected, the tracked files asked for' => [false, true, false];
+        yield 'gitignore not respected, the tracked files not asked for' => [false, false, false];
+    }
+
+    public function test_bundle_rejects_a_tracked_ignored_files_opt_in_that_is_not_a_boolean(): void
+    {
+        $this->expectException(InvalidTypeException::class);
+
+        $this->loadParameters(['model' => 'gpt-4o', 'scan' => ['include_tracked_ignored' => 'yes']]);
+    }
+
     public function test_bundle_defaults_scan_included_paths_to_symfony_skeleton(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
@@ -589,6 +627,30 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString('src/Controller/HomeController.php', $display);
         self::assertStringContainsString('src/Controller/Admin/DashboardController.php', $display);
         self::assertStringNotContainsString('PaymentService.php', $display);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_file_git_tracks_although_gitignore_matches_it_stays_out_of_the_scan_by_default_end_to_end(): void
+    {
+        $this->commitAnIgnoredFileAndAnotherOne();
+
+        $display = $this->showScanned($this->boot(['model' => 'gpt-4o']));
+
+        self::assertStringContainsString('src/Ok.php', $display);
+        self::assertStringNotContainsString('src/Evil.php', $display);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_file_git_tracks_although_gitignore_matches_it_joins_the_scan_when_asked_to_end_to_end(): void
+    {
+        $this->commitAnIgnoredFileAndAnotherOne();
+
+        $display = $this->showScanned($this->boot(['model' => 'gpt-4o', 'scan' => ['include_tracked_ignored' => true]]));
+
+        self::assertStringContainsString('src/Ok.php', $display);
+        self::assertStringContainsString('src/Evil.php', $display);
     }
 
     #[RunInSeparateProcess]
@@ -1710,6 +1772,27 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 5]]);
 
         self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
+    }
+
+    private function commitAnIgnoredFileAndAnotherOne(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "src/Evil.php\n");
+        file_put_contents($this->tmpDir.'/src/Evil.php', '<?php class Evil {}');
+        file_put_contents($this->tmpDir.'/src/Ok.php', '<?php class Ok {}');
+        (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
+        (new Process(['git', 'add', '--force', 'src/Evil.php', 'src/Ok.php'], $this->tmpDir))->mustRun();
+    }
+
+    private function showScanned(Kernel $kernel): string
+    {
+        $auditCommand = $this->getPrivateService($kernel, AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+
+        $commandTester = new CommandTester($auditCommand);
+        self::assertSame(Command::SUCCESS, $commandTester->execute(['project-path' => $this->tmpDir, '--show-scanned' => true]));
+
+        return $commandTester->getDisplay();
     }
 
     private function getPrivateService(Kernel $kernel, string $id): object

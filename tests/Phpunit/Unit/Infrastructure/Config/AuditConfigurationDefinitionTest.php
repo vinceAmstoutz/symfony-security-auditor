@@ -91,6 +91,28 @@ final class AuditConfigurationDefinitionTest extends TestCase
         $this->process([['audit' => ['min_score' => 101]]]);
     }
 
+    public function test_the_gitignore_is_respected_and_the_tracked_ignored_files_are_left_out_by_default(): void
+    {
+        $processed = $this->process([[]]);
+
+        self::assertTrue($this->valueAt($processed, ['scan', 'respect_gitignore']));
+        self::assertFalse($this->valueAt($processed, ['scan', 'include_tracked_ignored']));
+    }
+
+    public function test_the_tracked_ignored_files_opt_in_reads_true(): void
+    {
+        $processed = $this->process([['scan' => ['include_tracked_ignored' => true]]]);
+
+        self::assertTrue($this->valueAt($processed, ['scan', 'include_tracked_ignored']));
+    }
+
+    public function test_the_tracked_ignored_files_opt_in_refuses_a_value_that_is_no_boolean(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->process([['scan' => ['include_tracked_ignored' => 'yes']]]);
+    }
+
     /**
      * @return iterable<string, array{non-empty-list<string>}>
      */

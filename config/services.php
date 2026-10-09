@@ -91,6 +91,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewer
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
@@ -311,6 +312,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.scan.max_file_size_kb'),
             null,
             service(SecretScrubberInterface::class),
+            service(GitTrackedIgnoredFiles::class)->ignoreOnInvalid(),
         ]);
     $defaultsConfigurator->alias(ProjectFileScannerInterface::class, ProjectFileScanner::class);
 
