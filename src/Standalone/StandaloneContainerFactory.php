@@ -109,7 +109,9 @@ final readonly class StandaloneContainerFactory
     {
         $options = ['timeout' => $standaloneConfig->httpTimeout, 'max_duration' => 0];
 
-        return $standaloneConfig->offlineOnly() ? [...$options, 'no_proxy' => '*'] : $options;
+        return $standaloneConfig->offlineOnly() && $this->offlineOnlyPlatformGuard->reachesOnlyLoopback($standaloneConfig->platform)
+            ? [...$options, 'no_proxy' => '*']
+            : $options;
     }
 
     /**

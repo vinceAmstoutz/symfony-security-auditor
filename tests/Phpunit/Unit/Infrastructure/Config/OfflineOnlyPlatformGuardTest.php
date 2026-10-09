@@ -297,4 +297,34 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
 
         self::assertSame([], $standalonePlatformConfig->platform);
     }
+
+    /**
+     * @param array<array-key, mixed> $platform
+     */
+    #[DataProvider('loopbackOnlyCases')]
+    public function test_it_tells_a_platform_that_stays_on_the_loopback_interface_from_one_that_does_not(array $platform, bool $loopbackOnly): void
+    {
+        self::assertSame($loopbackOnly, $this->offlineOnlyPlatformGuard->reachesOnlyLoopback(new StandalonePlatformConfig($platform)));
+    }
+
+    /**
+     * @return iterable<string, array{array<array-key, mixed>, bool}>
+     */
+    public static function loopbackOnlyCases(): iterable
+    {
+        yield 'a loopback name' => [['ollama' => ['endpoint' => 'http://localhost:11434']], true];
+        yield 'a loopback ipv4 address' => [['ollama' => ['endpoint' => 'http://127.0.0.1:11434']], true];
+        yield 'a loopback ipv6 address' => [['ollama' => ['endpoint' => 'http://[::1]:11434']], true];
+        yield 'an endpoint below an instance' => [['generic' => ['gw' => ['base_url' => 'http://127.0.0.1:8080']]], true];
+        yield 'credentials in front of a loopback host' => [['ollama' => ['endpoint' => 'http://user:s3cretpassword@127.0.0.1:11434']], true];
+        yield 'two platforms on the loopback interface' => [['ollama' => ['endpoint' => 'http://localhost:11434'], 'lmstudio' => ['host_url' => 'http://127.0.0.1:1234']], true];
+        yield 'a setting that is not an endpoint beside a loopback one' => [['ollama' => ['endpoint' => 'http://localhost:11434', 'api_key' => 'user:s3cretpassword']], true];
+        yield 'a private-range address' => [['ollama' => ['endpoint' => 'http://192.168.1.20:11434']], false];
+        yield 'a private network name' => [['ollama' => ['endpoint' => 'http://workstation.local:11434']], false];
+        yield 'a private-range address below an instance' => [['generic' => ['gw' => ['base_url' => 'http://10.0.0.2:8080']]], false];
+        yield 'a private-range address beside a loopback one' => [['ollama' => ['endpoint' => 'http://localhost:11434', 'base_url' => 'http://10.0.0.2:8080']], false];
+        yield 'a private-range platform after a loopback one' => [['ollama' => ['endpoint' => 'http://localhost:11434'], 'lmstudio' => ['host_url' => 'http://192.168.1.20:1234']], false];
+        yield 'a private-range platform before a loopback one' => [['lmstudio' => ['host_url' => 'http://192.168.1.20:1234'], 'ollama' => ['endpoint' => 'http://localhost:11434']], false];
+        yield 'a provider whose configuration is not a map beside a loopback one' => [['bedrock' => null, 'ollama' => ['endpoint' => 'http://localhost:11434']], true];
+    }
 }

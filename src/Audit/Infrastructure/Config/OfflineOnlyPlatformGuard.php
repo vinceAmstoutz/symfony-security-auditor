@@ -38,6 +38,21 @@ final readonly class OfflineOnlyPlatformGuard
     }
 
     /**
+     * Whether every endpoint of every configured platform is on the loopback
+     * interface, which no proxy can reach on the caller's behalf.
+     */
+    public function reachesOnlyLoopback(StandalonePlatformConfig $standalonePlatformConfig): bool
+    {
+        foreach ($this->endpointsIn($standalonePlatformConfig->platform) as $platformEndpoint) {
+            if (!$platformEndpoint->isLoopback()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @param array<array-key, mixed> $providerConfig
      *
      * @throws NonLocalPlatformEndpointException
