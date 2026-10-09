@@ -411,6 +411,58 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a literal cast to a string' => ["password: (string) 'hunter2hunter2'", 'hunter2hunter2'];
     }
 
+    #[DataProvider('fallbackLiteralsAfterCodeCases')]
+    public function test_a_hard_coded_fallback_after_code_under_a_credential_key_is_redacted(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function fallbackLiteralsAfterCodeCases(): iterable
+    {
+        yield 'a short ternary after a call' => ['$password = getenv("DB_PASSWORD") ?: "Zx9Qw7Lm2Pv4";', '$password = getenv("DB_PASSWORD") ?: "***REDACTED:inline_assignment***";'];
+        yield 'a null coalescing after an array offset' => ['\'password\' => $_ENV["DB_PASSWORD"] ?? "Zx9Qw7Lm2Pv4",', '\'password\' => $_ENV["DB_PASSWORD"] ?? "***REDACTED:inline_assignment***",'];
+        yield 'the else branch of a ternary' => ["\$password = isset(\$a) ? \$a : 'Zx9Qw7Lm2Pv4';", "\$password = isset(\$a) ? \$a : '***REDACTED:inline_assignment***';"];
+        yield 'a concatenation after a short variable' => ['$password = $x . "Zx9Qw7Lm2Pv4";', '$password = $x . "***REDACTED:inline_assignment***";'];
+        yield 'both branches of a ternary' => ["\$password = \$production ? 'ProdSecret123' : 'DevSecret1234';", "\$password = \$production ? '***REDACTED:inline_assignment***' : '***REDACTED:inline_assignment***';"];
+        yield 'a concatenation after a call' => ["\$token = \$this->generate() . 'abcd1234efgh';", "\$token = \$this->generate() . '***REDACTED:inline_assignment***';"];
+        yield 'a fallback starting right after a slash' => ["\$password = \$a ?: 'x/Zx9Qw7Lm2Pv4';", "\$password = \$a ?: '***REDACTED:inline_assignment***';"];
+        yield 'a fallback after a literal' => ["password: hunter2xx ?: 'Zx9Qw7Lm2Pv4'", "password: ***REDACTED:inline_assignment*** ?: '***REDACTED:inline_assignment***'"];
+        yield 'a fallback of exactly four characters' => ["\$password = getenv('DB_PASSWORD') ?: 'abcd';", "\$password = getenv('DB_PASSWORD') ?: '***REDACTED:inline_assignment***';"];
+        yield 'a fallback after several operands' => ["\$password = \$a ?? \$b ?? 'Zx9Qw7Lm2Pv4';", "\$password = \$a ?? \$b ?? '***REDACTED:inline_assignment***';"];
+        yield 'a fallback after fifteen operands' => ['$password = $a'.str_repeat(' . $b', 14).' . "abcdefgh"', '$password = $a'.str_repeat(' . $b', 14).' . "***REDACTED:inline_assignment***"'];
+        yield 'a fallback after sixteen operands' => ['$password = $a'.str_repeat(' . $b', 15).' . "abcdefgh"', '$password = $a'.str_repeat(' . $b', 15).' . "***REDACTED:inline_assignment***"'];
+        yield 'a fallback after a call opening an argument list' => ["\$password = trim(\$a) ?: 'Zx9Qw7Lm2Pv4';", "\$password = trim(\$a) ?: '***REDACTED:inline_assignment***';"];
+        yield 'a fallback in an array entry followed by another' => ["['password' => \$a ?: 'Zx9Qw7Lm2Pv4', 'user' => 'bob']", "['password' => \$a ?: '***REDACTED:inline_assignment***', 'user' => 'bob']"];
+    }
+
+    #[DataProvider('fallbacksThatHoldNoSecretCases')]
+    public function test_a_fallback_after_code_that_holds_no_secret_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function fallbacksThatHoldNoSecretCases(): iterable
+    {
+        yield 'an empty fallback' => ["\$password = getenv('DB_PASSWORD') ?: '';"];
+        yield 'a fallback of three characters' => ["\$password = getenv('DB_PASSWORD') ?: 'abc';"];
+        yield 'a fallback that is a reference' => ["\$password = \$a ?? '%env(DB_PASSWORD)%';"];
+        yield 'a fallback that is a redaction placeholder' => ['$password = $a ?? \'***REDACTED:env_assignment***\';'];
+        yield 'a fallback that is null' => ['$password = $request->get(\'password\') ?: null;'];
+        yield 'a fallback that is code' => ['$password = $a ?? $b;'];
+        yield 'a concatenation of variables' => ['$password = $hasher->hash($plain) . $salt;'];
+        yield 'a literal passed as an argument' => ["\$signingKey = hash_hmac('sha256', \$payload, \$userInput);"];
+        yield 'a literal after an operator that is no fallback operator' => ["\$password = \$a + 'abcdefgh';"];
+        yield 'a fallback after the end of the statement' => ["\$password = \$a; \$b = \$c ?: 'abcdefgh';"];
+        yield 'a fallback after an argument separator' => ["connect(password: \$a, other: \$c ?: 'abcdefgh');"];
+        yield 'a path joined to a directory' => ["'Token' => \$vendorDir . '/theseer/tokenizer/src/Token.php',"];
+        yield 'a path joined to a directory of the class' => ["\$token = \$this->dir . '/../var/token.json';"];
+        yield 'a namespace as the fallback' => ["\$secret = \$a ?: '\\\\App\\\\Security\\\\Secret';"];
+        yield 'a hidden file as the fallback' => ["\$secret = \$a ?: '.secret.json';"];
+        yield 'a fallback joined to the operator' => ["\$password = \$a ?:'abcdefgh';"];
+    }
+
     #[DataProvider('phpConstantsNamedLikeCredentialsCases')]
     public function test_a_php_constant_named_like_a_credential_keeps_its_declaration_syntax(string $input, string $expected): void
     {
@@ -1467,6 +1519,9 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'placeholder openings after colons' => [str_repeat(': ***REDACTED:x', 34952)];
         yield 'dsn assignments holding no credential' => [str_repeat('MAILER_DSN=a://b?c=d ', 24966)];
         yield 'bearer words with no token' => [str_repeat('Bearer ', 74898)];
+        yield 'fallback operators with no literal' => ['$password = $a'.str_repeat(' ?? $a', 90000)];
+        yield 'credential keys followed by operands' => [str_repeat('password = $a ?: $b ?: $c ', 20000)];
+        yield 'a fallback literal never closed' => ['$password = $a ?: "'.str_repeat('a', 524288)];
     }
 
     #[DataProvider('hostileContentWithTheJitCases')]
@@ -1484,6 +1539,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'credential key openings' => [str_repeat("('db_password', ", 32768)];
         yield 'credential setters without arguments' => [str_repeat('->setpassword', 40342)];
         yield 'password function openings' => [str_repeat('password_hash(', 37449)];
+        yield 'fallback operators with no literal' => ['$password = $a'.str_repeat(' ?? $a', 90000)];
+        yield 'a fallback literal never closed' => ['$password = $a ?: "'.str_repeat('a', 524288)];
     }
 
     #[DataProvider('hostileContentRedactedCases')]
@@ -1519,6 +1576,9 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a block scalar of a hundred thousand lines' => ["secret: |\n".str_repeat("  x\n", 100000), "secret: |\n  ***REDACTED:block_scalar***".str_repeat("\n", 100000)];
         yield 'a private key cut after thirty thousand lines' => ["-----BEGIN PRIVATE KEY-----\n".str_repeat("MIIEowIBAAKCAQEAx\n", 30000), '***REDACTED:pem_private_key***'.str_repeat("\n", 30001)];
         yield 'an xml argument of half a megabyte' => ['<argument key="password">'.str_repeat('a', 524288).'</argument>', '<argument key="password">***REDACTED:xml_parameter***</argument>'];
+        yield 'a fallback literal of half a megabyte' => ['$password = $a ?: "'.str_repeat('a', 524288).'";', '$password = $a ?: "***REDACTED:inline_assignment***";'];
+        yield 'fallback literals line after line' => [str_repeat("\$password = \$a ?: 'abcd1234';\n", 12000), str_repeat("\$password = \$a ?: '***REDACTED:inline_assignment***';\n", 12000)];
+        yield 'sixteen concatenations then a literal' => ['$password = $a'.str_repeat(' . $b', 16).' . "abcdefgh"', '$password = $a'.str_repeat(' . $b', 16).' . "abcdefgh"'];
     }
 
     #[RunInSeparateProcess]

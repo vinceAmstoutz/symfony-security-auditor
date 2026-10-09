@@ -53,6 +53,14 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private const string UNQUOTED_YAML_PLACEHOLDER = '/([:\-][ \t]++)(\*\*\*REDACTED:[a-z0-9_]++\*\*\*)(?=[ \t]*+(?:[,})\]#]|\r?$))/m';
 
+    /**
+     * What a value goes on with after an operand: `?: 'x'`, `?? 'x'`, `. 'x'`, `? $a : 'x'`. Each step is
+     * an operator set off by blanks, then a quoted literal or one word.
+     */
+    private const string FALLBACK_TAIL = '((?:[ \t]++(?:\?\?|\?:|[?:.])[ \t]++(?:"(?:[^"\\\\\n]++|\\\\.)*+"|\'(?:[^\'\\\\\n]++|\\\\.)*+\'|[^\s"\';,)\]]++)){1,16}+)';
+
+    private const string FALLBACK_LITERAL = '/((?:\?\?|\?:|[?:.])[ \t]++)(?|(")((?![\/\\\\.])(?=(?:\\\\.|[^"\\\\\n]){4})(?:[^"\\\\\n]++|\\\\.)*+)"|(\')((?![\/\\\\.])(?=(?:\\\\.|[^\'\\\\\n]){4})(?:[^\'\\\\\n]++|\\\\.)*+)\')/';
+
     private const string STATEMENT_CLOSERS = ';:,\'")]';
 
     private const int MINIMUM_SECRET_LENGTH = 4;
@@ -158,7 +166,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
             SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+@~i',
             SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\r\n])*+(?:\4|(?=\r?$))|\S+)/m', $envCredentialName),
-            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++)?))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS),
+            SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|(?|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++)?)(?:(?<![;,])%4$s)?+|([^"\'\s]\S{0,2}+)(?<![;,])%4$s))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS, self::FALLBACK_TAIL),
             SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', $inlineCredentialKey),
             SecretPatternLabel::BlockScalar->value => \sprintf('/^([ \t]*+)(-[ \t]++)?(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?[ \t]*:[ \t]*[|>][+-]?[0-9]?[+-]?[ \t]*(?:#[^\n]*)?)\r?\n((?:\1(?(2)[ \t]{3,}|[ \t]+)[^\n]*(?:\n|\z)|[ \t]*\r?\n)++)/mi', $inlineCredentialKey),
             SecretPatternLabel::CallArgument->value => \sprintf('/(?|((?:->|::)(?:(?:set|with)[A-Za-z0-9_]{0,24}?)?%1$s[ \t]*\([ \t]*)(["\'])%2$s\2|(\([ \t]*["\'][\w.$:\-]{0,64}%3$s[\w.$:\-]{0,64}["\'][ \t]*,[ \t]*)(["\'])%2$s\2|(new[ \t]+\\\\?PDO[ \t]*\([^,\n]{1,200},[^,\n]{1,100},[ \t]*)(["\'])%2$s\2|((?:\$|->)[A-Za-z_]*key[ \t]*=[ \t]*\\\\?(?:hex2bin|sodium_hex2bin|base64_decode|sodium_base642bin)[ \t]*+\([ \t]*+)(["\'])((?:\\\\.|(?!\2)[^\n]){16,}+)\2|(\bpassword_(?:hash|verify)[ \t]*+\([ \t]*+)(["\'])%2$s\2)/i', $callCredentialName, self::QUOTED_BODY_OF_GROUP_TWO, $inlineCredentialKey),
@@ -295,12 +303,31 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         $quote = $match[2] ?? '';
         $value = ($match[3] ?? '').($match[4] ?? '');
         $secret = '' === $quote ? rtrim($value, self::STATEMENT_CLOSERS) : $value;
+        $tail = $match[5] ?? '';
+        $redactedTail = $this->redactFallbackLiterals($tail);
 
         if ($this->isKeptReadable($secret, $value, '' !== $quote)) {
+            return substr($match[0], 0, \strlen($match[0]) - \strlen($tail)).$redactedTail;
+        }
+
+        return \sprintf('%s%s***REDACTED:%s***%s%s%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote, substr($value, \strlen($secret)), $redactedTail);
+    }
+
+    private function redactFallbackLiterals(string $tail): string
+    {
+        return preg_replace_callback(self::FALLBACK_LITERAL, $this->redactFallbackLiteral(...), $tail) ?? $tail;
+    }
+
+    /**
+     * @param array<int|string, string> $match
+     */
+    private function redactFallbackLiteral(array $match): string
+    {
+        if ($this->isRedactionPlaceholder($match[3]) || $this->isConfigPlaceholder($match[3])) {
             return $match[0];
         }
 
-        return \sprintf('%s%s***REDACTED:%s***%s%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote, substr($value, \strlen($secret)));
+        return \sprintf('%s%s***REDACTED:%s***%s', $match[1], $match[2], SecretPatternLabel::InlineAssignment->value, $match[2]);
     }
 
     private function isKeptReadable(string $secret, string $value, bool $quoted): bool
