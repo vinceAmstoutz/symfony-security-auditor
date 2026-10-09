@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 
-use function Symfony\Component\String\u;
+use function Symfony\Component\String\b;
 
 /**
  * SHA-256 of the audited project's `composer.lock`, or `null` when there is
@@ -38,7 +38,7 @@ final readonly class LockfileHasher
 
     public function hash(string $projectPath): ?string
     {
-        $lockfilePath = \sprintf('%s/composer.lock', u($projectPath)->trimEnd('/')->toString());
+        $lockfilePath = \sprintf('%s/composer.lock', b($projectPath)->trimEnd('/')->toString());
 
         if (!$this->filesystem->exists($lockfilePath) || $this->isRefused($lockfilePath)) {
             return null;

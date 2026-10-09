@@ -16,7 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Filesystem\Path;
-use Symfony\Component\String\UnicodeString;
+use Symfony\Component\String\AbstractString;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\PathText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidMinScoreException;
@@ -110,7 +111,7 @@ final class AuditCommandInput
      */
     public function resolvedProjectPath(?callable $cwdResolver = null): string
     {
-        $trimmedPath = u($this->projectPath ?? '')->trim()->toString();
+        $trimmedPath = PathText::of($this->projectPath ?? '')->trim()->toString();
         if (Path::isAbsolute($trimmedPath)) {
             return Path::canonicalize($trimmedPath);
         }
@@ -131,7 +132,7 @@ final class AuditCommandInput
     {
         $normalized = [];
         foreach ($this->paths as $path) {
-            $trimmed = $this->stripLeadingCurrentDirSegment(u($path)->trim()->trimEnd('/'));
+            $trimmed = $this->stripLeadingCurrentDirSegment(PathText::of($path)->trim()->trimEnd('/'));
             if ($trimmed->isEmpty()) {
                 continue;
             }
@@ -149,13 +150,13 @@ final class AuditCommandInput
      * real relative path — silently scanning zero files instead of the
      * intended subdirectory (or, for a bare `.`, the whole project).
      */
-    private function stripLeadingCurrentDirSegment(UnicodeString $unicodeString): UnicodeString
+    private function stripLeadingCurrentDirSegment(AbstractString $abstractString): AbstractString
     {
-        while ($unicodeString->startsWith('./')) {
-            $unicodeString = $unicodeString->after('/')->trimStart('/');
+        while ($abstractString->startsWith('./')) {
+            $abstractString = $abstractString->after('/')->trimStart('/');
         }
 
-        return '.' === $unicodeString->toString() ? u('') : $unicodeString;
+        return '.' === $abstractString->toString() ? u('') : $abstractString;
     }
 
     /**
