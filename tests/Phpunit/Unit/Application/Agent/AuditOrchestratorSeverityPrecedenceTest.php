@@ -420,6 +420,44 @@ final class AuditOrchestratorSeverityPrecedenceTest extends TestCase
     }
 
     /**
+     * @param list<Vulnerability> $returned
+     * @param list<Vulnerability> $recorded
+     *
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    #[DataProvider('copiesAroundTheConfidenceFloor')]
+    public function test_a_recorded_copy_below_the_confidence_floor_does_not_hide_a_confident_copy_of_the_same_location(array $returned, array $recorded): void
+    {
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturn(AuditOrchestratorHarness::reviewerAcceptResponse());
+        $auditContext = AuditOrchestratorHarness::contextWithMapping($this->tmpDir);
+
+        $this->orchestratorWith(new ReturningAttackerAgent($returned, $recorded), $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertSame(['confident'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), array_values($auditContext->validatedVulnerabilities())));
+    }
+
+    /**
+     * @return iterable<string, array{list<Vulnerability>, list<Vulnerability>}>
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public static function copiesAroundTheConfidenceFloor(): iterable
+    {
+        $vulnerability = self::findingRanked('doubtful', VulnerabilitySeverity::HIGH, 0.4);
+        $confident = self::findingRanked('confident', VulnerabilitySeverity::MEDIUM, 0.9);
+
+        yield 'the confident copy is returned and the doubtful one recorded' => [[$confident], [$vulnerability]];
+        yield 'the doubtful copy is returned and the confident one recorded' => [[$vulnerability], [$confident]];
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
@@ -624,6 +662,21 @@ final class AuditOrchestratorSeverityPrecedenceTest extends TestCase
     {
         return Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
+            new CodeLocation('src/Controller/FooController.php', 10, 15),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private static function findingRanked(string $title, VulnerabilitySeverity $vulnerabilitySeverity, float $confidence): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, $vulnerabilitySeverity, $title, $confidence),
             new CodeLocation('src/Controller/FooController.php', 10, 15),
             new VulnerabilityNarrative('d', 'a', 'p', 'r'),
             'c',
