@@ -50,6 +50,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessContr
  */
 final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
+    private const int MAX_GUARD_ATTRIBUTES_PER_ROUTE = 100;
+
     public function __construct(
         private RouteAttributeParser $routeAttributeParser = new RouteAttributeParser(),
         private NodeFinder $nodeFinder = new NodeFinder(),
@@ -291,8 +293,11 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * `isGranted()` calls — the first argument of each, when it is a string
      * literal. A non-literal attribute (enum case, variable, `new
      * Expression(...)`) is left out rather than guessed at, mirroring how route
-     * paths are only resolved from literals. Duplicates are collapsed once,
-     * across every guard form, by {@see RouteAccessControl::guardAttributes()}.
+     * paths are only resolved from literals. Each distinct attribute is kept
+     * once, in the order it first appears, and only the first
+     * {@see self::MAX_GUARD_ATTRIBUTES_PER_ROUTE} are kept, so a chain of
+     * actions each reaching every later one cannot hold a quadratic number of
+     * names.
      *
      * @param list<MethodCall|NullsafeMethodCall|StaticCall> $denyAccessCalls
      *
@@ -300,15 +305,19 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      */
     private function attributesFromCalls(array $denyAccessCalls): array
     {
-        $attributes = [];
-        foreach ($denyAccessCalls as $denyAccessCall) {
-            $firstArgument = $denyAccessCall->args[0] ?? null;
-            if ($firstArgument instanceof Arg && $firstArgument->value instanceof String_) {
-                $attributes[] = $firstArgument->value->value;
-            }
-        }
+        $literals = array_filter(
+            array_map($this->literalFirstArgument(...), $denyAccessCalls),
+            static fn (?string $attribute): bool => null !== $attribute,
+        );
 
-        return $attributes;
+        return \array_slice(array_unique($literals), 0, self::MAX_GUARD_ATTRIBUTES_PER_ROUTE);
+    }
+
+    private function literalFirstArgument(MethodCall|NullsafeMethodCall|StaticCall $call): ?string
+    {
+        $firstArgument = $call->args[0] ?? null;
+
+        return $firstArgument instanceof Arg && $firstArgument->value instanceof String_ ? $firstArgument->value->value : null;
     }
 
     /**

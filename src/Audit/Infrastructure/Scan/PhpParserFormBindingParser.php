@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use Generator;
+use LimitIterator;
 use Override;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
@@ -50,6 +52,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInte
  */
 final readonly class PhpParserFormBindingParser implements FormBindingParserInterface
 {
+    private const int MAX_BINDINGS_PER_FILE = 500;
+
     public function __construct(
         private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
         private NodeFinder $nodeFinder = new NodeFinder(),
@@ -99,35 +103,33 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
      */
     private function bindingsForClasses(string $filePath, array $classes): array
     {
-        $bindings = [];
-        foreach ($classes as $class) {
-            foreach ($this->bindingsForPublicMethods($filePath, $class) as $binding) {
-                $bindings[] = $binding;
-            }
-        }
-
-        return $bindings;
+        return iterator_to_array(new LimitIterator($this->allBindings($filePath, $classes), 0, self::MAX_BINDINGS_PER_FILE), false);
     }
 
     /**
-     * @return list<FormBinding>
+     * @param array<Class_> $classes
+     *
+     * @return Generator<FormBinding>
      */
-    private function bindingsForPublicMethods(string $filePath, Class_ $class): array
+    private function allBindings(string $filePath, array $classes): Generator
+    {
+        foreach ($classes as $class) {
+            yield from $this->bindingsForPublicMethods($filePath, $class);
+        }
+    }
+
+    /**
+     * @return Generator<FormBinding>
+     */
+    private function bindingsForPublicMethods(string $filePath, Class_ $class): Generator
     {
         $reachableCallIndex = $this->thisCallReachability->indexCalls($this->methodsByName($class), $this->isCreateFormCall(...));
 
-        $bindings = [];
         foreach ($class->getMethods() as $classMethod) {
-            if (!$classMethod->isPublic()) {
-                continue;
-            }
-
-            foreach ($this->bindingsForMethod($filePath, $classMethod, $reachableCallIndex) as $binding) {
-                $bindings[] = $binding;
+            if ($classMethod->isPublic()) {
+                yield from $this->bindingsForMethod($filePath, $classMethod, $reachableCallIndex);
             }
         }
-
-        return $bindings;
     }
 
     /**
@@ -155,10 +157,10 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
                 continue;
             }
 
-            $bindings[] = new FormBinding($filePath, $classMethod->name->toString(), $formClass);
+            $bindings[$formClass] = new FormBinding($filePath, $classMethod->name->toString(), $formClass);
         }
 
-        return $bindings;
+        return array_values($bindings);
     }
 
     /**
