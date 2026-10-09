@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Override;
 use Psr\Log\LoggerInterface;
-use Symfony\AI\Platform\Exception\UnexpectedResultTypeException;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Throwable;
@@ -181,7 +180,6 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
-     * @throws UnexpectedResultTypeException
      */
     #[Override]
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -208,7 +206,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         }
 
         try {
-            $content = $deferredResult->asText();
+            $content = $this->platformResultExtractor->extractText($deferredResult->getResult());
             [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
         } catch (Throwable $throwable) {
             $this->rateLimiter->record(0, 0);
