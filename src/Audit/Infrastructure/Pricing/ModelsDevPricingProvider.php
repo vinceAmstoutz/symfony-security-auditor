@@ -342,8 +342,9 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /**
      * The catalog file this provider actually reads, so `doctor` can name it
      * instead of assuming the packaged one — a `self-update` refresh writes an
-     * override that takes precedence, unless it cannot serve as a catalog, in
-     * which case the packaged one is read in its place.
+     * override that takes precedence, unless it cannot serve as a catalog or the
+     * packaged one is newer, in which case the packaged one is read in its
+     * place.
      */
     public function effectiveCatalogPath(): ?string
     {
@@ -355,11 +356,13 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /**
      * An override that does not exist yet falls through to the packaged
      * catalog rather than shadowing it, which is what makes the override
-     * location safe to point at before anything writes there.
+     * location safe to point at before anything writes there. One the packaged
+     * catalog has since overtaken, by an upgrade of the binary, gives way to
+     * it as well.
      */
     private function preferredCatalogPath(): ?string
     {
-        if (null !== $this->catalogPath && is_file($this->catalogPath)) {
+        if (null !== $this->catalogPath && is_file($this->catalogPath) && !ModelsDevCatalog::isFileNewer($this->packagedCatalogPath(), $this->catalogPath)) {
             return $this->catalogPath;
         }
 
