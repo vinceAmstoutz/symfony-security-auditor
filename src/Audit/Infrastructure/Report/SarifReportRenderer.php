@@ -57,7 +57,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             $results[] = $this->resultFor($vulnerability, !\array_key_exists(spl_object_id($vulnerability), $notAccepted));
         }
 
-        $rules = array_values(array_map($this->ruleFor(...), $vulnerabilitiesByRule));
+        $rules = array_values(array_map(fn (array $contributingVulnerabilities): array => $this->ruleFor($contributingVulnerabilities, $notAccepted), $vulnerabilitiesByRule));
 
         $cost = $auditReport->cost();
         $sarif = [
@@ -194,11 +194,16 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
      * it stays stable across runs instead of following whichever finding
      * happens to be most severe.
      *
+     * Only the findings the baseline leaves open score the rule: an accepted
+     * finding raises no alert, so it must not rank the ones that remain, and
+     * a rule with nothing open carries no score.
+     *
      * @param non-empty-list<Vulnerability> $contributingVulnerabilities
+     * @param array<int, int>               $notAccepted                 the findings left standing, keyed by object id
      *
      * @return array<string, mixed>
      */
-    private function ruleFor(array $contributingVulnerabilities): array
+    private function ruleFor(array $contributingVulnerabilities, array $notAccepted): array
     {
         $contributingTypes = [];
         foreach ($contributingVulnerabilities as $contributingVulnerability) {
@@ -208,20 +213,24 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         ksort($contributingTypes);
         $vulnerabilityType = reset($contributingTypes);
 
+        $properties = ['tags' => [...array_values(array_unique(array_map($this->cweTag(...), $contributingTypes))), self::SECURITY_TAG]];
+
+        $openVulnerabilities = array_filter($contributingVulnerabilities, static fn (Vulnerability $vulnerability): bool => \array_key_exists(spl_object_id($vulnerability), $notAccepted));
+        if ([] !== $openVulnerabilities) {
+            $properties['security-severity'] = $this->securitySeverity($this->highestBaseScore($openVulnerabilities));
+        }
+
         return [
             'id' => $vulnerabilityType->owaspReference(),
             'name' => $vulnerabilityType->value,
             'shortDescription' => ['text' => $vulnerabilityType->category()],
             'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
-            'properties' => [
-                'tags' => [...array_values(array_unique(array_map($this->cweTag(...), $contributingTypes))), self::SECURITY_TAG],
-                'security-severity' => $this->securitySeverity($this->highestBaseScore($contributingVulnerabilities)),
-            ],
+            'properties' => $properties,
         ];
     }
 
     /**
-     * @param non-empty-list<Vulnerability> $vulnerabilities
+     * @param non-empty-array<int, Vulnerability> $vulnerabilities
      */
     private function highestBaseScore(array $vulnerabilities): float
     {
