@@ -28,6 +28,7 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
         private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
+        private ProviderBoundSettings $providerBoundSettings = new ProviderBoundSettings(),
     ) {}
 
     /**
@@ -35,10 +36,11 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
      * @throws UnsafeStandaloneConfigWriteException
      */
     #[Override]
-    public function write(string $configFile, array $config): void
+    public function write(string $configFile, array $config): array
     {
         $this->assertSafeToWrite($configFile);
-        $settings = $config + $this->existingSettings($configFile);
+        [$keptSettings, $removedSettings] = $this->keptSettings($configFile, $config);
+        $settings = $config + $keptSettings;
 
         try {
             if (!$this->filesystem->exists($configFile)) {
@@ -52,6 +54,31 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
         } catch (IOException $ioException) {
             throw StandaloneConfigWriteException::fromIOException($configFile, $ioException);
         }
+
+        return $removedSettings;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @return array{array<array-key, mixed>, list<string>}
+     */
+    private function keptSettings(string $configFile, array $config): array
+    {
+        $existingSettings = $this->existingSettings($configFile);
+
+        return $this->switchesProvider($config, $existingSettings)
+            ? $this->providerBoundSettings->removedFrom($existingSettings)
+            : [$existingSettings, []];
+    }
+
+    /**
+     * @param array<string, mixed>    $config
+     * @param array<array-key, mixed> $existingSettings
+     */
+    private function switchesProvider(array $config, array $existingSettings): bool
+    {
+        return \array_key_exists('provider', $config) && $config['provider'] !== ($existingSettings['provider'] ?? null);
     }
 
     /**
