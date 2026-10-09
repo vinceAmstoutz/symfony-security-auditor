@@ -17,7 +17,7 @@ deptrac:
         - type: classLike
           value: .*\\Infrastructure\\Scan\\(AccessControlRequirementReader|IsGrantedAttributeParser|PhpParserControllerAccessControlParser|PhpParserFormBindingParser|PhpParserVoterCapabilityParser|RouteAttributeParser|SymfonyYamlSecurityConfigParser|VoterSupportedAttributeCollector)$
         - type: classLike
-          value: .*\\Infrastructure\\Config\\(AttackerAgentDefinitionFactory|AuditConfigurationDefinition|ContainerParameterRegistrar|PricingPlatformPass)$
+          value: .*\\Infrastructure\\Config\\(AttackerAgentDefinitionFactory|AuditConfigurationDefinition|ContainerParameterRegistrar|PricingPlatformPass|TypedNodeEnvPlaceholderFinder)$
     - name: Infrastructure
       collectors:
         - type: bool

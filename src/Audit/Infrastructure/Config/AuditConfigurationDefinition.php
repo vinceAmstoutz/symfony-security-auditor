@@ -27,6 +27,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
  */
 final readonly class AuditConfigurationDefinition
 {
+    public const string REFUSES_ENV_PLACEHOLDER = 'refuses_env_placeholder';
+
     public function defineChildren(NodeBuilder $nodeBuilder): void
     {
         $this->defineModelNodes($nodeBuilder);
@@ -47,6 +49,7 @@ final readonly class AuditConfigurationDefinition
                 ->enumNode('profile')
                     ->values(['fast', 'balanced', 'thorough'])
                     ->defaultValue('balanced')
+                    ->attribute(self::REFUSES_ENV_PLACEHOLDER, true)
                     ->info('One-knob preset bundling the cost/speed/depth levers; any explicitly configured key always wins over the profile. `fast`: one attacker iteration, lean pre-scan (marker-bearing files only), code slicing on, up to 4 concurrent attacker and reviewer calls. `balanced` (default): identical to configuring nothing. `thorough`: balanced plus PoC synthesis for high-severity validated findings.')
                 ->end()
                 ->scalarNode('attacker_model')
@@ -214,6 +217,7 @@ final readonly class AuditConfigurationDefinition
                         ->enumNode('fail_on')
                             ->values(['safe', 'low', 'medium', 'high', 'critical'])
                             ->defaultValue('critical')
+                            ->attribute(self::REFUSES_ENV_PLACEHOLDER, true)
                             ->info("Minimum aggregate risk level that makes `audit:run` exit 1 (the CI gate). The audit exits 1 when the report's risk level is at or above this threshold, 0 otherwise (a budget abort still exits 2). Default `critical` preserves the historical behaviour (only a CRITICAL risk level fails). Set `high`/`medium`/`low` to fail PRs earlier. `safe` fails on every completed audit. The --fail-on CLI option overrides this per run.")
                         ->end()
                         ->append((new NullableIntegerNodeDefinition('min_score'))
@@ -258,7 +262,7 @@ final readonly class AuditConfigurationDefinition
                             ->useAttributeAsKey('name')
                             ->arrayPrototype()
                                 ->children()
-                                    ->enumNode('file_type')->isRequired()->values($this->projectFileTypeValues())->info('File-type bucket the skill applies to (controller, voter, entity, repository, form, template, config, php, …).')->end()
+                                    ->enumNode('file_type')->isRequired()->values($this->projectFileTypeValues())->attribute(self::REFUSES_ENV_PLACEHOLDER, true)->info('File-type bucket the skill applies to (controller, voter, entity, repository, form, template, config, php, …).')->end()
                                     ->scalarNode('instructions')->isRequired()->cannotBeEmpty()->info('Free-form expert instructions injected into the prompt. State both what to hunt and what NOT to flag.')->end()
                                     ->integerNode('priority')->defaultValue(500)->info('Emission rank — lower emits earlier (weighted more heavily by the LLM). Built-in skills occupy roughly 10–400; the 500 default emits custom skills after them.')->end()
                                 ->end()

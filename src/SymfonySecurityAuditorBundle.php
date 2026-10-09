@@ -63,7 +63,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewer
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TypedNodeEnvPlaceholderFinder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
@@ -112,10 +114,13 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      * @throws JsonException
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
+     * @throws TypedNodeEnvPlaceholderException
      */
     #[Override]
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        $this->assertNoEnvPlaceholderOnTypedSetting($config, $builder);
+
         $container->import('../config/services.php');
 
         /** @var BundleConfigArray $config */
@@ -130,6 +135,20 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $this->registerImplementationAliases($services, $bundleConfiguration);
         $this->registerCustomSkills($services, $bundleConfiguration);
         $this->registerEscalation($services, $bundleConfiguration);
+    }
+
+    /**
+     * @param array<array-key, mixed> $config
+     *
+     * @throws TypedNodeEnvPlaceholderException
+     */
+    private function assertNoEnvPlaceholderOnTypedSetting(array $config, ContainerBuilder $containerBuilder): void
+    {
+        $paths = (new TypedNodeEnvPlaceholderFinder())->pathsIn($config, $containerBuilder->getParameterBag());
+
+        if ([] !== $paths) {
+            throw TypedNodeEnvPlaceholderException::forPaths($paths);
+        }
     }
 
     /**

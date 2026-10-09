@@ -147,7 +147,7 @@ graph LR
 
 - `Infrastructure/Prompt/**` — the prompt builders and the `Skill/` blocks, whose wording names controllers, voters, forms, Twig templates and Doctrine repositories.
 - the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`, `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`, `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and `SymfonyYamlSecurityConfigParser`, plus the helpers two of them delegate to, `VoterSupportedAttributeCollector` and `AccessControlRequirementReader`.
-- the container-building classes in `Infrastructure/Config/` — `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory` and `ContainerParameterRegistrar`.
+- the container-building classes in `Infrastructure/Config/` — `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory`, `ContainerParameterRegistrar` and `TypedNodeEnvPlaceholderFinder`.
 
 The `Infrastructure` layer is then everything under `Infrastructure/` that is _not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain` and `Application` already cannot reach `Infrastructure` at all. So the audit engine, the LLM client, the caches, the report renderers and the scanners stay reusable for a non-Symfony target, while `Command`, the bundle class and the standalone entry point are free to wire the Symfony profile up.
 
