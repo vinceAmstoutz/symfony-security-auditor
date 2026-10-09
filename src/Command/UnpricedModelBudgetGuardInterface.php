@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface UnpricedModelBudgetGuardInterface
@@ -29,10 +29,9 @@ interface UnpricedModelBudgetGuardInterface
     public function permitsRun(InputInterface $input, SymfonyStyle $symfonyStyle): bool;
 
     /**
-     * The entry point with nobody to confirm (the MCP server): refuses a run
-     * whose cost budget cannot be enforced, since no prompt can accept the risk.
-     *
-     * @throws UnenforceableBudgetException
+     * The entry point with nobody to confirm (the MCP server) runs as it did
+     * before the guard existed — the cap never trips for an unpriced model —
+     * and says so in the log instead of refusing.
      */
-    public function assertBudgetEnforceable(): void;
+    public function warnWhenBudgetCannotBeEnforced(LoggerInterface $logger): void;
 }

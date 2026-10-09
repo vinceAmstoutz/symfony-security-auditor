@@ -795,6 +795,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(FindingTypeFilterInterface::class),
             service(ReviewerFeedbackHolder::class),
             service(UnpricedModelBudgetGuardInterface::class),
+            service('logger'),
         ]);
 
     $defaultsConfigurator->set(McpServerFactory::class)

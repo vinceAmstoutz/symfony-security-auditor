@@ -14,10 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnenforceableBudgetException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuardInterface
@@ -56,18 +56,27 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
             return $errorStyle->confirm('Continue anyway, knowing the cost budget will not be enforced?', false);
         }
 
-        $errorStyle->error(UnenforceableBudgetException::forUnpricedModels($unpricedModels)->getMessage());
+        $errorStyle->error('Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd.');
 
         return false;
     }
 
     #[Override]
-    public function assertBudgetEnforceable(): void
+    public function warnWhenBudgetCannotBeEnforced(LoggerInterface $logger): void
     {
         $unpricedModels = $this->unpricedModels();
-        if (null !== $this->maxCostUsd && [] !== $unpricedModels) {
-            throw UnenforceableBudgetException::forUnpricedModels($unpricedModels);
+        if (null === $this->maxCostUsd || [] === $unpricedModels) {
+            return;
         }
+
+        $logger->warning(
+            \sprintf(
+                'The cost budget audit.budget.max_cost_usd = %s cannot be enforced for the unpriced model(s) %s: the audit runs, and its real spend may exceed it.',
+                $this->maxCostUsd,
+                implode(', ', $unpricedModels),
+            ),
+            ['models' => $unpricedModels, 'max_cost_usd' => $this->maxCostUsd],
+        );
     }
 
     /** @return list<string> */
