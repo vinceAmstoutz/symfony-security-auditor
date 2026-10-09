@@ -181,7 +181,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
     /**
      * @throws AdvisorySourceUnavailableException
      */
-    public function test_a_symlinked_lockfile_is_never_cached(): void
+    public function test_a_lockfile_symlinked_to_a_file_inside_the_project_is_cached_like_any_other(): void
     {
         file_put_contents($this->projectDir.'/real.lock', '{"lock": "v1"}');
         symlink($this->projectDir.'/real.lock', $this->projectDir.'/composer.lock');
@@ -191,7 +191,29 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         $lockfileHashedAdvisoryCache->run($this->projectDir);
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
-        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'a symlinked lockfile must reach the inner runner every time');
+        self::assertSame(1, $recordingComposerAuditRunner->callCount, 'a lockfile symlinked inside the project is keyed by its content, so the second call is a hit');
+        self::assertFileExists($this->cacheDir.'/'.substr(hash('sha256', '{"lock": "v1"}'), 0, 2).'/'.hash('sha256', '{"lock": "v1"}').'.json');
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_a_lockfile_symlinked_outside_the_project_is_never_cached(): void
+    {
+        $outside = sys_get_temp_dir().'/advisory_cache_outside_'.uniqid('', true).'.lock';
+        file_put_contents($outside, '{"lock": "v1"}');
+        symlink($outside, $this->projectDir.'/composer.lock');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
+        $lockfileHashedAdvisoryCache = $this->makeCache($recordingComposerAuditRunner);
+
+        try {
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+        } finally {
+            unlink($outside);
+        }
+
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'a lockfile symlinked outside the project must reach the inner runner every time');
         $cacheFiles = glob($this->cacheDir.'/*/*.json');
         self::assertSame([], false !== $cacheFiles ? $cacheFiles : []);
     }

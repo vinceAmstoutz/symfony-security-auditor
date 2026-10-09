@@ -22,7 +22,8 @@ use function Symfony\Component\String\b;
 /**
  * SHA-256 of the audited project's `composer.lock`, or `null` when there is
  * no lockfile to key an advisory snapshot on. The project is untrusted, so a
- * lockfile that is a symlink (`composer.lock -> /dev/zero`) or larger than
+ * lockfile that is a symlink not leading to a regular file inside the project
+ * (`composer.lock -> /dev/zero`, see `LockfileSymlinkResolver`) or larger than
  * `MAX_LOCKFILE_BYTES` is refused before it is read.
  *
  * @internal not part of the BC promise — see docs/versioning.md
@@ -40,12 +41,17 @@ final readonly class LockfileHasher
     {
         $lockfilePath = \sprintf('%s/composer.lock', b($projectPath)->trimEnd('/')->toString());
 
-        if (!$this->filesystem->exists($lockfilePath) || $this->isRefused($lockfilePath)) {
+        if (!$this->filesystem->exists($lockfilePath)) {
+            return null;
+        }
+
+        $readablePath = $this->readablePath($lockfilePath, $projectPath);
+        if (null === $readablePath) {
             return null;
         }
 
         try {
-            $contents = $this->filesystem->readFile($lockfilePath);
+            $contents = $this->filesystem->readFile($readablePath);
         } catch (IOException $ioException) {
             $this->logger->warning('composer.lock present but unreadable; skipping advisory cache', [
                 'path' => $lockfilePath,
@@ -58,15 +64,16 @@ final readonly class LockfileHasher
         return hash('sha256', $contents);
     }
 
-    private function isRefused(string $lockfilePath): bool
+    private function readablePath(string $lockfilePath, string $projectPath): ?string
     {
-        if (is_link($lockfilePath)) {
-            $this->logger->warning('composer.lock is a symlink; skipping advisory cache', ['path' => $lockfilePath]);
+        $readablePath = LockfileSymlinkResolver::resolve($lockfilePath, $projectPath);
+        if (null === $readablePath) {
+            $this->logger->warning('composer.lock is a symlink that does not lead to a regular file inside the project; skipping advisory cache', ['path' => $lockfilePath]);
 
-            return true;
+            return null;
         }
 
-        $bytes = filesize($lockfilePath);
+        $bytes = filesize($readablePath);
         \assert(false !== $bytes, 'filesize() must succeed for a path exists() already confirmed present');
 
         if ($bytes > self::MAX_LOCKFILE_BYTES) {
@@ -76,9 +83,9 @@ final readonly class LockfileHasher
                 'max_bytes' => self::MAX_LOCKFILE_BYTES,
             ]);
 
-            return true;
+            return null;
         }
 
-        return false;
+        return $readablePath;
     }
 }

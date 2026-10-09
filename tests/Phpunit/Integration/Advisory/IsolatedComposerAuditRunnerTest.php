@@ -27,6 +27,8 @@ final class IsolatedComposerAuditRunnerTest extends TestCase
 {
     private const string HOSTILE_MANIFEST = '{"repositories": [{"type": "composer", "url": "http://169.254.169.254/"}]}';
 
+    private const string SYMLINK_REFUSAL = 'composer.lock is a symlink that does not lead to a regular file inside the project';
+
     private const string LOCKFILE = '{"packages": [{"name": "vendor/foo", "version": "1.0.0"}]}';
 
     private string $projectDir;
@@ -183,13 +185,64 @@ final class IsolatedComposerAuditRunnerTest extends TestCase
         $this->assertRefusedWithoutRunningComposer('composer.lock does not exist');
     }
 
-    public function test_a_symlinked_lockfile_is_refused_before_composer_runs(): void
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_a_lockfile_symlinked_to_a_file_inside_the_project_is_copied(): void
     {
         unlink($this->projectDir.'/composer.lock');
         file_put_contents($this->projectDir.'/real.lock', self::LOCKFILE);
         symlink($this->projectDir.'/real.lock', $this->projectDir.'/composer.lock');
+        $workspaceInspectingComposerAuditRunner = new WorkspaceInspectingComposerAuditRunner();
+        $isolatedComposerAuditRunner = new IsolatedComposerAuditRunner($workspaceInspectingComposerAuditRunner, new Filesystem());
 
-        $this->assertRefusedWithoutRunningComposer('composer.lock is a symlink');
+        $isolatedComposerAuditRunner->run($this->projectDir);
+
+        self::assertSame(1, $workspaceInspectingComposerAuditRunner->callCount);
+        self::assertSame(self::LOCKFILE, $workspaceInspectingComposerAuditRunner->lockfile);
+    }
+
+    public function test_a_lockfile_symlinked_to_a_file_outside_the_project_is_refused_before_composer_runs(): void
+    {
+        unlink($this->projectDir.'/composer.lock');
+        $outside = sys_get_temp_dir().'/isolated_composer_outside_'.uniqid('', true).'.lock';
+        file_put_contents($outside, self::LOCKFILE);
+        symlink($outside, $this->projectDir.'/composer.lock');
+
+        try {
+            $this->assertRefusedWithoutRunningComposer(self::SYMLINK_REFUSAL);
+        } finally {
+            unlink($outside);
+        }
+    }
+
+    public function test_a_lockfile_symlinked_to_a_device_is_refused_before_composer_runs(): void
+    {
+        unlink($this->projectDir.'/composer.lock');
+        symlink('/dev/zero', $this->projectDir.'/composer.lock');
+
+        $this->assertRefusedWithoutRunningComposer(self::SYMLINK_REFUSAL);
+    }
+
+    public function test_a_lockfile_symlinked_to_a_directory_inside_the_project_is_refused_before_composer_runs(): void
+    {
+        unlink($this->projectDir.'/composer.lock');
+        mkdir($this->projectDir.'/vendor', 0o777, true);
+        symlink($this->projectDir.'/vendor', $this->projectDir.'/composer.lock');
+
+        $this->assertRefusedWithoutRunningComposer(self::SYMLINK_REFUSAL);
+    }
+
+    public function test_a_symlinked_lockfile_over_the_size_cap_is_refused_before_composer_runs(): void
+    {
+        unlink($this->projectDir.'/composer.lock');
+        $handle = fopen($this->projectDir.'/real.lock', 'w');
+        self::assertIsResource($handle);
+        ftruncate($handle, IsolatedComposerAuditRunner::MAX_LOCKFILE_BYTES + 1);
+        fclose($handle);
+        symlink($this->projectDir.'/real.lock', $this->projectDir.'/composer.lock');
+
+        $this->assertRefusedWithoutRunningComposer(\sprintf('composer.lock is larger than %d bytes', IsolatedComposerAuditRunner::MAX_LOCKFILE_BYTES));
     }
 
     public function test_a_lockfile_over_the_size_cap_is_refused_before_composer_runs(): void
