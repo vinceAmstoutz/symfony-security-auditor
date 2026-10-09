@@ -87,8 +87,8 @@ final class ConcurrentChunkAnalyzerRefusedRecordingTest extends TestCase
         $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willReturnCallback(static function (array $requests): array {
             $toolRegistry = ConcurrentChunkAnalyzerHarness::registryOf($requests[0]);
-            $toolRegistry->execute('record_vulnerability', self::withoutDescription('refused'));
-            $toolRegistry->execute('record_vulnerability', self::withoutDescription('refused too'));
+            $toolRegistry->execute('record_vulnerability', self::withoutDescription('refused', 11));
+            $toolRegistry->execute('record_vulnerability', self::withoutDescription('refused too', 12));
             $toolRegistry->execute('record_vulnerability', self::withoutDescription('refused and repeated'));
             $toolRegistry->execute('record_vulnerability', ConcurrentChunkAnalyzerHarness::recordedFinding('refused and repeated'));
 
@@ -158,9 +158,10 @@ final class ConcurrentChunkAnalyzerRefusedRecordingTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private static function withoutDescription(string $title): array
+    private static function withoutDescription(string $title, int $lineStart = 1): array
     {
         $finding = ConcurrentChunkAnalyzerHarness::recordedFinding($title);
+        $finding['line_start'] = $lineStart;
         unset($finding['description']);
 
         return $finding;
