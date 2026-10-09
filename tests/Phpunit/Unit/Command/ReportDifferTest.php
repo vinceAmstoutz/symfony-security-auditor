@@ -250,6 +250,63 @@ final class ReportDifferTest extends TestCase
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
      */
+    public function test_diff_series_compares_each_report_with_the_one_before_it(): void
+    {
+        $first = $this->writeReport('first.json', [$this->vulnerability('SQL Injection')]);
+        $second = $this->writeReport('second.json', [$this->vulnerability('SQL Injection'), $this->vulnerability('XSS')]);
+        $third = $this->writeReport('third.json', [$this->vulnerability('XSS')]);
+        $reportDiffer = new ReportDiffer(new ReportFindingsLoader($this->filesystem));
+
+        $reportDiffs = $reportDiffer->diffSeries([$first, $second, $third]);
+
+        self::assertCount(2, $reportDiffs);
+        self::assertEquals($reportDiffer->diff($first, $second), $reportDiffs[0]);
+        self::assertEquals($reportDiffer->diff($second, $third), $reportDiffs[1]);
+        self::assertSame(['XSS'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiffs[0]->newFindings));
+        self::assertSame(['SQL Injection'], array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiffs[1]->fixedFindings));
+    }
+
+    /**
+     * @param list<string> $filenames
+     *
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    #[DataProvider('seriesTooShortToCompare')]
+    public function test_diff_series_has_nothing_to_compare_in_fewer_than_two_reports(array $filenames): void
+    {
+        $paths = array_map(fn (string $filename): string => $this->writeReport($filename, []), $filenames);
+
+        self::assertSame([], (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diffSeries($paths));
+    }
+
+    /**
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function seriesTooShortToCompare(): iterable
+    {
+        yield 'no report' => [[]];
+        yield 'one report' => [['only.json']];
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_series_throws_when_a_report_of_the_series_is_missing(): void
+    {
+        $first = $this->writeReport('first.json', []);
+        $third = $this->writeReport('third.json', []);
+
+        $this->expectException(ReportFileNotReadableException::class);
+
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diffSeries([$first, $this->tmpDir.'/absent.json', $third]);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
     public function test_diff_throws_when_the_previous_report_file_is_missing(): void
     {
         $current = $this->writeReport('current.json', []);

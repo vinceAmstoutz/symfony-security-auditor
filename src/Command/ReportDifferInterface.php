@@ -24,4 +24,16 @@ interface ReportDifferInterface
      * @throws MalformedReportFileException
      */
     public function diff(string $previousReportPath, string $currentReportPath): ReportDiff;
+
+    /**
+     * Compares each report with the one before it, reading every report once.
+     *
+     * @param list<string> $reportPaths ordered oldest to newest
+     *
+     * @return list<ReportDiff> one per consecutive pair
+     *
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function diffSeries(array $reportPaths): array;
 }
