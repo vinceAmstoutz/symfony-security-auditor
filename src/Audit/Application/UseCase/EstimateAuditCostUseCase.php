@@ -242,7 +242,6 @@ final readonly class EstimateAuditCostUseCase
         }
 
         $auditContext = AuditContext::forProject($projectPath);
-        $auditContext->setProjectFiles($scannedFiles);
         $auditContext->setMappingFiles(ScopedScan::mappingFiles($this->projectFileScanner, $projectPath, $scanPaths, $scannedFiles));
 
         $this->mappingStage->process($auditContext);
