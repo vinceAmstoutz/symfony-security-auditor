@@ -50,7 +50,9 @@ final readonly class PlatformResultExtractor
      * reported none (Bedrock's InvokeModel route, a gateway that omits
      * `usage`), the call's estimated input tokens, which the provider bills
      * all the same: the output it produced is then unknown and counted as
-     * none.
+     * none. A usage object that reports no prompt tokens (empty, or zero with
+     * no cache count to account for the prompt) books the estimate for the
+     * input as well, beside the completion it reported.
      *
      * @return array{0: int, 1: int, 2: int, 3: int}
      *
@@ -65,10 +67,27 @@ final readonly class PlatformResultExtractor
         }
 
         [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->tokenCounts($tokenUsage);
+        if (!$this->reportsPrompt($tokenUsage, $inputTokens, $cacheReadTokens, $cacheCreationTokens)) {
+            $this->logger->debug('The provider reported no prompt tokens for an answer; its input is booked at the estimated input tokens, since the provider bills the request it accepted', [
+                'estimated_input_tokens' => $estimatedInputTokens,
+            ]);
+            $inputTokens = $estimatedInputTokens;
+        }
+
         $this->assertNonNegative($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
         $this->tokenUsageRecorder?->record($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
 
         return [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
+    }
+
+    /**
+     * A request is never empty, so a prompt count that is missing, or zero
+     * with no cache read or write to stand in for it (Anthropic counts those
+     * apart from its input tokens), is a provider that did not report it.
+     */
+    private function reportsPrompt(TokenUsageInterface $tokenUsage, int $inputTokens, int $cacheReadTokens, int $cacheCreationTokens): bool
+    {
+        return null !== $tokenUsage->getPromptTokens() && (0 !== $inputTokens || 0 !== $cacheReadTokens || 0 !== $cacheCreationTokens);
     }
 
     /**
