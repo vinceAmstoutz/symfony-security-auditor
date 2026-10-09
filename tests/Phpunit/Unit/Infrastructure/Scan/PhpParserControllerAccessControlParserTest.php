@@ -1656,6 +1656,56 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_route_keeps_every_guard_attribute_up_to_the_cap(): void
+    {
+        $attributes = array_map(static fn (int $index): string => 'ATTR_'.$index, range(0, 99));
+
+        self::assertSame($attributes, $this->guardAttributesOfAnActionCalling($attributes));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_route_drops_the_guard_attributes_past_the_cap(): void
+    {
+        $attributes = array_map(static fn (int $index): string => 'ATTR_'.$index, range(0, 100));
+
+        self::assertSame(\array_slice($attributes, 0, 100), $this->guardAttributesOfAnActionCalling($attributes));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_repeated_guard_attribute_counts_once_against_the_cap(): void
+    {
+        $attributes = [...array_fill(0, 150, 'EDIT'), 'PUBLISH'];
+
+        self::assertSame(['EDIT', 'PUBLISH'], $this->guardAttributesOfAnActionCalling($attributes));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chain_of_actions_each_guarding_its_own_attribute_caps_what_each_route_reaches(): void
+    {
+        $actionCount = 150;
+        $source = "<?php\nnamespace App\\Controller;\nuse Symfony\\Component\\Routing\\Attribute\\Route;\nfinal class ChainController extends AbstractController {\n";
+        for ($i = 0; $i < $actionCount; ++$i) {
+            $source .= \sprintf("#[Route('/r%d')]\npublic function m%d() { \$this->denyAccessUnlessGranted('ATTR_%d'); \$this->m%d(); }\n", $i, $i, $i, $i + 1);
+        }
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/ChainController.php', $source."public function m150() {}\n}\n"));
+
+        self::assertSame(
+            array_map(static fn (int $index): int => min(100, $actionCount - $index), range(0, $actionCount - 1)),
+            array_map(static fn (RouteAccessControl $routeAccessControl): int => \count($routeAccessControl->guardAttributes()), \array_slice($entries, 0, $actionCount)),
+        );
+        self::assertSame('ATTR_99', $entries[0]->guardAttributes()[99]);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_file_nested_too_deeply_to_parse_safely(): void
     {
         $nesting = str_repeat('f(', 33000).'1'.str_repeat(')', 33000);
@@ -1679,6 +1729,29 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     private function makeFile(string $relativePath, string $content): ProjectFile
     {
         return ProjectFile::create($relativePath, '/app/'.$relativePath, $content);
+    }
+
+    /**
+     * @param list<string> $attributes
+     *
+     * @return list<string>
+     *
+     * @throws InvalidProjectFileException
+     */
+    private function guardAttributesOfAnActionCalling(array $attributes): array
+    {
+        $body = implode(' ', array_map(static fn (string $attribute): string => \sprintf("\$this->denyAccessUnlessGranted('%s');", $attribute), $attributes));
+        $source = <<<PHP
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class GuardedController extends AbstractController {
+                #[Route('/guarded')]
+                public function guarded(): void { {$body} }
+            }
+            PHP;
+
+        return $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/GuardedController.php', $source))[0]->guardAttributes();
     }
 
     /**

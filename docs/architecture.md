@@ -295,7 +295,7 @@ One entry per voter file emitted by `VoterCapabilityParserInterface` (default im
 
 ### `FormBinding` — immutable controller → form-type binding
 
-One entry per `$this->createForm(SomeFormType::class)` call site emitted by `FormBindingParserInterface` (default impl `PhpParserFormBindingParser`). Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The attacker prompt renders the list as a `Form Bindings` block so the LLM can cross-reference call sites against the form types involved for mass-assignment / CSRF analysis without re-deriving the binding from source.
+One entry per form type a public action creates with `$this->createForm(SomeFormType::class)` (directly or through a `$this->helper()` it reaches), emitted by `FormBindingParserInterface` (default impl `PhpParserFormBindingParser`), each form type once per action in the order it first appears and at most 500 entries per file. Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The attacker prompt renders the list as a `Form Bindings` block so the LLM can cross-reference call sites against the form types involved for mass-assignment / CSRF analysis without re-deriving the binding from source.
 
 ### Pipeline ports (`Domain/Pipeline/`)
 

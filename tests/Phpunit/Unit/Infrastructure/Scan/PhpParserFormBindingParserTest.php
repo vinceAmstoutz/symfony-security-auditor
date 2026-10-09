@@ -18,6 +18,7 @@ use PhpParser\Node;
 use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\ThisCallReachability;
@@ -727,6 +728,125 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertCount($actionCount + 1, $bindings);
         self::assertSame('m0', $bindings[0]->controllerMethod());
         self::assertLessThan(8 * $this->nodeCount($source), $countingNodeFinder->visitedNodes);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_binds_a_form_created_several_times_in_one_action_once(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            use App\Form\ProfileType;
+            final class UserController {
+                public function edit(): void {
+                    $first = $this->createForm(UserType::class);
+                    $profile = $this->createForm(ProfileType::class);
+                    $second = $this->createForm(UserType::class);
+                }
+            }
+            PHP;
+
+        $bindings = $this->phpParserFormBindingParser->parse(ProjectFile::create('src/Controller/UserController.php', '/app/x', $source));
+
+        self::assertSame(
+            ['App\\Form\\UserType', 'App\\Form\\ProfileType'],
+            array_map(static fn (FormBinding $formBinding): string => $formBinding->formTypeClass(), $bindings),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chain_of_actions_each_creating_the_same_form_binds_each_action_once(): void
+    {
+        $actionCount = 60;
+        $source = $this->chainOfActionsEachCreatingAForm($actionCount, static fn (): string => 'ItemType');
+
+        $bindings = $this->phpParserFormBindingParser->parse(ProjectFile::create('src/Controller/ChainController.php', '/app/x', $source));
+
+        self::assertSame(
+            array_map(static fn (int $index): string => 'm'.$index, range(0, $actionCount - 1)),
+            array_map(static fn (FormBinding $formBinding): string => $formBinding->controllerMethod(), $bindings),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chain_of_actions_each_creating_its_own_form_stops_at_the_binding_cap_per_file(): void
+    {
+        $source = $this->chainOfActionsEachCreatingAForm(600, static fn (int $index): string => 'Item'.$index.'Type');
+
+        $bindings = $this->phpParserFormBindingParser->parse(ProjectFile::create('src/Controller/ChainController.php', '/app/x', $source));
+
+        self::assertCount(500, $bindings);
+        self::assertSame('m0', $bindings[499]->controllerMethod());
+        self::assertSame('App\\Controller\\Item0Type', $bindings[0]->formTypeClass());
+        self::assertSame('App\\Controller\\Item499Type', $bindings[499]->formTypeClass());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_file_binding_exactly_as_many_forms_as_the_cap_keeps_them_all(): void
+    {
+        $bindings = $this->phpParserFormBindingParser->parse(ProjectFile::create('src/Controller/WideController.php', '/app/x', $this->actionsEachCreatingItsOwnForm(500)));
+
+        self::assertCount(500, $bindings);
+        self::assertSame('m499', $bindings[499]->controllerMethod());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_file_binding_one_form_more_than_the_cap_drops_only_the_last_one(): void
+    {
+        $bindings = $this->phpParserFormBindingParser->parse(ProjectFile::create('src/Controller/WideController.php', '/app/x', $this->actionsEachCreatingItsOwnForm(501)));
+
+        self::assertCount(500, $bindings);
+        self::assertSame('m499', $bindings[499]->controllerMethod());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_binding_cap_is_shared_by_every_class_of_a_file(): void
+    {
+        $source = $this->actionsEachCreatingItsOwnForm(300)."\nclass SecondController extends AbstractController {\n";
+        for ($i = 0; $i < 300; ++$i) {
+            $source .= \sprintf("public function s%d() { \$this->createForm(Second%dType::class); }\n", $i, $i);
+        }
+
+        $bindings = $this->phpParserFormBindingParser->parse(ProjectFile::create('src/Controller/WideController.php', '/app/x', $source."}\n"));
+
+        self::assertCount(500, $bindings);
+        self::assertSame('s199', $bindings[499]->controllerMethod());
+    }
+
+    /**
+     * @param callable(int): string $formTypeFor
+     */
+    private function chainOfActionsEachCreatingAForm(int $actionCount, callable $formTypeFor): string
+    {
+        $source = "<?php\nnamespace App\\Controller;\nfinal class ChainController extends AbstractController {\n";
+        for ($i = 0; $i < $actionCount; ++$i) {
+            $source .= \sprintf("public function m%d() { \$this->createForm(%s::class); \$this->m%d(); }\n", $i, $formTypeFor($i), $i + 1);
+        }
+
+        return $source.\sprintf("public function m%d() {}\n}\n", $actionCount);
+    }
+
+    private function actionsEachCreatingItsOwnForm(int $actionCount): string
+    {
+        $source = "<?php\nnamespace App\\Controller;\nfinal class WideController extends AbstractController {\n";
+        for ($i = 0; $i < $actionCount; ++$i) {
+            $source .= \sprintf("public function m%d() { \$this->createForm(Item%dType::class); }\n", $i, $i);
+        }
+
+        return $source."}\n";
     }
 
     private function chainOfPublicActionsEndingInAForm(int $actionCount): string
