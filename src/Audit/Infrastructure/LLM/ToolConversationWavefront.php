@@ -341,7 +341,7 @@ final readonly class ToolConversationWavefront
     {
         try {
             $platformResult = $deferredResult->getResult();
-            $callTokens = $this->platformResultExtractor->extractTokens($deferredResult);
+            $callTokens = $this->platformResultExtractor->extractTokens($deferredResult, $conversationState->estimatedInputTokens);
         } catch (Throwable $throwable) {
             $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
             $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $conversationState->estimatedInputTokens);

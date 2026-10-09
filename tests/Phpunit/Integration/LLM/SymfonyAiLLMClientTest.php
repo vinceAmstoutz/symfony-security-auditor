@@ -96,7 +96,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      */
     public function test_complete_returns_text_from_platform_invoke(): void
     {
-        $platform = $this->scriptedPlatform([new TextResult('Hello from LLM')]);
+        $platform = $this->scriptedPlatformWithTokenUsage(new TextResult('Hello from LLM'), new TokenUsage(promptTokens: 12, completionTokens: 5));
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
 
         $llmResponse = $symfonyAiLLMClient->complete('You are a helper.', 'Tell me a joke.');
@@ -104,8 +104,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('Hello from LLM', $llmResponse->content());
         self::assertSame('test-model', $llmResponse->model());
         self::assertSame('end_turn', $llmResponse->stopReason());
-        self::assertSame(0, $llmResponse->inputTokens());
-        self::assertSame(0, $llmResponse->outputTokens());
+        self::assertSame(12, $llmResponse->inputTokens());
+        self::assertSame(5, $llmResponse->outputTokens());
     }
 
     /**
@@ -1297,9 +1297,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      */
     public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
     {
-        $platform = $this->scriptedPlatform([
-            new MultiPartResult([new TextResult('done')]),
-        ]);
+        $platform = $this->scriptedPlatformWithTokenUsage(new MultiPartResult([new TextResult('done')]), new TokenUsage(promptTokens: 12, completionTokens: 5));
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'description here')], new NullLogger());
@@ -1308,8 +1306,8 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertSame('done', $llmResponse->content());
         self::assertSame('end_turn', $llmResponse->stopReason());
-        self::assertSame(0, $llmResponse->inputTokens());
-        self::assertSame(0, $llmResponse->outputTokens());
+        self::assertSame(12, $llmResponse->inputTokens());
+        self::assertSame(5, $llmResponse->outputTokens());
     }
 
     /**
@@ -1900,22 +1898,23 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_complete_returns_zero_tokens_when_platform_metadata_omits_token_usage(): void
+    public function test_complete_books_the_estimated_input_tokens_when_platform_metadata_omits_token_usage(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
         $platform = $this->scriptedPlatform([new TextResult('done')]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             new PlatformBinding($platform, 'm', new NullLogger()),
+            new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(7)),
             platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
 
-        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(14, $llmResponse->inputTokens());
         self::assertSame(0, $llmResponse->outputTokens());
         self::assertSame(0, $llmResponse->cacheReadTokens());
         self::assertSame(0, $llmResponse->cacheCreationTokens());
-        self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+        self::assertSame(14, $tokenUsageRecorder->snapshot()->totalTokens());
     }
 
     /**

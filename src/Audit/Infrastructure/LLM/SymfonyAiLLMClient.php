@@ -207,7 +207,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
 
         try {
             $content = $this->platformResultExtractor->extractText($deferredResult->getResult());
-            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
+            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult, $estimatedInputTokens);
         } catch (Throwable $throwable) {
             $this->rateLimiter->record(0, 0);
 

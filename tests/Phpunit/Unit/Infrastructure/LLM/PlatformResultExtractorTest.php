@@ -41,6 +41,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\U
 
 final class PlatformResultExtractorTest extends TestCase
 {
+    private const int ESTIMATED_INPUT_TOKENS = 999;
+
     /**
      * @throws NegativeTokenCountException
      */
@@ -50,6 +52,7 @@ final class PlatformResultExtractorTest extends TestCase
 
         $tokens = $platformResultExtractor->extractTokens(
             $this->deferredResultWithTokenUsage(new TokenUsage(promptTokens: 10, completionTokens: 5, cacheCreationTokens: 2, cacheReadTokens: 3)),
+            self::ESTIMATED_INPUT_TOKENS,
         );
 
         self::assertSame([10, 5, 3, 2], $tokens);
@@ -65,7 +68,7 @@ final class PlatformResultExtractorTest extends TestCase
     {
         $platformResultExtractor = new PlatformResultExtractor(null);
 
-        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage)));
+        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage), self::ESTIMATED_INPUT_TOKENS));
     }
 
     /** @return iterable<string, array{TokenUsage, array{int, int, int, int}}> */
@@ -83,6 +86,51 @@ final class PlatformResultExtractorTest extends TestCase
     }
 
     /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_books_the_estimated_input_tokens_when_the_provider_reports_no_usage(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platformResultExtractor = new PlatformResultExtractor($tokenUsageRecorder);
+
+        $tokens = $platformResultExtractor->extractTokens($this->deferredResult(), 1234);
+
+        self::assertSame([1234, 0, 0, 0], $tokens);
+        self::assertSame([1234, 0, 0, 0], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens(), $tokenUsageRecorder->snapshot()->cacheReadTokens(), $tokenUsageRecorder->snapshot()->cacheCreationTokens()]);
+    }
+
+    /**
+     * @throws NegativeTokenCountException
+     */
+    public function test_it_says_in_the_debug_log_that_the_usage_it_books_is_estimated(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('debug')
+            ->with('The provider reported no token usage for an answer; it is booked at its estimated input tokens, since the provider bills the request it accepted', ['estimated_input_tokens' => 1234]);
+
+        (new PlatformResultExtractor(null, $logger))->extractTokens($this->deferredResult(), 1234);
+    }
+
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_books_the_usage_the_provider_reported_and_not_the_estimate(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('debug');
+        $platformResultExtractor = new PlatformResultExtractor($tokenUsageRecorder, $logger);
+
+        $tokens = $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage(new TokenUsage(promptTokens: 10, completionTokens: 5)), 1234);
+
+        self::assertSame([10, 5, 0, 0], $tokens);
+        self::assertSame([10, 5], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens()]);
+    }
+
+    /**
      * @param array{int, int, int, int} $expectedTokens input, output, cache read, cache creation
      *
      * @throws NegativeTokenCountException
@@ -92,7 +140,7 @@ final class PlatformResultExtractorTest extends TestCase
     {
         $platformResultExtractor = new PlatformResultExtractor(null);
 
-        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage)));
+        self::assertSame($expectedTokens, $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage), 0));
     }
 
     /** @return iterable<string, array{TokenUsage, array{int, int, int, int}}> */
@@ -129,7 +177,7 @@ final class PlatformResultExtractorTest extends TestCase
         $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage($expectedMessage);
 
-        $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage));
+        $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage), self::ESTIMATED_INPUT_TOKENS);
     }
 
     /** @return iterable<string, array{TokenUsage, string}> */

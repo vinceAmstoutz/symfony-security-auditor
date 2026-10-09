@@ -303,7 +303,7 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([
             new ToolCallResult([new ToolCall('call-1', 'record_vulnerability', $this->finding())]),
             new MaxOutputTokensException('cut off'),
-        ], []);
+        ], [new TokenUsage(promptTokens: 7, completionTokens: 3)]);
         $messageCollectingLogger = new MessageCollectingLogger();
 
         $llmResponse = $this->client($scriptedTokenUsagePlatform, $messageCollectingLogger)->completeWithTools('sys', 'usr', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
@@ -311,7 +311,7 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
         self::assertSame('length', $llmResponse->stopReason());
         self::assertSame(2, $scriptedTokenUsagePlatform->invocations);
         self::assertContains(
-            ['Tool-using loop ended with empty content response', ['iterations' => 1, 'stop_reason' => 'length', 'input_tokens' => 0, 'output_tokens' => 0, 'error' => 'LLM returned a response with no content: cut off']],
+            ['Tool-using loop ended with empty content response', ['iterations' => 1, 'stop_reason' => 'length', 'input_tokens' => 7, 'output_tokens' => 3, 'error' => 'LLM returned a response with no content: cut off']],
             $messageCollectingLogger->records,
         );
     }
@@ -560,8 +560,10 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
         $consumed->method('cancel')->willReturnCallback(static function () use (&$cancelled): void {
             $cancelled[] = 'consumed';
         });
+        $deferredResult = new DeferredResult(new PlainConverter(new TextResult('ok')), new RawHttpResult($consumed), []);
+        $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 4, completionTokens: 1));
         $scriptedDeferredPlatform = new ScriptedDeferredPlatform([
-            new DeferredResult(new PlainConverter(new TextResult('ok')), new RawHttpResult($consumed), []),
+            $deferredResult,
             new DeferredResult(new ThrowingConverter(new RuntimeException('HTTP 401 Unauthorized')), new RawHttpResult($refused), []),
             new RuntimeException('dispatch blip'),
             new DeferredResult(new PlainConverter(new TextResult('never read')), new RawHttpResult($abandoned), []),
@@ -593,9 +595,9 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
         self::assertInstanceOf(NonTransientLLMFailureException::class, $caught);
         self::assertSame(['refused', 'abandoned'], $cancelled);
         self::assertSame([10, 0], end($fakeRateLimiter->recorded));
-        self::assertSame(10, $budgetTracker->tokensUsed());
-        self::assertSame(10, $tokenUsageRecorder->snapshot()->inputTokens());
-        self::assertSame(0, $tokenUsageRecorder->snapshot()->outputTokens());
+        self::assertSame(15, $budgetTracker->tokensUsed());
+        self::assertSame(14, $tokenUsageRecorder->snapshot()->inputTokens());
+        self::assertSame(1, $tokenUsageRecorder->snapshot()->outputTokens());
         self::assertContains(
             ['Cancelled a request still in flight; its estimated input tokens are booked as spent since the provider bills a request it accepted', ['estimated_input_tokens' => 10]],
             $messageCollectingLogger->records,

@@ -25,6 +25,7 @@ use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\StructuredVulnerabilityCollectionSession;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
@@ -193,7 +194,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([
             new ToolCallResult([new ToolCall('call-1', 'record_vulnerability', $this->finding())]),
             new BadRequestException(self::PROMPT_TOO_LONG),
-        ], []);
+        ], [new TokenUsage(promptTokens: 7, completionTokens: 3)]);
         $messageCollectingLogger = new MessageCollectingLogger();
         $symfonyAiLLMClient = $this->client($scriptedTokenUsagePlatform, $messageCollectingLogger);
 
@@ -202,7 +203,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
         self::assertSame('empty_content', $llmResponse->stopReason());
         self::assertSame(2, $scriptedTokenUsagePlatform->invocations);
         self::assertContains(
-            [self::OUTGROWN_WARNING, ['iterations' => 1, 'input_tokens' => 0, 'output_tokens' => 0, 'error' => 'The model cannot fit the request: '.self::PROMPT_TOO_LONG]],
+            [self::OUTGROWN_WARNING, ['iterations' => 1, 'input_tokens' => 7, 'output_tokens' => 3, 'error' => 'The model cannot fit the request: '.self::PROMPT_TOO_LONG]],
             $messageCollectingLogger->records,
         );
     }
@@ -283,7 +284,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([
             new ToolCallResult([new ToolCall('call-1', 'record_vulnerability', $this->finding())]),
             new BadRequestException(self::PROMPT_TOO_LONG),
-        ], []);
+        ], [new TokenUsage(promptTokens: 7, completionTokens: 3)]);
         $messageCollectingLogger = new MessageCollectingLogger();
         $symfonyAiLLMClient = $this->client($scriptedTokenUsagePlatform, $messageCollectingLogger);
 
@@ -292,7 +293,7 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
         self::assertSame('empty_content', $responses[0]->stopReason());
         self::assertSame(2, $scriptedTokenUsagePlatform->invocations);
         self::assertContains(
-            [self::CONCURRENT_OUTGROWN_WARNING, ['input_tokens' => 0, 'output_tokens' => 0, 'error' => self::PROMPT_TOO_LONG]],
+            [self::CONCURRENT_OUTGROWN_WARNING, ['input_tokens' => 7, 'output_tokens' => 3, 'error' => self::PROMPT_TOO_LONG]],
             $messageCollectingLogger->records,
         );
     }
