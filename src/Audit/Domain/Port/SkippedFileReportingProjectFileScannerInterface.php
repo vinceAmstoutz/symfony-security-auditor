@@ -19,10 +19,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
  * Opt-in extension of {@see ProjectFileScannerInterface} for scanners that
  * know which files they matched and still left out because they were over the
  * size limit or could not be read. `IngestionStage` checks `instanceof` and
- * records each as a file the run did not analyze, so the report is incomplete
- * instead of passing the file as clean; a scanner that does not implement it
- * keeps working and reports nothing. Files excluded on purpose — gitignored,
- * hidden, outside the included paths — are not among them.
+ * lists each in the report's coverage as `skipped` under the `scan` stage:
+ * the report shows the file was left out, and nothing gates on it, so the
+ * report stays complete as it did when such a file was dropped silently; a
+ * scanner that does not implement it keeps working and reports nothing. Files
+ * excluded on purpose — gitignored, hidden, outside the included paths — are
+ * not among them.
  */
 interface SkippedFileReportingProjectFileScannerInterface extends ProjectFileScannerInterface
 {

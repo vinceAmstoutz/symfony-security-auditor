@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AnalyzedFiles;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScanSkippedFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\UnanalyzedFiles;
 
 /**
@@ -25,7 +26,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\UnanalyzedFiles;
  * coverage ledger — the files its attacker analyzed or served from its cache,
  * the files its ledger names at all, and the scan scope of a complete run over
  * the whole history. Only in the files it analyzed, or in a file such a run no
- * longer lists, can the absence of a finding prove anything.
+ * longer lists, can the absence of a finding prove anything. A file the scan
+ * left out is listed for information only ({@see ScanSkippedFiles}): the
+ * ledger does not name it, as the ledger of a scan that listed nothing did not.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -56,7 +59,7 @@ final readonly class LoadedReport
     ) {
         $this->unanalyzed = array_flip(array_map(EchoedFilePath::normalize(...), UnanalyzedFiles::in($coverage ?? [])));
         $this->analyzed = null === $coverage ? null : array_flip(array_map(EchoedFilePath::normalize(...), AnalyzedFiles::in($coverage)));
-        $this->ledger = array_flip(array_map(EchoedFilePath::normalize(...), array_column($coverage ?? [], 'file')));
+        $this->ledger = array_flip(array_map(EchoedFilePath::normalize(...), array_column(ScanSkippedFiles::without($coverage ?? []), 'file')));
     }
 
     /**
