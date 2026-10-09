@@ -55,6 +55,21 @@ final class RouteAttributeParserTest extends TestCase
         self::assertNull($this->extractFrom('#[Route(path: Other::PATH)]', ['PATH' => '/from-const'])[0]['path']);
     }
 
+    public function test_it_reads_a_route_stacked_several_times_once(): void
+    {
+        $routes = $this->extractFrom("#[Route('/a', methods: ['GET'], name: 'a')]\n#[Route('/a', methods: ['GET'], name: 'a')]\n#[Route('/b')]\n#[Route('/a', methods: ['GET'], name: 'a')]");
+
+        self::assertSame(['/a', '/b'], array_column($routes, 'path'));
+    }
+
+    public function test_it_keeps_stacked_routes_that_differ_in_methods_or_name(): void
+    {
+        $routes = $this->extractFrom("#[Route('/a', methods: ['GET'], name: 'a')]\n#[Route('/a', methods: ['POST'], name: 'a')]\n#[Route('/a', methods: ['GET'], name: 'b')]\n#[Route('/a', methods: ['GET'])]");
+
+        self::assertSame([['GET'], ['POST'], ['GET'], ['GET']], array_column($routes, 'methods'));
+        self::assertSame(['a', 'a', 'b', null], array_column($routes, 'name'));
+    }
+
     /**
      * @param array<string, string> $classConstants
      *

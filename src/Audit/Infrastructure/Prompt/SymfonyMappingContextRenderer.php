@@ -43,6 +43,10 @@ final readonly class SymfonyMappingContextRenderer
 
     private const int MAX_LISTED_VOTER_BYTES = 2048;
 
+    private const int MAX_LISTED_ROUTE_GUARDS = 10;
+
+    private const int MAX_LISTED_ROUTE_GUARD_BYTES = 512;
+
     public static function renderFirewallRules(SymfonyMapping $symfonyMapping): string
     {
         $firewallRules = $symfonyMapping->toApplicationSecurityMap()->perimeterRules();
@@ -69,8 +73,8 @@ final readonly class SymfonyMappingContextRenderer
         $lines = ['## Voter Coverage'];
         $lines[] = 'Each line summarises a `Voter::supports()` body: the attributes it accepts and the subject types it gates. Use this to spot `#[IsGranted(\'ATTR\', $subject)]` calls referencing an attribute or subject type that no voter actually covers — that is a `missing_voter` finding.';
         foreach ($voterCapabilities as $voterCapability) {
-            $attributes = self::cappedVoterList($voterCapability->supportedAttributes());
-            $subjects = self::cappedVoterList($voterCapability->supportedSubjects());
+            $attributes = self::cappedList($voterCapability->supportedAttributes(), self::MAX_LISTED_VOTER_ITEMS, self::MAX_LISTED_VOTER_BYTES);
+            $subjects = self::cappedList($voterCapability->supportedSubjects(), self::MAX_LISTED_VOTER_ITEMS, self::MAX_LISTED_VOTER_BYTES);
             $lines[] = \sprintf('- %s — attributes: [%s] — subjects: [%s] — %s', self::sanitizeLine($voterCapability->className()), $attributes, $subjects, self::sanitizeLine($voterCapability->filePath()));
         }
 
@@ -127,7 +131,7 @@ final readonly class SymfonyMappingContextRenderer
         }
 
         if ([] !== $routeAccessControl->methodLevelIsGranted()) {
-            $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->methodLevelIsGranted())));
+            $checks[] = \sprintf('method:#[IsGranted(%s)]', self::cappedList(array_values(array_unique($routeAccessControl->methodLevelIsGranted())), self::MAX_LISTED_ROUTE_GUARDS, self::MAX_LISTED_ROUTE_GUARD_BYTES));
         }
 
         if ([] === $routeAccessControl->methodLevelIsGranted() && $routeAccessControl->methodHasIsGrantedAttribute()) {
@@ -164,13 +168,13 @@ final readonly class SymfonyMappingContextRenderer
     /**
      * @param list<string> $values
      */
-    private static function cappedVoterList(array $values): string
+    private static function cappedList(array $values, int $maxItems, int $maxBytes): string
     {
         if ([] === $values) {
             return '(none)';
         }
 
-        $listed = self::voterItemsWithinCaps($values);
+        $listed = self::itemsWithinCaps($values, $maxItems, $maxBytes);
         $omitted = \count($values) - \count($listed);
         if (0 < $omitted) {
             $listed[] = \sprintf('… and %d more', $omitted);
@@ -184,14 +188,14 @@ final readonly class SymfonyMappingContextRenderer
      *
      * @return list<string>
      */
-    private static function voterItemsWithinCaps(array $values): array
+    private static function itemsWithinCaps(array $values, int $maxItems, int $maxBytes): array
     {
         $listed = [];
         $bytes = 0;
         foreach ($values as $value) {
             $item = self::sanitizeLine($value);
             $itemBytes = \strlen($item) + ([] === $listed ? 0 : 1);
-            if (self::MAX_LISTED_VOTER_ITEMS === \count($listed) || self::MAX_LISTED_VOTER_BYTES < $bytes + $itemBytes) {
+            if ($maxItems === \count($listed) || $maxBytes < $bytes + $itemBytes) {
                 break;
             }
 
