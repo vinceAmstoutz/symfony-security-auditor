@@ -17,7 +17,6 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
@@ -45,8 +44,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
 /**
  * `--min-score` gates on the normalized score, which only spans 0 to 100: a
- * value outside it would either fail every run or gate nothing, so the run is
- * refused before the audit spends anything, as a conflicting option is.
+ * value outside it fails every run or gates nothing. It has always been
+ * accepted, so the audit runs as given and the command says what the value
+ * does instead of refusing it.
  */
 final class AuditCommandMinScoreRangeTest extends TestCase
 {
@@ -66,30 +66,7 @@ final class AuditCommandMinScoreRangeTest extends TestCase
     }
 
     #[DataProvider('outOfRangeScores')]
-    public function test_a_min_score_outside_the_normalized_range_is_refused_before_the_audit_runs(string $minScore): void
-    {
-        $pipeline = $this->createMock(PipelineInterface::class);
-        $pipeline->expects(self::never())->method('process');
-
-        $commandTester = $this->makeCommandTester($pipeline);
-        $commandTester->execute(['project-path' => $this->fixtureDir, '--min-score' => $minScore]);
-
-        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
-        self::assertStringContainsString(\sprintf('--min-score must be between 0 and 100, got %s.', $minScore), $commandTester->getDisplay());
-    }
-
-    /**
-     * @return iterable<string, array{string}>
-     */
-    public static function outOfRangeScores(): iterable
-    {
-        yield 'above the range' => ['150'];
-        yield 'just above the range' => ['101'];
-        yield 'below the range' => ['-1'];
-    }
-
-    #[DataProvider('inRangeScores')]
-    public function test_a_min_score_within_the_normalized_range_still_runs_the_audit(string $minScore): void
+    public function test_a_min_score_outside_the_normalized_range_runs_the_audit_and_says_what_it_does(string $minScore, string $effect): void
     {
         $pipeline = $this->createMock(PipelineInterface::class);
         $pipeline->expects(self::once())->method('process');
@@ -97,7 +74,31 @@ final class AuditCommandMinScoreRangeTest extends TestCase
         $commandTester = $this->makeCommandTester($pipeline);
         $commandTester->execute(['project-path' => $this->fixtureDir, '--min-score' => $minScore]);
 
-        self::assertStringNotContainsString('--min-score must be between', $commandTester->getDisplay());
+        $display = preg_replace('/\s+/', ' ', str_replace('!', '', $commandTester->getDisplay())) ?? '';
+        self::assertStringContainsString(\sprintf('--min-score %s is %s. Use a value from 0 to 100.', $minScore, $effect), $display);
+        self::assertStringNotContainsString('--min-score must be between', $display);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function outOfRangeScores(): iterable
+    {
+        yield 'above the range' => ['150', 'above 100, the highest normalized score, so it fails every run'];
+        yield 'just above the range' => ['101', 'above 100, the highest normalized score, so it fails every run'];
+        yield 'below the range' => ['-1', 'below 0, the lowest normalized score, so it never fails a run'];
+    }
+
+    #[DataProvider('inRangeScores')]
+    public function test_a_min_score_within_the_normalized_range_runs_the_audit_without_a_warning(string $minScore): void
+    {
+        $pipeline = $this->createMock(PipelineInterface::class);
+        $pipeline->expects(self::once())->method('process');
+
+        $commandTester = $this->makeCommandTester($pipeline);
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--min-score' => $minScore]);
+
+        self::assertStringNotContainsString('--min-score', $commandTester->getDisplay());
     }
 
     /**

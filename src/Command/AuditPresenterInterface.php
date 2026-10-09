@@ -28,6 +28,18 @@ interface AuditPresenterInterface
      */
     public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void;
 
+    /**
+     * Says that a `--min-score` below the 0 the normalized score starts at is
+     * honored as given, and gates no run.
+     */
+    public function minScoreBelowRange(SymfonyStyle $symfonyStyle, int $minScore): void;
+
+    /**
+     * Says that a `--min-score` above the 100 the normalized score ends at is
+     * honored as given, and fails every run.
+     */
+    public function minScoreAboveRange(SymfonyStyle $symfonyStyle, int $minScore): void;
+
     public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
 
     public function synthesisCostWarnings(SymfonyStyle $symfonyStyle, bool $pocSynthesisEnabled, bool $fixSynthesisEnabled): void;

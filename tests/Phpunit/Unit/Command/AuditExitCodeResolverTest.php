@@ -125,6 +125,10 @@ final class AuditExitCodeResolverTest extends TestCase
         yield 'a score above the minimum passes' => [0, 90, Command::SUCCESS];
         yield 'a high-risk report the risk gate lets through still fails the score gate' => [4, 70, Command::FAILURE];
         yield 'a minimum of zero can never fail' => [4, 0, Command::SUCCESS];
+        yield 'a minimum just above the highest score fails even a perfect score' => [0, 101, Command::FAILURE];
+        yield 'a minimum far above the highest score fails even a perfect score' => [0, 150, Command::FAILURE];
+        yield 'a minimum just below zero can never fail' => [4, -1, Command::SUCCESS];
+        yield 'a minimum far below zero can never fail' => [4, -50, Command::SUCCESS];
     }
 
     /**
