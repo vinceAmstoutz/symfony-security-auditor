@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -588,6 +589,43 @@ final class AuditCommandEndToEndTest extends TestCase
 
         self::assertSame(0, $baselineMergePlan->prunedCount);
         self::assertCount(1, $baselineMergePlan->keptEntries);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('everyReportFormat')]
+    public function test_a_baseline_entry_without_a_fingerprint_is_refused_before_any_model_call_whatever_the_format(string $format): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        file_put_contents($baselineFile, '[{"fingerprints": "SSA-AAAAAAAAAAAA"}]');
+
+        $attackerLLM = $this->createMock(LLMClientInterface::class);
+        $attackerLLM->expects(self::never())->method('complete');
+        $attackerLLM->expects(self::never())->method('completeWithTools');
+        $reviewerLLM = $this->createMock(LLMClientInterface::class);
+        $reviewerLLM->expects(self::never())->method('complete');
+        $reviewerLLM->expects(self::never())->method('completeWithTools');
+
+        $commandTester = $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => $format,
+        ]);
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertStringContainsString('fingerprint strings', $commandTester->getDisplay());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function everyReportFormat(): iterable
+    {
+        yield 'json' => ['json'];
+        yield 'sarif' => ['sarif'];
     }
 
     /**

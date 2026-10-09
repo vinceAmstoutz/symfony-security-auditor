@@ -288,16 +288,20 @@ final readonly class AuditCommand
      * output: a pipeline-skipped finding never reaches the report, so it
      * could not be rendered as a suppressed result — SARIF trades the
      * review-skip saving for suppressed results GitHub/GitLab can display.
+     * The baseline is read whatever the format, so a malformed entry stops
+     * the run before the first model call instead of after the whole audit.
      *
      * @return list<string>
      */
     private function acceptedFingerprintsFor(AuditCommandInput $auditCommandInput): array
     {
-        if (null !== $auditCommandInput->generateBaseline || OutputFormat::Sarif === $auditCommandInput->format) {
+        if (null !== $auditCommandInput->generateBaseline) {
             return [];
         }
 
-        return $this->baselineProcessor->acceptedFingerprints($auditCommandInput->baseline);
+        $acceptedFingerprints = $this->baselineProcessor->acceptedFingerprints($auditCommandInput->baseline);
+
+        return OutputFormat::Sarif === $auditCommandInput->format ? [] : $acceptedFingerprints;
     }
 
     /**
