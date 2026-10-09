@@ -352,7 +352,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
-        if (Command::FAILURE === $exitCode && !$auditReport->hasNoVerdict()) {
+        if (Command::FAILURE === $exitCode && !$auditReport->isWithoutVerdict()) {
             $totalVulnerabilities = $auditReport->totalVulnerabilities();
             $symfonyStyle->caution(\sprintf(
                 'Audit failed a configured gate. Risk: %s. Score: %d/100. %d %s found.',
@@ -394,7 +394,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        if (ExitCode::Failure->value === $exitCode && $auditReport->hasNoVerdict()) {
+        if (ExitCode::Failure->value === $exitCode && $auditReport->isWithoutVerdict()) {
             $symfonyStyle->error(\sprintf('%s A run with no verdict cannot pass, so it fails.', $summary));
 
             return;
@@ -405,7 +405,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
     private function statesNoCleanResult(AuditReport $auditReport): bool
     {
-        return !$auditReport->isComplete() || $auditReport->hasNoVerdict();
+        return !$auditReport->isComplete() || $auditReport->isWithoutVerdict();
     }
 
     /**

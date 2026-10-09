@@ -158,21 +158,36 @@ final readonly class AuditReport
     }
 
     /**
-     * Whether the run reached no verdict: its scan found no file at all, or it
-     * analyzed none of the files it had to — every attacker call failed or was
-     * cut short, or none was made — and holds no finding. A SAFE there would
-     * vouch for code nobody read. A run that holds a finding is a partial run
-     * even when it analyzed no file in full: a response cut short keeps the
-     * findings it recorded, while its chunk is recorded as errored.
+     * Whether the run reached no verdict: it analyzed none of the files it
+     * had to — every attacker call failed or was cut short, or none was made —
+     * and holds no finding. A SAFE there would vouch for code nobody read. A
+     * run that holds a finding is a partial run even when it analyzed no file
+     * in full: a response cut short keeps the findings it recorded, while its
+     * chunk is recorded as errored. A scan that found no file at all is
+     * {@see self::foundNoFile()}, which this does not answer.
      */
     public function hasNoVerdict(): bool
     {
-        return 0 === $this->reportIdentity->filesDiscovered || $this->analyzedNoFileAndFoundNothing();
+        return !$this->isComplete() && [] === $this->vulnerabilities && [] === AnalyzedFiles::in($this->coverage);
     }
 
-    private function analyzedNoFileAndFoundNothing(): bool
+    /**
+     * Whether the scan found no file at all, before a `--since` diff narrowed
+     * them: nothing was examined.
+     */
+    public function foundNoFile(): bool
     {
-        return !$this->isComplete() && [] === $this->vulnerabilities && [] === AnalyzedFiles::in($this->coverage);
+        return 0 === $this->reportIdentity->filesDiscovered;
+    }
+
+    /**
+     * Whether the report can vouch for nothing: the scan found no file, or the
+     * run reached no verdict ({@see self::hasNoVerdict()}). Neither may be
+     * presented as a clean result.
+     */
+    public function isWithoutVerdict(): bool
+    {
+        return $this->foundNoFile() || $this->hasNoVerdict();
     }
 
     private function estimatesFilesItNeverAnalyzed(): bool

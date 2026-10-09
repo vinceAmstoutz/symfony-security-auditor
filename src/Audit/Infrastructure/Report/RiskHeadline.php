@@ -30,7 +30,7 @@ final readonly class RiskHeadline
 
     public static function riskLevel(AuditReport $auditReport): string
     {
-        return $auditReport->hasNoVerdict() ? self::UNKNOWN_RISK_LEVEL : $auditReport->riskLevel();
+        return $auditReport->isWithoutVerdict() ? self::UNKNOWN_RISK_LEVEL : $auditReport->riskLevel();
     }
 
     /**
@@ -39,7 +39,7 @@ final readonly class RiskHeadline
      */
     public static function scoreDetail(AuditReport $auditReport, string $scoreLabel): string
     {
-        if ($auditReport->hasNoVerdict()) {
+        if ($auditReport->isWithoutVerdict()) {
             return 'no file was analyzed';
         }
 

@@ -1149,12 +1149,59 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_a_scan_that_discovered_no_file_has_no_verdict(): void
+    public function test_a_scan_that_discovered_no_file_found_no_file_and_is_without_a_verdict(): void
     {
         $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
 
         self::assertSame(0, $auditReport->filesDiscovered());
+        self::assertTrue($auditReport->foundNoFile());
+        self::assertTrue($auditReport->isWithoutVerdict());
+    }
+
+    /**
+     * `hasNoVerdict()` answers as it did in 1.21.0: it knows a run that
+     * analyzed none of its files and found nothing, not a scan that found no
+     * file at all.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_has_no_verdict_means_a_run_that_analyzed_none_of_its_files_not_a_scan_that_found_none(): void
+    {
+        $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+
+        self::assertFalse($auditReport->hasNoVerdict());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_scan_that_discovered_a_file_did_not_find_no_file(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertFalse($auditReport->foundNoFile());
+        self::assertFalse($auditReport->isWithoutVerdict());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_run_that_analyzed_none_of_its_files_is_without_a_verdict_though_it_found_a_file(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/A.php', $this->tmpDir.'/src/A.php', '<?php')]);
+        $auditContext->recordCoverage('attacker', 'src/A.php', 'errored');
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertFalse($auditReport->foundNoFile());
         self::assertTrue($auditReport->hasNoVerdict());
+        self::assertTrue($auditReport->isWithoutVerdict());
     }
 
     /**
