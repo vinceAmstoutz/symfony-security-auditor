@@ -71,7 +71,7 @@ services:
         tags:
             - phpstan.parser.richParserNodeVisitor
     -
-        class: Symplify\PHPStanRules\Rules\ForbiddenNodeRule
+        class: VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\ForbiddenNodeRule
         arguments:
             forbiddenNodes:
                 - PhpParser\Node\Expr\ErrorSuppress
