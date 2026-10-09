@@ -710,6 +710,59 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_lists_constant_values_in_the_order_their_constants_are_first_fetched(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class FetchOrderVoter {
+                const FIRST = ['a1', 'a2'];
+                const SECOND = ['b1'];
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, [...self::SECOND, ...self::FIRST, ...self::SECOND], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/FetchOrderVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['b1', 'a1', 'a2'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_constant_array_fetched_thousands_of_times_is_expanded_once(): void
+    {
+        $values = implode(', ', array_map(static fn (int $index): string => "'v".$index."'", range(0, 999)));
+        $fetches = str_repeat('self::ALL, ', 3000);
+        $source = <<<PHP
+            <?php
+            namespace App\Security;
+            final class RepeatedFetchVoter {
+                const ALL = [{$values}];
+                public function supports(string \$attribute, mixed \$subject): bool {
+                    return in_array(\$attribute, [{$fetches}], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/RepeatedFetchVoter.php', '/app/x', $source);
+
+        memory_reset_peak_usage();
+        $memoryBefore = memory_get_usage();
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+        $peakMegabytes = (memory_get_peak_usage() - $memoryBefore) / 1_048_576;
+
+        self::assertNotNull($voterCapability);
+        self::assertCount(1000, $voterCapability->supportedAttributes());
+        self::assertLessThan(64, $peakMegabytes);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_file_nested_too_deeply_to_parse_safely(): void
     {
         $nesting = str_repeat('f(', 33000).'1'.str_repeat(')', 33000);
