@@ -17,14 +17,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 
 /**
  * Finds the roles of the `security.yaml` `access_control` rule that governs a
- * route: the first rule whose path pattern matches it, else the rule keyed by
- * its route name.
+ * route: the first rule, in the order the map lists them, whose path pattern
+ * matches it or that is keyed by its route name.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class AccessControlRuleMatcher
 {
     private const string DELIMITER_CANDIDATES = '#~!%@';
+
+    private const string ROUTE_TARGET_PREFIX = 'route: ';
 
     /**
      * @param array<string, list<string>> $routeAccessMap
@@ -33,40 +35,43 @@ final readonly class AccessControlRuleMatcher
      */
     public static function rolesFor(RouteAccessControl $routeAccessControl, array $routeAccessMap): ?array
     {
-        return self::rolesForPath($routeAccessControl->routePath(), $routeAccessControl->routeMethods(), $routeAccessMap)
-            ?? self::rolesForRouteName($routeAccessControl->routeName(), $routeAccessControl->routeMethods(), $routeAccessMap);
-    }
-
-    /**
-     * Returns the roles of the first `security.yaml` `access_control` rule whose
-     * path pattern matches the route, or null when none matches. Symfony treats
-     * the `access_control` `path` as a regular expression, so it is matched as
-     * one; a malformed pattern, or one containing every delimiter candidate,
-     * simply fails to match rather than throwing.
-     *
-     * @param list<string>                $routeMethods
-     * @param array<string, list<string>> $routeAccessMap
-     *
-     * @return list<string>|null
-     */
-    private static function rolesForPath(?string $routePath, array $routeMethods, array $routeAccessMap): ?array
-    {
-        if (null === $routePath) {
-            return null;
-        }
-
-        foreach ($routeAccessMap as $pattern => $roles) {
-            if (!self::methodsAreCovered($roles, $routeMethods)) {
-                continue;
-            }
-
-            $delimiter = self::delimiterAvoiding($pattern);
-            if (null !== $delimiter && self::patternMatches($delimiter.$pattern.$delimiter, $routePath)) {
+        foreach ($routeAccessMap as $target => $roles) {
+            if (self::methodsAreCovered($roles, $routeAccessControl->routeMethods()) && self::targetGoverns($target, $routeAccessControl)) {
                 return $roles;
             }
         }
 
         return null;
+    }
+
+    /**
+     * A target is either `route: <name>`
+     * ({@see SymfonyYamlSecurityConfigParser::targetOf()}), which governs the
+     * route of that name, or the `path` pattern of a rule.
+     */
+    private static function targetGoverns(string $target, RouteAccessControl $routeAccessControl): bool
+    {
+        if (str_starts_with($target, self::ROUTE_TARGET_PREFIX)) {
+            $routeName = $routeAccessControl->routeName();
+
+            return null !== $routeName && $target === self::ROUTE_TARGET_PREFIX.$routeName;
+        }
+
+        $routePath = $routeAccessControl->routePath();
+
+        return null !== $routePath && self::pathPatternMatches($target, $routePath);
+    }
+
+    /**
+     * Symfony treats the `access_control` `path` as a regular expression, so
+     * it is matched as one; a malformed pattern, or one containing every
+     * delimiter candidate, simply fails to match rather than throwing.
+     */
+    private static function pathPatternMatches(string $pattern, string $routePath): bool
+    {
+        $delimiter = self::delimiterAvoiding($pattern);
+
+        return null !== $delimiter && self::patternMatches($delimiter.$pattern.$delimiter, $routePath);
     }
 
     /**
@@ -192,27 +197,5 @@ final readonly class AccessControlRuleMatcher
         }
 
         return null;
-    }
-
-    /**
-     * Returns the roles of the `security.yaml` `access_control` rule keyed by
-     * `route: <name>` — {@see SymfonyYamlSecurityConfigParser::targetOf()} —
-     * matching this route's name, or null when the route has no name or no
-     * such rule exists.
-     *
-     * @param list<string>                $routeMethods
-     * @param array<string, list<string>> $routeAccessMap
-     *
-     * @return list<string>|null
-     */
-    private static function rolesForRouteName(?string $routeName, array $routeMethods, array $routeAccessMap): ?array
-    {
-        if (null === $routeName) {
-            return null;
-        }
-
-        $roles = $routeAccessMap[\sprintf('route: %s', $routeName)] ?? null;
-
-        return null !== $roles && self::methodsAreCovered($roles, $routeMethods) ? $roles : null;
     }
 }
