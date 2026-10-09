@@ -18,7 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StructuredCollectionAwareReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSections;
@@ -27,7 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInterface
+final readonly class ReviewerPromptBuilder implements StructuredCollectionAwareReviewerPromptBuilderInterface
 {
     /**
      * Wire-format version of the prompt this builder emits. Folded into the
@@ -64,6 +64,12 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         private ReviewerMessageRendererInterface $reviewerMessageRenderer = new ReviewerMessageRenderer(),
         private ReviewerFeedbackProviderInterface $reviewerFeedbackProvider = new NullReviewerFeedbackProvider(),
     ) {}
+
+    #[Override]
+    public function withStructuredCollection(bool $structuredCollection): self
+    {
+        return new self($structuredCollection, $this->reviewerPromptSections, $this->reviewerMessageRenderer, $this->reviewerFeedbackProvider);
+    }
 
     #[Override]
     public function buildSystemPrompt(): string

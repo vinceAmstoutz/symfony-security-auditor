@@ -212,8 +212,9 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     /**
      * Each row swaps a different implementation behind the same public surface:
      * lean pre-scan + concurrency (`fast`), PoC synthesis (`thorough`), the
-     * JSON-array collection fallback (attacker and reviewer), and batched
-     * reviews. All must still surface — and validate — the seeded finding.
+     * JSON-array collection fallback (attacker and reviewer), batched
+     * reviews, and the reviewer's investigation tools. All must still surface
+     * — and validate — the seeded finding.
      *
      * @return iterable<string, array{array<string, mixed>}>
      */
@@ -224,6 +225,9 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         yield 'json collection (attacker + reviewer)' => [['audit' => ['structured_collection' => false, 'reviewer_structured_collection' => false]]];
         yield 'json reviewer via explicit tools opt-out' => [['audit' => ['reviewer_structured_collection' => false, 'reviewer_tools_enabled' => false]]];
         yield 'batched reviews' => [['audit' => ['reviewer_batch_size' => 3]]];
+        yield 'reviewer investigation tools' => [['audit' => ['reviewer_tools_enabled' => true]]];
+        yield 'batched reviewer investigation tools' => [['audit' => ['reviewer_tools_enabled' => true, 'reviewer_batch_size' => 3]]];
+        yield 'fast profile with reviewer investigation tools' => [['profile' => 'fast', 'audit' => ['reviewer_tools_enabled' => true]]];
     }
 
     #[RunInSeparateProcess]

@@ -28,6 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSectionsInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 
 final class ReviewerPromptBuilderTest extends TestCase
@@ -585,6 +587,77 @@ final class ReviewerPromptBuilderTest extends TestCase
 
         self::assertStringContainsString('Return ONLY the JSON array', $prompt);
         self::assertStringNotContainsString('record_review', $prompt);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_switches_to_the_structured_contract_for_every_prompt(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        $reviewerPromptBuilder = (new ReviewerPromptBuilder(false))->withStructuredCollection(true);
+
+        self::assertStringContainsString('record_review', $reviewerPromptBuilder->buildSystemPrompt());
+        self::assertStringContainsString('record_review', $reviewerPromptBuilder->buildBatchSystemPrompt());
+        self::assertStringContainsString('record_review', $reviewerPromptBuilder->buildUserMessage($vulnerability, 'code'));
+        self::assertStringContainsString('record_review', $reviewerPromptBuilder->buildBatchUserMessage([$vulnerability], [$vulnerability->id() => 'code']));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_switches_to_the_json_contract_for_every_prompt(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        $reviewerPromptBuilder = (new ReviewerPromptBuilder(true))->withStructuredCollection(false);
+
+        self::assertStringNotContainsString('record_review', $reviewerPromptBuilder->buildSystemPrompt());
+        self::assertStringNotContainsString('record_review', $reviewerPromptBuilder->buildBatchSystemPrompt());
+        self::assertStringNotContainsString('record_review', $reviewerPromptBuilder->buildUserMessage($vulnerability, 'code'));
+        self::assertStringNotContainsString('record_review', $reviewerPromptBuilder->buildBatchUserMessage([$vulnerability], [$vulnerability->id() => 'code']));
+    }
+
+    public function test_switching_the_contract_leaves_the_original_builder_as_it_was(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(false);
+
+        $reviewerPromptBuilder->withStructuredCollection(true);
+
+        self::assertStringNotContainsString('record_review', $reviewerPromptBuilder->buildSystemPrompt());
+    }
+
+    public function test_switching_the_contract_keeps_the_baseline_feedback(): void
+    {
+        $reviewerPromptBuilder = $this->builderWithFeedback(false, [
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk'),
+        ])->withStructuredCollection(true);
+
+        self::assertStringContainsString('- type "sql_injection", file "src/A.php", title "Title", reason "accepted risk"', $reviewerPromptBuilder->buildSystemPrompt());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_switching_the_contract_keeps_the_prompt_sections_and_the_message_renderer(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $reviewerPromptSections = self::createStub(ReviewerPromptSectionsInterface::class);
+        $reviewerPromptSections->method('coreInstructions')->willReturn('CORE-MARKER');
+        $reviewerMessageRenderer = $this->createMock(ReviewerMessageRendererInterface::class);
+        $reviewerMessageRenderer->expects(self::once())->method('renderSingle')->with($vulnerability, 'code', true)->willReturn('RENDERED-MARKER');
+
+        $reviewerPromptBuilder = (new ReviewerPromptBuilder(false, $reviewerPromptSections, $reviewerMessageRenderer))->withStructuredCollection(true);
+
+        self::assertStringContainsString('CORE-MARKER', $reviewerPromptBuilder->buildSystemPrompt());
+        self::assertSame('RENDERED-MARKER', $reviewerPromptBuilder->buildUserMessage($vulnerability, 'code'));
     }
 
     public function test_system_prompts_carry_no_feedback_section_without_baseline_feedback(): void

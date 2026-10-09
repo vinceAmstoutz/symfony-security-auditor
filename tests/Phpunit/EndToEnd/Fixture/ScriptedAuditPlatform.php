@@ -48,6 +48,10 @@ final class ScriptedAuditPlatform implements PlatformInterface
 
     private const string PLAIN_TEXT_RESPONSE = 'curl -i https://app.example/admin';
 
+    private const string UNOFFERED_TOOL_REPLY = 'The prompt tells me to record through a tool that is not available to me, so I cannot answer.';
+
+    private const array RECORDING_TOOLS = ['record_review', 'record_vulnerability'];
+
     private readonly ModelCatalogInterface $modelCatalog;
 
     public function __construct()
@@ -85,6 +89,10 @@ final class ScriptedAuditPlatform implements PlatformInterface
 
         $prompt = $this->promptText($input);
 
+        if ($this->demandsAnUnofferedTool($prompt, $toolNames)) {
+            return new TextResult(self::UNOFFERED_TOOL_REPLY);
+        }
+
         if (\in_array('record_review', $toolNames, true)) {
             return $this->reviewCalls($prompt);
         }
@@ -94,6 +102,23 @@ final class ScriptedAuditPlatform implements PlatformInterface
         }
 
         return $this->textPath($prompt);
+    }
+
+    /**
+     * A model does what its prompt says: told to answer through a recording
+     * tool it was not given, it has no way to answer, so this double gives none.
+     *
+     * @param list<string> $toolNames
+     */
+    private function demandsAnUnofferedTool(string $prompt, array $toolNames): bool
+    {
+        foreach (self::RECORDING_TOOLS as $recordingTool) {
+            if (str_contains($prompt, $recordingTool) && !\in_array($recordingTool, $toolNames, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function reviewCalls(string $prompt): ResultInterface

@@ -3090,6 +3090,35 @@ final class ReviewerAgentTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_its_investigation_tools_are_built_from_the_project_files_it_is_given(): void
+    {
+        $projectFiles = [$this->makeFile('src/A.php')];
+        $toolFactory = $this->createMock(ToolRegistryFactoryInterface::class);
+        $toolFactory->expects(self::once())->method('forProjectFiles')->with($projectFiles)->willReturn(new ToolRegistry([], new NullLogger()));
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('{"accepted": true}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($llmClient, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(toolsEnabled: true, useStructuredCollection: false),
+            toolRegistryFactory: $toolFactory,
+        );
+
+        $reviewed = $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php')], $projectFiles, new NullCoverageRecorder());
+
+        self::assertCount(1, $reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_structured_collection_is_the_default_when_a_record_review_factory_is_wired(): void
     {
