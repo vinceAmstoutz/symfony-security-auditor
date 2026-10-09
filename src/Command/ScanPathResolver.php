@@ -65,9 +65,9 @@ final readonly class ScanPathResolver
 
     private static function withForwardSlashes(string $path): string
     {
-        $slashed = u($path)->replace('\\', '/');
+        $slashed = str_replace('\\', '/', mb_check_encoding($path, 'UTF-8') ? u($path)->toString() : $path);
 
-        return [] === $slashed->match('#^[a-z]:(?:/|$)#') ? $slashed->toString() : $slashed->title()->toString();
+        return 1 === preg_match('#^[a-z]:(?:/|$)#', $slashed) ? ucfirst($slashed) : $slashed;
     }
 
     private static function isAbsolute(string $path): bool

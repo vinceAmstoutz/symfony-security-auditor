@@ -48,6 +48,41 @@ final class ScanPathResolverTest extends TestCase
         yield 'a dot segment resolved inside the project' => [['/home/vince/demo/src/../config'], '/home/vince/demo', ['config']];
         yield 'the project root itself means the whole project' => [['/home/vince/demo'], '/home/vince/demo', []];
         yield 'several paths, mixed' => [['src/Entity', '/home/vince/demo/templates'], '/home/vince/demo', ['src/Entity', 'templates']];
+        yield 'a decomposed accent in the project path against a precomposed one in the scan path' => [["/home/jos\u{E9}/proj/src"], "/home/jose\u{301}/proj", ['src']];
+    }
+
+    /**
+     * @param list<string> $scanPaths
+     * @param list<string> $expected
+     *
+     * @throws ScanPathOutsideProjectException
+     */
+    #[DataProvider('pathsUnderAProjectThatIsNotUtf8')]
+    public function test_a_project_path_that_is_not_valid_utf8_does_not_keep_the_scan_paths_from_resolving(array $scanPaths, string $projectPath, array $expected): void
+    {
+        self::assertSame($expected, ScanPathResolver::resolve($scanPaths, $projectPath));
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, string, list<string>}>
+     */
+    public static function pathsUnderAProjectThatIsNotUtf8(): iterable
+    {
+        yield 'no path at all' => [[], "/home/jos\xE9/proj", []];
+        yield 'a relative path' => [['src'], "/home/jos\xE9/proj", ['src']];
+        yield 'an absolute path inside the project' => [["/home/jos\xE9/proj/src"], "/home/jos\xE9/proj", ['src']];
+        yield 'an absolute path whose own name is not valid UTF-8' => [["/home/jos\xE9/proj/src/caf\xE9"], "/home/jos\xE9/proj", ["src/caf\xE9"]];
+        yield 'a backslash separated path inside the project' => [["/home/jos\xE9/proj\\src"], "/home/jos\xE9/proj", ['src']];
+    }
+
+    /**
+     * @throws ScanPathOutsideProjectException
+     */
+    public function test_an_absolute_scan_path_outside_a_project_that_is_not_valid_utf8_is_refused(): void
+    {
+        $this->expectException(ScanPathOutsideProjectException::class);
+
+        ScanPathResolver::resolve(['/somewhere/else'], "/home/jos\xE9/proj");
     }
 
     /**

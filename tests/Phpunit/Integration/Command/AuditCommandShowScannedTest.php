@@ -90,6 +90,27 @@ final class AuditCommandShowScannedTest extends TestCase
         self::assertStringNotContainsString('No files matched', $display);
     }
 
+    public function test_it_audits_the_working_directory_when_its_name_is_not_valid_utf8(): void
+    {
+        $project = $this->fixtureDir."/jos\xE9";
+        mkdir($project.'/src', 0o777, true);
+        file_put_contents($project.'/src/Repo.php', '<?php class Repo {}');
+        $commandTester = $this->makeCommandTester();
+
+        $previousDirectory = getcwd();
+        self::assertNotFalse($previousDirectory);
+        chdir($project);
+
+        try {
+            $commandTester->execute(['--show-scanned' => true]);
+        } finally {
+            chdir($previousDirectory);
+        }
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('src/Repo.php', preg_replace('/\s+/', ' ', $commandTester->getDisplay()) ?? '');
+    }
+
     private function makeCommandTester(): CommandTester
     {
         $pricingCatalog = __DIR__.'/../UseCase/Fixture/pricing-catalog.json';
