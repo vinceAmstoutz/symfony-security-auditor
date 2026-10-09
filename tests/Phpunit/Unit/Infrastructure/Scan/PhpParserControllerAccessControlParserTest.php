@@ -1435,6 +1435,8 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
             namespace App\Controller;
             use Symfony\Component\Routing\Attribute\Route;
             use Symfony\Component\Security\Http\Attribute\IsGranted;
+            use Symfony\Component\ExpressionLanguage\Expression;
+            use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
             {$classAttribute}
             final class AdminController extends AbstractController {
                 #[Route(path: '/admin/delete-all', methods: ['POST'])]
@@ -1467,6 +1469,64 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         yield 'a denyAccessUnlessGranted call for IS_AUTHENTICATED_ANONYMOUSLY' => ['', '', "\$this->denyAccessUnlessGranted('IS_AUTHENTICATED_ANONYMOUSLY');"];
         yield 'an isGranted call for PUBLIC_ACCESS' => ['', '', "if (!\$this->isGranted('PUBLIC_ACCESS')) { throw \$this->createAccessDeniedException(); }"];
         yield 'a nullsafe isGranted call for PUBLIC_ACCESS' => ['', '', "\$this?->isGranted('PUBLIC_ACCESS');"];
+        yield 'a method attribute with a PUBLIC_ACCESS expression' => ['', '#[IsGranted(new Expression("is_granted(\'PUBLIC_ACCESS\')"))]', ''];
+        yield 'a method attribute with an IS_AUTHENTICATED_ANONYMOUSLY expression' => ['', "#[IsGranted(new Expression('is_granted(\"IS_AUTHENTICATED_ANONYMOUSLY\")'))]", ''];
+        yield 'a method attribute with a padded expression' => ['', '#[IsGranted(new Expression("  is_granted( \'PUBLIC_ACCESS\' )  "))]', ''];
+        yield 'a method attribute with an expression given by argument name' => ['', '#[IsGranted(new Expression(expression: "is_granted(\'PUBLIC_ACCESS\')"))]', ''];
+        yield 'a class attribute with a PUBLIC_ACCESS expression' => ['#[IsGranted(new Expression("is_granted(\'PUBLIC_ACCESS\')"))]', '', ''];
+        yield 'a method Security attribute with a PUBLIC_ACCESS expression' => ['', '#[Security("is_granted(\'PUBLIC_ACCESS\')")]', ''];
+        yield 'a method Security attribute with an expression given by argument name' => ['', '#[Security(expression: "is_granted(\'IS_AUTHENTICATED_ANONYMOUSLY\')")]', ''];
+        yield 'a denyAccessUnlessGranted call naming PUBLIC_ACCESS after the subject' => ['', '', "\$this->denyAccessUnlessGranted(subject: \$post, attribute: 'PUBLIC_ACCESS');"];
+        yield 'an isGranted call naming PUBLIC_ACCESS after the subject' => ['', '', "if (!\$this->isGranted(subject: \$post, attribute: 'PUBLIC_ACCESS')) { throw \$this->createAccessDeniedException(); }"];
+        yield 'a denyAccessUnlessGranted call with a PUBLIC_ACCESS expression' => ['', '', '$this->denyAccessUnlessGranted(new Expression("is_granted(\'PUBLIC_ACCESS\')"));'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('guardsGrantingMoreThanPublicAccessCases')]
+    public function test_a_guard_granting_more_than_public_access_still_counts_as_an_access_check(string $methodAttribute, string $body): void
+    {
+        $source = <<<PHP
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            use Symfony\Component\ExpressionLanguage\Expression;
+            use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
+            final class AdminController extends AbstractController {
+                #[Route(path: '/admin/delete-all', methods: ['POST'])]
+                {$methodAttribute}
+                public function wipe(): void {
+                    {$body}
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertFalse($entries[0]->lacksAccessCheck());
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function guardsGrantingMoreThanPublicAccessCases(): iterable
+    {
+        yield 'an expression naming a role' => ['#[IsGranted(new Expression("is_granted(\'ROLE_ADMIN\')"))]', ''];
+        yield 'an expression naming public access and a role' => ['#[Security("is_granted(\'PUBLIC_ACCESS\') and is_granted(\'ROLE_ADMIN\')")]', ''];
+        yield 'an expression refusing public access' => ['#[Security("not is_granted(\'PUBLIC_ACCESS\')")]', ''];
+        yield 'an expression naming public access on a subject' => ['#[Security("is_granted(\'PUBLIC_ACCESS\', post)")]', ''];
+        yield 'an expression naming public access by a different function' => ['#[Security("has_role(\'PUBLIC_ACCESS\')")]', ''];
+        yield 'an expression that is not a literal' => ['#[IsGranted(new Expression($expression))]', ''];
+        yield 'an expression without arguments' => ['#[IsGranted(new Expression())]', ''];
+        yield 'an expression whose argument is named otherwise' => ['#[IsGranted(new Expression(text: "is_granted(\'PUBLIC_ACCESS\')"))]', ''];
+        yield 'an expression written as a first-class callable' => ['', '$this->denyAccessUnlessGranted(new Expression(...));'];
+        yield 'an expression built by another class' => ['#[IsGranted(new Other("is_granted(\'PUBLIC_ACCESS\')"))]', ''];
+        yield 'an expression built by a class held in a variable' => ['', '$this->denyAccessUnlessGranted(new $expressionClass("is_granted(\'PUBLIC_ACCESS\')"));'];
+        yield 'a denyAccessUnlessGranted call naming a role after the subject' => ['', "\$this->denyAccessUnlessGranted(subject: \$post, attribute: 'ROLE_ADMIN');"];
+        yield 'a denyAccessUnlessGranted call with an attribute that is not a literal after the subject' => ['', '$this->denyAccessUnlessGranted(subject: $post, attribute: $attribute);'];
+        yield 'a denyAccessUnlessGranted call naming PUBLIC_ACCESS as its subject' => ['', "\$this->denyAccessUnlessGranted(subject: 'PUBLIC_ACCESS', attribute: 'ROLE_ADMIN');"];
     }
 
     /**
