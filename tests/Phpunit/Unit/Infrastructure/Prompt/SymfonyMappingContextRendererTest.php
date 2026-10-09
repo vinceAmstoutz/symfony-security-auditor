@@ -35,6 +35,20 @@ final class SymfonyMappingContextRendererTest extends TestCase
         self::assertStringContainsString('COVERED_BY access_control[ROLE_FROM_PATH]', SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping));
     }
 
+    public function test_a_public_route_name_rule_listed_before_a_broader_path_rule_leaves_the_route_lacking_an_access_check(): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/AdminController.php', 'dashboard', '/admin/dashboard', ['GET'], true, [], false, false, 'admin_dashboard');
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: ['route: admin_dashboard' => ['PUBLIC_ACCESS'], '^/admin' => ['ROLE_ADMIN']], routeAccessControls: [$routeAccessControl]),
+        );
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
+
+        self::assertStringContainsString('- GET /admin/dashboard — src/Controller/AdminController.php::dashboard — LACKS_ACCESS_CHECK', $rendered);
+        self::assertStringNotContainsString('COVERED_BY', $rendered);
+    }
+
     public function test_a_route_covered_only_by_yaml_is_never_ruled_out_as_broken_access_control(): void
     {
         $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);

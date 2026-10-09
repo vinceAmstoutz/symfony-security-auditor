@@ -49,6 +49,10 @@ final class AccessControlRuleMatcherTest extends TestCase
         yield 'route without declared methods is not covered by a method-restricted rule' => ['/admin', [], null, ['^/admin' => ['ROLE_A', 'methods: GET']], null];
         yield 'any or-alternative may cover the methods' => ['/x', ['POST'], null, ['^/x' => ['methods: GET', 'or: methods: POST']], ['methods: GET', 'or: methods: POST']];
         yield 'route methods are compared case-insensitively' => ['/admin', ['get'], null, ['^/admin' => ['ROLE_ADMIN', 'methods: GET']], ['ROLE_ADMIN', 'methods: GET']];
+        yield 'route name rule listed before a broader path rule governs the route' => ['/admin/dashboard', ['GET'], 'admin_dashboard', ['route: admin_dashboard' => ['PUBLIC_ACCESS'], '^/admin' => ['ROLE_ADMIN']], ['PUBLIC_ACCESS']];
+        yield 'route name rule skipped on a method mismatch leaves the route to the next path rule' => ['/admin/dashboard', ['GET'], 'admin_dashboard', ['route: admin_dashboard' => ['PUBLIC_ACCESS', 'methods: POST'], '^/admin' => ['ROLE_ADMIN']], ['ROLE_ADMIN']];
+        yield 'route name rule of another route leaves the route to the next path rule' => ['/admin/dashboard', ['GET'], 'admin_dashboard', ['route: admin_dashboard_export' => ['PUBLIC_ACCESS'], '^/admin' => ['ROLE_ADMIN']], ['ROLE_ADMIN']];
+        yield 'path rule listed before a route name rule is skipped for a route without a path' => [null, ['GET'], 'admin_dashboard', ['^/admin' => ['ROLE_ADMIN'], 'route: admin_dashboard' => ['ROLE_NAME']], ['ROLE_NAME']];
         yield 'pattern holding a delimiter candidate' => ['/a#b', ['GET'], null, ['^/a#b$' => ['ROLE_HASH']], ['ROLE_HASH']];
         yield 'pattern holding every delimiter candidate' => ['/#~!%@', ['GET'], null, ['#~!%@' => ['ROLE_ALL']], null];
     }
