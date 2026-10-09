@@ -29,8 +29,31 @@ final readonly class ReportDiffer implements ReportDifferInterface
     #[Override]
     public function diff(string $previousReportPath, string $currentReportPath): ReportDiff
     {
-        $loadedReport = $this->reportFindingsLoader->load($previousReportPath);
-        $currentReport = $this->reportFindingsLoader->load($currentReportPath);
+        return $this->compare(
+            $this->reportFindingsLoader->load($previousReportPath),
+            $this->reportFindingsLoader->load($currentReportPath),
+        );
+    }
+
+    #[Override]
+    public function diffSeries(array $reportPaths): array
+    {
+        $reportDiffs = [];
+        $previousReport = null;
+        foreach ($reportPaths as $reportPath) {
+            $currentReport = $this->reportFindingsLoader->load($reportPath);
+            if ($previousReport instanceof LoadedReport) {
+                $reportDiffs[] = $this->compare($previousReport, $currentReport);
+            }
+
+            $previousReport = $currentReport;
+        }
+
+        return $reportDiffs;
+    }
+
+    private function compare(LoadedReport $loadedReport, LoadedReport $currentReport): ReportDiff
+    {
         $previousFindings = $this->indexByFingerprint($loadedReport->findings);
         $currentFindings = $this->indexByFingerprint($currentReport->findings);
 

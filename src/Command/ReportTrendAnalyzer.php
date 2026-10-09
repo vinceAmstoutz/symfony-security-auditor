@@ -38,9 +38,10 @@ final readonly class ReportTrendAnalyzer implements ReportTrendAnalyzerInterface
             throw InsufficientTrendReportsException::forCount(\count($reportPaths));
         }
 
+        $reportDiffs = $this->reportDiffer->diffSeries($reportPaths);
         $points = [];
         foreach (\array_slice($reportPaths, 1) as $index => $reportPath) {
-            $reportDiff = $this->reportDiffer->diff($reportPaths[$index], $reportPath);
+            $reportDiff = $reportDiffs[$index];
 
             if (0 === $index) {
                 $points[] = new TrendPoint(
