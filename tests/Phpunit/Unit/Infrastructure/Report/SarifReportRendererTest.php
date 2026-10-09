@@ -818,6 +818,23 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_with_suppressions_marks_an_xss_finding_a_baseline_holds_under_the_type_it_was_reported_as_before(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::TWIG_INJECTION);
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($this->makeValidatedVuln(VulnerabilityType::XSS)), [$vulnerability->fingerprint()]);
+
+        self::assertSame(
+            [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+            $decoded['runs'][0]['results'][0]['suppressions'] ?? null,
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_with_suppressions_leaves_a_non_baselined_finding_unsuppressed(): void
     {
         $vulnerability = $this->makeValidatedVuln();

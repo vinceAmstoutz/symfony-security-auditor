@@ -47,6 +47,17 @@ final readonly class SuppressedFindings
     }
 
     /**
+     * @param list<string> $fingerprints
+     */
+    public function withRemovedFingerprints(array $fingerprints): self
+    {
+        return new self(
+            $this->acceptedBeforeReview,
+            [...$this->removedFromReport, ...$fingerprints],
+        );
+    }
+
+    /**
      * @return list<string>
      */
     public function fingerprints(): array

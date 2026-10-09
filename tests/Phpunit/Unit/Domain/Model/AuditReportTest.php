@@ -757,6 +757,129 @@ final class AuditReportTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    #[DataProvider('typesXssWasReportedAsBefore')]
+    public function test_without_fingerprints_removes_an_xss_finding_a_baseline_holds_under_the_type_it_was_reported_as_before(VulnerabilityType $vulnerabilityType): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS)->withReviewerValidation(true));
+
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, $vulnerabilityType);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame(0, $auditReport->totalVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('typesXssWasReportedAsBefore')]
+    public function test_the_array_form_lists_the_baseline_fingerprint_an_xss_finding_was_removed_by(VulnerabilityType $vulnerabilityType): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS)->withReviewerValidation(true));
+
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, $vulnerabilityType);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_without_fingerprints_spends_the_fingerprint_of_an_xss_finding_before_the_one_of_a_former_type(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $former = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::TWIG_INJECTION);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$former->fingerprint(), $vulnerability->fingerprint()]);
+
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_without_fingerprints_falls_back_to_the_fingerprint_of_a_former_type_once_the_own_one_is_spent(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->sameFingerprintVuln(1, VulnerabilityType::XSS)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($this->sameFingerprintVuln(2, VulnerabilityType::XSS)->withReviewerValidation(true));
+        $auditContext->addVulnerability($this->sameFingerprintVuln(3, VulnerabilityType::XSS)->withReviewerValidation(true));
+
+        $former = $this->sameFingerprintVuln(1, VulnerabilityType::SENSITIVE_DATA_EXPOSURE);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint(), $former->fingerprint()]);
+
+        self::assertSame(1, $auditReport->totalVulnerabilities());
+        self::assertSame([$vulnerability->fingerprint(), $former->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_without_fingerprints_keeps_a_finding_of_a_former_type_when_the_baseline_holds_it_under_xss(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::TWIG_INJECTION)->withReviewerValidation(true));
+
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame(1, $auditReport->totalVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_without_fingerprints_keeps_an_xss_finding_the_baseline_holds_under_an_unrelated_type(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS)->withReviewerValidation(true));
+
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::SQL_INJECTION);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame(1, $auditReport->totalVulnerabilities());
+    }
+
+    /**
+     * @return iterable<string, array{VulnerabilityType}>
+     */
+    public static function typesXssWasReportedAsBefore(): iterable
+    {
+        yield 'twig_injection' => [VulnerabilityType::TWIG_INJECTION];
+        yield 'sensitive_data_exposure' => [VulnerabilityType::SENSITIVE_DATA_EXPOSURE];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_filtered_by_types_with_no_filters_keeps_all_findings(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
@@ -863,10 +986,10 @@ final class AuditReportTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function sameFingerprintVuln(int $lineStart): Vulnerability
+    private function sameFingerprintVuln(int $lineStart, VulnerabilityType $vulnerabilityType = VulnerabilityType::SQL_INJECTION): Vulnerability
     {
         return Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Shared title', 0.9),
+            new VulnerabilityClassification($vulnerabilityType, VulnerabilitySeverity::HIGH, 'Shared title', 0.9),
             new CodeLocation('src/Shared.php', $lineStart, $lineStart + 1),
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
             'code',

@@ -214,12 +214,12 @@ final readonly class AuditReport
         $remainingByFingerprint = array_count_values($fingerprints);
 
         $kept = [];
-        $removed = [];
+        $removedFingerprints = [];
         foreach ($this->vulnerabilities as $vulnerability) {
-            $fingerprint = $vulnerability->fingerprint();
-            if (\array_key_exists($fingerprint, $remainingByFingerprint) && $remainingByFingerprint[$fingerprint] > 0) {
-                --$remainingByFingerprint[$fingerprint];
-                $removed[] = $vulnerability;
+            $creditedFingerprint = $this->creditedFingerprint($vulnerability, $remainingByFingerprint);
+            if (null !== $creditedFingerprint) {
+                --$remainingByFingerprint[$creditedFingerprint];
+                $removedFingerprints[] = $creditedFingerprint;
 
                 continue;
             }
@@ -231,9 +231,23 @@ final readonly class AuditReport
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
-            $this->suppressedFindings->withRemoved($removed),
+            $this->suppressedFindings->withRemovedFingerprints($removedFingerprints),
             ...$kept,
         );
+    }
+
+    /**
+     * @param array<string, int> $remainingByFingerprint
+     */
+    private function creditedFingerprint(Vulnerability $vulnerability, array $remainingByFingerprint): ?string
+    {
+        foreach ($vulnerability->fingerprintCandidates() as $fingerprintCandidate) {
+            if (\array_key_exists($fingerprintCandidate, $remainingByFingerprint) && $remainingByFingerprint[$fingerprintCandidate] > 0) {
+                return $fingerprintCandidate;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -249,8 +263,8 @@ final readonly class AuditReport
     {
         $kept = array_filter(
             $this->vulnerabilities,
-            static fn (Vulnerability $vulnerability): bool => ([] === $includedTypes || \in_array($vulnerability->type(), $includedTypes, true))
-                && !\in_array($vulnerability->type(), $excludedTypes, true),
+            static fn (Vulnerability $vulnerability): bool => ([] === $includedTypes || $vulnerability->matchesAnyType($includedTypes))
+                && !$vulnerability->matchesAnyType($excludedTypes),
         );
 
         return new self(

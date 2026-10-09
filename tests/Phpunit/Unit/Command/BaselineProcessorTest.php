@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Filesystem\Filesystem;
@@ -428,6 +429,67 @@ final class BaselineProcessorTest extends TestCase
     }
 
     /**
+     * A baseline written before `xss` existed holds the finding under the type
+     * the model then reported it as.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('typesXssWasReportedAsBefore')]
+    public function test_apply_accepts_an_xss_finding_through_a_baseline_written_before_the_xss_type_existed(VulnerabilityType $vulnerabilityType): void
+    {
+        $vulnerability = $this->makeVulnAtLine('src/Template.php', 1, $vulnerabilityType);
+        $baselineFile = $this->tmpDir.'/baseline.json';
+        file_put_contents($baselineFile, json_encode([[
+            'fingerprint' => $vulnerability->fingerprint(),
+            'type' => $vulnerabilityType->value,
+            'file' => $vulnerability->filePath(),
+            'title' => $vulnerability->title(),
+            'added_at' => '2026-09-01',
+        ]]));
+        $xss = $this->makeVulnAtLine('src/Template.php', 1, VulnerabilityType::XSS);
+
+        $baselineResult = (new BaselineProcessor(new Baseline()))->apply($this->makeReport($xss), $baselineFile);
+
+        self::assertSame(0, $baselineResult->report->totalVulnerabilities());
+        self::assertSame(1, $baselineResult->suppressedCount);
+        self::assertSame([$vulnerability->fingerprint()], $baselineResult->report->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_apply_does_not_re_spend_a_legacy_baseline_credit_already_consumed_for_an_xss_finding(): void
+    {
+        $vulnerability = $this->makeVulnAtLine('src/Template.php', 1, VulnerabilityType::TWIG_INJECTION);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$vulnerability->fingerprint()]);
+        $auditContext->consumeBaselineCreditFor($this->makeVulnAtLine('src/Template.php', 1, VulnerabilityType::XSS));
+        $auditContext->addVulnerability($this->makeVulnAtLine('src/Template.php', 200, VulnerabilityType::XSS));
+
+        $baseline = self::createStub(BaselineInterface::class);
+        $baseline->method('load')->willReturn([$vulnerability->fingerprint()]);
+
+        $baselineResult = (new BaselineProcessor($baseline))->apply(AuditReport::fromContext($auditContext), '/baseline.json');
+
+        self::assertSame(1, $baselineResult->report->totalVulnerabilities());
+        self::assertSame(0, $baselineResult->suppressedCount);
+    }
+
+    /**
+     * @return iterable<string, array{VulnerabilityType}>
+     */
+    public static function typesXssWasReportedAsBefore(): iterable
+    {
+        yield 'twig_injection' => [VulnerabilityType::TWIG_INJECTION];
+        yield 'sensitive_data_exposure' => [VulnerabilityType::SENSITIVE_DATA_EXPOSURE];
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
@@ -520,10 +582,10 @@ final class BaselineProcessorTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function makeVulnAtLine(string $filePath, int $lineStart): Vulnerability
+    private function makeVulnAtLine(string $filePath, int $lineStart, VulnerabilityType $vulnerabilityType = VulnerabilityType::SQL_INJECTION): Vulnerability
     {
         return Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Finding '.$filePath, 0.9),
+            new VulnerabilityClassification($vulnerabilityType, VulnerabilitySeverity::HIGH, 'Finding '.$filePath, 0.9),
             new CodeLocation($filePath, $lineStart, $lineStart + 4),
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
             'code',
