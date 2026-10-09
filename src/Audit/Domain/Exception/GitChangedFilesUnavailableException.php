@@ -36,6 +36,18 @@ final class GitChangedFilesUnavailableException extends RuntimeException
     }
 
     /**
+     * Git ran and refused to use the repository — owned by another user,
+     * using an extension it does not know — with a reason of its own that
+     * names the cure, so it is passed on as it came.
+     */
+    public static function forRefusedRepository(string $projectPath, string $stderr): self
+    {
+        $stderr = trim($stderr);
+
+        return new self(\sprintf('Git refused the repository of "%s": %s', $projectPath, '' !== $stderr ? $stderr : 'unknown error'));
+    }
+
+    /**
      * Covers a git process that never produced a determinate result at
      * all — a timeout or a process start failure — as opposed to
      * `forNonGitDirectory()`/`forUnknownRef()`, which report a git process

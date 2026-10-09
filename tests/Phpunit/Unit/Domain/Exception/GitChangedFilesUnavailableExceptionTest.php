@@ -37,6 +37,22 @@ final class GitChangedFilesUnavailableExceptionTest extends TestCase
         self::assertSame('git diff against "origin/main" failed: unknown error', $gitChangedFilesUnavailableException->getMessage());
     }
 
+    public function test_for_refused_repository_names_the_project_and_passes_on_the_trimmed_reason_git_gave(): void
+    {
+        $gitChangedFilesUnavailableException = GitChangedFilesUnavailableException::forRefusedRepository('/srv/app', "  fatal: detected dubious ownership in repository at '/srv/app'\n");
+
+        self::assertSame('Git refused the repository of "/srv/app": fatal: detected dubious ownership in repository at \'/srv/app\'', $gitChangedFilesUnavailableException->getMessage());
+        self::assertSame(0, $gitChangedFilesUnavailableException->getCode());
+        self::assertNull($gitChangedFilesUnavailableException->getPrevious());
+    }
+
+    public function test_for_refused_repository_falls_back_to_unknown_error_when_git_said_nothing(): void
+    {
+        $gitChangedFilesUnavailableException = GitChangedFilesUnavailableException::forRefusedRepository('/srv/app', "   \n");
+
+        self::assertSame('Git refused the repository of "/srv/app": unknown error', $gitChangedFilesUnavailableException->getMessage());
+    }
+
     public function test_for_process_failure_names_the_operation_and_wraps_the_cause(): void
     {
         $runtimeException = new RuntimeException('timed out');
