@@ -22,8 +22,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class SarifReportRenderer implements ReportRendererInterface, BaselineSuppressingReportRendererInterface
 {
-    private const string SECURITY_TAG = 'security';
-
     public function __construct(
         private ReportPackage $reportPackage = new ReportPackage(),
         private ReportPathPrefix $reportPathPrefix = new ReportPathPrefix(),
@@ -50,14 +48,14 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         $notAccepted = $this->notAcceptedByBaseline($auditReport, $baselinedFingerprints);
 
         $results = [];
-        $vulnerabilitiesByRule = [];
+        $typesByRule = [];
 
         foreach ($auditReport->vulnerabilities() as $vulnerability) {
-            $vulnerabilitiesByRule[$vulnerability->type()->owaspReference()][] = $vulnerability;
+            $typesByRule[$vulnerability->type()->owaspReference()][$vulnerability->type()->value] = $vulnerability->type();
             $results[] = $this->resultFor($vulnerability, !\array_key_exists(spl_object_id($vulnerability), $notAccepted));
         }
 
-        $rules = array_values(array_map(fn (array $contributingVulnerabilities): array => $this->ruleFor($contributingVulnerabilities, $notAccepted), $vulnerabilitiesByRule));
+        $rules = array_values(array_map($this->ruleFor(...), $typesByRule));
 
         $cost = $auditReport->cost();
         $sarif = [
@@ -141,7 +139,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             ],
             // `security-severity` is the numeric score GitHub Code Scanning ranks alerts by; the CVSS vector rides alongside for consumers that display it.
             'properties' => [
-                'security-severity' => $this->securitySeverity($vulnerability->cvssEstimate()->baseScore()),
+                'security-severity' => \sprintf('%.1f', $vulnerability->cvssEstimate()->baseScore()),
                 'cvssV4_0Vector' => $vulnerability->cvssEstimate()->vector(),
             ],
         ];
@@ -194,52 +192,22 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
      * it stays stable across runs instead of following whichever finding
      * happens to be most severe.
      *
-     * Only the findings the baseline leaves open score the rule: an accepted
-     * finding raises no alert, so it must not rank the ones that remain, and
-     * a rule with nothing open carries no score.
-     *
-     * @param non-empty-list<Vulnerability> $contributingVulnerabilities
-     * @param array<int, int>               $notAccepted                 the findings left standing, keyed by object id
+     * @param non-empty-array<string, VulnerabilityType> $contributingTypes
      *
      * @return array<string, mixed>
      */
-    private function ruleFor(array $contributingVulnerabilities, array $notAccepted): array
+    private function ruleFor(array $contributingTypes): array
     {
-        $contributingTypes = [];
-        foreach ($contributingVulnerabilities as $contributingVulnerability) {
-            $contributingTypes[$contributingVulnerability->type()->value] = $contributingVulnerability->type();
-        }
-
         ksort($contributingTypes);
         $vulnerabilityType = reset($contributingTypes);
-
-        $properties = ['tags' => [...array_values(array_unique(array_map($this->cweTag(...), $contributingTypes))), self::SECURITY_TAG]];
-
-        $openVulnerabilities = array_filter($contributingVulnerabilities, static fn (Vulnerability $vulnerability): bool => \array_key_exists(spl_object_id($vulnerability), $notAccepted));
-        if ([] !== $openVulnerabilities) {
-            $properties['security-severity'] = $this->securitySeverity($this->highestBaseScore($openVulnerabilities));
-        }
 
         return [
             'id' => $vulnerabilityType->owaspReference(),
             'name' => $vulnerabilityType->value,
             'shortDescription' => ['text' => $vulnerabilityType->category()],
             'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
-            'properties' => $properties,
+            'properties' => ['tags' => array_values(array_unique(array_map($this->cweTag(...), $contributingTypes)))],
         ];
-    }
-
-    /**
-     * @param non-empty-array<int, Vulnerability> $vulnerabilities
-     */
-    private function highestBaseScore(array $vulnerabilities): float
-    {
-        return max(array_map(static fn (Vulnerability $vulnerability): float => $vulnerability->cvssEstimate()->baseScore(), $vulnerabilities));
-    }
-
-    private function securitySeverity(float $baseScore): string
-    {
-        return \sprintf('%.1f', $baseScore);
     }
 
     private function cweTag(VulnerabilityType $vulnerabilityType): string
