@@ -26,6 +26,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
@@ -745,6 +746,48 @@ final class StandaloneContainerFactoryTest extends TestCase
                 'Project config /repo/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.',
             ],
             $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_announces_the_audited_project_config_it_layered_in_and_the_one_it_skipped(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                [],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+                '/work/.symfony-security-auditor.yaml',
+                auditedProjectConfig: AuditedProjectConfig::layered('/repo/.symfony-security-auditor.yaml', [], null),
+            ),
+            $this->cacheDir,
+        );
+        $skipped = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                [],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+                auditedProjectConfig: AuditedProjectConfig::skipped('/repo/.symfony-security-auditor.yaml', 'It sets "100%".'),
+            ),
+            $this->cacheDir,
+        );
+
+        self::assertSame(
+            [
+                'Project config /work/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.',
+                'Audited project config /repo/.symfony-security-auditor.yaml is layered over the configuration read before it: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.',
+            ],
+            $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
+        );
+        self::assertSame(
+            ['Audited project config /repo/.symfony-security-auditor.yaml was skipped and the run goes on without it: It sets "100%".'],
+            $skipped->getParameter('symfony_security_auditor.config_notices'),
         );
     }
 

@@ -233,17 +233,35 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
-    public function test_the_config_of_the_project_wins_over_the_one_of_the_working_directory(): void
+    public function test_the_config_of_the_project_is_layered_over_the_one_of_the_working_directory(): void
     {
         $this->filesystem->dumpFile($this->elsewhere.'/.symfony-security-auditor.yaml', "scan:\n  included_paths:\n    - src/Entity\n");
         $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "scan:\n  included_paths:\n    - src/Controller\n");
 
         $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
 
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        $workingDirectoryConfigAt = strpos($display, $this->withoutWhitespace($this->elsewhere.'/.symfony-security-auditor.yaml'));
+        $projectConfigAt = strpos($display, $this->withoutWhitespace($this->project.'/.symfony-security-auditor.yaml'));
         self::assertSame(0, $process->getExitCode());
         $this->assertListsExactly(['src/Controller/BlogController.php'], $this->displayOf($process));
-        self::assertStringContainsString($this->withoutWhitespace($this->project.'/.symfony-security-auditor.yaml'), $this->withoutWhitespace($this->displayOf($process)));
-        self::assertStringNotContainsString($this->withoutWhitespace($this->elsewhere.'/.symfony-security-auditor.yaml'), $this->withoutWhitespace($this->displayOf($process)));
+        self::assertIsInt($workingDirectoryConfigAt);
+        self::assertIsInt($projectConfigAt);
+        self::assertLessThan($projectConfigAt, $workingDirectoryConfigAt);
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_setting_only_the_config_of_the_working_directory_makes_still_applies_beside_the_one_of_the_project(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/src/Controller/Huge.php', \sprintf("<?php\n/* %s */\nclass Huge {}\n", str_repeat('x', 3000)));
+        $this->filesystem->dumpFile($this->elsewhere.'/.symfony-security-auditor.yaml', "scan:\n  max_file_size_kb: 1\n  included_paths:\n    - src/Entity\n");
+        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "scan:\n  included_paths:\n    - src/Controller\n");
+
+        $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
+
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly(['src/Controller/BlogController.php'], $this->displayOf($process));
+        self::assertStringNotContainsString('Huge.php', $this->displayOf($process));
     }
 
     #[MaximumDuration(4000)]
@@ -256,15 +274,62 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
-    public function test_a_project_config_that_is_a_dangling_symlink_is_refused_instead_of_replaced_by_the_one_of_the_working_directory(): void
+    public function test_a_project_config_that_is_a_dangling_symlink_is_skipped_and_the_one_of_the_working_directory_still_applies(): void
     {
         $this->filesystem->dumpFile($this->elsewhere.'/.symfony-security-auditor.yaml', "scan:\n  included_paths:\n    - src/Entity\n");
         $this->filesystem->symlink($this->base.'/missing.yaml', $this->project.'/.symfony-security-auditor.yaml');
 
         $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
 
-        self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString($this->withoutWhitespace('is a symbolic link'), $this->withoutWhitespace($this->displayOf($process)));
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly(['src/Entity/User.php'], $this->displayOf($process));
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it', $this->project.'/.symfony-security-auditor.yaml')), $display);
+        self::assertStringContainsString($this->withoutWhitespace('is a symbolic link'), $display);
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_project_config_declaring_a_user_only_key_is_skipped_as_a_whole_instead_of_stopping_the_run(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "cache:\n  enabled: false\nscan:\n  included_paths:\n    - src/Entity\n");
+
+        $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
+
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly([...self::COMMAND_FILES, ...self::OTHER_FILES], $this->displayOf($process));
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it', $this->project.'/.symfony-security-auditor.yaml')), $display);
+        self::assertStringContainsString($this->withoutWhitespace('declares "cache"'), $display);
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_project_config_the_configuration_rejects_is_skipped_as_a_whole_instead_of_stopping_the_run(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "audit:\n  fail_on: banana\nscan:\n  included_paths:\n    - src/Entity\n");
+
+        $process = $this->audit([$this->project, '--show-scanned'], $this->elsewhere);
+
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly([...self::COMMAND_FILES, ...self::OTHER_FILES], $this->displayOf($process));
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it', $this->project.'/.symfony-security-auditor.yaml')), $display);
+        self::assertStringContainsString($this->withoutWhitespace('The value "banana" is not allowed'), $display);
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_config_of_the_working_directory_declaring_a_user_only_key_still_stops_the_run_whichever_project_is_named(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "cache:\n  enabled: false\n");
+
+        $withoutPath = $this->audit(['--show-scanned'], $this->project);
+        $namingTheWorkingDirectory = $this->audit([$this->project, '--show-scanned'], $this->project);
+        $namingItRelatively = $this->audit(['.', '--show-scanned'], $this->project);
+
+        foreach ([$withoutPath, $namingTheWorkingDirectory, $namingItRelatively] as $process) {
+            self::assertSame(1, $process->getExitCode());
+            self::assertStringContainsString($this->withoutWhitespace('declares "cache"'), $this->withoutWhitespace($this->displayOf($process)));
+            self::assertStringNotContainsString('was skipped', $this->displayOf($process));
+        }
     }
 
     #[MaximumDuration(4000)]
@@ -276,6 +341,8 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
 
         self::assertSame(0, $process->getExitCode());
         $this->assertListsExactly(['src/Entity/User.php'], $this->displayOf($process));
+        self::assertStringContainsString($this->withoutWhitespace($this->project.'/.symfony-security-auditor.yaml'), $this->withoutWhitespace($this->displayOf($process)));
+        self::assertStringNotContainsString('Audited project config', $this->displayOf($process));
     }
 
     #[MaximumDuration(4000)]
@@ -287,6 +354,21 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
 
         self::assertSame(0, $process->getExitCode());
         $this->assertListsExactly(['src/Entity/User.php'], $this->displayOf($process));
+        self::assertStringContainsString($this->withoutWhitespace('Audited project config '.$this->project.'/.symfony-security-auditor.yaml is layered'), $this->withoutWhitespace($this->displayOf($process)));
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_the_config_of_a_project_named_by_its_path_from_inside_it_is_read_once_as_the_one_of_the_working_directory(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "scan:\n  included_paths:\n    - src/Entity\n");
+
+        $process = $this->audit(['.', '--show-scanned'], $this->project);
+
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly(['src/Entity/User.php'], $this->displayOf($process));
+        self::assertSame(1, substr_count($display, $this->withoutWhitespace($this->project.'/.symfony-security-auditor.yaml')));
+        self::assertStringNotContainsString('Audited project config', $display);
     }
 
     #[MaximumDuration(4000)]
@@ -410,7 +492,7 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
 
     private function withoutWhitespace(string $text): string
     {
-        return preg_replace('/\s+/', '', $text) ?? $text;
+        return preg_replace(['/^ ! ?/m', '/\s+/'], '', $text) ?? $text;
     }
 
     private function estimatedInputTokens(Process $process): int

@@ -491,18 +491,23 @@ symfony-security-auditor init \
 
 ### Per-project overrides
 
-A `.symfony-security-auditor.yaml` in the audited project is layered **over** the user config, with the project values winning. This lets a repository pin its own audit settings (chunking strategy, `fail_on`, scan scope, …) while the API credentials stay in the shared user config. The audited project is the `project-path` argument, relative to the folder you run the command from, or the working directory (`$PWD`) when the argument is omitted: `symfony-security-auditor audit ~/work/shop` reads `~/work/shop/.symfony-security-auditor.yaml`, whatever folder you run it from. _Since 1.22_ the file of the project the command names is read when the project has one; before, only the working directory's was, so auditing a project from another folder skipped its file and applied the working directory's. A project that ships none still gets the working directory's file, as before, and the audit header names the file read. `mcp:serve` still reads the working directory's, since one server audits whichever project each tool call names. The effective precedence, highest first, is:
+The standalone binary reads its configuration as an ordered stack of layers, each overriding the keys it sets in the layers before it. This lets a repository pin its own audit settings (chunking strategy, `fail_on`, scan scope, …) while the API credentials stay in the shared user config. The effective precedence, highest first, is:
 
 1. CLI options (`--fail-on`, `--format`, …)
-2. The per-project `.symfony-security-auditor.yaml`
-3. The user-level `config.yaml`
-4. Built-in defaults
+2. The `.symfony-security-auditor.yaml` of the audited project, when `audit <project-path>` names a folder other than the one you run from and that folder holds one
+3. The `.symfony-security-auditor.yaml` of the folder you run the command from (the working directory, `$PWD`)
+4. The user-level `config.yaml`
+5. Built-in defaults
 
-When a project file is found, the audit header notes it — `Project config <path> is layered over your user config: …` — so a setting that comes from the checkout rather than from your own file is never silent.
+So user < working directory < audited project < command line: `symfony-security-auditor audit backend`, run from a monorepo root whose `.symfony-security-auditor.yaml` pins `fail_on` and the scan scope, applies the root's file and then `backend/.symfony-security-auditor.yaml` over it, key by key. When the project is the folder you run from (no `project-path`, or one naming it), its file is read once, as the working directory's. The working directory's file is read exactly as in 1.21.0, which read no other. _Since 1.22_ the audited project's file is read as well, on top of it. `mcp:serve` reads the working directory's file only, since one server audits whichever project each tool call names.
+
+The audit header names every file read, lowest priority first — `Project config <path> is layered over your user config: …` for the working directory's, `Audited project config <path> is layered over the configuration read before it: …` for the audited project's — so a setting that comes from the checkout rather than from your own file is never silent.
+
+The working directory's file is held to the rules below as it always was: a file that breaks one stops the run before it starts. The audited project's file is held to the same rules, but 1.21.0 never read it, so it never stops a run: one that breaks a rule, cannot be read or parsed (a symlink, malformed YAML, too many values), or sets a key, value or type the configuration rejects once merged (an unknown key, an out-of-range number) is skipped as a whole — none of its keys applies — and the run goes on with the layers before it. The header then says so in place of the layer note: `Audited project config <path> was skipped and the run goes on without it: <reason>`, the reason being the message the same rule gives the working directory's file. The budget caps it may tighten and the sections it may not erase are measured against the layers before it, the working directory's file included; each of the two files may raise `http_timeout` above your own, never lower it, and the highest value wins.
 
 > Scalars and mappings deep-merge; a **list** key (e.g. `scan.included_paths`) set in both files is replaced wholesale by whichever file sets it last — the per-project file's list fully overrides the user config's list rather than merging element-wise.
 
-The per-project file may **not** declare `platform:` or `provider:` — a run whose project file carries either key is rejected before it starts. That file ships with the repository you are auditing, and `%env(VAR)%` placeholders resolve against _your_ environment, so honoring it would let any repository point your resolved API key (and every prompt, i.e. the source code) at an endpoint of its choosing. Connection settings are read from the user config alone.
+A per-project file may **not** declare `platform:` or `provider:` — one carrying either key is rejected before the run starts (skipped, for the audited project's). That file ships with the repository you are auditing, and `%env(VAR)%` placeholders resolve against _your_ environment, so honoring it would let any repository point your resolved API key (and every prompt, i.e. the source code) at an endpoint of its choosing. Connection settings are read from the user config alone.
 
 The same reasoning bars `scan.import_sarif`: it reads whatever file it names — an absolute path included — and folds its contents into the LLM prompt, so a project file declaring it would let the repository point the scanner at paths of its own choosing. Configure SARIF imports in your user config instead.
 

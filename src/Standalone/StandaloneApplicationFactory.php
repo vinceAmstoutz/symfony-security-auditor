@@ -22,11 +22,13 @@ use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
@@ -429,30 +431,27 @@ final readonly class StandaloneApplicationFactory
             false,
             fn (): Command => $standaloneApplication->describesCommandsOnly()
                 ? $this->standaloneConsoleCommandFactory->describe(AuditCommand::class)
-                : $this->loadAuditCommand($standaloneApplication->needsProviderCredentials(), $this->projectConfigFileNamedBy($standaloneApplication)),
+                : $this->loadAuditCommand($standaloneApplication->needsProviderCredentials(), $this->auditedProjectConfigFileNamedBy($standaloneApplication)),
         );
     }
 
     /**
-     * The configuration file that ships with the project being audited — the
-     * one the command line names — or null when it names none or the project
-     * holds none, which keeps the loader's own: the working directory's, as
-     * before the project was read at all.
-     *
-     * @throws WorkingDirectoryUnavailableException
+     * Where the project being audited would keep its own configuration file —
+     * the folder the command line names, the working directory when it names
+     * none — or null when the working directory it is relative to cannot be
+     * told, which the audit command then reports itself. The loader layers that
+     * file over the working directory's when it exists and is another file.
      */
-    private function projectConfigFileNamedBy(StandaloneApplication $standaloneApplication): ?string
+    private function auditedProjectConfigFileNamedBy(StandaloneApplication $standaloneApplication): ?string
     {
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->projectPath = $standaloneApplication->projectPathGivenTo($this->standaloneConsoleCommandFactory->describe(AuditCommand::class));
 
-        if (null === $auditCommandInput->projectPath) {
+        try {
+            return self::projectConfigFileIn($auditCommandInput->resolvedProjectPath());
+        } catch (WorkingDirectoryUnavailableException) {
             return null;
         }
-
-        $projectConfigFile = self::projectConfigFileIn($auditCommandInput->resolvedProjectPath());
-
-        return is_file($projectConfigFile) || is_link($projectConfigFile) ? $projectConfigFile : null;
     }
 
     /**
@@ -474,9 +473,9 @@ final readonly class StandaloneApplicationFactory
      * @throws ProjectConfigUserOnlyKeyException
      * @throws UnsupportedEnvPlaceholderException
      */
-    private function loadAuditCommand(bool $credentialsRequired, ?string $projectConfigFile): Command
+    private function loadAuditCommand(bool $credentialsRequired, ?string $auditedProjectConfigFile): Command
     {
-        return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired, $projectConfigFile));
+        return $this->standaloneConsoleCommandFactory->create($this->buildContainer($credentialsRequired, $auditedProjectConfigFile));
     }
 
     private function lazyMcpServeCommand(StandaloneApplication $standaloneApplication): LazyCommand
@@ -538,14 +537,53 @@ final readonly class StandaloneApplicationFactory
      * @throws ProjectConfigUserOnlyKeyException
      * @throws UnsupportedEnvPlaceholderException
      */
-    private function buildContainer(bool $credentialsRequired, ?string $projectConfigFile): ContainerBuilder
+    private function buildContainer(bool $credentialsRequired, ?string $auditedProjectConfigFile): ContainerBuilder
     {
         $this->assertBridgeTreeLoadable();
-        $standaloneConfigLoader = null === $projectConfigFile ? $this->standaloneConfigLoader : $this->standaloneConfigLoader->withProjectConfigFile($projectConfigFile);
+        $standaloneConfig = $this->standaloneConfigLoader->load($credentialsRequired, $auditedProjectConfigFile);
+        $cacheDir = $this->xdgConfigPathResolver->cacheDir();
+
+        try {
+            return $this->standaloneContainerFactory->create($standaloneConfig, $cacheDir);
+        } catch (Throwable $throwable) {
+            return $this->containerWithoutAuditedProjectConfig($standaloneConfig, $throwable, $credentialsRequired, $cacheDir);
+        }
+    }
+
+    /**
+     * The configuration the audited project ships is checked by the container
+     * itself, which only a build tells: a key, a value or a type it rejects
+     * would stop a run that did not ask for that file, so the file is skipped
+     * and the container built again from the rest. A failure the rest shares
+     * is the rebuilt container's own, as it would be without the file.
+     *
+     * @throws UnresolvableConfigPathException
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     * @throws MalformedProjectConfigException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnsupportedEnvPlaceholderException
+     * @throws Throwable
+     */
+    private function containerWithoutAuditedProjectConfig(StandaloneConfig $standaloneConfig, Throwable $throwable, bool $credentialsRequired, string $cacheDir): ContainerBuilder
+    {
+        $auditedProjectConfig = $standaloneConfig->auditedProjectConfig;
+        if (!$auditedProjectConfig instanceof AuditedProjectConfig || $auditedProjectConfig->wasSkipped()) {
+            throw $throwable;
+        }
 
         return $this->standaloneContainerFactory->create(
-            $standaloneConfigLoader->load($credentialsRequired),
-            $this->xdgConfigPathResolver->cacheDir(),
+            $this->standaloneConfigLoader->load($credentialsRequired)->withAuditedProjectConfig(AuditedProjectConfig::skipped($auditedProjectConfig->file, $throwable->getMessage())),
+            $cacheDir,
         );
     }
 

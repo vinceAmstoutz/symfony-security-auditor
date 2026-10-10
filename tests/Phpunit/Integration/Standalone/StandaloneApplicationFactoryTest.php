@@ -379,7 +379,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
     /**
      * @return array{int, string} the exit code and the display without whitespace, so a wrapped path still matches
      */
-    private function auditFailure(string $projectDirectory): array
+    private function audit(string $projectDirectory, string ...$options): array
     {
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
             'XDG_CONFIG_HOME' => $this->configHome,
@@ -389,9 +389,14 @@ final class StandaloneApplicationFactoryTest extends TestCase
         $standaloneApplication->setAutoExit(false);
 
         $applicationTester = new ApplicationTester($standaloneApplication);
-        $statusCode = $applicationTester->run(['command' => AuditCommand::ALIAS, 'project-path' => $projectDirectory]);
+        $statusCode = $applicationTester->run(['command' => AuditCommand::ALIAS, 'project-path' => $projectDirectory, ...array_fill_keys($options, true)]);
 
-        return [$statusCode, (string) preg_replace('/\s+/', '', $applicationTester->getDisplay())];
+        return [$statusCode, $this->withoutWhitespace($applicationTester->getDisplay())];
+    }
+
+    private function withoutWhitespace(string $text): string
+    {
+        return (string) preg_replace(['/^ ! ?/m', '/\s+/'], '', $text);
     }
 
     private function applicationTesterWithoutConfiguration(): ApplicationTester
@@ -466,26 +471,17 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
-    public function test_the_audit_command_reads_the_config_that_ships_with_the_project_it_names(): void
+    public function test_the_audit_command_skips_a_config_of_the_project_it_names_that_is_not_valid_yaml_and_goes_on(): void
     {
         $projectDirectory = $this->configHome.'/audited';
         (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
-        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
-            'XDG_CONFIG_HOME' => $this->configHome,
-            'XDG_CACHE_HOME' => $this->cacheHome,
-            'SSA_NO_UPDATE_CHECK' => '1',
-        ])->create();
-        $standaloneApplication->setAutoExit(false);
+        (new Filesystem())->dumpFile($projectDirectory.'/src/Controller/HomeController.php', "<?php\nclass HomeController {}\n");
 
-        $applicationTester = new ApplicationTester($standaloneApplication);
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
 
-        $statusCode = $applicationTester->run(['command' => AuditCommand::ALIAS, 'project-path' => $projectDirectory]);
-
-        self::assertSame(
-            [Command::FAILURE, true],
-            [$statusCode, str_contains((string) preg_replace('/\s+/', '', $applicationTester->getDisplay()), $projectDirectory.'/.symfony-security-auditor.yaml')],
-            $applicationTester->getDisplay(),
-        );
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it', $projectDirectory.'/.symfony-security-auditor.yaml')), $display);
+        self::assertStringContainsString('isnotvalidYAML', $display);
     }
 
     #[RunInSeparateProcess]
@@ -497,14 +493,42 @@ final class StandaloneApplicationFactoryTest extends TestCase
         (new Filesystem())->mkdir($projectDirectory);
         chdir($workingDirectory);
 
-        [$statusCode, $display] = $this->auditFailure($projectDirectory);
+        [$statusCode, $display] = $this->audit($projectDirectory);
 
         self::assertSame(Command::FAILURE, $statusCode, $display);
         self::assertStringContainsString($workingDirectory.'/.symfony-security-auditor.yaml', $display);
     }
 
+    public function test_the_audit_command_skips_a_config_of_the_project_it_names_that_the_configuration_rejects_and_goes_on(): void
+    {
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "audit:\n    fail_on: banana\n");
+        (new Filesystem())->dumpFile($projectDirectory.'/src/Controller/HomeController.php', "<?php\nclass HomeController {}\n");
+
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
+
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString(
+            $this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it: The value "banana" is not allowed for path "symfony_security_auditor.audit.fail_on". Permissible values: "safe", "low", "medium", "high", "critical"', $projectDirectory.'/.symfony-security-auditor.yaml')),
+            $display,
+        );
+    }
+
+    public function test_the_audit_command_rebuilds_without_a_rejected_project_config_the_way_it_built_the_first_time(): void
+    {
+        $this->writeConfig("platform:\n    generic:\n        default:\n            base_url: 'http://localhost'\n            api_key: '%env(SSA_ABSENT_KEY_FOR_REBUILD)%'\n");
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "audit:\n    fail_on: banana\n");
+        (new Filesystem())->dumpFile($projectDirectory.'/src/Controller/HomeController.php', "<?php\nclass HomeController {}\n");
+
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
+
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString('wasskippedandtherungoesonwithoutit', $display);
+    }
+
     #[RunInSeparateProcess]
-    public function test_the_audit_command_reads_the_config_of_the_project_it_names_before_the_one_of_the_working_directory(): void
+    public function test_a_malformed_config_of_the_working_directory_stops_the_run_before_the_one_of_the_project_it_names_is_read(): void
     {
         $workingDirectory = $this->configHome.'/working';
         $projectDirectory = $this->configHome.'/audited';
@@ -512,28 +536,83 @@ final class StandaloneApplicationFactoryTest extends TestCase
         (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
         chdir($workingDirectory);
 
-        [$statusCode, $display] = $this->auditFailure($projectDirectory);
+        [$statusCode, $display] = $this->audit($projectDirectory);
 
         self::assertSame(Command::FAILURE, $statusCode, $display);
-        self::assertStringContainsString($projectDirectory.'/.symfony-security-auditor.yaml', $display);
-        self::assertStringNotContainsString($workingDirectory.'/.symfony-security-auditor.yaml', $display);
+        self::assertStringContainsString($workingDirectory.'/.symfony-security-auditor.yaml', $display);
+        self::assertStringNotContainsString($projectDirectory.'/.symfony-security-auditor.yaml', $display);
+        self::assertStringNotContainsString('wasskipped', $display);
     }
 
     #[RunInSeparateProcess]
-    public function test_the_audit_command_refuses_a_project_config_that_is_a_dangling_symlink_instead_of_reading_the_one_of_the_working_directory(): void
+    public function test_the_audit_command_skips_a_project_config_that_is_a_dangling_symlink_and_keeps_the_one_of_the_working_directory(): void
     {
         $workingDirectory = $this->configHome.'/working';
         $projectDirectory = $this->configHome.'/audited';
-        (new Filesystem())->dumpFile($workingDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
-        (new Filesystem())->mkdir($projectDirectory);
+        (new Filesystem())->dumpFile($workingDirectory.'/.symfony-security-auditor.yaml', "profile: fast\n");
+        (new Filesystem())->dumpFile($projectDirectory.'/src/Controller/HomeController.php', "<?php\nclass HomeController {}\n");
         (new Filesystem())->symlink($this->configHome.'/missing.yaml', $projectDirectory.'/.symfony-security-auditor.yaml');
         chdir($workingDirectory);
 
-        [$statusCode, $display] = $this->auditFailure($projectDirectory);
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
+
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Project config %s is layered over your user config', $workingDirectory.'/.symfony-security-auditor.yaml')), $display);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it', $projectDirectory.'/.symfony-security-auditor.yaml')), $display);
+        self::assertStringContainsString('isasymboliclink', $display);
+    }
+
+    public function test_a_failure_of_the_rest_of_the_configuration_is_not_blamed_on_the_project_config_it_names(): void
+    {
+        $this->writeConfig("platform:\n    generic:\n        default:\n            base_url: 'http://localhost'\nfrobnicate: 1\n");
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "profile: fast\n");
+
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
 
         self::assertSame(Command::FAILURE, $statusCode, $display);
-        self::assertStringContainsString($projectDirectory.'/.symfony-security-auditor.yaml', $display);
-        self::assertStringContainsString('isasymboliclink', $display);
+        self::assertStringContainsString('Unrecognizedoption"frobnicate"', $display);
+        self::assertStringNotContainsString('wasskipped', $display);
+    }
+
+    public function test_a_failure_of_the_configuration_is_shown_as_it_is_when_the_project_it_names_ships_no_config(): void
+    {
+        $this->writeConfig("platform:\n    generic:\n        default:\n            base_url: 'http://localhost'\nfrobnicate: 1\n");
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->mkdir($projectDirectory);
+
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
+
+        self::assertSame(Command::FAILURE, $statusCode, $display);
+        self::assertStringContainsString('Unrecognizedoption"frobnicate"', $display);
+    }
+
+    public function test_a_failure_of_the_configuration_is_shown_as_it_is_when_the_project_config_it_names_was_already_skipped(): void
+    {
+        $this->writeConfig("platform:\n    generic:\n        default:\n            base_url: 'http://localhost'\nfrobnicate: 1\n");
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "model: [unclosed\n");
+
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
+
+        self::assertSame(Command::FAILURE, $statusCode, $display);
+        self::assertStringContainsString('Unrecognizedoption"frobnicate"', $display);
+        self::assertStringNotContainsString('isnotvalidYAML', $display);
+    }
+
+    #[RunInSeparateProcess]
+    public function test_a_relative_project_whose_working_directory_is_gone_is_reported_by_the_audit_command_itself(): void
+    {
+        $workingDirectory = $this->configHome.'/working';
+        (new Filesystem())->mkdir($workingDirectory);
+        chdir($workingDirectory);
+        rmdir($workingDirectory);
+
+        [$statusCode, $display] = $this->audit('audited', '--dry-run');
+
+        self::assertSame(Command::FAILURE, $statusCode, $display);
+        self::assertStringContainsString('Failedtodeterminecurrentworkingdirectory', $display);
+        self::assertStringContainsString('audit:run[-f|--formatFORMAT]', $display);
     }
 
     public function test_there_is_no_bridge_tree_to_load_without_a_data_directory(): void
