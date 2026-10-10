@@ -29,22 +29,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
  */
 final readonly class StandaloneConfigLoader
 {
-    private const array PLATFORM_KEYS = ['platform', 'provider'];
-
-    private const array SCAN_SURFACE_KEYS = ['import_sarif'];
-
-    /**
-     * What a run spends, trusts and writes is the user's to decide: the
-     * audited repository may tune what is audited and how, not lift the
-     * budget cap, switch secret scrubbing or the offline guard off, put words
-     * in the attacker's system prompt or in the risk markers it is handed,
-     * widen the files the model's tools may open, or aim the cache at files it
-     * ships.
-     */
-    private const array USER_ONLY_PATHS = ['cache', 'privacy', 'audit.custom_skills', 'audit.output', 'audit.tools_scope', 'scan.secret_scrubbing', 'scan.custom_risk_patterns'];
-
-    private const array BUDGET_CAPS = ['max_tokens', 'max_cost_usd'];
-
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandalonePlatformConfigResolver $standalonePlatformConfigResolver,
@@ -52,17 +36,6 @@ final readonly class StandaloneConfigLoader
         private ProjectConfigValueGuard $projectConfigValueGuard = new ProjectConfigValueGuard(),
         private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
     ) {}
-
-    public function withProjectConfigFile(?string $projectConfigFile): self
-    {
-        return new self(
-            $this->xdgConfigPathResolver,
-            $this->standalonePlatformConfigResolver,
-            $projectConfigFile,
-            $this->projectConfigValueGuard,
-            $this->standaloneConfigFileReader,
-        );
-    }
 
     /**
      * @throws UnresolvableConfigPathException
@@ -76,22 +49,26 @@ final readonly class StandaloneConfigLoader
      * @throws ProjectConfigUserOnlyKeyException
      * @throws UnsupportedEnvPlaceholderException
      */
-    public function load(bool $credentialsRequired = true): StandaloneConfig
+    public function load(bool $credentialsRequired = true, ?string $auditedProjectConfigFile = null): StandaloneConfig
     {
         $userConfigFile = $this->xdgConfigPathResolver->configFile();
         $userConfig = $this->standaloneConfigFileReader->read($userConfigFile);
         $userTimeout = HttpTimeout::in($userConfig, $userConfigFile);
         $projectConfig = $this->readProjectConfig($userConfig);
-        $rawConfig = $this->merge($userConfig, $projectConfig);
+        $workingDirectoryConfig = $this->merge($userConfig, $projectConfig);
 
-        $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig, $credentialsRequired);
-        $auditConfig = array_diff_key($rawConfig, array_flip([...self::PLATFORM_KEYS, HttpTimeout::KEY]));
+        $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($workingDirectoryConfig, $credentialsRequired);
+        $workingDirectoryTimeout = $this->projectTimeout($projectConfig, $userTimeout) ?? $userTimeout;
+        $auditedProjectConfig = $this->auditedProjectConfig($auditedProjectConfigFile, $workingDirectoryConfig, $userTimeout);
+        $rawConfig = $this->merge($workingDirectoryConfig, $auditedProjectConfig->config ?? []);
+        $auditConfig = array_diff_key($rawConfig, array_flip([...GuardedProjectConfigReader::PLATFORM_KEYS, HttpTimeout::KEY]));
 
         return new StandaloneConfig(
             $auditConfig,
             $standalonePlatformConfig,
             $this->existingProjectConfigFile(),
-            $this->projectTimeout($projectConfig, $userTimeout) ?? $userTimeout,
+            max($workingDirectoryTimeout, $auditedProjectConfig->httpTimeout ?? $workingDirectoryTimeout),
+            $auditedProjectConfig,
         );
     }
 
@@ -158,10 +135,6 @@ final readonly class StandaloneConfigLoader
     }
 
     /**
-     * The audited repository ships its own config file, so letting it define
-     * the connection would let it point the user's resolved API credentials at
-     * an endpoint of its choosing.
-     *
      * @param array<array-key, mixed> $userConfig
      *
      * @return array<array-key, mixed>
@@ -173,169 +146,48 @@ final readonly class StandaloneConfigLoader
      */
     private function readProjectConfig(array $userConfig): array
     {
-        if (null === $this->projectConfigFile) {
-            return [];
-        }
-
-        if (is_link($this->projectConfigFile)) {
-            throw MalformedProjectConfigException::forSymlink($this->projectConfigFile);
-        }
-
-        $projectConfig = $this->standaloneConfigFileReader->read($this->projectConfigFile);
-        $this->projectConfigValueGuard->assertPlainKeys($this->projectConfigFile, $projectConfig);
-        $connectionKeys = array_values(array_intersect(self::PLATFORM_KEYS, array_keys($projectConfig)));
-
-        if ([] !== $connectionKeys) {
-            throw ProjectConfigPlatformOverrideException::forKeys($this->projectConfigFile, $connectionKeys);
-        }
-
-        $this->guardAgainstSectionErasure($this->projectConfigFile, $projectConfig, $userConfig);
-        $this->guardAgainstScanSurfaceOverride($this->projectConfigFile, $projectConfig);
-        $this->guardAgainstUserOnlyOverride($this->projectConfigFile, $projectConfig);
-        $this->guardAgainstLoosenedBudget($this->projectConfigFile, $projectConfig, $userConfig);
-        $this->projectConfigValueGuard->assertLiteralPlainText($this->projectConfigFile, $projectConfig);
-
-        return ProjectConfigPathAnchor::anchored($projectConfig, $this->projectConfigFile);
+        return null === $this->projectConfigFile ? [] : $this->projectConfigReader()->read($this->projectConfigFile, $userConfig);
     }
 
     /**
-     * `merge()` writes a non-map project value over a whole user section, so
-     * `audit: []` or `audit: ~` would drop the user's budget caps and custom
-     * skills without ever naming them; a repository may override single keys
-     * beneath a section, never the section itself.
+     * The audited project's own file is layered over the other two, but the
+     * run never asked for it: a file this loader would refuse, or cannot read,
+     * is skipped as a whole and says why, instead of stopping a run that does
+     * not need it. The file of the working directory, read first, is the
+     * user's own and stays strict.
      *
-     * @param array<array-key, mixed> $projectConfig
-     * @param array<array-key, mixed> $userConfig
-     *
-     * @throws ProjectConfigUserOnlyKeyException
+     * @param array<array-key, mixed> $workingDirectoryConfig
      */
-    private function guardAgainstSectionErasure(string $projectConfigFile, array $projectConfig, array $userConfig): void
+    private function auditedProjectConfig(?string $auditedProjectConfigFile, array $workingDirectoryConfig, float $userTimeout): ?AuditedProjectConfig
     {
-        foreach ($projectConfig as $key => $value) {
-            if (!$this->isMap($value) && $this->isMap($userConfig[$key] ?? null)) {
-                throw ProjectConfigUserOnlyKeyException::forErasedSection($projectConfigFile, (string) $key);
-            }
+        if (!$this->isAnotherProjectConfig($auditedProjectConfigFile)) {
+            return null;
         }
+
+        try {
+            $config = $this->projectConfigReader()->read($auditedProjectConfigFile, $workingDirectoryConfig);
+            $httpTimeout = HttpTimeout::raisedBy($config, $userTimeout, $auditedProjectConfigFile);
+        } catch (MalformedProjectConfigException|ProjectConfigPlatformOverrideException|ProjectConfigScanOverrideException|ProjectConfigUserOnlyKeyException $projectConfigRefusal) {
+            return AuditedProjectConfig::skipped($auditedProjectConfigFile, $projectConfigRefusal->getMessage());
+        }
+
+        return AuditedProjectConfig::layered($auditedProjectConfigFile, ProjectConfigPathAnchor::anchored($config, $auditedProjectConfigFile), $httpTimeout);
     }
 
     /**
-     * A project file may cap the run tighter than the user config — a CI
-     * repository lowering its own spend is legitimate — but never loosen it:
-     * a raised, removed or non-numeric cap decides what the run spends, so it
-     * stays the user's alone. `merge()` writes a null or empty `budget` over
-     * the user's caps, which is why those count as loosening too.
-     *
-     * @param array<array-key, mixed> $projectConfig
-     * @param array<array-key, mixed> $userConfig
-     *
-     * @throws ProjectConfigUserOnlyKeyException
+     * @phpstan-assert-if-true string $auditedProjectConfigFile
      */
-    private function guardAgainstLoosenedBudget(string $projectConfigFile, array $projectConfig, array $userConfig): void
+    private function isAnotherProjectConfig(?string $auditedProjectConfigFile): bool
     {
-        $audit = $projectConfig['audit'] ?? null;
-        if (!\is_array($audit) || !\array_key_exists('budget', $audit)) {
-            return;
-        }
-
-        if (!\is_array($audit['budget']) || [] === $audit['budget']) {
-            throw ProjectConfigUserOnlyKeyException::forLoosenedBudget($projectConfigFile, 'audit.budget');
-        }
-
-        foreach ($audit['budget'] as $cap => $value) {
-            if (!$this->tightensCap($cap, $value, $this->budgetOf($userConfig))) {
-                throw ProjectConfigUserOnlyKeyException::forLoosenedBudget($projectConfigFile, \sprintf('audit.budget.%s', $cap));
-            }
-        }
-    }
-
-    /**
-     * @param array<array-key, mixed> $config
-     *
-     * @return array<array-key, mixed>
-     */
-    private function budgetOf(array $config): array
-    {
-        $audit = $config['audit'] ?? null;
-        $budget = \is_array($audit) ? ($audit['budget'] ?? null) : null;
-
-        return \is_array($budget) ? $budget : [];
-    }
-
-    /**
-     * A known cap, given as a number no higher than the user's own number for
-     * it; a cap the user left open can only be tightened.
-     *
-     * @param array<array-key, mixed> $userBudget
-     */
-    private function tightensCap(int|string $cap, mixed $value, array $userBudget): bool
-    {
-        if (!\in_array($cap, self::BUDGET_CAPS, true) || (!\is_int($value) && !\is_float($value))) {
+        if (null === $auditedProjectConfigFile || (!is_file($auditedProjectConfigFile) && !is_link($auditedProjectConfigFile))) {
             return false;
         }
 
-        $userCap = $userBudget[$cap] ?? null;
-
-        return (!\is_int($userCap) && !\is_float($userCap)) || $value <= $userCap;
+        return null === $this->projectConfigFile || realpath(\dirname($this->projectConfigFile)) !== realpath(\dirname($auditedProjectConfigFile));
     }
 
-    /**
-     * @param array<array-key, mixed> $projectConfig
-     *
-     * @throws ProjectConfigUserOnlyKeyException
-     */
-    private function guardAgainstUserOnlyOverride(string $projectConfigFile, array $projectConfig): void
+    private function projectConfigReader(): GuardedProjectConfigReader
     {
-        $declared = array_values(array_filter(
-            self::USER_ONLY_PATHS,
-            fn (string $path): bool => $this->declares($projectConfig, explode('.', $path)),
-        ));
-
-        if ([] !== $declared) {
-            throw ProjectConfigUserOnlyKeyException::forKeys($projectConfigFile, $declared);
-        }
-    }
-
-    /**
-     * @param array<array-key, mixed> $config
-     * @param non-empty-list<string>  $segments
-     */
-    private function declares(array $config, array $segments): bool
-    {
-        $key = array_shift($segments);
-        if (!\array_key_exists($key, $config)) {
-            return false;
-        }
-
-        if ([] === $segments) {
-            return true;
-        }
-
-        return \is_array($config[$key]) && $this->declares($config[$key], $segments);
-    }
-
-    /**
-     * `scan.import_sarif` reads whatever file it names — an absolute path or
-     * one escaping the project root included — and folds its contents into
-     * the LLM prompt. Letting the audited repository declare it would let the
-     * repository point the scanner at paths of its own choosing, the same
-     * threat model already applied to `platform`/`provider`.
-     *
-     * @param array<array-key, mixed> $projectConfig
-     *
-     * @throws ProjectConfigScanOverrideException
-     */
-    private function guardAgainstScanSurfaceOverride(string $projectConfigFile, array $projectConfig): void
-    {
-        $scanConfig = $projectConfig['scan'] ?? null;
-        if (!\is_array($scanConfig)) {
-            return;
-        }
-
-        $scanKeys = array_values(array_intersect(self::SCAN_SURFACE_KEYS, array_keys($scanConfig)));
-        if ([] === $scanKeys) {
-            return;
-        }
-
-        throw ProjectConfigScanOverrideException::forKeys($projectConfigFile, array_map(static fn (string $key): string => \sprintf('scan.%s', $key), $scanKeys));
+        return new GuardedProjectConfigReader($this->standaloneConfigFileReader, $this->projectConfigValueGuard);
     }
 }

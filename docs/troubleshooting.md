@@ -29,7 +29,7 @@ Entries in this section apply only to the standalone binary (`init`, `self-updat
 - **`No provider is configured — run "init".`** — no `platform:` block in `config.yaml`; run `init`.
 - **`No API key available. Your config reads it from "<VAR>", which is not set in the environment and has nothing stored for it. …`** (reported under the `API key` label) — store the key with `auth:set --env-var=<VAR>`, export `<VAR>`, or pass it for one run from a password manager; `auth:status --env-var=<VAR>` shows what resolves. With several platforms configured, only the one `provider:` selects needs its key; without `provider:`, every platform's key is needed, and a bare `auth:set` would store under the first `api_key` in the file, which is why the message names `<VAR>`.
 - **`The environment variable "<VAR>", referenced by your config, is not set.`** (reported under the `Configuration` label) — a setting other than the key, such as a `base_url` or `endpoint` written as `%env(VAR)%`, has no value: export the variable.
-- **`Config file "<path>" is not valid YAML: <detail>`** — fix the malformed `config.yaml` or `.symfony-security-auditor.yaml` at `<path>`.
+- **`Config file "<path>" is not valid YAML: <detail>`** — fix the malformed `config.yaml` or `.symfony-security-auditor.yaml` at `<path>`. The same message after `Audited project config <path> was skipped and the run goes on without it:` is a note, not a failure: the audited project's own file was left out.
 - **Cannot resolve the user configuration directory** — set `$HOME`, or set `SYMFONY_SECURITY_AUDITOR_HOME` to the absolute path of a writable directory:
 
   ```text
@@ -75,7 +75,7 @@ The bridges under the data directory were installed by another version of the bi
 
 ### `.symfony-security-auditor.yaml` cannot override `platform`, `provider`, or `scan.import_sarif`
 
-Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.yaml` ships with the audited repository, so letting it contribute these keys allowed a malicious or compromised repository to redirect your resolved API key — and every prompt, i.e. the source code — to an endpoint of its choosing via `platform:`/`provider:`, or to point the SARIF importer at an arbitrary file via `scan.import_sarif`. Both are now rejected outright before the audit starts:
+Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.yaml` ships with the audited repository, so letting it contribute these keys allowed a malicious or compromised repository to redirect your resolved API key — and every prompt, i.e. the source code — to an endpoint of its choosing via `platform:`/`provider:`, or to point the SARIF importer at an arbitrary file via `scan.import_sarif`. Both are now rejected outright before the audit starts, when they come from the `.symfony-security-auditor.yaml` of the folder you run from (the file of another project named by `project-path` is skipped as a whole instead, with an `Audited project config <path> was skipped and the run goes on without it: …` note in the audit header):
 
 - Declaring `platform` and/or `provider` aborts with `ProjectConfigPlatformOverrideException`:
 

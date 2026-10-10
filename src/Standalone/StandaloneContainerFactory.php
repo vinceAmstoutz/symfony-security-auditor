@@ -49,8 +49,6 @@ final readonly class StandaloneContainerFactory
 {
     private const string CONFIG_NOTICES_PARAMETER = 'symfony_security_auditor.config_notices';
 
-    private const string PROJECT_CONFIG_NOTICE = 'Project config %s is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.';
-
     private const string PLATFORM_TAG = 'ai.platform';
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
@@ -89,7 +87,7 @@ final readonly class StandaloneContainerFactory
 
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), FreeTextSettings::literalIn($standaloneConfig->auditConfig, $containerBuilder->getParameterBag()), $containerBuilder);
 
-        $this->announceProjectConfig($containerBuilder, $standaloneConfig->projectConfigFile);
+        $this->announceProjectConfigs($containerBuilder, $standaloneConfig);
         $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
@@ -135,15 +133,10 @@ final readonly class StandaloneContainerFactory
         ];
     }
 
-    /**
-     * The audited repository may tune the run through its own config file, so
-     * the audit header says which file was layered in: a stricter `fail_on` or
-     * another model coming from the checkout rather than from the user's own
-     * file would otherwise be silent.
-     */
-    private function announceProjectConfig(ContainerBuilder $containerBuilder, ?string $projectConfigFile): void
+    private function announceProjectConfigs(ContainerBuilder $containerBuilder, StandaloneConfig $standaloneConfig): void
     {
-        if (null === $projectConfigFile) {
+        $projectConfigNotices = ProjectConfigNotices::of($standaloneConfig);
+        if ([] === $projectConfigNotices) {
             return;
         }
 
@@ -151,7 +144,7 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->setParameter(self::CONFIG_NOTICES_PARAMETER, [
             ...(\is_array($notices) ? $notices : []),
-            \sprintf(self::PROJECT_CONFIG_NOTICE, ContainerParameterSyntax::escape($projectConfigFile)),
+            ...$projectConfigNotices,
         ]);
     }
 

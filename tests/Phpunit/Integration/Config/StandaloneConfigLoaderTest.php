@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
@@ -154,56 +155,6 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->filesystem->dumpFile($projectConfigFile, "model: project-model\n");
 
         self::assertSame('project-model', $this->loader($projectConfigFile)->load()->auditConfig['model']);
-    }
-
-    /**
-     * @throws MissingEnvironmentVariableException
-     * @throws UnreadableCredentialFileException
-     * @throws MissingPlatformException
-     * @throws UnresolvableConfigPathException
-     * @throws MalformedProjectConfigException
-     * @throws ProjectConfigPlatformOverrideException
-     * @throws ProjectConfigScanOverrideException
-     * @throws ProjectConfigUserOnlyKeyException
-     * @throws UnreadableCredentialStoreException
-     * @throws UnsupportedEnvPlaceholderException
-     */
-    public function test_a_loader_pointed_at_another_project_config_reads_that_file_and_leaves_the_first_loader_alone(): void
-    {
-        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
-        $firstFile = $this->configHome.'/first/.symfony-security-auditor.yaml';
-        $secondFile = $this->configHome.'/second/.symfony-security-auditor.yaml';
-        $this->filesystem->dumpFile($firstFile, "model: first-model\n");
-        $this->filesystem->dumpFile($secondFile, "model: second-model\n");
-
-        $standaloneConfigLoader = $this->loader($firstFile);
-
-        $standaloneConfig = $standaloneConfigLoader->withProjectConfigFile($secondFile)->load();
-
-        self::assertSame(['second-model', $secondFile, 'first-model'], [$standaloneConfig->auditConfig['model'], $standaloneConfig->projectConfigFile, $standaloneConfigLoader->load()->auditConfig['model']]);
-    }
-
-    /**
-     * @throws MissingEnvironmentVariableException
-     * @throws UnreadableCredentialFileException
-     * @throws MissingPlatformException
-     * @throws UnresolvableConfigPathException
-     * @throws MalformedProjectConfigException
-     * @throws ProjectConfigPlatformOverrideException
-     * @throws ProjectConfigScanOverrideException
-     * @throws ProjectConfigUserOnlyKeyException
-     * @throws UnreadableCredentialStoreException
-     * @throws UnsupportedEnvPlaceholderException
-     */
-    public function test_a_loader_released_from_its_project_config_reads_the_user_config_alone(): void
-    {
-        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
-        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
-        $this->filesystem->dumpFile($projectConfigFile, "model: project-model\n");
-
-        $standaloneConfig = $this->loader($projectConfigFile)->withProjectConfigFile(null)->load();
-
-        self::assertSame(['user-model', null], [$standaloneConfig->auditConfig['model'], $standaloneConfig->projectConfigFile]);
     }
 
     /**
@@ -502,7 +453,7 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
-    public function test_a_relative_baseline_of_the_project_config_is_read_from_the_project_not_the_working_directory(): void
+    public function test_a_relative_baseline_of_the_audited_project_config_is_read_from_the_project_not_the_working_directory(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
@@ -510,8 +461,394 @@ final class StandaloneConfigLoaderTest extends TestCase
 
         self::assertSame(
             ['baseline' => $this->configHome.'/project/.security-baseline.json'],
-            $this->loader($projectConfigFile)->load()->auditConfig['audit'],
+            $this->loader()->load(auditedProjectConfigFile: $projectConfigFile)->auditConfig['audit'],
         );
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_the_audited_project_config_is_layered_over_the_working_directory_config_over_the_user_config(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\naudit:\n  fail_on: low\n  min_confidence: 0.5\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->dumpFile($workingFile, "audit:\n  fail_on: medium\nscan:\n  included_paths:\n    - src\n");
+        $this->filesystem->dumpFile($projectFile, "audit:\n  min_confidence: 0.9\nscan:\n  included_paths:\n    - app\n");
+
+        $standaloneConfig = $this->loader($workingFile)->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertSame(
+            ['model' => 'user-model', 'audit' => ['fail_on' => 'medium', 'min_confidence' => 0.9], 'scan' => ['included_paths' => ['app']]],
+            $standaloneConfig->auditConfig,
+        );
+        self::assertSame($workingFile, $standaloneConfig->projectConfigFile);
+        self::assertInstanceOf(AuditedProjectConfig::class, $standaloneConfig->auditedProjectConfig);
+        self::assertSame($projectFile, $standaloneConfig->auditedProjectConfig->file);
+        self::assertFalse($standaloneConfig->auditedProjectConfig->wasSkipped());
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_the_audited_project_config_applies_beside_a_working_directory_that_has_none(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->dumpFile($projectFile, "model: project-model\n");
+
+        $standaloneConfig = $this->loader($this->workingDirectoryConfigFile())->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertSame('project-model', $standaloneConfig->auditConfig['model']);
+        self::assertNull($standaloneConfig->projectConfigFile);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_an_audited_project_holding_no_config_file_changes_nothing(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $this->filesystem->mkdir(\dirname($this->auditedProjectConfigFile()));
+
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $this->auditedProjectConfigFile());
+
+        self::assertSame(['model' => 'user-model'], $standaloneConfig->auditConfig);
+        self::assertNull($standaloneConfig->auditedProjectConfig);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_an_audited_project_that_is_the_working_directory_is_read_once_as_the_working_directory_config(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $this->filesystem->dumpFile($workingFile, "model: working-model\n");
+
+        $standaloneConfig = $this->loader($workingFile)->load(auditedProjectConfigFile: $workingFile);
+        $spelledThroughAnotherFolder = $this->loader($workingFile)->load(auditedProjectConfigFile: \dirname($workingFile).'/../working/'.basename($workingFile));
+
+        self::assertSame('working-model', $standaloneConfig->auditConfig['model']);
+        self::assertSame($workingFile, $standaloneConfig->projectConfigFile);
+        self::assertNull($standaloneConfig->auditedProjectConfig);
+        self::assertNull($spelledThroughAnotherFolder->auditedProjectConfig);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_working_directory_config_holding_a_user_only_key_stops_the_load_even_when_it_is_the_audited_project(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $this->filesystem->dumpFile($workingFile, "cache:\n  dir: .ssa-cache\n");
+
+        $this->expectException(ProjectConfigUserOnlyKeyException::class);
+        $this->expectExceptionMessage(\sprintf('The project config "%s" declares "cache"', $workingFile));
+
+        $this->loader($workingFile)->load(auditedProjectConfigFile: $workingFile);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_working_directory_config_holding_a_user_only_key_stops_the_load_whatever_the_audited_project_ships(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->dumpFile($workingFile, "cache:\n  dir: .ssa-cache\n");
+        $this->filesystem->dumpFile($projectFile, "model: project-model\n");
+
+        $this->expectException(ProjectConfigUserOnlyKeyException::class);
+        $this->expectExceptionMessage(\sprintf('The project config "%s" declares "cache"', $workingFile));
+
+        $this->loader($workingFile)->load(auditedProjectConfigFile: $projectFile);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_relative_baseline_of_the_working_directory_config_stays_as_written(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $this->filesystem->dumpFile($workingFile, "audit:\n  baseline: .security-baseline.json\n");
+
+        self::assertSame(['baseline' => '.security-baseline.json'], $this->loader($workingFile)->load()->auditConfig['audit']);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('refusedAuditedProjectConfigs')]
+    public function test_an_audited_project_config_the_strict_rules_refuse_is_skipped_as_a_whole_with_its_reason(string $userYaml, string $workingYaml, string $projectYaml, string $reason): void
+    {
+        $this->writeConfig($userYaml);
+        $workingFile = $this->workingDirectoryConfigFile();
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->dumpFile($workingFile, $workingYaml);
+        $this->filesystem->dumpFile($projectFile, $projectYaml);
+
+        $withoutTheProject = $this->loader($workingFile)->load();
+
+        $standaloneConfig = $this->loader($workingFile)->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertSame($withoutTheProject->auditConfig, $standaloneConfig->auditConfig);
+        self::assertSame($withoutTheProject->httpTimeout, $standaloneConfig->httpTimeout);
+        self::assertSame($workingFile, $standaloneConfig->projectConfigFile);
+        self::assertInstanceOf(AuditedProjectConfig::class, $standaloneConfig->auditedProjectConfig);
+        self::assertTrue($standaloneConfig->auditedProjectConfig->wasSkipped());
+        self::assertSame($projectFile, $standaloneConfig->auditedProjectConfig->file);
+        self::assertSame([], $standaloneConfig->auditedProjectConfig->config);
+        self::assertStringContainsString($projectFile, (string) $standaloneConfig->auditedProjectConfig->skipReason);
+        self::assertStringContainsString($reason, (string) $standaloneConfig->auditedProjectConfig->skipReason);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string, string}>
+     */
+    public static function refusedAuditedProjectConfigs(): iterable
+    {
+        $user = "platform:\n  anthropic:\n    api_key: sk-user\n";
+        $budgetedUser = $user."audit:\n  budget:\n    max_tokens: 5000\n";
+
+        yield 'a cache directory the repository ships' => [$user, '', "profile: fast\ncache:\n  dir: .ssa-cache\n", 'declares "cache"'];
+        yield 'the offline guard' => [$user, '', "profile: fast\nprivacy:\n  offline_only: false\n", 'declares "privacy"'];
+        yield 'a platform block' => [$user, '', "profile: fast\nplatform:\n  anthropic:\n    base_url: https://attacker.example\n", 'declares "platform"'];
+        yield 'a provider switch' => [$user, '', "profile: fast\nprovider: attacker\n", 'declares "provider"'];
+        yield 'a SARIF import path' => [$user, '', "profile: fast\nscan:\n  import_sarif:\n    - /etc/passwd\n", 'declares "scan.import_sarif"'];
+        yield 'a budget loosened against the user config' => [$budgetedUser, '', "profile: fast\naudit:\n  budget:\n    max_tokens: 6000\n", 'sets "audit.budget.max_tokens"'];
+        yield 'a budget loosened against the working directory config' => [$budgetedUser, "audit:\n  budget:\n    max_tokens: 3000\n", "profile: fast\naudit:\n  budget:\n    max_tokens: 4000\n", 'sets "audit.budget.max_tokens"'];
+        yield 'a section of the user config erased' => [$user."audit:\n  fail_on: low\n", '', "profile: fast\naudit: ~\n", 'sets "audit" to something other than a map'];
+        yield 'a section of the working directory config erased' => [$user, "scan:\n  max_file_size_kb: 256\n", "profile: fast\nscan: none\n", 'sets "scan" to something other than a map'];
+        yield 'a file that is not YAML' => [$user, '', "profile: fast\nmodel: [unclosed\n", 'is not valid YAML'];
+        yield 'a file whose aliases expand past any configuration' => [$user, '', self::aliasBomb(), 'values or more once its YAML aliases are expanded'];
+        yield 'a value holding a control character' => [$user, '', "profile: fast\nmodel: \"gpt\\x1b[2J\"\n", 'a control character'];
+        yield 'a value the container would resolve' => [$user, '', "profile: fast\nmodel: '%env(SECRET)%'\n", 'a container reference'];
+        yield 'a key the container would resolve' => [$user, '', "profile: fast\n'%env(SECRET)%': 1\n", 'a container reference'];
+        yield 'a model name carrying request options' => [$user, '', "profile: fast\nmodel: 'claude-opus-4-8?tool_choice[type]=none'\n", 'a model name holding more than a model id'];
+        yield 'a value holding a workflow command' => [$user, '', "profile: fast\nmodel: 'gpt-4::error'\n", 'a double colon'];
+        yield 'a shorter HTTP timeout than the user one' => [$user."http_timeout: 900\n", '', "profile: fast\nhttp_timeout: 800\n", 'sets "http_timeout"'];
+        yield 'an HTTP timeout that is no number of seconds' => [$user, '', "profile: fast\nhttp_timeout: soon\n", 'sets "http_timeout"'];
+    }
+
+    private static function aliasBomb(): string
+    {
+        $lines = ['profile: fast', 'x:', '  a0: &a0 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'];
+        for ($level = 1; $level <= 8; ++$level) {
+            $previous = \sprintf('*a%d', $level - 1);
+            $lines[] = \sprintf('  a%d: &a%d [%s]', $level, $level, implode(', ', array_fill(0, 10, $previous)));
+        }
+
+        return implode("\n", $lines)."\nscan: {included_paths: *a8}\n";
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_symlinked_audited_project_config_is_skipped_without_being_read(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $secretFile = $this->configHome.'/secret.env';
+        $this->filesystem->dumpFile($secretFile, "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI }{ not yaml\n");
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->mkdir(\dirname($projectFile));
+        $this->filesystem->symlink($secretFile, $projectFile);
+
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertInstanceOf(AuditedProjectConfig::class, $standaloneConfig->auditedProjectConfig);
+        self::assertTrue($standaloneConfig->auditedProjectConfig->wasSkipped());
+        self::assertSame(\sprintf('Config file "%s" is a symbolic link. A project config must be a regular file, so the audited repository cannot point it at a file of yours; replace the link with the file itself.', $projectFile), $standaloneConfig->auditedProjectConfig->skipReason);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_dangling_audited_project_config_symlink_is_skipped_too(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->mkdir(\dirname($projectFile));
+        $this->filesystem->symlink($this->configHome.'/missing.yaml', $projectFile);
+
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertInstanceOf(AuditedProjectConfig::class, $standaloneConfig->auditedProjectConfig);
+        self::assertTrue($standaloneConfig->auditedProjectConfig->wasSkipped());
+        self::assertStringContainsString('is a symbolic link', (string) $standaloneConfig->auditedProjectConfig->skipReason);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_an_audited_project_config_may_tighten_the_budget_the_working_directory_config_tightened(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\naudit:\n  budget:\n    max_tokens: 5000\n    max_cost_usd: 10\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->dumpFile($workingFile, "audit:\n  budget:\n    max_tokens: 3000\n");
+        $this->filesystem->dumpFile($projectFile, "audit:\n  budget:\n    max_tokens: 3000\n    max_cost_usd: 4\n");
+
+        $standaloneConfig = $this->loader($workingFile)->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertSame(['budget' => ['max_tokens' => 3000, 'max_cost_usd' => 4]], $standaloneConfig->auditConfig['audit']);
+        self::assertFalse($standaloneConfig->auditedProjectConfig?->wasSkipped());
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('layeredHttpTimeouts')]
+    public function test_the_http_timeout_is_the_highest_any_layer_asks_for(string $userYaml, string $workingYaml, string $projectYaml, float $expected): void
+    {
+        $this->writeConfig($userYaml);
+        $workingFile = $this->workingDirectoryConfigFile();
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->dumpFile($workingFile, $workingYaml);
+        $this->filesystem->dumpFile($projectFile, $projectYaml);
+
+        $standaloneConfig = $this->loader($workingFile)->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertSame($expected, $standaloneConfig->httpTimeout);
+        self::assertFalse($standaloneConfig->auditedProjectConfig?->wasSkipped());
+        self::assertArrayNotHasKey('http_timeout', $standaloneConfig->auditConfig);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string, float}>
+     */
+    public static function layeredHttpTimeouts(): iterable
+    {
+        $user = "platform:\n  anthropic:\n    api_key: sk-user\n";
+
+        yield 'only the audited project raises it' => [$user, "profile: fast\n", "http_timeout: 900\n", 900.0];
+        yield 'the audited project asks for less than the working directory' => [$user, "http_timeout: 900\n", "http_timeout: 700\n", 900.0];
+        yield 'the audited project asks for more than the working directory' => [$user, "http_timeout: 700\n", "http_timeout: 900\n", 900.0];
+        yield 'the audited project repeats the user one' => [$user, "profile: fast\n", "http_timeout: 600\n", 600.0];
+        yield 'the audited project sets none' => [$user, "http_timeout: 700\n", "profile: fast\n", 700.0];
+        yield 'neither project layer sets one over a user one' => [$user."http_timeout: 300\n", "profile: fast\n", "profile: fast\n", 300.0];
+        yield 'both ask for less than the user one but the user one stays' => [$user."http_timeout: 300\n", "http_timeout: 400\n", "http_timeout: 350\n", 400.0];
+    }
+
+    private function workingDirectoryConfigFile(): string
+    {
+        return $this->configHome.'/working/.symfony-security-auditor.yaml';
+    }
+
+    private function auditedProjectConfigFile(): string
+    {
+        return $this->configHome.'/project/.symfony-security-auditor.yaml';
     }
 
     private function loader(?string $projectConfigFile = null): StandaloneConfigLoader
@@ -1052,7 +1389,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: \"Ärger\\tbaseline.json\"\n");
 
-        self::assertSame(['baseline' => $this->configHome."/project/Ärger\tbaseline.json"], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome."/project/Ärger\tbaseline.json"], $this->loader()->load(auditedProjectConfigFile: $projectConfigFile)->auditConfig['audit']);
     }
 
     /**
@@ -1404,7 +1741,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: 'baseline?v2.json'\n");
 
-        $auditConfig = $this->loader($projectConfigFile)->load()->auditConfig;
+        $auditConfig = $this->loader()->load(auditedProjectConfigFile: $projectConfigFile)->auditConfig;
 
         self::assertSame('claude-haiku-4-5?temperature=0.2', $auditConfig['model']);
         self::assertSame(['baseline' => $this->configHome.'/project/baseline?v2.json'], $auditConfig['audit']);
@@ -1428,7 +1765,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: 'baseline-100%.json'\n");
 
-        self::assertSame(['baseline' => $this->configHome.'/project/baseline-100%.json'], $this->loader($projectConfigFile)->load()->auditConfig['audit']);
+        self::assertSame(['baseline' => $this->configHome.'/project/baseline-100%.json'], $this->loader()->load(auditedProjectConfigFile: $projectConfigFile)->auditConfig['audit']);
     }
 
     /**

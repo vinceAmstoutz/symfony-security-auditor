@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 
@@ -44,6 +45,29 @@ final class StandaloneConfigTest extends TestCase
         yield 'empty privacy section' => [['privacy' => []]];
         yield 'privacy is not a map' => [['privacy' => 'yes']];
         yield 'truthy but not true' => [['privacy' => ['offline_only' => 1]]];
+    }
+
+    public function test_it_gets_the_audited_project_config_without_losing_anything_else(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['ollama' => []], 'ollama');
+        $auditedProjectConfig = AuditedProjectConfig::skipped('/repo/.symfony-security-auditor.yaml', 'not valid YAML');
+        $standaloneConfig = new StandaloneConfig(['model' => 'm'], $standalonePlatformConfig, '/work/.symfony-security-auditor.yaml', 900.0);
+
+        $withTheAuditedProject = $standaloneConfig->withAuditedProjectConfig($auditedProjectConfig);
+
+        self::assertNull($standaloneConfig->auditedProjectConfig);
+        self::assertSame($auditedProjectConfig, $withTheAuditedProject->auditedProjectConfig);
+        self::assertSame(['model' => 'm'], $withTheAuditedProject->auditConfig);
+        self::assertSame($standalonePlatformConfig, $withTheAuditedProject->platform);
+        self::assertSame('/work/.symfony-security-auditor.yaml', $withTheAuditedProject->projectConfigFile);
+        self::assertSame(900.0, $withTheAuditedProject->httpTimeout);
+    }
+
+    public function test_it_drops_the_audited_project_config_when_given_none(): void
+    {
+        $standaloneConfig = $this->config([])->withAuditedProjectConfig(AuditedProjectConfig::layered('/repo/.symfony-security-auditor.yaml', [], null));
+
+        self::assertNull($standaloneConfig->withAuditedProjectConfig(null)->auditedProjectConfig);
     }
 
     /**
