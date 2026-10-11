@@ -143,8 +143,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
 
     /**
      * Spends one baseline credit on `$vulnerability`: its own fingerprint's
-     * first, then the ones it carries from the types it was reported as
-     * before its own type existed (`Vulnerability::fingerprintCandidates()`).
+     * first, then the other ones a baseline written before may hold for it
+     * (`Vulnerability::fingerprintCandidates()`).
      */
     public function consumeBaselineCreditFor(Vulnerability $vulnerability): bool
     {

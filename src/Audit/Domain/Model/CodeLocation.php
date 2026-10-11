@@ -18,12 +18,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocat
 final readonly class CodeLocation
 {
     /**
+     * @param string|null $echoedFilePath the path as the model wrote it, when `$filePath` names the project file it denotes in another spelling
+     *
      * @throws InvalidCodeLocationException
      */
     public function __construct(
         private string $filePath,
         private int $lineStart,
         private int $lineEnd,
+        private ?string $echoedFilePath = null,
     ) {
         if ('' === trim($filePath)) {
             throw InvalidCodeLocationException::forBlankFilePath();
@@ -51,5 +54,16 @@ final readonly class CodeLocation
     public function lineEnd(): int
     {
         return $this->lineEnd;
+    }
+
+    /**
+     * The path as the model wrote it: {@see self::filePath()} unless the
+     * finding was named by another spelling of it.
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function echoedFilePath(): string
+    {
+        return $this->echoedFilePath ?? $this->filePath;
     }
 }

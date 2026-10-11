@@ -28,4 +28,23 @@ final class CodeLocationTest extends TestCase
 
         new CodeLocation('   ', 1, 1);
     }
+
+    /**
+     * @throws InvalidCodeLocationException
+     */
+    public function test_the_echoed_file_path_is_the_file_path_when_no_other_spelling_is_given(): void
+    {
+        self::assertSame('src/A.php', (new CodeLocation('src/A.php', 1, 1))->echoedFilePath());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     */
+    public function test_the_echoed_file_path_is_the_spelling_the_model_wrote(): void
+    {
+        $codeLocation = new CodeLocation('src/A.php', 1, 1, './src/A.php');
+
+        self::assertSame('src/A.php', $codeLocation->filePath());
+        self::assertSame('./src/A.php', $codeLocation->echoedFilePath());
+    }
 }

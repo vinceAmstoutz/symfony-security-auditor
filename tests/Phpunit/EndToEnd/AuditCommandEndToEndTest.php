@@ -45,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
@@ -65,7 +66,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ExecutiveSummaryReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubCommentReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
@@ -83,6 +86,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadable
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
@@ -703,6 +707,137 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    #[DataProvider('everyOutputFormat')]
+    public function test_a_baseline_entry_written_under_the_path_spelling_the_model_echoed_accepts_the_finding_whatever_the_format(string $format): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->baselineAccepting('SSA-8C9F6BEB1695', './src/Controller/HomeController.php');
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayloadAt('./src/Controller/HomeController.php'), '{"accepted": true}', ['riskLevel' => RiskLevel::Low]);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => $format,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function everyOutputFormat(): iterable
+    {
+        foreach (OutputFormat::cases() as $outputFormat) {
+            yield $outputFormat->value => [$outputFormat->value];
+        }
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('spellingsOfTheControllerPathWithTheFingerprintTheyHadBefore')]
+    public function test_a_baseline_entry_written_under_the_path_spelling_the_model_echoed_is_reported_suppressed_and_kept_by_a_prune(string $echoedPath, string $fingerprintOfTheEchoedSpelling): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->baselineAccepting($fingerprintOfTheEchoedSpelling, $echoedPath);
+        $reportFile = $this->fixtureDir.'/report.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayloadAt($echoedPath), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'json',
+            '--output' => $reportFile,
+        ]);
+
+        $report = json_decode((string) file_get_contents($reportFile), true);
+        self::assertIsArray($report);
+        self::assertSame([[], [$fingerprintOfTheEchoedSpelling]], [$report['vulnerabilities'] ?? null, $report['suppressed_fingerprints'] ?? null]);
+
+        $baselineMergePlan = (new BaselineMerger(new ReportFindingsLoader(), new Baseline()))->plan($reportFile, $baselineFile, true);
+        self::assertSame([0, 1, []], [$baselineMergePlan->prunedCount, \count($baselineMergePlan->keptEntries), $baselineMergePlan->newFindings]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('spellingsOfTheControllerPathWithTheFingerprintTheyHadBefore')]
+    public function test_a_sarif_report_marks_the_finding_named_by_the_project_file_suppressed_by_a_baseline_entry_written_under_the_echoed_spelling(string $echoedPath, string $fingerprintOfTheEchoedSpelling): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->baselineAccepting($fingerprintOfTheEchoedSpelling, $echoedPath);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayloadAt($echoedPath), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'sarif',
+        ]);
+
+        self::assertSame(
+            [[
+                ['symfonySecurityAuditor/v1' => 'SSA-2C08A47E5035'],
+                'src/Controller/HomeController.php',
+                [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+            ]],
+            $this->sarifResultSummaries($commandTester->getDisplay()),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function spellingsOfTheControllerPathWithTheFingerprintTheyHadBefore(): iterable
+    {
+        yield 'as the project spells it' => ['src/Controller/HomeController.php', 'SSA-2C08A47E5035'];
+        yield 'with a leading dot slash' => ['./src/Controller/HomeController.php', 'SSA-8C9F6BEB1695'];
+        yield 'with backslashes' => ['src\Controller\HomeController.php', 'SSA-78C070241F61'];
+        yield 'with a leading slash' => ['/src/Controller/HomeController.php', 'SSA-D3F19A8AE4F9'];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_a_baseline_entry_written_under_the_absolute_path_the_model_echoed_accepts_the_finding_and_is_kept_by_a_prune(): void
+    {
+        $this->createProjectDir();
+        $absolutePath = $this->fixtureDir.'/src/Controller/HomeController.php';
+        $fingerprintOfTheAbsolutePath = Vulnerability::fingerprintOf('sql_injection', $absolutePath, 'Critical SQL Injection');
+        $baselineFile = $this->baselineAccepting($fingerprintOfTheAbsolutePath, $absolutePath);
+        $reportFile = $this->fixtureDir.'/report.json';
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayloadAt($absolutePath), '{"accepted": true}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--baseline' => $baselineFile, '--format' => 'sarif']);
+        $this->makeCommandTester($this->criticalAttackerPayloadAt($absolutePath), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'json',
+            '--output' => $reportFile,
+        ]);
+
+        $report = json_decode((string) file_get_contents($reportFile), true);
+        self::assertIsArray($report);
+        self::assertSame([[], [$fingerprintOfTheAbsolutePath]], [$report['vulnerabilities'] ?? null, $report['suppressed_fingerprints'] ?? null]);
+        self::assertSame(
+            [[
+                ['symfonySecurityAuditor/v1' => 'SSA-2C08A47E5035'],
+                'src/Controller/HomeController.php',
+                [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+            ]],
+            $this->sarifResultSummaries($commandTester->getDisplay()),
+        );
+        self::assertSame(0, (new BaselineMerger(new ReportFindingsLoader(), new Baseline()))->plan($reportFile, $baselineFile, true)->prunedCount);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_json_output_written_to_file(): void
     {
         $this->createProjectDir();
@@ -1149,6 +1284,67 @@ final class AuditCommandEndToEndTest extends TestCase
         return (string) json_encode($vulns);
     }
 
+    private function criticalAttackerPayloadAt(string $filePath): string
+    {
+        return (string) json_encode([[
+            'type' => 'sql_injection',
+            'severity' => 'critical',
+            'title' => 'Critical SQL Injection',
+            'description' => 'Raw query with user input',
+            'file_path' => $filePath,
+            'line_start' => 1,
+            'line_end' => 5,
+            'vulnerable_code' => '$q',
+            'attack_vector' => 'SQL injection via query param',
+            'proof' => "' OR 1=1--",
+            'remediation' => 'Use prepared statements',
+            'confidence' => 0.95,
+        ]]);
+    }
+
+    private function baselineAccepting(string $fingerprint, string $file): string
+    {
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        file_put_contents($baselineFile, (string) json_encode([[
+            'fingerprint' => $fingerprint,
+            'type' => 'sql_injection',
+            'file' => $file,
+            'title' => 'Critical SQL Injection',
+            'added_at' => '2026-10-04',
+        ]], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
+
+        return $baselineFile;
+    }
+
+    /**
+     * @return list<array{mixed, mixed, mixed}>
+     */
+    private function sarifResultSummaries(string $output): array
+    {
+        preg_match('/(\{.*\})/s', $output, $matches);
+        $results = $this->valueAt(json_decode($matches[1] ?? '', true), 'runs', 0, 'results');
+        self::assertIsArray($results);
+
+        return array_map(
+            fn (mixed $result): array => [
+                $this->valueAt($result, 'partialFingerprints'),
+                $this->valueAt($result, 'locations', 0, 'physicalLocation', 'artifactLocation', 'uri'),
+                $this->valueAt($result, 'suppressions'),
+            ],
+            array_values($results),
+        );
+    }
+
+    private function valueAt(mixed $node, int|string ...$keys): mixed
+    {
+        foreach ($keys as $key) {
+            self::assertIsArray($node);
+            $node = $node[$key] ?? null;
+        }
+
+        return $node;
+    }
+
     private function criticalAttackerPayload(string $filePathFormat = 'src/Repo%d.php'): string
     {
         $vulns = [];
@@ -1279,6 +1475,8 @@ final class AuditCommandEndToEndTest extends TestCase
                 new MarkdownReportRenderer(),
                 new JunitReportRenderer(),
                 new GithubAnnotationsReportRenderer(),
+                new ExecutiveSummaryReportRenderer(),
+                new GithubCommentReportRenderer(),
             ], new Filesystem()),
             new AuditExitCodeResolver(),
             new AuditPresenter(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json')),
