@@ -1065,6 +1065,42 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
      */
+    public function test_it_reports_a_finding_whose_line_start_is_a_range_at_line_one_and_records_the_chunk_analyzed_and_cached(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $finding = [
+            'type' => 'sql_injection',
+            'severity' => 'high',
+            'title' => 'Range',
+            'description' => 'x',
+            'file_path' => 'src/Controller/UserController.php',
+            'line_start' => '42-50',
+            'confidence' => 0.85,
+        ];
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->method('get')->willReturn(null);
+        $cache->expects(self::once())->method('store')->with(self::isArray(), [$finding]);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::of((string) json_encode([$finding]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $recordingCoverageRecorder);
+
+        self::assertSame([['Range', 1, 1]], array_map(static fn (Vulnerability $vulnerability): array => [$vulnerability->title(), $vulnerability->lineStart(), $vulnerability->lineEnd()], $vulnerabilities));
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/Controller/UserController.php', 'status' => 'analyzed']], $recordingCoverageRecorder->coverage);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_stores_empty_array_in_cache_when_llm_returns_empty_response(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
