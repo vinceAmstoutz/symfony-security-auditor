@@ -140,6 +140,34 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
     }
 
     /**
+     * @param array<string, int> $usage
+     *
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    #[DataProvider('usageReportingNoPromptTokensCases')]
+    public function test_complete_with_tools_books_a_tool_call_the_output_limit_cut_off_whose_usage_reports_no_prompt_tokens_at_its_estimated_input_tokens(array $usage): void
+    {
+        $this->client(new ScriptedDeferredPlatform([$this->toolCallCutOffByTheOutputLimit($usage)]))->completeWithTools('sys', 'user', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
+
+        self::assertSame(4103, $this->budgetTracker->tokensUsed());
+        self::assertSame([7, 4096], [$this->tokenUsageRecorder->snapshot()->inputTokens(), $this->tokenUsageRecorder->snapshot()->outputTokens()]);
+        self::assertSame([[7, 4096]], $this->fakeRateLimiter->recorded);
+        self::assertContains([self::REPORTED_USAGE_DEBUG, ['stop_reason' => 'length', 'input_tokens' => 7, 'output_tokens' => 4096]], $this->messageCollectingLogger->records);
+    }
+
+    /** @return iterable<string, array{array<string, int>}> */
+    public static function usageReportingNoPromptTokensCases(): iterable
+    {
+        yield 'a completion count alone' => [['completion_tokens' => 4096]];
+        yield 'a prompt of zero from a local OpenAI-compatible server' => [['prompt_tokens' => 0, 'completion_tokens' => 4096]];
+    }
+
+    /**
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws LLMProviderException
@@ -581,11 +609,16 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         ])])), new InMemoryRawResult(), []);
     }
 
-    private function toolCallCutOffByTheOutputLimit(): DeferredResult
+    /**
+     * @param array<string, int>|null $usage
+     */
+    private function toolCallCutOffByTheOutputLimit(?array $usage = null): DeferredResult
     {
+        $chatCompletion = $this->chatCompletion('length', '{"type":"sql_injection","title":"SQL inj', 50000, 4096);
+
         return new DeferredResult(
             new ThrowingConverter(new MalformedToolCallException(self::MALFORMED_ARGUMENTS), new RawUsageExtractor()),
-            new InMemoryRawResult($this->chatCompletion('length', '{"type":"sql_injection","title":"SQL inj', 50000, 4096)),
+            new InMemoryRawResult(null === $usage ? $chatCompletion : ['usage' => $usage] + $chatCompletion),
             [],
         );
     }

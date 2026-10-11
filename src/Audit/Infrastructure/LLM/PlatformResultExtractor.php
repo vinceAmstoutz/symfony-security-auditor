@@ -66,6 +66,18 @@ final readonly class PlatformResultExtractor
             return $this->bookEstimatedInput($estimatedInputTokens);
         }
 
+        [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->billedTokenCounts($tokenUsage, $estimatedInputTokens);
+        $this->assertNonNegative($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
+        $this->tokenUsageRecorder?->record($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
+
+        return [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
+    }
+
+    /**
+     * @return array{0: int, 1: int, 2: int, 3: int}
+     */
+    private function billedTokenCounts(TokenUsageInterface $tokenUsage, int $estimatedInputTokens): array
+    {
         [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->tokenCounts($tokenUsage);
         if (!$this->reportsPrompt($tokenUsage, $inputTokens, $cacheReadTokens, $cacheCreationTokens)) {
             $this->logger->debug('The provider reported no prompt tokens for an answer; its input is booked at the estimated input tokens, since the provider bills the request it accepted', [
@@ -73,9 +85,6 @@ final readonly class PlatformResultExtractor
             ]);
             $inputTokens = $estimatedInputTokens;
         }
-
-        $this->assertNonNegative($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
-        $this->tokenUsageRecorder?->record($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
 
         return [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
     }
@@ -108,16 +117,18 @@ final readonly class PlatformResultExtractor
     /**
      * The usage a provider reported in the raw answer of a call its bridge
      * failed to convert, read with that bridge's own extractor — a failed
-     * conversion attaches no `token_usage` metadata. Null when the answer
-     * reports none, cannot be read, or reports a negative count. Nothing is
-     * recorded here: the caller books the failed call.
+     * conversion attaches no `token_usage` metadata. A usage that reports no
+     * prompt tokens has the call's estimated input tokens as its input, as in
+     * `extractTokens()`. Null when the answer reports none, cannot be read, or
+     * reports a negative count. Nothing is recorded here: the caller books the
+     * failed call.
      */
-    public function extractBilledUsage(DeferredResult $deferredResult): ?TokenUsageSnapshot
+    public function extractBilledUsage(DeferredResult $deferredResult, int $estimatedInputTokens): ?TokenUsageSnapshot
     {
         try {
             $tokenUsage = $deferredResult->getResultConverter()->getTokenUsageExtractor()?->extract($deferredResult->getRawResult());
 
-            return $tokenUsage instanceof TokenUsageInterface ? TokenUsageSnapshot::of(...$this->tokenCounts($tokenUsage)) : null;
+            return $tokenUsage instanceof TokenUsageInterface ? TokenUsageSnapshot::of(...$this->billedTokenCounts($tokenUsage, $estimatedInputTokens)) : null;
         } catch (Throwable) {
             return null;
         }

@@ -122,6 +122,8 @@ final class PlatformResultExtractorTest extends TestCase
         yield 'a prompt of zero beside a completion of zero' => [new TokenUsage(promptTokens: 0, completionTokens: 0), [self::ESTIMATED_INPUT_TOKENS, 0, 0, 0]];
         yield 'a prompt of zero beside a completion' => [new TokenUsage(promptTokens: 0, completionTokens: 40), [self::ESTIMATED_INPUT_TOKENS, 40, 0, 0]];
         yield 'a prompt of zero beside cache counts of zero' => [new TokenUsage(promptTokens: 0, completionTokens: 40, cacheCreationTokens: 0, cacheReadTokens: 0), [self::ESTIMATED_INPUT_TOKENS, 40, 0, 0]];
+        yield 'thinking tokens a total without the prompt has room for' => [new TokenUsage(completionTokens: 10, thinkingTokens: 5, totalTokens: 15), [self::ESTIMATED_INPUT_TOKENS, 15, 0, 0]];
+        yield 'thinking tokens a total without the prompt leaves no room for' => [new TokenUsage(completionTokens: 10, thinkingTokens: 5, totalTokens: 14), [self::ESTIMATED_INPUT_TOKENS, 10, 0, 0]];
     }
 
     /**
@@ -277,7 +279,7 @@ final class PlatformResultExtractorTest extends TestCase
         $tokenUsageRecorder = new TokenUsageRecorder();
         $platformResultExtractor = new PlatformResultExtractor($tokenUsageRecorder);
 
-        $billedUsage = $platformResultExtractor->extractBilledUsage(self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), new TokenUsage(promptTokens: 10, completionTokens: 5, cacheCreationTokens: 2, cacheReadTokens: 3)));
+        $billedUsage = $platformResultExtractor->extractBilledUsage(self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), new TokenUsage(promptTokens: 10, completionTokens: 5, cacheCreationTokens: 2, cacheReadTokens: 3)), self::ESTIMATED_INPUT_TOKENS);
 
         self::assertInstanceOf(TokenUsageSnapshot::class, $billedUsage);
         self::assertSame([10, 5, 3, 2], [$billedUsage->inputTokens(), $billedUsage->outputTokens(), $billedUsage->cacheReadTokens(), $billedUsage->cacheCreationTokens()]);
@@ -289,16 +291,30 @@ final class PlatformResultExtractorTest extends TestCase
      */
     public function test_it_reads_the_thinking_tokens_of_an_answer_its_bridge_failed_to_convert_as_output(): void
     {
-        $billedUsage = (new PlatformResultExtractor(null))->extractBilledUsage(self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), new TokenUsage(promptTokens: 10, completionTokens: 5, thinkingTokens: 4, totalTokens: 19)));
+        $billedUsage = (new PlatformResultExtractor(null))->extractBilledUsage(self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), new TokenUsage(promptTokens: 10, completionTokens: 5, thinkingTokens: 4, totalTokens: 19)), self::ESTIMATED_INPUT_TOKENS);
 
         self::assertInstanceOf(TokenUsageSnapshot::class, $billedUsage);
         self::assertSame([10, 9], [$billedUsage->inputTokens(), $billedUsage->outputTokens()]);
     }
 
+    /**
+     * @param array{int, int, int, int} $expectedTokens input, output, cache read, cache creation
+     *
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('usageWithoutPromptTokensCases')]
+    public function test_it_reads_the_estimated_input_tokens_as_the_input_of_an_answer_its_bridge_failed_to_convert_when_the_usage_reports_no_prompt_tokens(TokenUsage $tokenUsage, array $expectedTokens): void
+    {
+        $billedUsage = (new PlatformResultExtractor(null))->extractBilledUsage(self::unconvertedAnswer(new InMemoryRawResult(['usage' => []]), $tokenUsage), self::ESTIMATED_INPUT_TOKENS);
+
+        self::assertInstanceOf(TokenUsageSnapshot::class, $billedUsage);
+        self::assertSame($expectedTokens, [$billedUsage->inputTokens(), $billedUsage->outputTokens(), $billedUsage->cacheReadTokens(), $billedUsage->cacheCreationTokens()]);
+    }
+
     #[DataProvider('answersReportingNoBilledUsageCases')]
     public function test_it_reads_no_billed_usage_from_an_answer_that_reports_none_it_can_trust(DeferredResult $deferredResult): void
     {
-        self::assertNull((new PlatformResultExtractor(null))->extractBilledUsage($deferredResult));
+        self::assertNull((new PlatformResultExtractor(null))->extractBilledUsage($deferredResult, self::ESTIMATED_INPUT_TOKENS));
     }
 
     /** @return iterable<string, array{DeferredResult}> */

@@ -32,8 +32,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
  * So it is booked against the budget, the report's token totals and the
  * rate-limit window: at the usage its raw answer reports, or at its estimated
  * input tokens when it reports none, the output it produced then unknown and
- * counted as none. A call the provider never answered only releases its
- * rate-limit reservation.
+ * counted as none. A usage that reports no prompt tokens books the estimated
+ * input tokens as its input, beside the output it reports. A call the
+ * provider never answered only releases its rate-limit reservation.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -62,7 +63,7 @@ final readonly class DegradedAnswerBooker
             return;
         }
 
-        $reportedUsage = $deferredResult instanceof DeferredResult ? $this->platformResultExtractor->extractBilledUsage($deferredResult) : null;
+        $reportedUsage = $deferredResult instanceof DeferredResult ? $this->platformResultExtractor->extractBilledUsage($deferredResult, $estimatedInputTokens) : null;
         $billedUsage = $reportedUsage ?? TokenUsageSnapshot::of($estimatedInputTokens, 0);
 
         $this->rateLimiter->record($billedUsage->inputTokens(), $billedUsage->outputTokens());
