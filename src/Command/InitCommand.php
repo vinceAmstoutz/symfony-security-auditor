@@ -128,9 +128,8 @@ final readonly class InitCommand
         }
 
         $this->installBridges($symfonyStyle, $provider, $providerKey, $model);
-        $removedSettings = $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
 
-        $this->reportRemoved($symfonyStyle, $removedSettings, $provider);
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
 
         return Command::SUCCESS;
@@ -240,22 +239,6 @@ final readonly class InitCommand
         $symfonyStyle->error($violation);
 
         return true;
-    }
-
-    /**
-     * @param list<string> $removedSettings
-     */
-    private function reportRemoved(SymfonyStyle $symfonyStyle, array $removedSettings, string $provider): void
-    {
-        if ([] === $removedSettings) {
-            return;
-        }
-
-        $symfonyStyle->warning(\sprintf(
-            'Removed %s: they named models of the previous provider, not of "%s". Set them again to split the models.',
-            implode(', ', $removedSettings),
-            $provider,
-        ));
     }
 
     private function reportWritten(SymfonyStyle $symfonyStyle, string $configFile, string $provider, string $model, ?string $envVar): void

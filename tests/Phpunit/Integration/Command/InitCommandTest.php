@@ -205,99 +205,45 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_keeps_the_settings_it_does_not_manage_when_it_rewrites_an_existing_configuration(): void
+    #[DataProvider('providersOverAnExistingConfiguration')]
+    public function test_it_rewrites_an_existing_configuration_from_scratch_when_forced(string $provider, string $model, string $envVar): void
     {
-        (new Filesystem())->dumpFile($this->configFile(), "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: old-model\nprivacy:\n    offline_only: true\naudit:\n    budget:\n        max_cost_usd: 5.0\ncache:\n    enabled: true\n");
+        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithEverythingInitDoesNotWrite());
 
         $this->commandTester()->execute(
-            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true],
+            ['--provider' => $provider, '--model' => $model, '--force' => true],
             ['interactive' => false],
         );
 
         self::assertSame(
-            [
-                'provider' => 'openai',
-                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
-                'model' => 'gpt-5.4',
-                'privacy' => ['offline_only' => true],
-                'audit' => ['budget' => ['max_cost_usd' => 5.0]],
-                'cache' => ['enabled' => true],
-            ],
+            ['provider' => $provider, 'platform' => [$provider => ['api_key' => \sprintf('%%env(%s)%%', $envVar)]], 'model' => $model],
             Yaml::parseFile($this->configFile()),
         );
     }
 
-    public function test_it_drops_the_models_bound_to_the_previous_provider_when_it_switches_provider(): void
+    #[DataProvider('providersOverAnExistingConfiguration')]
+    public function test_it_rewrites_an_existing_configuration_from_scratch_when_the_overwrite_is_confirmed(string $provider, string $model, string $envVar): void
     {
-        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
+        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithEverythingInitDoesNotWrite());
 
-        $this->commandTester()->execute(
-            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true],
-            ['interactive' => false],
-        );
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([$provider, $model, $envVar, 'yes', '']);
+
+        $commandTester->execute([]);
 
         self::assertSame(
-            [
-                'provider' => 'openai',
-                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
-                'model' => 'gpt-5.4',
-                'audit' => ['escalation' => ['enabled' => true], 'budget' => ['max_cost_usd' => 5.0]],
-            ],
+            ['provider' => $provider, 'platform' => [$provider => ['api_key' => \sprintf('%%env(%s)%%', $envVar)]], 'model' => $model],
             Yaml::parseFile($this->configFile()),
         );
     }
 
-    public function test_it_names_the_models_it_dropped_when_it_switches_provider(): void
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function providersOverAnExistingConfiguration(): iterable
     {
-        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
-
-        $commandTester = $this->commandTester();
-        $commandTester->execute(
-            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true],
-            ['interactive' => false],
-        );
-
-        self::assertStringContainsString(
-            'Removed attacker_model, reviewer_model, audit.escalation.cheap_model: they named models of the previous provider, not of "openai". Set them again to split the models.',
-            $this->unwrappedDisplay($commandTester),
-        );
-    }
-
-    public function test_it_shows_the_provider_it_switched_to_as_written_when_it_names_the_models_it_dropped(): void
-    {
-        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
-
-        $commandTester = $this->commandTester();
-        $commandTester->execute(
-            ['--provider' => 'generic.x<info>y', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example', '--force' => true],
-            ['interactive' => false],
-        );
-
-        self::assertStringContainsString('not of "generic.x<info>y"', $this->unwrappedDisplay($commandTester));
-    }
-
-    public function test_it_keeps_the_models_when_the_provider_is_unchanged(): void
-    {
-        (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithSplitModels());
-
-        $commandTester = $this->commandTester();
-        $commandTester->execute(
-            ['--provider' => 'anthropic', '--model' => 'claude-opus-4-8', '--force' => true],
-            ['interactive' => false],
-        );
-
-        self::assertSame(
-            [
-                'provider' => 'anthropic',
-                'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']],
-                'model' => 'claude-opus-4-8',
-                'attacker_model' => 'claude-opus-4-8',
-                'reviewer_model' => 'claude-haiku-4-5',
-                'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'claude-haiku-4-5'], 'budget' => ['max_cost_usd' => 5.0]],
-            ],
-            Yaml::parseFile($this->configFile()),
-        );
-        self::assertStringNotContainsString('Removed', $this->unwrappedDisplay($commandTester));
+        yield 'the same provider' => ['anthropic', 'claude-haiku-4-5', 'ANTHROPIC_API_KEY'];
+        yield 'another provider' => ['openai', 'gpt-5.4', 'OPENAI_API_KEY'];
     }
 
     public function test_it_rebuilds_the_bridge_of_a_configured_machine_under_no_interaction_when_forced(): void
@@ -1906,9 +1852,9 @@ final class InitCommandTest extends TestCase
         return new CommandTester($initCommand);
     }
 
-    private function anthropicConfigurationWithSplitModels(): string
+    private function anthropicConfigurationWithEverythingInitDoesNotWrite(): string
     {
-        return "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: claude-opus-4-8\nattacker_model: claude-opus-4-8\nreviewer_model: claude-haiku-4-5\naudit:\n    escalation:\n        enabled: true\n        cheap_model: claude-haiku-4-5\n    budget:\n        max_cost_usd: 5.0\n";
+        return "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: claude-opus-4-8\nattacker_model: claude-opus-4-8\nreviewer_model: claude-haiku-4-5\naudit:\n    escalation:\n        enabled: true\n        cheap_model: claude-haiku-4-5\n    budget:\n        max_cost_usd: 5.0\nprivacy:\n    offline_only: true\nhttp_timeout: 900\n";
     }
 
     private function unwrappedDisplay(CommandTester $commandTester): string

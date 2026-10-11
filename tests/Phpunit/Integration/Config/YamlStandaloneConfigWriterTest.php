@@ -67,168 +67,24 @@ final class YamlStandaloneConfigWriterTest extends TestCase
      * @throws StandaloneConfigWriteException
      * @throws UnsafeStandaloneConfigWriteException
      */
-    public function test_it_keeps_the_settings_of_an_existing_configuration_that_it_is_not_given(): void
+    #[DataProvider('existingProviderLines')]
+    public function test_it_replaces_an_existing_configuration_with_only_what_it_is_given(string $providerLine): void
     {
-        (new Filesystem())->dumpFile($this->configFile, "provider: anthropic\nplatform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: old-model\nprivacy:\n    offline_only: true\naudit:\n    budget:\n        max_cost_usd: 5.0\n    custom_skills: []\nscan:\n    secret_scrubbing:\n        additional_patterns: ['acme_[a-z0-9]{32}']\ncache:\n    enabled: true\nhttp_timeout: 900\n");
+        (new Filesystem())->dumpFile($this->configFile, $providerLine."platform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: claude-opus-4-8\nattacker_model: claude-opus-4-8\nreviewer_model: claude-haiku-4-5\naudit:\n    escalation:\n        enabled: true\n        cheap_model: claude-haiku-4-5\n    budget:\n        max_cost_usd: 5.0\nprivacy:\n    offline_only: true\nscan:\n    secret_scrubbing:\n        additional_patterns: ['acme_[a-z0-9]{32}']\ncache:\n    enabled: true\nhttp_timeout: 900\n");
 
-        (new YamlStandaloneConfigWriter())->write($this->configFile, ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4']);
+        (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration());
 
-        self::assertSame(
-            [
-                'provider' => 'openai',
-                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
-                'model' => 'gpt-5.4',
-                'privacy' => ['offline_only' => true],
-                'audit' => ['budget' => ['max_cost_usd' => 5.0], 'custom_skills' => []],
-                'scan' => ['secret_scrubbing' => ['additional_patterns' => ['acme_[a-z0-9]{32}']]],
-                'cache' => ['enabled' => true],
-                'http_timeout' => 900,
-            ],
-            Yaml::parseFile($this->configFile),
-        );
+        self::assertStringEqualsFile($this->configFile, "provider: openai\nplatform:\n    openai: { api_key: '%env(OPENAI_API_KEY)%' }\nmodel: gpt-5.4\n");
     }
 
     /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
+     * @return iterable<string, array{string}>
      */
-    public function test_it_removes_the_models_of_the_previous_provider_and_says_which_when_the_provider_changes(): void
+    public static function existingProviderLines(): iterable
     {
-        (new Filesystem())->dumpFile($this->configFile, $this->existingConfiguration('provider: anthropic'));
-
-        $removed = (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration());
-
-        self::assertSame(['attacker_model', 'reviewer_model', 'audit.escalation.cheap_model'], $removed);
-        self::assertSame(
-            [
-                'provider' => 'openai',
-                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
-                'model' => 'gpt-5.4',
-                'audit' => ['escalation' => ['enabled' => true], 'budget' => ['max_cost_usd' => 5.0]],
-            ],
-            Yaml::parseFile($this->configFile),
-        );
-    }
-
-    /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
-     */
-    public function test_it_keeps_the_models_when_the_provider_is_the_one_already_configured(): void
-    {
-        (new Filesystem())->dumpFile($this->configFile, $this->existingConfiguration('provider: openai'));
-
-        $removed = (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration());
-
-        self::assertSame([], $removed);
-        self::assertSame(
-            [
-                'provider' => 'openai',
-                'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
-                'model' => 'gpt-5.4',
-                'attacker_model' => 'claude-opus-4-8',
-                'reviewer_model' => 'claude-haiku-4-5',
-                'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'claude-haiku-4-5'], 'budget' => ['max_cost_usd' => 5.0]],
-            ],
-            Yaml::parseFile($this->configFile),
-        );
-    }
-
-    /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
-     */
-    public function test_it_removes_the_models_of_a_configuration_that_does_not_say_which_provider_it_selects(): void
-    {
-        (new Filesystem())->dumpFile($this->configFile, $this->existingConfiguration(null));
-
-        $removed = (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration());
-
-        self::assertSame(['attacker_model', 'reviewer_model', 'audit.escalation.cheap_model'], $removed);
-    }
-
-    /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
-     */
-    public function test_it_keeps_the_models_when_the_configuration_it_is_given_selects_no_provider(): void
-    {
-        (new Filesystem())->dumpFile($this->configFile, $this->existingConfiguration('provider: anthropic'));
-
-        $removed = (new YamlStandaloneConfigWriter())->write($this->configFile, ['model' => 'claude-opus-4-8']);
-
-        self::assertSame([], $removed);
-        self::assertSame(
-            [
-                'model' => 'claude-opus-4-8',
-                'provider' => 'anthropic',
-                'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']],
-                'attacker_model' => 'claude-opus-4-8',
-                'reviewer_model' => 'claude-haiku-4-5',
-                'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'claude-haiku-4-5'], 'budget' => ['max_cost_usd' => 5.0]],
-            ],
-            Yaml::parseFile($this->configFile),
-        );
-    }
-
-    /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
-     */
-    public function test_it_removes_nothing_from_a_configuration_that_does_not_exist_yet(): void
-    {
-        self::assertSame([], (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration()));
-    }
-
-    /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
-     */
-    public function test_it_does_not_name_a_model_setting_that_names_no_model(): void
-    {
-        (new Filesystem())->dumpFile($this->configFile, "provider: anthropic\nattacker_model: ~\naudit:\n    escalation:\n        enabled: true\n        cheap_model: ~\n");
-
-        $removed = (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration());
-
-        self::assertSame([], $removed);
-    }
-
-    /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
-     */
-    public function test_it_leaves_an_escalation_section_empty_once_its_cheap_model_is_removed(): void
-    {
-        (new Filesystem())->dumpFile($this->configFile, "provider: anthropic\naudit:\n    escalation:\n        cheap_model: claude-haiku-4-5\n");
-
-        $removed = (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration());
-
-        self::assertSame(['audit.escalation.cheap_model'], $removed);
-        self::assertSame($this->openAiConfiguration() + ['audit' => ['escalation' => []]], Yaml::parseFile($this->configFile));
-    }
-
-    /**
-     * @throws StandaloneConfigWriteException
-     * @throws UnsafeStandaloneConfigWriteException
-     */
-    #[DataProvider('sectionsThatAreNotMaps')]
-    public function test_it_rewrites_a_configuration_whose_sections_are_not_maps(string $sections, mixed $expectedSection): void
-    {
-        (new Filesystem())->dumpFile($this->configFile, "provider: anthropic\nattacker_model: claude-opus-4-8\n".$sections);
-
-        $removed = (new YamlStandaloneConfigWriter())->write($this->configFile, $this->openAiConfiguration());
-
-        self::assertSame(['attacker_model'], $removed);
-        self::assertSame($this->openAiConfiguration() + ['audit' => $expectedSection], Yaml::parseFile($this->configFile));
-    }
-
-    /**
-     * @return iterable<string, array{string, mixed}>
-     */
-    public static function sectionsThatAreNotMaps(): iterable
-    {
-        yield 'audit is a string' => ["audit: oops\n", 'oops'];
-        yield 'escalation is a string' => ["audit:\n    escalation: oops\n", ['escalation' => 'oops']];
+        yield 'another provider' => ["provider: anthropic\n"];
+        yield 'the same provider' => ["provider: openai\n"];
+        yield 'no provider' => [''];
     }
 
     /**
@@ -429,10 +285,5 @@ final class YamlStandaloneConfigWriterTest extends TestCase
     private function openAiConfiguration(): array
     {
         return ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'];
-    }
-
-    private function existingConfiguration(?string $providerLine): string
-    {
-        return (null === $providerLine ? '' : $providerLine."\n")."platform:\n    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }\nmodel: claude-opus-4-8\nattacker_model: claude-opus-4-8\nreviewer_model: claude-haiku-4-5\naudit:\n    escalation:\n        enabled: true\n        cheap_model: claude-haiku-4-5\n    budget:\n        max_cost_usd: 5.0\n";
     }
 }

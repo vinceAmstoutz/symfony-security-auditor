@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
 
@@ -27,8 +26,6 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
 {
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
-        private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
-        private ProviderBoundSettings $providerBoundSettings = new ProviderBoundSettings(),
     ) {}
 
     /**
@@ -36,11 +33,9 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
      * @throws UnsafeStandaloneConfigWriteException
      */
     #[Override]
-    public function write(string $configFile, array $config): array
+    public function write(string $configFile, array $config): void
     {
         $this->assertSafeToWrite($configFile);
-        [$keptSettings, $removedSettings] = $this->keptSettings($configFile, $config);
-        $settings = $config + $keptSettings;
 
         try {
             if (!$this->filesystem->exists($configFile)) {
@@ -49,47 +44,10 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
                 $this->filesystem->chmod($configFile, 0o600);
             }
 
-            $this->filesystem->dumpFile($configFile, RoundTripYaml::dump($settings, 2, 4));
+            $this->filesystem->dumpFile($configFile, RoundTripYaml::dump($config, 2, 4));
             $this->filesystem->chmod($configFile, 0o600);
         } catch (IOException $ioException) {
             throw StandaloneConfigWriteException::fromIOException($configFile, $ioException);
-        }
-
-        return $removedSettings;
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     *
-     * @return array{array<array-key, mixed>, list<string>}
-     */
-    private function keptSettings(string $configFile, array $config): array
-    {
-        $existingSettings = $this->existingSettings($configFile);
-
-        return $this->switchesProvider($config, $existingSettings)
-            ? $this->providerBoundSettings->removedFrom($existingSettings)
-            : [$existingSettings, []];
-    }
-
-    /**
-     * @param array<string, mixed>    $config
-     * @param array<array-key, mixed> $existingSettings
-     */
-    private function switchesProvider(array $config, array $existingSettings): bool
-    {
-        return \array_key_exists('provider', $config) && $config['provider'] !== ($existingSettings['provider'] ?? null);
-    }
-
-    /**
-     * @return array<array-key, mixed>
-     */
-    private function existingSettings(string $configFile): array
-    {
-        try {
-            return $this->standaloneConfigFileReader->read($configFile);
-        } catch (MalformedProjectConfigException) {
-            return [];
         }
     }
 
