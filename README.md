@@ -101,6 +101,10 @@ irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/mai
 > ```bash
 > curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
 > ```
+>
+> ```powershell
+> $env:SSA_INIT = '1'; irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.ps1 | iex
+> ```
 
 Or download the binary for your platform straight from the [latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest):
 
