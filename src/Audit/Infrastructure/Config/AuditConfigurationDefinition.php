@@ -52,22 +52,10 @@ final readonly class AuditConfigurationDefinition
                     ->attribute(self::REFUSES_ENV_PLACEHOLDER, true)
                     ->info('One-knob preset bundling the cost/speed/depth levers; any explicitly configured key always wins over the profile. `fast`: one attacker iteration, lean pre-scan (marker-bearing files only), code slicing on, up to 4 concurrent attacker and reviewer calls. `balanced` (default): identical to configuring nothing. `thorough`: balanced plus PoC synthesis for high-severity validated findings.')
                 ->end()
-                ->scalarNode('attacker_model')
-                    ->defaultNull()
-                    ->validate()
-                        ->ifTrue(static fn (mixed $value): bool => '' === $value)
-                        ->thenInvalid('attacker_model cannot be an empty string; omit the key or set it to null to fall back to "model".')
-                    ->end()
-                    ->info('Override: dedicated model for the Attacker role. Falls back to `model` when null.')
-                ->end()
-                ->scalarNode('reviewer_model')
-                    ->defaultNull()
-                    ->validate()
-                        ->ifTrue(static fn (mixed $value): bool => '' === $value)
-                        ->thenInvalid('reviewer_model cannot be an empty string; omit the key or set it to null to fall back to "model".')
-                    ->end()
-                    ->info('Override: dedicated model for the Reviewer role. Falls back to `model` when null.')
-                ->end()
+                ->append($this->modelOverrideNode('attacker_model', 'attacker_model cannot be an empty string; omit the key or set it to null to fall back to "model".')
+                    ->info('Override: dedicated model for the Attacker role. Falls back to `model` when null.'))
+                ->append($this->modelOverrideNode('reviewer_model', 'reviewer_model cannot be an empty string; omit the key or set it to null to fall back to "model".')
+                    ->info('Override: dedicated model for the Reviewer role. Falls back to `model` when null.'))
                 ->integerNode('max_output_tokens')
                     ->defaultValue(4096)
                     ->min(1)
@@ -312,14 +300,8 @@ final readonly class AuditConfigurationDefinition
                                     ->defaultFalse()
                                     ->info('When true, AttackerAgentInterface is wired to the EscalatingAttackerAgent wrapper. The cheap first pass uses `cheap_model`, falling back to the reviewer model when unset; a configuration notice warns when the effective cheap model is the attacker model itself (no saving).')
                                 ->end()
-                                ->scalarNode('cheap_model')
-                                    ->defaultNull()
-                                    ->validate()
-                                        ->ifTrue(static fn (mixed $value): bool => '' === $value)
-                                        ->thenInvalid('cheap_model cannot be an empty string; omit the key or set it to null to fall back to the reviewer model.')
-                                    ->end()
-                                    ->info('Provider model id used for the cheap first pass (e.g. claude-haiku-4-5-20251001, gpt-5-mini, mistral-small). Falls back to the reviewer model when null.')
-                                ->end()
+                                ->append($this->modelOverrideNode('cheap_model', 'cheap_model cannot be an empty string; omit the key or set it to null to fall back to the reviewer model.')
+                                    ->info('Provider model id used for the cheap first pass (e.g. claude-haiku-4-5-20251001, gpt-5-mini, mistral-small). Falls back to the reviewer model when null.'))
                             ->end()
                         ->end()
                         ->arrayNode('code_slicing')
@@ -472,6 +454,15 @@ final readonly class AuditConfigurationDefinition
                     ->end()
                 ->end()
         ;
+    }
+
+    /**
+     * A model id falling back to another model when null, whose empty string
+     * is refused while an `%env()%` placeholder is taken, as on `model`.
+     */
+    private function modelOverrideNode(string $name, string $emptyStringError): OptionalModelNodeDefinition
+    {
+        return (new OptionalModelNodeDefinition($name, $emptyStringError))->defaultNull();
     }
 
     /**

@@ -23,6 +23,7 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\NodeInterface;
 use Symfony\Component\Config\Definition\PrototypedArrayNode;
 use Symfony\Component\DependencyInjection\Compiler\MergeExtensionConfigurationPass;
+use Symfony\Component\DependencyInjection\Compiler\ValidateEnvPlaceholdersPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Throwable;
@@ -73,6 +74,54 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
         $attackerModel = $containerBuilder->getParameter('symfony_security_auditor.attacker_model');
         self::assertIsString($attackerModel);
         self::assertStringStartsWith('env_', $attackerModel);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('textSettings')]
+    public function test_a_kernel_takes_a_placeholder_on_a_text_setting_whose_variable_declares_no_default(array $config): void
+    {
+        self::assertNull($this->kernelPlaceholderCheckFailure($config));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function textSettings(): iterable
+    {
+        yield 'model' => [['model' => self::PLACEHOLDER]];
+        yield 'attacker_model' => [['attacker_model' => self::PLACEHOLDER]];
+        yield 'reviewer_model' => [['reviewer_model' => self::PLACEHOLDER]];
+        yield 'audit.escalation.cheap_model' => [['audit' => ['escalation' => ['cheap_model' => self::PLACEHOLDER]]]];
+        yield 'cache.dir' => [['cache' => ['dir' => self::PLACEHOLDER]]];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('choicesKeptAsText')]
+    public function test_a_kernel_takes_a_placeholder_on_a_choice_kept_as_text_only_once_its_variable_declares_a_default_among_the_choices(array $config, string $path, string $choice): void
+    {
+        $failure = $this->kernelPlaceholderCheckFailure($config);
+
+        self::assertInstanceOf(InvalidConfigurationException::class, $failure);
+        self::assertStringStartsWith(\sprintf('The value "" is not allowed for path "%s".', $path), $failure->getMessage());
+        self::assertNull($this->kernelPlaceholderCheckFailure($config, $choice));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string, string}>
+     */
+    public static function choicesKeptAsText(): iterable
+    {
+        yield 'audit.format' => [['audit' => ['format' => self::PLACEHOLDER]], 'symfony_security_auditor.audit.format', 'json'];
+        yield 'audit.chunking.strategy' => [['audit' => ['chunking' => ['strategy' => self::PLACEHOLDER]]], 'symfony_security_auditor.audit.chunking.strategy', 'type'];
+        yield 'audit.since_closure' => [['audit' => ['since_closure' => self::PLACEHOLDER]], 'symfony_security_auditor.audit.since_closure', 'direct'];
+        yield 'audit.poc_synthesis.severity_floor' => [['audit' => ['poc_synthesis' => ['severity_floor' => self::PLACEHOLDER]]], 'symfony_security_auditor.audit.poc_synthesis.severity_floor', 'low'];
+        yield 'audit.fix_synthesis.severity_floor' => [['audit' => ['fix_synthesis' => ['severity_floor' => self::PLACEHOLDER]]], 'symfony_security_auditor.audit.fix_synthesis.severity_floor', 'low'];
+        yield 'an audit.excluded_types entry' => [['audit' => ['excluded_types' => [self::PLACEHOLDER]]], 'symfony_security_auditor.audit.excluded_types.0', 'sql_injection'];
+        yield 'an audit.included_types entry' => [['audit' => ['included_types' => [self::PLACEHOLDER]]], 'symfony_security_auditor.audit.included_types.0', 'xss'];
     }
 
     /**
@@ -155,9 +204,30 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
     }
 
     /**
+     * Symfony checks every placeholder against the configuration tree while
+     * a kernel compiles its container, with the default its variable
+     * declares, or with an empty string when it declares none.
+     *
      * @param array<string, mixed> $config
      */
-    private function mergeConfiguration(array $config): ContainerBuilder
+    private function kernelPlaceholderCheckFailure(array $config, ?string $variableDefault = null): ?Throwable
+    {
+        $containerBuilder = $this->mergeConfiguration($config, null === $variableDefault ? [] : ['env(SSA_VALUE)' => $variableDefault]);
+
+        try {
+            (new ValidateEnvPlaceholdersPass())->process($containerBuilder);
+        } catch (Throwable $throwable) {
+            return $throwable;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed>  $config
+     * @param array<string, string> $parameters
+     */
+    private function mergeConfiguration(array $config, array $parameters = []): ContainerBuilder
     {
         $containerBuilder = new ContainerBuilder(new EnvPlaceholderParameterBag([
             'kernel.cache_dir' => '/tmp/ssa-cache',
@@ -165,6 +235,7 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
             'kernel.project_dir' => '/tmp/ssa-project',
             'kernel.environment' => 'test',
             'kernel.debug' => true,
+            ...$parameters,
         ]));
         $extension = (new SymfonySecurityAuditorBundle())->getContainerExtension();
         self::assertNotNull($extension);
