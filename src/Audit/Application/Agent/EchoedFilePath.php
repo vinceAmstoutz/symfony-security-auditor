@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
-use function Symfony\Component\String\u;
+use function Symfony\Component\String\b;
 
 /**
  * `Vulnerability::filePath()` is free text echoed back by the LLM — the
@@ -24,7 +24,11 @@ use function Symfony\Component\String\u;
  * leading `./` must not keep a finding from matching its `ProjectFile`.
  * `resolve()` names a finding by the known file its path denotes — an absolute
  * path, a leading slash, backslashes or a leading `./` alike — so one file has
- * one spelling in every id, fingerprint and code lookup.
+ * one spelling in every id, fingerprint and code lookup. Paths are compared
+ * byte for byte: one that names a known file as written keeps naming it, and a
+ * folded spelling resolves only when it denotes one known file alone, so a
+ * look-alike name (a backslash, another Unicode form) never takes the findings
+ * of the file it resembles.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -40,18 +44,36 @@ final readonly class EchoedFilePath
      */
     public static function resolve(string $path, array $knownFiles): string
     {
-        $echoed = self::comparable($path);
         foreach ($knownFiles as $knownFile) {
-            if (self::comparable($knownFile->relativePath()) === $echoed || self::comparable($knownFile->absolutePath()) === $echoed) {
+            if ($knownFile->relativePath() === $path || $knownFile->absolutePath() === $path) {
                 return $knownFile->relativePath();
             }
         }
 
-        return $path;
+        $denoted = self::denotedBy(self::comparable($path), $knownFiles);
+
+        return 1 === \count($denoted) ? $denoted[0] : $path;
+    }
+
+    /**
+     * @param list<ProjectFile> $knownFiles
+     *
+     * @return list<string>
+     */
+    private static function denotedBy(string $echoed, array $knownFiles): array
+    {
+        $denoted = [];
+        foreach ($knownFiles as $knownFile) {
+            if (self::comparable($knownFile->relativePath()) === $echoed || self::comparable($knownFile->absolutePath()) === $echoed) {
+                $denoted[] = $knownFile->relativePath();
+            }
+        }
+
+        return $denoted;
     }
 
     private static function comparable(string $path): string
     {
-        return u(mb_scrub($path, 'UTF-8'))->replace('\\', '/')->replaceMatches('#^(?:\./|/)+#', '')->toString();
+        return b($path)->replace('\\', '/')->replaceMatches('#^(?:\./|/)+#', '')->toString();
     }
 }

@@ -26,6 +26,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmColl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
@@ -41,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -66,6 +69,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
  */
 final class FullAuditEndToEndTest extends TestCase
 {
+    private const string SQL_SINK = '->db->query(';
+
     private string $fixtureProjectDir;
 
     /**
@@ -235,6 +240,72 @@ final class FullAuditEndToEndTest extends TestCase
     }
 
     /**
+     * @param array<string, string> $files
+     *
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    #[DataProvider('projectsWithAFileWhoseNameOnlyLooksLikeTheVulnerablePath')]
+    public function test_a_finding_is_reviewed_and_validated_on_its_file_beside_a_file_whose_name_only_looks_like_its_path(ChunkingStrategy $chunkingStrategy, array $files, string $vulnerablePath): void
+    {
+        foreach ($files as $path => $content) {
+            (new Filesystem())->dumpFile($this->fixtureProjectDir.'/'.$path, $content);
+        }
+
+        $attackerLLM = self::createStub(LLMClientInterface::class);
+        $attackerLLM->method('complete')->willReturnCallback(
+            fn (string $systemPrompt, string $userMessage): LLMResponse => LLMResponse::of(
+                str_contains($userMessage, self::SQL_SINK) ? $this->makeVulnerabilityJson($vulnerablePath, 'critical', 'SQL injection', 0.95, 'sql_injection') : '[]',
+                'stub',
+                'end_turn',
+                TokenUsageSnapshot::of(0, 0),
+            ),
+        );
+        /** @var ArrayObject<int, string> $arrayObject */
+        $arrayObject = new ArrayObject();
+        $reviewerLLM = self::createStub(LLMClientInterface::class);
+        $reviewerLLM->method('complete')->willReturnCallback(
+            static function (string $systemPrompt, string $userMessage) use ($arrayObject): LLMResponse {
+                $arrayObject[] = $userMessage;
+
+                return LLMResponse::of((string) json_encode(['accepted' => str_contains($userMessage, self::SQL_SINK), 'adjusted_severity' => null, 'reviewer_notes' => 'Checked']), 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0));
+            },
+        );
+
+        $auditReport = $this->makeUseCase($attackerLLM, $reviewerLLM, fileChunker: new FileChunker($chunkingStrategy))->execute($this->fixtureProjectDir);
+
+        preg_match_all('/^<file path="([^"]*)">$/m', implode("\n", $arrayObject->getArrayCopy()), $reviewedFiles);
+        self::assertSame([$vulnerablePath], array_values(array_unique($reviewedFiles[1])));
+        self::assertSame(
+            [[$vulnerablePath, true]],
+            array_map(static fn (Vulnerability $vulnerability): array => [$vulnerability->filePath(), $vulnerability->isReviewerValidated()], $auditReport->vulnerabilities()),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{ChunkingStrategy, array<string, string>, string}>
+     */
+    public static function projectsWithAFileWhoseNameOnlyLooksLikeTheVulnerablePath(): iterable
+    {
+        yield 'a voter named like a service, chunked by feature' => [ChunkingStrategy::Feature, [
+            'src/Service/PaymentService.php' => "<?php\nnamespace App\\Service;\nclass PaymentService\n{\n    public function find(\$id) { return \$this".self::SQL_SINK."'SELECT * FROM payment WHERE id = ' . \$id); }\n}\n",
+            'src/Service\\PaymentService.php' => "<?php\nnamespace App\\Security;\nuse Symfony\\Component\\Security\\Core\\Authorization\\Voter\\Voter;\nclass NoopVoter extends Voter\n{\n}\n",
+            'src/Controller/HomeController.php' => "<?php\nnamespace App\\Controller;\nclass HomeController\n{\n    public function index() {}\n}\n",
+        ], 'src/Service/PaymentService.php'];
+        yield 'a controller named like a repository, chunked by type' => [ChunkingStrategy::Type, [
+            'src/Repository/UserRepository.php' => "<?php\nnamespace App\\Repository;\nclass UserRepository\n{\n    public function find(\$name) { return \$this".self::SQL_SINK."'SELECT * FROM user WHERE name = ' . \$name); }\n}\n",
+            'src/Repository\\UserRepository.php' => "<?php\nnamespace App\\Controller;\nuse Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;\nclass DecoyController extends AbstractController\n{\n    public function index() {}\n}\n",
+        ], 'src/Repository/UserRepository.php'];
+        yield 'a controller whose name is the same text in another Unicode form, chunked by type' => [ChunkingStrategy::Type, [
+            "src/Controller/Caf\u{00E9}Controller.php" => "<?php\nnamespace App\\Controller;\nclass PaymentController\n{\n    public function find(\$id) { return \$this".self::SQL_SINK."'SELECT * FROM payment WHERE id = ' . \$id); }\n}\n",
+            "src/Controller/Cafe\u{0301}Controller.php" => "<?php\nnamespace App\\Controller;\nclass DecoyController\n{\n    public function index() {}\n}\n",
+        ], "src/Controller/Caf\u{00E9}Controller.php"];
+    }
+
+    /**
      * @return iterable<string, array{CodeSlicerInterface}>
      */
     public static function codeSlicers(): iterable
@@ -330,10 +401,10 @@ final class FullAuditEndToEndTest extends TestCase
         return $attackerLLM;
     }
 
-    private function makeUseCase(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, CodeSlicerInterface $codeSlicer = new NullCodeSlicer()): RunAuditUseCase
+    private function makeUseCase(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, CodeSlicerInterface $codeSlicer = new NullCodeSlicer(), FileChunker $fileChunker = new FileChunker()): RunAuditUseCase
     {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent(new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), $codeSlicer), new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), new NullProgressReporter()), new AttackerAnalysisSettings(), new NullLogger()),
+            new AttackerAgent(new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), $codeSlicer), new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), new NullProgressReporter(), $fileChunker), new AttackerAnalysisSettings(), new NullLogger()),
             new ReviewerAgent(
                 new ReviewerAgentCollaborators(
                     $reviewerLLM,
