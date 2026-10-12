@@ -206,7 +206,7 @@ symfony-security-auditor audit /path/to/project --path src/Command
 
 An absolute `--path` inside the project is accepted, and one outside it is refused. `--path` narrows `scan.included_paths` to the part under it; _since 1.22_, when the configured scope holds nothing under the path, the path itself is scanned, so it reaches a folder the configured scope leaves out (`--path apps/api` on a monorepo). Either way it has to exist in the project and hold PHP, Twig, YAML or XML files. If a scan still lists nothing, the warning names the project and the `--path` values it applied: `No files matched under "/home/me" for --path src/Command.`
 
-### `[ERROR] Project does not look like a Symfony app`
+### `[ERROR] The scan found no file to audit, so the run has no verdict`
 
 The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files inside `scan.included_paths` (default: `src/`, `config/`, `templates/`, `public/index.php`, and the root dotenv files — the Symfony Flex skeleton). If nothing is found, the path is wrong, the layout is non-standard, or `scan.respect_gitignore` is filtering everything out. A log line `No included paths exist in project` at `warning` level confirms the allow-list resolved to nothing.
 
@@ -437,7 +437,7 @@ Diagnostic order:
 4. **Switch to a stronger model** — Claude Opus and GPT-5.6 consistently outperform small models.
 5. **Check the file actually got scanned** — run with `--show-scanned` to list the files in scope (the progress line `Auditing N file(s)` gives the count, and `chunk i/M` the chunks); in a Symfony application, `-vv` also logs the ingested file and chunk counts.
 6. **`scan.respect_gitignore: true`** silently skips every file the `.gitignore` matches, including a file git tracks (committed with `git add -f`). Set to `false` to include them, or set `scan.include_tracked_ignored: true` to audit the tracked ones only.
-7. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files. Each file it drops is listed in the report as not analyzed, so the run reports itself incomplete.
+7. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files. Each file it drops is listed in the report's `coverage` as `skipped` under the `scan` stage (_since 1.22_), but nothing gates on it: the report stays complete and `--fail-on-incomplete` does not fire.
 
 ### Report has too many false positives
 
@@ -626,15 +626,15 @@ permissions:
 
 ### GitLab CI: SARIF report not visible in Security Dashboard
 
-Upload it as a `sast` report:
+Upload it as a `sarif` report, not a `sast` one: `artifacts:reports:sast` takes GitLab's own SAST report format, so a SARIF file there shows nothing.
 
 ```yaml
 artifacts:
   reports:
-    sast: gl-sast-report.sarif
+    sarif: security-audit.sarif
 ```
 
-Path can be anything — GitLab parses the file. See [CI → GitLab CI](ci.md#gitlab-ci).
+The `sarif` report type needs GitLab Ultimate, on GitLab 19.2 or later (from 18.11 with the `sarif_ingestion` feature flag enabled). GitLab also ingests the report only when the job succeeded, so a job that ends with the audit's non-zero exit code shows no finding: keep the exit code in the script, as the [CI → GitLab CI](ci.md#gitlab-ci) recipe does. On another tier or an older GitLab, use the JUnit report shown there.
 
 ### Audit succeeds locally but fails in CI
 

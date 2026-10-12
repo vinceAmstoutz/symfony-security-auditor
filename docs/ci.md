@@ -429,7 +429,9 @@ Add your LLM provider key as a CI/CD variable (`Settings → CI/CD → Variables
 
 ### Scheduled pipeline with Security Dashboard upload
 
-GitLab natively parses SARIF and displays findings in the **Security Dashboard** and **Vulnerability Report** when you upload a `gl-sast-report.json` (GitLab SAST format) or use the `security` artifact report type.
+GitLab Ultimate reads a SARIF 2.1.0 report through the `artifacts:reports:sarif` report type — generally available since GitLab 19.2, and from GitLab 18.11 behind the `sarif_ingestion` feature flag — and lists its findings in the pipeline **Security** tab, the **Vulnerability Report** and the **Security Dashboard**. Do not upload the SARIF report as `artifacts:reports:sast`: that type takes GitLab's own SAST report format, not SARIF, so GitLab shows none of the findings.
+
+GitLab ingests the report only when its job succeeds, and the audit exits non-zero when a gate trips (exit codes `1`, `2` and `3`, see [Exit codes](configuration.md#exit-codes)). The script below therefore keeps the exit code, prints it, and fails the job only when no report was written:
 
 ```yaml
 # .gitlab-ci.yml (add to existing file or create standalone)
@@ -445,13 +447,15 @@ symfony-security-audit:
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - composer install --no-interaction --prefer-dist --no-progress
   script:
-    - php bin/console audit:run --format sarif --output gl-sast-report.sarif
+    - php bin/console audit:run --format sarif --output security-audit.sarif || audit_exit=$?
+    - if [ ! -s security-audit.sarif ]; then echo "The audit wrote no report (exit ${audit_exit:-0})."; exit 1; fi
+    - echo "The audit exited ${audit_exit:-0}; its findings are in the pipeline Security tab."
   artifacts:
     when: always
     reports:
-      sast: gl-sast-report.sarif
+      sarif: security-audit.sarif
     paths:
-      - gl-sast-report.sarif
+      - security-audit.sarif
     expire_in: 30 days
 ```
 
@@ -459,7 +463,7 @@ Set the schedule in `CI/CD → Schedules` (e.g., every night at 02:00).
 
 ### JUnit test report (free tier)
 
-The `sast:` report above renders in GitLab's security dashboard, which requires the Ultimate tier. On any tier — including free — the JUnit format shows every finding directly in the merge-request test widget instead:
+The `sarif:` report above needs GitLab Ultimate on a version that reads SARIF. On any tier and version — including free — the JUnit format shows every finding directly in the merge-request test widget instead; keep a SARIF or JSON report as a plain artifact beside it (see [JSON artifact only](#json-artifact-only-no-dashboard)) for the full detail:
 
 ```yaml
 security_audit_junit:

@@ -34,7 +34,7 @@ interface LLMClientInterface
 
 `completeWithTools()` drives an autonomous tool-using conversation: as long as the model emits tool calls (and the iteration cap is not reached), the client executes them via the supplied `ToolRegistry` (also under `Audit\Domain\Port\Tool\`) and feeds the results back. Stub implementations may delegate to `complete()` when they don't need tool support.
 
-The default implementation (`SymfonyAiLLMClient`) delegates to `symfony/ai`'s `AgentInterface`. Replace it when you need direct HTTP calls, custom retry logic, token tracking, or a provider that `symfony/ai` does not support.
+The default implementation (`SymfonyAiLLMClient`) delegates to `symfony/ai`'s `PlatformInterface`. Replace it when you need direct HTTP calls, custom retry logic, token tracking, or a provider that `symfony/ai` does not support.
 
 `LLMResponse` is an immutable value object built via its `of()` factory, with the token counts grouped into a `TokenUsageSnapshot`:
 

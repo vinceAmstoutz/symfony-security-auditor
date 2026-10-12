@@ -12,7 +12,7 @@ End-to-end demonstrations and configuration recipes for `vinceamstoutz/symfony-s
 | --- | --- |
 | [`configs/ci-optimized.yaml`](configs/ci-optimized.yaml) | Split-model (large attacker, fast reviewer) for scheduled CI runs. Cache + prompt caching on. Targets accuracy at moderate cost. |
 | [`configs/cost-aware.yaml`](configs/cost-aware.yaml) | One small model, single iteration, tools disabled. Smallest possible bill. Use when you need rough triage of a large monorepo. |
-| [`configs/dev-fast.yaml`](configs/dev-fast.yaml) | Local Ollama backend (no API key, no spend). Higher recall via lower `min_confidence` for exploratory development scans. |
+| [`configs/dev-fast.yaml`](configs/dev-fast.yaml) | Local Ollama backend (no API key, no spend) with `privacy.offline_only`, so the advisory lookup never reaches Packagist. Higher recall via lower `min_confidence` for exploratory development scans. |
 | [`vulnerable-app/`](vulnerable-app/) | Tiny Symfony 7 skeleton with deliberate flaws (broken access control, IDOR, SQL injection by concatenation, mass assignment). |
 
 ## Reproducing each example

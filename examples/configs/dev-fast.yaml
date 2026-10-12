@@ -26,3 +26,6 @@ symfony_security_auditor:
 
     cache:
         enabled: true
+
+    privacy:
+        offline_only: true      # no `composer audit` call to Packagist; advisory lookups answer "none"

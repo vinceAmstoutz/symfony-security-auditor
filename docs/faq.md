@@ -338,7 +338,7 @@ Then upload via `github/codeql-action/upload-sarif@v4`. Findings appear in the G
 
 ### How do I get findings into the GitLab Security Dashboard?
 
-GitLab natively parses SARIF when uploaded as a `sast` report artifact. See [CI → GitLab CI](ci.md#gitlab-ci).
+Upload the SARIF report as an `artifacts:reports:sarif` artifact: GitLab Ultimate reads it from GitLab 19.2 (18.11 behind a feature flag). A `sast` report artifact does not work, since it takes GitLab's own SAST format. On another tier, the JUnit report shows the findings in the merge-request test widget. See [CI → GitLab CI](ci.md#gitlab-ci).
 
 ### Can I store the JSON report somewhere private?
 
