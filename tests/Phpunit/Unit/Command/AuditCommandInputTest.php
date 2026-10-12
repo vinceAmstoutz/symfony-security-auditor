@@ -357,7 +357,7 @@ final class AuditCommandInputTest extends TestCase
     {
         $auditCommandInput = new AuditCommandInput();
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(80, true, OutputFormat::Sarif, 'audit.sarif'), false);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(80, true, OutputFormat::Sarif, 'audit.sarif'));
 
         self::assertSame(80, $auditCommandInput->minScore);
         self::assertTrue($auditCommandInput->failsOnIncomplete());
@@ -370,10 +370,10 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->minScore = 50;
         $auditCommandInput->failOnIncomplete = false;
-        $auditCommandInput->format = OutputFormat::Markdown;
+        $auditCommandInput->givenFormat = OutputFormat::Markdown;
         $auditCommandInput->output = 'cli.md';
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(80, true, OutputFormat::Sarif, 'audit.sarif'), true);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(80, true, OutputFormat::Sarif, 'audit.sarif'));
 
         self::assertSame(50, $auditCommandInput->minScore);
         self::assertFalse($auditCommandInput->failsOnIncomplete());
@@ -384,9 +384,9 @@ final class AuditCommandInputTest extends TestCase
     public function test_a_format_named_on_the_command_line_wins_even_when_it_is_the_default_one(): void
     {
         $auditCommandInput = new AuditCommandInput();
-        $auditCommandInput->format = OutputFormat::Console;
+        $auditCommandInput->givenFormat = OutputFormat::Console;
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json), true);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json));
 
         self::assertSame(OutputFormat::Console, $auditCommandInput->format);
     }
@@ -395,7 +395,7 @@ final class AuditCommandInputTest extends TestCase
     {
         $auditCommandInput = new AuditCommandInput();
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(), false);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults());
 
         self::assertFalse($auditCommandInput->failsOnIncomplete());
         self::assertNull($auditCommandInput->minScore);
@@ -407,7 +407,7 @@ final class AuditCommandInputTest extends TestCase
     {
         $auditCommandInput = new AuditCommandInput();
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json), false);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json));
 
         self::assertTrue($auditCommandInput->isMachineReadableToStdout());
     }
@@ -543,7 +543,7 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->noOutput = true;
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'), true);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'));
 
         self::assertNull($auditCommandInput->reportFile());
     }
@@ -553,7 +553,7 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->dryRun = true;
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'), true);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'));
 
         self::assertNull($auditCommandInput->reportFile());
     }
@@ -564,7 +564,7 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->dryRun = true;
         $auditCommandInput->output = 'estimate.json';
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'), true);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.sarif'));
 
         self::assertSame('estimate.json', $auditCommandInput->reportFile());
     }
@@ -573,9 +573,9 @@ final class AuditCommandInputTest extends TestCase
     {
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->noOutput = true;
-        $auditCommandInput->format = OutputFormat::Json;
+        $auditCommandInput->givenFormat = OutputFormat::Json;
 
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.json'), true);
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: 'audit.json'));
 
         self::assertTrue($auditCommandInput->isMachineReadableToStdout());
     }

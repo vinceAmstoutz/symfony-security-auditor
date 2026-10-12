@@ -66,4 +66,20 @@ final readonly class AuditCommandHelp
           CI integration: <info>docs/ci.md</info>
           Versioning    : <info>docs/versioning.md</info>
         HELP;
+
+    private const string BUNDLE_CONFIGURATION = 'via <info>config/packages/symfony_security_auditor.yaml</info>.';
+
+    private const string STANDALONE_CONFIGURATION = <<<'TEXT'
+        via the <info>config.yaml</info> that <info>init</info> writes to your user configuration directory, and a
+        <info>.symfony-security-auditor.yaml</info> in the folder you run from or in the audited project.
+        TEXT;
+
+    /**
+     * The binary reads no `config/packages/` file, so its help names the
+     * files it reads instead.
+     */
+    public static function standalone(): string
+    {
+        return str_replace(self::BUNDLE_CONFIGURATION, self::STANDALONE_CONFIGURATION, self::HELP);
+    }
 }

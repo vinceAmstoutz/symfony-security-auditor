@@ -17,6 +17,7 @@ use ReflectionClass;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandHelp;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
@@ -37,7 +38,9 @@ final readonly class StandaloneConsoleCommandFactory
      */
     public function describe(string $invokableClass): Command
     {
-        return new Command(null, (new ReflectionClass($invokableClass))->newInstanceWithoutConstructor());
+        $command = new Command(null, (new ReflectionClass($invokableClass))->newInstanceWithoutConstructor());
+
+        return AuditCommand::class === $invokableClass ? $command->setHelp(AuditCommandHelp::standalone()) : $command;
     }
 
     /**
@@ -50,7 +53,7 @@ final readonly class StandaloneConsoleCommandFactory
             throw UnresolvableAuditCommandException::fromContainer(AuditCommand::class);
         }
 
-        return new Command(null, $auditCommand);
+        return (new Command(null, $auditCommand))->setHelp(AuditCommandHelp::standalone());
     }
 
     /**

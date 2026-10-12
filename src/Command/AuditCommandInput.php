@@ -40,10 +40,12 @@ final class AuditCommandInput
     #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory.')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit, github or github-comment', shortcut: 'f')]
+    #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit, github or github-comment. Defaults to the audit.format config key, console when it is unset.', name: 'format', shortcut: 'f')]
+    public ?OutputFormat $givenFormat = null;
+
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (any format)', shortcut: 'o')]
+    #[Option(description: 'Output file path (any format). Overrides the audit.output config key for this run.', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Print the report instead of writing it to a file, whatever audit.output says. Cannot be combined with --output.', name: 'no-output')]
@@ -76,7 +78,7 @@ final class AuditCommandInput
     #[Option(description: 'Minimum aggregate risk level (safe|low|medium|high|critical) that makes the command exit 1. Overrides the audit.fail_on config key for this run. Defaults to the configured value (critical) when omitted.', name: 'fail-on')]
     public ?RiskLevel $failOn = null;
 
-    #[Option(description: 'Minimum normalized score (0-100) below which the command exits 1. Independent of --fail-on: the audit fails when either gate trips. Omit to gate on the risk level alone.', name: 'min-score')]
+    #[Option(description: 'Minimum normalized score (0-100) below which the command exits 1. Independent of --fail-on: the audit fails when either gate trips. Overrides the audit.min_score config key for this run; with neither, the risk level alone gates.', name: 'min-score')]
     public ?int $minScore = null;
 
     #[Option(description: 'Exit 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning unless audit.fail_on_incomplete is set; --no-fail-on-incomplete turns that off for this run.', name: 'fail-on-incomplete')]
@@ -84,18 +86,14 @@ final class AuditCommandInput
 
     /**
      * Fills what the command line left unset from the configuration, so a flag
-     * always wins over its `audit.*` key. A format has a default on the
-     * command line itself, so whether it was given is told by the caller.
+     * always wins over its `audit.*` key.
      */
-    public function applyDefaults(AuditCommandDefaults $auditCommandDefaults, bool $formatGiven): void
+    public function applyDefaults(AuditCommandDefaults $auditCommandDefaults): void
     {
         $this->minScore ??= $auditCommandDefaults->minScore;
         $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
         $this->output ??= $this->noOutput || $this->dryRun ? null : $auditCommandDefaults->output;
-
-        if (!$formatGiven) {
-            $this->format = $auditCommandDefaults->format;
-        }
+        $this->format = $this->givenFormat ?? $auditCommandDefaults->format;
     }
 
     public function failsOnIncomplete(): bool

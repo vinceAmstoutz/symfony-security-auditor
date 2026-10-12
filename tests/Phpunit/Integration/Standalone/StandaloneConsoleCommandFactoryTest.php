@@ -17,6 +17,7 @@ use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use stdClass;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputDefinition;
@@ -27,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandHelp;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -153,6 +155,34 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
         $command = (new StandaloneConsoleCommandFactory())->createMcpServer($this->containerBuilder());
 
         self::assertEquals($this->describedSurface($command), $this->describedSurface((new StandaloneConsoleCommandFactory())->describe(McpServeCommand::class)));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws UnresolvableAuditCommandException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_audit_command_it_builds_carries_the_standalone_help(): void
+    {
+        self::assertSame(AuditCommandHelp::standalone(), (new StandaloneConsoleCommandFactory())->create($this->containerBuilder())->getHelp());
+    }
+
+    public function test_it_describes_the_audit_command_with_the_standalone_help(): void
+    {
+        self::assertSame(AuditCommandHelp::standalone(), (new StandaloneConsoleCommandFactory())->describe(AuditCommand::class)->getHelp());
+    }
+
+    public function test_it_describes_the_mcp_server_command_with_its_own_help(): void
+    {
+        self::assertSame(
+            (new Command(null, (new ReflectionClass(McpServeCommand::class))->newInstanceWithoutConstructor()))->getHelp(),
+            (new StandaloneConsoleCommandFactory())->describe(McpServeCommand::class)->getHelp(),
+        );
     }
 
     /**

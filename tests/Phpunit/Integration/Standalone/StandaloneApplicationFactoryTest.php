@@ -783,6 +783,20 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'shell completion of an audit option' => [['command' => '_complete', '--shell' => 'bash', '--api-version' => '1', '--current' => '2', '--input' => ['symfony-security-auditor', AuditCommand::ALIAS, '--dry']], '--dry-run'];
     }
 
+    public function test_the_audit_help_names_the_standalone_configuration_and_no_fixed_format_default(): void
+    {
+        $applicationTester = $this->applicationTesterWithoutConfiguration();
+
+        $applicationTester->run(['command' => AuditCommand::ALIAS, '--help' => true]);
+
+        $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
+        self::assertSame(
+            [true, false, false],
+            [str_contains($display, '.symfony-security-auditor.yaml in the folder you run from'), str_contains($display, 'config/packages/'), str_contains($display, '[default: "console"]')],
+            $display,
+        );
+    }
+
     public function test_no_other_command_answers_to_an_abbreviation_of_help_or_list(): void
     {
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
