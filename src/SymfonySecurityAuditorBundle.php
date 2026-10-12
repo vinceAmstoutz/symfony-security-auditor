@@ -34,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitCon
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
@@ -79,6 +80,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Retr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
@@ -122,6 +124,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     {
         $this->assertNoEnvPlaceholderOnTypedSetting($config, $builder);
 
+        $this->registerForAutoconfiguration($builder);
         $container->import('../config/services.php');
 
         /** @var BundleConfigArray $config */
@@ -151,6 +154,19 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         if ([] !== $paths) {
             throw TypedNodeEnvPlaceholderException::forPaths($paths);
         }
+    }
+
+    /**
+     * Every autoconfigured service implementing an extension point joins the
+     * tagged iterator that collects it, the application's own services
+     * included, not only the ones `config/services.php` defines.
+     */
+    private function registerForAutoconfiguration(ContainerBuilder $containerBuilder): void
+    {
+        $containerBuilder->registerForAutoconfiguration(StageInterface::class)
+            ->addTag('symfony_security_auditor.pipeline_stage');
+        $containerBuilder->registerForAutoconfiguration(ProviderTokenEstimatorInterface::class)
+            ->addTag('symfony_security_auditor.token_estimator');
     }
 
     /**

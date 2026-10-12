@@ -202,9 +202,11 @@ interface StageInterface
 // src/Pipeline/Stage/DeduplicationStage.php
 namespace App\Pipeline\Stage;
 
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
+#[AsTaggedItem(priority: -100)]
 final class DeduplicationStage implements StageInterface
 {
     public function name(): string
@@ -241,15 +243,21 @@ final class DeduplicationStage implements StageInterface
 
 ### Wire — append after AuditStage
 
-`AuditPipeline` collects stages via the `symfony_security_auditor.pipeline_stage` tag. Anything implementing `StageInterface` is auto-tagged in `config/services.php`, so a service definition is enough — order follows service registration.
+`AuditPipeline` collects stages via the `symfony_security_auditor.pipeline_stage` tag. The bundle registers `StageInterface` for autoconfiguration, so when your services are autoconfigured (`autoconfigure: true`, as in the `_defaults` of a Symfony application's `services.yaml`) a service definition is enough.
+
+Stages run by descending priority, then in service registration order. The built-in stages have priority `0`, and an application's own services are registered before the bundle's, so a stage left at priority `0` runs before `IngestionStage`. The `#[AsTaggedItem(priority: -100)]` on the class above gives it a negative priority, which appends it after the built-in stages:
 
 ```yaml
 # config/services.yaml
 services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
     App\Pipeline\Stage\DeduplicationStage: ~
 ```
 
-If you need to override the order, manually tag with `priority`:
+Without autoconfiguration, or to set the priority in configuration instead of on the class, tag the service yourself:
 
 ```yaml
 services:
@@ -323,7 +331,7 @@ Beyond the seams above, these Domain ports can each be implemented and aliased i
 - `AdvisoryDatabaseInterface` — `lookup(string $packageName, string $installedVersion): array` backing the attacker's `lookup_advisory` tool (default: `ComposerAuditAdvisoryDatabase` running `composer audit`; `InMemoryAdvisoryDatabase` is the offline fallback). Implement it to query an internal vulnerability feed or a commercial advisory service.
 - `PricingProviderInterface` — per-model USD prices for cost estimation (default: `ModelsDevPricingProvider` reading the `symfony/models-dev` catalog). Also implement `CacheAwarePricingProviderInterface` if your source knows cache-read/cache-write rates — the cost report then prices cached tokens at their discounted rate, and `ServingPlatformPricingProviderInterface` if it knows which rates belong to the platform serving the audit — a model the provider reports answering a call is then billed as that model only when that platform prices it. Implement for private model deployments or negotiated pricing.
 - `RateLimiterInterface` — `acquire()` / `record()` / `pauseUntil()` around every LLM call (default: `NullRateLimiter`, or `TokenBucketRateLimiter` when any `audit.rate_limit.*` key is set). Implement it to coordinate quota out-of-process (Redis, file lock) across parallel CI jobs sharing one API key.
-- `TokenEstimatorInterface` — `estimateTokens(string $text, string $model)` used for pre-flight budgeting and rate-limit sizing (default: `ResolvingTokenEstimator`, which picks the per-provider heuristic matching the model id). To tune a single provider instead of the whole port, register a service implementing the Infrastructure-level `ProviderTokenEstimatorInterface` — it is auto-tagged and joins the resolver's candidate list.
+- `TokenEstimatorInterface` — `estimateTokens(string $text, string $model)` used for pre-flight budgeting and rate-limit sizing (default: `ResolvingTokenEstimator`, which picks the per-provider heuristic matching the model id). To tune a single provider instead of the whole port, register a service implementing the Infrastructure-level `ProviderTokenEstimatorInterface` — the bundle registers that interface for autoconfiguration, so an autoconfigured service is tagged `symfony_security_auditor.token_estimator` and joins the resolver's candidate list (without autoconfiguration, add that tag yourself). The resolver asks each candidate in turn and the first whose `supports()` accepts the model wins; an application's own services are registered before the bundle's, so yours is asked before the built-in estimators.
 - `SecurityConfigParserInterface` — extracts the route access-control map and firewall rules from raw security configuration content (default: `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse). Implement it when your project encodes access control outside standard YAML — e.g. PHP or XML security config, or a custom DSL. _Since 1.21._ Also implement `ProductionAwareSecurityConfigParserInterface` — `isLoadedInProduction(string $relativePath): bool` — when your parser knows which configuration files the application loads in production: `MappingStage` then reads only those, so a rule in a test override or a file nothing imports never marks a route as covered. A parser without it is handed every configuration file. _Since 1.22._ Also implement `LoadOrderAwareSecurityConfigParserInterface` — `loadRank(string $relativePath): int` — when your parser knows the order in which the application loads those files: the first matching `access_control` rule applies, so `MappingStage` hands you the files by ascending rank, then by path (the default parser ranks `config/packages/prod/` after the rest). A parser without it is handed the files in the order the scan lists them.
 - `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`, `FormBindingParserInterface` — the deterministic AST extractions (`#[IsGranted]`/`denyAccessUnlessGranted`, voter attributes, form field-to-entity bindings) that feed the `SymfonyMapping` given to the attacker (defaults: the `PhpParser*` implementations in `Infrastructure/Scan/`). Implement one when your project encodes access control in a custom idiom the bundled parser cannot see.
 - `ProgressReporterInterface` — `report(string $event, array $context)` for every progress event the pipeline emits (defaults: `ConsoleProgressReporter` on a TTY, `PlainProgressReporter` otherwise, `LoggerProgressReporter` for logs). Implement it to stream audit progress to a dashboard, metrics system, or chat webhook; the stable event names are the cases of the `Audit\Domain\Model\ProgressEvent` enum. _Since 1.22_ the `attacker.chunk.completed` context carries a `reason` (a short sentence) next to `status: errored` when the chunk failed for a reason worth showing.

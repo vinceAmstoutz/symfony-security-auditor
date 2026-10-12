@@ -1,0 +1,14 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\LeadingHostStage: ~
+
+    VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\DeduplicationStage: ~
+
+    VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\ExplicitlyTaggedHostStage:
+        tags:
+            - { name: symfony_security_auditor.pipeline_stage, priority: -200 }
+
+    VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\AcmeTokenEstimator: ~
