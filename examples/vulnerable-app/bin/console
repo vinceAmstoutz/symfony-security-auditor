@@ -1,0 +1,19 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use App\Kernel;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+
+if (!is_file(dirname(__DIR__).'/vendor/autoload.php')) {
+    fwrite(\STDERR, "Dependencies are missing. Run \"composer install\" in examples/vulnerable-app first.\n");
+
+    exit(1);
+}
+
+require dirname(__DIR__).'/vendor/autoload.php';
+
+$environment = $_SERVER['APP_ENV'] ?? 'dev';
+
+exit((new Application(new Kernel($environment, 'prod' !== $environment)))->run());

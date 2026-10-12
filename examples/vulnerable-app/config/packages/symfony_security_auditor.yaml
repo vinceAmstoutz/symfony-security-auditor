@@ -4,6 +4,7 @@ symfony_security_auditor:
     attacker_model: 'claude-opus-5'
     reviewer_model: 'claude-haiku-4-5-20251001'
     audit:
+        fail_on: high
         min_confidence: 0.6
         tools_enabled: true
     cache:

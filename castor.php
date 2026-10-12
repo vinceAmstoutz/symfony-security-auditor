@@ -16,6 +16,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\EvalReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\EvalScorer;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\GroundTruthManifest;
 
+use function Castor\context;
+use function Castor\fs;
 use function Castor\io;
 use function Castor\run;
 
@@ -75,11 +77,23 @@ function evaluate(
     string $groundTruth = 'examples/vulnerable-app/ground-truth.json',
     float $minPrecision = 0.0,
     float $minRecall = 0.0,
+    string $apiKeyEnv = 'ANTHROPIC_API_KEY',
 ): void {
-    $reportPath = sprintf('%s/ssa-eval-%s.json', sys_get_temp_dir(), bin2hex(random_bytes(4)));
+    registerProjectAutoloader();
+    fs()->mkdir('var');
+    $reportPath = sprintf('var/ssa-eval-%s.json', bin2hex(random_bytes(4)));
 
     io()->section('Running the auditor against the fixture (uses real LLM calls)');
-    run(sprintf('docker compose exec php bin/console audit:run %s --format=json --output=%s', $target, $reportPath));
+    $audit = run(
+        ['docker', 'compose', 'exec', '-e', $apiKeyEnv, 'php', 'examples/vulnerable-app/bin/console', 'audit:run', $target, '--format=json', '--output='.$reportPath],
+        context()->withAllowFailure(),
+    );
+
+    if (!is_file($reportPath)) {
+        io()->error(sprintf('The audit wrote no report (exit code %d). Run "composer install" in examples/vulnerable-app and export %s first.', $audit->getExitCode(), $apiKeyEnv));
+
+        exit(1);
+    }
 
     $manifest = GroundTruthManifest::fromFile($groundTruth);
     $evalReport = (new EvalScorer())->score($manifest, actualFindingsFromReport($reportPath));
@@ -93,6 +107,25 @@ function evaluate(
     }
 
     io()->success('Detection quality meets the configured thresholds.');
+}
+
+/** Castor loads no Composer autoloader, and the Docker setup keeps vendor/ inside the container. */
+function registerProjectAutoloader(): void
+{
+    spl_autoload_register(static function (string $class): void {
+        $namespaceDirectories = [
+            'VinceAmstoutz\\SymfonySecurityAuditor\\Tooling\\' => __DIR__.'/tools/',
+            'VinceAmstoutz\\SymfonySecurityAuditor\\' => __DIR__.'/src/',
+        ];
+
+        foreach ($namespaceDirectories as $namespace => $directory) {
+            if (str_starts_with($class, $namespace)) {
+                require $directory.str_replace('\\', '/', substr($class, strlen($namespace))).'.php';
+
+                return;
+            }
+        }
+    });
 }
 
 /**

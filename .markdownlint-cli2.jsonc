@@ -16,6 +16,7 @@
   ],
   "ignores": [
     "vendor/**",
+    "examples/vulnerable-app/vendor/**",
     "node_modules/**",
     "var/**",
     ".phpunit.cache/**"

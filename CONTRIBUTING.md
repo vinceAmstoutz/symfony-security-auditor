@@ -116,7 +116,9 @@ Unit and mutation tests prove the code behaves as written; they say nothing abou
 bin/castor eval
 ```
 
-This audits `examples/vulnerable-app` (real LLM calls, so it costs tokens), then scores the JSON report against [`examples/vulnerable-app/ground-truth.json`](examples/vulnerable-app/ground-truth.json) — a manifest of `{"file", "type"}` seeds. Scoring is at `(file, type)` granularity: a seed the run reproduced is a true positive, a seed it missed a false negative, and a reported finding with no matching seed a false positive (so a safe decoy file the auditor flags lowers precision). Precision, recall, and F1 are printed overall and per vulnerability class.
+This audits `examples/vulnerable-app` with the demo app's own console (real LLM calls, so it costs tokens), then scores the JSON report against [`examples/vulnerable-app/ground-truth.json`](examples/vulnerable-app/ground-truth.json) — a manifest of `{"file", "type"}` seeds. Scoring is at `(file, type)` granularity: a seed the run reproduced is a true positive, a seed it missed a false negative, and a reported finding with no matching seed a false positive (so a safe decoy file the auditor flags lowers precision). Precision, recall, and F1 are printed overall and per vulnerability class.
+
+It runs `examples/vulnerable-app/bin/console` in the `php` container, so install the demo's dependencies once (`docker compose exec php composer install -d examples/vulnerable-app`) and export the key of the platform its [`ai.yaml`](examples/vulnerable-app/config/packages/ai.yaml) configures — `ANTHROPIC_API_KEY` by default — before running it: the task passes that variable into the container. For another platform, edit that `ai.yaml`, `composer require` its bridge in the demo, and name its variable with `--api-key-env` (for example `--api-key-env=OPENAI_API_KEY`). The JSON report is kept as `var/ssa-eval-<id>.json`.
 
 Point it at another fixture and gate a run on minimum quality:
 

@@ -25,13 +25,15 @@ export ANTHROPIC_API_KEY=…             # or configure another platform
 bin/console audit:run
 ```
 
+Run it from a clone of this repository: `composer.json` installs the auditor from the repository root through a path repository (`../..`), so the demo always runs the code checked out next to it.
+
 Expected outcome:
 
-- Exit code **1** (risk level `CRITICAL` once the controller findings are validated).
+- Exit code **1** when the validated findings put the risk level at `HIGH` or above, as they typically do: [`config/packages/symfony_security_auditor.yaml`](config/packages/symfony_security_auditor.yaml) sets `audit.fail_on: high`. Four critical findings and one medium score 45, which is `HIGH`; it takes 50, five critical findings, to reach `CRITICAL`.
 - Report lists ≈ 5 findings, one per row of the table above. Severity and wording vary by model.
 
-To try a different provider, edit [`config/packages/ai.yaml`](config/packages/ai.yaml).
+To try a different provider, edit [`config/packages/ai.yaml`](config/packages/ai.yaml) and install its bridge, for example `composer require symfony/ai-openai-platform:^0.14`.
 
 ## What this app does **not** demonstrate
 
-It is a toy. There is no database, no real router beyond what's needed to make the controllers look plausible, and no tests. The flaws are kept inline and obvious so that a human can verify the auditor's output by eye. For real usage patterns, see the [`configs/`](../configs/) recipes.
+It is a toy. There is no database, no real router beyond what's needed to make the controllers look plausible, and no tests: the kernel and `bin/console` are only there to run the auditor. The flaws are kept inline and obvious so that a human can verify the auditor's output by eye. For real usage patterns, see the [`configs/`](../configs/) recipes.

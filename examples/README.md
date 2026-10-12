@@ -13,7 +13,7 @@ End-to-end demonstrations and configuration recipes for `vinceamstoutz/symfony-s
 | [`configs/ci-optimized.yaml`](configs/ci-optimized.yaml) | Split-model (large attacker, fast reviewer) for scheduled CI runs. Cache + prompt caching on. Targets accuracy at moderate cost. |
 | [`configs/cost-aware.yaml`](configs/cost-aware.yaml) | One small model, single iteration, tools disabled. Smallest possible bill. Use when you need rough triage of a large monorepo. |
 | [`configs/dev-fast.yaml`](configs/dev-fast.yaml) | Local Ollama backend (no API key, no spend) with `privacy.offline_only`, so the advisory lookup never reaches Packagist. Higher recall via lower `min_confidence` for exploratory development scans. |
-| [`vulnerable-app/`](vulnerable-app/) | Tiny Symfony 7 skeleton with deliberate flaws (broken access control, IDOR, SQL injection by concatenation, mass assignment). |
+| [`vulnerable-app/`](vulnerable-app/) | Tiny Symfony skeleton with deliberate flaws (broken access control, IDOR, JSON hijacking, SQL injection by concatenation, mass assignment). |
 
 ## Reproducing each example
 
@@ -31,13 +31,14 @@ Expect: a console report whose risk level depends on what your codebase actually
 
 ```bash
 cd examples/vulnerable-app
-composer install
-export ANTHROPIC_API_KEY=…           # or set up Ollama and uncomment the
-                                     # ollama: block in config/packages/ai.yaml
+composer install                     # installs the auditor from this repository
+export ANTHROPIC_API_KEY=…           # or set up Ollama: uncomment the ollama: block in
+                                     # config/packages/ai.yaml and composer require
+                                     # symfony/ai-ollama-platform:^0.14
 bin/console audit:run
 ```
 
-Expect: a non-zero exit code and a report listing roughly four findings — one broken-access-control on `UserController::deleteAction()`, one IDOR on `UserController::showAction()`, one SQL-injection on `SearchController::queryAction()`, and one mass-assignment on the `User` entity. Exact wording and severity vary by model.
+Expect: exit code `1` (the demo's configuration sets `audit.fail_on: high`) and a report listing roughly five findings — one broken-access-control on `UserController::deleteAction()`, one IDOR on `UserController::showAction()`, one JSON hijacking on `UserController::listAction()`, one SQL-injection on `SearchController::queryAction()`, and one mass-assignment on the `User` entity. Their risk level is typically `HIGH` (four critical findings and one medium score 45; `CRITICAL` takes 50). Exact wording and severity vary by model.
 
 ## Files in this directory are not shipped to Packagist
 
