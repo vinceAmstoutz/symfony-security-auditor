@@ -85,9 +85,8 @@ final readonly class ReachableCallIndex
 
             $walk[$name] = $name;
 
-            $steps = $this->nextSteps[$name];
-            for ($i = \count($steps) - 1; $i >= 0; --$i) {
-                $stack[] = $steps[$i];
+            foreach (array_reverse($this->nextSteps[$name]) as $step) {
+                $stack[] = $step;
             }
         }
 

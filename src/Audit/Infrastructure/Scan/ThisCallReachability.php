@@ -77,9 +77,8 @@ final readonly class ThisCallReachability
                 $result[] = $statement;
             }
 
-            $helperMethods = $this->helperMethodsCalledBy($ownBody, $methodsByName);
-            for ($i = \count($helperMethods) - 1; $i >= 0; --$i) {
-                $stack[] = $helperMethods[$i];
+            foreach (array_reverse($this->helperMethodsCalledBy($ownBody, $methodsByName)) as $helperMethod) {
+                $stack[] = $helperMethod;
             }
         }
 
