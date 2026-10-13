@@ -17,6 +17,7 @@ use Closure;
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
@@ -1645,6 +1646,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
         self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
+    }
+
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
+    public function test_bundle_accepts_a_risk_pattern_bucket_that_names_no_file_type_and_notices_it(): void
+    {
+        $this->expectUserDeprecationMessageMatches('/scan\.custom_risk_patterns\.controlers names no file type/');
+
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'scan' => ['custom_risk_patterns' => ['controlers' => ['audit_log' => ['regex' => '/AuditService::log/', 'description' => 'privileged action logged']]]],
+        ]);
+
+        self::assertSame(
+            ['controlers' => ['audit_log' => ['regex' => '/AuditService::log/', 'description' => 'privileged action logged']]],
+            $containerBuilder->getParameter('symfony_security_auditor.scan.custom_risk_patterns'),
+        );
+        self::assertSame(
+            ['scan.custom_risk_patterns.controlers names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.'],
+            $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
+        );
     }
 
     public function test_bundle_lean_mode_is_forced_off_when_the_static_prescanner_is_disabled(): void

@@ -21,6 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExec
 
 final class ConfigurationNoticesTest extends TestCase
 {
+    private const array RISK_PATTERNS = ['audit_log' => ['regex' => '/AuditService::log/', 'description' => 'privileged action logged']];
+
     /**
      * @throws InvalidAuditExecutionConfigurationException
      */
@@ -244,6 +246,50 @@ final class ConfigurationNoticesTest extends TestCase
             $this->audit(['reviewerBatchSize' => 1, 'staticPreScanEnabled' => true, 'staticPreScanLeanMode' => true]),
             $this->llm(),
         ));
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_a_risk_pattern_bucket_that_names_no_file_type_emits_a_notice_naming_it_and_every_file_type(): void
+    {
+        $notices = ConfigurationNotices::of($this->audit(), $this->llm(), [
+            'controller' => self::RISK_PATTERNS,
+            'controlers' => self::RISK_PATTERNS,
+        ]);
+
+        self::assertSame([$this->unknownBucketNotice('controlers')], $notices);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_every_risk_pattern_bucket_that_names_no_file_type_emits_its_own_notice_after_the_other_notices(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['staticPreScanEnabled' => false, 'staticPreScanLeanMode' => true]),
+            $this->llm(),
+            ['Controller' => self::RISK_PATTERNS, 'php' => self::RISK_PATTERNS, 0 => self::RISK_PATTERNS],
+        );
+
+        self::assertCount(3, $notices);
+        self::assertStringContainsString('lean_mode', $notices[0]);
+        self::assertSame([$this->unknownBucketNotice('Controller'), $this->unknownBucketNotice('0')], [$notices[1], $notices[2]]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_risk_pattern_buckets_that_each_name_a_file_type_emit_no_notice(): void
+    {
+        $buckets = array_fill_keys(['controller', 'api_resource', 'php', 'other'], self::RISK_PATTERNS);
+
+        self::assertSame([], ConfigurationNotices::of($this->audit(), $this->llm(), $buckets));
+    }
+
+    private function unknownBucketNotice(string $bucket): string
+    {
+        return \sprintf('scan.custom_risk_patterns.%s names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.', $bucket);
     }
 
     /**

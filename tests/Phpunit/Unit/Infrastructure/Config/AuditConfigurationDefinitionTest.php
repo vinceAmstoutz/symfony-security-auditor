@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -22,6 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfig
 
 final class AuditConfigurationDefinitionTest extends TestCase
 {
+    private const array RISK_PATTERNS = ['audit_log' => ['regex' => '/AuditService::log/', 'description' => 'privileged action logged']];
+
     /**
      * @param non-empty-list<string> $path
      */
@@ -159,6 +162,23 @@ final class AuditConfigurationDefinitionTest extends TestCase
         yield 'audit.rate_limit.requests_per_minute' => [['audit', 'rate_limit', 'requests_per_minute'], 8, 0];
         yield 'audit.rate_limit.input_tokens_per_minute' => [['audit', 'rate_limit', 'input_tokens_per_minute'], 8, 0];
         yield 'audit.rate_limit.output_tokens_per_minute' => [['audit', 'rate_limit', 'output_tokens_per_minute'], 8, 0];
+    }
+
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
+    public function test_a_risk_pattern_bucket_that_names_no_file_type_is_kept_and_deprecated(): void
+    {
+        $this->expectUserDeprecationMessage('Since vinceamstoutz/symfony-security-auditor 1.22: scan.custom_risk_patterns.controlers names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.');
+
+        $processed = $this->process([['scan' => ['custom_risk_patterns' => ['controller' => self::RISK_PATTERNS, 'controlers' => self::RISK_PATTERNS]]]]);
+
+        self::assertSame(['controller' => self::RISK_PATTERNS, 'controlers' => self::RISK_PATTERNS], $this->valueAt($processed, ['scan', 'custom_risk_patterns']));
+    }
+
+    public function test_risk_pattern_buckets_that_each_name_a_file_type_are_kept(): void
+    {
+        $processed = $this->process([['scan' => ['custom_risk_patterns' => ['controller' => self::RISK_PATTERNS, 'php' => self::RISK_PATTERNS]]]]);
+
+        self::assertSame(['controller' => self::RISK_PATTERNS, 'php' => self::RISK_PATTERNS], $this->valueAt($processed, ['scan', 'custom_risk_patterns']));
     }
 
     /**

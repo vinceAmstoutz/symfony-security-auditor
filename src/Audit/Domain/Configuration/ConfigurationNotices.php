@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+
 /**
  * Derives the pre-flight notices `audit:run` prints for configuration
  * combinations that silently disable a cost saver.
@@ -21,10 +23,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
  */
 final readonly class ConfigurationNotices
 {
+    private const string UNKNOWN_RISK_PATTERN_BUCKET = 'scan.custom_risk_patterns.%s names no file type, so its patterns never run. Key them by one of: %s. A bucket that names no file type is deprecated and will be refused in 2.0.';
+
     /**
+     * @param array<array-key, mixed> $customRiskPatterns
+     *
      * @return list<string>
      */
-    public static function of(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array
+    public static function of(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration, array $customRiskPatterns = []): array
     {
         $notices = [];
 
@@ -44,7 +50,25 @@ final readonly class ConfigurationNotices
             $notices[] = 'audit.static_prescan.lean_mode has no effect while audit.static_prescan.enabled is false: with no risk markers, lean mode would drop every file, so all files are analysed instead. Enable static_prescan to use lean mode, or set lean_mode: false to silence this.';
         }
 
-        return $notices;
+        return [...$notices, ...self::ofRiskPatternBuckets($customRiskPatterns)];
+    }
+
+    /**
+     * A bucket is matched against a file's type as written, so one that names
+     * no type (`controlers`, `Controller`) is accepted and never runs.
+     *
+     * @param array<array-key, mixed> $customRiskPatterns
+     *
+     * @return array<int, string>
+     */
+    public static function ofRiskPatternBuckets(array $customRiskPatterns): array
+    {
+        $fileTypes = array_map(static fn (ProjectFileType $projectFileType): string => $projectFileType->value, ProjectFileType::cases());
+
+        return array_map(
+            static fn (int|string $bucket): string => \sprintf(self::UNKNOWN_RISK_PATTERN_BUCKET, $bucket, implode(', ', $fileTypes)),
+            array_diff(array_keys($customRiskPatterns), $fileTypes),
+        );
     }
 
     private static function escalationSavesNothing(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): bool

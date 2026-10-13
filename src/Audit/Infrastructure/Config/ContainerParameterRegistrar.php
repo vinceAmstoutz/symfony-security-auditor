@@ -108,7 +108,7 @@ final readonly class ContainerParameterRegistrar
             'audit.retry.initial_delay_ms' => $retry->initialDelayMs,
             'audit.retry.backoff_multiplier' => $retry->backoffMultiplier,
             'audit.retry.jitter_ratio' => $retry->jitterRatio,
-            'config_notices' => ConfigurationNotices::of($audit, $llm),
+            'config_notices' => ConfigurationNotices::of($audit, $llm, $scan->customRiskPatterns),
             'cache.enabled' => $cache->enabled,
             'cache.dir' => $cache->dir,
             'cache.advisory_dir' => \sprintf('%s/advisory', $cache->dir),
