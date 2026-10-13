@@ -915,6 +915,38 @@ final class StagesTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      */
+    public function test_dependency_expansion_stage_adds_only_the_guarded_controllers_under_the_scan_paths(): void
+    {
+        $postVoter = ProjectFile::create('src/Security/PostVoter.php', '/app/PV', '<?php class PostVoter {}');
+        $insidePath = ProjectFile::create('src/Security/Admin/PostAdminController.php', '/app/PAC', '<?php class PostAdminController {}');
+        $outsidePath = ProjectFile::create('src/Controller/PostController.php', '/app/PC', '<?php class PostController {}');
+
+        $auditContext = AuditContext::forProject($this->tmpDir, ['src/Security'], false, 'main');
+        $auditContext->setProjectFiles([$postVoter]);
+        $auditContext->setMappingFiles([$postVoter, $insidePath, $outsidePath]);
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromFiles([$postVoter, $insidePath, $outsidePath]),
+            new AccessControlMap(
+                routeAccessControls: [
+                    new RouteAccessControl('src/Security/Admin/PostAdminController.php', 'edit', '/admin/posts/edit', ['POST'], true, ['POST_EDIT'], false, false),
+                    new RouteAccessControl('src/Controller/PostController.php', 'edit', '/posts/edit', ['POST'], true, ['POST_EDIT'], false, false),
+                ],
+                voterCapabilities: [new VoterCapability('src/Security/PostVoter.php', 'PostVoter', ['POST_EDIT'], ['Post'])],
+            ),
+        ));
+
+        (new DependencyExpansionStage(new NullLogger(), 'direct'))->process($auditContext);
+
+        self::assertSame(
+            ['src/Security/PostVoter.php', 'src/Security/Admin/PostAdminController.php'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_dependency_expansion_stage_does_not_duplicate_a_guarded_controller_already_in_the_diff(): void
     {
         $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/V', '<?php class PostVoter {}');
