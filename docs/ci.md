@@ -366,7 +366,7 @@ permissions:
           fail-on: high
 ```
 
-`GITHUB_TOKEN` has to be passed explicitly: a composite action cannot read the calling workflow's secrets on its own. When it is missing, or the format is not `github-comment`, or no report file was produced, the step emits a `::warning::` naming the reason and leaves the audit's own exit code untouched rather than failing the job over a comment.
+`GITHUB_TOKEN` has to be passed explicitly: a composite action cannot read the calling workflow's secrets on its own. When it is missing, or the format is not `github-comment`, or no report file was produced, the step emits a `::warning::` naming the reason and leaves the audit's own exit code untouched rather than failing the job over a comment. _Since 1.22_ it also posts only the report this run wrote: not a file the audit did not replace — one the pull request committed, left from an earlier step, or kept because the audit failed before writing — and not one a symbolic link between the working directory and the file leads to, which the audit refuses to write through.
 
 The step runs under `if: always()` internally, so a run that trips `--fail-on` still posts its summary — that being the run reviewers most need to see.
 

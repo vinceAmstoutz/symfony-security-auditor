@@ -175,6 +175,24 @@ runs:
         # shellcheck disable=SC2206 -- intentional word-splitting of caller-supplied extra args
         if [ -n "$SSA_EXTRA_ARGS" ]; then args+=($SSA_EXTRA_ARGS); fi
 
+        # A symlink on the way from the working directory to the report, which
+        # the audit refuses to write through, would point at another file.
+        through_symlink() {
+          local path="$1" prefix="" part
+          case "$path" in
+            "$PWD"/*) path="${path#"$PWD"/}" ;;
+            /*) return 1 ;;
+          esac
+          IFS=/ read -r -a parts <<< "$path"
+          for part in "${parts[@]}"; do
+            prefix="${prefix:+$prefix/}$part"
+            if [ -L "$prefix" ]; then return 0; fi
+          done
+          return 1
+        }
+        inode_of() { ls -di -- "$1" 2>/dev/null | awk '{print $1}'; }
+        output_inode="$(inode_of "$SSA_OUTPUT")"
+
         # Capture the audit exit code without letting the inherited errexit
         # abort before the outputs below are written — the fail-on gate exit 1,
         # budget-abort exit 2 and fail-on-incomplete exit 3 are the cases those
@@ -188,6 +206,14 @@ runs:
 
         echo "exit-code=$exit_code" >> "$GITHUB_OUTPUT"
         echo "report-path=$SSA_OUTPUT" >> "$GITHUB_OUTPUT"
+
+        # The audit replaces the file it writes, so a file this run wrote is a
+        # new one: a committed or stale file, or one a symlink reaches, is not.
+        report_written=false
+        if [ -n "$SSA_OUTPUT" ] && [ -f "$SSA_OUTPUT" ] && ! through_symlink "$SSA_OUTPUT" && [ "$(inode_of "$SSA_OUTPUT")" != "$output_inode" ]; then
+          report_written=true
+        fi
+        echo "report-written=$report_written" >> "$GITHUB_OUTPUT"
         if [ "$SSA_FORMAT" = "json" ] && [ -n "$SSA_OUTPUT" ] && [ -f "$SSA_OUTPUT" ]; then
           echo "findings-count=$(jq -r '.total_vulnerabilities' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
           echo "highest-severity=$(jq -r '.risk_level' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
@@ -271,6 +297,7 @@ runs:
       env:
         SSA_OUTPUT: ${{ inputs.output }}
         SSA_FORMAT: ${{ inputs.format }}
+        SSA_REPORT_WRITTEN: ${{ steps.audit.outputs.report-written }}
         SSA_COMMENTS_URL: ${{ github.event.pull_request.comments_url }}
       run: |
         set -euo pipefail
@@ -280,6 +307,10 @@ runs:
         fi
         if [ -z "$SSA_OUTPUT" ] || [ ! -f "$SSA_OUTPUT" ]; then
           echo "::warning::comment-pr found no report file at output '$SSA_OUTPUT'. No comment was posted."
+          exit 0
+        fi
+        if [ "$SSA_REPORT_WRITTEN" != "true" ]; then
+          echo "::warning::comment-pr posts only the report this run wrote, and the file at output '$SSA_OUTPUT' is not one: the audit did not write it, or a symbolic link leads to it. No comment was posted."
           exit 0
         fi
         if [ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
