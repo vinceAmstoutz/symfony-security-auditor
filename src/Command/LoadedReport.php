@@ -50,12 +50,17 @@ final readonly class LoadedReport
      * @param list<string>|null                                             $completeRunScanPaths   the `--path` scopes of a complete run over the whole history
      *                                                                                              (no `--since`); null when the report records no scope or ran
      *                                                                                              otherwise
+     * @param string|null                                                   $projectPath            the folder the run audited, which an absolute path inside it is
+     *                                                                                              read against; null for a report written before 1.22, which
+     *                                                                                              lists no `suppressed_fingerprints` and names each finding as
+     *                                                                                              the model did, not by its project file
      */
     public function __construct(
         public array $findings,
         public array $suppressedFingerprints = [],
         ?array $coverage = null,
         private ?array $completeRunScanPaths = null,
+        public ?string $projectPath = null,
     ) {
         $this->unanalyzed = array_flip(array_map(EchoedFilePath::normalize(...), UnanalyzedFiles::in($coverage ?? [])));
         $this->analyzed = null === $coverage ? null : array_flip(array_map(EchoedFilePath::normalize(...), AnalyzedFiles::in($coverage)));

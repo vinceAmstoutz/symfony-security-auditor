@@ -90,6 +90,31 @@ final class ReportFindingsLoaderTest extends TestCase
 
     /**
      * @param array<string, mixed> $report
+     *
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('projectsAReportNames')]
+    public function test_it_reads_the_project_the_report_audited(array $report, ?string $expected): void
+    {
+        $path = $this->writeReport(['vulnerabilities' => [], ...$report]);
+
+        self::assertSame($expected, (new ReportFindingsLoader($this->filesystem))->load($path)->projectPath);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string|null}>
+     */
+    public static function projectsAReportNames(): iterable
+    {
+        yield 'a project' => [['project' => '/abs/project', 'suppressed_fingerprints' => []], '/abs/project'];
+        yield 'no project' => [['suppressed_fingerprints' => []], ''];
+        yield 'a project that is not a string' => [['project' => 42, 'suppressed_fingerprints' => []], ''];
+        yield 'a project, in a report written before it listed suppressed fingerprints' => [['project' => '/abs/project'], null];
+    }
+
+    /**
+     * @param array<string, mixed> $report
      */
     private function writeReport(array $report): string
     {

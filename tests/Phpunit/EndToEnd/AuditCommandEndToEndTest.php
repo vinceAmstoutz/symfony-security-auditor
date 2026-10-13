@@ -837,6 +837,55 @@ final class AuditCommandEndToEndTest extends TestCase
 
     /**
      * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     * @throws UnsafeBaselineWriteException
+     */
+    #[DataProvider('respelledControllerPaths')]
+    public function test_a_baseline_entry_written_under_the_path_spelling_the_model_echoed_keeps_its_reason_through_a_prune_of_a_report_written_without_the_baseline(string $echoedPathFormat): void
+    {
+        $this->createProjectDir();
+        $echoedPath = \sprintf($echoedPathFormat, $this->fixtureDir);
+        $entry = [
+            'fingerprint' => Vulnerability::fingerprintOf('sql_injection', $echoedPath, 'Critical SQL Injection'),
+            'type' => 'sql_injection',
+            'file' => $echoedPath,
+            'title' => 'Critical SQL Injection',
+            'added_at' => '2026-10-04',
+            'reason' => 'The query is built from a constant',
+        ];
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        file_put_contents($baselineFile, (string) json_encode([$entry]));
+        $reportFile = $this->fixtureDir.'/report.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayloadAt($echoedPath), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+            '--output' => $reportFile,
+        ]);
+
+        $baselineMerger = new BaselineMerger(new ReportFindingsLoader(), new Baseline());
+        $baselineMergePlan = $baselineMerger->plan($reportFile, $baselineFile, true);
+        $baselineMerger->commit($baselineFile, $baselineMergePlan, []);
+
+        self::assertSame([0, []], [$baselineMergePlan->prunedCount, $baselineMergePlan->newFindings]);
+        self::assertSame([$entry], json_decode((string) file_get_contents($baselineFile), true));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function respelledControllerPaths(): iterable
+    {
+        yield 'with a leading dot slash' => ['./src/Controller/HomeController.php'];
+        yield 'with backslashes' => ['src\\Controller\\HomeController.php'];
+        yield 'with a leading slash' => ['/src/Controller/HomeController.php'];
+        yield 'as an absolute path inside the project' => ['%s/src/Controller/HomeController.php'];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
      */
     public function test_command_json_output_written_to_file(): void
     {

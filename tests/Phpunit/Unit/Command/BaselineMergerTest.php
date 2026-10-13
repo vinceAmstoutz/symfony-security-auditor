@@ -21,6 +21,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
@@ -454,6 +455,174 @@ final class BaselineMergerTest extends TestCase
      * @throws ReportFileNotReadableException
      * @throws UnsafeBaselineWriteException
      */
+    #[DataProvider('otherNamesOfTheFindingABaselineWrittenBeforeHolds')]
+    public function test_an_entry_holding_the_finding_under_a_name_it_had_before_keeps_its_reason_and_adds_no_duplicate(string $reportedType, string $entryType, string $entryFile): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([$this->findingInFoo($reportedType, 'Injection')]);
+        $entry = $this->entryInFoo($entryType, $entryFile, 'Injection');
+        $baseline = $this->writeBaseline([[...$entry, 'reason' => 'The value is escaped upstream.']]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+        $mergePlan = $this->baselineMerger->plan($report, $baseline, false);
+        $this->baselineMerger->commit($baseline, $baselineMergePlan, []);
+
+        self::assertSame([0, [], []], [$baselineMergePlan->prunedCount, $baselineMergePlan->newFindings, $mergePlan->newFindings]);
+        self::assertSame([[...$entry, 'reason' => 'The value is escaped upstream.']], $this->decode($baseline));
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function otherNamesOfTheFindingABaselineWrittenBeforeHolds(): iterable
+    {
+        yield 'a path with a leading dot slash' => ['sql_injection', 'sql_injection', './src/Foo.php'];
+        yield 'a path with backslashes' => ['sql_injection', 'sql_injection', 'src\\Foo.php'];
+        yield 'a path with a leading slash' => ['sql_injection', 'sql_injection', '/src/Foo.php'];
+        yield 'an absolute path inside the project' => ['sql_injection', 'sql_injection', '/abs/project/src/Foo.php'];
+        yield 'the type twig_injection' => ['xss', 'twig_injection', 'src/Foo.php'];
+        yield 'the type sensitive_data_exposure' => ['xss', 'sensitive_data_exposure', 'src/Foo.php'];
+        yield 'a former type and a path with a leading dot slash' => ['xss', 'twig_injection', './src/Foo.php'];
+        yield 'a path with a leading dot slash, for a type this release does not know' => ['custom_type', 'custom_type', './src/Foo.php'];
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_a_legacy_entry_holding_the_finding_under_a_former_type_covers_it(): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([$this->findingInFoo('xss', 'Injection')]);
+        $baseline = $this->tmpDir.'/baseline.json';
+        $this->filesystem->dumpFile($baseline, json_encode([Vulnerability::fingerprintOf('twig_injection', 'src/Foo.php', 'Injection')], \JSON_THROW_ON_ERROR));
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame([0, 1, []], [$baselineMergePlan->prunedCount, \count($baselineMergePlan->keptEntries), $baselineMergePlan->newFindings]);
+    }
+
+    /**
+     * @param array<string, string> $entry
+     *
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('entriesOfAnotherFinding')]
+    public function test_an_entry_of_another_finding_is_pruned_from_a_complete_run_and_covers_nothing(array $entry): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([$this->findingInFoo('sql_injection', 'Injection')]);
+        $baseline = $this->writeBaseline([$entry]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(
+            [1, [], [$this->findingInFoo('sql_injection', 'Injection')]],
+            [$baselineMergePlan->prunedCount, $baselineMergePlan->keptEntries, array_map(static fn (DiffFinding $diffFinding): array => [...$diffFinding->toArray()], $baselineMergePlan->newFindings)],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function entriesOfAnotherFinding(): iterable
+    {
+        $entry = static fn (string $type, string $file, string $title, ?string $fingerprintFile = null): array => [
+            'fingerprint' => Vulnerability::fingerprintOf($type, $fingerprintFile ?? $file, $title),
+            'type' => $type,
+            'file' => $file,
+            'title' => $title,
+        ];
+
+        yield 'another file' => [$entry('sql_injection', 'src/Bar.php', 'Injection')];
+        yield 'another file with a leading dot slash' => [$entry('sql_injection', './src/Bar.php', 'Injection')];
+        yield 'a file of the same name under another directory' => [$entry('sql_injection', 'lib/src/Foo.php', 'Injection')];
+        yield 'the same path under another project' => [$entry('sql_injection', '/elsewhere/src/Foo.php', 'Injection')];
+        yield 'another title' => [$entry('sql_injection', './src/Foo.php', 'Other')];
+        yield 'a type the finding never had' => [$entry('twig_injection', './src/Foo.php', 'Injection')];
+        yield 'a fingerprint of another file than the one it names' => [$entry('sql_injection', './src/Foo.php', 'Injection', 'src/Bar.php')];
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_an_entry_holding_the_finding_under_another_path_covers_one_occurrence_and_no_other_finding(): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([
+            $this->findingInFoo('sql_injection', 'Other'),
+            $this->findingInFoo('sql_injection', 'Injection'),
+            $this->findingInFoo('sql_injection', 'Injection'),
+        ]);
+        $baseline = $this->writeBaseline([$this->entryInFoo('sql_injection', './src/Foo.php', 'Injection')]);
+
+        self::assertSame(
+            [['Other', 'Injection'], ['Other', 'Injection']],
+            [
+                array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $this->baselineMerger->plan($report, $baseline, true)->newFindings),
+                array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $this->baselineMerger->plan($report, $baseline, false)->newFindings),
+            ],
+        );
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_one_entry_holding_the_finding_under_another_path_per_occurrence_of_it(): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([$this->findingInFoo('sql_injection', 'Injection')]);
+        $baseline = $this->writeBaseline([
+            $this->entryInFoo('sql_injection', './src/Foo.php', 'Injection'),
+            $this->entryInFoo('sql_injection', './src/Foo.php', 'Injection'),
+        ]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame([1, 1], [$baselineMergePlan->prunedCount, \count($baselineMergePlan->keptEntries)]);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('respelledPathsOfFoo')]
+    public function test_an_entry_holding_the_finding_under_another_path_covers_nothing_in_a_report_written_before_findings_were_named_by_their_project_file(string $entryFile): void
+    {
+        $report = $this->tmpDir.'/report.json';
+        $this->filesystem->dumpFile($report, json_encode([
+            'project' => '/abs/project',
+            'complete' => true,
+            'scope' => ['since' => null, 'paths' => []],
+            'vulnerabilities' => [$this->findingInFoo('sql_injection', 'Injection')],
+            'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'analyzed']],
+        ], \JSON_THROW_ON_ERROR));
+        $baseline = $this->writeBaseline([$this->entryInFoo('sql_injection', $entryFile, 'Injection')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame([1, ['Injection']], [$baselineMergePlan->prunedCount, array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $baselineMergePlan->newFindings)]);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function respelledPathsOfFoo(): iterable
+    {
+        yield 'with a leading dot slash' => ['./src/Foo.php'];
+        yield 'with a leading slash' => ['/src/Foo.php'];
+        yield 'as an absolute path inside the project' => ['/abs/project/src/Foo.php'];
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     * @throws UnsafeBaselineWriteException
+     */
     public function test_commit_preserves_kept_entries_verbatim_including_their_reasons(): void
     {
         $report = $this->writeReport([$this->finding('SQL Injection'), $this->finding('XSS')]);
@@ -567,6 +736,56 @@ final class BaselineMergerTest extends TestCase
         $this->baselineMerger->commit($baseline, $this->baselineMerger->plan($report, $baseline, false), []);
 
         self::assertSame(['SSA-LEGACY'], $this->decode($baseline));
+    }
+
+    /**
+     * @return array{fingerprint: string, type: string, file: string, title: string, severity: string}
+     */
+    private function findingInFoo(string $type, string $title): array
+    {
+        return [
+            'fingerprint' => Vulnerability::fingerprintOf($type, 'src/Foo.php', $title),
+            'type' => $type,
+            'file' => 'src/Foo.php',
+            'title' => $title,
+            'severity' => 'high',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function entryInFoo(string $type, string $file, string $title): array
+    {
+        return [
+            'fingerprint' => Vulnerability::fingerprintOf($type, $file, $title),
+            'type' => $type,
+            'file' => $file,
+            'title' => $title,
+            'added_at' => '2025-11-20',
+        ];
+    }
+
+    /**
+     * A complete run over the whole project at `/abs/project` whose attacker
+     * analyzed `src/Foo.php`, so the absence of a finding there is proven,
+     * written since reports list `suppressed_fingerprints`.
+     *
+     * @param list<array<string, string>> $vulnerabilities
+     */
+    private function writeCompleteReportOfTheProject(array $vulnerabilities): string
+    {
+        $path = $this->tmpDir.'/report.json';
+        $this->filesystem->dumpFile($path, json_encode([
+            'project' => '/abs/project',
+            'complete' => true,
+            'scope' => ['since' => null, 'paths' => []],
+            'vulnerabilities' => $vulnerabilities,
+            'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'analyzed']],
+            'suppressed_fingerprints' => [],
+        ], \JSON_THROW_ON_ERROR));
+
+        return $path;
     }
 
     /**

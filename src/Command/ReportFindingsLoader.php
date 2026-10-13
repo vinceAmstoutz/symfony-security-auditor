@@ -65,6 +65,7 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
             $this->suppressedFingerprintsIn($decoded),
             $coverage,
             $this->completeRunScanPathsIn($decoded, AnalyzedFiles::in($coverage ?? [])),
+            $this->projectPathIn($decoded),
         );
     }
 
@@ -82,6 +83,25 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
         $suppressed = $decoded['suppressed_fingerprints'] ?? null;
 
         return \is_array($suppressed) ? array_values(array_filter($suppressed, \is_string(...))) : [];
+    }
+
+    /**
+     * The folder the run audited, from a report that names each finding by
+     * its project file — one written since it lists `suppressed_fingerprints`.
+     * Null for a report written before, whose findings keep the paths the
+     * model echoed.
+     *
+     * @param array<array-key, mixed> $decoded
+     */
+    private function projectPathIn(array $decoded): ?string
+    {
+        if (!\array_key_exists('suppressed_fingerprints', $decoded)) {
+            return null;
+        }
+
+        $project = $decoded['project'] ?? null;
+
+        return \is_string($project) ? $project : '';
     }
 
     /**
