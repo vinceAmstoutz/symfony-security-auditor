@@ -30,19 +30,19 @@ use function Symfony\Component\String\u;
  *
  * Resolves the set of changed files via four git invocations:
  *
- *   1. `git diff --relative --name-only --diff-filter=ACMR <ref>...HEAD`
+ *   1. `git diff --relative --name-only --diff-filter=ACMRT <ref>...HEAD`
  *      — committed changes that diverge from the ref's merge base. The triple
  *      dot semantics handle topic branches diverged from the ref correctly:
  *      only changes ON the branch are returned, not changes the ref accrued
  *      since branch point. Pure tree-to-tree comparison — never touches the
  *      working tree, so it cannot invoke a `.gitattributes` content filter.
  *
- *   2. `git diff-index --relative --name-only --diff-filter=ACMR --cached HEAD`
+ *   2. `git diff-index --relative --name-only --diff-filter=ACMRT --cached HEAD`
  *      — staged changes against HEAD (including files already `git add`ed):
  *      index vs tree, both already-hashed objects, so no working-tree content
  *      filter runs either.
  *
- *   3. `git diff-files --relative --name-only --diff-filter=ACMR`
+ *   3. `git diff-files --relative --name-only --diff-filter=ACMRT`
  *      — unstaged edits to already-tracked files: working tree vs index.
  *      Deliberately the plumbing form rather than `git diff HEAD` — the
  *      porcelain form normalizes a working-tree file through its
@@ -61,6 +61,9 @@ use function Symfony\Component\String\u;
  *      Together, invocations 2, 3 and 4 let a local dev running
  *      `audit:run --since=main` see their staged, already-tracked and brand-new
  *      in-flight work too.
+ *
+ * The `T` of each filter keeps a type change: a committed symlink replaced by
+ * a regular file holds code the scan never read.
  *
  * `--relative` rewrites paths relative to `$projectPath` instead of the git
  * root, and excludes changes outside it — required so the result lines up
@@ -101,9 +104,9 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
             throw GitChangedFilesUnavailableException::forUnknownRef($ref, $projectPath);
         }
 
-        $committed = $this->runGit($projectPath, ['diff', '--relative', '--name-only', '--diff-filter=ACMR', \sprintf('%s...HEAD', $ref)]);
-        $staged = $this->runGit($projectPath, ['diff-index', '--relative', '--name-only', '--diff-filter=ACMR', '--cached', 'HEAD']);
-        $unstaged = $this->runGit($projectPath, ['diff-files', '--relative', '--name-only', '--diff-filter=ACMR']);
+        $committed = $this->runGit($projectPath, ['diff', '--relative', '--name-only', '--diff-filter=ACMRT', \sprintf('%s...HEAD', $ref)]);
+        $staged = $this->runGit($projectPath, ['diff-index', '--relative', '--name-only', '--diff-filter=ACMRT', '--cached', 'HEAD']);
+        $unstaged = $this->runGit($projectPath, ['diff-files', '--relative', '--name-only', '--diff-filter=ACMRT']);
         $untracked = $this->runGit($projectPath, ['ls-files', '--others', '--exclude-standard']);
 
         return $this->mergeAndNormalize([...$committed, ...$staged, ...$unstaged, ...$untracked]);

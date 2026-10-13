@@ -165,6 +165,55 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_lists_a_committed_file_that_replaced_a_symlink(): void
+    {
+        $this->initRepo();
+        $this->commit('src/AController.php', '<?php // a', 'init');
+        $this->commitSymlink('src/BController.php', 'AController.php');
+        $this->createBranch('feature');
+        $this->replaceSymlinkWithFile('src/BController.php', '<?php // b');
+        $this->stage('src/BController.php');
+        $this->runGit(['git', 'commit', '-m', 'replace the link']);
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertSame(['src/BController.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_lists_a_staged_file_that_replaced_a_symlink(): void
+    {
+        $this->initRepo();
+        $this->commit('src/AController.php', '<?php // a', 'init');
+        $this->commitSymlink('src/BController.php', 'AController.php');
+        $this->replaceSymlinkWithFile('src/BController.php', '<?php // b');
+        $this->stage('src/BController.php');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
+
+        self::assertSame(['src/BController.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_lists_an_unstaged_file_that_replaced_a_symlink(): void
+    {
+        $this->initRepo();
+        $this->commit('src/AController.php', '<?php // a', 'init');
+        $this->commitSymlink('src/BController.php', 'AController.php');
+        $this->replaceSymlinkWithFile('src/BController.php', '<?php // b');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
+
+        self::assertSame(['src/BController.php'], $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_includes_uncommitted_changes_against_head(): void
     {
         $this->initRepo();
@@ -575,6 +624,19 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->writeFile($relativePath, $content);
         $this->stage($relativePath);
         $this->runGit(['git', 'commit', '-m', $message]);
+    }
+
+    private function commitSymlink(string $relativePath, string $target): void
+    {
+        $this->filesystem->symlink($target, $this->tmpDir.'/'.$relativePath);
+        $this->stage($relativePath);
+        $this->runGit(['git', 'commit', '-m', 'link']);
+    }
+
+    private function replaceSymlinkWithFile(string $relativePath, string $content): void
+    {
+        $this->filesystem->remove($this->tmpDir.'/'.$relativePath);
+        $this->writeFile($relativePath, $content);
     }
 
     private function makeGitRefuseTheRepository(): void
