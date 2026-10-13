@@ -248,3 +248,12 @@ jobs:
             ARGS="$ARGS --git-diff-lines --git-diff-base=origin/$BASE_REF --ignore-msi-with-no-mutations"
           fi
           php -d memory_limit=4G bin/infection $ARGS
+
+      - name: Upload Infection logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: infection-logs-php${{ matrix.php }}-symfony${{ matrix.symfony }}
+          path: infection/
+          if-no-files-found: ignore
+          retention-days: 7
