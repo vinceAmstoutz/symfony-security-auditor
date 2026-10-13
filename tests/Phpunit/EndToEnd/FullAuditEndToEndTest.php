@@ -235,7 +235,7 @@ final class FullAuditEndToEndTest extends TestCase
         $arrayObject = new ArrayObject();
         $auditReport = $this->makeUseCase($this->promptRecordingAttacker($arrayObject), self::createStub(LLMClientInterface::class))->execute($this->fixtureProjectDir);
 
-        self::assertStringContainsString("templates/r\u{FFFD}sum\u{FFFD}.html.twig", implode("\n", $arrayObject->getArrayCopy()));
+        self::assertStringContainsString('templates/résumé.html.twig', implode("\n", $arrayObject->getArrayCopy()));
         self::assertTrue($auditReport->isComplete());
     }
 

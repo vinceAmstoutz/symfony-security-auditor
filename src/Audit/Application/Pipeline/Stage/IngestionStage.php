@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
@@ -98,12 +97,15 @@ final readonly class IngestionStage implements StageInterface
     }
 
     /**
-     * A file the scan matched and still left out — over the size limit,
-     * unreadable, or sharing a repaired name — is recorded as skipped under
-     * the `scan` stage, so the report lists it without gating on it: the
-     * report stays complete, as it did when such a file was silently dropped.
-     * Only the files the run was asked to cover count: those under the
-     * `--path` scope and, for a `--since` run, those changed since the ref.
+     * A file the scan matched and still left out is recorded under the `scan`
+     * stage. One over the size limit or unreadable is `skipped`, so the report
+     * lists it without gating on it: the report stays complete, as it did when
+     * such a file was silently dropped. One whose name or content cannot be
+     * read back one way only once its invalid UTF-8 is repaired is `errored`,
+     * so the run cannot pass as complete without it.
+     * Only the files the run was asked to cover are listed: `ScopedScan`
+     * hands over those under the `--path` scope only, and for a `--since` run
+     * the ones not changed since the ref are left out here.
      *
      * @param list<SkippedFile> $skippedFiles
      * @param ?list<string>     $changed      the files changed since the ref; null for a run that is not a `--since` run
@@ -112,8 +114,8 @@ final readonly class IngestionStage implements StageInterface
     {
         $changedSet = null === $changed ? null : array_flip($changed);
         foreach ($skippedFiles as $skippedFile) {
-            if ($this->isInScope($skippedFile->relativePath, $auditContext, $changedSet)) {
-                $auditContext->recordCoverage(ScanSkippedFiles::STAGE, $skippedFile->relativePath, ScanSkippedFiles::STATUS);
+            if ($this->isChangedSinceTheRef($skippedFile->relativePath, $changedSet)) {
+                $auditContext->recordCoverage(ScanSkippedFiles::STAGE, $skippedFile->relativePath, $skippedFile->reason->leavesTheRunIncomplete() ? 'errored' : ScanSkippedFiles::STATUS);
                 $this->logger->warning('The scan left a file out, so it is not analyzed', [
                     'file' => $skippedFile->relativePath,
                     'reason' => $skippedFile->reason->description(),
@@ -125,10 +127,9 @@ final readonly class IngestionStage implements StageInterface
     /**
      * @param ?array<string, int> $changedSet
      */
-    private function isInScope(string $relativePath, AuditContext $auditContext, ?array $changedSet): bool
+    private function isChangedSinceTheRef(string $relativePath, ?array $changedSet): bool
     {
-        return ScanPathFilter::includes($relativePath, $auditContext->scanPaths())
-            && (null === $changedSet || \array_key_exists($relativePath, $changedSet));
+        return null === $changedSet || \array_key_exists($relativePath, $changedSet);
     }
 
     /**

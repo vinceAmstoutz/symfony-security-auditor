@@ -476,7 +476,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
                 $content = $this->secretScrubber->scrub($content);
             }
 
-            return ProjectFile::create(
+            return AmbiguousContent::skipped($relativePath, $content) ?? ProjectFile::create(
                 relativePath: $relativePath,
                 absolutePath: $splFile->getPathname(),
                 content: $this->validUtf8Content($content, $relativePath),

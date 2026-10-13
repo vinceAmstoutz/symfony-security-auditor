@@ -151,11 +151,11 @@ final class ScopedScanTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_a_path_the_configured_scan_reaches_keeps_the_files_the_scanner_left_out(): void
+    public function test_a_path_the_configured_scan_reaches_keeps_the_files_the_scanner_left_out_under_it_only(): void
     {
         $skippedFile = new SkippedFile('src/Big.php', SkippedFileReason::TooLarge);
         $configured = [$this->file('src/A.php'), $this->file('config/services.yaml')];
-        $recordingReportingScanner = new RecordingReportingScanner(new ProjectFileScan($configured, [$skippedFile]), new ProjectFileScan([$this->file('apps/api/B.php')], []));
+        $recordingReportingScanner = new RecordingReportingScanner(new ProjectFileScan($configured, [new SkippedFile('config/big.yaml', SkippedFileReason::TooLarge), $skippedFile]), new ProjectFileScan([$this->file('apps/api/B.php')], []));
 
         $scopedScanResult = ScopedScan::resolve($recordingReportingScanner, '/project', ['src']);
 

@@ -38,7 +38,7 @@ final class Utf8NormalizerTest extends TestCase
     }
 
     #[DataProvider('invalidTexts')]
-    public function test_it_replaces_each_invalid_byte_with_the_replacement_character(string $invalid, string $expected): void
+    public function test_it_writes_each_invalid_byte_as_the_latin1_character_of_that_byte(string $invalid, string $expected): void
     {
         self::assertSame($expected, Utf8Normalizer::normalize($invalid));
     }
@@ -48,19 +48,62 @@ final class Utf8NormalizerTest extends TestCase
      */
     public static function invalidTexts(): iterable
     {
-        yield 'a Latin-1 letter' => ["caf\xE9", "caf\u{FFFD}"];
-        yield 'a byte no UTF-8 sequence starts with' => ["Fo\xFFo.php", "Fo\u{FFFD}o.php"];
-        yield 'a continuation byte on its own' => ["a\x80b", "a\u{FFFD}b"];
-        yield 'valid and invalid text mixed' => ["é\xE9é", "é\u{FFFD}é"];
-        yield 'two separate invalid bytes' => ["\xE9 and \xE8", "\u{FFFD} and \u{FFFD}"];
+        yield 'a Latin-1 letter' => ["caf\xE9", 'café'];
+        yield 'a byte no UTF-8 sequence starts with' => ["Fo\xFFo.php", 'Foÿo.php'];
+        yield 'a continuation byte on its own' => ["a\x80b", "a\u{80}b"];
+        yield 'valid and invalid text mixed' => ["\u{E8}\xE9\u{E8}", 'èéè'];
+        yield 'two separate invalid bytes' => ["\xE9 and \xE8", 'é and è'];
+        yield 'a truncated sequence, byte by byte' => ["\xE9\x80b", "é\u{80}b"];
+        yield 'an overlong encoding' => ["\xC0\xAF", 'À¯'];
+        yield 'an encoded surrogate' => ["\xED\xA0\x80", "í\u{A0}\u{80}"];
+        yield 'a code point past U+10FFFF' => ["\xF4\x90\x80\x80", "ô\u{90}\u{80}\u{80}"];
+        yield 'a valid character right after an invalid lead byte' => ["\xE9\u{E9}\u{65E5}", 'éé日'];
+        yield 'invalid bytes around a long valid run' => ["\xE9".str_repeat('日a', 300)."\xE8", 'é'.str_repeat('日a', 300).'è'];
     }
 
-    public function test_it_leaves_the_substitute_character_setting_as_it_found_it(): void
+    public function test_a_valid_run_of_a_million_characters_between_invalid_bytes_is_kept_whole(): void
     {
-        $before = mb_substitute_character();
+        $valid = str_repeat('日', 1_100_000);
 
-        Utf8Normalizer::normalize("caf\xE9");
+        self::assertSame('é'.$valid.'è', Utf8Normalizer::normalize("\xE9".$valid."\xE8"));
+    }
 
-        self::assertSame($before, mb_substitute_character());
+    public function test_texts_that_differ_only_in_their_invalid_bytes_stay_different(): void
+    {
+        self::assertNotSame(Utf8Normalizer::normalize("Admin\xE8.php"), Utf8Normalizer::normalize("Admin\xE9.php"));
+    }
+
+    #[DataProvider('unambiguousTexts')]
+    public function test_text_whose_repair_reads_back_one_way_only_is_not_ambiguous(string $text): void
+    {
+        self::assertFalse(Utf8Normalizer::isAmbiguous($text));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unambiguousTexts(): iterable
+    {
+        yield 'valid text with accented letters' => ['café über'];
+        yield 'invalid bytes and only ASCII' => ["caf\xE9 and caf\xE8"];
+        yield 'invalid bytes and characters past U+00FF' => ["\xE9 \u{100} \u{20AC} \u{65E5}"];
+        yield 'invalid bytes and the last ASCII character' => ["\xE9 \x7F"];
+    }
+
+    #[DataProvider('ambiguousTexts')]
+    public function test_invalid_bytes_beside_a_character_they_could_be_repaired_into_make_the_text_ambiguous(string $text): void
+    {
+        self::assertTrue(Utf8Normalizer::isAmbiguous($text));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function ambiguousTexts(): iterable
+    {
+        yield 'the same letter, invalid and valid' => ["\$id\xE9 = \$id\u{E9};"];
+        yield 'U+0080, the first character a byte is repaired into' => ["\xE9 \u{80}"];
+        yield 'U+00FF, the last character a byte is repaired into' => ["\xE9 \u{FF}"];
+        yield 'the valid character first' => ["\u{A0} \xFF"];
     }
 }

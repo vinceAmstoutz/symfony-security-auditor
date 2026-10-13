@@ -351,18 +351,18 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame($content, $files[0]->content());
     }
 
-    public function test_it_replaces_bytes_that_are_not_valid_utf8_in_file_content_with_the_replacement_character(): void
+    public function test_it_writes_bytes_that_are_not_valid_utf8_in_file_content_as_latin1_characters(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
-        file_put_contents($this->tmpDir.'/src/Legacy.php', "<?php\n// caf\xE9\n");
+        file_put_contents($this->tmpDir.'/src/Legacy.php', "<?php\n\$id\xE9 = \$request->get('id');\n\$id\xE8 = (int) \$id\xE9;\n");
 
         $files = $this->projectFileScanner->scan($this->tmpDir);
 
         self::assertCount(1, $files);
-        self::assertSame("<?php\n// caf\u{FFFD}\n", $files[0]->content());
+        self::assertSame("<?php\n\$idé = \$request->get('id');\n\$idè = (int) \$idé;\n", $files[0]->content());
     }
 
-    public function test_it_replaces_bytes_that_are_not_valid_utf8_in_a_file_name_with_the_replacement_character(): void
+    public function test_it_writes_bytes_that_are_not_valid_utf8_in_a_file_name_as_latin1_characters(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
         $absolutePath = $this->tmpDir."/src/Controller/Fo\xFFo.php";
@@ -371,11 +371,11 @@ final class ProjectFileScannerTest extends TestCase
         $files = $this->projectFileScanner->scan($this->tmpDir);
 
         self::assertCount(1, $files);
-        self::assertSame("src/Controller/Fo\u{FFFD}o.php", $files[0]->relativePath());
+        self::assertSame('src/Controller/Foÿo.php', $files[0]->relativePath());
         self::assertSame($absolutePath, $files[0]->absolutePath());
     }
 
-    public function test_it_keeps_one_of_two_files_whose_names_are_the_same_once_their_invalid_bytes_are_replaced_and_reports_the_other_as_skipped(): void
+    public function test_two_files_whose_names_differ_only_in_their_invalid_bytes_are_both_scanned_under_different_names(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir."/src/caf\xE9.php", '<?php class A {}');
@@ -383,17 +383,29 @@ final class ProjectFileScannerTest extends TestCase
 
         $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
 
-        self::assertSame([["src/caf\u{FFFD}.php", '<?php class B {}']], array_map(static fn (ProjectFile $projectFile): array => [$projectFile->relativePath(), $projectFile->content()], $projectFileScan->files));
-        self::assertSame([["src/caf\u{FFFD}.php", SkippedFileReason::AmbiguousName]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
+        self::assertSame([['src/cafè.php', '<?php class B {}'], ['src/café.php', '<?php class A {}']], array_map(static fn (ProjectFile $projectFile): array => [$projectFile->relativePath(), $projectFile->content()], $projectFileScan->files));
+        self::assertSame([], $projectFileScan->skippedFiles);
+    }
+
+    public function test_it_keeps_one_of_two_files_whose_names_are_the_same_once_their_invalid_bytes_are_replaced_and_reports_the_other_as_skipped(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir."/src/caf\xE9.php", '<?php class A {}');
+        file_put_contents($this->tmpDir.'/src/café.php', '<?php class B {}');
+
+        $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame([['src/café.php', '<?php class B {}']], array_map(static fn (ProjectFile $projectFile): array => [$projectFile->relativePath(), $projectFile->content()], $projectFileScan->files));
+        self::assertSame([['src/café.php', SkippedFileReason::AmbiguousName]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
     }
 
     public function test_the_file_kept_among_those_with_the_same_repaired_name_is_the_first_in_byte_order_of_its_path_not_the_first_listed(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir."/src/caf\xE9.php", '<?php class A {}');
-        file_put_contents($this->tmpDir."/src/caf\xE8.php", '<?php class B {}');
+        file_put_contents($this->tmpDir.'/src/café.php', '<?php class B {}');
 
-        $projectFileScan = (new ProjectFileScanner(new NullLogger(), includedPaths: ["src/caf\xE9.php", "src/caf\xE8.php"]))->scanReportingSkippedFiles($this->tmpDir);
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), includedPaths: ["src/caf\xE9.php", 'src/café.php']))->scanReportingSkippedFiles($this->tmpDir);
 
         self::assertSame(['<?php class B {}'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->content(), $projectFileScan->files));
         self::assertCount(1, $projectFileScan->skippedFiles);
@@ -402,14 +414,26 @@ final class ProjectFileScannerTest extends TestCase
     public function test_three_files_that_share_a_repaired_name_leave_one_file_and_one_skipped_entry_for_the_name(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
-        foreach (["\xE7", "\xE8", "\xE9"] as $invalidByte) {
-            file_put_contents($this->tmpDir.'/src/caf'.$invalidByte.'.php', '<?php');
+        foreach (["\xE9\xE9", "\xE9é", "é\xE9"] as $name) {
+            file_put_contents($this->tmpDir.'/src/'.$name.'.php', '<?php');
         }
 
         $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
 
-        self::assertSame(["src/caf\u{FFFD}.php"], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files));
-        self::assertSame([["src/caf\u{FFFD}.php", SkippedFileReason::AmbiguousName]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
+        self::assertSame(['src/éé.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files));
+        self::assertSame([['src/éé.php', SkippedFileReason::AmbiguousName]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
+    }
+
+    public function test_a_file_whose_content_mixes_invalid_bytes_with_the_characters_they_are_repaired_into_is_skipped_as_ambiguous(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Clear.php', "<?php\n\$caf\xE9 = 1;\n");
+        file_put_contents($this->tmpDir.'/src/Mixed.php', "<?php\n\$id\xE9 = \$request->get('id');\n\$idé = (int) \$id\xE9;\n");
+
+        $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame(['src/Clear.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files));
+        self::assertSame([['src/Mixed.php', SkippedFileReason::AmbiguousContent]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
     }
 
     public function test_a_file_reached_through_two_spellings_of_its_path_is_not_a_name_collision(): void
@@ -456,7 +480,7 @@ final class ProjectFileScannerTest extends TestCase
 
         (new ProjectFileScanner($logger))->scan($this->tmpDir);
 
-        self::assertSame([['File name is not valid UTF-8, its invalid bytes were replaced', ['path' => "src/Fo\u{FFFD}o.php"]]], $warnings);
+        self::assertSame([['File name is not valid UTF-8, its invalid bytes were replaced', ['path' => 'src/Foÿo.php']]], $warnings);
     }
 
     public function test_it_does_not_warn_about_encoding_for_valid_utf8_names_and_content(): void
@@ -483,7 +507,7 @@ final class ProjectFileScannerTest extends TestCase
         $projectFileScanner = new ProjectFileScanner(new NullLogger(), secretScrubber: new RegexSecretScrubber(["/geheim\xE4/"]));
         $files = $projectFileScanner->scan($this->tmpDir);
 
-        self::assertSame("<?php\n// ***REDACTED:custom_0*** caf\u{FFFD}\n", $files[0]->content());
+        self::assertSame("<?php\n// ***REDACTED:custom_0*** café\n", $files[0]->content());
     }
 
     public function test_it_logs_scanning_start_and_completion_with_exact_context(): void
@@ -823,14 +847,14 @@ final class ProjectFileScannerTest extends TestCase
         );
     }
 
-    public function test_it_names_a_file_left_out_for_its_size_with_the_replacement_character_for_invalid_utf8_in_its_name(): void
+    public function test_it_names_a_file_left_out_for_its_size_with_the_latin1_characters_of_the_invalid_utf8_bytes_in_its_name(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir."/src/Fo\xFFo.php", str_repeat('a', (2 * 1024) + 1));
 
         $projectFileScan = (new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2))->scanReportingSkippedFiles($this->tmpDir);
 
-        self::assertSame(["src/Fo\u{FFFD}o.php"], array_map(static fn (SkippedFile $skippedFile): string => $skippedFile->relativePath, $projectFileScan->skippedFiles));
+        self::assertSame(['src/Foÿo.php'], array_map(static fn (SkippedFile $skippedFile): string => $skippedFile->relativePath, $projectFileScan->skippedFiles));
     }
 
     public function test_it_reports_a_file_it_could_not_read_as_skipped_and_unreadable(): void

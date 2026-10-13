@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
@@ -48,12 +49,23 @@ final readonly class ScopedScan
 
         $narrowed = ScanPathFilter::apply($configured->files, $paths);
         if ([] !== $narrowed) {
-            return new ScopedScanResult(new ProjectFileScan($narrowed, $configured->skippedFiles), $configured->files);
+            return new ScopedScanResult(new ProjectFileScan($narrowed, self::skippedUnder($configured->skippedFiles, $paths)), $configured->files);
         }
 
         $within = self::within($projectFileScanner, $projectPath, $paths);
 
         return new ScopedScanResult($within, [...$configured->files, ...$within->files]);
+    }
+
+    /**
+     * @param list<SkippedFile>      $skippedFiles
+     * @param non-empty-list<string> $paths
+     *
+     * @return list<SkippedFile>
+     */
+    private static function skippedUnder(array $skippedFiles, array $paths): array
+    {
+        return array_values(array_filter($skippedFiles, static fn (SkippedFile $skippedFile): bool => ScanPathFilter::includes($skippedFile->relativePath, $paths)));
     }
 
     private static function configured(ProjectFileScannerInterface $projectFileScanner, string $projectPath): ProjectFileScan

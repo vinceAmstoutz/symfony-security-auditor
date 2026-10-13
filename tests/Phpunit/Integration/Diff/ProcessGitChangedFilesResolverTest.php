@@ -144,7 +144,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
 
         $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
 
-        self::assertSame(["src/Bar\u{FFFD}.php"], $changed);
+        self::assertSame(['src/Barÿ.php'], $changed);
     }
 
     /**
