@@ -454,6 +454,12 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
+     * Finder's `files()` leaves out directories alone, so a named pipe, a
+     * socket or a device node named like a source file reaches this point:
+     * opening a pipe waits for a writer forever, and a device may never end,
+     * so anything but a regular file is reported unreadable without being
+     * opened.
+     *
      * @param Closure(SplFileInfo): string $reader
      */
     private function scanFile(SplFileInfo $splFile, string $projectPath, Closure $reader): ProjectFile|SkippedFile|null
@@ -465,6 +471,12 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         }
 
         $relativePath = $this->validUtf8RelativePath($splFile, $projectPath);
+
+        if (!$splFile->isFile()) {
+            $this->logger->warning('Skipped a file that is not a regular file', ['path' => $splFile->getPathname()]);
+
+            return new SkippedFile($relativePath, SkippedFileReason::Unreadable);
+        }
 
         try {
             if ($splFile->getSize() > $this->maxFileSizeKb * 1024) {

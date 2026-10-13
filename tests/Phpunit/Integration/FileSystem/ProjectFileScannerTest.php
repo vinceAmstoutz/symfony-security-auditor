@@ -847,6 +847,27 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame(SkippedFileReason::Unreadable, $projectFileScan->skippedFiles[0]->reason);
     }
 
+    public function test_a_named_pipe_in_a_scanned_folder_is_reported_unreadable_without_being_opened(): void
+    {
+        mkdir($this->tmpDir.'/src/Controller', 0o777, true);
+        posix_mkfifo($this->tmpDir.'/src/Controller/Fifo.php', 0o600);
+        file_put_contents($this->tmpDir.'/src/Controller/Ok.php', '<?php class Ok {}');
+        $opened = [];
+        $reader = static function (SplFileInfo $splFile) use (&$opened): string {
+            $opened[] = $splFile->getRelativePathname();
+
+            return '<?php class Ok {}';
+        };
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        $projectFileScan = (new ProjectFileScanner($warningCollectingLogger, ['src'], fileReader: $reader))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame(['Controller/Ok.php'], $opened);
+        self::assertSame(['src/Controller/Ok.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files));
+        self::assertSame([['src/Controller/Fifo.php', SkippedFileReason::Unreadable]], array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles));
+        self::assertSame([['Skipped a file that is not a regular file', ['path' => $this->tmpDir.'/src/Controller/Fifo.php']]], $warningCollectingLogger->warnings);
+    }
+
     public function test_it_reports_nothing_skipped_for_a_project_without_included_paths(): void
     {
         $projectFileScan = $this->projectFileScanner->scanReportingSkippedFiles($this->tmpDir);
