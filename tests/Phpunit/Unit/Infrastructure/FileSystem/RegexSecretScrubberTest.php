@@ -32,6 +32,14 @@ final class RegexSecretScrubberTest extends TestCase
 
     private const string GHP = 'ghp';
 
+    private const string PASSWORD_ARGUMENT = 'password';
+
+    private const string PLACEHOLDER_SECRET = 'xyxyxyxyxyxyxyxy';
+
+    private const string PLACEHOLDER_USER = 'svc-user';
+
+    private const string USERNAME_ARGUMENT = 'username';
+
     private const string GHO = 'gho';
 
     private const string GITHUB_PAT = 'github_pat';
@@ -572,6 +580,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a header closed by a parenthesis inside a single-quoted string' => ["<?php \$h = 'password: hunter2xx)';", "<?php \$h = 'password: ***REDACTED:inline_assignment***)';"];
         yield 'a file opening with a byte order mark and a shebang' => ["\xEF\xBB\xBF#!/usr/bin/env php\n<?php \$h = 'password: hunter2xx';", "\xEF\xBB\xBF#!/usr/bin/env php\n<?php \$h = 'password: ***REDACTED:inline_assignment***';"];
         yield 'markup before a tag' => ['<?php $a = 1; ?>password: hunter2xx<?php $b = 2;', '<?php $a = 1; ?>password: ***REDACTED:inline_assignment***<?php $b = 2;'];
+        yield 'a credential call written inside a string' => ['<?php $a = \'->setPassword(\' . $x . \', "abcd1234")\';', '<?php $a = \'->setPassword(\' . $x . \', "***REDACTED:call_argument***")\';'];
+        yield 'credentials handed to a call over several lines' => ["<?php\n\$transport->setCredentials(\n    '".self::PLACEHOLDER_USER."',\n    '".self::PLACEHOLDER_SECRET."',\n);\n", "<?php\n\$transport->setCredentials(\n    '***REDACTED:call_argument***',\n    '***REDACTED:call_argument***',\n);\n"];
     }
 
     public function test_a_yaml_document_that_merely_mentions_a_php_tag_is_scrubbed_as_yaml(): void
@@ -1696,6 +1706,11 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a returned binary literal never closed' => ['return "'.str_repeat('\\x41', 131072)];
         yield 'returned binary literals one byte short of a key pair' => [str_repeat('return "'.str_repeat('\\x41', 63)."\";\n", 1900)];
         yield 'a key literal under its base64 copy never closed' => ["SYMFONY_DECRYPTION_SECRET=\nreturn \"".str_repeat('\\x41', 131072)];
+        yield 'credential call arguments never closed' => ['->setCredentials('.str_repeat("'abcd', ", 65536)];
+        yield 'credential calls opening on a quote' => [str_repeat("->setcredentials('", 29127)];
+        yield 'user and password lists never closed' => ["'auth' => [".str_repeat("'abcd', ", 65536)];
+        yield 'authorization headers holding short credentials' => [str_repeat("Authorization: Token abc\n", 21000)];
+        yield 'url query keys with no value' => [str_repeat('?token=', 74898)];
     }
 
     #[DataProvider('hostileContentWithTheJitCases')]
@@ -1722,6 +1737,11 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a returned binary literal never closed' => ['return "'.str_repeat('\\x41', 131072)];
         yield 'returned binary literals one byte short of a key pair' => [str_repeat('return "'.str_repeat('\\x41', 63)."\";\n", 1900)];
         yield 'a key literal under its base64 copy never closed' => ["SYMFONY_DECRYPTION_SECRET=\nreturn \"".str_repeat('\\x41', 131072)];
+        yield 'credential call arguments never closed' => ['->setCredentials('.str_repeat("'abcd', ", 65536)];
+        yield 'credential calls opening on a quote' => [str_repeat("->setcredentials('", 29127)];
+        yield 'user and password lists never closed' => ["'auth' => [".str_repeat("'abcd', ", 65536)];
+        yield 'authorization headers holding short credentials' => [str_repeat("Authorization: Token abc\n", 21000)];
+        yield 'url query keys with no value' => [str_repeat('?token=', 74898)];
     }
 
     #[DataProvider('hostileContentRedactedCases')]
@@ -1763,6 +1783,9 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a fallback literal of half a megabyte' => ['$password = $a ?: "'.str_repeat('a', 524288).'";', '$password = $a ?: "***REDACTED:inline_assignment***";'];
         yield 'fallback literals line after line' => [str_repeat("\$password = \$a ?: 'abcd1234';\n", 12000), str_repeat("\$password = \$a ?: '***REDACTED:inline_assignment***';\n", 12000)];
         yield 'sixteen concatenations then a literal' => ['$password = $a'.str_repeat(' . $b', 16).' . "abcdefgh"', '$password = $a'.str_repeat(' . $b', 16).' . "abcdefgh"'];
+        yield 'a credential call of eight thousand literals' => ['->setCredentials('.str_repeat("'".str_repeat('a', 60)."', ", 8000).')', '->setCredentials('.str_repeat("'***REDACTED:call_argument***', ", 8000).')'];
+        yield 'a url query token of half a megabyte' => ['?token='.str_repeat('a', 524288), '?token=***REDACTED:query_credential***'];
+        yield 'an authorization credential of half a megabyte' => ['Authorization: Token '.str_repeat('a', 524288), 'Authorization: Token ***REDACTED:authorization_header***'];
     }
 
     #[RunInSeparateProcess]
@@ -1957,6 +1980,96 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'one byte short of a key pair' => [\sprintf("<?php\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(substr($keyPair, 0, -1)))];
         yield 'one byte over a key pair' => [\sprintf("<?php\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped($keyPair."\x00"))];
         yield 'sixty-four characters with no escaped byte' => [\sprintf("<?php\n\nreturn \"%s\";\n", str_repeat('ab', 32))];
+    }
+
+    #[DataProvider('credentialsInTheFormsOfSymfonyAndPhpLibraries')]
+    public function test_a_credential_written_the_way_a_symfony_or_php_library_takes_it_is_redacted(string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($expected, $output);
+        self::assertSame($output, $this->regexSecretScrubber->scrub($output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function credentialsInTheFormsOfSymfonyAndPhpLibraries(): iterable
+    {
+        yield 'a lexik jwt pass phrase' => ["lexik_jwt_authentication:\n    secret_key: '%env(resolve:JWT_SECRET_KEY)%'\n    pass_phrase: '".self::PLACEHOLDER_SECRET."'\n", "lexik_jwt_authentication:\n    secret_key: '%env(resolve:JWT_SECRET_KEY)%'\n    pass_phrase: '***REDACTED:inline_assignment***'\n"];
+        yield 'an unquoted pass phrase' => ["lexik_jwt_authentication:\n    pass_phrase: ".self::PLACEHOLDER_SECRET."\n", "lexik_jwt_authentication:\n    pass_phrase: \"***REDACTED:inline_assignment***\"\n"];
+        yield 'a pass phrase set in a template' => ["{% set pass_phrase = '".self::PLACEHOLDER_SECRET."' %}\n", "{% set pass_phrase = '***REDACTED:inline_assignment***' %}\n"];
+        yield 'an http client bearer token' => ["framework:\n    http_client:\n        scoped_clients:\n            github.client:\n                auth_bearer: '".self::PLACEHOLDER_SECRET."'\n", "framework:\n    http_client:\n        scoped_clients:\n            github.client:\n                auth_bearer: '***REDACTED:inline_assignment***'\n"];
+        yield 'an http client basic credential' => ["framework:\n    http_client:\n        scoped_clients:\n            crm.client:\n                auth_basic: '".self::PLACEHOLDER_USER.':'.self::PLACEHOLDER_SECRET."'\n", "framework:\n    http_client:\n        scoped_clients:\n            crm.client:\n                auth_basic: '***REDACTED:inline_assignment***'\n"];
+        yield 'an http client bearer option in php' => ["<?php\n\$client = HttpClient::create(['auth_bearer' => '".self::PLACEHOLDER_SECRET."']);\n", "<?php\n\$client = HttpClient::create(['auth_bearer' => '***REDACTED:inline_assignment***']);\n"];
+        yield 'an http client basic option in php' => ["<?php\n\$client = HttpClient::create(['auth_basic' => '".self::PLACEHOLDER_USER.':'.self::PLACEHOLDER_SECRET."']);\n", "<?php\n\$client = HttpClient::create(['auth_basic' => '***REDACTED:inline_assignment***']);\n"];
+        yield 'a user and a password handed to a credential setter' => ["<?php\n\$transport->setCredentials('".self::PLACEHOLDER_USER."', '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$transport->setCredentials('***REDACTED:call_argument***', '***REDACTED:call_argument***');\n"];
+        yield 'a password after a short user' => ["<?php\n\$client->withCredentials('svc', '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$client->withCredentials('svc', '***REDACTED:call_argument***');\n"];
+        yield 'a password after a variable' => ["<?php\n\$transport->setCredentials(\$user, '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$transport->setCredentials(\$user, '***REDACTED:call_argument***');\n"];
+        yield 'a password after a nested call' => ["<?php\n\$transport->setCredentials(\$this->getParameter('mailer_user'), '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$transport->setCredentials(\$this->getParameter('mailer_user'), '***REDACTED:call_argument***');\n"];
+        yield 'credentials over several lines' => ["<?php\n\$transport->setCredentials(\n    '".self::PLACEHOLDER_USER."',\n    \"".self::PLACEHOLDER_SECRET."\",\n);\n", "<?php\n\$transport->setCredentials(\n    '***REDACTED:call_argument***',\n    \"***REDACTED:call_argument***\",\n);\n"];
+        yield 'credentials passed by name' => ["<?php\n\$transport->setCredentials(".self::USERNAME_ARGUMENT.": '".self::PLACEHOLDER_USER."', ".self::PASSWORD_ARGUMENT.": '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$transport->setCredentials(".self::USERNAME_ARGUMENT.": '***REDACTED:call_argument***', ".self::PASSWORD_ARGUMENT.": '***REDACTED:inline_assignment***');\n"];
+        yield 'an aws secret beside its access key' => ["<?php\n\$credentials = new Credentials('".self::AWS.str_repeat('A', 16)."', '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$credentials = new Credentials('***REDACTED:aws_access_key***', '***REDACTED:call_argument***');\n"];
+        yield 'a qualified credentials class' => ["<?php\n\$credentials = new \\Aws\\Credentials\\Credentials(\$key, '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$credentials = new \\Aws\\Credentials\\Credentials(\$key, '***REDACTED:call_argument***');\n"];
+        yield 'a mysqli connection' => ["<?php\n\$db = new mysqli('localhost', 'root', '".self::PLACEHOLDER_SECRET."', 'app');\n", "<?php\n\$db = new mysqli('***REDACTED:call_argument***', '***REDACTED:call_argument***', '***REDACTED:call_argument***', 'app');\n"];
+        yield 'a mysqli connection through the function' => ["<?php\n\$db = mysqli_connect('localhost', 'root', '".self::PLACEHOLDER_SECRET."', 'app');\n", "<?php\n\$db = mysqli_connect('***REDACTED:call_argument***', '***REDACTED:call_argument***', '***REDACTED:call_argument***', 'app');\n"];
+        yield 'a mysqli connection opened on a link' => ["<?php\nmysqli_real_connect(\$link, 'db', 'root', '".self::PLACEHOLDER_SECRET."');\n", "<?php\nmysqli_real_connect(\$link, 'db', '***REDACTED:call_argument***', '***REDACTED:call_argument***');\n"];
+        yield 'an ldap bind of the symfony component' => ["<?php\n\$ldap->bind('cn=admin,dc=example,dc=com', '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$ldap->bind('***REDACTED:call_argument***', '***REDACTED:call_argument***');\n"];
+        yield 'an ldap bind on a property' => ["<?php\n\$this->ldapClient->bind(\$dn, '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$this->ldapClient->bind(\$dn, '***REDACTED:call_argument***');\n"];
+        yield 'an ldap bind through the function' => ["<?php\nldap_bind(\$connection, 'cn=admin,dc=example,dc=com', '".self::PLACEHOLDER_SECRET."');\n", "<?php\nldap_bind(\$connection, '***REDACTED:call_argument***', '***REDACTED:call_argument***');\n"];
+        yield 'a redis password' => ["<?php\n\$redis->auth('".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$redis->auth('***REDACTED:call_argument***');\n"];
+        yield 'an ftp login' => ["<?php\nftp_login(\$ftp, 'svc', '".self::PLACEHOLDER_SECRET."');\n", "<?php\nftp_login(\$ftp, 'svc', '***REDACTED:call_argument***');\n"];
+        yield 'an ssh password' => ["<?php\nssh2_auth_password(\$ssh, 'svc', '".self::PLACEHOLDER_SECRET."');\n", "<?php\nssh2_auth_password(\$ssh, 'svc', '***REDACTED:call_argument***');\n"];
+        yield 'an imap mailbox' => ["<?php\nimap_open('{imap.example.com:993/imap/ssl}INBOX', 'svc', '".self::PLACEHOLDER_SECRET."');\n", "<?php\nimap_open('***REDACTED:call_argument***', 'svc', '***REDACTED:call_argument***');\n"];
+        yield 'an authentication setter' => ["<?php\n\$client->setAuth('svc', '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$client->setAuth('svc', '***REDACTED:call_argument***');\n"];
+        yield 'a basic authentication setter' => ["<?php\n\$client->setBasicAuth('".self::PLACEHOLDER_USER."', '".self::PLACEHOLDER_SECRET."');\n", "<?php\n\$client->setBasicAuth('***REDACTED:call_argument***', '***REDACTED:call_argument***');\n"];
+        yield 'a guzzle user and password' => ["<?php\n\$client->request('GET', \$url, ['auth' => ['admin', '".self::PLACEHOLDER_SECRET."']]);\n", "<?php\n\$client->request('GET', \$url, ['auth' => ['***REDACTED:call_argument***', '***REDACTED:call_argument***']]);\n"];
+        yield 'an http client user and password list' => ["<?php\n\$client = \$client->withOptions(['auth_basic' => ['svc', '".self::PLACEHOLDER_SECRET."']]);\n", "<?php\n\$client = \$client->withOptions(['auth_basic' => ['svc', '***REDACTED:call_argument***']]);\n"];
+        yield 'a user and password list over several lines' => ["<?php\nreturn [\n    \"auth_basic\" => [\n        '".self::PLACEHOLDER_USER."',\n        '".self::PLACEHOLDER_SECRET."',\n    ],\n];\n", "<?php\nreturn [\n    \"auth_basic\" => [\n        '***REDACTED:call_argument***',\n        '***REDACTED:call_argument***',\n    ],\n];\n"];
+        yield 'an authorization header of another scheme' => ["framework:\n    http_client:\n        default_options:\n            headers:\n                Authorization: 'Token ".self::PLACEHOLDER_SECRET."'\n", "framework:\n    http_client:\n        default_options:\n            headers:\n                Authorization: 'Token ***REDACTED:authorization_header***'\n"];
+        yield 'an authorization header of another scheme in php' => ["<?php\n\$client->request('GET', \$url, ['headers' => ['Authorization' => 'Token ".self::PLACEHOLDER_SECRET."']]);\n", "<?php\n\$client->request('GET', \$url, ['headers' => ['Authorization' => 'Token ***REDACTED:authorization_header***']]);\n"];
+        yield 'an unquoted authorization header' => ["headers:\n    Proxy-Authorization: Digest ".self::PLACEHOLDER_SECRET."\n", "headers:\n    Proxy-Authorization: Digest ***REDACTED:authorization_header***\n"];
+        yield 'a bearer token too short to be one on its own' => ["curl -H \"Authorization: Bearer xyxyxyxyxyxy\" https://api.example.com\n", "curl -H \"Authorization: Bearer ***REDACTED:authorization_header***\" https://api.example.com\n"];
+        yield 'a server variable holding the header' => ["<?php\n\$server = ['HTTP_AUTHORIZATION' => 'Token ".self::PLACEHOLDER_SECRET."'];\n", "<?php\n\$server = ['HTTP_AUTHORIZATION' => 'Token ***REDACTED:authorization_header***'];\n"];
+        yield 'a token in a url query' => ["<?php\n\$url = 'https://api.example.com/v1/sms?token=".self::PLACEHOLDER_SECRET."&to=1';\n", "<?php\n\$url = 'https://api.example.com/v1/sms?token=***REDACTED:query_credential***&to=1';\n"];
+        yield 'a token in a url query in yaml' => ["notifier:\n    url: https://api.example.com/hook?channel=ops&token=".self::PLACEHOLDER_SECRET."\n", "notifier:\n    url: https://api.example.com/hook?channel=ops&token=***REDACTED:query_credential***\n"];
+        yield 'a key in a url query' => ['<script src="https://maps.example.com/js?key='.self::PLACEHOLDER_SECRET."&callback=init\"></script>\n", "<script src=\"https://maps.example.com/js?key=***REDACTED:query_credential***&callback=init\"></script>\n"];
+        yield 'a percent-encoded signature in a url query' => ['https://acct.blob.core.windows.net/c/f?sv=2022-11-02&sig='.self::PLACEHOLDER_SECRET."%2BAb%3D\n", "https://acct.blob.core.windows.net/c/f?sv=2022-11-02&sig=***REDACTED:query_credential***\n"];
+        yield 'a private token in a url query' => ["{{ 'https://gitlab.example.com/api/v4/projects?private_token=".self::PLACEHOLDER_SECRET."' }}\n", "{{ 'https://gitlab.example.com/api/v4/projects?private_token=***REDACTED:query_credential***' }}\n"];
+        yield 'a password credential of the security component' => ["<?php\nnew Passport(\$badge, new PasswordCredentials('".self::PLACEHOLDER_SECRET."'));\n", "<?php\nnew Passport(\$badge, new PasswordCredentials('***REDACTED:call_argument***'));\n"];
+        yield 'an authorization credential of exactly eight characters' => ["Authorization: Token xyxyxyxy\n", "Authorization: Token ***REDACTED:authorization_header***\n"];
+        yield 'a url query credential of exactly eight characters' => ["https://example.com/?token=xyxyxyxy\n", "https://example.com/?token=***REDACTED:query_credential***\n"];
+        yield 'an http client basic credential through the config builder' => ["<?php\n\$framework->httpClient()->scopedClient('crm.client')->authBasic('".self::PLACEHOLDER_USER.':'.self::PLACEHOLDER_SECRET."');\n", "<?php\n\$framework->httpClient()->scopedClient('crm.client')->authBasic('***REDACTED:call_argument***');\n"];
+    }
+
+    #[DataProvider('settingsOfSymfonyAndPhpLibrariesHoldingNoCredential')]
+    public function test_a_setting_of_a_symfony_or_php_library_that_holds_no_credential_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function settingsOfSymfonyAndPhpLibrariesHoldingNoCredential(): iterable
+    {
+        yield 'a pass phrase read from the environment' => ["lexik_jwt_authentication:\n    pass_phrase: '%env(JWT_PASSPHRASE)%'\n"];
+        yield 'a bearer token read from the environment' => ["framework:\n    http_client:\n        scoped_clients:\n            github.client:\n                auth_bearer: '%env(GITHUB_TOKEN)%'\n"];
+        yield 'credentials read from the environment' => ["<?php\n\$transport->setCredentials('%env(MAILER_USER)%', '%env(MAILER_PASSWORD)%');\n"];
+        yield 'a credential setter with a literal inside a nested call only' => ["<?php\n\$transport->setCredentials(\$this->getParameter('mailer_user'), \$password);\n"];
+        yield 'a literal concatenated into an argument' => ["<?php\n\$transport->setCredentials('".self::PLACEHOLDER_USER."' . \$suffix, \$password);\n"];
+        yield 'a login handed an authenticator and a firewall' => ["<?php\n\$security->login(\$user, 'form_login', 'main');\n"];
+        yield 'an author setter' => ["<?php\n\$book->setAuthor('Jane Doe');\n"];
+        yield 'a bind that is no ldap bind' => ["<?php\n\$services->defaults()->bind('\$projectDir', '%kernel.project_dir%');\n\$statement->bind('name', 'Jane Doe');\n"];
+        yield 'a class whose name merely holds credentials' => ["<?php\n\$provider = new CredentialsProvider('default', 'eu-west-1');\n"];
+        yield 'an authentication map' => ["<?php\nreturn ['auth' => ['enabled' => true, 'provider' => 'ldap_users']];\n"];
+        yield 'an authorization header built from a variable' => ["<?php\n\$headers = ['Authorization' => 'Token '.\$token, 'X-Other' => \"Bearer {\$token}\"];\n"];
+        yield 'an authorization header read from the environment' => ["framework:\n    http_client:\n        default_options:\n            headers:\n                Authorization: 'Token %env(API_TOKEN)%'\n"];
+        yield 'an authorization checker built in code' => ["<?php\n\$authorization = new AuthorizationChecker(\$tokenStorage);\n\$authorization = new AuthorizationCheckerStub;\n"];
+        yield 'an authorization header holding a short credential' => ["Authorization: Token abc1234\n"];
+        yield 'a token interpolated into a url query' => ["<?php\n\$url = '/reset?token=' . \$token . '&expires=' . \$expires;\n\$link = \"https://example.com/confirm?token={\$token}\";\n"];
+        yield 'a token placeholder in a route' => ["{{ path('app_reset') }}?token={{ token }}\n<a href=\"/verify?token={token}\">verify</a>\n"];
+        yield 'a short token in a url query' => ["https://example.com/?token=abc1234\n"];
+        yield 'a url query template holding a fixed prefix' => ["<?php\n\$url = \\sprintf('https://example.com/hook?token=webhook-%s', \$id);\n"];
+        yield 'a query parameter whose name merely ends in a credential word' => ["https://example.com/?monkey=bananas123&sort_key=created_at_desc\n"];
+        yield 'a list under a key that merely starts like auth' => ["<?php\nreturn ['authors' => ['Jane Doe', 'John Roe']];\n"];
+        yield 'basic credentials read from variables' => ["<?php\n\$client = HttpClient::create(['auth_basic' => [\$user, \$password]]);\n"];
     }
 
     public function test_words_that_merely_start_with_pass_are_not_credentials(): void

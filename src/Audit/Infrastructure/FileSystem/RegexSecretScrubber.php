@@ -29,8 +29,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  * Symfony secrets vault, env-style token assignments,
  * Symfony `env(NAME)` parameter defaults and XML `<parameter>` values, PHP `define()`
  * constants, connection-string URIs with
- * embedded credentials (e.g. `postgres://user:pass@host`), `Authorization: Bearer` and
- * `Authorization: Basic` headers,
+ * embedded credentials (e.g. `postgres://user:pass@host`), credentials in a URL query
+ * (`?token=…`), `Authorization` headers of any scheme, the literal arguments of a call
+ * that takes a credential (`setCredentials()`, `ldap_bind()`, `new Credentials()`),
  * OpenAI-style `sk-`/`sk-proj-` keys, Slack and Discord webhook URLs, and GitLab, Hugging Face,
  * npm, SendGrid and PyPI tokens. Each match is replaced
  * with `***REDACTED:<label>***` so downstream prompt builders can still emit a coherent
@@ -82,6 +83,19 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
      */
     private const string CONNECTION_URI = '~\b(?|([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+|((?:rediss?|valkeys?|sendgrid|[a-z0-9.\-]{1,31}\+api)://)(?![%$])[^:@/\s]{4,}+|([a-z][a-z0-9+.\-]{0,31}://)(?![%$])[^:@/\s]{4,}+(?=@default\b))@~i';
 
+    /**
+     * The credential of an `Authorization` header of any scheme (`Token …`, `Digest …`, a bearer
+     * token too short for `BearerToken`), when it ends the value as a header does: a word
+     * followed by a parenthesis or a semicolon is code (`new AuthorizationChecker($storage)`).
+     */
+    private const string AUTHORIZATION_HEADER = '/(?:proxy-)?authorization\b["\']?[ \t]*(?::|=>|=)[ \t]*["\']?[A-Za-z][A-Za-z0-9_-]{0,31}[ \t]++\K[A-Za-z0-9+\/=_.~:-]{8,}+(?=["\'\s]|\z)/i';
+
+    /**
+     * A credential in a URL query (`?token=…`, `&key=…`, `&sig=…`, `?private_token=…`), unless the
+     * value is a placeholder filled in later (`?token=%s`, `?token={token}`).
+     */
+    private const string QUERY_CREDENTIAL = '/[?&](?:(?:access|auth|api|private|refresh|id|client|secret)_?)?(?:token|key|secret|sig|signature|password|passwd|pwd)=\K(?:[A-Za-z0-9._~+\/=-]|%[0-9A-Fa-f]{2}){8,}+(?![%{$])/i';
+
     private const string PRIVATE_KEY_LABEL = '(?:(?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY|PGP PRIVATE KEY BLOCK)';
 
     /**
@@ -105,7 +119,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
      */
     private const string PHP_EXPRESSION = '/^!?(?:\$[A-Za-z_]\w*(?:[;,)\]]*$|->|\?->|::|\[)|(?:self|static|parent)::[A-Z_][A-Z0-9_]*[;,)\]]*$|[A-Z]\w*::[A-Z_][A-Z0-9_]*[;,)\]]+$|\\\\[A-Za-z_][\w\\\\]*(?:::[A-Za-z_]\w*)?[;,)\]]*$|\[(?:["\'$\]]|\.\.\.)|\((?:\$[A-Za-z_]|new$)|\\\\?[a-z_]\w*\([a-z_]\w*\(|(?:\\\\?[a-z_]\w*|(?:self|static|parent|[A-Z]\w*)::[A-Za-z_]\w*)\((?:(?:[\'"$]|[a-z_]\w*\().*[,;()\]]|.*[;,])$)/';
 
-    private const string CREDENTIAL_WORDS = 'password|passwd|pwd|passphrase|secret|credentials|api[_-]?key|api[_-]?token|api[_-]?secret|access[_-]?token|access[_-]?key|auth[_-]?token|auth[_-]?key|client[_-]?secret|private[_-]?key|account[_-]?key|secret[_-]?key|app[_-]?key|app[_-]?secret|master[_-]?key|signing[_-]?key|encryption[_-]?key|session[_-]?secret|jwt[_-]?secret|refresh[_-]?token|bearer[_-]?token|(?:db|database|root|admin|user|mysql|postgres|pg|mongo|redis|smtp|mail|ftp|ssh)[_-]?pass(?:word|wd)?';
+    private const string CREDENTIAL_WORDS = 'password|passwd|pwd|pass[_-]?phrase|secret|credentials|api[_-]?key|api[_-]?token|api[_-]?secret|access[_-]?token|access[_-]?key|auth[_-]?token|auth[_-]?key|auth[_-]?bearer|auth[_-]?basic|client[_-]?secret|private[_-]?key|account[_-]?key|secret[_-]?key|app[_-]?key|app[_-]?secret|master[_-]?key|signing[_-]?key|encryption[_-]?key|session[_-]?secret|jwt[_-]?secret|refresh[_-]?token|bearer[_-]?token|(?:db|database|root|admin|user|mysql|postgres|pg|mongo|redis|smtp|mail|ftp|ssh)[_-]?pass(?:word|wd)?';
 
     private const string PURE_VALUE_FUNCTIONS = 'hex2bin|bin2hex|base64_decode|base64_encode|sodium_hex2bin|sodium_base642bin|password_hash|md5|sha1|trim|ltrim|rtrim|strtolower|strtoupper|urldecode|rawurldecode|urlencode|rawurlencode';
 
@@ -122,7 +136,15 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
      */
     private const string SECRETS_VAULT_KEY_FILE = '.decrypt.private.php';
 
-    private const string QUOTED_BODY_OF_GROUP_TWO = '((?:\\\\.|(?!\2)[^\n]){4,}+)';
+    private const string QUOTED_BODY_OF_GROUP_THREE = '((?:\\\\.|(?!\3)[^\n]){4,}+)';
+
+    private const string QUOTED_LITERAL = '"(?:[^"\\\\\n]++|\\\\.)*+"|\'(?:[^\'\\\\\n]++|\\\\.)*+\'';
+
+    /**
+     * A literal standing as a whole argument, by position or by name: not one inside a nested
+     * call, nor one concatenated with something else.
+     */
+    private const string ARGUMENT_LITERAL = '/(\A|,)([ \t\r\n]*+(?:[A-Za-z_]\w*+[ \t]*+:(?!:)[ \t\r\n]*+)?)(["\'])((?:\\\\.|(?!\3)[^\n]){4,}+)\3(?=[ \t\r\n]*+(?:,|\z))/';
 
     /**
      * @var array<string, string>
@@ -194,10 +216,12 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
             SecretPatternLabel::InlineAssignment->value => \sprintf('/(["\']?(?:%1$s(?:[_-][a-z0-9]+){0,8}["\']?\]?\s*(?:=>|:(?!:)|=)|env\(%2$s\)["\']?\s*:|define\(\s*["\']%2$s["\']\s*,)[ \t]*(?:\((?:string|int|integer|float|double|bool|boolean|array|object)\)[ \t]*)?+(?:\\\\?(?:%3$s)[ \t]*+\([ \t]*+(?=["\']))?)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|(?|([^"\'\s]\S{3,}(?:(?<![;:)\]\'"])(?:(?<!,)|(?![ \t]*+[\w-]++[ \t]*+:))(?:[ \t]*+[A-Za-z0-9]++)++)?)(?:(?<![;,])%4$s)?+|([^"\'\s]\S{0,2}+)(?<![;,])%4$s))/i', $inlineCredentialKey, $envCredentialName, self::PURE_VALUE_FUNCTIONS, self::FALLBACK_TAIL),
             SecretPatternLabel::MultilineAssignment->value => \sprintf('/(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi', $inlineCredentialKey),
             SecretPatternLabel::BlockScalar->value => \sprintf('/^([ \t]*+)(-[ \t]++)?(["\']?%s(?:[_-][a-z0-9]+){0,8}["\']?[ \t]*:[ \t]*[|>][+-]?[0-9]?[+-]?[ \t]*(?:#[^\n]*)?)\r?\n((?:\1(?(2)[ \t]{3,}|[ \t]+)[^\n]*(?:\n|\z)|[ \t]*\r?\n)++)/mi', $inlineCredentialKey),
-            SecretPatternLabel::CallArgument->value => \sprintf('/(?|((?:->|::)(?:(?:set|with)[A-Za-z0-9_]{0,24}?)?%1$s[ \t]*\([ \t]*)(["\'])%2$s\2|(\([ \t]*["\'][\w.$:\-]{0,64}%3$s[\w.$:\-]{0,64}["\'][ \t]*,[ \t]*)(["\'])%2$s\2|(new[ \t]+\\\\?PDO[ \t]*\([^,\n]{1,200},[^,\n]{1,100},[ \t]*)(["\'])%2$s\2|((?:\$|->)[A-Za-z_]*key[ \t]*=[ \t]*\\\\?(?:hex2bin|sodium_hex2bin|base64_decode|sodium_base642bin)[ \t]*+\([ \t]*+)(["\'])((?:\\\\.|(?!\2)[^\n]){16,}+)\2|(\bpassword_(?:hash|verify)[ \t]*+\([ \t]*+)(["\'])%2$s\2)/i', $callCredentialName, self::QUOTED_BODY_OF_GROUP_TWO, $inlineCredentialKey),
+            SecretPatternLabel::CallArgument->value => \sprintf('/(?|((?>%4$s[ \t]*\())%5$s|(["\']auth(?:[_-]?basic)?["\'][ \t]*(?:=>|:)[ \t]*\[)%6$s|(\([ \t]*["\'][\w.$:\-]{0,64}%3$s[\w.$:\-]{0,64}["\'][ \t]*,[ \t]*)((["\'])%2$s\3)|(new[ \t]+\\\\?PDO[ \t]*\([^,\n]{1,200},[^,\n]{1,100},[ \t]*)((["\'])%2$s\3)|((?:\$|->)[A-Za-z_]*key[ \t]*=[ \t]*\\\\?(?:hex2bin|sodium_hex2bin|base64_decode|sodium_base642bin)[ \t]*+\([ \t]*+)((["\'])((?:\\\\.|(?!\3)[^\n]){16,}+)\3)|(\bpassword_(?:hash|verify)[ \t]*+\([ \t]*+)((["\'])%2$s\3))/i', $callCredentialName, self::QUOTED_BODY_OF_GROUP_THREE, $inlineCredentialKey, $this->credentialCall($callCredentialName), $this->callArguments(), $this->listItems()),
             SecretPatternLabel::XmlParameter->value => \sprintf('~(<(?:parameter|argument)\b[^>]{0,256}?\bkey=(["\'])[^"\'<>]{0,256}?%s[^"\'<>]{0,256}?\2[^>]{0,256}>)(?!\*\*\*REDACTED:)([^<\n]{4,}+)(?=</(?:parameter|argument)>)~i', $inlineCredentialKey),
             SecretPatternLabel::BearerToken->value => '/\bBearer\s+[A-Za-z0-9\-_.]{20,4096}\b/i',
             SecretPatternLabel::BasicAuthorization->value => '~\b((?:proxy-)?authorization\b["\']?\s*(?::|=>|=)\s*["\']?basic\s+)[A-Za-z0-9+/=_\-]{8,4096}~i',
+            SecretPatternLabel::AuthorizationHeader->value => self::AUTHORIZATION_HEADER,
+            SecretPatternLabel::QueryCredential->value => self::QUERY_CREDENTIAL,
             SecretPatternLabel::OpenAiApiKey->value => '/\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,}+/',
             SecretPatternLabel::SlackWebhookUrl->value => '~\bhttps://hooks\.slack\.com/services/[A-Za-z0-9]+/[A-Za-z0-9]+/[A-Za-z0-9]+\b~',
             SecretPatternLabel::DiscordWebhookUrl->value => '~\bhttps://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/(?:v\d+/)?webhooks/\d+/[A-Za-z0-9_\-]+~',
@@ -212,6 +236,35 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     private function inlineCredentialKey(): string
     {
         return \sprintf('(?:%s|(?<![a-z])pass(?![_-])|(?<![\w?&-])token(?![\w-]))', self::CREDENTIAL_WORDS);
+    }
+
+    /**
+     * A call whose literal arguments are a credential and the account or server it opens: a
+     * setter or config builder named after one (`setPassword()`, `setCredentials()`,
+     * `setBasicAuth()`, `secret()`), a client logging in with one (`new mysqli()`,
+     * `mysqli_connect()`, `ldap_bind()`, `$ldap->bind()`, `$redis->auth()`, `ftp_login()`,
+     * `ssh2_auth_password()`, `imap_open()`) or a class holding one (`new Credentials()`).
+     */
+    private function credentialCall(string $callCredentialName): string
+    {
+        return \sprintf('(?:(?:->|::)(?:(?:set|with)[A-Za-z0-9_]{0,24}?(?:%1$s|auth)|%1$s)|redis[A-Za-z0-9_]{0,64}->auth|ldap[A-Za-z0-9_]{0,64}->bind|\b(?:ldap_bind|ftp_login|ssh2_auth_password|imap_open|mysqli_connect|mysqli_real_connect)|\bnew[ \t]+\\\\?(?:[A-Za-z_][A-Za-z0-9_]{0,64}\\\\){0,8}(?:mysqli|[A-Za-z0-9_]{0,64}credentials))', $callCredentialName);
+    }
+
+    /**
+     * The arguments of a call, up to its closing parenthesis, with calls nested two deep in them.
+     */
+    private function callArguments(): string
+    {
+        return \sprintf('((?:[^()"\']++|%1$s|\((?:[^()"\']++|%1$s|\((?:[^()"\']++|%1$s)*+\))*+\))*+)(?=\))', self::QUOTED_LITERAL);
+    }
+
+    /**
+     * The items of a list, up to its closing bracket: the user and the password a Guzzle `auth`
+     * or an HttpClient `auth_basic` option takes as a list.
+     */
+    private function listItems(): string
+    {
+        return \sprintf('((?:[^\\[\\]()"\']++|%s)*+)(?=\\])', self::QUOTED_LITERAL);
     }
 
     private function truncatedPrivateKeyPattern(): string
@@ -237,7 +290,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
                 SecretPatternLabel::InlineAssignment => $this->redactInlineAssignments($pattern, $content),
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
                 SecretPatternLabel::BlockScalar => preg_replace_callback($pattern, $this->redactBlockScalar(...), $content),
-                SecretPatternLabel::CallArgument => preg_replace_callback($pattern, $this->redactCallArgument(...), $content),
+                SecretPatternLabel::CallArgument => $this->redactCallArguments($pattern, $content),
                 SecretPatternLabel::XmlParameter => preg_replace_callback($pattern, $this->redactXmlParameter(...), $content),
                 SecretPatternLabel::PemPrivateKey => $this->redactPrivateKeys($pattern, $content),
                 SecretPatternLabel::BearerToken => preg_replace_callback($pattern, $this->redactBearerToken(...), $content),
@@ -480,18 +533,36 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * @param array<int|string, string> $match
+     * Each literal standing as a whole argument of a call that takes a credential is redacted,
+     * the user handed over beside a password included, provided PHP reads it as a string: a
+     * scrubbed file still parses.
      */
-    private function redactCallArgument(array $match): string
+    private function redactCallArguments(string $pattern, string $content): ?string
     {
-        $quote = $match[2];
-        $value = $match[3];
+        $phpDataMask = PhpDataMask::of($content);
 
-        if ($this->isRedactionPlaceholder($value) || $this->isConfigPlaceholder($value)) {
-            return $match[0];
-        }
+        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $match[1][0].$this->redactArgumentLiterals($match[2], $phpDataMask));
+    }
 
-        return \sprintf('%s%s%s%s', $match[1], $quote, SecretPatternLabel::CallArgument->placeholder(), $quote);
+    /**
+     * @param array{0: string, 1: int} $arguments the arguments and their offset in the content
+     */
+    private function redactArgumentLiterals(array $arguments, PhpDataMask $phpDataMask): string
+    {
+        return $this->offsetCaptureReplacer->replace(self::ARGUMENT_LITERAL, $arguments[0], fn (array $match): string => $this->redactArgumentLiteral($match, $arguments[1], $phpDataMask)) ?? $arguments[0];
+    }
+
+    /**
+     * @param array<int|string, array{0: string, 1: int}> $match
+     */
+    private function redactArgumentLiteral(array $match, int $argumentsOffset, PhpDataMask $phpDataMask): string
+    {
+        $body = $match[4][0];
+        $opening = $argumentsOffset + $match[3][1];
+
+        return $this->isRedactionPlaceholder($body) || $this->isConfigPlaceholder($body) || !$phpDataMask->isStringLiteral($opening, $opening + \strlen($body) + 1)
+            ? $match[0][0]
+            : \sprintf('%s%s%3$s%4$s%3$s', $match[1][0], $match[2][0], $match[3][0], SecretPatternLabel::CallArgument->placeholder());
     }
 
     /**

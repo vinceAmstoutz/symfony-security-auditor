@@ -29,6 +29,8 @@ enum SecretPatternLabel: string
     case ConnectionUri = 'connection_uri';
     case BearerToken = 'bearer_token';
     case BasicAuthorization = 'basic_authorization';
+    case AuthorizationHeader = 'authorization_header';
+    case QueryCredential = 'query_credential';
     case OpenAiApiKey = 'openai_api_key';
     case SlackWebhookUrl = 'slack_webhook_url';
     case GitlabToken = 'gitlab_token';
