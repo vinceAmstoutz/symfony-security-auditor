@@ -229,7 +229,7 @@ Locally, only via `LoggerInterface` warnings if the Attacker / Reviewer fails to
 | Highest accuracy | `attacker_model: claude-opus-5` + `reviewer_model: claude-opus-5` |
 | Best cost/quality | `attacker_model: claude-opus-5` + `reviewer_model: claude-haiku-4-5-20251001` |
 | Strong + cheaper | `attacker_model: claude-sonnet-5` + `reviewer_model: claude-haiku-4-5-20251001` |
-| Cheapest paid | `model: deepseek-chat` or `mistral-large-latest` |
+| Cheapest paid | `model: deepseek-flash` or `mistral-large-latest` |
 | Offline / free | `model: llama3.3` via Ollama |
 | Enterprise | Azure OpenAI / AWS Bedrock with split-model |
 

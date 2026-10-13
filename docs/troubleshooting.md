@@ -491,7 +491,7 @@ To bring a repository of that size into a sane envelope, in the order that helps
 - Confirm Anthropic prompt caching is on — `cache_retention` in `ai.yaml` (default `short`) gives a ~90% input-token discount on cached prompts.
 - Confirm `cache.enabled: true` (default) — repeated chunks skip the LLM entirely.
 - Lower `audit.max_tool_iterations` from `8` to `4` or `5` — caps chatty tool-use loops on each chunk at the cost of less cross-file investigation.
-- Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-4-5-20251001` or `deepseek-chat`).
+- Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-4-5-20251001` or `deepseek-flash`).
 - Set a provider-side hard cap. See [CI → Set a spend cap](ci.md#set-a-spend-cap).
 - Run weekly instead of nightly for large monorepos.
 
@@ -508,7 +508,7 @@ symfony_security_auditor configuration against the models supported by your
 symfony/ai platform.
 ```
 
-Fix the model identifier if it is a typo. If the name is correct but missing from the catalog, the token counts in the report are still accurate — only the USD figure is unavailable. Run `composer update symfony/models-dev` to pull a fresher catalog, or alias your own `PricingProviderInterface` implementation to supply prices (see [Extending](extending.md)).
+Fix the model identifier if it is a typo. A model id the catalog has dropped prices at zero as well: it no longer lists DeepSeek's legacy `deepseek-chat` and `deepseek-reasoner` ids, so configure `deepseek-flash` or `deepseek-v4-pro` instead. If the name is correct but missing from the catalog, the token counts in the report are still accurate — only the USD figure is unavailable. Run `composer update symfony/models-dev` to pull a fresher catalog, or alias your own `PricingProviderInterface` implementation to supply prices (see [Extending](extending.md)).
 
 **Standalone binary:** `composer update` does not apply — there is no user-facing `vendor/` or `composer.json`; the binary carries the `symfony/models-dev` catalog its release was built with. Run `self-update` to refresh it: even when the binary is already the latest release, it downloads the current catalog into the cache directory, and later runs price from that copy (`doctor`'s `Pricing catalog` check names it). A copy the run cannot use — unreadable, not JSON, or pricing no model — is ignored in favor of the catalog the binary was built with, and so is one the binary's own catalog has overtaken (the newest `last_updated` of its models is older), as after replacing the binary with a newer release without running `self-update`. `self-update --check` and a configuration with `privacy.offline_only: true` leave the catalog as it is.
 
