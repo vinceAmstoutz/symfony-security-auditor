@@ -1159,6 +1159,34 @@ final class AuditReportTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_array_form_of_a_scan_that_found_no_file_says_it_discovered_none(): void
+    {
+        $array = AuditReport::fromContext(AuditContext::forProject($this->tmpDir))->toArray();
+
+        self::assertSame(0, $array['files_discovered']);
+        self::assertSame(0, $array['files_scanned']);
+    }
+
+    /**
+     * A `--since` run whose diff left nothing changed scanned no file either,
+     * but its scan found some: it has a verdict.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_array_form_lists_the_files_the_scan_discovered_before_a_since_diff_narrowed_them(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, diffSinceRef: 'HEAD');
+        $auditContext->setFilesDiscovered(3);
+
+        $array = AuditReport::fromContext($auditContext)->toArray();
+
+        self::assertSame(3, $array['files_discovered']);
+        self::assertSame(0, $array['files_scanned']);
+    }
+
+    /**
      * `hasNoVerdict()` answers as it did in 1.21.0: it knows a run that
      * analyzed none of its files and found nothing, not a scan that found no
      * file at all.

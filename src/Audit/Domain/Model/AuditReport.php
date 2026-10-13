@@ -379,6 +379,7 @@ final readonly class AuditReport
             'completed_at' => $this->reportIdentity->completedAt->format(DateTimeInterface::ATOM),
             'duration_seconds' => $this->durationSeconds(),
             'files_scanned' => $this->reportIdentity->filesScanned,
+            'files_discovered' => $this->reportIdentity->filesDiscovered,
             'complete' => $this->isComplete(),
             'risk_score' => $this->riskScore(),
             'risk_level' => $this->riskLevel(),
