@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 
 final class OfflineOnlyPlatformGuardTest extends TestCase
 {
@@ -209,6 +210,59 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
                 'ollama' => ['endpoint' => 'http://localhost:11434'],
                 'openai' => ['api_key' => 'sk-secret'],
             ]),
+        );
+    }
+
+    /**
+     * @param array<array-key, mixed> $platform
+     *
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[DataProvider('settingsADryRunReadFromAnUnsetVariableCases')]
+    public function test_a_dry_run_does_not_judge_a_setting_read_from_an_unset_variable(array $platform): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig($platform);
+
+        $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal($standalonePlatformConfig);
+
+        self::assertSame($platform, $standalonePlatformConfig->platform);
+    }
+
+    /**
+     * @return iterable<string, array{array<array-key, mixed>}>
+     */
+    public static function settingsADryRunReadFromAnUnsetVariableCases(): iterable
+    {
+        yield 'an endpoint' => [['ollama' => ['endpoint' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]];
+        yield 'an endpoint after a setting that is not one' => [['ollama' => ['model' => 'llama3.2', 'endpoint' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]];
+        yield 'a base url below an instance, beside its api key' => [['generic' => ['gw' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL, 'base_url' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]]];
+        yield 'a base url after a nested block without one' => [['generic' => ['options' => ['model' => 'm'], 'base_url' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]];
+        yield 'a host url beside a local platform' => [['ollama' => ['endpoint' => 'http://localhost:11434'], 'lmstudio' => ['host_url' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]];
+    }
+
+    /**
+     * @throws NonLocalPlatformEndpointException
+     */
+    public function test_an_api_key_read_from_an_unset_variable_leaves_a_hosted_provider_hosted(): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessage('the "anthropic" platform is a hosted provider with no local endpoint configured');
+
+        $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
+            new StandalonePlatformConfig(['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]),
+        );
+    }
+
+    /**
+     * @throws NonLocalPlatformEndpointException
+     */
+    public function test_a_remote_endpoint_beside_a_setting_read_from_an_unset_variable_is_still_refused(): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessage('the "generic" platform would send your source code to "https://api.example.com"');
+
+        $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
+            new StandalonePlatformConfig(['generic' => ['base_url' => 'https://api.example.com', 'completions_path' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]),
         );
     }
 

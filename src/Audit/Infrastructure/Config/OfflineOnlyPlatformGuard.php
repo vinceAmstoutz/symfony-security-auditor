@@ -21,7 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
  * accepted only when it carries at least one URL and every URL it carries
  * resolves to a loopback, link-local or private-range host — so a hosted
  * provider (an `api_key` and nothing else) and a cloud endpoint
- * (`base_url: https://…azure.com`) are both rejected.
+ * (`base_url: https://…azure.com`) are both rejected. A provider whose only
+ * candidate endpoint a dry run read from an unset variable is not judged.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -61,7 +62,7 @@ final readonly class OfflineOnlyPlatformGuard
     {
         $endpoints = $this->endpointsIn($providerConfig);
 
-        if ([] === $endpoints) {
+        if ([] === $endpoints && !$this->holdsAnUnresolvedSetting($providerConfig)) {
             throw NonLocalPlatformEndpointException::forProviderWithoutEndpoint($provider);
         }
 
@@ -94,6 +95,33 @@ final readonly class OfflineOnlyPlatformGuard
         }
 
         return $endpoints;
+    }
+
+    /**
+     * A dry run stands in for a setting whose `%env()%` variable is unset,
+     * since it never reaches the provider: whether that setting is a local
+     * endpoint only the real run can tell, and it names the variable instead.
+     *
+     * @param array<array-key, mixed> $providerConfig
+     */
+    private function holdsAnUnresolvedSetting(array $providerConfig): bool
+    {
+        foreach ($providerConfig as $key => $value) {
+            if ($this->isUnresolved($key, $value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isUnresolved(int|string $key, mixed $value): bool
+    {
+        if (\is_array($value)) {
+            return $this->holdsAnUnresolvedSetting($value);
+        }
+
+        return !PlatformApiKey::names($key) && StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL === $value;
     }
 
     private function endpointIn(int|string $key, mixed $value): ?PlatformEndpoint
