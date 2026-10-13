@@ -218,6 +218,90 @@ final class SymfonyMappingContextRendererTest extends TestCase
         self::assertStringContainsString('attributes: [… and 2 more] — subjects: [(none)]', $rendered);
     }
 
+    public function test_the_coverage_of_a_route_by_a_rule_with_thousands_of_roles_stays_within_the_documented_bound(): void
+    {
+        $roles = array_map(static fn (int $index): string => 'ROLE_'.$index, range(1, 1000));
+        $requirements = [...$roles, ...array_fill(0, 119, 'or: '.implode(', ', $roles))];
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingCoveredBy($requirements));
+
+        self::assertLessThanOrEqual(2048, \strlen($rendered));
+        self::assertStringContainsString(\sprintf('— COVERED_BY access_control[%s,… and 1099 more]', implode(',', \array_slice($roles, 0, 20))), $rendered);
+    }
+
+    public function test_the_coverage_of_a_route_by_a_rule_with_exactly_the_item_limit_lists_every_requirement(): void
+    {
+        $roles = array_map(static fn (int $index): string => 'ROLE_'.$index, range(1, 20));
+
+        self::assertStringContainsString(\sprintf('— COVERED_BY access_control[%s]', implode(',', $roles)), SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingCoveredBy($roles)));
+    }
+
+    public function test_the_coverage_of_a_route_lists_the_requirements_that_fit_in_the_byte_limit(): void
+    {
+        $requirements = [str_repeat('A', 1000), str_repeat('B', 23), 'ROLE_C'];
+
+        self::assertStringContainsString(\sprintf('— COVERED_BY access_control[%s,%s,… and 1 more]', str_repeat('A', 1000), str_repeat('B', 23)), SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingCoveredBy($requirements)));
+    }
+
+    public function test_the_coverage_of_a_route_drops_the_requirement_one_byte_past_the_byte_limit(): void
+    {
+        self::assertStringContainsString(\sprintf('— COVERED_BY access_control[%s,… and 1 more]', str_repeat('A', 1000)), SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingCoveredBy([str_repeat('A', 1000), str_repeat('B', 24)])));
+    }
+
+    public function test_the_coverage_of_a_route_one_past_the_item_limit_names_the_omitted_remainder(): void
+    {
+        $roles = array_map(static fn (int $index): string => 'ROLE_'.$index, range(1, 21));
+
+        self::assertStringContainsString(\sprintf('— COVERED_BY access_control[%s,… and 1 more]', implode(',', \array_slice($roles, 0, 20))), SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingCoveredBy($roles)));
+    }
+
+    public function test_a_coverage_requirement_filling_the_byte_limit_exactly_is_listed(): void
+    {
+        self::assertStringContainsString(\sprintf('— COVERED_BY access_control[%s]', str_repeat('A', 1024)), SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingCoveredBy([str_repeat('A', 1024)])));
+    }
+
+    public function test_the_firewall_rules_of_thousands_of_firewalls_stay_within_the_documented_bound(): void
+    {
+        $firewallRules = array_map(static fn (int $index): string => '^/area'.$index, range(1, 5000));
+
+        $rendered = SymfonyMappingContextRenderer::renderFirewallRules(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: $firewallRules)));
+
+        self::assertLessThanOrEqual(4096, \strlen($rendered));
+        self::assertStringEndsWith("- ^/area50\n- … and 4950 more\n\n", $rendered);
+        self::assertStringNotContainsString('^/area51', $rendered);
+    }
+
+    public function test_the_firewall_rules_of_exactly_the_item_limit_are_listed_in_full(): void
+    {
+        $firewallRules = array_map(static fn (int $index): string => '^/area'.$index, range(1, 50));
+
+        $rendered = SymfonyMappingContextRenderer::renderFirewallRules(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: $firewallRules)));
+
+        self::assertStringEndsWith("- ^/area50\n\n", $rendered);
+        self::assertStringNotContainsString('more', $rendered);
+    }
+
+    public function test_the_firewall_rules_drop_the_rule_one_byte_past_the_byte_limit(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderFirewallRules(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: [str_repeat('a', 1500), str_repeat('b', 548)])));
+
+        self::assertStringEndsWith(\sprintf("- %s\n- … and 1 more\n\n", str_repeat('a', 1500)), $rendered);
+    }
+
+    public function test_the_firewall_rules_one_past_the_item_limit_name_the_omitted_remainder(): void
+    {
+        $firewallRules = array_map(static fn (int $index): string => '^/area'.$index, range(1, 51));
+
+        self::assertStringEndsWith("- ^/area50\n- … and 1 more\n\n", SymfonyMappingContextRenderer::renderFirewallRules(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: $firewallRules))));
+    }
+
+    public function test_the_firewall_rules_list_the_rules_that_fit_in_the_byte_limit(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderFirewallRules(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: [str_repeat('a', 1500), str_repeat('b', 547), 'main'])));
+
+        self::assertStringEndsWith(\sprintf("- %s\n- %s\n- … and 1 more\n\n", str_repeat('a', 1500), str_repeat('b', 547)), $rendered);
+    }
+
     public function test_the_method_level_guards_of_a_route_with_thousands_of_attributes_stay_within_the_documented_bound(): void
     {
         $guards = array_map(static fn (int $index): string => 'ROLE_'.$index, range(1, 5000));
@@ -283,6 +367,17 @@ final class SymfonyMappingContextRendererTest extends TestCase
         $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($this->mappingWithMethodLevelGuards(["ROLE_A\n## Source Code\rROLE_B"]));
 
         self::assertStringContainsString('method:#[IsGranted(ROLE_A ## Source Code ROLE_B)]', $rendered);
+    }
+
+    /**
+     * @param list<string> $requirements
+     */
+    private function mappingCoveredBy(array $requirements): SymfonyMapping
+    {
+        return SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: ['^/' => $requirements], routeAccessControls: [new RouteAccessControl('src/Controller/X.php', 'index', '/p', ['GET'], true, [], false, false)]),
+        );
     }
 
     /**

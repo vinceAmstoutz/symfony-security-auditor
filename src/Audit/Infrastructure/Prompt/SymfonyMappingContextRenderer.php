@@ -47,6 +47,14 @@ final readonly class SymfonyMappingContextRenderer
 
     private const int MAX_LISTED_ROUTE_GUARD_BYTES = 512;
 
+    private const int MAX_LISTED_RULE_REQUIREMENTS = 20;
+
+    private const int MAX_LISTED_RULE_REQUIREMENT_BYTES = 1024;
+
+    private const int MAX_LISTED_FIREWALL_RULES = 50;
+
+    private const int MAX_LISTED_FIREWALL_RULE_BYTES = 2048;
+
     public static function renderFirewallRules(SymfonyMapping $symfonyMapping): string
     {
         $firewallRules = $symfonyMapping->toApplicationSecurityMap()->perimeterRules();
@@ -56,8 +64,8 @@ final readonly class SymfonyMappingContextRenderer
 
         $lines = ['## Firewall Rules'];
         $lines[] = 'Each line names a `security.yaml` firewall and any notable flags. A `security: false` firewall enforces no authentication or access control at all on matching paths — treat every route behind it as unauthenticated regardless of voters or `#[IsGranted]`. A `stateless` firewall carries no session, so session-backed CSRF protection is ineffective there.';
-        foreach ($firewallRules as $firewallRule) {
-            $lines[] = \sprintf('- %s', self::sanitizeLine($firewallRule));
+        foreach (self::itemsWithOmissionNotice($firewallRules, self::MAX_LISTED_FIREWALL_RULES, self::MAX_LISTED_FIREWALL_RULE_BYTES) as $firewallRule) {
+            $lines[] = \sprintf('- %s', $firewallRule);
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
@@ -174,13 +182,27 @@ final readonly class SymfonyMappingContextRenderer
             return '(none)';
         }
 
+        return implode(',', self::itemsWithOmissionNotice($values, $maxItems, $maxBytes));
+    }
+
+    /**
+     * Every list rendered from the audited repository is repeated in each
+     * chunk prompt, so it is cut at a number of items and of bytes, and a cut
+     * list ends with `… and N more`.
+     *
+     * @param list<string> $values
+     *
+     * @return list<string>
+     */
+    private static function itemsWithOmissionNotice(array $values, int $maxItems, int $maxBytes): array
+    {
         $listed = self::itemsWithinCaps($values, $maxItems, $maxBytes);
         $omitted = \count($values) - \count($listed);
         if (0 < $omitted) {
             $listed[] = \sprintf('… and %d more', $omitted);
         }
 
-        return implode(',', $listed);
+        return $listed;
     }
 
     /**
@@ -234,7 +256,7 @@ final readonly class SymfonyMappingContextRenderer
             return 'LACKS_ACCESS_CHECK';
         }
 
-        return \sprintf('COVERED_BY access_control[%s]', implode(',', array_map(self::sanitizeLine(...), $firewallRoles)));
+        return \sprintf('COVERED_BY access_control[%s]', implode(',', self::itemsWithOmissionNotice($firewallRoles, self::MAX_LISTED_RULE_REQUIREMENTS, self::MAX_LISTED_RULE_REQUIREMENT_BYTES)));
     }
 
     /**
