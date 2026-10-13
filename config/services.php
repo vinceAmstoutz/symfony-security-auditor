@@ -304,6 +304,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             null,
             service(SecretScrubberInterface::class),
             service(GitTrackedIgnoredFiles::class)->ignoreOnInvalid(),
+            param('symfony_security_auditor.scan.include_dotfiles'),
         ]);
     $defaultsConfigurator->alias(ProjectFileScannerInterface::class, ProjectFileScanner::class);
 

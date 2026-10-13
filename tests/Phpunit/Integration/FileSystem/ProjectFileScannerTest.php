@@ -120,6 +120,28 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('src/App.php', $files[0]->relativePath());
     }
 
+    public function test_it_leaves_out_dot_files_dot_directories_and_version_control_directories_by_default(): void
+    {
+        $this->writeDotFilesProject();
+
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), ['src', 'templates']))->scanReportingSkippedFiles($this->tmpDir);
+
+        self::assertSame(['src/Controller/AdminController.php', 'templates/admin/index.html.twig'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files));
+        self::assertSame([], $projectFileScan->skippedFiles);
+    }
+
+    public function test_it_scans_dot_files_and_dot_directories_but_never_version_control_directories_when_asked_to(): void
+    {
+        $this->writeDotFilesProject();
+
+        $files = (new ProjectFileScanner(new NullLogger(), ['src', 'templates'], includeDotfiles: true))->scan($this->tmpDir);
+
+        self::assertSame(
+            ['src/Controller/.helpers.php', 'src/Controller/Admin/.legacy/OldController.php', 'src/Controller/AdminController.php', 'templates/admin/.row.html.twig', 'templates/admin/index.html.twig'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files),
+        );
+    }
+
     public function test_it_scans_an_explicitly_included_dotenv_file(): void
     {
         file_put_contents($this->tmpDir.'/.env', "APP_ENV=prod\nAPP_SECRET=abcdef0123456789\n");
@@ -1172,6 +1194,18 @@ final class ProjectFileScannerTest extends TestCase
     public function test_it_scans_nothing_when_the_project_path_does_not_exist(): void
     {
         self::assertSame([], $this->projectFileScanner->scan($this->tmpDir.'/missing-'.uniqid('', true)));
+    }
+
+    private function writeDotFilesProject(): void
+    {
+        $this->filesystem->dumpFile($this->tmpDir.'/src/Controller/AdminController.php', "<?php\nrequire __DIR__.'/.helpers.php';\n");
+        $this->filesystem->dumpFile($this->tmpDir.'/src/Controller/.helpers.php', "<?php\nfunction q(\$q) { return \$GLOBALS['db']->query(\$q); }\n");
+        $this->filesystem->dumpFile($this->tmpDir.'/src/Controller/Admin/.legacy/OldController.php', '<?php class OldController {}');
+        $this->filesystem->dumpFile($this->tmpDir.'/templates/admin/index.html.twig', "{% include 'admin/.row.html.twig' %}\n");
+        $this->filesystem->dumpFile($this->tmpDir.'/templates/admin/.row.html.twig', "{{ x|raw }}\n");
+        foreach (['.git', '.svn', '.hg', '.bzr', 'CVS', '_darcs'] as $versionControlDirectory) {
+            $this->filesystem->dumpFile(\sprintf('%s/src/Integration/%s/Client.php', $this->tmpDir, $versionControlDirectory), '<?php class Client {}');
+        }
     }
 
     /**

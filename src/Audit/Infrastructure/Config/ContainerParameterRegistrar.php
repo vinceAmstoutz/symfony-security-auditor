@@ -64,6 +64,7 @@ final readonly class ContainerParameterRegistrar
             'reviewer_max_output_tokens' => $llm->reviewerMaxOutputTokens(),
             'scan.included_paths' => $scan->includedPaths,
             'scan.respect_gitignore' => $scan->respectGitignore,
+            'scan.include_dotfiles' => $scan->includeDotfiles,
             'scan.max_file_size_kb' => $scan->maxFileSizeKb,
             'scan.secret_scrubbing.enabled' => $scan->secretScrubbingEnabled,
             'scan.secret_scrubbing.additional_patterns' => $scan->additionalScrubberPatterns,

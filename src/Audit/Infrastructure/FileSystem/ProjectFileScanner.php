@@ -74,6 +74,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      * @param list<string>                  $includedPaths          project-relative directories and files to scan; defaults to the Symfony skeleton layout
      * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents; tests inject a stub
      * @param ?GitTrackedIgnoredFiles       $gitTrackedIgnoredFiles the files git tracks although a `.gitignore` pattern matches them are scanned too, so pass it only with `$respectGitignore`; none runs no git process
+     * @param bool                          $includeDotfiles        whether a directory walk also reads dot files and dot directories; version-control directories (`.git`, `.svn`, `CVS`, …) are left out either way
      */
     public function __construct(
         private LoggerInterface $logger,
@@ -83,6 +84,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         private ?Closure $fileReader = null,
         private ?SecretScrubberInterface $secretScrubber = null,
         private ?GitTrackedIgnoredFiles $gitTrackedIgnoredFiles = null,
+        private bool $includeDotfiles = false,
     ) {}
 
     /**
@@ -222,6 +224,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
         $finder = (new Finder())
             ->files()
+            ->ignoreDotFiles(!$this->includeDotfiles)
             ->in($directories)
             ->name($this->finderNamePatterns())
             ->filter($this->entersReadableDirectory(...), true);
@@ -335,15 +338,20 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
+     * A glob's `*` never matches a leading dot, so each extension is matched
+     * as `.*.ext` too: the dot files a walk reads when `$includeDotfiles`
+     * asks for them.
+     *
      * @return list<string>
      */
     private function finderNamePatterns(): array
     {
-        return array_merge(
-            array_map(static fn (string $ext): string => \sprintf('*.%s', $ext), self::PHP_EXTENSIONS),
-            array_map(static fn (string $ext): string => \sprintf('*.%s', $ext), self::TEMPLATE_EXTENSIONS),
-            array_map(static fn (string $ext): string => \sprintf('*.%s', $ext), self::CONFIG_EXTENSIONS),
-        );
+        $extensions = [...self::PHP_EXTENSIONS, ...self::TEMPLATE_EXTENSIONS, ...self::CONFIG_EXTENSIONS];
+
+        return [
+            ...array_map(static fn (string $extension): string => \sprintf('*.%s', $extension), $extensions),
+            ...array_map(static fn (string $extension): string => \sprintf('.*.%s', $extension), $extensions),
+        ];
     }
 
     /**

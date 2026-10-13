@@ -113,6 +113,25 @@ final class AuditConfigurationDefinitionTest extends TestCase
         $this->process([['scan' => ['include_tracked_ignored' => 'yes']]]);
     }
 
+    public function test_dot_files_are_left_out_of_the_scan_by_default(): void
+    {
+        self::assertFalse($this->valueAt($this->process([[]]), ['scan', 'include_dotfiles']));
+    }
+
+    public function test_the_dot_files_opt_in_reads_true(): void
+    {
+        $processed = $this->process([['scan' => ['include_dotfiles' => true]]]);
+
+        self::assertTrue($this->valueAt($processed, ['scan', 'include_dotfiles']));
+    }
+
+    public function test_the_dot_files_opt_in_refuses_a_value_that_is_no_boolean(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->process([['scan' => ['include_dotfiles' => 'yes']]]);
+    }
+
     /**
      * @return iterable<string, array{non-empty-list<string>}>
      */

@@ -595,6 +595,24 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $this->loadParameters(['model' => 'gpt-4o', 'scan' => ['include_tracked_ignored' => 'yes']]);
     }
 
+    /**
+     * @param array<string, bool> $scan
+     */
+    #[DataProvider('dotfilesSettings')]
+    public function test_bundle_registers_the_dot_files_opt_in(array $scan, bool $includeDotfiles): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'scan' => $scan]);
+
+        self::assertSame($includeDotfiles, $containerBuilder->getParameter('symfony_security_auditor.scan.include_dotfiles'));
+    }
+
+    /** @return iterable<string, array{array<string, bool>, bool}> */
+    public static function dotfilesSettings(): iterable
+    {
+        yield 'left out by default' => [[], false];
+        yield 'asked for' => [['include_dotfiles' => true], true];
+    }
+
     public function test_bundle_defaults_scan_included_paths_to_symfony_skeleton(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
@@ -642,6 +660,24 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertStringContainsString('src/Ok.php', $display);
         self::assertStringNotContainsString('src/Evil.php', $display);
+    }
+
+    /**
+     * @param array<string, bool> $scan
+     */
+    #[DataProvider('dotfilesSettings')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_dot_file_joins_the_scan_only_when_asked_to_end_to_end(array $scan, bool $includeDotfiles): void
+    {
+        $filesystem = new Filesystem();
+        $filesystem->dumpFile($this->tmpDir.'/src/Controller/AdminController.php', "<?php\nrequire __DIR__.'/.helpers.php';\n");
+        $filesystem->dumpFile($this->tmpDir.'/src/Controller/.helpers.php', '<?php function q() {}');
+
+        $display = $this->showScanned($this->boot(['model' => 'gpt-4o', 'scan' => $scan]));
+
+        self::assertStringContainsString('src/Controller/AdminController.php', $display);
+        self::assertSame($includeDotfiles, str_contains($display, 'src/Controller/.helpers.php'));
     }
 
     #[RunInSeparateProcess]

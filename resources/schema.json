@@ -63,6 +63,10 @@
               "type": "boolean",
               "description": "Effective only with respect_gitignore: true. Also audit a file git tracks although a .gitignore pattern matches it (runs git ls-files in the project). Default: false."
             },
+            "include_dotfiles": {
+              "type": "boolean",
+              "description": "Also audit the dot files and dot directories inside the included directories (src/Controller/.helpers.php, templates/admin/.row.html.twig). Version-control directories (.git, .svn, .hg, .bzr, CVS, _darcs) stay out either way. Default: false."
+            },
             "max_file_size_kb": {
               "type": "integer",
               "minimum": 1,

@@ -437,7 +437,8 @@ Diagnostic order:
 4. **Switch to a stronger model** — Claude Opus and GPT-5.6 consistently outperform small models.
 5. **Check the file actually got scanned** — run with `--show-scanned` to list the files in scope (the progress line `Auditing N file(s)` gives the count, and `chunk i/M` the chunks); in a Symfony application, `-vv` also logs the ingested file and chunk counts.
 6. **`scan.respect_gitignore: true`** silently skips every file the `.gitignore` matches, including a file git tracks (committed with `git add -f`). Set to `false` to include them, or set `scan.include_tracked_ignored: true` to audit the tracked ones only.
-7. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files. Each file it drops is listed in the report's `coverage` as `skipped` under the `scan` stage (_since 1.22_), but nothing gates on it: the report stays complete and `--fail-on-incomplete` does not fire.
+7. **A dot file or dot directory** under an included path (`src/Controller/.helpers.php`, `templates/admin/.row.html.twig`, `src/.legacy/`) is skipped, and so is a directory named like version-control metadata (`CVS`, `_darcs`, `.svn`), without a record in the report. Set `scan.include_dotfiles: true` to audit the dot ones, or list the file in `scan.included_paths`.
+8. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files. Each file it drops is listed in the report's `coverage` as `skipped` under the `scan` stage (_since 1.22_), but nothing gates on it: the report stays complete and `--fail-on-incomplete` does not fire.
 
 ### Report has too many false positives
 

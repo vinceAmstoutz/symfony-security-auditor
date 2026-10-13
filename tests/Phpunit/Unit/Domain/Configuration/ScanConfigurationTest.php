@@ -31,4 +31,18 @@ final class ScanConfigurationTest extends TestCase
 
         self::assertTrue($scanConfiguration->includeTrackedIgnored);
     }
+
+    public function test_dot_files_stay_out_of_the_scan_unless_asked_for(): void
+    {
+        $scanConfiguration = new ScanConfiguration(['src'], true, 512, true, []);
+
+        self::assertFalse($scanConfiguration->includeDotfiles);
+    }
+
+    public function test_dot_files_join_the_scan_when_asked_for(): void
+    {
+        $scanConfiguration = new ScanConfiguration(['src'], true, 512, true, [], includeDotfiles: true);
+
+        self::assertTrue($scanConfiguration->includeDotfiles);
+    }
 }
