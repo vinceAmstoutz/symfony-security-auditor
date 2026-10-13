@@ -42,6 +42,8 @@ final readonly class CostCalculator
 
     private const float ANTHROPIC_CACHE_CREATION_PRICE_MULTIPLIER = 1.25;
 
+    private const float ANTHROPIC_ONE_HOUR_CACHE_CREATION_PRICE_MULTIPLIER = 2.0;
+
     private const float PLAIN_INPUT_PRICE_MULTIPLIER = 1.0;
 
     public function __construct(private PricingProviderInterface $pricingProvider) {}
@@ -59,6 +61,16 @@ final readonly class CostCalculator
         $cacheCreationCost = ($cacheCreationTokens / self::TOKENS_PER_MILLION) * $this->cacheCreationPrice($model);
 
         return $inputCost + $outputCost + $cacheReadCost + $cacheCreationCost;
+    }
+
+    /**
+     * Anthropic bills a prompt-cache write it keeps for an hour
+     * (`cache_retention: long`) at twice the base input rate; a pricing
+     * source lists only the five-minute write rate.
+     */
+    public function costForOneHourCacheWrites(int $oneHourCacheCreationTokens, string $model): float
+    {
+        return ($oneHourCacheCreationTokens / self::TOKENS_PER_MILLION) * $this->pricingProvider->pricePerMillionInputTokens($model) * self::ANTHROPIC_ONE_HOUR_CACHE_CREATION_PRICE_MULTIPLIER;
     }
 
     /**

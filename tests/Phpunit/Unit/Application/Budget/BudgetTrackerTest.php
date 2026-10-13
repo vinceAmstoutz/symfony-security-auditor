@@ -302,6 +302,19 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_the_cache_writes_kept_for_an_hour_cost_twice_the_input_rate_and_the_others_the_cache_creation_rate(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 3.0, cacheCreationPrice: 3.75);
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-sonnet-4-5', 'end_turn', TokenUsageSnapshot::of(0, 0, 0, 40_000)), 30_000);
+
+        self::assertSame(0.2175, $budgetTracker->costUsdUsed());
+        self::assertSame(['cache_creation_tokens' => 40_000, 'estimated_cost_usd' => 0.2175], array_intersect_key($budgetTracker->usageByModel()['claude-sonnet-4-5'], ['cache_creation_tokens' => true, 'estimated_cost_usd' => true]));
+    }
+
+    /**
      * @throws BudgetExceededException
      * @throws InvalidAuditBudgetException
      * @throws InvalidTokenUsageException
@@ -400,6 +413,18 @@ final class BudgetTrackerTest extends TestCase
         }
 
         self::assertSame(['claude-opus-5', 'ollama/llama3.2'], $budgetTracker->usageByModel()['ollama/llama3.2']['billed_models']);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_the_cache_writes_kept_for_an_hour_are_priced_at_the_input_rate_of_the_model_the_call_is_billed_as(): void
+    {
+        $budgetTracker = $this->splitModelBudgetTracker();
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'ollama/llama3.2', 'end_turn', TokenUsageSnapshot::of(0, 0, 0, 1_000_000))->withReportedModel('claude-opus-5'), 1_000_000);
+
+        self::assertSame(6.0, $budgetTracker->costUsdUsed());
     }
 
     /** A tracker whose pricing provider knows `claude-opus-5` and prices everything else at zero, as an unlisted or self-hosted model does. */

@@ -54,7 +54,7 @@ final readonly class ToolIterationBooker
             $this->model,
             'tool_iteration',
             $tokenUsageSnapshot,
-        )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult)));
+        )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult)), $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $tokenUsageSnapshot->cacheCreationTokens()));
         $this->budgetTracker->assertWithinBudget();
     }
 }

@@ -190,6 +190,27 @@ final readonly class PlatformResultExtractor
     }
 
     /**
+     * The share of the `$cacheCreationTokens` cache writes a call is booked
+     * with that Anthropic keeps for an hour (`cache_retention: long`) and
+     * bills at its own rate. Only the raw answer reports it: the bridge's
+     * usage counts every write alike. None when the answer does not split its
+     * writes or cannot be read.
+     */
+    public function extractOneHourCacheCreationTokens(DeferredResult $deferredResult, int $cacheCreationTokens): int
+    {
+        try {
+            $usage = $deferredResult->getRawResult()->getData()['usage'] ?? null;
+        } catch (Throwable) {
+            return 0;
+        }
+
+        $cacheCreation = \is_array($usage) ? $usage['cache_creation'] ?? null : null;
+        $oneHourCacheCreationTokens = \is_array($cacheCreation) ? $cacheCreation['ephemeral_1h_input_tokens'] ?? null : null;
+
+        return \is_int($oneHourCacheCreationTokens) ? min($oneHourCacheCreationTokens, $cacheCreationTokens) : 0;
+    }
+
+    /**
      * The model the provider says served the call, which a gateway routing
      * on its own, or a failover platform, can differ from the one requested.
      */

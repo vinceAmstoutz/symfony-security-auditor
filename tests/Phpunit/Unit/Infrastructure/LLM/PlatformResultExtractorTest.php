@@ -331,6 +331,39 @@ final class PlatformResultExtractorTest extends TestCase
         return new DeferredResult(new FailingResultConverter(new BadRequestException('Bad Request'), new ReportedUsageExtractor($tokenUsage)), $rawResult);
     }
 
+    #[DataProvider('oneHourCacheWriteCases')]
+    public function test_it_reads_the_share_of_the_booked_cache_writes_an_anthropic_answer_reports_as_kept_for_an_hour(int $reportedOneHourWrites, int $bookedCacheWrites, int $expectedOneHourWrites): void
+    {
+        $deferredResult = new DeferredResult(new PlainConverter(new TextResult('ok')), new InMemoryRawResult(['usage' => ['cache_creation_input_tokens' => 40000, 'cache_creation' => ['ephemeral_5m_input_tokens' => 40000 - $reportedOneHourWrites, 'ephemeral_1h_input_tokens' => $reportedOneHourWrites]]]));
+
+        self::assertSame($expectedOneHourWrites, (new PlatformResultExtractor(null))->extractOneHourCacheCreationTokens($deferredResult, $bookedCacheWrites));
+    }
+
+    /** @return iterable<string, array{int, int, int}> */
+    public static function oneHourCacheWriteCases(): iterable
+    {
+        yield 'every write kept for an hour' => [40000, 40000, 40000];
+        yield 'part of the writes kept for an hour' => [30000, 40000, 30000];
+        yield 'every write kept for five minutes' => [0, 40000, 0];
+        yield 'more one-hour writes than the call is booked with' => [40000, 39999, 39999];
+        yield 'a call booked with no cache write' => [40000, 0, 0];
+    }
+
+    #[DataProvider('answersReportingNoOneHourCacheWriteCases')]
+    public function test_it_reads_no_one_hour_cache_write_from_an_answer_that_does_not_report_one(RawResultInterface $rawResult): void
+    {
+        self::assertSame(0, (new PlatformResultExtractor(null))->extractOneHourCacheCreationTokens(new DeferredResult(new PlainConverter(new TextResult('ok')), $rawResult), 40000));
+    }
+
+    /** @return iterable<string, array{RawResultInterface}> */
+    public static function answersReportingNoOneHourCacheWriteCases(): iterable
+    {
+        yield 'an answer that does not split its writes' => [new InMemoryRawResult(['usage' => ['cache_creation_input_tokens' => 40000]])];
+        yield 'an answer without a usage entry' => [new InMemoryRawResult(['choices' => []])];
+        yield 'a one-hour count that is not a number' => [new InMemoryRawResult(['usage' => ['cache_creation' => ['ephemeral_1h_input_tokens' => '40000']]])];
+        yield 'an answer that cannot be read' => [new RawHttpResult(new UnreadableResponse())];
+    }
+
     #[DataProvider('reportedModelCases')]
     public function test_it_extracts_the_model_the_provider_reports(?TokenUsage $tokenUsage, ?string $expectedModel): void
     {

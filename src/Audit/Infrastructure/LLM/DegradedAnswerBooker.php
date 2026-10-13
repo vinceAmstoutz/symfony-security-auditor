@@ -67,9 +67,20 @@ final readonly class DegradedAnswerBooker
         $billedUsage = $reportedUsage ?? TokenUsageSnapshot::of($estimatedInputTokens, 0);
 
         $this->rateLimiter->record($billedUsage->inputTokens(), $billedUsage->outputTokens());
-        $this->budgetTracker?->recordCall(LLMResponse::of('', $this->model, $stopReason, $billedUsage));
+        $this->budgetTracker?->recordCall(LLMResponse::of('', $this->model, $stopReason, $billedUsage), $this->oneHourCacheCreationTokens($deferredResult, $billedUsage));
         $this->tokenUsageRecorder?->record($billedUsage->inputTokens(), $billedUsage->outputTokens(), $billedUsage->cacheReadTokens(), $billedUsage->cacheCreationTokens());
         $this->logBooking($stopReason, $reportedUsage, $estimatedInputTokens);
+    }
+
+    /**
+     * The share of the booked cache writes the provider keeps for an hour, as
+     * the raw answer reports it: none when no answer came back.
+     */
+    private function oneHourCacheCreationTokens(?DeferredResult $deferredResult, TokenUsageSnapshot $tokenUsageSnapshot): int
+    {
+        return $deferredResult instanceof DeferredResult
+            ? $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $tokenUsageSnapshot->cacheCreationTokens())
+            : 0;
     }
 
     private function logBooking(string $stopReason, ?TokenUsageSnapshot $tokenUsageSnapshot, int $estimatedInputTokens): void

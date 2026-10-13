@@ -123,6 +123,13 @@ final class CostCalculatorTest extends TestCase
         self::assertEqualsWithDelta(0.02475, $costCalculator->costForCall(1_000, 1_000, 'model', 1_000, 1_000), 1e-12);
     }
 
+    public function test_one_hour_cache_writes_cost_twice_the_input_rate_whatever_the_listed_cache_write_rate(): void
+    {
+        $costCalculator = new CostCalculator($this->cacheAwarePricing(3.0, 15.0, 0.5, 6.25));
+
+        self::assertEqualsWithDelta(3.0, $costCalculator->costForOneHourCacheWrites(500_000, 'model'), 1e-12);
+    }
+
     public function test_cache_tokens_default_to_zero_cost(): void
     {
         $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));

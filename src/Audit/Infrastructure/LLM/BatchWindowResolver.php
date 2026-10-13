@@ -227,7 +227,7 @@ final readonly class BatchWindowResolver
                 $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
                 TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
             )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult));
-            $this->budgetTracker?->recordCall($llmResponse);
+            $this->budgetTracker?->recordCall($llmResponse, $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $cacheCreationTokens));
 
             return $llmResponse;
         } catch (Throwable $throwable) {

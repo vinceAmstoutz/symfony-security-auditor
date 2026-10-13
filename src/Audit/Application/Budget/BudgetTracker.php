@@ -42,7 +42,11 @@ final class BudgetTracker
         private readonly CostCalculator $costCalculator,
     ) {}
 
-    public function recordCall(LLMResponse $llmResponse): void
+    /**
+     * `$oneHourCacheCreationTokens` is the share of the call's cache writes
+     * the provider keeps for an hour, which it bills at its own rate.
+     */
+    public function recordCall(LLMResponse $llmResponse, int $oneHourCacheCreationTokens = 0): void
     {
         $billedModel = $this->costCalculator->billedModel($llmResponse->model(), $llmResponse->reportedModel());
         $costUsd = $this->costCalculator->costForCall(
@@ -50,8 +54,8 @@ final class BudgetTracker
             $llmResponse->outputTokens(),
             $billedModel,
             $llmResponse->cacheReadTokens(),
-            $llmResponse->cacheCreationTokens(),
-        );
+            $llmResponse->cacheCreationTokens() - $oneHourCacheCreationTokens,
+        ) + $this->costCalculator->costForOneHourCacheWrites($oneHourCacheCreationTokens, $billedModel);
 
         $this->tokensUsed += $llmResponse->totalTokens();
         $this->costUsdUsed += $costUsd;
