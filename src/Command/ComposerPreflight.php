@@ -18,7 +18,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Stops `init` before its first question when `composer` cannot run, since
- * every path of `init` ends in a `composer require`.
+ * every path of `init` but a declined overwrite ends in a `composer require`.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

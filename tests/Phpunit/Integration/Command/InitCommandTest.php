@@ -1813,6 +1813,44 @@ final class InitCommandTest extends TestCase
         self::assertFileDoesNotExist($this->configFile());
     }
 
+    public function test_a_run_that_cannot_ask_leaves_an_existing_configuration_untouched_without_composer(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+        $commandTester = $this->commandTesterWithoutComposer('sh: 1: exec: composer: not found');
+
+        $exitCode = $commandTester->execute([], ['interactive' => false]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString('Aborted; the existing configuration was left untouched (use --force to overwrite).', $this->unwrappedDisplay($commandTester));
+        self::assertStringNotContainsString('init cannot continue', $this->unwrappedDisplay($commandTester));
+        self::assertSame(['model' => 'keep-me'], Yaml::parseFile($this->configFile()));
+        self::assertSame([], $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_a_forced_run_over_an_existing_configuration_stops_when_composer_cannot_run(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+        $commandTester = $this->commandTesterWithoutComposer('sh: 1: exec: composer: not found');
+
+        $exitCode = $commandTester->execute(['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('init cannot continue', $this->unwrappedDisplay($commandTester));
+        self::assertSame(['model' => 'keep-me'], Yaml::parseFile($this->configFile()));
+        self::assertSame([], $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_a_run_that_can_ask_about_an_existing_configuration_stops_before_asking_when_composer_cannot_run(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+        $commandTester = $this->commandTesterWithoutComposer('sh: 1: exec: composer: not found');
+
+        $exitCode = $commandTester->execute([], ['interactive' => true]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringNotContainsString('Which AI provider', $commandTester->getDisplay());
+    }
+
     private function commandTesterWithoutComposer(string $failure, ComposerSetupAdvice $composerSetupAdvice = new ComposerSetupAdvice()): CommandTester
     {
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
