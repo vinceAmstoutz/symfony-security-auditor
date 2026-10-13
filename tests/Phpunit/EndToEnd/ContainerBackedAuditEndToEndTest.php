@@ -524,6 +524,18 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
+    public function test_a_configured_output_read_from_a_blank_environment_variable_prints_the_report(): void
+    {
+        putenv('SSA_AUDIT_OUTPUT=');
+        $commandTester = $this->auditCommandTester($this->boot(['model' => 'gpt-4o', 'audit' => ['format' => 'json', 'output' => '%env(SSA_AUDIT_OUTPUT)%']]));
+
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(3, $this->decode($commandTester->getDisplay())['files_scanned']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
     public function test_a_no_output_flag_and_an_output_flag_together_are_refused_before_the_audit_runs(): void
     {
         $output = $this->fixtureDir.'/flag.json';

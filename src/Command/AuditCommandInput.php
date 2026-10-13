@@ -86,13 +86,15 @@ final class AuditCommandInput
 
     /**
      * Fills what the command line left unset from the configuration, so a flag
-     * always wins over its `audit.*` key.
+     * always wins over its `audit.*` key. An empty `audit.output`, such as an
+     * `%env()%` an `.env` file leaves blank, prints the report, as an unset
+     * one does.
      */
     public function applyDefaults(AuditCommandDefaults $auditCommandDefaults): void
     {
         $this->minScore ??= $auditCommandDefaults->minScore;
         $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
-        $this->output ??= $this->noOutput || $this->dryRun ? null : $auditCommandDefaults->output;
+        $this->output ??= $this->noOutput || $this->dryRun || '' === $auditCommandDefaults->output ? null : $auditCommandDefaults->output;
         $this->format = $this->givenFormat ?? $auditCommandDefaults->format;
     }
 

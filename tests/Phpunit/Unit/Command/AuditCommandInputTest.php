@@ -569,6 +569,17 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame('estimate.json', $auditCommandInput->reportFile());
     }
 
+    public function test_an_empty_configured_output_prints_the_report_as_an_unset_one_does(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->givenFormat = OutputFormat::Json;
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(output: ''));
+
+        self::assertNull($auditCommandInput->reportFile());
+        self::assertTrue($auditCommandInput->isMachineReadableToStdout());
+    }
+
     public function test_a_no_output_flag_prints_a_machine_readable_report_to_stdout(): void
     {
         $auditCommandInput = new AuditCommandInput();
