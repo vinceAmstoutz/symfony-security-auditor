@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use LimitIterator;
 use RecursiveArrayIterator;
 use RecursiveIteratorIterator;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
@@ -35,6 +36,10 @@ final readonly class StandaloneConfigFileReader
      */
     public const int VALUE_LIMIT = 10_000;
 
+    private const int MAX_BYTES = 524_288;
+
+    private const int MAX_DEPTH = 32;
+
     /**
      * @return array<array-key, mixed>
      *
@@ -45,6 +50,8 @@ final readonly class StandaloneConfigFileReader
         if (!is_file($configFile)) {
             return [];
         }
+
+        $this->assertParseable($configFile);
 
         try {
             $parsed = Yaml::parseFile($configFile);
@@ -61,6 +68,52 @@ final readonly class StandaloneConfigFileReader
         }
 
         return $this->foldHyphenatedKeys($parsed);
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    private function assertParseable(string $configFile): void
+    {
+        $bytes = filesize($configFile);
+        \assert(false !== $bytes, 'filesize() must succeed for a file is_file() found');
+
+        if ($bytes > self::MAX_BYTES) {
+            throw MalformedProjectConfigException::forOversizedFile($configFile, self::MAX_BYTES);
+        }
+
+        if (is_readable($configFile) && $this->nestingDepth((new Filesystem())->readFile($configFile)) > self::MAX_DEPTH) {
+            throw MalformedProjectConfigException::forDeeplyNestedFile($configFile, self::MAX_DEPTH);
+        }
+    }
+
+    /**
+     * How many indentation levels are open at once, read from the lines alone:
+     * each deeper line opens one, a shallower one closes those it leaves.
+     * Blank and comment lines open none, since they nest nothing.
+     */
+    private function nestingDepth(string $contents): int
+    {
+        $openIndents = [];
+        $depth = 0;
+        foreach (explode("\n", $contents) as $line) {
+            $indent = $this->structuralIndent($line);
+            if (null === $indent) {
+                continue;
+            }
+
+            $openIndents = [...array_filter($openIndents, static fn (int $openIndent): bool => $openIndent < $indent), $indent];
+            $depth = max($depth, \count($openIndents));
+        }
+
+        return $depth;
+    }
+
+    private function structuralIndent(string $line): ?int
+    {
+        $content = ltrim($line, ' ');
+
+        return '' === trim($content) || str_starts_with($content, '#') ? null : \strlen($line) - \strlen($content);
     }
 
     /**

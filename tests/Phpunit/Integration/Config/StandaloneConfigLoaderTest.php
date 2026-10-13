@@ -583,6 +583,30 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_a_working_directory_config_nested_past_any_configuration_stops_the_load_with_a_clear_error(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $this->filesystem->dumpFile($workingFile, self::nestedPast(40));
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage(\sprintf('Config file "%s" nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.', $workingFile));
+
+        $this->loader($workingFile)->load();
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_a_working_directory_config_holding_a_user_only_key_stops_the_load_even_when_it_is_the_audited_project(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
@@ -697,6 +721,8 @@ final class StandaloneConfigLoaderTest extends TestCase
         yield 'a section of the working directory config erased' => [$user, "scan:\n  max_file_size_kb: 256\n", "profile: fast\nscan: none\n", 'sets "scan" to something other than a map'];
         yield 'a file that is not YAML' => [$user, '', "profile: fast\nmodel: [unclosed\n", 'is not valid YAML'];
         yield 'a file whose aliases expand past any configuration' => [$user, '', self::aliasBomb(), 'values or more once its YAML aliases are expanded'];
+        yield 'a file larger than any configuration' => [$user, '', "profile: fast\n#".str_repeat('x', 524_288), 'is larger than 524288 bytes'];
+        yield 'a file nested deeper than any configuration' => [$user, '', "profile: fast\n".self::nestedPast(40), 'nests more than 32 levels deep'];
         yield 'a value holding a control character' => [$user, '', "profile: fast\nmodel: \"gpt\\x1b[2J\"\n", 'a control character'];
         yield 'a value the container would resolve' => [$user, '', "profile: fast\nmodel: '%env(SECRET)%'\n", 'a container reference'];
         yield 'a key the container would resolve' => [$user, '', "profile: fast\n'%env(SECRET)%': 1\n", 'a container reference'];
@@ -704,6 +730,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         yield 'a value holding a workflow command' => [$user, '', "profile: fast\nmodel: 'gpt-4::error'\n", 'a double colon'];
         yield 'a shorter HTTP timeout than the user one' => [$user."http_timeout: 900\n", '', "profile: fast\nhttp_timeout: 800\n", 'sets "http_timeout"'];
         yield 'an HTTP timeout that is no number of seconds' => [$user, '', "profile: fast\nhttp_timeout: soon\n", 'sets "http_timeout"'];
+    }
+
+    private static function nestedPast(int $levels): string
+    {
+        return implode('', array_map(static fn (int $level): string => str_repeat(' ', $level)."a:\n", range(0, $levels - 1))).str_repeat(' ', $levels)."leaf: 1\n";
     }
 
     private static function aliasBomb(): string

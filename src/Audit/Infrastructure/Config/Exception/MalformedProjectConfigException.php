@@ -44,6 +44,16 @@ final class MalformedProjectConfigException extends RuntimeException
         return new self(TerminalText::escaped(\sprintf('Config file "%s" holds %d values or more once its YAML aliases are expanded, far more than any configuration needs, so it was not read any further. Remove the aliases that repeat whole sections, or write the values out.', $configFile, $valueLimit)));
     }
 
+    public static function forOversizedFile(string $configFile, int $maxBytes): self
+    {
+        return new self(TerminalText::escaped(\sprintf('Config file "%s" is larger than %d bytes, far more than any configuration needs, so it was not parsed.', $configFile, $maxBytes)));
+    }
+
+    public static function forDeeplyNestedFile(string $configFile, int $maxDepth): self
+    {
+        return new self(TerminalText::escaped(\sprintf('Config file "%s" nests more than %d levels deep, far more than any configuration needs, so it was not parsed.', $configFile, $maxDepth)));
+    }
+
     /**
      * Refused before the file is read: a link committed in the audited
      * repository could point at any file of the user's, and a parse error

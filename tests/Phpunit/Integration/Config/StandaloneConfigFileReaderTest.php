@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
@@ -103,9 +104,124 @@ final class StandaloneConfigFileReaderTest extends TestCase
     /**
      * @throws MalformedProjectConfigException
      */
+    public function test_a_file_of_half_a_mebibyte_is_read(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, $this->paddedTo(524_288));
+
+        self::assertSame(['profile' => 'fast'], (new StandaloneConfigFileReader())->read($this->configFile));
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    public function test_a_file_one_byte_past_half_a_mebibyte_is_refused_before_it_is_parsed(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, $this->paddedTo(524_289));
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage(\sprintf('Config file "%s" is larger than 524288 bytes, far more than any configuration needs, so it was not parsed.', $this->configFile));
+
+        (new StandaloneConfigFileReader())->read($this->configFile);
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    public function test_a_file_nested_thirty_two_levels_deep_is_read(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, self::nestedTo(32));
+
+        self::assertSame(self::nestedValueTo(32), (new StandaloneConfigFileReader())->read($this->configFile));
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    public function test_a_file_nested_thirty_three_levels_deep_is_refused_before_it_is_parsed(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, self::nestedTo(33)."profile: fast\n");
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage(\sprintf('Config file "%s" nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.', $this->configFile));
+
+        (new StandaloneConfigFileReader())->read($this->configFile);
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    public function test_comments_between_its_levels_do_not_hide_how_deep_a_file_nests(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, str_replace("a:\n", "a:\n# note\n\n", self::nestedTo(33)));
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage('nests more than 32 levels deep');
+
+        (new StandaloneConfigFileReader())->read($this->configFile);
+    }
+
+    /**
+     * @param array<array-key, mixed> $expected
+     *
+     * @throws MalformedProjectConfigException
+     */
+    #[DataProvider('shallowFilesWithManyLines')]
+    public function test_lines_that_open_no_level_do_not_count_towards_the_depth(string $yaml, array $expected): void
+    {
+        $this->filesystem->dumpFile($this->configFile, $yaml);
+
+        self::assertSame($expected, (new StandaloneConfigFileReader())->read($this->configFile));
+    }
+
+    /**
+     * @return iterable<string, array{string, array<array-key, mixed>}>
+     */
+    public static function shallowFilesWithManyLines(): iterable
+    {
+        $paths = array_map(static fn (int $length): string => str_repeat('p', $length), range(1, 40));
+
+        yield 'forty siblings each longer than the one before' => ["scan:\n    excluded_paths:\n".implode('', array_map(static fn (string $path): string => \sprintf("        - %s\n", $path), $paths)), ['scan' => ['excluded_paths' => $paths]]];
+        yield 'forty comments each indented one more' => [implode('', array_map(static fn (int $indent): string => str_repeat(' ', $indent)."# note\n", range(0, 39)))."profile: fast\n", ['profile' => 'fast']];
+        yield 'forty blank lines each indented one more, with Windows line endings' => ["profile: fast\r\n".implode('', array_map(static fn (int $indent): string => str_repeat(' ', $indent)."\r\n", range(1, 40)))."model: gpt\r\n", ['profile' => 'fast', 'model' => 'gpt']];
+        yield 'two branches of twenty levels' => [self::nestedTo(20).self::nestedTo(20, 'b'), [...self::nestedValueTo(20), ...self::nestedValueTo(20, 'b')]];
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
     public function test_a_missing_file_reads_as_empty(): void
     {
         self::assertSame([], (new StandaloneConfigFileReader())->read($this->configFile));
+    }
+
+    private static function nestedTo(int $levels, string $key = 'a'): string
+    {
+        $yaml = '';
+        for ($level = 0; $level < $levels - 1; ++$level) {
+            $yaml .= str_repeat(' ', $level).$key.":\n";
+        }
+
+        return $yaml.str_repeat(' ', $levels - 1)."leaf: 1\n";
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function nestedValueTo(int $levels, string $key = 'a'): array
+    {
+        $value = ['leaf' => 1];
+        for ($level = 1; $level < $levels; ++$level) {
+            $value = [$key => $value];
+        }
+
+        return $value;
+    }
+
+    private function paddedTo(int $bytes): string
+    {
+        $yaml = "profile: fast\n#";
+
+        return $yaml.str_repeat('x', $bytes - \strlen($yaml));
     }
 
     private function writeExcludedPaths(int $count): void
