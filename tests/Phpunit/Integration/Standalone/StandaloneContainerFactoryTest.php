@@ -776,7 +776,7 @@ final class StandaloneContainerFactoryTest extends TestCase
             [
                 'audit.reviewer_max_concurrent > 1 has no effect while audit.reviewer_tools_enabled is true: tool-using reviews run sequentially. Drop reviewer_tools_enabled to review concurrently, or set reviewer_max_concurrent: 1 to silence this.',
                 'audit.attacker_max_concurrent > 1 has no effect while audit.structured_collection is false: the JSON-parsing attacker analyses chunks sequentially. Re-enable structured_collection to analyse concurrently, or set attacker_max_concurrent: 1 to silence this.',
-                'Project config /repo/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.',
+                'Project config /repo/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.',
             ],
             $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
         );
@@ -813,8 +813,8 @@ final class StandaloneContainerFactoryTest extends TestCase
 
         self::assertSame(
             [
-                'Project config /work/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.',
-                'Audited project config /repo/.symfony-security-auditor.yaml is layered over the configuration read before it: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.',
+                'Project config /work/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.',
+                'Audited project config /repo/.symfony-security-auditor.yaml is layered over the configuration read before it: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.',
             ],
             $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
         );
@@ -864,7 +864,7 @@ final class StandaloneContainerFactoryTest extends TestCase
         );
 
         self::assertSame(
-            ['Project config /repo/%weird%/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.'],
+            ['Project config /repo/%weird%/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.'],
             $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
         );
     }

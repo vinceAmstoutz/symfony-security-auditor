@@ -21,9 +21,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\ProjectConfigNotices;
 
 final class ProjectConfigNoticesTest extends TestCase
 {
-    private const string WORKING_DIRECTORY_NOTICE = 'Project config /work/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.';
+    private const string WORKING_DIRECTORY_NOTICE = 'Project config /work/.symfony-security-auditor.yaml is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.';
 
-    private const string AUDITED_PROJECT_NOTICE = 'Audited project config /repo/.symfony-security-auditor.yaml is layered over the configuration read before it: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.';
+    private const string AUDITED_PROJECT_NOTICE = 'Audited project config /repo/.symfony-security-auditor.yaml is layered over the configuration read before it: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.';
 
     public function test_it_says_nothing_when_no_project_config_was_layered_in(): void
     {

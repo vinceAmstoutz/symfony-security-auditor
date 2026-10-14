@@ -28,9 +28,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
  */
 final readonly class ProjectConfigNotices
 {
-    private const string WORKING_DIRECTORY_CONFIG = 'Project config %s is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.';
+    private const string WORKING_DIRECTORY_CONFIG = 'Project config %s is layered over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.';
 
-    private const string AUDITED_PROJECT_CONFIG = 'Audited project config %s is layered over the configuration read before it: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, secret scrubbing, custom risk patterns or imported SARIF.';
+    private const string AUDITED_PROJECT_CONFIG = 'Audited project config %s is layered over the configuration read before it: the audited repository may tune the audit through it (paths, profile, models, a tighter budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope of the file tools, secret scrubbing, custom risk patterns or imported SARIF.';
 
     private const string SKIPPED_AUDITED_PROJECT_CONFIG = 'Audited project config %s was skipped and the run goes on without it: %s';
 
