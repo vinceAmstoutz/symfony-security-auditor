@@ -10,6 +10,7 @@ Thanks for considering a contribution. This guide walks through the dev setup, e
 - [Daily Dev Loop](#daily-dev-loop)
 - [Running Tests](#running-tests)
 - [Mutation Testing](#mutation-testing)
+- [Compatibility Checks](#compatibility-checks)
 - [Evaluating Detection Quality](#evaluating-detection-quality)
 - [Code Quality](#code-quality)
 - [Writing Tests](#writing-tests)
@@ -107,6 +108,30 @@ docker compose exec php bin/infection
 ```
 
 **100% MSI (Mutation Score Indicator) is required.** Every mutation must be killed. Suppression directives (`@infection-ignore-all`, `ignoreSourceCodeByRegex`, …) are not allowed — fix the underlying test gap instead. See [CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
+
+## Compatibility Checks
+
+A `1.x` upgrade must not break what a user wrote or built against the last release. Unit and end-to-end tests move with the code, so a separate suite compares this tree with fixtures recorded from the last release tag, and fails on any difference the maintainer has not accepted:
+
+```bash
+docker compose exec php vendor/bin/phpunit -c phpunit.compat.xml
+```
+
+It runs as the **Compatibility** CI job, on PHP 8.3 and Symfony 7.4. A difference is accepted only with the bold summary of the `CHANGELOG.md` bullet under `## [Unreleased]` that announces it; an accepted difference that no longer shows fails too, so the list never outlives what it describes. The fixtures are written only by the recorders, which seal them: a fixture edited by hand fails. Record them again instead.
+
+### Configuration Snapshot
+
+`tests/Phpunit/Compat/Configuration/` compares the bundle configuration with the snapshot recorded from the last release, path by path: kind, default, choices, bounds and whether the key is required; which of a fixed set of values the bundle loads with and what each becomes (a value the tree let through but the release then failed on, with a `TypeError` for instance, does not count as taken); whether it takes an `%env()%` placeholder; whether the standalone binary lets a project's `.symfony-security-auditor.yaml` set it; and the container parameters the bundle publishes, for the default configuration and for each `profile`. A narrowing of a path is a `MAJOR` change (see [Versioning](docs/versioning.md)): restore the released contract. A parameter whose value changes on purpose, such as a cache key salt when a prompt changes, goes into `tests/Phpunit/Compat/Configuration/accepted-differences.php` with the parameters it names (`*` matches any run of characters), a one-line reason, and its `CHANGELOG.md` bullet. A key added since the release must be listed in `docs/versioning.md` and described in `resources/schema.json`.
+
+### Recording From a New Release
+
+Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch, and empty the `accepted-differences.php` files, whose entries described differences from the previous release:
+
+```bash
+bin/castor compat:record X.Y.Z
+```
+
+The task checks the tag out under `var/compat/X.Y.Z`, installs its dependencies, and runs the recorders against it.
 
 ## Evaluating Detection Quality
 
@@ -237,7 +262,7 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
      sh .github/scripts/check-pull-request.sh
    ```
 
-The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.1, 8.1 on PHP 8.4+ only) → **Mutation** (Infection 100% MSI). All six must pass before merging.
+The CI pipeline runs seven jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife) → **zizmor** (GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.1, 8.1 on PHP 8.4+ only, then Infection 100% MSI) → **Compatibility** (see [Compatibility Checks](#compatibility-checks)). All seven must pass before merging.
 
 Details: [`docs/ci.md`](docs/ci.md).
 

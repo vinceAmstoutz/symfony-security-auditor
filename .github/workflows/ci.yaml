@@ -276,3 +276,31 @@ jobs:
           path: infection/
           if-no-files-found: ignore
           retention-days: 7
+
+  compat:
+    name: Compatibility (with the last release)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vendor
+          key: composer-compat-${{ hashFiles('composer.json') }}
+          restore-keys: composer-compat-
+
+      - name: Install dependencies
+        run: composer update --no-interaction --prefer-dist --no-progress
+
+      - name: Compare with the fixtures recorded from the last release
+        run: vendor/bin/phpunit -c phpunit.compat.xml

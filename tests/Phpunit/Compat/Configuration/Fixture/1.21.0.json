@@ -1,0 +1,4870 @@
+{
+    "release": "1.21.0",
+    "paths": {
+        "attacker_max_output_tokens": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "attacker_model": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "audit.attacker_max_concurrent": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.baseline": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": true,
+                    "value": ""
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": "accepted"
+        },
+        "audit.budget": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "audit.budget.max_cost_usd": {
+            "node": {
+                "kind": "float",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 0.01,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": true,
+                    "value": 1.5
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.budget.max_tokens": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.chunking": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.chunking.strategy": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": {
+                    "value": "feature"
+                },
+                "values": [
+                    "feature",
+                    "type"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.code_slicing": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.code_slicing.enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.code_slicing.min_lines_before_slicing": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 80
+                },
+                "values": null,
+                "min": 10,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.custom_skills": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": []
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "audit.custom_skills.*": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": null
+        },
+        "audit.custom_skills.*.file_type": {
+            "node": {
+                "kind": "enum",
+                "required": true,
+                "default": "none",
+                "values": [
+                    "controller",
+                    "api_resource",
+                    "live_component",
+                    "entity",
+                    "voter",
+                    "repository",
+                    "form",
+                    "authenticator",
+                    "ldap_service",
+                    "sonata_admin",
+                    "easyadmin_crud",
+                    "messenger_handler",
+                    "webhook_consumer",
+                    "event_subscriber",
+                    "normalizer",
+                    "scheduler",
+                    "twig_extension",
+                    "template",
+                    "config",
+                    "php",
+                    "other"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": null
+        },
+        "audit.custom_skills.*.instructions": {
+            "node": {
+                "kind": "scalar",
+                "required": true,
+                "default": "none",
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": null
+        },
+        "audit.custom_skills.*.priority": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 500
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": true,
+                    "value": -1
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": null
+        },
+        "audit.escalation": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.escalation.cheap_model": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.escalation.enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": false
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.excluded_types": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": []
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.excluded_types.*": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": "none",
+                "values": [
+                    "sql_injection",
+                    "command_injection",
+                    "ldap_injection",
+                    "xpath_injection",
+                    "twig_injection",
+                    "header_injection",
+                    "broken_access_control",
+                    "missing_voter",
+                    "voter_bypass",
+                    "role_escalation",
+                    "insecure_direct_object_reference",
+                    "missing_csrf_protection",
+                    "json_hijacking",
+                    "business_logic_flaw",
+                    "race_condition",
+                    "insecure_workflow",
+                    "price_manipulation",
+                    "state_machine_bypass",
+                    "mass_assignment",
+                    "insecure_deserialization",
+                    "unsafe_parameter_binding",
+                    "exposed_internal_service",
+                    "misconfigured_firewall",
+                    "insecure_redirect",
+                    "over_permissive_serializer_group",
+                    "sensitive_data_exposure",
+                    "log_injection",
+                    "path_traversal",
+                    "ssrf",
+                    "xxe",
+                    "open_redirect",
+                    "weak_cryptography",
+                    "insecure_random",
+                    "hardcoded_secret",
+                    "missing_signature_verification",
+                    "messenger_handler_unsafe",
+                    "missing_rate_limiting",
+                    "cache_poisoning",
+                    "mailer_header_injection",
+                    "webhook_replay",
+                    "authenticator_bypass",
+                    "host_header_injection",
+                    "trusted_proxy_misconfiguration",
+                    "weak_password_hashing",
+                    "permissive_cors_origin",
+                    "weak_content_security_policy",
+                    "missing_transport_security",
+                    "debug_mode_enabled",
+                    "permissive_mercure_topic_selector"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": null
+        },
+        "audit.fail_on": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": {
+                    "value": "critical"
+                },
+                "values": [
+                    "safe",
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.fix_synthesis": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.fix_synthesis.enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": false
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.fix_synthesis.severity_floor": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": {
+                    "value": "high"
+                },
+                "values": [
+                    "critical",
+                    "high",
+                    "medium",
+                    "low",
+                    "info"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.included_types": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": []
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.included_types.*": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": "none",
+                "values": [
+                    "sql_injection",
+                    "command_injection",
+                    "ldap_injection",
+                    "xpath_injection",
+                    "twig_injection",
+                    "header_injection",
+                    "broken_access_control",
+                    "missing_voter",
+                    "voter_bypass",
+                    "role_escalation",
+                    "insecure_direct_object_reference",
+                    "missing_csrf_protection",
+                    "json_hijacking",
+                    "business_logic_flaw",
+                    "race_condition",
+                    "insecure_workflow",
+                    "price_manipulation",
+                    "state_machine_bypass",
+                    "mass_assignment",
+                    "insecure_deserialization",
+                    "unsafe_parameter_binding",
+                    "exposed_internal_service",
+                    "misconfigured_firewall",
+                    "insecure_redirect",
+                    "over_permissive_serializer_group",
+                    "sensitive_data_exposure",
+                    "log_injection",
+                    "path_traversal",
+                    "ssrf",
+                    "xxe",
+                    "open_redirect",
+                    "weak_cryptography",
+                    "insecure_random",
+                    "hardcoded_secret",
+                    "missing_signature_verification",
+                    "messenger_handler_unsafe",
+                    "missing_rate_limiting",
+                    "cache_poisoning",
+                    "mailer_header_injection",
+                    "webhook_replay",
+                    "authenticator_bypass",
+                    "host_header_injection",
+                    "trusted_proxy_misconfiguration",
+                    "weak_password_hashing",
+                    "permissive_cors_origin",
+                    "weak_content_security_policy",
+                    "missing_transport_security",
+                    "debug_mode_enabled",
+                    "permissive_mercure_topic_selector"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": null
+        },
+        "audit.max_iterations": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.max_tool_iterations": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 8
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.min_confidence": {
+            "node": {
+                "kind": "float",
+                "required": false,
+                "default": {
+                    "value": 0.6
+                },
+                "values": null,
+                "min": 0.0,
+                "max": 1.0
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": true,
+                    "value": 0.0
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.poc_synthesis": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.poc_synthesis.enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.poc_synthesis.severity_floor": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": {
+                    "value": "high"
+                },
+                "values": [
+                    "critical",
+                    "high",
+                    "medium",
+                    "low",
+                    "info"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.rate_limit": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.rate_limit.input_tokens_per_minute": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.rate_limit.output_tokens_per_minute": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.rate_limit.requests_per_minute": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.retry": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.retry.backoff_multiplier": {
+            "node": {
+                "kind": "float",
+                "required": false,
+                "default": {
+                    "value": 2.0
+                },
+                "values": null,
+                "min": 1.0,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": true,
+                    "value": 1.5
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.retry.initial_delay_ms": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 500
+                },
+                "values": null,
+                "min": 0,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.retry.jitter_ratio": {
+            "node": {
+                "kind": "float",
+                "required": false,
+                "default": {
+                    "value": 0.2
+                },
+                "values": null,
+                "min": 0.0,
+                "max": 1.0
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": true,
+                    "value": 0.0
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.retry.max_attempts": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 3
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.reviewer_batch_size": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 1
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.reviewer_max_concurrent": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.reviewer_max_tool_iterations": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 4
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.reviewer_structured_collection": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.reviewer_tools_enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": false
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.since_closure": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": [
+                    "none",
+                    "direct"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.stable_system_prompt": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.static_prescan": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "audit.static_prescan.enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.static_prescan.lean_mode": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.structured_collection": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.tools_enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "audit.triage_memory": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": false
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "cache": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "cache.dir": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": {
+                    "value": "%kernel.cache_dir%/symfony_security_auditor/attacker"
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": true,
+                    "value": ""
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": "refused"
+        },
+        "cache.enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "refused"
+        },
+        "cache.prompt_caching": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "refused"
+        },
+        "max_output_tokens": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 4096
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "model": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": {
+                    "value": "claude-opus-4-8"
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": "accepted"
+        },
+        "privacy": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "privacy.offline_only": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": false
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "refused"
+        },
+        "profile": {
+            "node": {
+                "kind": "enum",
+                "required": false,
+                "default": {
+                    "value": "balanced"
+                },
+                "values": [
+                    "fast",
+                    "balanced",
+                    "thorough"
+                ],
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "provider_json_mode": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": false
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "reviewer_max_output_tokens": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "reviewer_model": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": {
+                    "value": null
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "scan": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "scan.custom_risk_patterns": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": []
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "scan.custom_risk_patterns.*": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": []
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": null
+        },
+        "scan.custom_risk_patterns.*.*": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": null
+        },
+        "scan.custom_risk_patterns.*.*.description": {
+            "node": {
+                "kind": "scalar",
+                "required": true,
+                "default": "none",
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": true,
+                    "value": -1
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": true,
+                    "value": 1.5
+                },
+                "zero-float": {
+                    "accepted": true,
+                    "value": 0.0
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": null
+        },
+        "scan.custom_risk_patterns.*.*.regex": {
+            "node": {
+                "kind": "scalar",
+                "required": true,
+                "default": "none",
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": true,
+                    "value": -1
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": true,
+                    "value": 1.5
+                },
+                "zero-float": {
+                    "accepted": true,
+                    "value": 0.0
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": null
+        },
+        "scan.import_sarif": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": []
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "scan.import_sarif.*": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": "none",
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": true,
+                    "value": -1
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": true,
+                    "value": 1.5
+                },
+                "zero-float": {
+                    "accepted": true,
+                    "value": 0.0
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": true,
+                    "value": ""
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": null
+        },
+        "scan.included_paths": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": [
+                        "src",
+                        "config",
+                        "templates",
+                        "public/index.php",
+                        ".env",
+                        ".env.local",
+                        ".env.dev",
+                        ".env.test",
+                        ".env.prod",
+                        ".env.dist"
+                    ]
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "accepted"
+        },
+        "scan.included_paths.*": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": "none",
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": true,
+                    "value": -1
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": true,
+                    "value": 1.5
+                },
+                "zero-float": {
+                    "accepted": true,
+                    "value": 0.0
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": true,
+                    "value": ""
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": null
+        },
+        "scan.max_file_size_kb": {
+            "node": {
+                "kind": "integer",
+                "required": false,
+                "default": {
+                    "value": 512
+                },
+                "values": null,
+                "min": 1,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": false
+                },
+                "false": {
+                    "accepted": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": false
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "scan.respect_gitignore": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "accepted"
+        },
+        "scan.secret_scrubbing": {
+            "node": {
+                "kind": "array",
+                "required": false,
+                "default": null,
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "scan.secret_scrubbing.additional_patterns": {
+            "node": {
+                "kind": "prototype",
+                "required": false,
+                "default": {
+                    "value": []
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": null,
+            "environment_placeholder": null,
+            "project_config": "refused"
+        },
+        "scan.secret_scrubbing.additional_patterns.*": {
+            "node": {
+                "kind": "scalar",
+                "required": false,
+                "default": "none",
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": true,
+                    "value": 0
+                },
+                "one": {
+                    "accepted": true,
+                    "value": 1
+                },
+                "minus-one": {
+                    "accepted": true,
+                    "value": -1
+                },
+                "hundred-and-one": {
+                    "accepted": true,
+                    "value": 101
+                },
+                "one-and-a-half": {
+                    "accepted": true,
+                    "value": 1.5
+                },
+                "zero-float": {
+                    "accepted": true,
+                    "value": 0.0
+                },
+                "text": {
+                    "accepted": true,
+                    "value": "abc"
+                },
+                "empty-text": {
+                    "accepted": true,
+                    "value": ""
+                },
+                "numeric-text": {
+                    "accepted": true,
+                    "value": "5"
+                },
+                "severity": {
+                    "accepted": true,
+                    "value": "high"
+                },
+                "format": {
+                    "accepted": true,
+                    "value": "json"
+                },
+                "null": {
+                    "accepted": true,
+                    "value": null
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": true,
+            "project_config": null
+        },
+        "scan.secret_scrubbing.enabled": {
+            "node": {
+                "kind": "boolean",
+                "required": false,
+                "default": {
+                    "value": true
+                },
+                "values": null,
+                "min": null,
+                "max": null
+            },
+            "values": {
+                "true": {
+                    "accepted": true,
+                    "value": true
+                },
+                "false": {
+                    "accepted": true,
+                    "value": false
+                },
+                "zero": {
+                    "accepted": false
+                },
+                "one": {
+                    "accepted": false
+                },
+                "minus-one": {
+                    "accepted": false
+                },
+                "hundred-and-one": {
+                    "accepted": false
+                },
+                "one-and-a-half": {
+                    "accepted": false
+                },
+                "zero-float": {
+                    "accepted": false
+                },
+                "text": {
+                    "accepted": false
+                },
+                "empty-text": {
+                    "accepted": false
+                },
+                "numeric-text": {
+                    "accepted": false
+                },
+                "severity": {
+                    "accepted": false
+                },
+                "format": {
+                    "accepted": false
+                },
+                "null": {
+                    "accepted": true,
+                    "value": true
+                },
+                "empty-list": {
+                    "accepted": false
+                },
+                "list": {
+                    "accepted": false
+                }
+            },
+            "environment_placeholder": false,
+            "project_config": "refused"
+        }
+    },
+    "parameters": {
+        "default": {
+            "symfony_security_auditor.attacker_max_output_tokens": 4096,
+            "symfony_security_auditor.attacker_model": "gpt-4o",
+            "symfony_security_auditor.audit.attacker_max_concurrent": 1,
+            "symfony_security_auditor.audit.baseline": null,
+            "symfony_security_auditor.audit.budget.max_cost_usd": null,
+            "symfony_security_auditor.audit.budget.max_tokens": null,
+            "symfony_security_auditor.audit.chunking.strategy": "feature",
+            "symfony_security_auditor.audit.code_slicing.enabled": false,
+            "symfony_security_auditor.audit.code_slicing.min_lines_before_slicing": 80,
+            "symfony_security_auditor.audit.excluded_types": [],
+            "symfony_security_auditor.audit.fail_on": "critical",
+            "symfony_security_auditor.audit.fix_synthesis.enabled": false,
+            "symfony_security_auditor.audit.fix_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.included_types": [],
+            "symfony_security_auditor.audit.max_iterations": 3,
+            "symfony_security_auditor.audit.max_tool_iterations": 8,
+            "symfony_security_auditor.audit.min_confidence": 0.6,
+            "symfony_security_auditor.audit.models_requiring_pricing": [
+                "gpt-4o"
+            ],
+            "symfony_security_auditor.audit.poc_synthesis.enabled": false,
+            "symfony_security_auditor.audit.poc_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.retry.backoff_multiplier": 2.0,
+            "symfony_security_auditor.audit.retry.initial_delay_ms": 500,
+            "symfony_security_auditor.audit.retry.jitter_ratio": 0.2,
+            "symfony_security_auditor.audit.retry.max_attempts": 3,
+            "symfony_security_auditor.audit.reviewer_batch_size": 1,
+            "symfony_security_auditor.audit.reviewer_max_concurrent": 1,
+            "symfony_security_auditor.audit.reviewer_max_tool_iterations": 4,
+            "symfony_security_auditor.audit.reviewer_structured_collection": true,
+            "symfony_security_auditor.audit.reviewer_tools_enabled": false,
+            "symfony_security_auditor.audit.since_closure": "none",
+            "symfony_security_auditor.audit.stable_system_prompt": true,
+            "symfony_security_auditor.audit.static_prescan.enabled": true,
+            "symfony_security_auditor.audit.static_prescan.lean_mode": false,
+            "symfony_security_auditor.audit.structured_collection": true,
+            "symfony_security_auditor.audit.tools_enabled": true,
+            "symfony_security_auditor.audit.triage_memory": false,
+            "symfony_security_auditor.cache.advisory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/advisory",
+            "symfony_security_auditor.cache.cheap_attacker_key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-off|max-output-4096",
+            "symfony_security_auditor.cache.dir": "%kernel.cache_dir%/symfony_security_auditor/attacker",
+            "symfony_security_auditor.cache.enabled": true,
+            "symfony_security_auditor.cache.key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-off|max-output-4096",
+            "symfony_security_auditor.cache.prompt_caching": true,
+            "symfony_security_auditor.cache.reviewer_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/reviewer",
+            "symfony_security_auditor.cache.reviewer_key_salt": "gpt-4o|reviewer-v1|prompt-v3|collect-tool|tools-off|batch-1|max-output-4096",
+            "symfony_security_auditor.cache.triage_memory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/triage-memory",
+            "symfony_security_auditor.config_notices": [],
+            "symfony_security_auditor.pricing.platform": null,
+            "symfony_security_auditor.reviewer_max_output_tokens": 4096,
+            "symfony_security_auditor.reviewer_model": "gpt-4o",
+            "symfony_security_auditor.scan.custom_risk_patterns": [],
+            "symfony_security_auditor.scan.included_paths": [
+                "src",
+                "config",
+                "templates",
+                "public/index.php",
+                ".env",
+                ".env.local",
+                ".env.dev",
+                ".env.test",
+                ".env.prod",
+                ".env.dist"
+            ],
+            "symfony_security_auditor.scan.max_file_size_kb": 512,
+            "symfony_security_auditor.scan.respect_gitignore": true,
+            "symfony_security_auditor.scan.secret_scrubbing.additional_patterns": [],
+            "symfony_security_auditor.scan.secret_scrubbing.enabled": true
+        },
+        "profile: fast": {
+            "symfony_security_auditor.attacker_max_output_tokens": 4096,
+            "symfony_security_auditor.attacker_model": "gpt-4o",
+            "symfony_security_auditor.audit.attacker_max_concurrent": 4,
+            "symfony_security_auditor.audit.baseline": null,
+            "symfony_security_auditor.audit.budget.max_cost_usd": null,
+            "symfony_security_auditor.audit.budget.max_tokens": null,
+            "symfony_security_auditor.audit.chunking.strategy": "feature",
+            "symfony_security_auditor.audit.code_slicing.enabled": true,
+            "symfony_security_auditor.audit.code_slicing.min_lines_before_slicing": 80,
+            "symfony_security_auditor.audit.excluded_types": [],
+            "symfony_security_auditor.audit.fail_on": "critical",
+            "symfony_security_auditor.audit.fix_synthesis.enabled": false,
+            "symfony_security_auditor.audit.fix_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.included_types": [],
+            "symfony_security_auditor.audit.max_iterations": 1,
+            "symfony_security_auditor.audit.max_tool_iterations": 8,
+            "symfony_security_auditor.audit.min_confidence": 0.6,
+            "symfony_security_auditor.audit.models_requiring_pricing": [
+                "gpt-4o"
+            ],
+            "symfony_security_auditor.audit.poc_synthesis.enabled": false,
+            "symfony_security_auditor.audit.poc_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.retry.backoff_multiplier": 2.0,
+            "symfony_security_auditor.audit.retry.initial_delay_ms": 500,
+            "symfony_security_auditor.audit.retry.jitter_ratio": 0.2,
+            "symfony_security_auditor.audit.retry.max_attempts": 3,
+            "symfony_security_auditor.audit.reviewer_batch_size": 1,
+            "symfony_security_auditor.audit.reviewer_max_concurrent": 4,
+            "symfony_security_auditor.audit.reviewer_max_tool_iterations": 4,
+            "symfony_security_auditor.audit.reviewer_structured_collection": true,
+            "symfony_security_auditor.audit.reviewer_tools_enabled": false,
+            "symfony_security_auditor.audit.since_closure": "none",
+            "symfony_security_auditor.audit.stable_system_prompt": true,
+            "symfony_security_auditor.audit.static_prescan.enabled": true,
+            "symfony_security_auditor.audit.static_prescan.lean_mode": true,
+            "symfony_security_auditor.audit.structured_collection": true,
+            "symfony_security_auditor.audit.tools_enabled": true,
+            "symfony_security_auditor.audit.triage_memory": false,
+            "symfony_security_auditor.cache.advisory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/advisory",
+            "symfony_security_auditor.cache.cheap_attacker_key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-on-80|max-output-4096",
+            "symfony_security_auditor.cache.dir": "%kernel.cache_dir%/symfony_security_auditor/attacker",
+            "symfony_security_auditor.cache.enabled": true,
+            "symfony_security_auditor.cache.key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-on-80|max-output-4096",
+            "symfony_security_auditor.cache.prompt_caching": true,
+            "symfony_security_auditor.cache.reviewer_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/reviewer",
+            "symfony_security_auditor.cache.reviewer_key_salt": "gpt-4o|reviewer-v1|prompt-v3|collect-tool|tools-off|batch-1|max-output-4096",
+            "symfony_security_auditor.cache.triage_memory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/triage-memory",
+            "symfony_security_auditor.config_notices": [],
+            "symfony_security_auditor.pricing.platform": null,
+            "symfony_security_auditor.reviewer_max_output_tokens": 4096,
+            "symfony_security_auditor.reviewer_model": "gpt-4o",
+            "symfony_security_auditor.scan.custom_risk_patterns": [],
+            "symfony_security_auditor.scan.included_paths": [
+                "src",
+                "config",
+                "templates",
+                "public/index.php",
+                ".env",
+                ".env.local",
+                ".env.dev",
+                ".env.test",
+                ".env.prod",
+                ".env.dist"
+            ],
+            "symfony_security_auditor.scan.max_file_size_kb": 512,
+            "symfony_security_auditor.scan.respect_gitignore": true,
+            "symfony_security_auditor.scan.secret_scrubbing.additional_patterns": [],
+            "symfony_security_auditor.scan.secret_scrubbing.enabled": true
+        },
+        "profile: balanced": {
+            "symfony_security_auditor.attacker_max_output_tokens": 4096,
+            "symfony_security_auditor.attacker_model": "gpt-4o",
+            "symfony_security_auditor.audit.attacker_max_concurrent": 1,
+            "symfony_security_auditor.audit.baseline": null,
+            "symfony_security_auditor.audit.budget.max_cost_usd": null,
+            "symfony_security_auditor.audit.budget.max_tokens": null,
+            "symfony_security_auditor.audit.chunking.strategy": "feature",
+            "symfony_security_auditor.audit.code_slicing.enabled": false,
+            "symfony_security_auditor.audit.code_slicing.min_lines_before_slicing": 80,
+            "symfony_security_auditor.audit.excluded_types": [],
+            "symfony_security_auditor.audit.fail_on": "critical",
+            "symfony_security_auditor.audit.fix_synthesis.enabled": false,
+            "symfony_security_auditor.audit.fix_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.included_types": [],
+            "symfony_security_auditor.audit.max_iterations": 3,
+            "symfony_security_auditor.audit.max_tool_iterations": 8,
+            "symfony_security_auditor.audit.min_confidence": 0.6,
+            "symfony_security_auditor.audit.models_requiring_pricing": [
+                "gpt-4o"
+            ],
+            "symfony_security_auditor.audit.poc_synthesis.enabled": false,
+            "symfony_security_auditor.audit.poc_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.retry.backoff_multiplier": 2.0,
+            "symfony_security_auditor.audit.retry.initial_delay_ms": 500,
+            "symfony_security_auditor.audit.retry.jitter_ratio": 0.2,
+            "symfony_security_auditor.audit.retry.max_attempts": 3,
+            "symfony_security_auditor.audit.reviewer_batch_size": 1,
+            "symfony_security_auditor.audit.reviewer_max_concurrent": 1,
+            "symfony_security_auditor.audit.reviewer_max_tool_iterations": 4,
+            "symfony_security_auditor.audit.reviewer_structured_collection": true,
+            "symfony_security_auditor.audit.reviewer_tools_enabled": false,
+            "symfony_security_auditor.audit.since_closure": "none",
+            "symfony_security_auditor.audit.stable_system_prompt": true,
+            "symfony_security_auditor.audit.static_prescan.enabled": true,
+            "symfony_security_auditor.audit.static_prescan.lean_mode": false,
+            "symfony_security_auditor.audit.structured_collection": true,
+            "symfony_security_auditor.audit.tools_enabled": true,
+            "symfony_security_auditor.audit.triage_memory": false,
+            "symfony_security_auditor.cache.advisory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/advisory",
+            "symfony_security_auditor.cache.cheap_attacker_key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-off|max-output-4096",
+            "symfony_security_auditor.cache.dir": "%kernel.cache_dir%/symfony_security_auditor/attacker",
+            "symfony_security_auditor.cache.enabled": true,
+            "symfony_security_auditor.cache.key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-off|max-output-4096",
+            "symfony_security_auditor.cache.prompt_caching": true,
+            "symfony_security_auditor.cache.reviewer_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/reviewer",
+            "symfony_security_auditor.cache.reviewer_key_salt": "gpt-4o|reviewer-v1|prompt-v3|collect-tool|tools-off|batch-1|max-output-4096",
+            "symfony_security_auditor.cache.triage_memory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/triage-memory",
+            "symfony_security_auditor.config_notices": [],
+            "symfony_security_auditor.pricing.platform": null,
+            "symfony_security_auditor.reviewer_max_output_tokens": 4096,
+            "symfony_security_auditor.reviewer_model": "gpt-4o",
+            "symfony_security_auditor.scan.custom_risk_patterns": [],
+            "symfony_security_auditor.scan.included_paths": [
+                "src",
+                "config",
+                "templates",
+                "public/index.php",
+                ".env",
+                ".env.local",
+                ".env.dev",
+                ".env.test",
+                ".env.prod",
+                ".env.dist"
+            ],
+            "symfony_security_auditor.scan.max_file_size_kb": 512,
+            "symfony_security_auditor.scan.respect_gitignore": true,
+            "symfony_security_auditor.scan.secret_scrubbing.additional_patterns": [],
+            "symfony_security_auditor.scan.secret_scrubbing.enabled": true
+        },
+        "profile: thorough": {
+            "symfony_security_auditor.attacker_max_output_tokens": 4096,
+            "symfony_security_auditor.attacker_model": "gpt-4o",
+            "symfony_security_auditor.audit.attacker_max_concurrent": 1,
+            "symfony_security_auditor.audit.baseline": null,
+            "symfony_security_auditor.audit.budget.max_cost_usd": null,
+            "symfony_security_auditor.audit.budget.max_tokens": null,
+            "symfony_security_auditor.audit.chunking.strategy": "feature",
+            "symfony_security_auditor.audit.code_slicing.enabled": false,
+            "symfony_security_auditor.audit.code_slicing.min_lines_before_slicing": 80,
+            "symfony_security_auditor.audit.excluded_types": [],
+            "symfony_security_auditor.audit.fail_on": "critical",
+            "symfony_security_auditor.audit.fix_synthesis.enabled": false,
+            "symfony_security_auditor.audit.fix_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.included_types": [],
+            "symfony_security_auditor.audit.max_iterations": 3,
+            "symfony_security_auditor.audit.max_tool_iterations": 8,
+            "symfony_security_auditor.audit.min_confidence": 0.6,
+            "symfony_security_auditor.audit.models_requiring_pricing": [
+                "gpt-4o"
+            ],
+            "symfony_security_auditor.audit.poc_synthesis.enabled": true,
+            "symfony_security_auditor.audit.poc_synthesis.severity_floor": "high",
+            "symfony_security_auditor.audit.retry.backoff_multiplier": 2.0,
+            "symfony_security_auditor.audit.retry.initial_delay_ms": 500,
+            "symfony_security_auditor.audit.retry.jitter_ratio": 0.2,
+            "symfony_security_auditor.audit.retry.max_attempts": 3,
+            "symfony_security_auditor.audit.reviewer_batch_size": 1,
+            "symfony_security_auditor.audit.reviewer_max_concurrent": 1,
+            "symfony_security_auditor.audit.reviewer_max_tool_iterations": 4,
+            "symfony_security_auditor.audit.reviewer_structured_collection": true,
+            "symfony_security_auditor.audit.reviewer_tools_enabled": false,
+            "symfony_security_auditor.audit.since_closure": "direct",
+            "symfony_security_auditor.audit.stable_system_prompt": true,
+            "symfony_security_auditor.audit.static_prescan.enabled": true,
+            "symfony_security_auditor.audit.static_prescan.lean_mode": false,
+            "symfony_security_auditor.audit.structured_collection": true,
+            "symfony_security_auditor.audit.tools_enabled": true,
+            "symfony_security_auditor.audit.triage_memory": false,
+            "symfony_security_auditor.cache.advisory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/advisory",
+            "symfony_security_auditor.cache.cheap_attacker_key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-off|max-output-4096",
+            "symfony_security_auditor.cache.dir": "%kernel.cache_dir%/symfony_security_auditor/attacker",
+            "symfony_security_auditor.cache.enabled": true,
+            "symfony_security_auditor.cache.key_salt": "gpt-4o|prompt-v17|prescan-v31|prescan-on|tools-on-8|patterns-4f53cda18c2baa0c|collect-tool|skills-full|slice-off|max-output-4096",
+            "symfony_security_auditor.cache.prompt_caching": true,
+            "symfony_security_auditor.cache.reviewer_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/reviewer",
+            "symfony_security_auditor.cache.reviewer_key_salt": "gpt-4o|reviewer-v1|prompt-v3|collect-tool|tools-off|batch-1|max-output-4096",
+            "symfony_security_auditor.cache.triage_memory_dir": "%kernel.cache_dir%/symfony_security_auditor/attacker/triage-memory",
+            "symfony_security_auditor.config_notices": [],
+            "symfony_security_auditor.pricing.platform": null,
+            "symfony_security_auditor.reviewer_max_output_tokens": 4096,
+            "symfony_security_auditor.reviewer_model": "gpt-4o",
+            "symfony_security_auditor.scan.custom_risk_patterns": [],
+            "symfony_security_auditor.scan.included_paths": [
+                "src",
+                "config",
+                "templates",
+                "public/index.php",
+                ".env",
+                ".env.local",
+                ".env.dev",
+                ".env.test",
+                ".env.prod",
+                ".env.dist"
+            ],
+            "symfony_security_auditor.scan.max_file_size_kb": 512,
+            "symfony_security_auditor.scan.respect_gitignore": true,
+            "symfony_security_auditor.scan.secret_scrubbing.additional_patterns": [],
+            "symfony_security_auditor.scan.secret_scrubbing.enabled": true
+        }
+    },
+    "seal": "11c0990fb7a8461fbdc89e80bc9ac021d65f0945de07722f840dc6adfcff8ca3"
+}

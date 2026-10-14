@@ -71,6 +71,30 @@ function releaseBump(string $version): void
     io()->success(sprintf('All version pins now point at %s.', $version));
 }
 
+#[AsTask(name: 'compat:record', description: 'Record the compatibility fixtures from a release tag, or from a checkout of one that has its vendor/ installed')]
+function compatRecord(string $tagOrCheckout): void
+{
+    $checkout = is_dir($tagOrCheckout) ? rtrim($tagOrCheckout, '/') : sprintf('var/compat/%s', $tagOrCheckout);
+    $release = is_dir($tagOrCheckout)
+        ? trim(run(['git', '-C', $checkout, 'describe', '--tags', '--exact-match'], context()->withQuiet())->getOutput())
+        : $tagOrCheckout;
+
+    if (1 !== preg_match('/^\\d+\\.\\d+\\.\\d+$/', $release)) {
+        io()->error(sprintf('"%s" is not a X.Y.Z release tag.', $release));
+
+        exit(1);
+    }
+
+    if (!is_dir($checkout)) {
+        run(['git', 'worktree', 'add', '--detach', $checkout, $release]);
+        run(['docker', 'compose', 'exec', 'php', 'composer', 'install', '--no-interaction', '--no-progress', sprintf('--working-dir=%s', $checkout)]);
+    }
+
+    run(['docker', 'compose', 'exec', 'php', 'php', 'tools/Compat/record-configuration.php', $checkout, $release]);
+
+    io()->success(sprintf('Recorded the compatibility fixtures from %s. Empty the accepted-differences.php files: they list differences from the previous release.', $release));
+}
+
 #[AsTask(name: 'eval', description: 'Audit a ground-truth fixture and score detection precision/recall against its manifest')]
 function evaluate(
     string $target = 'examples/vulnerable-app',

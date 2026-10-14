@@ -13,6 +13,7 @@ Run the AI security audit on a nightly schedule and ship the SARIF report to Git
   - [Live security badge in your README](#live-security-badge-in-your-readme)
 - [GitLab CI](#gitlab-ci)
 - [Output Formats in CI](#output-formats-in-ci)
+- [How This Project Guards Compatibility](#how-this-project-guards-compatibility)
 
 > See also: [Configuration](configuration.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
 
@@ -521,3 +522,11 @@ php bin/console audit:run /path/to/project --format html --output report.html
 ```
 
 Every format, its options and sample output live in the [Output Formats Reference](configuration.md#output-formats-reference).
+
+## How This Project Guards Compatibility
+
+Upgrading within `1.x` must not change what your pipeline relies on. Besides its unit, integration and end-to-end suites, this repository's own CI compares every pull request with the last release, and fails on any difference the maintainer has not accepted and announced in [`CHANGELOG.md`](../CHANGELOG.md):
+
+- **Configuration** — the bundle configuration, path by path: kind, default, choices, bounds, the values each setting takes and what it reads them as, `%env()%` placeholders, what a project's `.symfony-security-auditor.yaml` may set, and the published container parameters for each `profile`. A key added since the release must be listed in [Versioning](versioning.md).
+
+[CONTRIBUTING.md → Compatibility Checks](../CONTRIBUTING.md#compatibility-checks) explains how to run them, accept a difference, and record them again from a new release.
