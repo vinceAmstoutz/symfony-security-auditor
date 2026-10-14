@@ -19,6 +19,7 @@ use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseChannel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
@@ -171,6 +172,68 @@ final class SelfUpdateCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertNull($inMemoryUpdateCheckStore->read());
+    }
+
+    public function test_it_follows_the_release_channel_by_default(): void
+    {
+        $recordingSelfUpdater = new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0'));
+
+        $this->commandTester($recordingSelfUpdater)->execute([]);
+
+        self::assertSame(ReleaseChannel::Stable, $recordingSelfUpdater->releaseChannel);
+    }
+
+    public function test_it_follows_the_snapshot_channel_on_request(): void
+    {
+        $recordingSelfUpdater = new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '1.0.0+3.gabcdef1'));
+
+        $this->commandTester($recordingSelfUpdater)->execute(['--snapshot' => true]);
+
+        self::assertSame(ReleaseChannel::Snapshot, $recordingSelfUpdater->releaseChannel);
+    }
+
+    public function test_it_names_the_command_that_installs_an_available_release(): void
+    {
+        $commandTester = $this->commandTester(new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::UpdateAvailable, '1.0.0', '2.0.0')));
+
+        $commandTester->execute(['--check' => true]);
+
+        self::assertStringContainsString('A newer version is available: 2.0.0 (currently 1.0.0). Run "self-update" without --check to install it.', $this->flattened($commandTester->getDisplay()));
+    }
+
+    public function test_it_names_the_command_that_installs_an_available_snapshot(): void
+    {
+        $commandTester = $this->commandTester(new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::UpdateAvailable, '1.0.0', '1.0.0+3.gabcdef1')));
+
+        $commandTester->execute(['--check' => true, '--snapshot' => true]);
+
+        self::assertStringContainsString('Run "self-update --snapshot" without --check to install it.', $this->flattened($commandTester->getDisplay()));
+    }
+
+    public function test_it_never_records_a_snapshot_as_the_version_the_passive_notice_announces(): void
+    {
+        $inMemoryUpdateCheckStore = new InMemoryUpdateCheckStore();
+        $commandTester = $this->commandTester(
+            new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::UpdateAvailable, '1.0.0', '1.0.0+3.gabcdef1')),
+            inMemoryUpdateCheckStore: $inMemoryUpdateCheckStore,
+        );
+
+        $commandTester->execute(['--check' => true, '--snapshot' => true]);
+
+        self::assertNull($inMemoryUpdateCheckStore->read());
+    }
+
+    public function test_it_clears_the_update_check_cache_after_installing_a_snapshot(): void
+    {
+        $inMemoryUpdateCheckStore = new InMemoryUpdateCheckStore();
+        $commandTester = $this->commandTester(
+            new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '1.0.0+3.gabcdef1')),
+            inMemoryUpdateCheckStore: $inMemoryUpdateCheckStore,
+        );
+
+        $commandTester->execute(['--snapshot' => true]);
+
+        self::assertSame(1, $inMemoryUpdateCheckStore->clearCalls);
     }
 
     private function flattened(string $display): string

@@ -1,0 +1,111 @@
+name: Snapshot
+
+# Every push to the development branch republishes the `snapshot`
+# pre-release, so a fix can be tried before it ships:
+# `self-update --snapshot`, or the installers with SSA_VERSION=snapshot.
+on:
+  push:
+    branches:
+      - 1.x
+
+permissions: {}
+
+# A push that lands mid-build waits for the running one instead of racing it
+# for the same release assets.
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve the snapshot version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Count the commits since the branch's last release
+        id: version
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # Releases are tagged on the merge into main, which the branch never
+          # contains, so `git describe` cannot see them: count from the newest
+          # X.Y.Z tag of the branch's own major instead. The `+` build-metadata
+          # form is the one Composer accepts as a root version.
+          major="${BRANCH%.x}"
+          release="$(git tag --list --sort=-version:refname "${major}.*" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+          if [ -z "$release" ]; then
+            echo "::error::No ${major}.Y.Z release tag to count the snapshot's commits from."
+            exit 1
+          fi
+
+          count="$(git rev-list --count "${release}..HEAD")"
+          echo "version=${release}+${count}.g$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create the snapshot pre-release on the first run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Titled "snapshot" until the first build attaches its binaries, so
+          # `self-update --snapshot` refuses it rather than installing nothing.
+          if ! gh release view snapshot >/dev/null 2>&1; then
+            gh release create snapshot --target "$GITHUB_SHA" --prerelease --latest=false --title snapshot --notes "The first snapshot is still building."
+          fi
+
+  build:
+    name: Build
+    needs: prepare
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yaml # zizmor: ignore[self-repository] -- the documented local-call form; actionlint does not yet accept the `$/` one
+    with:
+      tag: snapshot
+      ref: ${{ github.sha }}
+      version: ${{ needs.prepare.outputs.version }}
+
+  publish:
+    name: Point the snapshot at the commit it was built from
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - build
+    permissions:
+      contents: write
+    steps:
+      - name: Move the tag and title the release with the snapshot version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # The title is what `self-update --snapshot` reads as the version, so
+          # it changes only once every binary of that version is attached.
+          gh api --method PATCH "repos/${GH_REPO}/git/refs/tags/snapshot" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+
+          {
+            printf 'Built from %s on `%s`. Not a release: it carries every change merged since the last one, untested beyond CI.\n\n' "$GITHUB_SHA" "$BRANCH"
+            printf '```bash\n'
+            printf 'symfony-security-auditor self-update --snapshot\n'
+            printf '# or, from scratch\n'
+            printf 'curl -fsSL https://raw.githubusercontent.com/%s/main/install.sh | SSA_VERSION=snapshot sh\n' "$GH_REPO"
+            printf '```\n\n'
+            printf 'A plain `self-update` takes you back to the latest release.\n'
+          } > snapshot-notes.md
+
+          gh release edit snapshot --title "$VERSION" --notes-file snapshot-notes.md --prerelease --latest=false

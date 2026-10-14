@@ -23,5 +23,5 @@ interface SelfUpdaterInterface
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
-    public function run(string $currentVersion, bool $checkOnly): SelfUpdateResult;
+    public function run(string $currentVersion, bool $checkOnly, ReleaseChannel $releaseChannel = ReleaseChannel::Stable): SelfUpdateResult;
 }

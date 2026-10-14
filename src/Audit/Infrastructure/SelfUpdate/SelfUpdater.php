@@ -31,11 +31,21 @@ use function Symfony\Component\String\u;
  * that is the path the release publishes under. A tag outside `ReleaseTag`'s
  * grammar is refused before any URL is built from it.
  *
+ * The snapshot channel reads the version from the title of the `snapshot`
+ * pre-release, which the Snapshot workflow sets once every asset is attached,
+ * and installs whenever it differs from the running one. A snapshot binary on
+ * the stable channel likewise takes the latest release, older or not, so
+ * leaving the snapshot channel takes a plain `self-update`.
+ *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class SelfUpdater implements SelfUpdaterInterface
 {
     private const string LATEST_RELEASE_API_URL = 'https://api.github.com/repos/vinceAmstoutz/symfony-security-auditor/releases/latest';
+
+    private const string SNAPSHOT_TAG = 'snapshot';
+
+    private const string SNAPSHOT_RELEASE_API_URL = 'https://api.github.com/repos/vinceAmstoutz/symfony-security-auditor/releases/tags/snapshot';
 
     public function __construct(
         private ReleaseClientInterface $releaseClient,
@@ -51,14 +61,16 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
      * @throws UnsupportedSelfUpdatePlatformException
      */
     #[Override]
-    public function run(string $currentVersion, bool $checkOnly): SelfUpdateResult
+    public function run(string $currentVersion, bool $checkOnly, ReleaseChannel $releaseChannel = ReleaseChannel::Stable): SelfUpdateResult
     {
         $this->gitHubBinaryAssetResolver->assertSupportedPlatform();
 
-        $latestTag = $this->latestTag();
-        $latestVersion = u($latestTag)->trimPrefix(['v', 'V'])->toString();
+        [$latestTag, $latestVersion] = match ($releaseChannel) {
+            ReleaseChannel::Stable => $this->latestRelease(),
+            ReleaseChannel::Snapshot => [self::SNAPSHOT_TAG, $this->snapshotVersion()],
+        };
 
-        if (!version_compare($latestVersion, $currentVersion, '>')) {
+        if (!$this->replacesRunningVersion($releaseChannel, $latestVersion, $currentVersion)) {
             return new SelfUpdateResult(
                 SelfUpdateStatus::AlreadyUpToDate,
                 $currentVersion,
@@ -91,24 +103,61 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         return $checkOnly ? PricingCatalogRefreshOutcome::Skipped : $this->pricingCatalogRefresher->refresh();
     }
 
+    private function replacesRunningVersion(ReleaseChannel $releaseChannel, string $latestVersion, string $currentVersion): bool
+    {
+        if (ReleaseChannel::Snapshot === $releaseChannel || SnapshotVersion::isValid($currentVersion)) {
+            return $latestVersion !== $currentVersion;
+        }
+
+        return version_compare($latestVersion, $currentVersion, '>');
+    }
+
+    /**
+     * @return array{string, string} the release tag, then the version it carries
+     *
+     * @throws SelfUpdateFailedException
+     */
+    private function latestRelease(): array
+    {
+        $latestTag = $this->releaseField(self::LATEST_RELEASE_API_URL, 'tag_name');
+        if (!ReleaseTag::isValid($latestTag)) {
+            throw SelfUpdateFailedException::forUnresolvableLatestVersion(self::LATEST_RELEASE_API_URL);
+        }
+
+        return [$latestTag, u($latestTag)->trimPrefix(['v', 'V'])->toString()];
+    }
+
     /**
      * @throws SelfUpdateFailedException
      */
-    private function latestTag(): string
+    private function snapshotVersion(): string
     {
-        $payload = $this->releaseClient->get(self::LATEST_RELEASE_API_URL);
+        $snapshotVersion = $this->releaseField(self::SNAPSHOT_RELEASE_API_URL, 'name');
+        if (!SnapshotVersion::isValid($snapshotVersion)) {
+            throw SelfUpdateFailedException::forUnresolvableLatestVersion(self::SNAPSHOT_RELEASE_API_URL);
+        }
+
+        return $snapshotVersion;
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    private function releaseField(string $url, string $field): string
+    {
+        $payload = $this->releaseClient->get($url);
 
         try {
             $decoded = json_decode($payload, true, flags: \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
-            throw SelfUpdateFailedException::forUnresolvableLatestVersion(self::LATEST_RELEASE_API_URL, $jsonException);
+            throw SelfUpdateFailedException::forUnresolvableLatestVersion($url, $jsonException);
         }
 
-        if (!\is_array($decoded) || !\array_key_exists('tag_name', $decoded) || !\is_string($decoded['tag_name']) || !ReleaseTag::isValid($decoded['tag_name'])) {
-            throw SelfUpdateFailedException::forUnresolvableLatestVersion(self::LATEST_RELEASE_API_URL);
+        if (!\is_array($decoded) || !\array_key_exists($field, $decoded) || !\is_string($decoded[$field])) {
+            throw SelfUpdateFailedException::forUnresolvableLatestVersion($url);
         }
 
-        return $decoded['tag_name'];
+        return $decoded[$field];
     }
 
     /**

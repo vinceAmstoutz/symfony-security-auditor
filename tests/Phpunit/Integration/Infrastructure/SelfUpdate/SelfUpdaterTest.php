@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPri
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PendingBinarySwap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefresherInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PricingCatalogRefreshOutcome;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseChannel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
@@ -37,6 +38,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUp
 final class SelfUpdaterTest extends TestCase
 {
     private const string LATEST_RELEASE_API_URL = 'https://api.github.com/repos/vinceAmstoutz/symfony-security-auditor/releases/latest';
+
+    private const string SNAPSHOT_RELEASE_API_URL = 'https://api.github.com/repos/vinceAmstoutz/symfony-security-auditor/releases/tags/snapshot';
 
     private string $workingDirectory;
 
@@ -544,6 +547,99 @@ final class SelfUpdaterTest extends TestCase
         yield 'object without tag_name' => ['{"foo":"bar"}'];
         yield 'non-string tag_name' => ['{"tag_name":123}'];
         yield 'empty tag_name' => ['{"tag_name":""}'];
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_installs_the_snapshot_named_by_the_snapshot_release(): void
+    {
+        $payload = 'SNAPSHOT-BINARY';
+        $selfUpdateResult = $this->selfUpdater($this->snapshotClientFor('1.0.0+3.gabcdef1', $payload, hash('sha256', $payload)))->run('1.0.0', false, ReleaseChannel::Snapshot);
+        $this->pendingBinarySwap->commit();
+
+        self::assertSame(SelfUpdateStatus::Updated, $selfUpdateResult->status);
+        self::assertSame('1.0.0+3.gabcdef1', $selfUpdateResult->latestVersion);
+        self::assertStringEqualsFile($this->binaryPath, $payload);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_installs_a_snapshot_that_ranks_below_the_running_release(): void
+    {
+        $payload = 'SNAPSHOT-BINARY';
+        $selfUpdateResult = $this->selfUpdater($this->snapshotClientFor('1.0.0+3.gabcdef1', $payload, hash('sha256', $payload)))->run('2.0.0', false, ReleaseChannel::Snapshot);
+
+        self::assertSame(SelfUpdateStatus::Updated, $selfUpdateResult->status);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_reports_the_running_snapshot_as_up_to_date(): void
+    {
+        $selfUpdateResult = $this->selfUpdater($this->snapshotClientFor('1.0.0+3.gabcdef1', 'IGNORED', hash('sha256', 'IGNORED')))->run('1.0.0+3.gabcdef1', false, ReleaseChannel::Snapshot);
+
+        self::assertSame(SelfUpdateStatus::AlreadyUpToDate, $selfUpdateResult->status);
+        self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    public function test_it_takes_a_snapshot_build_back_to_the_latest_release(): void
+    {
+        $payload = 'RELEASE-BINARY';
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', $payload, hash('sha256', $payload)))->run('1.0.0+3.gabcdef1', false);
+        $this->pendingBinarySwap->commit();
+
+        self::assertSame(SelfUpdateStatus::Updated, $selfUpdateResult->status);
+        self::assertStringEqualsFile($this->binaryPath, $payload);
+    }
+
+    /**
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    #[DataProvider('unresolvableSnapshotPayloads')]
+    public function test_it_refuses_a_snapshot_release_that_names_no_snapshot_version(string $apiBody): void
+    {
+        $fakeReleaseClient = new FakeReleaseClient([self::SNAPSHOT_RELEASE_API_URL => $apiBody]);
+
+        try {
+            $this->selfUpdater($fakeReleaseClient)->run('1.0.0', false, ReleaseChannel::Snapshot);
+            self::fail('A snapshot release without a snapshot version must be refused.');
+        } catch (SelfUpdateFailedException $selfUpdateFailedException) {
+            self::assertSame(\sprintf('Could not determine the latest released version from "%s".', self::SNAPSHOT_RELEASE_API_URL), $selfUpdateFailedException->getMessage());
+            self::assertSame(1, $fakeReleaseClient->requests);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unresolvableSnapshotPayloads(): iterable
+    {
+        yield 'not json' => ['this is not json'];
+        yield 'object without name' => ['{"tag_name":"snapshot"}'];
+        yield 'non-string name' => ['{"name":123}'];
+        yield 'a release version' => ['{"name":"1.0.0"}'];
+        yield 'a terminal escape' => ['{"name":"1.0.0+3.gabcdef1\\u001b[31m"}'];
+    }
+
+    /**
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    private function snapshotClientFor(string $snapshotVersion, string $payload, string $checksum): FakeReleaseClient
+    {
+        return new FakeReleaseClient([
+            self::SNAPSHOT_RELEASE_API_URL => \sprintf('{"tag_name":"snapshot","name":"%s"}', $snapshotVersion),
+            $this->asset('snapshot')->checksumUrl => \sprintf("%s\n", $checksum),
+        ], $payload);
     }
 
     /**

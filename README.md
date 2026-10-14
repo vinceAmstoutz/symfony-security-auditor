@@ -184,6 +184,14 @@ symfony-security-auditor self-update --check  # only report whether a newer vers
 
 `self-update` fetches the latest release for your platform, **verifies its checksum before replacing the binary**, and swaps it in place — see the [CLI reference](docs/configuration.md#self-update--updating-the-standalone-binary).
 
+Want a fix before it ships? Every push to the development branch publishes a `snapshot` pre-release, reporting a version such as `1.21.0+14.g4531440` (the last release, the commits since, the commit it was built from). A plain `self-update` takes you back to the latest release:
+
+```bash
+symfony-security-auditor self-update --snapshot
+# or, from scratch
+curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_VERSION=snapshot sh
+```
+
 ## Use it as a Symfony bundle
 
 ### 1. Install — Symfony Flex wires everything
