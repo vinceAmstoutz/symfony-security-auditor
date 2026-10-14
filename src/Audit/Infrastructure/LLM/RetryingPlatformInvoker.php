@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\MessageBag;
-use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
@@ -49,7 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Retr
 final readonly class RetryingPlatformInvoker
 {
     public function __construct(
-        private ?PlatformInterface $platform,
+        private PlatformBinding $platformBinding,
         private string $model,
         private LoggerInterface $logger,
         private RateLimiterInterface $rateLimiter,
@@ -77,7 +76,7 @@ final readonly class RetryingPlatformInvoker
      */
     public function invoke(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
-        $platform = $this->platform ?? throw MissingAiPlatformException::create();
+        $platform = $this->platformBinding->platform();
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 

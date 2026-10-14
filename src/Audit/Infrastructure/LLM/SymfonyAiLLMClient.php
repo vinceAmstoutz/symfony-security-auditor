@@ -106,7 +106,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         );
 
         $this->retryingPlatformInvoker = new RetryingPlatformInvoker(
-            $platformBinding->platform,
+            $platformBinding,
             $platformBinding->model,
             $platformBinding->logger,
             $this->rateLimiter,
@@ -137,7 +137,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         $inFlightRequestCanceller = new InFlightRequestCanceller($platformBinding->model, $this->rateLimiter, $platformAccountingConfig->budgetTracker, $platformBinding->logger, $platformAccountingConfig->tokenUsageRecorder);
 
         $this->batchWindowResolver = new BatchWindowResolver(
-            $platformBinding->platform,
+            $platformBinding,
             $platformBinding->model,
             $this->rateLimiter,
             $platformAccountingConfig->budgetTracker,
@@ -153,7 +153,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         );
 
         $this->toolConversationWavefront = new ToolConversationWavefront(
-            $platformBinding->platform,
+            $platformBinding,
             $platformBinding->model,
             $platformBinding->logger,
             $this->rateLimiter,

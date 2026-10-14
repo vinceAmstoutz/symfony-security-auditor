@@ -51,7 +51,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 final readonly class BatchWindowResolver
 {
     public function __construct(
-        private ?PlatformInterface $platform,
+        private PlatformBinding $platformBinding,
         private string $model,
         private RateLimiterInterface $rateLimiter,
         private ?BudgetTracker $budgetTracker,
@@ -78,7 +78,7 @@ final readonly class BatchWindowResolver
      */
     public function resolveWindow(array $window): array
     {
-        $platform = $this->platform ?? throw MissingAiPlatformException::create();
+        $platform = $this->platformBinding->platform();
         $this->budgetTracker?->assertWithinBudget();
 
         return $this->resolveDispatched($window, $this->dispatch($platform, $window));

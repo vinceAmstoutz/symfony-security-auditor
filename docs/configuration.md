@@ -335,6 +335,18 @@ ai:
     #     api_key: '%env(GATEWAY_TOKEN)%'
 ```
 
+### Several platforms in a Symfony application
+
+`symfony/ai-bundle` wires `Symfony\AI\Platform\PlatformInterface`, the platform the audit runs against, only when `ai.yaml` configures exactly one platform. When it configures several, or several instances of an instance-keyed platform, select the one to audit with by aliasing the interface to its service, `ai.platform.<platform>` or `ai.platform.<platform>.<instance>`, in your application's services:
+
+```yaml
+# config/services.yaml
+services:
+    Symfony\AI\Platform\PlatformInterface: '@ai.platform.anthropic'
+```
+
+The alias also decides whose rates price the run. Without it, the audit stops at its first LLM call with `Several AI platforms are configured (ai.platform.anthropic, ai.platform.openai) and none is selected`, naming the services you can alias to; a `--dry-run` estimate, which calls no model, still runs.
+
 ### Instance-keyed platforms
 
 Most platforms take their settings directly (`anthropic: {api_key: …}`). Six of them are keyed by an instance name instead, because you may configure several of each: `generic`, `openresponses`, `azure`, `bedrock`, `cache` and `failover`. Their settings live one level deeper, under a name you choose:
@@ -348,7 +360,7 @@ ai:
                 api_key: '%env(GATEWAY_TOKEN)%'
 ```
 
-In **bundle** mode that is all you need: `symfony/ai-bundle` selects the platform by itself when exactly one is configured.
+In **bundle** mode that is all you need: `symfony/ai-bundle` selects the platform by itself when exactly one is configured, and you alias `PlatformInterface` to one of them when there are several (see [Several platforms in a Symfony application](#several-platforms-in-a-symfony-application)).
 
 In **standalone** mode the top-level `provider:` key selects which platform the audit runs against, and for these six it must carry the instance name too:
 

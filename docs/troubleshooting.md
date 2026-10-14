@@ -170,13 +170,17 @@ VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['de
 
 `audit:run` aborts with this message when no `Symfony\AI\Platform\PlatformInterface` service exists in the container. The `symfony/ai-bundle` recipe ships `config/packages/ai.yaml` with **every platform commented out** — uncomment one (e.g. `anthropic`) and set its API key. See [Configuration → Platform Configuration](configuration.md#platform-configuration).
 
+### `Several AI platforms are configured (…) and none is selected`
+
+`config/packages/ai.yaml` configures more than one platform, and `symfony/ai-bundle` wires `Symfony\AI\Platform\PlatformInterface` only for a single one, so the audit has none to call. Alias the interface to the service of the platform to audit with, one of those the message names, under `services:` in `config/services.yaml` (`Symfony\AI\Platform\PlatformInterface: '@ai.platform.anthropic'`). See [Configuration → Several platforms in a Symfony application](configuration.md#several-platforms-in-a-symfony-application).
+
 ### `The service "security_auditor.attacker_client" has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"`
 
 Same root cause as above, surfaced at container compile time (`cache:clear`, `cache:warmup`) by versions **≤ 1.7.0**. Upgrade to `1.7.1` or later — the container then compiles without a platform and the actionable error above is raised only when an audit actually runs.
 
 ### `Argument #1 ... must be of type Symfony\AI\Platform\PlatformInterface, NULL given`
 
-Same root cause as above — another **≤ 1.7.0** symptom. Since `1.7.1`, `PlatformBinding`'s platform property (and every collaborator built from it) is typed `?PlatformInterface`, so a missing platform can no longer reach a constructor as a hard type error. Upgrade to `1.7.1` or later, or verify `ai.yaml` has a `platform:` block and the corresponding `symfony/ai-*-platform` package is installed.
+Same root cause as above — another **≤ 1.7.0** symptom. Since `1.7.1`, `PlatformBinding`'s platform property is typed `?PlatformInterface` and every collaborator built from it asks the binding for the platform when it calls one, so a missing platform can no longer reach a constructor as a hard type error. Upgrade to `1.7.1` or later, or verify `ai.yaml` has a `platform:` block and the corresponding `symfony/ai-*-platform` package is installed.
 
 ## Running the Audit
 

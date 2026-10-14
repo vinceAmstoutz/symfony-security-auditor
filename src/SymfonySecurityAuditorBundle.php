@@ -67,6 +67,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerPa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TypedNodeEnvPlaceholderFinder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\UnselectedPlatformsPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
@@ -102,6 +103,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
+        $container->addCompilerPass(new UnselectedPlatformsPass(PlatformInterface::class));
     }
 
     #[Override]
@@ -433,6 +435,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $model,
                 service('logger'),
                 $maxOutputTokens,
+                param(UnselectedPlatformsPass::PARAMETER),
             ]),
             inline_service(PlatformRequestConfig::class)->args([
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,

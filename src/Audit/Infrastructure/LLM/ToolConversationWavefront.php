@@ -74,7 +74,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 final readonly class ToolConversationWavefront
 {
     public function __construct(
-        private ?PlatformInterface $platform,
+        private PlatformBinding $platformBinding,
         private string $model,
         private LoggerInterface $logger,
         private RateLimiterInterface $rateLimiter,
@@ -105,7 +105,7 @@ final readonly class ToolConversationWavefront
      */
     public function resolveToolWindow(array $window, int $maxToolIterations): array
     {
-        $platform = $this->platform ?? throw MissingAiPlatformException::create();
+        $platform = $this->platformBinding->platform();
 
         $states = $this->initializeConversationStates($window);
 
