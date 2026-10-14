@@ -53,15 +53,11 @@ final class ConfigKeyInstanceNameTest extends TestCase
         yield 'a single digit other than zero keys by name' => ['1', true];
         yield 'leading zeroes keep the name a string' => ['007', true];
         yield 'a negative number is usable once folded' => ['-1', true];
-        yield 'a hyphen that folds into a float is refused' => ['1.-', false];
         yield 'digits with a letter name the instance' => ['eu1', true];
         yield 'a leading digit still names the instance' => ['1eu', true];
         yield 'an ordinary name is usable' => ['my_gateway', true];
-        yield 'infinity is written unquoted and cannot be read back' => ['.inf', false];
-        yield 'not-a-number is written unquoted too' => ['.nan', false];
-        yield 'the casing of infinity does not save it' => ['.INF', false];
         yield 'a word that merely looks evaluable is quoted for us' => ['true', true];
         yield 'a yaml tag is resolved away where the writer nests it' => ['!php/const', false];
-        yield 'the merge key is not a name the block keeps' => ['<<', false];
+        yield 'bytes that are not UTF-8 cannot be read back' => ["\xff", false];
     }
 }

@@ -1119,7 +1119,7 @@ final class InitCommandTest extends TestCase
         $commandTester = $this->commandTester();
 
         $exitCode = $commandTester->execute(
-            ['--provider' => 'generic..inf', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['--provider' => 'generic.0', '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
             ['interactive' => false],
         );
 
@@ -1128,6 +1128,40 @@ final class InitCommandTest extends TestCase
             'cannot be read back with',
             $this->unwrappedDisplay($commandTester),
         );
+    }
+
+    #[DataProvider('instanceNamesTheYamlLibraryDecides')]
+    public function test_it_never_writes_an_instance_name_the_config_cannot_be_read_back_with(string $instance): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(
+            ['--provider' => 'generic.'.$instance, '--model' => 'our-model', '--env-var' => 'TOKEN', '--base-url' => 'https://gw.example'],
+            ['interactive' => false],
+        );
+
+        if (Command::INVALID === $exitCode) {
+            self::assertStringContainsString('cannot be read back with', $this->unwrappedDisplay($commandTester));
+
+            return;
+        }
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertSame(
+            ['provider' => 'generic.'.$instance, 'platform' => ['generic' => [$instance => ['base_url' => 'https://gw.example', 'api_key' => '%env(TOKEN)%']]], 'model' => 'our-model'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function instanceNamesTheYamlLibraryDecides(): iterable
+    {
+        yield 'infinity' => ['.inf'];
+        yield 'not-a-number' => ['.nan'];
+        yield 'infinity in capitals' => ['.INF'];
+        yield 'the merge key' => ['<<'];
     }
 
     public function test_it_names_the_stray_instance_before_the_base_url_rule(): void

@@ -45,10 +45,11 @@ final readonly class ConfigKeyInstanceName
      * A name only works if the config file still holds it after `init` writes
      * it, so the same dumper and parser that will handle the file are asked
      * about a block nested the way the writer nests one: `0` is dumped as a
-     * sequence entry the prototype cannot take a name from, `.inf` and `.nan`
-     * are dumped unquoted and refused on the way back in, and a name read as a
-     * YAML tag or as the merge key comes back as something else entirely, which
-     * would leave `provider:` pointing at an instance the block does not hold.
+     * sequence entry the prototype cannot take a name from, symfony/yaml
+     * releases before 7.4.21 dump `.inf` and `.nan` unquoted and refuse them on
+     * the way back in, and a name read as a YAML tag or, on those releases, as
+     * the merge key comes back as something else entirely, which would leave
+     * `provider:` pointing at an instance the block does not hold.
      */
     public static function isUsable(string $instance): bool
     {
