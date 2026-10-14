@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
@@ -646,6 +645,24 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws MalformedSarifFileException
      * @throws InvalidCustomRiskPatternException
      */
+    public function test_a_sarif_path_leading_to_a_device_that_never_ends_aborts_with_a_clear_error(): void
+    {
+        $sarifPath = $this->tmpDir.'/psalm.sarif';
+        $this->filesystem->symlink('/dev/zero', $sarifPath);
+
+        $this->expectException(SarifFileNotReadableException::class);
+        $this->expectExceptionMessage(\sprintf('Configured SARIF import file "%1$s" could not be read: File "%1$s" holds more than 33554432 bytes, so it was not read.', $sarifPath));
+
+        $this->scanner(['psalm.sarif'], projectRoot: $this->tmpDir)->scan([$this->projectFile('src/A.php', $this->tmpDir)]);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
+     */
     public function test_a_missing_sarif_file_aborts_with_a_clear_error(): void
     {
         $this->expectException(SarifFileNotReadableException::class);
@@ -760,22 +777,10 @@ final class SarifImportingPreScannerTest extends TestCase
      */
     public function test_an_unreadable_sarif_file_aborts_with_a_clear_error(): void
     {
-        $filesystem = $this->createMock(Filesystem::class);
-        $filesystem->method('exists')->willReturn(true);
-        $filesystem->expects(self::once())
-            ->method('readFile')
-            ->willThrowException(new IOException('permission denied'));
-        $sarifImportingPreScanner = new SarifImportingPreScanner(
-            new RegexStaticPreScanner(),
-            ['/reports/psalm.sarif'],
-            $filesystem,
-            new AuditedProjectPathHolder('/app'),
-        );
-
         $this->expectException(SarifFileNotReadableException::class);
-        $this->expectExceptionMessage('does not exist or is not readable');
+        $this->expectExceptionMessage(\sprintf('Configured SARIF import file "%1$s" could not be read: File "%1$s" could not be read: file_get_contents(): Read of', $this->tmpDir));
 
-        $sarifImportingPreScanner->scan([$this->projectFile('src/A.php')]);
+        $this->scanner([$this->tmpDir])->scan([$this->projectFile('src/A.php')]);
     }
 
     /**

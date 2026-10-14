@@ -20,6 +20,8 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\BoundedFileReader;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\UnreadableInputFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
@@ -111,11 +113,11 @@ final readonly class Baseline implements BaselineInterface
         }
 
         try {
-            $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
+            $decoded = json_decode(BoundedFileReader::read($path), true, flags: \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
             throw MalformedBaselineFileException::fromJsonException($path, $jsonException);
-        } catch (IOException $ioException) {
-            throw MalformedBaselineFileException::fromIOException($path, $ioException);
+        } catch (UnreadableInputFileException $unreadableInputFileException) {
+            throw MalformedBaselineFileException::fromIOException($path, $unreadableInputFileException);
         }
 
         if (!\is_array($decoded) || !array_is_list($decoded)) {

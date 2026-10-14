@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
+use Closure;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -463,6 +464,146 @@ final class StandaloneConfigLoaderTest extends TestCase
             ['baseline' => $this->configHome.'/project/.security-baseline.json'],
             $this->loader()->load(auditedProjectConfigFile: $projectConfigFile)->auditConfig['audit'],
         );
+    }
+
+    /**
+     * @param Closure(Filesystem, string): string $placeBaseline
+     *
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('unreadableAuditedProjectBaselines')]
+    public function test_an_audited_project_config_naming_a_baseline_the_run_may_not_read_is_skipped_as_a_whole_with_its_reason(Closure $placeBaseline, string $reason): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->mkdir(\dirname($projectFile));
+        $baseline = $placeBaseline($this->filesystem, \dirname($projectFile));
+        $this->filesystem->dumpFile($projectFile, \sprintf("profile: fast\naudit:\n  baseline: '%s'\n", $baseline));
+
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertInstanceOf(AuditedProjectConfig::class, $standaloneConfig->auditedProjectConfig);
+        self::assertTrue($standaloneConfig->auditedProjectConfig->wasSkipped());
+        self::assertSame([], $standaloneConfig->auditConfig);
+        self::assertSame(\sprintf($reason, $projectFile, $baseline), $standaloneConfig->auditedProjectConfig->skipReason);
+    }
+
+    /**
+     * @return iterable<string, array{Closure(Filesystem, string): string, string}>
+     */
+    public static function unreadableAuditedProjectBaselines(): iterable
+    {
+        $outsideTheProject = 'Config file "%s" names the baseline "%s", which is not a regular file inside the audited project: a project config may not point the baseline at a device or at a file of yours.';
+
+        yield 'a link to a device' => [static function (Filesystem $filesystem, string $projectDirectory): string {
+            $filesystem->symlink('/dev/zero', $projectDirectory.'/security-baseline.json');
+
+            return $projectDirectory.'/security-baseline.json';
+        }, $outsideTheProject];
+        yield 'a file outside the project' => [static function (Filesystem $filesystem, string $projectDirectory): string {
+            $filesystem->dumpFile(\dirname($projectDirectory).'/elsewhere/baseline.json', '[]');
+
+            return \dirname($projectDirectory).'/elsewhere/baseline.json';
+        }, $outsideTheProject];
+        yield 'a link out of the project' => [static function (Filesystem $filesystem, string $projectDirectory): string {
+            $filesystem->dumpFile(\dirname($projectDirectory).'/elsewhere/baseline.json', '[]');
+            $filesystem->symlink(\dirname($projectDirectory).'/elsewhere/baseline.json', $projectDirectory.'/security-baseline.json');
+
+            return $projectDirectory.'/security-baseline.json';
+        }, $outsideTheProject];
+        yield 'a directory of the project' => [static function (Filesystem $filesystem, string $projectDirectory): string {
+            $filesystem->mkdir($projectDirectory.'/security-baseline.json');
+
+            return $projectDirectory.'/security-baseline.json';
+        }, $outsideTheProject];
+        yield 'a link to a file of the project one byte past a mebibyte' => [static function (Filesystem $filesystem, string $projectDirectory): string {
+            $filesystem->dumpFile($projectDirectory.'/shared/baseline.json', '['.str_repeat(' ', 1_048_575).']');
+            $filesystem->symlink($projectDirectory.'/shared/baseline.json', $projectDirectory.'/security-baseline.json');
+
+            return $projectDirectory.'/security-baseline.json';
+        }, 'Config file "%s" names the baseline "%s", which holds more than 1048576 bytes, far more than a project baseline needs.'];
+    }
+
+    /**
+     * @param Closure(Filesystem, string): string $placeBaseline
+     *
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('readableAuditedProjectBaselines')]
+    public function test_an_audited_project_config_naming_a_baseline_the_run_may_read_is_layered(Closure $placeBaseline): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->mkdir(\dirname($projectFile));
+        $baseline = $placeBaseline($this->filesystem, \dirname($projectFile));
+        $this->filesystem->dumpFile($projectFile, \sprintf("audit:\n  baseline: '%s'\n", $baseline));
+
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertSame(['audit' => ['baseline' => $baseline]], $standaloneConfig->auditConfig);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_an_audited_project_reached_through_a_linked_folder_may_name_a_baseline_inside_it(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $this->filesystem->dumpFile($this->configHome.'/project/security-baseline.json', '[]');
+        $this->filesystem->symlink($this->configHome.'/project', $this->configHome.'/linked');
+
+        $projectFile = $this->configHome.'/linked/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectFile, "audit:\n  baseline: security-baseline.json\n");
+
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $projectFile);
+
+        self::assertSame(['audit' => ['baseline' => $this->configHome.'/linked/security-baseline.json']], $standaloneConfig->auditConfig);
+    }
+
+    /**
+     * @return iterable<string, array{Closure(Filesystem, string): string}>
+     */
+    public static function readableAuditedProjectBaselines(): iterable
+    {
+        yield 'a file of a mebibyte' => [static function (Filesystem $filesystem, string $projectDirectory): string {
+            $filesystem->dumpFile($projectDirectory.'/security-baseline.json', '['.str_repeat(' ', 1_048_574).']');
+
+            return $projectDirectory.'/security-baseline.json';
+        }];
+        yield 'a link to a file of the project' => [static function (Filesystem $filesystem, string $projectDirectory): string {
+            $filesystem->dumpFile($projectDirectory.'/shared/baseline.json', '[]');
+            $filesystem->symlink($projectDirectory.'/shared/baseline.json', $projectDirectory.'/security-baseline.json');
+
+            return $projectDirectory.'/security-baseline.json';
+        }];
+        yield 'a file the project does not hold yet' => [static fn (Filesystem $filesystem, string $projectDirectory): string => $projectDirectory.'/security-baseline.json'];
     }
 
     /**

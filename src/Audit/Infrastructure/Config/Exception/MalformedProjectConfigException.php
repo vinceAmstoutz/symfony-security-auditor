@@ -64,6 +64,16 @@ final class MalformedProjectConfigException extends RuntimeException
         return new self(TerminalText::escaped(\sprintf('Config file "%s" is a symbolic link. A project config must be a regular file, so the audited repository cannot point it at a file of yours; replace the link with the file itself.', $configFile)));
     }
 
+    public static function forBaselineOutsideProject(string $configFile, string $baseline): self
+    {
+        return new self(TerminalText::escaped(\sprintf('Config file "%s" names the baseline "%s", which is not a regular file inside the audited project: a project config may not point the baseline at a device or at a file of yours.', $configFile, $baseline)));
+    }
+
+    public static function forOversizedBaseline(string $configFile, string $baseline, int $maxBytes): self
+    {
+        return new self(TerminalText::escaped(\sprintf('Config file "%s" names the baseline "%s", which holds more than %d bytes, far more than a project baseline needs.', $configFile, $baseline, $maxBytes)));
+    }
+
     /**
      * The value is not quoted: it is what would have reached the terminal.
      */

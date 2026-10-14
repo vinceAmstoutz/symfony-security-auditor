@@ -241,6 +241,20 @@ final class BaselineTest extends TestCase
     /**
      * @throws MalformedBaselineFileException
      */
+    public function test_load_refuses_a_file_past_thirty_two_mebibytes_without_decoding_it(): void
+    {
+        $path = $this->tmpDir.'/huge.json';
+        $this->filesystem->dumpFile($path, '['.str_repeat(' ', 33_554_431).']');
+
+        $this->expectException(MalformedBaselineFileException::class);
+        $this->expectExceptionMessage(\sprintf('Baseline file "%1$s" could not be read or written: File "%1$s" holds more than 33554432 bytes, so it was not read.', $path));
+
+        (new Baseline($this->filesystem))->load($path);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_load_throws_when_the_json_is_a_bare_scalar(): void
     {
         $path = $this->tmpDir.'/scalar.json';

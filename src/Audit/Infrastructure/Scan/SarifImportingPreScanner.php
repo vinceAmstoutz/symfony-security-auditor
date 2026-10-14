@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use JsonException;
 use Override;
-use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
@@ -23,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\BoundedFileReader;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\UnreadableInputFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\MalformedSarifFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\SarifFileNotReadableException;
 
@@ -123,9 +124,9 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
         }
 
         try {
-            $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
-        } catch (IOException $ioException) {
-            throw SarifFileNotReadableException::forPath($path, $ioException);
+            $decoded = json_decode(BoundedFileReader::read($path), true, flags: \JSON_THROW_ON_ERROR);
+        } catch (UnreadableInputFileException $unreadableInputFileException) {
+            throw SarifFileNotReadableException::fromUnreadableFile($path, $unreadableInputFileException);
         } catch (JsonException $jsonException) {
             throw MalformedSarifFileException::fromJsonException($path, $jsonException);
         }

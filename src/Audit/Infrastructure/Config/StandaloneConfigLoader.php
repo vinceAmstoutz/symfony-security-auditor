@@ -165,13 +165,14 @@ final readonly class StandaloneConfigLoader
         }
 
         try {
-            $config = $this->projectConfigReader()->read($auditedProjectConfigFile, $workingDirectoryConfig);
+            $config = ProjectConfigPathAnchor::anchored($this->projectConfigReader()->read($auditedProjectConfigFile, $workingDirectoryConfig), $auditedProjectConfigFile);
             $httpTimeout = HttpTimeout::raisedBy($config, $userTimeout, $auditedProjectConfigFile);
+            AuditedProjectBaseline::assertReadable($config, $auditedProjectConfigFile);
         } catch (MalformedProjectConfigException|ProjectConfigPlatformOverrideException|ProjectConfigScanOverrideException|ProjectConfigUserOnlyKeyException $projectConfigRefusal) {
             return AuditedProjectConfig::skipped($auditedProjectConfigFile, $projectConfigRefusal->getMessage());
         }
 
-        return AuditedProjectConfig::layered($auditedProjectConfigFile, ProjectConfigPathAnchor::anchored($config, $auditedProjectConfigFile), $httpTimeout);
+        return AuditedProjectConfig::layered($auditedProjectConfigFile, $config, $httpTimeout);
     }
 
     /**

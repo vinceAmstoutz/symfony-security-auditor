@@ -23,4 +23,9 @@ final class SarifFileNotReadableException extends RuntimeException
     {
         return new self(\sprintf('Configured SARIF import file "%s" does not exist or is not readable.', $path), previous: $throwable);
     }
+
+    public static function fromUnreadableFile(string $path, Throwable $throwable): self
+    {
+        return new self(\sprintf('Configured SARIF import file "%s" could not be read: %s', $path, $throwable->getMessage()), previous: $throwable);
+    }
 }
