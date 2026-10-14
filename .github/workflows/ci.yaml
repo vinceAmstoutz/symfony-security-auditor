@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # A newer push to the same branch supersedes the run of the commit before it; pull request and manual runs are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 env:
   # Pin the root package version instead of letting Composer guess it. The guess
   # depends on the checked-out branch name and on tags being present, neither of
