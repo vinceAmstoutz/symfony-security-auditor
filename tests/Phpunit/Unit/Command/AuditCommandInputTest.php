@@ -353,6 +353,40 @@ final class AuditCommandInputTest extends TestCase
         self::assertNull((new AuditCommandInput())->failOnIncomplete);
     }
 
+    public function test_the_flag_decides_whether_an_incomplete_run_fails_until_the_configuration_is_applied(): void
+    {
+        self::assertSame('--fail-on-incomplete', (new AuditCommandInput())->failOnIncompleteSetting());
+    }
+
+    public function test_the_configuration_decides_whether_an_incomplete_run_fails_when_the_flag_is_unset(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(failOnIncomplete: true));
+
+        self::assertSame('audit.fail_on_incomplete', $auditCommandInput->failOnIncompleteSetting());
+    }
+
+    #[DataProvider('failOnIncompleteFlags')]
+    public function test_the_flag_decides_whether_an_incomplete_run_fails_whatever_the_configuration_says(bool $failOnIncomplete): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->failOnIncomplete = $failOnIncomplete;
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(failOnIncomplete: true));
+
+        self::assertSame('--fail-on-incomplete', $auditCommandInput->failOnIncompleteSetting());
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function failOnIncompleteFlags(): iterable
+    {
+        yield '--fail-on-incomplete' => [true];
+        yield '--no-fail-on-incomplete' => [false];
+    }
+
     public function test_the_configured_defaults_fill_what_the_command_line_left_unset(): void
     {
         $auditCommandInput = new AuditCommandInput();

@@ -84,6 +84,8 @@ final class AuditCommandInput
     #[Option(description: 'Exit 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning unless audit.fail_on_incomplete is set; --no-fail-on-incomplete turns that off for this run.', name: 'fail-on-incomplete')]
     public ?bool $failOnIncomplete = null;
 
+    private bool $failOnIncompleteFromConfiguration = false;
+
     /**
      * Fills what the command line left unset from the configuration, so a flag
      * always wins over its `audit.*` key. An empty `audit.output`, such as an
@@ -93,6 +95,7 @@ final class AuditCommandInput
     public function applyDefaults(AuditCommandDefaults $auditCommandDefaults): void
     {
         $this->minScore ??= $auditCommandDefaults->minScore;
+        $this->failOnIncompleteFromConfiguration = null === $this->failOnIncomplete;
         $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
         $this->output ??= $this->noOutput || $this->dryRun || '' === $auditCommandDefaults->output ? null : $auditCommandDefaults->output;
         $this->format = $this->givenFormat ?? $auditCommandDefaults->format;
@@ -101,6 +104,15 @@ final class AuditCommandInput
     public function failsOnIncomplete(): bool
     {
         return true === $this->failOnIncomplete;
+    }
+
+    /**
+     * What decides whether an incomplete run fails: the flag, or — when the
+     * command line left it unset — the configuration key.
+     */
+    public function failOnIncompleteSetting(): string
+    {
+        return $this->failOnIncompleteFromConfiguration ? 'audit.fail_on_incomplete' : '--fail-on-incomplete';
     }
 
     /**

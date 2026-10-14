@@ -69,14 +69,19 @@ interface AuditPresenterInterface
 
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void;
 
-    public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void;
+    /**
+     * @param string $failOnIncompleteSetting the flag or configuration key that failed an incomplete run, named when it did
+     */
+    public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode, string $failOnIncompleteSetting): void;
 
     /**
      * Says so when the report could not analyze every file — and nothing
      * otherwise. `result()` prints it itself; a run that shows no result — its
      * report went to stdout, or it generated a baseline — calls it directly.
+     *
+     * @param string $failOnIncompleteSetting the flag or configuration key that failed an incomplete run, named when it did
      */
-    public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void;
+    public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode, string $failOnIncompleteSetting): void;
 
     public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void;
 

@@ -20,7 +20,7 @@ inputs:
     required: false
     default: sarif
   output:
-    description: File path to write the report to. Leave empty to print to stdout.
+    description: File path to write the report to. Leave empty to print to stdout, whatever the project's audit.output configuration says.
     required: false
     default: report.sarif
   baseline:
@@ -40,13 +40,13 @@ inputs:
     required: false
     default: ""
   min-score:
-    description: Minimum normalized score (0-100) below which the audit exits 1. Independent of fail-on — the audit fails when either gate trips. Leave empty to gate on the risk level alone.
+    description: Minimum normalized score (0-100) below which the audit exits 1. Independent of fail-on — the audit fails when either gate trips. Leave empty to use the project's audit.min_score configuration (none by default, so the risk level alone gates).
     required: false
     default: ""
   fail-on-incomplete:
-    description: Whether the audit exits 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass the job. A tripped fail-on or min-score gate still exits 1. Left false, such a run only raises a warning annotation (when format is json or sarif and output is a file).
+    description: Whether the audit exits 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass the job. A tripped fail-on or min-score gate still exits 1. Leave empty to use the project's audit.fail_on_incomplete configuration (default false); false turns it off for this run. A run that does not fail on it only raises a warning annotation (when format is json or sarif and output is a file).
     required: false
-    default: "false"
+    default: ""
   comment-pr:
     description: Whether to post the report as a single pull-request comment, editing the previous one in place on every rerun instead of appending. Requires format github-comment plus a non-empty output, a pull_request event, and pull-requests write permission on the calling job's GITHUB_TOKEN (passed as the GITHUB_TOKEN env var).
     required: false
@@ -164,14 +164,40 @@ runs:
         SSA_EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
         set -uo pipefail
+        if [ "$SSA_MODE" = "standalone" ]; then
+          audit=(symfony-security-auditor audit)
+        else
+          audit=(php bin/console audit:run)
+        fi
+
+        # A command older than 1.22 has neither the audit.output and
+        # audit.fail_on_incomplete keys nor the flags that override them.
+        overrides_config=false
+        if [ -z "$SSA_OUTPUT" ] || [ "$SSA_FAIL_ON_INCOMPLETE" = "false" ]; then
+          usage="$("${audit[@]}" --help 2>/dev/null)" || usage=""
+          case "$usage" in *--no-output*) overrides_config=true ;; esac
+        fi
+
+        # An empty output prints the report, unless extra-args names a file.
+        no_output=false
+        if [ -z "$SSA_OUTPUT" ] && [ "$overrides_config" = true ]; then
+          no_output=true
+          # shellcheck disable=SC2086 -- the same word-splitting extra-args gets below
+          for arg in $SSA_EXTRA_ARGS; do
+            case "$arg" in --output | --output=* | -o* | -[!-]*o*) no_output=false ;; esac
+          done
+        fi
+
         args=("$SSA_PROJECT_PATH" "--format=$SSA_FORMAT")
         if [ -n "$SSA_OUTPUT" ]; then args+=("--output=$SSA_OUTPUT"); fi
+        if [ "$no_output" = true ]; then args+=("--no-output"); fi
         if [ -n "$SSA_BASELINE" ]; then args+=("--baseline=$SSA_BASELINE"); fi
         if [ -n "$SSA_GENERATE_BASELINE" ]; then args+=("--generate-baseline=$SSA_GENERATE_BASELINE"); fi
         if [ -n "$SSA_SINCE" ]; then args+=("--since=$SSA_SINCE"); fi
         if [ -n "$SSA_FAIL_ON" ]; then args+=("--fail-on=$SSA_FAIL_ON"); fi
         if [ -n "$SSA_MIN_SCORE" ]; then args+=("--min-score=$SSA_MIN_SCORE"); fi
         if [ "$SSA_FAIL_ON_INCOMPLETE" = "true" ]; then args+=("--fail-on-incomplete"); fi
+        if [ "$SSA_FAIL_ON_INCOMPLETE" = "false" ] && [ "$overrides_config" = true ]; then args+=("--no-fail-on-incomplete"); fi
         # shellcheck disable=SC2206 -- intentional word-splitting of caller-supplied extra args
         if [ -n "$SSA_EXTRA_ARGS" ]; then args+=($SSA_EXTRA_ARGS); fi
 
@@ -198,11 +224,7 @@ runs:
         # budget-abort exit 2 and fail-on-incomplete exit 3 are the cases those
         # outputs exist to report.
         exit_code=0
-        if [ "$SSA_MODE" = "standalone" ]; then
-          symfony-security-auditor audit "${args[@]}" || exit_code=$?
-        else
-          php bin/console audit:run "${args[@]}" || exit_code=$?
-        fi
+        "${audit[@]}" "${args[@]}" || exit_code=$?
 
         echo "exit-code=$exit_code" >> "$GITHUB_OUTPUT"
         echo "report-path=$SSA_OUTPUT" >> "$GITHUB_OUTPUT"

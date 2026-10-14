@@ -350,7 +350,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     #[Override]
-    public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
+    public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode, string $failOnIncompleteSetting): void
     {
         if (Command::FAILURE === $exitCode && !$auditReport->isWithoutVerdict()) {
             $totalVulnerabilities = $auditReport->totalVulnerabilities();
@@ -361,13 +361,13 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                 $totalVulnerabilities,
                 1 === $totalVulnerabilities ? 'vulnerability' : 'vulnerabilities',
             ));
-            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode);
+            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode, $failOnIncompleteSetting);
 
             return;
         }
 
         if ($this->statesNoCleanResult($auditReport)) {
-            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode);
+            $this->incompleteRunNotice($symfonyStyle, $auditReport, $exitCode, $failOnIncompleteSetting);
 
             return;
         }
@@ -380,7 +380,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     #[Override]
-    public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
+    public function incompleteRunNotice(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode, string $failOnIncompleteSetting): void
     {
         if (!$this->statesNoCleanResult($auditReport)) {
             return;
@@ -389,7 +389,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $summary = $this->incompleteSummary($auditReport);
 
         if (ExitCode::Incomplete->value === $exitCode) {
-            $symfonyStyle->error(\sprintf('%s The run fails because --fail-on-incomplete is set.', $summary));
+            $symfonyStyle->error(\sprintf('%s The run fails because %s is set.', $summary, $failOnIncompleteSetting));
 
             return;
         }

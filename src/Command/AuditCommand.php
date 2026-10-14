@@ -352,7 +352,7 @@ final readonly class AuditCommand
             $this->auditPresenter->baselineGenerated($symfonyStyle, $generateBaseline, $fingerprintCount);
         }
 
-        $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $auditReport, $exitCode);
+        $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $auditReport, $exitCode, $auditCommandInput->failOnIncompleteSetting());
 
         return $exitCode;
     }
@@ -380,12 +380,12 @@ final readonly class AuditCommand
         );
 
         if ($auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $baselineResult->report, $exitCode);
+            $this->auditPresenter->incompleteRunNotice($this->displayStyle($symfonyStyle, $auditCommandInput), $baselineResult->report, $exitCode, $auditCommandInput->failOnIncompleteSetting());
 
             return $exitCode;
         }
 
-        $this->auditPresenter->result($symfonyStyle, $baselineResult->report, $exitCode);
+        $this->auditPresenter->result($symfonyStyle, $baselineResult->report, $exitCode, $auditCommandInput->failOnIncompleteSetting());
 
         return $exitCode;
     }
