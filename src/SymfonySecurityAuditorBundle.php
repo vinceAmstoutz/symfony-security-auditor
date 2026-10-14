@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
@@ -42,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
@@ -82,6 +84,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\UnpricedCostCapWarning;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\UsageBookingClientFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
@@ -281,6 +285,38 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ));
 
         $servicesConfigurator->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
+
+        $this->bookUsageOfReplacedClients($servicesConfigurator);
+    }
+
+    /**
+     * An application may wire its own client in place of either one; its
+     * decorator wraps the client the id ends up naming before any decorator of
+     * the application's own does, so the usage is booked once.
+     */
+    private function bookUsageOfReplacedClients(ServicesConfigurator $servicesConfigurator): void
+    {
+        $servicesConfigurator->set(UnpricedCostCapWarning::class)
+            ->private()
+            ->args([
+                service(AuditBudget::class),
+                service(CostCalculator::class),
+                service(PricingProviderInterface::class),
+                service('logger'),
+            ]);
+
+        foreach (['security_auditor.attacker_client', 'security_auditor.reviewer_client'] as $clientId) {
+            $servicesConfigurator->set(\sprintf('%s.usage_booking', $clientId), LLMClientInterface::class)
+                ->private()
+                ->decorate($clientId, null, \PHP_INT_MAX)
+                ->factory([UsageBookingClientFactory::class, 'around'])
+                ->args([
+                    service('.inner'),
+                    service(TokenUsageRecorder::class),
+                    service(BudgetTracker::class),
+                    service(UnpricedCostCapWarning::class),
+                ]);
+        }
     }
 
     private function registerImplementationAliases(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void

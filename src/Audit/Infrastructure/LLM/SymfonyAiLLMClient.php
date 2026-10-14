@@ -44,7 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInterface
+final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInterface, UsageBookingLLMClientInterface
 {
     public const ?float DEFAULT_TEMPERATURE = null;
 

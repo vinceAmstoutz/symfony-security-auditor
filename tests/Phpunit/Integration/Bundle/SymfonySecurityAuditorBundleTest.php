@@ -51,14 +51,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
@@ -92,8 +98,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
@@ -110,6 +121,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportin
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\PassThroughLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\UsageReportingLLMClient;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
 {
@@ -1126,6 +1139,133 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(LLMClientInterface::class, $this->getPrivateService($kernel, LLMClientInterface::class));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_custom_llm_client_has_the_usage_it_reports_booked_for_the_report_and_the_budget(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o'], registerHostServices: $this->replaceBothClientsWithAUsageReportingOne(...));
+
+        foreach ([LLMClientInterface::class, 'security_auditor.reviewer_client'] as $clientId) {
+            $llmClient = $this->getPrivateService($kernel, $clientId);
+            self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+            $llmClient->complete('system', 'user');
+        }
+
+        $tokenUsageRecorder = $this->getPrivateService($kernel, TokenUsageRecorder::class);
+        self::assertInstanceOf(TokenUsageRecorder::class, $tokenUsageRecorder);
+        self::assertSame([200, 40], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens()]);
+        $budgetTracker = $this->getPrivateService($kernel, BudgetTracker::class);
+        self::assertInstanceOf(BudgetTracker::class, $budgetTracker);
+        self::assertSame(240, $budgetTracker->tokensUsed());
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_custom_llm_client_is_stopped_once_it_spends_the_token_budget(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 100]]], registerHostServices: $this->replaceBothClientsWithAUsageReportingOne(...));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $this->expectException(BudgetExceededException::class);
+
+        $llmClient->complete('system', 'user');
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_bundled_llm_client_books_its_own_usage_once(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(SymfonyAiLLMClient::class, $llmClient);
+
+        $llmResponse = $llmClient->complete('system', 'user');
+
+        $tokenUsageRecorder = $this->getPrivateService($kernel, TokenUsageRecorder::class);
+        self::assertInstanceOf(TokenUsageRecorder::class, $tokenUsageRecorder);
+        self::assertGreaterThan(0, $llmResponse->inputTokens());
+        self::assertSame([$llmResponse->inputTokens(), $llmResponse->outputTokens()], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens()]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_decorator_an_application_wraps_around_the_bundled_client_leaves_its_usage_booked_once(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o'], registerHostServices: static function (ContainerBuilder $containerBuilder): void {
+            $containerBuilder->register(PassThroughLLMClient::class, PassThroughLLMClient::class)
+                ->setDecoratedService('security_auditor.attacker_client')
+                ->setArguments([new Reference('.inner')]);
+        });
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(PassThroughLLMClient::class, $llmClient);
+
+        $llmResponse = $llmClient->complete('system', 'user');
+
+        $tokenUsageRecorder = $this->getPrivateService($kernel, TokenUsageRecorder::class);
+        self::assertInstanceOf(TokenUsageRecorder::class, $tokenUsageRecorder);
+        self::assertGreaterThan(0, $llmResponse->inputTokens());
+        self::assertSame($llmResponse->inputTokens(), $tokenUsageRecorder->snapshot()->inputTokens());
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function clientIdsAliasingEachOther(): iterable
+    {
+        yield 'the reviewer client aliasing the attacker client' => ['security_auditor.attacker_client', 'security_auditor.reviewer_client', 'security_auditor.attacker_client'];
+        yield 'the attacker client aliasing the reviewer client' => ['security_auditor.reviewer_client', 'security_auditor.attacker_client', 'security_auditor.reviewer_client'];
+        yield 'the reviewer client aliasing the client interface' => ['security_auditor.attacker_client', 'security_auditor.reviewer_client', LLMClientInterface::class];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('clientIdsAliasingEachOther')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_custom_llm_client_both_ids_reach_through_an_alias_is_booked_once_a_call(string $replacedClientId, string $aliasingClientId, string $aliasTarget): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o'], registerHostServices: static function (ContainerBuilder $containerBuilder) use ($replacedClientId, $aliasingClientId, $aliasTarget): void {
+            $containerBuilder->register(UsageReportingLLMClient::class, UsageReportingLLMClient::class);
+            $containerBuilder->setAlias($replacedClientId, UsageReportingLLMClient::class);
+            $containerBuilder->setAlias($aliasingClientId, $aliasTarget);
+        });
+
+        foreach (['security_auditor.attacker_client', 'security_auditor.reviewer_client'] as $clientId) {
+            $llmClient = $this->getPrivateService($kernel, $clientId);
+            self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+            $llmClient->complete('system', 'user');
+        }
+
+        $tokenUsageRecorder = $this->getPrivateService($kernel, TokenUsageRecorder::class);
+        self::assertInstanceOf(TokenUsageRecorder::class, $tokenUsageRecorder);
+        self::assertSame([200, 40], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens()]);
+    }
+
+    private function replaceBothClientsWithAUsageReportingOne(ContainerBuilder $containerBuilder): void
+    {
+        $containerBuilder->register(UsageReportingLLMClient::class, UsageReportingLLMClient::class);
+        $containerBuilder->setAlias('security_auditor.attacker_client', UsageReportingLLMClient::class);
+        $containerBuilder->setAlias('security_auditor.reviewer_client', UsageReportingLLMClient::class);
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_bundle_wires_null_rate_limiter_when_no_rate_limit_dimension_configured(): void
@@ -2057,12 +2197,17 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $bundleConfig
+     * @param array<string, mixed>                   $bundleConfig
+     * @param (Closure(ContainerBuilder): void)|null $registerHostServices
      */
-    private function boot(array $bundleConfig, bool $registerPlatform = true, bool $hostRegistersClock = true): Kernel
+    private function boot(array $bundleConfig, bool $registerPlatform = true, bool $hostRegistersClock = true, ?Closure $registerHostServices = null): Kernel
     {
         $tmpDir = $this->tmpDir;
-        $configureHost = static function (ContainerBuilder $containerBuilder) use ($registerPlatform, $hostRegistersClock): void {
+        $configureHost = static function (ContainerBuilder $containerBuilder) use ($registerPlatform, $hostRegistersClock, $registerHostServices): void {
+            if ($registerHostServices instanceof Closure) {
+                $registerHostServices($containerBuilder);
+            }
+
             if ($registerPlatform) {
                 $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
                     ->setArguments(['stub-response'])
