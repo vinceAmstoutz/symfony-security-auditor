@@ -441,6 +441,21 @@ final class SymfonyMappingContextRendererTest extends TestCase
         self::assertSame(['after matching'], $received);
     }
 
+    public function test_a_route_whose_governing_rule_cannot_be_told_is_marked_as_such_rather_than_covered_or_lacking(): void
+    {
+        $routePath = '/'.str_repeat('a', 30).'b0';
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', $routePath, ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: ['^/(a+)+z0$' => ['ROLE_ADMIN'], '^/a' => ['ROLE_A']], routeAccessControls: [$routeAccessControl]),
+        );
+
+        self::assertStringEndsWith(
+            \sprintf("- GET %s — src/Controller/X.php::index — UNKNOWN_ACCESS_CONTROL (an access_control path pattern was too costly to evaluate against this route)\n\n", $routePath),
+            SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping),
+        );
+    }
+
     public function test_a_later_valid_rule_still_covers_the_route_after_a_pattern_that_does_not_compile(): void
     {
         $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);

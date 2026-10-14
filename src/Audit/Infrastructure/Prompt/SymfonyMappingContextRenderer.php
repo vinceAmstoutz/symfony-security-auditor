@@ -246,12 +246,17 @@ final readonly class SymfonyMappingContextRenderer
      * restricts access. When no rule matches, or the matching one grants
      * {@see self::PUBLIC_ACCESS_PSEUDO_ROLES public access}, the route is
      * reachable by anyone, so it is tagged `LACKS_ACCESS_CHECK` rather than
-     * suppressed as `COVERED_BY`.
+     * suppressed as `COVERED_BY`. When the matcher cannot tell which rule
+     * governs the route, it is tagged as unknown, never as covered.
      *
-     * @param list<string>|null $firewallRoles
+     * @param list<string>|false|null $firewallRoles
      */
-    private static function firewallCoverageLabel(?array $firewallRoles): string
+    private static function firewallCoverageLabel(array|false|null $firewallRoles): string
     {
+        if (false === $firewallRoles) {
+            return 'UNKNOWN_ACCESS_CONTROL (an access_control path pattern was too costly to evaluate against this route)';
+        }
+
         if (null === $firewallRoles || self::grantsPublicAccess($firewallRoles)) {
             return 'LACKS_ACCESS_CHECK';
         }

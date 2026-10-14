@@ -381,6 +381,27 @@ final class AttackerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_every_chunk_of_a_mapping_carries_the_access_control_map_rendered_for_it_and_another_mapping_its_own(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/AdminController.php', '/app/src/Controller/AdminController.php', '<?php class AdminController {}');
+        $secondChunk = ProjectFile::create('src/Service/Mailer.php', '/app/src/Service/Mailer.php', '<?php class Mailer {}');
+        $routeAccessControl = new RouteAccessControl('src/Controller/AdminController.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(routeAccessMap: ['^/admin' => ['ROLE_ADMIN']], routeAccessControls: [$routeAccessControl]));
+        $otherMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(routeAccessMap: ['^/api' => ['ROLE_API']], routeAccessControls: [$routeAccessControl]));
+
+        $firstMessage = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+        $secondMessage = $this->attackerPromptBuilder->buildUserMessage([$secondChunk], $symfonyMapping);
+        $otherMessage = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $otherMapping);
+
+        $coveredLine = '- GET /admin — src/Controller/AdminController.php::index — COVERED_BY access_control[ROLE_ADMIN]';
+        self::assertStringContainsString($coveredLine, $firstMessage);
+        self::assertStringContainsString($coveredLine, $secondMessage);
+        self::assertStringContainsString('- GET /admin — src/Controller/AdminController.php::index — LACKS_ACCESS_CHECK', $otherMessage);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_route_without_attribute_check_is_marked_covered_when_a_firewall_access_control_matches(): void
     {
         $projectFile = ProjectFile::create(

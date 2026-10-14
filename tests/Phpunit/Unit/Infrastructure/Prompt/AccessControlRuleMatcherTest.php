@@ -20,13 +20,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AccessContr
 
 final class AccessControlRuleMatcherTest extends TestCase
 {
+    private const string CATASTROPHIC_PATTERN = '^/(a+)+z0$';
+
+    private const string CATASTROPHIC_ROUTE = '/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaab0';
+
     /**
      * @param list<string>                $routeMethods
      * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>|null           $expectedRoles
+     * @param list<string>|false|null     $expectedRoles
      */
     #[DataProvider('routeCases')]
-    public function test_it_finds_the_roles_of_the_rule_that_governs_the_route(?string $routePath, array $routeMethods, ?string $routeName, array $routeAccessMap, ?array $expectedRoles): void
+    public function test_it_finds_the_roles_of_the_rule_that_governs_the_route(?string $routePath, array $routeMethods, ?string $routeName, array $routeAccessMap, array|false|null $expectedRoles): void
     {
         $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', $routePath, $routeMethods, true, [], false, false, $routeName);
 
@@ -34,7 +38,7 @@ final class AccessControlRuleMatcherTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{0: ?string, 1: list<string>, 2: ?string, 3: array<string, list<string>>, 4: list<string>|null}>
+     * @return iterable<string, array{0: ?string, 1: list<string>, 2: ?string, 3: array<string, list<string>>, 4: list<string>|false|null}>
      */
     public static function routeCases(): iterable
     {
@@ -55,5 +59,27 @@ final class AccessControlRuleMatcherTest extends TestCase
         yield 'path rule listed before a route name rule is skipped for a route without a path' => [null, ['GET'], 'admin_dashboard', ['^/admin' => ['ROLE_ADMIN'], 'route: admin_dashboard' => ['ROLE_NAME']], ['ROLE_NAME']];
         yield 'pattern holding a delimiter candidate' => ['/a#b', ['GET'], null, ['^/a#b$' => ['ROLE_HASH']], ['ROLE_HASH']];
         yield 'pattern holding every delimiter candidate' => ['/#~!%@', ['GET'], null, ['#~!%@' => ['ROLE_ALL']], null];
+        yield 'pattern that does not compile matches nothing' => ['/admin', ['GET'], null, ['^/(admin' => ['ROLE_BROKEN']], null];
+        yield 'pattern that cannot be decided within the bound leaves the route undetermined' => [self::CATASTROPHIC_ROUTE, ['GET'], null, [self::CATASTROPHIC_PATTERN => ['ROLE_X']], false];
+        yield 'pattern that cannot be decided listed before a matching rule leaves the route undetermined' => [self::CATASTROPHIC_ROUTE, ['GET'], null, [self::CATASTROPHIC_PATTERN => ['ROLE_X'], '^/a' => ['ROLE_A']], false];
+        yield 'pattern that cannot be decided listed after the governing rule is never reached' => [self::CATASTROPHIC_ROUTE, ['GET'], null, ['^/a' => ['ROLE_A'], self::CATASTROPHIC_PATTERN => ['ROLE_X']], ['ROLE_A']];
+        yield 'pattern that cannot be decided is not evaluated for a rule skipped on a method mismatch' => [self::CATASTROPHIC_ROUTE, ['GET'], null, [self::CATASTROPHIC_PATTERN => ['ROLE_X', 'methods: POST'], '^/a' => ['ROLE_A']], ['ROLE_A']];
+        yield 'pattern decided within ten thousand backtracking steps' => [str_repeat('/a', 9_997).'/', ['GET'], null, ['(*NO_JIT)^(?:/a)*$' => ['ROLE_X']], null];
+        yield 'pattern needing one backtracking step past ten thousand' => [str_repeat('/a', 9_998).'/', ['GET'], null, ['(*NO_JIT)^(?:/a)*$' => ['ROLE_X']], false];
+    }
+
+    public function test_the_backtrack_limit_in_place_before_matching_is_back_afterwards(): void
+    {
+        $previousLimit = \ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', '777777');
+
+        try {
+            AccessControlRuleMatcher::rolesFor(new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false), ['^/admin' => ['ROLE_ADMIN']]);
+            $limitAfterMatching = \ini_get('pcre.backtrack_limit');
+        } finally {
+            ini_set('pcre.backtrack_limit', false === $previousLimit ? '1000000' : $previousLimit);
+        }
+
+        self::assertSame('777777', $limitAfterMatching);
     }
 }

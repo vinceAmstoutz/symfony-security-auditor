@@ -28,16 +28,23 @@ final readonly class AccessControlRuleMatcher
 
     private const string ROUTE_TARGET_PREFIX = 'route: ';
 
+    private const int PATTERN_BACKTRACK_LIMIT = 10_000;
+
     /**
+     * A rule whose path pattern cannot be decided for the route, before any
+     * rule governs it, leaves the answer open: that rule may be the one
+     * Symfony applies, so the route is neither covered nor uncovered.
+     *
      * @param array<string, list<string>> $routeAccessMap
      *
-     * @return list<string>|null
+     * @return list<string>|false|null the governing rule's roles, null when no rule governs the route, false when it cannot be told
      */
-    public static function rolesFor(RouteAccessControl $routeAccessControl, array $routeAccessMap): ?array
+    public static function rolesFor(RouteAccessControl $routeAccessControl, array $routeAccessMap): array|false|null
     {
         foreach ($routeAccessMap as $target => $roles) {
-            if (self::methodsAreCovered($roles, $routeAccessControl->routeMethods()) && self::targetGoverns($target, $routeAccessControl)) {
-                return $roles;
+            $governs = self::ruleGoverns($target, $roles, $routeAccessControl);
+            if (false !== $governs) {
+                return true === $governs ? $roles : false;
             }
         }
 
@@ -45,11 +52,19 @@ final readonly class AccessControlRuleMatcher
     }
 
     /**
+     * @param list<string> $roles
+     */
+    private static function ruleGoverns(string $target, array $roles, RouteAccessControl $routeAccessControl): ?bool
+    {
+        return self::methodsAreCovered($roles, $routeAccessControl->routeMethods()) ? self::targetGoverns($target, $routeAccessControl) : false;
+    }
+
+    /**
      * A target is either `route: <name>`
      * ({@see SymfonyYamlSecurityConfigParser::targetOf()}), which governs the
      * route of that name, or the `path` pattern of a rule.
      */
-    private static function targetGoverns(string $target, RouteAccessControl $routeAccessControl): bool
+    private static function targetGoverns(string $target, RouteAccessControl $routeAccessControl): ?bool
     {
         if (str_starts_with($target, self::ROUTE_TARGET_PREFIX)) {
             $routeName = $routeAccessControl->routeName();
@@ -59,7 +74,7 @@ final readonly class AccessControlRuleMatcher
 
         $routePath = $routeAccessControl->routePath();
 
-        return null !== $routePath && self::pathPatternMatches($target, $routePath);
+        return null === $routePath ? false : self::pathPatternMatches($target, $routePath);
     }
 
     /**
@@ -67,11 +82,11 @@ final readonly class AccessControlRuleMatcher
      * it is matched as one; a malformed pattern, or one containing every
      * delimiter candidate, simply fails to match rather than throwing.
      */
-    private static function pathPatternMatches(string $pattern, string $routePath): bool
+    private static function pathPatternMatches(string $pattern, string $routePath): ?bool
     {
         $delimiter = self::delimiterAvoiding($pattern);
 
-        return null !== $delimiter && self::patternMatches($delimiter.$pattern.$delimiter, $routePath);
+        return null === $delimiter ? false : self::patternMatches($delimiter.$pattern.$delimiter, $routePath);
     }
 
     /**
@@ -80,8 +95,14 @@ final readonly class AccessControlRuleMatcher
      * (Symfony debug, `mcp:serve`) would abort the prompt build on a pattern
      * taken from the audited repository, so the warning is captured here and
      * the pattern simply matches nothing.
+     *
+     * A pattern from the repository may also backtrack catastrophically
+     * (`^/(a+)+z$` against a long route path), and each route meets each
+     * rule, so a match gets {@see self::PATTERN_BACKTRACK_LIMIT} steps rather
+     * than `pcre.backtrack_limit`'s million. One it cannot decide within them
+     * returns null: the pattern may match the route, so it cannot be told.
      */
-    private static function patternMatches(string $delimitedPattern, string $routePath): bool
+    private static function patternMatches(string $delimitedPattern, string $routePath): ?bool
     {
         $compilationError = null;
         set_error_handler(static function (int $severity, string $message) use (&$compilationError): bool {
@@ -90,11 +111,17 @@ final readonly class AccessControlRuleMatcher
             return true;
         });
 
-        try {
-            return 1 === preg_match($delimitedPattern, $routePath);
-        } finally {
-            restore_error_handler();
+        $backtrackLimit = ini_set('pcre.backtrack_limit', self::PATTERN_BACKTRACK_LIMIT);
+
+        $matched = preg_match($delimitedPattern, $routePath);
+        ini_set('pcre.backtrack_limit', $backtrackLimit);
+        restore_error_handler();
+
+        if (false !== $matched) {
+            return 1 === $matched;
         }
+
+        return null === $compilationError ? null : false;
     }
 
     /**
