@@ -1,6 +1,7 @@
 /vendor/
 /var/
 composer.lock
+!/tools/bc-check/composer.lock
 .phpunit.cache/
 infection/
 /build/coverage/

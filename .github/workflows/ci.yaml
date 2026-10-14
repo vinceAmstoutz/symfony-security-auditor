@@ -304,3 +304,63 @@ jobs:
 
       - name: Compare with the fixtures recorded from the last release
         run: vendor/bin/phpunit -c phpunit.compat.xml
+
+  api-bc:
+    name: API compatibility (roave/backward-compatibility-check)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.3'
+          extensions: bcmath, intl
+          coverage: none
+
+      - name: Install roave/backward-compatibility-check
+        run: composer install --working-dir=tools/bc-check --no-interaction --prefer-dist --no-progress
+
+      - name: Find the last release of the line this change is headed for
+        id: release
+        env:
+          BASE_BRANCH: ${{ github.base_ref || github.ref_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          # A release branch names its line; a stacked pull request names it with the release branch ticked in its description, else the release branch it is closest to.
+          line=''
+          case "$BASE_BRANCH" in
+            [0-9]*.x) line="${BASE_BRANCH%.x}" ;;
+            main) ;;
+            *)
+              line="$(printf '%s\n' "${PR_BODY:-}" | tr -d '\r' | sed -n 's/^- \[[xX]\] `\([0-9][0-9]*\)\.x`.*/\1/p' | head -n 1)"
+              if [ -z "$line" ]; then
+                closest=''
+                for branch in $(git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin/); do
+                  case "$branch" in [0-9]*.x) ;; *) continue ;; esac
+                  ahead="$(git rev-list --count "origin/$branch..HEAD")"
+                  if [ -z "$closest" ] || [ "$ahead" -lt "$closest" ]; then
+                    closest="$ahead"
+                    line="${branch%.x}"
+                  fi
+                done
+              fi
+              ;;
+          esac
+          if [ -n "$line" ]; then pattern="$line.*.*"; else pattern='*.*.*'; fi
+          tag="$(git tag --list "$pattern" --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ -z "$tag" ]; then
+            echo "::notice::No release of ${line:+line $line.x}${line:-any line} yet: there is no public API to compare with."
+          fi
+
+      - name: Compare the public API with that release
+        if: steps.release.outputs.tag != ''
+        env:
+          LAST_RELEASE: ${{ steps.release.outputs.tag }}
+        run: var/bc-check/vendor/bin/roave-backward-compatibility-check --from="$LAST_RELEASE" --format=github-actions

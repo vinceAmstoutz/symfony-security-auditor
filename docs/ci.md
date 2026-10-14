@@ -528,5 +528,6 @@ Every format, its options and sample output live in the [Output Formats Referenc
 Upgrading within `1.x` must not change what your pipeline relies on. Besides its unit, integration and end-to-end suites, this repository's own CI compares every pull request with the last release, and fails on any difference the maintainer has not accepted and announced in [`CHANGELOG.md`](../CHANGELOG.md):
 
 - **Configuration** — the bundle configuration, path by path: kind, default, choices, bounds, the values each setting takes and what it reads them as, `%env()%` placeholders, what a project's `.symfony-security-auditor.yaml` may set, and the published container parameters for each `profile`. A key added since the release must be listed in [Versioning](versioning.md).
+- **Public PHP API** — every class, interface, enum and member not tagged `@internal` (see [Versioning](versioning.md#public-api--what-is-covered-by-the-bc-promise)), compared by [roave/backward-compatibility-check](https://github.com/Roave/BackwardCompatibilityCheck) with the last release of the line the change is headed for.
 
 [CONTRIBUTING.md → Compatibility Checks](../CONTRIBUTING.md#compatibility-checks) explains how to run them, accept a difference, and record them again from a new release.

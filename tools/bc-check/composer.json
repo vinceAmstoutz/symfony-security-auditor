@@ -1,0 +1,17 @@
+{
+    "name": "vinceamstoutz/symfony-security-auditor-bc-check",
+    "description": "roave/backward-compatibility-check, installed apart from the project's own dependencies for the API compatibility job",
+    "license": "MIT",
+    "type": "project",
+    "require": {
+        "php": "~8.3.0",
+        "roave/backward-compatibility-check": "^8.18"
+    },
+    "config": {
+        "platform": {
+            "php": "8.3.6"
+        },
+        "sort-packages": true,
+        "vendor-dir": "../../var/bc-check/vendor"
+    }
+}

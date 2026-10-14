@@ -123,9 +123,22 @@ It runs as the **Compatibility** CI job, on PHP 8.3 and Symfony 7.4. A differenc
 
 `tests/Phpunit/Compat/Configuration/` compares the bundle configuration with the snapshot recorded from the last release, path by path: kind, default, choices, bounds and whether the key is required; which of a fixed set of values the bundle loads with and what each becomes (a value the tree let through but the release then failed on, with a `TypeError` for instance, does not count as taken); whether it takes an `%env()%` placeholder; whether the standalone binary lets a project's `.symfony-security-auditor.yaml` set it; and the container parameters the bundle publishes, for the default configuration and for each `profile`. A narrowing of a path is a `MAJOR` change (see [Versioning](docs/versioning.md)): restore the released contract. A parameter whose value changes on purpose, such as a cache key salt when a prompt changes, goes into `tests/Phpunit/Compat/Configuration/accepted-differences.php` with the parameters it names (`*` matches any run of characters), a one-line reason, and its `CHANGELOG.md` bullet. A key added since the release must be listed in `docs/versioning.md` and described in `resources/schema.json`.
 
+### Public API
+
+The **API compatibility** CI job compares the public PHP API with the last release of the line the change is headed for, with [roave/backward-compatibility-check](https://github.com/Roave/BackwardCompatibilityCheck), and fails on a removed or changed class, method, property, constant or enum case, a narrowed type or an added required parameter. Classes and members tagged `@internal` are not checked. The release is the newest `X.Y.Z` tag of the base branch's line (`1.*.*` for a pull request on `1.x`); a stacked pull request, based on another one's branch, takes the line of the release branch ticked in its description, else of the release branch its commits are closest to.
+
+The tool lives in its own Composer project under `tools/bc-check/`, apart from the project's dependencies, and needs the `bcmath` and `intl` extensions. It reads the release from git and refuses to run in a `git worktree` checkout, so run it in a full clone that holds the tag:
+
+```bash
+docker compose exec php composer install --working-dir=tools/bc-check
+docker compose exec php var/bc-check/vendor/bin/roave-backward-compatibility-check --from=1.21.0
+```
+
+A break the maintainer accepted goes into `.roave-backward-compatibility-check.xml` as an `ignored-regex` that is the reported line itself, with every metacharacter escaped, right after a `<!-- CHANGELOG: "…" -->` comment naming the bold summary of its bullet under `## [Unreleased]`. `RoaveBaselineTest` refuses a pattern with a wildcard and an entry no such bullet announces.
+
 ### Recording From a New Release
 
-Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch, and empty the `accepted-differences.php` files, whose entries described differences from the previous release:
+Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch, and empty the `accepted-differences.php` files and the `<baseline>` of `.roave-backward-compatibility-check.xml`, whose entries described differences from the previous release:
 
 ```bash
 bin/castor compat:record X.Y.Z
@@ -262,7 +275,7 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
      sh .github/scripts/check-pull-request.sh
    ```
 
-The CI pipeline runs seven jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife) → **zizmor** (GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.1, 8.1 on PHP 8.4+ only, then Infection 100% MSI) → **Compatibility** (see [Compatibility Checks](#compatibility-checks)). All seven must pass before merging.
+The CI pipeline runs eight jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife) → **zizmor** (GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.1, 8.1 on PHP 8.4+ only, then Infection 100% MSI) → **Compatibility** → **API compatibility** (see [Compatibility Checks](#compatibility-checks)). All eight must pass before merging.
 
 Details: [`docs/ci.md`](docs/ci.md).
 

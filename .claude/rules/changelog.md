@@ -42,3 +42,4 @@ Place it under the correct Keep-a-Changelog subsection (`### Added`, `### Change
 6. Once the tag exists, record the compatibility fixtures from it in a pull request on `<N>.x`, as [CONTRIBUTING.md → Compatibility Checks](../../CONTRIBUTING.md#compatibility-checks) describes:
    - run `bin/castor compat:record X.Y.Z`, which replaces the configuration snapshot under `tests/Phpunit/Compat/Configuration/Fixture/`;
    - empty `tests/Phpunit/Compat/Configuration/accepted-differences.php`: its entries described differences from the previous release.
+   - empty the `<baseline>` of `.roave-backward-compatibility-check.xml`: the API compatibility job now compares with the new tag, and the breaks it accepted were against the previous one.

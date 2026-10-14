@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    API changes from the last release that the maintainer accepted: one
+    ignored-regex per reported line, written as that line, under a
+    CHANGELOG comment naming the bullet of CHANGELOG.md's [Unreleased]
+    section that announces it (checked by RoaveBaselineTest). Emptied once
+    the next release is tagged (see CONTRIBUTING.md, "Compatibility Checks").
+-->
+<roave-bc-check xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="var/bc-check/vendor/roave/backward-compatibility-check/Resources/schema.xsd">
+    <baseline>
+        <!-- CHANGELOG: "Cross-site scripting is now a finding type of its own: `xss` (CWE-79, OWASP A05:2025 - Injection)." -->
+        <ignored-regex>#\[BC\] ADDED: Case VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\VulnerabilityType::XSS was added#</ignored-regex>
+    </baseline>
+</roave-bc-check>
