@@ -13,7 +13,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
 #
 # Environment variables:
-#   SSA_VERSION      release tag to install (default: latest)
+#   SSA_VERSION      release tag to install (default: latest; "snapshot" for the
+#                    latest snapshot)
 #   SSA_INSTALL_DIR  target directory (default: /usr/local/bin, else ~/.local/bin)
 #   SSA_INIT         when "1", run "<binary> init" after installing so a single
 #                    command installs and configures the tool; prompts read from

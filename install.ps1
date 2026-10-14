@@ -16,7 +16,7 @@
 
 .NOTES
     Environment variables:
-      SSA_VERSION      release tag to install (default: latest)
+      SSA_VERSION      release tag to install (default: latest; "snapshot" for the latest snapshot)
       SSA_INSTALL_DIR  target directory (default: %LOCALAPPDATA%\Programs\symfony-security-auditor)
       SSA_INIT         when "1", run "<binary> init" after installing so a single
                        command installs and configures the tool; prompts read from

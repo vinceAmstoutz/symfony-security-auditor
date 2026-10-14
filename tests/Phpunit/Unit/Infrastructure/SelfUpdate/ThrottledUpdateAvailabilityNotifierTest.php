@@ -37,6 +37,28 @@ final class ThrottledUpdateAvailabilityNotifierTest extends TestCase
         self::assertSame(self::EXPECTED_NOTICE, $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0'));
     }
 
+    public function test_it_reports_a_release_newer_than_the_one_a_snapshot_was_built_on(): void
+    {
+        $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier(
+            new FakeSelfUpdater('2.0.0'),
+            new InMemoryUpdateCheckStore(),
+            new MockClock('2026-01-01 00:00:00'),
+        );
+
+        self::assertSame(self::EXPECTED_NOTICE, $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0+14.g4531440'));
+    }
+
+    public function test_it_stays_quiet_on_a_snapshot_of_the_latest_release(): void
+    {
+        $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier(
+            new FakeSelfUpdater('1.0.0'),
+            new InMemoryUpdateCheckStore(),
+            new MockClock('2026-01-01 00:00:00'),
+        );
+
+        self::assertNull($throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0+14.g4531440'));
+    }
+
     #[DataProvider('hostileLatestVersions')]
     public function test_it_never_prints_a_looked_up_version_that_is_not_a_release_version(string $latestVersion): void
     {

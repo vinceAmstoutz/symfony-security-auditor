@@ -1071,6 +1071,7 @@ Updates the [standalone binary](#standalone-configuration) in place to the lates
 ```bash
 symfony-security-auditor self-update          # download + verify + replace, if newer
 symfony-security-auditor self-update --check  # only report whether a newer version exists
+symfony-security-auditor self-update --snapshot  # switch to the latest snapshot
 ```
 
 It queries the GitHub releases API for the latest version (a release tag is accepted only as `X.Y.Z`, with an optional pre-release suffix and an optional leading `v`, and anything else is refused before it reaches a download URL or the terminal) and, when the running binary is older, downloads the asset for your platform (the same OS/arch detection `install.sh` uses) next to the running executable, **verifies its `.sha256` checksum before replacing anything**, and renames it over the executable — an atomic swap — as the command exits, once nothing more is loaded from the running binary. The command therefore reports `Downloaded and verified <new>; it replaces <old> as this command exits.`; if that final swap fails, it prints why on stderr, keeps the previous binary, and exits `1`. Downloads use `curl`, so it must be on the host (as it already is for the install script).
@@ -1078,6 +1079,13 @@ It queries the GitHub releases API for the latest version (a release tag is acce
 | Option | Default | Description |
 | --- | --- | --- |
 | `--check` | off | Report whether a newer version is available; make no changes to the binary. |
+| `--snapshot` | off | _Since 1.22._ Use the latest snapshot instead of the latest release. |
+
+#### Snapshots
+
+_Since 1.22._ Every push to the development branch (`1.x`) publishes the `snapshot` pre-release: the binaries of that commit, built and checksummed exactly as a release is. It is the shortest way to try a fix before it ships. `self-update --snapshot` installs it whenever its version differs from the running one, and the installers take it with `SSA_VERSION=snapshot` (`curl -fsSL …/install.sh | SSA_VERSION=snapshot sh`, or `$env:SSA_VERSION = 'snapshot'` before `install.ps1`).
+
+A snapshot reports a version such as `1.21.0+14.g4531440`: the last release, the number of commits since, and the commit it was built from. A plain `self-update` takes it back to the latest release, even one older than the snapshot, and the [update notice](#update-notifications) only ever announces a release newer than the one the snapshot was built on. A snapshot is not a release: it carries every change merged since the last one, tested by CI only, and its tag and assets are replaced on every push.
 
 The swap writes a new file into the directory holding the binary, so that directory must be writable — the binary's own permissions do not matter. If it is not (e.g. installed in `/usr/local/bin` without write access), the command refuses to update before downloading anything and tells you to re-run with the necessary permissions (`sudo`) or reinstall with the install script.
 

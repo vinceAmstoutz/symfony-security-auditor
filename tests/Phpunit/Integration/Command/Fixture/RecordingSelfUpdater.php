@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ReleaseChannel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdaterInterface;
 
@@ -23,16 +24,19 @@ final class RecordingSelfUpdater implements SelfUpdaterInterface
 
     public ?bool $checkOnly = null;
 
+    public ?ReleaseChannel $releaseChannel = null;
+
     public function __construct(private readonly SelfUpdateResult $selfUpdateResult) {}
 
     /**
      * @throws void
      */
     #[Override]
-    public function run(string $currentVersion, bool $checkOnly): SelfUpdateResult
+    public function run(string $currentVersion, bool $checkOnly, ReleaseChannel $releaseChannel = ReleaseChannel::Stable): SelfUpdateResult
     {
         $this->currentVersion = $currentVersion;
         $this->checkOnly = $checkOnly;
+        $this->releaseChannel = $releaseChannel;
 
         return $this->selfUpdateResult;
     }

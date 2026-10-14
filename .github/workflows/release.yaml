@@ -37,6 +37,22 @@ on:
         required: false
         type: string
         default: ''
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Existing release to attach the binaries to (e.g. snapshot)'
+        required: true
+        type: string
+      ref:
+        description: 'Commit to build, when it is not the one the tag points at'
+        required: true
+        type: string
+      version:
+        description:
+          "Version to stamp the binaries with (e.g. 1.21.0+14.g4531440);
+          Composer otherwise derives it from the checked-out ref"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -45,11 +61,15 @@ jobs:
   phar:
     name: Compile the PHAR (build input for the binaries)
     runs-on: ubuntu-latest
+    env:
+      # Read by the install and by the autoloader dump Box runs while
+      # compiling; empty outside a snapshot build, which Composer ignores.
+      COMPOSER_ROOT_VERSION: ${{ inputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.ref || inputs.tag || github.ref }}
           persist-credentials: false
 
       - name: Setup PHP
@@ -120,7 +140,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.ref || inputs.tag || github.ref }}
           persist-credentials: false
 
       - name: Setup static-php-cli (pinned stable release, checksum-verified)
@@ -254,9 +274,14 @@ jobs:
         run: test -s "${{ matrix.asset }}"
 
       - name: Smoke-test the binary
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
         run: |
           chmod +x "${{ matrix.asset }}" 2>/dev/null || true
           ./"${{ matrix.asset }}" --version
+          if [ -n "$EXPECTED_VERSION" ]; then
+            ./"${{ matrix.asset }}" --version | grep -F "$EXPECTED_VERSION"
+          fi
 
       - name: Generate the SHA-256 checksum
         run: |
@@ -325,7 +350,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.ref || inputs.tag || github.ref }}
           persist-credentials: false
 
       - name: Attach the installers and config schema to the release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
