@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\BaseNode;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
@@ -24,6 +26,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfig
 final class AuditConfigurationDefinitionTest extends TestCase
 {
     private const array RISK_PATTERNS = ['audit_log' => ['regex' => '/AuditService::log/', 'description' => 'privileged action logged']];
+
+    private const string ENV_PLACEHOLDER = 'env_0123456789abcdef_MODEL_0123456789abcdef0123456789abcdef';
 
     /**
      * @param non-empty-list<string> $path
@@ -198,6 +202,133 @@ final class AuditConfigurationDefinitionTest extends TestCase
         $processed = $this->process([['scan' => ['custom_risk_patterns' => ['controller' => self::RISK_PATTERNS, 'php' => self::RISK_PATTERNS]]]]);
 
         self::assertSame(['controller' => self::RISK_PATTERNS, 'php' => self::RISK_PATTERNS], $this->valueAt($processed, ['scan', 'custom_risk_patterns']));
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('valuesThatAreNoTextOnAModelKey')]
+    public function test_a_model_key_refuses_a_value_that_is_no_text(array $path, mixed $value, string $type): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "string", but got "%s".', implode('.', $path), $type));
+
+        $this->process([self::nested($path, $value)]);
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>, mixed, string}>
+     */
+    public static function valuesThatAreNoTextOnAModelKey(): iterable
+    {
+        foreach (self::modelKeys() as $name => [$path]) {
+            yield $name.' set to a number' => [$path, 5, 'int'];
+            yield $name.' set to a decimal' => [$path, 4.1, 'float'];
+            yield $name.' set to a switch' => [$path, true, 'bool'];
+        }
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('modelKeys')]
+    public function test_a_model_key_still_reads_a_model_name(array $path): void
+    {
+        $processed = $this->process([self::nested($path, 'gpt-4o')]);
+
+        self::assertSame('gpt-4o', $this->valueAt($processed, $path));
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('modelOverrideKeys')]
+    public function test_an_explicit_null_on_a_model_override_resets_the_model_an_earlier_configuration_set(array $path): void
+    {
+        $processed = $this->process([self::nested($path, 'gpt-4o'), self::nested($path, null)]);
+
+        self::assertNull($this->valueAt($processed, $path));
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     * @param array<string, mixed>   $standIns
+     */
+    #[DataProvider('envPlaceholderStandInsOnAModelKey')]
+    public function test_a_model_key_takes_an_env_placeholder_whatever_stand_in_symfony_checks_it_with(array $path, array $standIns): void
+    {
+        BaseNode::setPlaceholder(self::ENV_PLACEHOLDER, $standIns);
+
+        $processed = $this->process([self::nested($path, self::ENV_PLACEHOLDER)]);
+
+        self::assertSame(self::ENV_PLACEHOLDER, $this->valueAt($processed, $path));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>, array<string, mixed>}>
+     */
+    public static function envPlaceholderStandInsOnAModelKey(): iterable
+    {
+        foreach (self::modelKeys() as $name => [$path]) {
+            yield $name.' read through a variable with no default' => [$path, ['string' => '']];
+            yield $name.' read through a variable whose default is null' => [$path, ['string' => null]];
+            yield $name.' read through a typed processor' => [$path, ['int' => 0]];
+        }
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('modelKeys')]
+    public function test_a_model_key_set_to_a_list_keeps_the_message_it_had(array $path): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "scalar", but got "array".', implode('.', $path)));
+
+        $this->process([self::nested($path, ['gpt-4o'])]);
+    }
+
+    #[DataProvider('emptyModels')]
+    public function test_an_empty_model_keeps_the_message_it_had(?string $model, string $message): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage($message);
+
+        $this->process([['model' => $model]]);
+    }
+
+    /**
+     * @return iterable<string, array{?string, string}>
+     */
+    public static function emptyModels(): iterable
+    {
+        yield 'an empty string' => ['', 'The path "symfony_security_auditor.model" cannot contain an empty value, but got "".'];
+        yield 'null' => [null, 'The path "symfony_security_auditor.model" cannot contain an empty value, but got null.'];
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>}>
+     */
+    public static function modelKeys(): iterable
+    {
+        yield 'model' => [['model']];
+        yield from self::modelOverrideKeys();
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>}>
+     */
+    public static function modelOverrideKeys(): iterable
+    {
+        yield 'attacker_model' => [['attacker_model']];
+        yield 'reviewer_model' => [['reviewer_model']];
+        yield 'audit.escalation.cheap_model' => [['audit', 'escalation', 'cheap_model']];
+    }
+
+    #[Override]
+    protected function tearDown(): void
+    {
+        BaseNode::resetPlaceholders();
     }
 
     /**

@@ -42,11 +42,10 @@ final readonly class AuditConfigurationDefinition
     private function defineModelNodes(NodeBuilder $nodeBuilder): void
     {
         $nodeBuilder
-                ->scalarNode('model')
+                ->append((new OptionalModelNodeDefinition('model', null))
                     ->defaultValue('claude-opus-4-8')
                     ->cannotBeEmpty()
-                    ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.')
-                ->end()
+                    ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.'))
                 ->enumNode('profile')
                     ->values(['fast', 'balanced', 'thorough'])
                     ->defaultValue('balanced')

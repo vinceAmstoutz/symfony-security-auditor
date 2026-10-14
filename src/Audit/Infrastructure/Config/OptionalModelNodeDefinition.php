@@ -21,7 +21,7 @@ use Symfony\Component\Config\Definition\Builder\ScalarNodeDefinition;
  */
 final class OptionalModelNodeDefinition extends ScalarNodeDefinition
 {
-    public function __construct(string $name, private readonly string $emptyStringError)
+    public function __construct(string $name, private readonly ?string $emptyStringError)
     {
         parent::__construct($name);
     }

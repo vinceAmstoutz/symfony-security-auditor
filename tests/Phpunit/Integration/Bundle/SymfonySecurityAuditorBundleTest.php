@@ -487,6 +487,29 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $this->boot(['model' => 'gpt-4o', 'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => '']]]);
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('modelKeysSetToANumber')]
+    public function test_bundle_refuses_a_model_key_set_to_a_number_with_a_configuration_error_naming_it(array $config, string $path): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "int".', $path));
+
+        $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function modelKeysSetToANumber(): iterable
+    {
+        yield 'model' => [['model' => 5], 'symfony_security_auditor.model'];
+        yield 'attacker_model' => [['attacker_model' => 5], 'symfony_security_auditor.attacker_model'];
+        yield 'reviewer_model' => [['reviewer_model' => 5], 'symfony_security_auditor.reviewer_model'];
+        yield 'audit.escalation.cheap_model' => [['audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 5]]], 'symfony_security_auditor.audit.escalation.cheap_model'];
+    }
+
     public function test_bundle_accepts_a_null_attacker_model_falling_back_to_model(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'attacker_model' => null]);
