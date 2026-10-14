@@ -27,6 +27,21 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan\Fixture\
 
 final class PhpParserControllerAccessControlParserTest extends TestCase
 {
+    private const string WIPE_CONTROLLER = <<<'PHP'
+        <?php
+        namespace App\Controller;
+        use Symfony\Component\Routing\Attribute\Route;
+        class WipeController
+        {
+            private const DEFAULTS = [];
+            #[Route('/admin/wipe', name: 'admin_wipe', methods: ['POST'])]
+            public function wipe(): void
+            {
+            }
+        }
+
+        PHP;
+
     private PhpParserControllerAccessControlParser $phpParserControllerAccessControlParser;
 
     #[Override]
@@ -1800,6 +1815,26 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $projectFile = $this->makeFile('src/Controller/AdminController.php', $source.str_repeat(')', 16000));
 
         self::assertSame([], $this->phpParserControllerAccessControlParser->parse($projectFile));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_maps_a_controller_whose_unmatched_closing_brackets_sit_in_a_comment(): void
+    {
+        $projectFile = $this->makeFile('src/Controller/WipeController.php', self::WIPE_CONTROLLER.'/* '.str_repeat(')', 16000)." */\n");
+
+        self::assertSame(['/admin/wipe'], array_map(static fn (RouteAccessControl $routeAccessControl): ?string => $routeAccessControl->routePath(), $this->phpParserControllerAccessControlParser->parse($projectFile)));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_maps_a_controller_holding_an_array_literal_nested_a_thousand_levels_deep(): void
+    {
+        $source = str_replace('DEFAULTS = []', 'DEFAULTS = '.str_repeat('[', 1000).str_repeat(']', 1000), self::WIPE_CONTROLLER);
+
+        self::assertSame(['/admin/wipe'], array_map(static fn (RouteAccessControl $routeAccessControl): ?string => $routeAccessControl->routePath(), $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/WipeController.php', $source))));
     }
 
     /**

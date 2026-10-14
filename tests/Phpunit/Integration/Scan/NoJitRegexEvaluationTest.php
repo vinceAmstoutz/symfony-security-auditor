@@ -52,7 +52,7 @@ final class NoJitRegexEvaluationTest extends TestCase
     public static function hostileLineCases(): iterable
     {
         yield 'a line repeating include' => ['dynamic_file_inclusion', ['dynamic_file_inclusion@3']];
-        yield 'a line repeating a LiveProp attribute' => ['live_prop_writable', ['live_prop_writable@4']];
+        yield 'a line repeating a LiveProp attribute' => ['live_prop_writable', ['live_prop_writable@4', 'unmapped_access_control@1']];
         yield 'a line repeating supports()' => ['supports_returns_null', ['supports_returns_null@4']];
         yield 'a line repeating trusted_proxies' => ['trusted_proxies_wildcard', ['trusted_proxies_wildcard@2']];
         yield 'a line repeating forced_ssl' => ['hsts_disabled', ['hsts_disabled@2']];

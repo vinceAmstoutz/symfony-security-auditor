@@ -29,20 +29,27 @@ final class UnmatchedClosersTest extends TestCase
     public static function sourceCases(): iterable
     {
         yield 'an empty source' => ['', false];
-        yield 'parentheses closed as often as they are opened' => [str_repeat('(', 3000).str_repeat(')', 3000), false];
-        yield 'siblings of every kind' => [str_repeat('()', 3000).str_repeat('[]', 3000).str_repeat('{}', 3000), false];
-        yield 'parentheses left open' => [str_repeat('(', 5000), false];
-        yield 'as many unmatched parentheses as the limit' => [str_repeat(')', 1000), false];
-        yield 'one unmatched parenthesis past the limit' => [str_repeat(')', 1001), true];
-        yield 'as many unmatched square brackets as the limit' => [str_repeat(']', 1000), false];
-        yield 'one unmatched square bracket past the limit' => [str_repeat(']', 1001), true];
-        yield 'as many unmatched curly braces as the limit' => [str_repeat('}', 1000), false];
-        yield 'one unmatched curly brace past the limit' => [str_repeat('}', 1001), true];
-        yield 'openers of the same kind taken off the closers' => [str_repeat(')', 1500).str_repeat('(', 500), false];
-        yield 'one closer more once the openers are taken off' => [str_repeat(')', 1501).str_repeat('(', 500), true];
-        yield 'unmatched closers of every kind added up to the limit' => [str_repeat(')', 400).str_repeat(']', 300).str_repeat('}', 300), false];
-        yield 'unmatched closers of every kind added up past the limit' => [str_repeat(')', 400).str_repeat(']', 300).str_repeat('}', 301), true];
-        yield 'openers of another kind taken off nothing' => [str_repeat('(', 500).str_repeat(']', 1001), true];
-        yield 'surplus openers of one kind and closers of another' => [str_repeat('{', 2000).str_repeat(')', 1000), false];
+        yield 'nothing but the PHP tag' => ['<?php ', false];
+        yield 'parentheses closed as often as they are opened' => ['<?php '.str_repeat('(', 3000).str_repeat(')', 3000), false];
+        yield 'siblings of every kind' => ['<?php '.str_repeat('()', 3000).str_repeat('[]', 3000).str_repeat('{}', 3000), false];
+        yield 'parentheses left open' => ['<?php '.str_repeat('(', 5000), false];
+        yield 'as many unmatched parentheses as the limit' => ['<?php '.str_repeat(')', 1000), false];
+        yield 'one unmatched parenthesis past the limit' => ['<?php '.str_repeat(')', 1001), true];
+        yield 'as many unmatched square brackets as the limit' => ['<?php '.str_repeat(']', 1000), false];
+        yield 'one unmatched square bracket past the limit' => ['<?php '.str_repeat(']', 1001), true];
+        yield 'as many unmatched curly braces as the limit' => ['<?php '.str_repeat('}', 1000), false];
+        yield 'one unmatched curly brace past the limit' => ['<?php '.str_repeat('}', 1001), true];
+        yield 'openers of the same kind taken off the closers' => ['<?php '.str_repeat(')', 1500).str_repeat('(', 500), false];
+        yield 'one closer more once the openers are taken off' => ['<?php '.str_repeat(')', 1501).str_repeat('(', 500), true];
+        yield 'unmatched closers of every kind added up to the limit' => ['<?php '.str_repeat(')', 400).str_repeat(']', 300).str_repeat('}', 300), false];
+        yield 'unmatched closers of every kind added up past the limit' => ['<?php '.str_repeat(')', 400).str_repeat(']', 300).str_repeat('}', 301), true];
+        yield 'openers of another kind taken off nothing' => ['<?php '.str_repeat('(', 500).str_repeat(']', 1001), true];
+        yield 'surplus openers of one kind and closers of another' => ['<?php '.str_repeat('{', 2000).str_repeat(')', 1000), false];
+        yield 'closers inside a block comment of a file PHP parses' => ['<?php /* '.str_repeat(')', 1001).' */', false];
+        yield 'closers inside a line comment of a file PHP parses' => ['<?php // '.str_repeat(']', 1001)."\n", false];
+        yield 'closers inside a string of a file PHP parses' => ["<?php \$a = '".str_repeat('}', 1001)."';", false];
+        yield 'closers in inline HTML' => [str_repeat(')', 1001), false];
+        yield 'closers inside a comment of a file PHP cannot parse' => ['<?php 0b2; /* '.str_repeat(')', 1001).' */', true];
+        yield 'closers inside a comment of a file PHP cannot compile' => ['<?php class A { public public $a; } /* '.str_repeat(')', 1001).' */', true];
     }
 }

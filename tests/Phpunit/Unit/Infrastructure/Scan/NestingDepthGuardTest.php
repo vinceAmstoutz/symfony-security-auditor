@@ -30,7 +30,7 @@ final class NestingDepthGuardTest extends TestCase
         $logger = self::createMock(LoggerInterface::class);
         $logger->expects(self::never())->method('warning');
 
-        $admitted = (new NestingDepthGuard($logger))->admits($this->fileWith(str_repeat('(', 200).str_repeat(')', 200)));
+        $admitted = (new NestingDepthGuard($logger))->admits($this->fileWith(str_repeat('(', 5000).str_repeat(')', 5000)));
 
         self::assertTrue($admitted);
     }
@@ -45,10 +45,10 @@ final class NestingDepthGuardTest extends TestCase
             ->method('warning')
             ->with(
                 self::stringContains('nest too deeply'),
-                self::identicalTo(['file' => 'src/Controller/X.php', 'max_nesting_depth' => 200]),
+                self::identicalTo(['file' => 'src/Controller/X.php', 'max_nesting_depth' => 5000]),
             );
 
-        $admitted = (new NestingDepthGuard($logger))->admits($this->fileWith(str_repeat('(', 201).str_repeat(')', 201)));
+        $admitted = (new NestingDepthGuard($logger))->admits($this->fileWith(str_repeat('(', 5001).str_repeat(')', 5001)));
 
         self::assertFalse($admitted);
     }
@@ -94,16 +94,29 @@ final class NestingDepthGuardTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_admits_a_file_whose_unmatched_closers_all_sit_in_comments_and_strings(): void
+    {
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('warning');
+
+        $admitted = (new NestingDepthGuard($logger))->admits($this->fileWith('/* '.str_repeat(')', 16000)." */ \$a = '".str_repeat(']', 16000)."';"));
+
+        self::assertTrue($admitted);
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function nestingConstructsPastTheLimit(): iterable
     {
-        yield 'parentheses' => [str_repeat('(', 201)];
-        yield 'square brackets' => [str_repeat('[', 201)];
-        yield 'curly braces' => [str_repeat('{', 201)];
-        yield 'interpolated expressions' => [str_repeat('"{$a', 201)];
-        yield 'dollar-brace interpolations' => [str_repeat('"${a', 201)];
-        yield 'attributes' => [str_repeat('#[A', 201)];
+        yield 'parentheses' => [str_repeat('(', 5001)];
+        yield 'square brackets' => [str_repeat('[', 5001)];
+        yield 'curly braces' => [str_repeat('{', 5001)];
+        yield 'interpolated expressions' => [str_repeat('"{$a', 5001)];
+        yield 'dollar-brace interpolations' => [str_repeat('"${a', 5001)];
+        yield 'attributes' => [str_repeat('#[A', 5001)];
     }
 
     /**
@@ -139,7 +152,7 @@ final class NestingDepthGuardTest extends TestCase
      */
     public function test_it_measures_the_deepest_point_reached_after_partially_closing_a_group(): void
     {
-        $nesting = str_repeat('(', 150).str_repeat(')', 10).str_repeat('(', 61);
+        $nesting = str_repeat('(', 4950).str_repeat(')', 10).str_repeat('(', 61);
 
         self::assertFalse((new NestingDepthGuard())->admits($this->fileWith($nesting)));
     }
@@ -149,7 +162,7 @@ final class NestingDepthGuardTest extends TestCase
      */
     public function test_it_ignores_brackets_inside_string_literals_comments_and_inline_html(): void
     {
-        $brackets = str_repeat('([{', 100);
+        $brackets = str_repeat('([{', 2000);
         $source = <<<PHP
             <?php
             \$single = '{$brackets}';

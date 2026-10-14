@@ -2003,6 +2003,60 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('filesTheMappingCannotRead')]
+    public function test_it_marks_a_controller_or_voter_the_access_control_map_could_not_read(string $relativePath, string $source): void
+    {
+        $markers = $this->unmappedAccessControlMarkers($relativePath, $source);
+
+        self::assertSame(
+            [[$relativePath, 1, 'The access-control map could not read this file, whose brackets nest too deeply or hold too many unmatched closers to parse safely: its routes, access checks and voter attributes are missing from the map, so read them in the code.']],
+            array_map(static fn (RiskMarker $riskMarker): array => [$riskMarker->filePath(), $riskMarker->line(), $riskMarker->description()], $markers),
+        );
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function filesTheMappingCannotRead(): iterable
+    {
+        yield 'a controller nested one level past the bar' => ['src/Controller/WipeController.php', '<?php $a = '.str_repeat('[', 5001).str_repeat(']', 5001).';'];
+        yield 'a voter holding a flood of stray closers' => ['src/Security/PostVoter.php', '<?php '.str_repeat(')', 1001)];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('filesTheMappingReadsOrNeverReads')]
+    public function test_it_does_not_mark_a_file_the_access_control_map_reads_or_never_reads(string $relativePath, string $source): void
+    {
+        self::assertSame([], $this->unmappedAccessControlMarkers($relativePath, $source));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function filesTheMappingReadsOrNeverReads(): iterable
+    {
+        yield 'a controller nested to the bar' => ['src/Controller/WipeController.php', '<?php $a = '.str_repeat('[', 5000).str_repeat(']', 5000).';'];
+        yield 'a voter whose stray closers sit in a comment' => ['src/Security/PostVoter.php', '<?php /* '.str_repeat(')', 1001).' */'];
+        yield 'a service nested past the bar' => ['src/Service/Defaults.php', '<?php $a = '.str_repeat('[', 5001).str_repeat(']', 5001).';'];
+    }
+
+    /**
+     * @return list<RiskMarker>
+     *
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    private function unmappedAccessControlMarkers(string $relativePath, string $source): array
+    {
+        return array_values(array_filter(
+            $this->regexStaticPreScanner->scan([ProjectFile::create($relativePath, '/app/'.$relativePath, $source)]),
+            static fn (RiskMarker $riskMarker): bool => 'unmapped_access_control' === $riskMarker->pattern(),
+        ));
+    }
+
+    /**
      * @param callable(): list<RiskMarker> $scan
      *
      * @return list<RiskMarker>

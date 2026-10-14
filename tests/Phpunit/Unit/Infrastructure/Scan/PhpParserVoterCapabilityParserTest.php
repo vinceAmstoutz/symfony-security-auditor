@@ -784,6 +784,25 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_reads_a_file_whose_unmatched_closing_brackets_sit_in_a_comment(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class PostVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return $attribute === 'EDIT';
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source.'/* '.str_repeat(')', 16000).' */');
+
+        self::assertSame(['EDIT'], $this->phpParserVoterCapabilityParser->parse($projectFile)?->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_file_holding_a_flood_of_unmatched_closing_brackets(): void
     {
         $source = <<<'PHP'

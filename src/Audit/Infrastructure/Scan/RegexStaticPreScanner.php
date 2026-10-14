@@ -46,6 +46,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      */
     private const string TRAILING_DOT_ALL_MODIFIER = '/s[a-zA-Z]*$/';
 
+    private const string UNMAPPED_ACCESS_CONTROL = 'unmapped_access_control';
+
+    private const string UNMAPPED_ACCESS_CONTROL_DESCRIPTION = 'The access-control map could not read this file, whose brackets nest too deeply or hold too many unmatched closers to parse safely: its routes, access checks and voter attributes are missing from the map, so read them in the code.';
+
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
      *
@@ -54,6 +58,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     public function __construct(
         private array $customPatterns = [],
         private LoggerInterface $logger = new NullLogger(),
+        private NestingDepthGuard $nestingDepthGuard = new NestingDepthGuard(),
     ) {
         foreach ($this->customPatterns as $bucket => $patterns) {
             foreach ($patterns as $label => $entry) {
@@ -463,9 +468,35 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                     );
                 }
             }
+
+            $markers = [...$markers, ...$this->unmappedAccessControlMarkers($file)];
         }
 
         return $markers;
+    }
+
+    /**
+     * The mapping parsers skip a controller or voter that {@see NestingDepthGuard}
+     * refuses, so its routes and guards are missing from the access-control
+     * map the attacker reads: this marker tells the attacker so, instead of
+     * letting the file pass as one with nothing to map.
+     *
+     * @return list<RiskMarker>
+     *
+     * @throws InvalidRiskMarkerException
+     */
+    private function unmappedAccessControlMarkers(ProjectFile $projectFile): array
+    {
+        if (!$this->isReadByTheMapping($projectFile) || $this->nestingDepthGuard->admits($projectFile)) {
+            return [];
+        }
+
+        return [RiskMarker::create($projectFile->relativePath(), 1, self::UNMAPPED_ACCESS_CONTROL, self::UNMAPPED_ACCESS_CONTROL_DESCRIPTION)];
+    }
+
+    private function isReadByTheMapping(ProjectFile $projectFile): bool
+    {
+        return $projectFile->fileType()->isControllerLike() || ProjectFileType::VOTER === $projectFile->fileType();
     }
 
     /**

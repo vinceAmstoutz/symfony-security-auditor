@@ -688,6 +688,26 @@ final class PhpParserFormBindingParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_reads_a_file_whose_unmatched_closing_brackets_sit_in_a_comment(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class UserController {
+                public function edit(): void {
+                    $form = $this->createForm(UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source.'/* '.str_repeat(')', 16000).' */');
+
+        self::assertCount(1, $this->phpParserFormBindingParser->parse($projectFile));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_file_holding_a_flood_of_unmatched_closing_brackets(): void
     {
         $source = <<<'PHP'
