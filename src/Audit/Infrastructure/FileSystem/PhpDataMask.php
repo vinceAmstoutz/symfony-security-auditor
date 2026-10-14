@@ -98,6 +98,18 @@ final readonly class PhpDataMask implements Stringable
         return self::CODE === $this->mask[$opening] ? self::STRING_END === $this->mask[$closing] : self::TEXT === $this->mask[$opening] && self::TEXT === $this->mask[$closing];
     }
 
+    /**
+     * Where the body of each string literal of the file sits, as an offset and a length.
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    public function stringBodies(): array
+    {
+        preg_match_all(\sprintf('/(?<=%s)%s++(?=%s)/', self::CODE, self::TEXT, self::STRING_END), $this->mask, $bodies, \PREG_OFFSET_CAPTURE);
+
+        return array_map(static fn (array $body): array => [$body[1], \strlen($body[0])], $bodies[0]);
+    }
+
     private static function maskOfToken(PhpToken $phpToken, bool $insideString): string
     {
         return match (true) {

@@ -40,6 +40,7 @@ enum SecretPatternLabel: string
     case XmlParameter = 'xml_parameter';
     case CallArgument = 'call_argument';
     case BlockScalar = 'block_scalar';
+    case SecretsVaultKey = 'secrets_vault_key';
     case Unscannable = 'unscannable';
 
     public function placeholder(): string

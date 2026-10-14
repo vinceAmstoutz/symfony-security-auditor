@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PathAwareSecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
@@ -491,10 +492,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
                 return new SkippedFile($relativePath, SkippedFileReason::TooLarge);
             }
 
-            $content = $reader($splFile);
-            if ($this->secretScrubber instanceof SecretScrubberInterface) {
-                $content = $this->secretScrubber->scrub($content);
-            }
+            $content = $this->scrubbed($relativePath, $reader($splFile));
 
             return AmbiguousContent::skipped($relativePath, $content) ?? ProjectFile::create(
                 relativePath: $relativePath,
@@ -509,6 +507,19 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
             return new SkippedFile($relativePath, SkippedFileReason::Unreadable);
         }
+    }
+
+    /**
+     * A scrubber that reads the name of the file as well gets it: the name of a secrets-vault key
+     * file says what its content holds.
+     */
+    private function scrubbed(string $relativePath, string $content): string
+    {
+        if ($this->secretScrubber instanceof PathAwareSecretScrubberInterface) {
+            return $this->secretScrubber->scrubFile($relativePath, $content);
+        }
+
+        return $this->secretScrubber?->scrub($content) ?? $content;
     }
 
     private function validUtf8RelativePath(SplFileInfo $splFile, string $projectPath): string

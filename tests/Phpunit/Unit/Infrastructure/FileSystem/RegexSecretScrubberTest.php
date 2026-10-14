@@ -23,6 +23,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem\Fixture\SodiumVaultKeyFile;
 
 final class RegexSecretScrubberTest extends TestCase
 {
@@ -1692,6 +1693,9 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'fallback operators with no literal' => ['$password = $a'.str_repeat(' ?? $a', 90000)];
         yield 'credential keys followed by operands' => [str_repeat('password = $a ?: $b ?: $c ', 20000)];
         yield 'a fallback literal never closed' => ['$password = $a ?: "'.str_repeat('a', 524288)];
+        yield 'a returned binary literal never closed' => ['return "'.str_repeat('\\x41', 131072)];
+        yield 'returned binary literals one byte short of a key pair' => [str_repeat('return "'.str_repeat('\\x41', 63)."\";\n", 1900)];
+        yield 'a key literal under its base64 copy never closed' => ["SYMFONY_DECRYPTION_SECRET=\nreturn \"".str_repeat('\\x41', 131072)];
     }
 
     #[DataProvider('hostileContentWithTheJitCases')]
@@ -1715,6 +1719,9 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'php constants assigned to credential variables' => ['<?php '.str_repeat("\$password = ABCDEFG;\n", 14000)];
         yield 'fallback operators with no literal' => ['$password = $a'.str_repeat(' ?? $a', 90000)];
         yield 'a fallback literal never closed' => ['$password = $a ?: "'.str_repeat('a', 524288)];
+        yield 'a returned binary literal never closed' => ['return "'.str_repeat('\\x41', 131072)];
+        yield 'returned binary literals one byte short of a key pair' => [str_repeat('return "'.str_repeat('\\x41', 63)."\";\n", 1900)];
+        yield 'a key literal under its base64 copy never closed' => ["SYMFONY_DECRYPTION_SECRET=\nreturn \"".str_repeat('\\x41', 131072)];
     }
 
     #[DataProvider('hostileContentRedactedCases')]
@@ -1863,6 +1870,93 @@ final class RegexSecretScrubberTest extends TestCase
         }
 
         return $input;
+    }
+
+    #[DataProvider('secretsVaultDecryptionKeyFiles')]
+    public function test_a_secrets_vault_decryption_key_is_redacted_whatever_its_file_is_named(string $input, string $expected): void
+    {
+        self::assertSame($expected, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function secretsVaultDecryptionKeyFiles(): iterable
+    {
+        $key = SodiumVaultKeyFile::generatedKey();
+
+        yield 'a key file with its base64 copy' => [SodiumVaultKeyFile::contents($key), SodiumVaultKeyFile::redacted()];
+        yield 'a shorter literal under the base64 copy' => [SodiumVaultKeyFile::returning($key, substr($key, 0, 31)), SodiumVaultKeyFile::redacted()];
+        yield 'a longer literal under the base64 copy' => [SodiumVaultKeyFile::returning($key, $key.substr($key, 0, 32)), SodiumVaultKeyFile::redacted()];
+        yield 'a key file without its base64 copy' => [
+            \sprintf("<?php // backup on Mon, 12 Oct 2026 05:59:43 +0000\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped($key)),
+            "<?php // backup on Mon, 12 Oct 2026 05:59:43 +0000\n\nreturn \"***REDACTED:secrets_vault_key***\";\n",
+        ];
+        yield 'a key pair of a low-entropy pattern' => [
+            \sprintf("<?php\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(str_repeat("\x00\x01", 32))),
+            "<?php\n\nreturn \"***REDACTED:secrets_vault_key***\";\n",
+        ];
+    }
+
+    #[DataProvider('filesNamedLikeAVaultDecryptionKey')]
+    public function test_every_string_literal_of_a_file_named_like_a_vault_decryption_key_is_redacted(string $relativePath, string $input, string $expected): void
+    {
+        $output = $this->regexSecretScrubber->scrubFile($relativePath, $input);
+
+        self::assertSame($expected, $output);
+        self::assertSame($output, $this->regexSecretScrubber->scrubFile($relativePath, $output));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string, 2: string}> */
+    public static function filesNamedLikeAVaultDecryptionKey(): iterable
+    {
+        yield 'a key of another size' => ['config/secrets/prod/prod.decrypt.private.php', \sprintf("<?php\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(str_repeat("\x00\x01", 4))), "<?php\n\nreturn \"***REDACTED:secrets_vault_key***\";\n"];
+        yield 'a key in a vault of its own' => ['config/vault/staging/staging.decrypt.private.php', "<?php return 'a1b2c3';", "<?php return '***REDACTED:secrets_vault_key***';"];
+        yield 'a key split over two literals' => ['config/secrets/prod/prod.decrypt.private.php', "<?php return 'a1b2' . \"c3d4\";", "<?php return '***REDACTED:secrets_vault_key***' . \"***REDACTED:secrets_vault_key***\";"];
+        yield 'a key after a comment holding a quote' => ['config/secrets/prod/prod.decrypt.private.php', "<?php // the key's file\nreturn 'a1b2c3';", "<?php // the key's file\nreturn '***REDACTED:secrets_vault_key***';"];
+        yield 'a file returning no literal' => ['config/secrets/prod/prod.decrypt.private.php', '<?php return $key;', '<?php return $key;'];
+        yield 'an empty literal' => ['config/secrets/prod/prod.decrypt.private.php', "<?php return '';", "<?php return '';"];
+    }
+
+    #[DataProvider('filesNamedOtherwise')]
+    public function test_a_file_named_otherwise_keeps_the_literals_that_hold_no_credential(string $relativePath): void
+    {
+        $input = \sprintf("<?php\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(str_repeat("\x02", 8)));
+
+        self::assertSame($input, $this->regexSecretScrubber->scrubFile($relativePath, $input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function filesNamedOtherwise(): iterable
+    {
+        yield 'the vault encryption key' => ['config/secrets/prod/prod.encrypt.public.php'];
+        yield 'an encrypted vault value' => ['config/secrets/prod/prod.STRIPE_SECRET.0a0a0a.php'];
+        yield 'a key file kept under another extension' => ['config/secrets/prod/prod.decrypt.private.php.dist'];
+        yield 'a source file' => ['src/Kernel.php'];
+        yield 'a configuration file named private' => ['config/routes.private.php'];
+    }
+
+    public function test_a_file_named_otherwise_is_scrubbed_as_its_content_alone_is(): void
+    {
+        $input = \sprintf("<?php\n\$password = 'hunter2hunter2';\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(SodiumVaultKeyFile::generatedKey()));
+
+        self::assertSame($this->regexSecretScrubber->scrub($input), $this->regexSecretScrubber->scrubFile('src/Kernel.php', $input));
+    }
+
+    #[DataProvider('returnedLiteralsShapedUnlikeAVaultDecryptionKey')]
+    public function test_a_returned_literal_shaped_unlike_a_secrets_vault_decryption_key_is_left_readable(string $input): void
+    {
+        self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function returnedLiteralsShapedUnlikeAVaultDecryptionKey(): iterable
+    {
+        $keyPair = str_repeat("\x00\x01", 32);
+
+        yield 'the vault encryption key, 32 bytes' => [\sprintf("<?php // prod.encrypt.public on Mon, 12 Oct 2026 05:59:43 +0000\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(str_repeat("\x02", 32)))];
+        yield 'an encrypted vault value' => [\sprintf("<?php // prod.STRIPE_SECRET.0a0a0a on Mon, 12 Oct 2026 05:59:43 +0000\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(str_repeat("\x03", 59)))];
+        yield 'one byte short of a key pair' => [\sprintf("<?php\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped(substr($keyPair, 0, -1)))];
+        yield 'one byte over a key pair' => [\sprintf("<?php\n\nreturn \"%s\";\n", SodiumVaultKeyFile::escaped($keyPair."\x00"))];
+        yield 'sixty-four characters with no escaped byte' => [\sprintf("<?php\n\nreturn \"%s\";\n", str_repeat('ab', 32))];
     }
 
     public function test_words_that_merely_start_with_pass_are_not_credentials(): void

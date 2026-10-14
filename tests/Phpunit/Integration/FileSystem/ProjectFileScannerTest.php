@@ -25,6 +25,7 @@ use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
@@ -965,6 +966,18 @@ final class ProjectFileScannerTest extends TestCase
         foreach ($files as $file) {
             self::assertStringNotContainsString($stripeShape, $file->content());
         }
+    }
+
+    public function test_a_scrubber_that_reads_no_file_name_scrubs_the_content_of_every_file(): void
+    {
+        mkdir($this->tmpDir.'/config/secrets/prod', 0o777, true);
+        file_put_contents($this->tmpDir.'/config/secrets/prod/prod.decrypt.private.php', "<?php return 'k';");
+        $secretScrubber = self::createStub(SecretScrubberInterface::class);
+        $secretScrubber->method('scrub')->willReturnCallback(static fn (string $content): string => strtoupper($content));
+
+        $files = (new ProjectFileScanner(new NullLogger(), secretScrubber: $secretScrubber))->scan($this->tmpDir);
+
+        self::assertSame(["<?PHP RETURN 'K';"], array_map(static fn (ProjectFile $projectFile): string => $projectFile->content(), $files));
     }
 
     public function test_null_scrubber_leaves_file_content_unmodified(): void

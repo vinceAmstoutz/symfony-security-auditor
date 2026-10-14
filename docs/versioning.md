@@ -109,7 +109,7 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 - `CodeSlicerInterface` — implement and alias to control how files are trimmed before reaching the LLM.
 - `GitChangedFilesResolverInterface` — implement and alias to change how `--since` resolves the changed-file set.
 - `AdvisoryDatabaseInterface` — host applications may implement this and alias it to swap the CVE feed (Snyk, internal database, …). See [`docs/extending.md`](extending.md).
-- `SecretScrubberInterface`
+- `SecretScrubberInterface` — the scanner hands every file to `scrub()`. The bundled `RegexSecretScrubber` also implements `PathAwareSecretScrubberInterface` (since 1.22) to read the file's path as well; that companion is `@internal` and outside this promise, so a custom scrubber keeps working through `scrub()` alone.
 - `PricingProviderInterface`
 - `CacheAwarePricingProviderInterface` — opt-in extension of `PricingProviderInterface` for providers that expose real per-model prompt-cache rates. `CostCalculator` checks `instanceof` and falls back to the base input rate, so it never breaks an existing pricing provider.
 - `ServingPlatformPricingProviderInterface` — opt-in extension of `PricingProviderInterface` (since 1.21) for providers that know the platform the audit runs against. `CostCalculator` bills the model a provider reports answering a call as that model only when `hasServingPlatformPrice()` is `true`; without the interface it falls back to `hasModel()`, so it never breaks an existing pricing provider.

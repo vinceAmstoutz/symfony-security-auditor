@@ -17,7 +17,7 @@ use Override;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SecretPatternLabel;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PathAwareSecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 
 /**
@@ -25,7 +25,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  *
  * The pattern set covers common high-signal leaks: cloud provider keys, version-control
  * tokens, payment processor keys, generic credential assignments, JWT-shaped tokens,
- * PEM-encoded private keys and PGP private key blocks, env-style token assignments,
+ * PEM-encoded private keys and PGP private key blocks, the decryption key of a
+ * Symfony secrets vault, env-style token assignments,
  * Symfony `env(NAME)` parameter defaults and XML `<parameter>` values, PHP `define()`
  * constants, connection-string URIs with
  * embedded credentials (e.g. `postgres://user:pass@host`), `Authorization: Bearer` and
@@ -37,7 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class RegexSecretScrubber implements SecretScrubberInterface
+final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInterface
 {
     /**
      * A credential word glued to a known qualifier (`APIKEY`, `SECRETKEY`,
@@ -108,6 +109,19 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
 
     private const string PURE_VALUE_FUNCTIONS = 'hex2bin|bin2hex|base64_decode|base64_encode|sodium_hex2bin|sodium_base642bin|password_hash|md5|sha1|trim|ltrim|rtrim|strtolower|strtoupper|urldecode|rawurldecode|urlencode|rawurlencode';
 
+    /**
+     * A Symfony secrets vault writes its decryption key, a 64-byte sodium key
+     * pair, as `return "…";`, each byte `rawurlencode()` escapes spelled `\xHH`,
+     * and recent releases put a `// SYMFONY_DECRYPTION_SECRET=` copy right above: a
+     * literal returned under that copy is the key whatever its length.
+     */
+    private const string SECRETS_VAULT_KEY = '/(?:\bSYMFONY_DECRYPTION_SECRET=[^\n]{0,256}+\n[ \t]*+return[ \t]*+"\K(?:\\\\x[0-9A-Fa-f]{2}|[A-Za-z0-9_.~-])++|\breturn[ \t]*+"\K(?=[^"\n]{0,255}?\\\\x)(?:\\\\x[0-9A-Fa-f]{2}|[A-Za-z0-9_.~-]){64})(?=")/';
+
+    /**
+     * The name Symfony gives the decryption key of a secrets vault, `<vault>/<vault>.decrypt.private.php`.
+     */
+    private const string SECRETS_VAULT_KEY_FILE = '.decrypt.private.php';
+
     private const string QUOTED_BODY_OF_GROUP_TWO = '((?:\\\\.|(?!\2)[^\n]){4,}+)';
 
     /**
@@ -173,6 +187,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             SecretPatternLabel::SlackToken->value => '/\b(?:xox[abprs]-[A-Za-z0-9-]{10,72}|xapp-[0-9]-[A-Za-z0-9-]{10,120})\b/',
             SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}(?![0-9A-Za-z_\-])/',
             SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
+            SecretPatternLabel::SecretsVaultKey->value => self::SECRETS_VAULT_KEY,
             SecretPatternLabel::PemPrivateKey->value => \sprintf('/-----BEGIN %1$s-----(*COMMIT)[\s\S]*?-----END %1$s-----/', self::PRIVATE_KEY_LABEL),
             SecretPatternLabel::ConnectionUri->value => self::CONNECTION_URI,
             SecretPatternLabel::EnvAssignment->value => \sprintf('/((?:^|\s)(const\s+(?:[?\w\\\\|&]+\s+)?|case\s+)?%s)(\s*=[ \t]*)(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\4)[^\r\n])*+(?:\4|(?=\r?$))|\S+)/m', $envCredentialName),
@@ -237,6 +252,31 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         }
 
         return PhpDataMask::opensWithPhpTag($content) ? $content : (preg_replace(self::UNQUOTED_YAML_PLACEHOLDER, '$1"$2"', $content) ?? $content);
+    }
+
+    /**
+     * A file named like the decryption key of a Symfony secrets vault holds nothing but the key, so
+     * every string literal in it is redacted, whatever spelling or size the key comes in.
+     */
+    #[Override]
+    public function scrubFile(string $relativePath, string $content): string
+    {
+        $scrubbed = $this->scrub($content);
+
+        return str_ends_with($relativePath, self::SECRETS_VAULT_KEY_FILE) ? $this->redactStringLiterals($scrubbed) : $scrubbed;
+    }
+
+    /**
+     * Each body becomes the placeholder, followed by the line breaks it spanned, from the last one
+     * back so the offsets of the others still hold.
+     */
+    private function redactStringLiterals(string $content): string
+    {
+        return array_reduce(
+            array_reverse(PhpDataMask::of($content)->stringBodies()),
+            static fn (string $redacted, array $body): string => substr_replace($redacted, \sprintf('%s%s', SecretPatternLabel::SecretsVaultKey->placeholder(), str_repeat("\n", substr_count($redacted, "\n", $body[0], $body[1]))), $body[0], $body[1]),
+            $content,
+        );
     }
 
     /**
