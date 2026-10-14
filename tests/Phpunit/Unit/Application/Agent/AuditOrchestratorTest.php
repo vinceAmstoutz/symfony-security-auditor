@@ -1906,6 +1906,86 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_path_run_reports_the_controllers_voters_and_forms_under_its_paths(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, ['src/Controller']);
+        $auditContext->setProjectFiles([ProjectFile::create('src/Controller/A.php', '/a', '<?php')]);
+        $auditContext->setMapping($this->mappingAcrossTheProject());
+
+        self::assertSame(['files' => 1, 'controllers' => 2, 'voters' => 1, 'forms' => 3], $this->auditStartedContext($auditContext));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_since_run_reports_the_controllers_voters_and_forms_of_the_whole_scope_as_1_21_did(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, diffSinceRef: 'main');
+        $auditContext->setProjectFiles([ProjectFile::create('src/Controller/A.php', '/a', '<?php')]);
+        $auditContext->setMapping($this->mappingAcrossTheProject());
+
+        self::assertSame(['files' => 1, 'controllers' => 3, 'voters' => 2, 'forms' => 4], $this->auditStartedContext($auditContext));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    private function mappingAcrossTheProject(): SymfonyMapping
+    {
+        return SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([
+                'controllers' => [
+                    ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+                    ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+                    ProjectFile::create('src/Admin/C.php', '/c', '<?php'),
+                ],
+                'voters' => [
+                    ProjectFile::create('src/Controller/Voter/V.php', '/v', '<?php'),
+                    ProjectFile::create('src/Security/W.php', '/w', '<?php'),
+                ],
+                'forms' => [
+                    ProjectFile::create('src/Controller/Form/F1.php', '/f1', '<?php'),
+                    ProjectFile::create('src/Controller/Form/F2.php', '/f2', '<?php'),
+                    ProjectFile::create('src/Controller/Form/F3.php', '/f3', '<?php'),
+                    ProjectFile::create('src/Form/G.php', '/g', '<?php'),
+                ],
+            ]),
+            new AccessControlMap(),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws InvalidTokenUsageException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function auditStartedContext(AuditContext $auditContext): array
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->makeOrchestrator($attackerLlm, self::createStub(LLMClientInterface::class), ['recordingProgressReporter' => $recordingProgressReporter])->orchestrate($auditContext);
+
+        $started = array_values(array_filter($recordingProgressReporter->events, static fn (array $event): bool => 'audit.started' === $event[0]));
+        self::assertCount(1, $started);
+
+        return $started[0][1];
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException

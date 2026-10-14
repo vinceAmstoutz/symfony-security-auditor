@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
@@ -69,11 +70,12 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             'max_iterations' => $this->auditLoopSettings->maxIterations,
         ]);
 
+        $scanPaths = $auditContext->scanPaths();
         $this->progressReporter->report(ProgressEvent::AuditStarted->value, [
             'files' => \count($files),
-            'controllers' => \count($mapping->controllers()),
-            'voters' => \count($mapping->voters()),
-            'forms' => \count($mapping->forms()),
+            'controllers' => \count(ScanPathFilter::apply($mapping->controllers(), $scanPaths)),
+            'voters' => \count(ScanPathFilter::apply($mapping->voters(), $scanPaths)),
+            'forms' => \count(ScanPathFilter::apply($mapping->forms(), $scanPaths)),
         ]);
 
         do {
