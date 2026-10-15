@@ -18,7 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator
 
 /**
  * How each request body is shaped: sampling temperature, provider JSON mode,
- * and the token estimator used for rate-limit accounting.
+ * the token estimator used for rate-limit accounting, and the `symfony/ai`
+ * platform that serves the requests, when the composition root knows it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -28,5 +29,6 @@ final readonly class PlatformRequestConfig
         public ?float $temperature = SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
         public bool $providerJsonMode = SymfonyAiLLMClient::DEFAULT_PROVIDER_JSON_MODE,
         public TokenEstimatorInterface $tokenEstimator = new ResolvingTokenEstimator(),
+        public ?string $servingPlatform = null,
     ) {}
 }

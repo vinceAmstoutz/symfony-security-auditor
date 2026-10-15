@@ -91,7 +91,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         $this->rateLimiter = $platformResilienceConfig->rateLimiter;
         $this->promptTokenEstimator = new PromptTokenEstimator($platformRequestConfig->tokenEstimator, $platformBinding->model);
         $this->platformResultExtractor = new PlatformResultExtractor($platformAccountingConfig->tokenUsageRecorder, $platformBinding->logger);
-        $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $platformRequestConfig->temperature, $platformRequestConfig->providerJsonMode, $platformBinding->maxOutputTokens);
+        $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $platformRequestConfig->temperature, $platformRequestConfig->providerJsonMode, $platformBinding->maxOutputTokens, $platformRequestConfig->servingPlatform);
         $this->platformOptionsFactory = $platformOptionsFactory;
 
         $conversionFailureExplainer = new ConversionFailureExplainer();

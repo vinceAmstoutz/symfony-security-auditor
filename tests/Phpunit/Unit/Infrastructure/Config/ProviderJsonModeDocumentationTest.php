@@ -72,6 +72,30 @@ final class ProviderJsonModeDocumentationTest extends TestCase
         self::assertSame(['response_format' => ['type' => 'json_object']], $options);
     }
 
+    #[DataProvider('platformsWithoutAJsonObjectMode')]
+    public function test_provider_json_mode_sends_no_response_format_to_a_claude_model_a_platform_without_a_json_object_mode_serves(string $servingPlatform): void
+    {
+        $options = (new PlatformOptionsFactory('claude-opus-4-8', null, true, null, $servingPlatform))->baseOptions();
+
+        self::assertSame([], $options);
+    }
+
+    public function test_provider_json_mode_sends_a_json_object_response_format_to_a_claude_model_a_gateway_serves(): void
+    {
+        $options = (new PlatformOptionsFactory('anthropic/claude-opus-4.8', null, true, null, 'openrouter'))->baseOptions();
+
+        self::assertSame(['response_format' => ['type' => 'json_object']], $options);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function platformsWithoutAJsonObjectMode(): iterable
+    {
+        yield 'Anthropic' => ['anthropic'];
+        yield 'Bedrock' => ['bedrock'];
+    }
+
     /**
      * @return iterable<string, array{string}>
      */
@@ -85,6 +109,8 @@ final class ProviderJsonModeDocumentationTest extends TestCase
     private function assertAnthropicDialectOnly(string $description): void
     {
         self::assertStringContainsString('Claude', $description);
+        self::assertStringContainsString('anthropic', $description);
+        self::assertStringContainsString('bedrock', $description);
         self::assertStringNotContainsString('OpenAI', $description);
         self::assertStringNotContainsString('Mistral', $description);
         self::assertStringNotContainsString('Ollama', $description);

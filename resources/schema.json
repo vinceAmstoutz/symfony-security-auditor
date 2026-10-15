@@ -43,7 +43,7 @@
         },
         "provider_json_mode": {
           "type": "boolean",
-          "description": "Send response_format: {type: json_object} on every call to a Claude/Anthropic-dialect model (its name contains claude). A no-op for every other model. Default: false."
+          "description": "Send response_format: {type: json_object} on every call to a Claude/Anthropic-dialect model (its name contains claude) a gateway serves. Not sent on the anthropic and bedrock platforms, which have no JSON-object mode for Claude, and a no-op for every other model. Default: false."
         },
         "scan": {
           "type": "object",

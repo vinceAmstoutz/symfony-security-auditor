@@ -64,6 +64,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
@@ -121,6 +122,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportin
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\OptionsRecordingPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\PassThroughLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\UsageReportingLLMClient;
 
@@ -179,6 +181,49 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o'], registerPlatform: false);
 
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[DataProvider('platformsWithoutAJsonObjectModeCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_provider_json_mode_sends_no_response_format_to_a_platform_without_a_json_object_mode(string $servingPlatform, string $model): void
+    {
+        $kernel = $this->boot(['model' => $model, 'provider_json_mode' => true], registerPlatform: false, registerHostServices: $this->servedBy($servingPlatform));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertArrayNotHasKey('response_format', OptionsRecordingPlatform::$lastOptions);
+        self::assertSame(4096, OptionsRecordingPlatform::$lastOptions['max_tokens']);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function platformsWithoutAJsonObjectModeCases(): iterable
+    {
+        yield 'Anthropic' => ['anthropic', 'claude-sonnet-4-5'];
+        yield 'Bedrock' => ['bedrock', 'anthropic.claude-sonnet-4-5-20250929-v1:0'];
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_provider_json_mode_still_sends_a_json_object_response_format_to_a_claude_model_a_gateway_serves(): void
+    {
+        $kernel = $this->boot(['model' => 'anthropic/claude-sonnet-4.5', 'provider_json_mode' => true], registerPlatform: false, registerHostServices: $this->servedBy('openrouter'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(['type' => 'json_object'], OptionsRecordingPlatform::$lastOptions['response_format']);
     }
 
     public function test_bundle_registers_the_pass_publishing_the_platform_pricing_reads(): void
@@ -2194,6 +2239,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder->getParameterBag()->resolve();
 
         return $containerBuilder;
+    }
+
+    /**
+     * The host's AI platform, registered under the name `ai.platform.<name>`
+     * the AI bundle gives it, recording the options of each call.
+     *
+     * @return Closure(ContainerBuilder): void
+     */
+    private function servedBy(string $servingPlatform): Closure
+    {
+        return static function (ContainerBuilder $containerBuilder) use ($servingPlatform): void {
+            $containerBuilder->register('ai.platform.'.$servingPlatform, OptionsRecordingPlatform::class);
+            $containerBuilder->setAlias(PlatformInterface::class, 'ai.platform.'.$servingPlatform)->setPublic(true);
+        };
     }
 
     /**

@@ -16,17 +16,26 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 /**
  * Builds the per-invocation platform options: temperature plus the
  * Anthropic-dialect knobs (provider JSON mode, max output tokens) that other
- * providers reject.
+ * providers reject. The JSON mode goes only to a platform that can honour it:
+ * the Anthropic and Bedrock bridges turn any `response_format` into a JSON
+ * schema for Anthropic's structured outputs, empty for a JSON-object mode,
+ * which Anthropic has no equivalent of, and Bedrock's Mantle route refuses it
+ * outright; a gateway relaying a Claude model through an OpenAI-compatible API
+ * passes it on.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class PlatformOptionsFactory
 {
+    /** @var list<string> */
+    private const array PLATFORMS_WITHOUT_A_JSON_OBJECT_MODE = ['anthropic', 'bedrock'];
+
     public function __construct(
         private string $model,
         private ?float $temperature,
         private bool $providerJsonMode,
         private ?int $maxOutputTokens,
+        private ?string $servingPlatform = null,
     ) {}
 
     /**
@@ -40,7 +49,7 @@ final readonly class PlatformOptionsFactory
         }
 
         if ($this->usesAnthropicOptionDialect()) {
-            if ($this->providerJsonMode) {
+            if ($this->providerJsonMode && !\in_array($this->servingPlatform, self::PLATFORMS_WITHOUT_A_JSON_OBJECT_MODE, true)) {
                 $options['response_format'] = ['type' => 'json_object'];
             }
 

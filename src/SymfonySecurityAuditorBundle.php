@@ -477,6 +477,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
                 $bundleConfiguration->llm->providerJsonMode,
                 service(TokenEstimatorInterface::class),
+                param(PricingPlatformPass::PARAMETER),
             ]),
             inline_service(PlatformResilienceConfig::class)->args([
                 service(RetryPolicy::class),
