@@ -755,7 +755,10 @@ final class AuditCommandEndToEndTest extends TestCase
 
         $report = json_decode((string) file_get_contents($reportFile), true);
         self::assertIsArray($report);
-        self::assertSame([[], [$fingerprintOfTheEchoedSpelling]], [$report['vulnerabilities'] ?? null, $report['suppressed_fingerprints'] ?? null]);
+        self::assertSame(
+            [[], [Vulnerability::fingerprintOf('sql_injection', 'src/Controller/HomeController.php', 'Critical SQL Injection')], [$fingerprintOfTheEchoedSpelling]],
+            [$report['vulnerabilities'] ?? null, $report['suppressed_fingerprints'] ?? null, $report['suppressed_baseline_fingerprints'] ?? null],
+        );
 
         $baselineMergePlan = (new BaselineMerger(new ReportFindingsLoader(), new Baseline()))->plan($reportFile, $baselineFile, true);
         self::assertSame([0, 1, []], [$baselineMergePlan->prunedCount, \count($baselineMergePlan->keptEntries), $baselineMergePlan->newFindings]);
@@ -823,7 +826,10 @@ final class AuditCommandEndToEndTest extends TestCase
 
         $report = json_decode((string) file_get_contents($reportFile), true);
         self::assertIsArray($report);
-        self::assertSame([[], [$fingerprintOfTheAbsolutePath]], [$report['vulnerabilities'] ?? null, $report['suppressed_fingerprints'] ?? null]);
+        self::assertSame(
+            [[], [Vulnerability::fingerprintOf('sql_injection', 'src/Controller/HomeController.php', 'Critical SQL Injection')], [$fingerprintOfTheAbsolutePath]],
+            [$report['vulnerabilities'] ?? null, $report['suppressed_fingerprints'] ?? null, $report['suppressed_baseline_fingerprints'] ?? null],
+        );
         self::assertSame(
             [[
                 ['symfonySecurityAuditor/v1' => 'SSA-2C08A47E5035'],

@@ -777,16 +777,39 @@ final class AuditReportTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('typesXssWasReportedAsBefore')]
-    public function test_the_array_form_lists_the_baseline_fingerprint_an_xss_finding_was_removed_by(VulnerabilityType $vulnerabilityType): void
+    public function test_the_array_form_names_an_xss_finding_the_baseline_removed_through_a_former_type_by_its_own_fingerprint(VulnerabilityType $vulnerabilityType): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->addVulnerability($this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS)->withReviewerValidation(true));
+        $xss = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS)->withReviewerValidation(true);
+        $auditContext->addVulnerability($xss);
 
         $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, $vulnerabilityType);
 
-        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+        $array = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()])->toArray();
 
-        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame([$xss->fingerprint()], $array['suppressed_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint()], $array['suppressed_baseline_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('typesXssWasReportedAsBefore')]
+    public function test_the_array_form_names_an_xss_finding_accepted_before_the_review_through_a_former_type_by_its_own_fingerprint(VulnerabilityType $vulnerabilityType): void
+    {
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, $vulnerabilityType);
+        $xss = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$vulnerability->fingerprint()]);
+        $auditContext->consumeBaselineCreditFor($xss);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame([$xss->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_baseline_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->consumedBaselineFingerprints());
     }
 
     /**
@@ -805,6 +828,7 @@ final class AuditReportTest extends TestCase
         $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$former->fingerprint(), $vulnerability->fingerprint()]);
 
         self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_baseline_fingerprints']);
     }
 
     /**
@@ -826,7 +850,8 @@ final class AuditReportTest extends TestCase
         $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint(), $former->fingerprint()]);
 
         self::assertSame(1, $auditReport->totalVulnerabilities());
-        self::assertSame([$vulnerability->fingerprint(), $former->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint(), $vulnerability->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint(), $former->fingerprint()], $auditReport->toArray()['suppressed_baseline_fingerprints']);
     }
 
     /**
@@ -863,6 +888,100 @@ final class AuditReportTest extends TestCase
         $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
 
         self::assertSame(1, $auditReport->totalVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_finding_accepted_before_the_review_through_the_attacker_fingerprint_of_an_entry_is_named_by_the_fingerprint_of_that_entry(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-CORRECTED', 'SSA-ATTACKER']);
+        $auditContext->consumeBaselineCredit('SSA-ATTACKER');
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        $named = $auditReport->withFindingsAcceptedBeforeReviewNamedBy(['SSA-CORRECTED' => ['SSA-CORRECTED'], 'SSA-ATTACKER' => ['SSA-CORRECTED']]);
+
+        self::assertSame(['SSA-CORRECTED'], $named->toArray()['suppressed_fingerprints']);
+        self::assertSame(['SSA-ATTACKER'], $named->toArray()['suppressed_baseline_fingerprints']);
+        self::assertSame(['SSA-ATTACKER'], $named->consumedBaselineFingerprints());
+        self::assertSame(['SSA-ATTACKER'], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_finding_accepted_before_the_review_through_the_own_fingerprint_of_an_entry_keeps_its_own_fingerprint(): void
+    {
+        $vulnerability = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::TWIG_INJECTION);
+        $xss = $this->makeVulnerability('page', VulnerabilitySeverity::HIGH, VulnerabilityType::XSS);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$vulnerability->fingerprint()]);
+        $auditContext->consumeBaselineCreditFor($xss);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withFindingsAcceptedBeforeReviewNamedBy([$vulnerability->fingerprint() => [$vulnerability->fingerprint()]]);
+
+        self::assertSame([$xss->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint()], $auditReport->toArray()['suppressed_baseline_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_each_finding_accepted_through_a_shared_attacker_fingerprint_is_named_by_the_next_entry_carrying_it(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-FIRST', 'SSA-ATTACKER', 'SSA-SECOND', 'SSA-ATTACKER']);
+        $auditContext->consumeBaselineCredit('SSA-ATTACKER');
+        $auditContext->consumeBaselineCredit('SSA-ATTACKER');
+
+        $auditReport = AuditReport::fromContext($auditContext)->withFindingsAcceptedBeforeReviewNamedBy(['SSA-ATTACKER' => ['SSA-FIRST', 'SSA-SECOND']]);
+
+        self::assertSame(['SSA-FIRST', 'SSA-SECOND'], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame(['SSA-ATTACKER', 'SSA-ATTACKER'], $auditReport->toArray()['suppressed_baseline_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_finding_accepted_through_a_fingerprint_no_entry_names_any_more_keeps_its_own_fingerprint(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-ATTACKER', 'SSA-ATTACKER', 'SSA-GONE']);
+        $auditContext->consumeBaselineCredit('SSA-ATTACKER');
+        $auditContext->consumeBaselineCredit('SSA-ATTACKER');
+        $auditContext->consumeBaselineCredit('SSA-GONE');
+
+        $auditReport = AuditReport::fromContext($auditContext)->withFindingsAcceptedBeforeReviewNamedBy(['SSA-ATTACKER' => ['SSA-CORRECTED']]);
+
+        self::assertSame(['SSA-CORRECTED', 'SSA-ATTACKER', 'SSA-GONE'], $auditReport->toArray()['suppressed_fingerprints']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_naming_the_findings_accepted_before_the_review_leaves_the_ones_removed_afterwards_and_the_report_alone(): void
+    {
+        $vulnerability = $this->makeVulnerability('removed', VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $kept = $this->makeVulnerability('kept', VulnerabilitySeverity::LOW)->withReviewerValidation(true);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordCoverage('attacker', 'src/removed.php', 'analyzed');
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($kept);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        $named = $auditReport->withFindingsAcceptedBeforeReviewNamedBy([$vulnerability->fingerprint() => ['SSA-OTHER']]);
+
+        self::assertSame([$vulnerability->fingerprint()], $named->toArray()['suppressed_fingerprints']);
+        self::assertSame([], $named->consumedBaselineFingerprints());
+        self::assertSame([$kept], $named->vulnerabilities());
+        self::assertSame($auditReport->auditId(), $named->auditId());
+        self::assertSame($auditReport->coverage(), $named->coverage());
+        self::assertSame($auditReport->cost(), $named->cost());
     }
 
     /**
@@ -1347,6 +1466,7 @@ final class AuditReportTest extends TestCase
         $auditContext->addVulnerability($this->makeVulnerability('a', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
 
         self::assertSame([], AuditReport::fromContext($auditContext)->toArray()['suppressed_fingerprints']);
+        self::assertSame([], AuditReport::fromContext($auditContext)->toArray()['suppressed_baseline_fingerprints']);
     }
 
     /**
@@ -1359,6 +1479,7 @@ final class AuditReportTest extends TestCase
         $auditContext->consumeBaselineCredit('SSA-AAA');
 
         self::assertSame(['SSA-BBB', 'SSA-AAA'], AuditReport::fromContext($auditContext)->toArray()['suppressed_fingerprints']);
+        self::assertSame(['SSA-BBB', 'SSA-AAA'], AuditReport::fromContext($auditContext)->toArray()['suppressed_baseline_fingerprints']);
     }
 
     /**
@@ -1457,6 +1578,7 @@ final class AuditReportTest extends TestCase
             ->withoutFingerprints([$accepted->fingerprint()]);
 
         self::assertSame(['SSA-SKIPPED', $vulnerability->fingerprint(), $accepted->fingerprint()], $auditReport->toArray()['suppressed_fingerprints']);
+        self::assertSame(['SSA-SKIPPED', $vulnerability->fingerprint(), $accepted->fingerprint()], $auditReport->toArray()['suppressed_baseline_fingerprints']);
     }
 
     /**

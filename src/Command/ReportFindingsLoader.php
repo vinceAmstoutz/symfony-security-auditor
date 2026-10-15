@@ -62,7 +62,10 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
 
         return new LoadedReport(
             $findings,
-            $this->suppressedFingerprintsIn($decoded),
+            new SuppressedFingerprintLists(
+                $this->stringsIn($decoded['suppressed_fingerprints'] ?? null),
+                $this->stringsIn($decoded['suppressed_baseline_fingerprints'] ?? $decoded['suppressed_fingerprints'] ?? null),
+            ),
             $coverage,
             $this->completeRunScanPathsIn($decoded, AnalyzedFiles::in($coverage ?? [])),
             $this->projectPathIn($decoded),
@@ -70,19 +73,18 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
     }
 
     /**
-     * The findings the run found and its report leaves out — accepted by the
-     * baseline or muted by type — as the fingerprints it lists them under.
-     * Empty for a report written before the key existed.
-     *
-     * @param array<array-key, mixed> $decoded
+     * The strings of a list the report holds: the fingerprints of the findings
+     * the run found and its report leaves out — accepted by the baseline or
+     * muted by type — under `suppressed_fingerprints`, the baseline
+     * fingerprints that left them out under `suppressed_baseline_fingerprints`.
+     * A report written before that key existed lists the baseline fingerprints
+     * under `suppressed_fingerprints`, and one written before both lists none.
      *
      * @return list<string>
      */
-    private function suppressedFingerprintsIn(array $decoded): array
+    private function stringsIn(mixed $fingerprints): array
     {
-        $suppressed = $decoded['suppressed_fingerprints'] ?? null;
-
-        return \is_array($suppressed) ? array_values(array_filter($suppressed, \is_string(...))) : [];
+        return \is_array($fingerprints) ? array_values(array_filter($fingerprints, \is_string(...))) : [];
     }
 
     /**

@@ -89,6 +89,56 @@ final class ReportFindingsLoaderTest extends TestCase
     }
 
     /**
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_it_reads_the_baseline_fingerprints_that_left_the_suppressed_findings_out(): void
+    {
+        $path = $this->writeReport(['vulnerabilities' => [], 'suppressed_fingerprints' => ['SSA-XSS', 'SSA-AAA'], 'suppressed_baseline_fingerprints' => ['SSA-TWIG', 'SSA-AAA']]);
+
+        $loadedReport = (new ReportFindingsLoader($this->filesystem))->load($path);
+
+        self::assertSame(['SSA-XSS', 'SSA-AAA'], $loadedReport->suppressedFingerprints);
+        self::assertSame(['SSA-TWIG', 'SSA-AAA'], $loadedReport->suppressedBaselineFingerprints);
+    }
+
+    /**
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_a_report_written_before_the_baseline_fingerprints_were_listed_takes_its_suppressed_fingerprints_for_them(): void
+    {
+        $path = $this->writeReport(['vulnerabilities' => [], 'suppressed_fingerprints' => ['SSA-TWIG', 'SSA-AAA']]);
+
+        self::assertSame(['SSA-TWIG', 'SSA-AAA'], (new ReportFindingsLoader($this->filesystem))->load($path)->suppressedBaselineFingerprints);
+    }
+
+    /**
+     * @param list<string> $expected
+     *
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('suppressedBaselineFingerprintsThatAreNotAListOfStrings')]
+    public function test_it_keeps_only_the_strings_of_a_suppressed_baseline_list(mixed $suppressed, array $expected): void
+    {
+        $path = $this->writeReport(['vulnerabilities' => [], 'suppressed_fingerprints' => ['SSA-OTHER'], 'suppressed_baseline_fingerprints' => $suppressed]);
+
+        self::assertSame($expected, (new ReportFindingsLoader($this->filesystem))->load($path)->suppressedBaselineFingerprints);
+    }
+
+    /**
+     * @return iterable<string, array{mixed, list<string>}>
+     */
+    public static function suppressedBaselineFingerprintsThatAreNotAListOfStrings(): iterable
+    {
+        yield 'a string instead of a list' => ['SSA-AAA', []];
+        yield 'null, as if the key were missing' => [null, ['SSA-OTHER']];
+        yield 'a list holding no string' => [[42, null, ['SSA-AAA']], []];
+        yield 'a list holding strings among other values' => [[42, 'SSA-AAA', null, 'SSA-BBB'], ['SSA-AAA', 'SSA-BBB']];
+    }
+
+    /**
      * @param array<string, mixed> $report
      *
      * @throws MalformedReportFileException

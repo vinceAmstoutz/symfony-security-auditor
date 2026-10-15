@@ -56,8 +56,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     /** @var ?array<string, int> */
     private ?array $remainingBaselineBudget = null;
 
-    /** @var list<string> */
-    private array $consumedBaselineFingerprints = [];
+    /** @var list<SuppressedFinding> */
+    private array $baselineAcceptedFindings = [];
 
     /** @var list<Vulnerability> */
     private array $baselineSkippedFindings = [];
@@ -133,16 +133,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
      */
     public function consumeBaselineCredit(string $fingerprint): bool
     {
-        $this->remainingBaselineBudget ??= array_count_values($this->acceptedFingerprints);
-
-        if (!\array_key_exists($fingerprint, $this->remainingBaselineBudget) || $this->remainingBaselineBudget[$fingerprint] <= 0) {
-            return false;
-        }
-
-        --$this->remainingBaselineBudget[$fingerprint];
-        $this->consumedBaselineFingerprints[] = $fingerprint;
-
-        return true;
+        return $this->spendBaselineCredit(new SuppressedFinding($fingerprint, $fingerprint));
     }
 
     /**
@@ -153,7 +144,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     public function consumeBaselineCreditFor(Vulnerability $vulnerability): bool
     {
         foreach ($vulnerability->fingerprintCandidates() as $fingerprintCandidate) {
-            if ($this->consumeBaselineCredit($fingerprintCandidate)) {
+            if ($this->spendBaselineCredit(new SuppressedFinding($vulnerability->fingerprint(), $fingerprintCandidate))) {
                 return true;
             }
         }
@@ -161,10 +152,41 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
         return false;
     }
 
+    private function spendBaselineCredit(SuppressedFinding $suppressedFinding): bool
+    {
+        $this->remainingBaselineBudget ??= array_count_values($this->acceptedFingerprints);
+        $fingerprint = $suppressedFinding->baselineFingerprint;
+
+        if (!\array_key_exists($fingerprint, $this->remainingBaselineBudget) || $this->remainingBaselineBudget[$fingerprint] <= 0) {
+            return false;
+        }
+
+        --$this->remainingBaselineBudget[$fingerprint];
+        $this->baselineAcceptedFindings[] = $suppressedFinding;
+
+        return true;
+    }
+
     /** @return list<string> */
     public function consumedBaselineFingerprints(): array
     {
-        return $this->consumedBaselineFingerprints;
+        return array_map(
+            static fn (SuppressedFinding $suppressedFinding): string => $suppressedFinding->baselineFingerprint,
+            $this->baselineAcceptedFindings,
+        );
+    }
+
+    /**
+     * The findings whose baseline credit was spent, each under its own
+     * fingerprint beside the baseline fingerprint it spent.
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     *
+     * @return list<SuppressedFinding>
+     */
+    public function baselineAcceptedFindings(): array
+    {
+        return $this->baselineAcceptedFindings;
     }
 
     /**

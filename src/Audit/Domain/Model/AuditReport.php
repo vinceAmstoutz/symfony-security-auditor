@@ -68,7 +68,7 @@ final readonly class AuditReport
             ),
             $auditContext->coverage(),
             $auditCost,
-            new SuppressedFindings($auditContext->consumedBaselineFingerprints()),
+            new SuppressedFindings($auditContext->baselineAcceptedFindings()),
             ...$auditContext->validatedVulnerabilities(),
         );
     }
@@ -83,7 +83,30 @@ final readonly class AuditReport
      */
     public function consumedBaselineFingerprints(): array
     {
-        return $this->suppressedFindings->acceptedBeforeReview;
+        return $this->suppressedFindings->baselineFingerprintsAcceptedBeforeReview();
+    }
+
+    /**
+     * Copy of the report naming each finding the baseline accepted before the
+     * review after the entry whose credit it spent — see
+     * {@see SuppressedFindings::withAcceptedBeforeReviewNamedBy()}. Before the
+     * review, a finding the reviewer had reclassified carries the type the
+     * attacker reports, which only the entry ties to the fingerprint a report
+     * lists the finding under.
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     *
+     * @param array<string, list<string>> $entryFingerprintsByBaselineFingerprint
+     */
+    public function withFindingsAcceptedBeforeReviewNamedBy(array $entryFingerprintsByBaselineFingerprint): self
+    {
+        return new self(
+            $this->reportIdentity,
+            $this->coverage,
+            $this->auditCost,
+            $this->suppressedFindings->withAcceptedBeforeReviewNamedBy($entryFingerprintsByBaselineFingerprint),
+            ...$this->vulnerabilities,
+        );
     }
 
     public function auditId(): string
@@ -229,12 +252,12 @@ final readonly class AuditReport
         $remainingByFingerprint = array_count_values($fingerprints);
 
         $kept = [];
-        $removedFingerprints = [];
+        $removed = [];
         foreach ($this->vulnerabilities as $vulnerability) {
             $creditedFingerprint = $this->creditedFingerprint($vulnerability, $remainingByFingerprint);
             if (null !== $creditedFingerprint) {
                 --$remainingByFingerprint[$creditedFingerprint];
-                $removedFingerprints[] = $creditedFingerprint;
+                $removed[] = new SuppressedFinding($vulnerability->fingerprint(), $creditedFingerprint);
 
                 continue;
             }
@@ -246,7 +269,7 @@ final readonly class AuditReport
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
-            $this->suppressedFindings->withRemovedFingerprints($removedFingerprints),
+            $this->suppressedFindings->withRemovedFindings($removed),
             ...$kept,
         );
     }
@@ -398,6 +421,7 @@ final readonly class AuditReport
             ],
             'coverage' => $this->coverage,
             'suppressed_fingerprints' => $this->suppressedFindings->fingerprints(),
+            'suppressed_baseline_fingerprints' => $this->suppressedFindings->baselineFingerprints(),
         ];
     }
 }

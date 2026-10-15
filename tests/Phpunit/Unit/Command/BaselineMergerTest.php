@@ -388,6 +388,40 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
+     * A baseline written before `xss` existed holds the finding under the type
+     * the model reported it as then: the report lists the finding under its
+     * own `xss` fingerprint and the baseline fingerprint that accepted it
+     * beside it.
+     *
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_an_entry_through_the_baseline_fingerprint_a_suppressed_finding_was_accepted_by(): void
+    {
+        $report = $this->writeReportWithSuppressed([], [$this->fingerprint('XSS')], [$this->fingerprint('SQL Injection')]);
+        $baseline = $this->writeBaseline([$this->baselineEntry('SQL Injection')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(0, $baselineMergePlan->prunedCount);
+        self::assertCount(1, $baselineMergePlan->keptEntries);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_drops_an_entry_only_the_fingerprint_a_suppressed_finding_is_listed_under_matches(): void
+    {
+        $report = $this->writeReportWithSuppressed([], [$this->fingerprint('XSS')], [$this->fingerprint('SQL Injection')]);
+        $baseline = $this->writeBaseline([$this->baselineEntry('XSS')]);
+
+        self::assertSame(1, $this->baselineMerger->plan($report, $baseline, true)->prunedCount);
+    }
+
+    /**
      * @throws MalformedBaselineFileException
      * @throws MalformedReportFileException
      * @throws ReportFileNotReadableException
@@ -849,14 +883,16 @@ final class BaselineMergerTest extends TestCase
      * the report would be gone for good were it not listed as suppressed.
      *
      * @param list<array<string, string>> $vulnerabilities
+     * @param list<string>|null           $suppressedBaseline
      */
-    private function writeReportWithSuppressed(array $vulnerabilities, mixed $suppressed): string
+    private function writeReportWithSuppressed(array $vulnerabilities, mixed $suppressed, ?array $suppressedBaseline = null): string
     {
         $path = $this->tmpDir.'/report.json';
         $this->filesystem->dumpFile($path, json_encode([
             'vulnerabilities' => $vulnerabilities,
             'coverage' => [['stage' => 'attacker', 'file' => 'src/Foo.php', 'status' => 'analyzed']],
             'suppressed_fingerprints' => $suppressed,
+            ...null === $suppressedBaseline ? [] : ['suppressed_baseline_fingerprints' => $suppressedBaseline],
         ], \JSON_THROW_ON_ERROR));
 
         return $path;

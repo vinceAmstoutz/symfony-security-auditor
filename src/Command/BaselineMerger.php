@@ -195,7 +195,9 @@ final readonly class BaselineMerger implements BaselineMergerInterface
 
     /**
      * Every occurrence the run found, whether its report lists the finding or
-     * leaves it out because the baseline accepted it or its type is muted.
+     * leaves it out because the baseline accepted it or its type is muted — a
+     * finding left out counted under the baseline fingerprint that accepted
+     * it, which an entry written under another type or path holds.
      *
      * @return array<string, int>
      */
@@ -203,7 +205,7 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     {
         return array_count_values([
             ...array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->fingerprint, $loadedReport->findings),
-            ...$loadedReport->suppressedFingerprints,
+            ...$loadedReport->suppressedBaselineFingerprints,
         ]);
     }
 

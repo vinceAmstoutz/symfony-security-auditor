@@ -117,5 +117,6 @@
             "status": "validated"
         }
     ],
-    "suppressed_fingerprints": []
+    "suppressed_fingerprints": [],
+    "suppressed_baseline_fingerprints": []
 }

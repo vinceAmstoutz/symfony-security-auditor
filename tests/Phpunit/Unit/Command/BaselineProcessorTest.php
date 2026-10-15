@@ -455,7 +455,8 @@ final class BaselineProcessorTest extends TestCase
 
         self::assertSame(0, $baselineResult->report->totalVulnerabilities());
         self::assertSame(1, $baselineResult->suppressedCount);
-        self::assertSame([$vulnerability->fingerprint()], $baselineResult->report->toArray()['suppressed_fingerprints']);
+        self::assertSame([$xss->fingerprint()], $baselineResult->report->toArray()['suppressed_fingerprints']);
+        self::assertSame([$vulnerability->fingerprint()], $baselineResult->report->toArray()['suppressed_baseline_fingerprints']);
     }
 
     /**
@@ -478,6 +479,56 @@ final class BaselineProcessorTest extends TestCase
 
         self::assertSame(1, $baselineResult->report->totalVulnerabilities());
         self::assertSame(0, $baselineResult->suppressedCount);
+    }
+
+    /**
+     * The baseline holds the reviewer-corrected finding the first run listed;
+     * the next run's attacker reports it under its own type again, so its
+     * credit is spent through the entry's `attacker_fingerprint` before any
+     * review.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_apply_names_a_finding_accepted_through_its_attacker_fingerprint_by_the_fingerprint_the_first_run_listed_it_under(): void
+    {
+        $vulnerability = $this->makeVulnAtLine('src/Order.php', 1, VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE)->withCorrectedType(VulnerabilityType::BROKEN_ACCESS_CONTROL);
+        $baselineFile = $this->tmpDir.'/baseline.json';
+        $baselineProcessor = new BaselineProcessor(new Baseline());
+        $baselineProcessor->generate($this->makeReport($vulnerability), $baselineFile);
+
+        $reReported = $this->makeVulnAtLine('src/Order.php', 3, VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: $baselineProcessor->acceptedFingerprints($baselineFile));
+        $auditContext->consumeBaselineCreditFor($reReported);
+
+        $report = $baselineProcessor->apply(AuditReport::fromContext($auditContext), $baselineFile)->report;
+
+        self::assertSame([$vulnerability->fingerprint()], $report->toArray()['suppressed_fingerprints']);
+        self::assertSame([$reReported->fingerprint()], $report->toArray()['suppressed_baseline_fingerprints']);
+        self::assertSame([$reReported->fingerprint()], $report->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_apply_returns_the_report_unchanged_when_the_baseline_accepts_nothing(): void
+    {
+        $auditReport = $this->makeReport($this->makeVuln('src/A.php'));
+
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->method('load')->willReturn([]);
+        $baseline->expects(self::never())->method('entries');
+
+        $baselineResult = (new BaselineProcessor($baseline))->apply($auditReport, '/baseline.json');
+
+        self::assertSame($auditReport, $baselineResult->report);
+        self::assertSame(0, $baselineResult->suppressedCount);
+        self::assertSame([], $baselineResult->acceptedFingerprints);
     }
 
     /**

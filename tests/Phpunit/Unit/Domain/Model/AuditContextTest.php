@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SuppressedFinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -86,6 +87,7 @@ final class AuditContextTest extends TestCase
 
         self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
         self::assertSame(['SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+        self::assertEquals([new SuppressedFinding('SSA-AAA', 'SSA-AAA')], $auditContext->baselineAcceptedFindings());
     }
 
     /**
@@ -97,6 +99,7 @@ final class AuditContextTest extends TestCase
 
         self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
         self::assertSame([], $auditContext->consumedBaselineFingerprints());
+        self::assertSame([], $auditContext->baselineAcceptedFindings());
     }
 
     /**
@@ -143,6 +146,7 @@ final class AuditContextTest extends TestCase
 
         self::assertTrue($auditContext->consumeBaselineCreditFor($vulnerability));
         self::assertSame([$accepted], $auditContext->consumedBaselineFingerprints());
+        self::assertEquals([new SuppressedFinding($vulnerability->fingerprint(), $accepted)], $auditContext->baselineAcceptedFindings());
         self::assertFalse($auditContext->consumeBaselineCreditFor($vulnerability));
     }
 
@@ -162,6 +166,10 @@ final class AuditContextTest extends TestCase
         self::assertTrue($auditContext->consumeBaselineCreditFor($vulnerability));
         self::assertFalse($auditContext->consumeBaselineCreditFor($vulnerability));
         self::assertSame([$vulnerability->fingerprint(), $former->fingerprint()], $auditContext->consumedBaselineFingerprints());
+        self::assertEquals(
+            [new SuppressedFinding($vulnerability->fingerprint(), $vulnerability->fingerprint()), new SuppressedFinding($vulnerability->fingerprint(), $former->fingerprint())],
+            $auditContext->baselineAcceptedFindings(),
+        );
     }
 
     /**
