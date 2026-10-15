@@ -64,7 +64,7 @@ final readonly class FormerFindingNames
     {
         return [
             $diffFinding->file,
-            ...(null !== $entryFile && EchoedFilePath::denotes($entryFile, $diffFinding->file, \sprintf('%s/%s', $projectPath, $diffFinding->file)) ? [$entryFile] : []),
+            ...(null !== $entryFile && EchoedFilePath::denotesProjectFile($entryFile, $diffFinding->file, $projectPath) ? [$entryFile] : []),
         ];
     }
 

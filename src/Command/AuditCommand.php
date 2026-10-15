@@ -77,6 +77,7 @@ final readonly class AuditCommand
         private bool $pocSynthesisEnabled = false,
         private bool $fixSynthesisEnabled = false,
         private AuditCommandDefaults $auditCommandDefaults = new AuditCommandDefaults(),
+        private BaselineFilePathsHolder $baselineFilePathsHolder = new BaselineFilePathsHolder(),
     ) {}
 
     /**
@@ -176,6 +177,7 @@ final readonly class AuditCommand
                 $this->beginAuditRun($symfonyStyle, $auditCommandInput);
 
                 $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback($auditCommandInput->baseline));
+                $this->baselineFilePathsHolder->set($projectPath, $this->baselineProcessor->filePaths($auditCommandInput->baseline));
 
                 $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since, $this->acceptedFingerprintsFor($auditCommandInput));
                 $report = $this->findingTypeFilter->apply($report);

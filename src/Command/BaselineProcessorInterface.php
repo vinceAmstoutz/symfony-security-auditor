@@ -56,6 +56,15 @@ interface BaselineProcessorInterface
     public function acceptedFingerprints(?string $cliBaseline): array;
 
     /**
+     * The paths the effective baseline file's entries name their findings'
+     * files by, in its order, resolving the CLI `--baseline` override against
+     * the configured default path. Empty when neither is set.
+     *
+     * @return list<string>
+     */
+    public function filePaths(?string $cliBaseline): array;
+
+    /**
      * Suppresses baselined findings from the report, resolving the CLI
      * `--baseline` override against the configured default path. When no path
      * is set, the report is returned unchanged with a zero suppressed count.

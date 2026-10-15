@@ -78,6 +78,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineFilePathsHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
@@ -893,6 +894,75 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    #[DataProvider('respelledControllerPathsInEveryOutputFormat')]
+    public function test_a_baseline_entry_written_under_another_spelling_of_the_path_accepts_the_finding_the_model_now_names_by_its_project_file(string $entryPathFormat, string $format): void
+    {
+        $this->createProjectDir();
+        $entryPath = \sprintf($entryPathFormat, $this->fixtureDir);
+        $baselineFile = $this->baselineAccepting(Vulnerability::fingerprintOf('sql_injection', $entryPath, 'Critical SQL Injection'), $entryPath);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayloadAt('src/Controller/HomeController.php'), '{"accepted": true}', ['riskLevel' => RiskLevel::Low]);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => $format,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function respelledControllerPathsInEveryOutputFormat(): iterable
+    {
+        foreach (self::respelledControllerPaths() as $spelling => [$entryPathFormat]) {
+            foreach (OutputFormat::cases() as $outputFormat) {
+                yield \sprintf('%s, %s', $spelling, $outputFormat->value) => [$entryPathFormat, $outputFormat->value];
+            }
+        }
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('respelledControllerPaths')]
+    public function test_a_baseline_entry_written_under_another_spelling_of_the_path_is_reported_suppressed_when_the_model_names_the_project_file(string $entryPathFormat): void
+    {
+        $this->createProjectDir();
+        $entryPath = \sprintf($entryPathFormat, $this->fixtureDir);
+        $entryFingerprint = Vulnerability::fingerprintOf('sql_injection', $entryPath, 'Critical SQL Injection');
+        $baselineFile = $this->baselineAccepting($entryFingerprint, $entryPath);
+        $reportFile = $this->fixtureDir.'/report.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayloadAt('src/Controller/HomeController.php'), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'json',
+            '--output' => $reportFile,
+        ]);
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayloadAt('src/Controller/HomeController.php'), '{"accepted": true}');
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--baseline' => $baselineFile, '--format' => 'sarif']);
+
+        $report = json_decode((string) file_get_contents($reportFile), true);
+        self::assertIsArray($report);
+        self::assertSame(
+            [[], [Vulnerability::fingerprintOf('sql_injection', 'src/Controller/HomeController.php', 'Critical SQL Injection')], [$entryFingerprint]],
+            [$report['vulnerabilities'] ?? null, $report['suppressed_fingerprints'] ?? null, $report['suppressed_baseline_fingerprints'] ?? null],
+        );
+        self::assertSame(
+            [[
+                ['symfonySecurityAuditor/v1' => 'SSA-2C08A47E5035'],
+                'src/Controller/HomeController.php',
+                [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+            ]],
+            $this->sarifResultSummaries($commandTester->getDisplay()),
+        );
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_json_output_written_to_file(): void
     {
         $this->createProjectDir();
@@ -1479,9 +1549,10 @@ final class AuditCommandEndToEndTest extends TestCase
         $fixSynthesisEnabled = $overrides['fixSynthesisEnabled'] ?? false;
 
         $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
+        $baselineFilePathsHolder = new BaselineFilePathsHolder();
         $auditOrchestrator = new AuditOrchestrator(
             new AttackerAgent(
-                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullCodeSlicer()),
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator(), $baselineFilePathsHolder), new NullCodeSlicer()),
                 new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), progressReporter: $progressReporterHolder),
                 new AttackerAnalysisSettings(),
                 new NullLogger(),
@@ -1551,6 +1622,7 @@ final class AuditCommandEndToEndTest extends TestCase
             riskLevel: $riskLevel,
             pocSynthesisEnabled: $pocSynthesisEnabled,
             fixSynthesisEnabled: $fixSynthesisEnabled,
+            baselineFilePathsHolder: $baselineFilePathsHolder,
         );
 
         return new CommandTester($auditCommand);

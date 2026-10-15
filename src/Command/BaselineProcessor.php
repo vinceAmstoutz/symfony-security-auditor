@@ -90,6 +90,25 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     #[Override]
+    public function filePaths(?string $cliBaseline): array
+    {
+        $baselinePath = $cliBaseline ?? $this->configuredBaseline;
+        if (null === $baselinePath) {
+            return [];
+        }
+
+        $filePaths = [];
+        foreach ($this->baseline->entries($baselinePath) as $baselineEntry) {
+            $file = $baselineEntry->file();
+            if (null !== $file) {
+                $filePaths[] = $file;
+            }
+        }
+
+        return $filePaths;
+    }
+
+    #[Override]
     public function feedback(?string $cliBaseline): ReviewerFeedback
     {
         $baselinePath = $cliBaseline ?? $this->configuredBaseline;

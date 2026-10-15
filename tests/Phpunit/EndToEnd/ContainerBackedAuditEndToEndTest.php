@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
+use Mcp\Exception\ToolCallException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
@@ -49,6 +50,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedExce
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
@@ -598,6 +600,36 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         self::assertSame(1, $withTheFlag['total_vulnerabilities']);
     }
 
+    /**
+     * @throws ToolCallException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_baseline_entry_under_another_spelling_of_the_path_suppresses_the_finding_the_model_names_by_its_project_file_in_the_command_and_the_mcp_tool(): void
+    {
+        $entryFingerprint = Vulnerability::fingerprintOf('broken_access_control', './src/Controller/AdminController.php', 'Unprotected administrative action');
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        (new Filesystem())->dumpFile($baselineFile, json_encode([[
+            'fingerprint' => $entryFingerprint,
+            'type' => 'broken_access_control',
+            'file' => './src/Controller/AdminController.php',
+            'title' => 'Unprotected administrative action',
+        ]], \JSON_THROW_ON_ERROR));
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['baseline' => $baselineFile]]);
+
+        $commandReport = $this->decode($this->execute($kernel, 'json'));
+        $toolReport = $this->decode($this->mcpAuditTool($kernel)->audit($this->fixtureDir));
+
+        $reportedFingerprint = Vulnerability::fingerprintOf('broken_access_control', 'src/Controller/AdminController.php', 'Unprotected administrative action');
+        self::assertSame(
+            [[0, [$reportedFingerprint], [$entryFingerprint]], [0, [$reportedFingerprint], [$entryFingerprint]]],
+            [
+                [$commandReport['total_vulnerabilities'] ?? null, $commandReport['suppressed_fingerprints'] ?? null, $commandReport['suppressed_baseline_fingerprints'] ?? null],
+                [$toolReport['total_vulnerabilities'] ?? null, $toolReport['suppressed_fingerprints'] ?? null, $toolReport['suppressed_baseline_fingerprints'] ?? null],
+            ],
+        );
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
     public function test_a_no_cache_flag_wins_over_the_enabled_cache(): void
@@ -917,6 +949,16 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         self::assertInstanceOf(AuditCommand::class, $auditCommand);
 
         return $auditCommand;
+    }
+
+    private function mcpAuditTool(Kernel $kernel): AuditTool
+    {
+        $testContainer = $kernel->getContainer()->get('test.service_container');
+        self::assertInstanceOf(TestContainer::class, $testContainer);
+        $auditTool = $testContainer->get(AuditTool::class);
+        self::assertInstanceOf(AuditTool::class, $auditTool);
+
+        return $auditTool;
     }
 
     private function normalizeTextReport(string $report): string

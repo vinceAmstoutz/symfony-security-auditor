@@ -179,6 +179,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineFilePathsHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMergerInterface;
@@ -311,10 +312,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
     $defaultsConfigurator->alias(ProjectFileScannerInterface::class, ProjectFileScanner::class);
 
+    $defaultsConfigurator->set(BaselineFilePathsHolder::class);
     $defaultsConfigurator->set(VulnerabilityFactory::class)
         ->args([
             service('logger')->ignoreOnInvalid(),
             inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
+            service(BaselineFilePathsHolder::class),
         ]);
     $defaultsConfigurator->set(ApiResourceAttackerSkill::class);
     $defaultsConfigurator->set(AuthenticatorAttackerSkill::class);
@@ -769,6 +772,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                     ->args([param('symfony_security_auditor.audit.format')]),
                 param('symfony_security_auditor.audit.output'),
             ]),
+            service(BaselineFilePathsHolder::class),
         ])
         ->tag('console.command');
 
@@ -802,6 +806,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReviewerFeedbackHolder::class),
             service(UnpricedModelBudgetGuardInterface::class),
             service('logger'),
+            service(BaselineFilePathsHolder::class),
         ]);
 
     $defaultsConfigurator->set(McpServerFactory::class)

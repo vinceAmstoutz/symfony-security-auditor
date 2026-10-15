@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
@@ -323,6 +324,41 @@ final class BaselineProcessorTest extends TestCase
         $baselineProcessor = new BaselineProcessor($baseline, '/configured.json');
 
         self::assertSame(['SSA-AAA'], $baselineProcessor->acceptedFingerprints('/cli.json'));
+    }
+
+    public function test_file_paths_are_empty_when_no_path_is_configured(): void
+    {
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::never())->method('entries');
+
+        self::assertSame([], (new BaselineProcessor($baseline))->filePaths(null));
+    }
+
+    public function test_file_paths_list_the_file_of_every_entry_that_names_one_in_baseline_order(): void
+    {
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('entries')
+            ->with('/cli.json')
+            ->willReturn([
+                new BaselineEntry('SSA-AAA', null, ['fingerprint' => 'SSA-AAA', 'file' => './src/A.php']),
+                new BaselineEntry('SSA-LEGACY', null, 'SSA-LEGACY'),
+                new BaselineEntry('SSA-BBB', null, ['fingerprint' => 'SSA-BBB', 'file' => 'src\\B.php']),
+                new BaselineEntry('SSA-CCC', null, ['fingerprint' => 'SSA-CCC']),
+            ]);
+
+        self::assertSame(['./src/A.php', 'src\\B.php'], (new BaselineProcessor($baseline, '/configured.json'))->filePaths('/cli.json'));
+    }
+
+    public function test_file_paths_fall_back_to_the_configured_path(): void
+    {
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('entries')
+            ->with('/configured.json')
+            ->willReturn([new BaselineEntry('SSA-AAA', null, ['fingerprint' => 'SSA-AAA', 'file' => './src/A.php'])]);
+
+        self::assertSame(['./src/A.php'], (new BaselineProcessor($baseline, '/configured.json'))->filePaths(null));
     }
 
     public function test_accepted_fingerprints_falls_back_to_the_configured_path(): void

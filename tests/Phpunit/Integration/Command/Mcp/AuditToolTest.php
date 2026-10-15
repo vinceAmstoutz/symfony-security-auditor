@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineFilePathsHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
@@ -379,6 +380,34 @@ final class AuditToolTest extends TestCase
             ['The id is cast to int upstream.'],
             array_map(static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason, $reviewerFeedbackHolder->feedback()->entries),
         );
+    }
+
+    /**
+     * @throws ToolCallException
+     */
+    public function test_it_hands_the_run_the_paths_the_configured_baseline_names_files_by(): void
+    {
+        $baselineFilePathsHolder = new BaselineFilePathsHolder();
+        $baselineFile = $this->projectPath.'/.security-baseline.json';
+        (new Filesystem())->dumpFile($baselineFile, json_encode([
+            ['fingerprint' => 'SSA-AAAAAAAAAAAA', 'file' => './src/A.php'],
+            ['fingerprint' => 'SSA-BBBBBBBBBBBB', 'file' => \sprintf('%s/src/A.php', $this->projectPath)],
+        ], \JSON_THROW_ON_ERROR));
+
+        $auditTool = new AuditTool(
+            new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()),
+            new JsonReportRenderer(),
+            $this->auditedProjectPathHolder(),
+            new BaselineProcessor(new Baseline(), $baselineFile),
+            new FindingTypeFilter(),
+            new ReviewerFeedbackHolder(),
+            $this->budgetGuard(),
+            baselineFilePathsHolder: $baselineFilePathsHolder,
+        );
+
+        $auditTool->audit($this->projectPath);
+
+        self::assertSame(['./src/A.php', \sprintf('%s/src/A.php', $this->projectPath)], $baselineFilePathsHolder->naming('src/A.php'));
     }
 
     /**

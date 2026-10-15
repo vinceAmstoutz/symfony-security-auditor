@@ -51,6 +51,15 @@ final readonly class EchoedFilePath
     }
 
     /**
+     * Whether `$path` names the file `$relativePath` of the project at
+     * `$projectPath`, by its relative or its absolute path.
+     */
+    public static function denotesProjectFile(string $path, string $relativePath, string $projectPath): bool
+    {
+        return self::denotes($path, $relativePath, \sprintf('%s/%s', $projectPath, $relativePath));
+    }
+
+    /**
      * @param list<ProjectFile> $knownFiles
      */
     public static function resolve(string $path, array $knownFiles): string

@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineFilePathsHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
@@ -49,6 +50,7 @@ final readonly class AuditTool
         private ReviewerFeedbackHolder $reviewerFeedbackHolder,
         private UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard,
         private LoggerInterface $logger = new NullLogger(),
+        private BaselineFilePathsHolder $baselineFilePathsHolder = new BaselineFilePathsHolder(),
     ) {}
 
     /**
@@ -112,6 +114,7 @@ final readonly class AuditTool
     {
         $this->unpricedModelBudgetGuard->warnWhenBudgetCannotBeEnforced($this->logger);
         $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback(null));
+        $this->baselineFilePathsHolder->set($projectPath, $this->baselineProcessor->filePaths(null));
 
         $auditReport = $this->findingTypeFilter->apply(
             $this->runAuditUseCase->execute($projectPath, acceptedFingerprints: $this->baselineProcessor->acceptedFingerprints(null)),
