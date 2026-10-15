@@ -14,17 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
 
 use Override;
-use RuntimeException;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\Result\RawResultInterface;
 use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\ResultConverterInterface;
 use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
+use Throwable;
 
 final class ThrowingConverter implements ResultConverterInterface
 {
     public function __construct(
-        private readonly RuntimeException $runtimeException,
+        private readonly Throwable $throwable,
         private readonly ?TokenUsageExtractorInterface $tokenUsageExtractor = null,
     ) {}
 
@@ -37,7 +37,7 @@ final class ThrowingConverter implements ResultConverterInterface
     #[Override]
     public function convert(RawResultInterface $result, array $options = []): ResultInterface
     {
-        throw $this->runtimeException;
+        throw $this->throwable;
     }
 
     #[Override]

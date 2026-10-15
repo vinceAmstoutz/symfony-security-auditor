@@ -145,6 +145,7 @@ final readonly class TransientFailureClassifier
         'does not contain any content',
         'response does not contain',
         'no content blocks',
+        'no completions found',
     ];
 
     /**

@@ -20,6 +20,7 @@ use Symfony\AI\Platform\Exception\AuthenticationException;
 use Symfony\AI\Platform\Exception\BadRequestException;
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
+use Symfony\AI\Platform\Exception\InvalidArgumentException as PlatformInvalidArgumentException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
@@ -271,6 +272,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'response_does_not_contain_variant' => [new RuntimeException('Response does not contain text blocks')];
         yield 'no_content_blocks_variant' => [new RuntimeException('Anthropic returned no content blocks')];
         yield 'case_insensitive_match' => [new RuntimeException('RESPONSE DOES NOT CONTAIN ANY CONTENT.')];
+        yield 'venice_completion_with_empty_text' => [new PlatformInvalidArgumentException('No completions found in the response.')];
         yield 'wrapped_empty_content' => [
             new RuntimeException(
                 'platform invoke failed',

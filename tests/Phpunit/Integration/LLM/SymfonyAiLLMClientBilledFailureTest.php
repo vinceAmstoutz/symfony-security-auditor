@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\Platform\Exception\AuthenticationException;
+use Symfony\AI\Platform\Exception\InvalidArgumentException as PlatformInvalidArgumentException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
@@ -552,6 +553,60 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         self::assertSame(25, $this->budgetTracker->tokensUsed());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_with_tools_ends_a_conversation_venice_closed_with_empty_text_as_an_empty_answer_booked_at_its_reported_usage(): void
+    {
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), []);
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->toolCallRecordingAFinding(), $this->veniceEmptyCompletion()]);
+
+        $llmResponse = $this->client($scriptedDeferredPlatform)->completeWithTools('sys', 'user', $structuredVulnerabilityCollectionSession->toolRegistry, 3);
+
+        self::assertSame('empty_content', $llmResponse->stopReason());
+        self::assertCount(1, $structuredVulnerabilityCollectionSession->drain());
+        self::assertSame([1000, 1], $this->fakeRateLimiter->recorded[1]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_batch_with_tools_ends_a_conversation_venice_closed_with_empty_text_as_an_empty_answer(): void
+    {
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), []);
+        $scriptedDeferredPlatform = new ScriptedDeferredPlatform([$this->toolCallRecordingAFinding(), $this->veniceEmptyCompletion()]);
+
+        $llmResponses = $this->client($scriptedDeferredPlatform)->completeBatchWithTools([['system' => 'sys', 'user' => 'user', 'tools' => $structuredVulnerabilityCollectionSession->toolRegistry]], 2, 3);
+
+        self::assertSame('empty_content', $llmResponses[0]->stopReason());
+        self::assertCount(1, $structuredVulnerabilityCollectionSession->drain());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_answers_venice_empty_text_as_an_empty_answer_booked_at_its_reported_usage(): void
+    {
+        $llmResponse = $this->client(new ScriptedDeferredPlatform([$this->veniceEmptyCompletion()]))->complete('sys', 'user');
+
+        self::assertSame('empty_content', $llmResponse->stopReason());
+        self::assertSame(1001, $this->budgetTracker->tokensUsed());
+    }
+
     /** @return iterable<string, array{int, array<string, mixed>}> */
     public static function gatewayRefusalsWithoutAnErrorOrChoicesCases(): iterable
     {
@@ -589,6 +644,15 @@ final class SymfonyAiLLMClientBilledFailureTest extends TestCase
         $refusal->method('toArray')->willReturn($body);
 
         return new DeferredResult(new ThrowingConverter($runtimeException ?? new PlatformRuntimeException('Response does not contain choices.')), new RawHttpResult($refusal), []);
+    }
+
+    private function veniceEmptyCompletion(): DeferredResult
+    {
+        return new DeferredResult(
+            new ThrowingConverter(new PlatformInvalidArgumentException('No completions found in the response.'), new RawUsageExtractor()),
+            new InMemoryRawResult(['id' => 'chatcmpl-2', 'object' => 'chat.completion', 'model' => 'qwen3-235b', 'choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => ''], 'finish_reason' => 'stop']], 'usage' => ['prompt_tokens' => 1000, 'completion_tokens' => 1, 'total_tokens' => 1001]]),
+            [],
+        );
     }
 
     private function toolCallRecordingAFinding(): DeferredResult
