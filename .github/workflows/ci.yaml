@@ -254,6 +254,13 @@ jobs:
           fi
           php -d memory_limit=4G bin/infection $ARGS
 
+      - name: Show the escaped and timed-out mutants
+        if: failure()
+        run: |
+          if [ -f infection/infection.log ]; then
+            sed -n '/^Escaped mutants:$/,/^Skipped mutants:$/p' infection/infection.log | head -n 2000
+          fi
+
       - name: Upload Infection logs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
