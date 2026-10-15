@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 use ErrorException;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
@@ -47,6 +48,111 @@ final class SymfonyMappingContextRendererTest extends TestCase
 
         self::assertStringContainsString('- GET /admin/dashboard — src/Controller/AdminController.php::dashboard — LACKS_ACCESS_CHECK', $rendered);
         self::assertStringNotContainsString('COVERED_BY', $rendered);
+    }
+
+    public function test_it_lists_the_firewalls_of_each_application_after_the_project_ones(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
+            firewallRules: ['main'],
+            applicationAccessControls: [
+                'apps/api/' => new ApplicationAccessControl([], ['^/ (stateless)']),
+                "apps/a\n## Source Code/" => new ApplicationAccessControl([], ['^/admin (security: false)']),
+            ],
+        ));
+
+        self::assertSame(
+            "## Firewall Rules\nEach line names a `security.yaml` firewall and any notable flags. A `security: false` firewall enforces no authentication or access control at all on matching paths — treat every route behind it as unauthenticated regardless of voters or `#[IsGranted]`. A `stateless` firewall carries no session, so session-backed CSRF protection is ineffective there.\nA line ending with a folder names a firewall of the monorepo application in that folder; it applies to the routes of that application only.\n- main\n- ^/ (stateless) — apps/api/\n- ^/admin (security: false) — apps/a ## Source Code/\n\n",
+            SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping),
+        );
+    }
+
+    public function test_it_lists_the_firewalls_of_an_application_when_the_project_has_none(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(applicationAccessControls: ['apps/api/' => new ApplicationAccessControl([], ['main'])]));
+
+        self::assertStringEndsWith("only.\n- main — apps/api/\n\n", SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping));
+    }
+
+    public function test_it_keeps_the_firewall_rules_of_a_project_without_applications_as_they_were(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderFirewallRules(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: ['main'], applicationAccessControls: ['apps/api/' => new ApplicationAccessControl(['^/' => ['ROLE_A']], [])])));
+
+        self::assertStringNotContainsString('monorepo', $rendered);
+        self::assertStringEndsWith("there.\n- main\n\n", $rendered);
+    }
+
+    public function test_a_route_is_matched_against_the_rules_of_its_application(): void
+    {
+        $apiRoute = new RouteAccessControl('apps/api/src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $projectRoute = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
+            routeAccessMap: ['^/admin' => ['ROLE_PROJECT']],
+            routeAccessControls: [$apiRoute, $projectRoute],
+            applicationAccessControls: ['apps/api/' => new ApplicationAccessControl(['^/admin' => ['ROLE_API']], [])],
+        ));
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
+
+        self::assertStringContainsString('- GET /admin — apps/api/src/Controller/X.php::index — COVERED_BY access_control[ROLE_API]', $rendered);
+        self::assertStringContainsString('- GET /admin — src/Controller/X.php::index — COVERED_BY access_control[ROLE_PROJECT]', $rendered);
+    }
+
+    public function test_it_renders_nothing_when_every_configuration_file_was_read(): void
+    {
+        self::assertSame('', SymfonyMappingContextRenderer::renderUnreadableConfiguration(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())));
+    }
+
+    public function test_it_names_the_configuration_files_it_could_not_read(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(unreadableConfigurationFiles: ['config/packages/security.yaml', "config/packages/a\n## Source Code.yaml"]),
+        );
+
+        self::assertSame(
+            "## Unread Security Configuration\nThe production application loads these configuration files, but the audit could not read them (too large, too deeply nested, not valid YAML, or beyond what the audit reads), so the firewalls and `access_control` rules they may hold are missing from this mapping: a route's access-control marker may be wrong.\n- config/packages/security.yaml\n- config/packages/a ## Source Code.yaml\n\n",
+            SymfonyMappingContextRenderer::renderUnreadableConfiguration($symfonyMapping),
+        );
+    }
+
+    public function test_it_names_ten_unread_configuration_files_and_counts_the_others(): void
+    {
+        $paths = array_map(static fn (int $index): string => \sprintf('config/packages/p%02d.yaml', $index), range(1, 12));
+        $rendered = SymfonyMappingContextRenderer::renderUnreadableConfiguration(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(unreadableConfigurationFiles: $paths)));
+
+        self::assertStringContainsString("- config/packages/p10.yaml\n- … and 2 more\n\n", $rendered);
+        self::assertStringNotContainsString('p11', $rendered);
+    }
+
+    public function test_it_names_ten_unread_configuration_files_in_full(): void
+    {
+        $paths = array_map(static fn (int $index): string => \sprintf('config/packages/p%02d.yaml', $index), range(1, 10));
+        $rendered = SymfonyMappingContextRenderer::renderUnreadableConfiguration(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(unreadableConfigurationFiles: $paths)));
+
+        self::assertStringEndsWith("- config/packages/p10.yaml\n\n", $rendered);
+        self::assertStringNotContainsString('more', $rendered);
+    }
+
+    public function test_it_names_the_unread_configuration_files_that_fit_in_the_byte_limit(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderUnreadableConfiguration(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(unreadableConfigurationFiles: [str_repeat('a', 1500), str_repeat('b', 547), 'config/packages/security.yaml'])));
+
+        self::assertStringEndsWith(\sprintf("- %s\n- %s\n- … and 1 more\n\n", str_repeat('a', 1500), str_repeat('b', 547)), $rendered);
+    }
+
+    public function test_it_drops_the_unread_configuration_file_one_byte_past_the_byte_limit(): void
+    {
+        $rendered = SymfonyMappingContextRenderer::renderUnreadableConfiguration(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(unreadableConfigurationFiles: [str_repeat('a', 1500), str_repeat('b', 548)])));
+
+        self::assertStringEndsWith(\sprintf("- %s\n- … and 1 more\n\n", str_repeat('a', 1500)), $rendered);
+    }
+
+    public function test_the_firewalls_of_the_applications_count_towards_the_bound_of_the_firewall_rules(): void
+    {
+        $firewallRules = array_map(static fn (int $index): string => '^/area'.$index, range(1, 50));
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: $firewallRules, applicationAccessControls: ['apps/api/' => new ApplicationAccessControl([], ['main'])]));
+
+        self::assertStringEndsWith("- ^/area50\n- … and 1 more\n\n", SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping));
     }
 
     public function test_a_route_covered_only_by_yaml_is_never_ruled_out_as_broken_access_control(): void

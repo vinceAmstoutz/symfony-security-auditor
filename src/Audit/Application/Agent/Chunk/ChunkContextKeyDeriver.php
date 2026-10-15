@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
@@ -111,6 +112,8 @@ final readonly class ChunkContextKeyDeriver
         $signatures = [
             ...$applicationSecurityMap->perimeterRules(),
             ...$this->routeAccessMapSignatures($symfonyMapping->routeAccessMap()),
+            ...$this->unreadableConfigurationSignatures($symfonyMapping->unreadableConfigurationFiles()),
+            ...$this->applicationAccessControlSignatures($symfonyMapping->applicationAccessControls()),
             ...$this->routeAccessControlSignatures($symfonyMapping->routeAccessControls()),
             ...$this->voterCapabilitySignatures($applicationSecurityMap->authorizationRules()),
             ...$this->formBindingSignatures($symfonyMapping->formBindings()),
@@ -136,6 +139,37 @@ final readonly class ChunkContextKeyDeriver
         $signatures = [];
         foreach ($routeAccessMap as $pattern => $roles) {
             $signatures[] = \sprintf('%s=%s', $pattern, implode(',', $roles));
+        }
+
+        return $signatures;
+    }
+
+    /**
+     * @param list<string> $unreadableConfigurationFiles
+     *
+     * @return list<string>
+     */
+    private function unreadableConfigurationSignatures(array $unreadableConfigurationFiles): array
+    {
+        return array_map(static fn (string $path): string => \sprintf('unreadable configuration: %s', $path), $unreadableConfigurationFiles);
+    }
+
+    /**
+     * @param array<string, ApplicationAccessControl> $applicationAccessControls
+     *
+     * @return list<string>
+     */
+    private function applicationAccessControlSignatures(array $applicationAccessControls): array
+    {
+        $signatures = [];
+        foreach ($applicationAccessControls as $applicationFolder => $applicationAccessControl) {
+            foreach ($this->routeAccessMapSignatures($applicationAccessControl->routeAccessMap) as $ruleSignature) {
+                $signatures[] = \sprintf('application %s rule: %s', $applicationFolder, $ruleSignature);
+            }
+
+            foreach ($applicationAccessControl->firewallRules as $firewallRule) {
+                $signatures[] = \sprintf('application %s firewall: %s', $applicationFolder, $firewallRule);
+            }
         }
 
         return $signatures;

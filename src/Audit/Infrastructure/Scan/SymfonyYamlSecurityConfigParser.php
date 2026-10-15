@@ -16,18 +16,20 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 use Override;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Component\Yaml\Exception\ParseException;
-use Symfony\Component\Yaml\Yaml;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LoadOrderAwareSecurityConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProductionConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ImportAwareSecurityConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SymfonyYamlSecurityConfigParser implements LoadOrderAwareSecurityConfigParserInterface
+final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecurityConfigParserInterface
 {
     private const string PRODUCTION_ENVIRONMENT_BLOCK = 'when@prod';
 
     public function __construct(
         private LoggerInterface $logger = new NullLogger(),
         private AccessControlRequirementReader $accessControlRequirementReader = new AccessControlRequirementReader(),
+        private KernelConfigurationLoader $kernelConfigurationLoader = new KernelConfigurationLoader(),
+        private RepositoryYamlReader $repositoryYamlReader = new RepositoryYamlReader(),
     ) {}
 
     #[Override]
@@ -41,24 +43,22 @@ final readonly class SymfonyYamlSecurityConfigParser implements LoadOrderAwareSe
         return $routeAccessMap;
     }
 
-    /**
-     * The kernel reads `config/packages/security.yaml` in every environment
-     * and what sits under `config/packages/prod/` in production only.
-     */
     #[Override]
     public function isLoadedInProduction(string $relativePath): bool
     {
-        return 1 === preg_match('~\Aconfig/packages/(?:prod/.+|security)\.ya?ml\z~', $relativePath);
+        return KernelConfigurationLoader::isLoadedByTheKernel($relativePath);
     }
 
-    /**
-     * The kernel imports `config/packages/*.yaml` and then
-     * `config/packages/<environment>/*.yaml`.
-     */
     #[Override]
     public function loadRank(string $relativePath): int
     {
-        return str_starts_with($relativePath, 'config/packages/prod/') ? 1 : 0;
+        return KernelConfigurationLoader::loadRank($relativePath);
+    }
+
+    #[Override]
+    public function productionConfiguration(array $files, array $scanPaths): ProductionConfiguration
+    {
+        return $this->kernelConfigurationLoader->filesInLoadOrder($files, $scanPaths);
     }
 
     #[Override]
@@ -168,10 +168,10 @@ final readonly class SymfonyYamlSecurityConfigParser implements LoadOrderAwareSe
     private function parseYaml(string $configContent): mixed
     {
         try {
-            return Yaml::parse($configContent);
-        } catch (ParseException $parseException) {
+            return $this->repositoryYamlReader->read($configContent);
+        } catch (UnreadableYamlException $unreadableYamlException) {
             $this->logger->debug('Skipping unparseable YAML during security-config mapping', [
-                'error' => $parseException->getMessage(),
+                'error' => $unreadableYamlException->getMessage(),
             ]);
 
             return null;

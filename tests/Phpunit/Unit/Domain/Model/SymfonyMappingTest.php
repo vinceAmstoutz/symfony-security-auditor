@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
@@ -295,6 +296,40 @@ final class SymfonyMappingTest extends TestCase
         self::assertStringContainsString('Entities: 1', $summary);
         self::assertStringContainsString('Routes mapped: 1', $summary);
         self::assertStringContainsString('Firewall rules: 1', $summary);
+    }
+
+    public function test_its_summary_counts_the_rules_and_firewalls_of_each_application(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
+            routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
+            firewallRules: ['^/admin'],
+            applicationAccessControls: [
+                'apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A'], '^/b' => ['ROLE_B']], ['main', 'api']),
+                'apps/web/' => new ApplicationAccessControl(['^/c' => ['ROLE_C']], ['web', 'login', 'admin']),
+            ],
+        ));
+
+        $summary = $symfonyMapping->toSummary();
+
+        self::assertStringContainsString("Routes mapped: 4\nFirewall rules: 6", $summary);
+    }
+
+    public function test_a_controller_takes_the_rules_of_the_nearest_application_holding_it(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
+            routeAccessMap: ['^/' => ['ROLE_PROJECT']],
+            applicationAccessControls: [
+                'apps/' => new ApplicationAccessControl(['^/' => ['ROLE_APPS']], []),
+                'apps/api/' => new ApplicationAccessControl(['^/' => ['ROLE_API']], []),
+                'apps/api/v2/' => new ApplicationAccessControl(['^/' => ['ROLE_V2']], []),
+            ],
+        ));
+
+        self::assertSame(['^/' => ['ROLE_API']], $symfonyMapping->routeAccessMapFor('apps/api/src/X.php'));
+        self::assertSame(['^/' => ['ROLE_V2']], $symfonyMapping->routeAccessMapFor('apps/api/v2/src/X.php'));
+        self::assertSame(['^/' => ['ROLE_APPS']], $symfonyMapping->routeAccessMapFor('apps/web/src/X.php'));
+        self::assertSame(['^/' => ['ROLE_PROJECT']], $symfonyMapping->routeAccessMapFor('src/X.php'));
+        self::assertSame(['^/' => ['ROLE_PROJECT']], $symfonyMapping->routeAccessMapFor('apps-other/X.php'));
     }
 
     /**

@@ -85,6 +85,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             $symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule(),
         ));
 
+        $unreadableConfiguration = SymfonyMappingContextRenderer::renderUnreadableConfiguration($symfonyMapping);
         $firewallRules = SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping);
         $accessControlMap = $this->routeAccessControlMap($symfonyMapping);
         $voterCoverage = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
@@ -98,7 +99,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             ## Controllers WITHOUT Security Annotations (High Priority)
             {$noVoterList}
 
-            {$firewallRules}{$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
+            {$unreadableConfiguration}{$firewallRules}{$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
             Analyze these files for exploitable vulnerabilities. Each line is prefixed with its line number (`NNN | code`) — use those exact numbers when populating `line_start` and `line_end`; do NOT count manually or guess.
 
             {$context}

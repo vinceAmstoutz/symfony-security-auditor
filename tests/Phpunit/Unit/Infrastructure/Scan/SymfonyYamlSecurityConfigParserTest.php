@@ -353,7 +353,9 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         yield 'a development package' => ['config/packages/dev/security.yaml', false];
         yield 'a file no kernel imports' => ['config/legacy/access.yaml', false];
         yield 'a security file outside the packages' => ['config/security.yaml', false];
-        yield 'another package' => ['config/packages/framework.yaml', false];
+        yield 'another package' => ['config/packages/framework.yaml', true];
+        yield 'another package with a yml extension, which the kernel does not load' => ['config/packages/security_access.yml', false];
+        yield 'a production package with a yml extension' => ['config/packages/prod/security_access.yml', true];
         yield 'a security package below another directory' => ['src/config/packages/security.yaml', false];
         yield 'a distributed security package' => ['config/packages/security.yaml.dist', false];
         yield 'an xml production package' => ['config/packages/prod/security.xml', false];
@@ -527,6 +529,18 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
             );
 
         (new SymfonyYamlSecurityConfigParser($logger))->parseAccessControl("\t{ not: yaml");
+    }
+
+    public function test_it_skips_and_logs_security_configuration_too_large_to_read(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('debug')
+            ->with('Skipping unparseable YAML during security-config mapping', ['error' => 'it holds 262145 bytes, more than the 262144 the audit reads']);
+
+        $securityYaml = "security:\n    access_control:\n        - { path: ^/admin, roles: ROLE_ADMIN }\n";
+
+        self::assertSame([], (new SymfonyYamlSecurityConfigParser($logger))->parseAccessControl($securityYaml.'#'.str_repeat('x', 262_144 - 1 - \strlen($securityYaml))."\n"));
     }
 
     public function test_it_trims_quoted_padded_paths_and_patterns(): void

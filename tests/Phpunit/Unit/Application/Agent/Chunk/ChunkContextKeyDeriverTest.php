@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chun
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
@@ -38,6 +39,30 @@ final class ChunkContextKeyDeriverTest extends TestCase
             $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping),
             $chunkContextKeyDeriver->derive('', '', '', '', $shifted),
         );
+    }
+
+    public function test_the_configuration_files_the_mapping_could_not_read_change_the_key(): void
+    {
+        self::assertNotSame($this->keyFor(['main'], []), $this->keyFor(['main'], ['config/packages/security.yaml']));
+        self::assertNotSame($this->keyFor(['main'], ['config/packages/security.yaml']), $this->keyFor(['main'], ['config/packages/app.yaml']));
+        self::assertNotSame($this->keyFor(['config/packages/security.yaml'], []), $this->keyFor([], ['config/packages/security.yaml']));
+    }
+
+    public function test_the_rules_and_firewalls_of_each_application_change_the_key(): void
+    {
+        $keys = [
+            $this->keyForApplications([]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], [])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_B']], [])]),
+            $this->keyForApplications(['apps/web/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], [])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl([], ['^/a=ROLE_A'])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl([], ['main'])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], ['main'])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], ['other'])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A'], '^/b' => ['ROLE_B']], [])]),
+        ];
+
+        self::assertSame($keys, array_values(array_unique($keys)));
     }
 
     public function test_the_candidate_preamble_alone_yields_a_key_of_its_own(): void
@@ -88,5 +113,28 @@ final class ChunkContextKeyDeriverTest extends TestCase
         self::assertSame($firstChunkKey, $secondChunkKey);
         self::assertSame(hash('sha256', hash('sha256', '').hash('sha256', '').hash('sha256', '').hash('sha256', hash('sha256', hash('sha256', '^/admin')))), $firstChunkKey);
         self::assertNotSame($firstChunkKey, $chunkContextKeyDeriver->derive('', '', '', '', $otherMapping));
+    }
+
+    /**
+     * @param list<string> $firewallRules
+     * @param list<string> $unreadableConfigurationFiles
+     */
+    private function keyFor(array $firewallRules, array $unreadableConfigurationFiles): string
+    {
+        return (new ChunkContextKeyDeriver())->derive('', '', '', '', SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(firewallRules: $firewallRules, unreadableConfigurationFiles: $unreadableConfigurationFiles),
+        ));
+    }
+
+    /**
+     * @param array<string, ApplicationAccessControl> $applicationAccessControls
+     */
+    private function keyForApplications(array $applicationAccessControls): string
+    {
+        return (new ChunkContextKeyDeriver())->derive('', '', '', '', SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(firewallRules: ['main'], applicationAccessControls: $applicationAccessControls),
+        ));
     }
 }

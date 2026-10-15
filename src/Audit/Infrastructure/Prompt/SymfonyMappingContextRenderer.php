@@ -55,20 +55,60 @@ final readonly class SymfonyMappingContextRenderer
 
     private const int MAX_LISTED_FIREWALL_RULE_BYTES = 2048;
 
+    private const int MAX_LISTED_UNREADABLE_FILES = 10;
+
+    private const int MAX_LISTED_UNREADABLE_FILE_BYTES = 2048;
+
+    public static function renderUnreadableConfiguration(SymfonyMapping $symfonyMapping): string
+    {
+        $unreadableFiles = $symfonyMapping->unreadableConfigurationFiles();
+        if ([] === $unreadableFiles) {
+            return '';
+        }
+
+        $lines = ['## Unread Security Configuration'];
+        $lines[] = "The production application loads these configuration files, but the audit could not read them (too large, too deeply nested, not valid YAML, or beyond what the audit reads), so the firewalls and `access_control` rules they may hold are missing from this mapping: a route's access-control marker may be wrong.";
+        foreach (self::itemsWithOmissionNotice($unreadableFiles, self::MAX_LISTED_UNREADABLE_FILES, self::MAX_LISTED_UNREADABLE_FILE_BYTES) as $unreadableFile) {
+            $lines[] = \sprintf('- %s', $unreadableFile);
+        }
+
+        return \sprintf("%s\n\n", implode("\n", $lines));
+    }
+
     public static function renderFirewallRules(SymfonyMapping $symfonyMapping): string
     {
-        $firewallRules = $symfonyMapping->toApplicationSecurityMap()->perimeterRules();
+        $applicationFirewallRules = self::applicationFirewallRules($symfonyMapping);
+        $firewallRules = [...$symfonyMapping->toApplicationSecurityMap()->perimeterRules(), ...$applicationFirewallRules];
         if ([] === $firewallRules) {
             return '';
         }
 
         $lines = ['## Firewall Rules'];
         $lines[] = 'Each line names a `security.yaml` firewall and any notable flags. A `security: false` firewall enforces no authentication or access control at all on matching paths — treat every route behind it as unauthenticated regardless of voters or `#[IsGranted]`. A `stateless` firewall carries no session, so session-backed CSRF protection is ineffective there.';
+        if ([] !== $applicationFirewallRules) {
+            $lines[] = 'A line ending with a folder names a firewall of the monorepo application in that folder; it applies to the routes of that application only.';
+        }
+
         foreach (self::itemsWithOmissionNotice($firewallRules, self::MAX_LISTED_FIREWALL_RULES, self::MAX_LISTED_FIREWALL_RULE_BYTES) as $firewallRule) {
             $lines[] = \sprintf('- %s', $firewallRule);
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function applicationFirewallRules(SymfonyMapping $symfonyMapping): array
+    {
+        $applicationFirewallRules = [];
+        foreach ($symfonyMapping->applicationAccessControls() as $applicationFolder => $applicationAccessControl) {
+            foreach ($applicationAccessControl->firewallRules as $firewallRule) {
+                $applicationFirewallRules[] = \sprintf('%s — %s', $firewallRule, $applicationFolder);
+            }
+        }
+
+        return $applicationFirewallRules;
     }
 
     public static function renderVoterCoverage(SymfonyMapping $symfonyMapping): string
@@ -112,8 +152,6 @@ final readonly class SymfonyMappingContextRenderer
             return '';
         }
 
-        $routeAccessMap = $symfonyMapping->routeAccessMap();
-
         $lines = ['## Route Access-Control Map'];
         $lines[] = 'Each line describes a controller action: HTTP method(s), route path, source location, and the access-control surface (class- and method-level `#[IsGranted]`, `denyAccessUnlessGranted()` body calls). A line whose surface is empty is tagged at the end: routes with no enforcement at all carry the LACKS marker — treat those as primary candidates for `broken_access_control` and `missing_voter`. Routes with no attribute or body check whose path matches an `access_control` rule of the production `security.yaml` carry a firewall-covered marker listing the gating roles. That coverage is read from the repository\'s YAML, not verified against the running application, so it lowers the priority of `broken_access_control` there without ruling it out: still report it when the rule may not apply to the action or the gating role is too permissive for it.';
 
@@ -121,7 +159,7 @@ final readonly class SymfonyMappingContextRenderer
             $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->routeMethods()));
             $path = self::sanitizeLine($routeAccessControl->routePath() ?? '(unresolved)');
             $checks = self::accessCheckLabelsFor($routeAccessControl);
-            $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $routeAccessMap);
+            $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $symfonyMapping->routeAccessMapFor($routeAccessControl->filePath()));
             $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, self::sanitizeLine($routeAccessControl->filePath()), $routeAccessControl->methodName(), $checkLabel);
         }
 

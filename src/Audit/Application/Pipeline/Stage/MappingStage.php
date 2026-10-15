@@ -15,10 +15,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProductionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
@@ -27,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ImportAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LoadOrderAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProductionAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
@@ -70,7 +74,7 @@ final readonly class MappingStage implements StageInterface
         $projectFileInventory = ProjectFileInventory::fromFiles($files);
         $controllerLikeFiles = $this->controllerLikeFiles($files);
 
-        [$routeAccessMap, $firewallRules] = $this->extractSecurityConfig($files);
+        [$routeAccessMap, $firewallRules, $unreadableConfigurationFiles, $applicationAccessControls] = $this->extractSecurityConfig($files, ScanPathFilter::normalize($auditContext->scanPaths()));
         $routeAccessControls = $this->parseControllerAccessControls($controllerLikeFiles);
         $voterCapabilities = $this->parseVoterCapabilities($projectFileInventory->voters());
         $formBindings = $this->parseFormBindings($controllerLikeFiles);
@@ -83,6 +87,8 @@ final readonly class MappingStage implements StageInterface
                 $routeAccessControls,
                 $voterCapabilities,
                 $formBindings,
+                $unreadableConfigurationFiles,
+                $applicationAccessControls,
             ),
         );
 
@@ -176,22 +182,60 @@ final readonly class MappingStage implements StageInterface
     }
 
     /**
-     * @param list<ProjectFile> $files
+     * The project's rules and firewalls, the configuration files that could
+     * not be read, and the rules and firewalls of each monorepo application
+     * the run is narrowed to, kept apart since they govern that application's
+     * routes only.
      *
-     * @return array{array<string, list<string>>, list<string>}
+     * @param list<ProjectFile> $files
+     * @param list<string>      $scanPaths
+     *
+     * @return array{array<string, list<string>>, list<string>, list<string>, array<string, ApplicationAccessControl>}
      */
-    private function extractSecurityConfig(array $files): array
+    private function extractSecurityConfig(array $files, array $scanPaths): array
+    {
+        $productionConfiguration = $this->productionConfiguration($files, $scanPaths);
+        $applicationAccessControl = $this->accessControlOf($productionConfiguration->projectFiles);
+
+        foreach ($productionConfiguration->unreadableFiles as $path => $reason) {
+            $this->logger->warning('A configuration file the production application loads could not be read, so the security rules it may hold are missing from the mapping', ['file' => $path, 'reason' => $reason]);
+        }
+
+        return [
+            $applicationAccessControl->routeAccessMap,
+            $applicationAccessControl->firewallRules,
+            array_keys($productionConfiguration->unreadableFiles),
+            array_map($this->accessControlOf(...), $productionConfiguration->applicationFiles),
+        ];
+    }
+
+    /**
+     * @param list<ProjectFile> $configurationFiles in load order
+     */
+    private function accessControlOf(array $configurationFiles): ApplicationAccessControl
     {
         $routeAccessMap = [];
         $firewallRules = [];
-
-        foreach ($this->configurationFilesInLoadOrder($files) as $projectFile) {
-            $content = $projectFile->content();
+        foreach ($configurationFiles as $configurationFile) {
+            $content = $configurationFile->content();
             $routeAccessMap = $this->mergeRouteAccessMaps($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
             $firewallRules = [...$firewallRules, ...$this->securityConfigParser->parseFirewallRules($content)];
         }
 
-        return [$routeAccessMap, $firewallRules];
+        return new ApplicationAccessControl($routeAccessMap, $firewallRules);
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     * @param list<string>      $scanPaths
+     */
+    private function productionConfiguration(array $files, array $scanPaths): ProductionConfiguration
+    {
+        if ($this->securityConfigParser instanceof ImportAwareSecurityConfigParserInterface) {
+            return $this->securityConfigParser->productionConfiguration($files, $scanPaths);
+        }
+
+        return new ProductionConfiguration($this->configurationFilesInLoadOrder($files));
     }
 
     /**

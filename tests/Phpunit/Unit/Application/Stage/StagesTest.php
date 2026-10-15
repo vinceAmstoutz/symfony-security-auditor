@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInte
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LoadOrderAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
@@ -1332,6 +1333,32 @@ final class StagesTest extends TestCase
         $mappingStage->process($auditContext);
 
         self::assertSame(['^/s', '^/a', '^/b', '^/c'], array_keys($auditContext->mapping()?->routeAccessMap() ?? []));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_orders_the_files_by_the_rank_a_load_order_aware_parser_gives_them_then_by_path(): void
+    {
+        $securityConfigParser = self::createStub(LoadOrderAwareSecurityConfigParserInterface::class);
+        $securityConfigParser->method('isLoadedInProduction')->willReturn(true);
+        $securityConfigParser->method('loadRank')->willReturnCallback(static fn (string $relativePath): int => str_contains($relativePath, '/prod/') ? 1 : 0);
+        $securityConfigParser->method('parseAccessControl')->willReturnCallback(static fn (string $configContent): array => [$configContent => ['ROLE_ANY']]);
+        $securityConfigParser->method('parseFirewallRules')->willReturn([]);
+
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), $securityConfigParser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/packages/prod/b.yaml', '/app/config/packages/prod/b.yaml', 'prod b'),
+            ProjectFile::create('config/packages/z.yaml', '/app/config/packages/z.yaml', 'z'),
+            ProjectFile::create('config/packages/prod/a.yaml', '/app/config/packages/prod/a.yaml', 'prod a'),
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', 'security'),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        self::assertSame(['security', 'z', 'prod a', 'prod b'], array_keys($auditContext->mapping()?->routeAccessMap() ?? []));
     }
 
     /**

@@ -151,6 +151,36 @@ final readonly class SymfonyMapping
         return $this->applicationSecurityMap->perimeterRules();
     }
 
+    /**
+     * @return list<string>
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function unreadableConfigurationFiles(): array
+    {
+        return $this->accessControlMap->unreadableConfigurationFiles();
+    }
+
+    /**
+     * @return array<string, ApplicationAccessControl>
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function applicationAccessControls(): array
+    {
+        return $this->accessControlMap->applicationAccessControls();
+    }
+
+    /**
+     * @return array<string, list<string>>
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function routeAccessMapFor(string $controllerFilePath): array
+    {
+        return $this->accessControlMap->routeAccessMapFor($controllerFilePath);
+    }
+
     /** @return list<RouteAccessControl> */
     public function routeAccessControls(): array
     {
@@ -230,8 +260,8 @@ final readonly class SymfonyMapping
             \sprintf('Forms: %d', \count($this->projectFileInventory->forms())),
             \sprintf('Services: %d', \count($this->projectFileInventory->services())),
             \sprintf('Templates: %d', \count($this->projectFileInventory->templates())),
-            \sprintf('Routes mapped: %d', \count($this->accessControlMap->routeAccessMap())),
-            \sprintf('Firewall rules: %d', \count($this->accessControlMap->firewallRules())),
+            \sprintf('Routes mapped: %d', \count($this->accessControlMap->routeAccessMap()) + array_sum(array_map(static fn (ApplicationAccessControl $applicationAccessControl): int => \count($applicationAccessControl->routeAccessMap), $this->accessControlMap->applicationAccessControls()))),
+            \sprintf('Firewall rules: %d', \count($this->accessControlMap->firewallRules()) + array_sum(array_map(static fn (ApplicationAccessControl $applicationAccessControl): int => \count($applicationAccessControl->firewallRules), $this->accessControlMap->applicationAccessControls()))),
         ];
 
         return implode("\n", $lines);

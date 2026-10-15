@@ -118,6 +118,20 @@ final class EstimateAuditCostUseCasePromptOverheadTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
+    public function test_the_mapping_of_a_path_scoped_estimate_is_built_for_the_paths_of_the_run(): void
+    {
+        $mappingSettingStage = new MappingSettingStage(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        $this->useCase([$this->file('a.php', 'aaa'), $this->file('b.php', 'bbb')], attackerPromptBuilder: new RecordingAttackerPromptBuilder(self::SYSTEM_PROMPT, self::MAPPING_MESSAGE), mappingStage: $mappingSettingStage)->execute($this->projectDir, ['a.php']);
+
+        self::assertSame([['a.php']], $mappingSettingStage->scanPaths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_the_mapping_is_built_from_the_scanned_files_the_git_diff_has_not_narrowed(): void
     {
         $mappingSettingStage = new MappingSettingStage(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));

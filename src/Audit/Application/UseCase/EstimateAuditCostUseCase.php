@@ -147,7 +147,7 @@ final readonly class EstimateAuditCostUseCase
         }
 
         $chunks = $this->fileChunker->chunk($files);
-        $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scopedScanResult->mappingFiles));
+        $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scanPaths, $scopedScanResult->mappingFiles));
 
         if ($this->toolsEnabled) {
             $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * $this->toolRoundTripMultiplier());
@@ -232,19 +232,21 @@ final readonly class EstimateAuditCostUseCase
      * route access-control, voter and form sections — which grows with the
      * routes of the project, not with the chunk. The pipeline maps every file
      * it scanned, however a git diff then narrows the files to audit, and the
-     * configured scope besides when `--path` narrows the scan.
+     * configured scope besides when `--path` narrows the scan, with the
+     * `--path` values that pick the configuration of a monorepo application.
      *
+     * @param list<string>      $scanPaths
      * @param list<ProjectFile> $mappingFiles
      *
      * @throws InvalidAuditContextException
      */
-    private function mappingPromptTokens(string $projectPath, array $mappingFiles): int
+    private function mappingPromptTokens(string $projectPath, array $scanPaths, array $mappingFiles): int
     {
         if (!$this->attackerPromptBuilder instanceof AttackerPromptBuilderInterface || !$this->mappingStage instanceof StageInterface) {
             return 0;
         }
 
-        $auditContext = AuditContext::forProject($projectPath);
+        $auditContext = AuditContext::forProject($projectPath, $scanPaths);
         $auditContext->setMappingFiles($mappingFiles);
 
         $this->mappingStage->process($auditContext);
