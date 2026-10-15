@@ -237,7 +237,7 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
      sh .github/scripts/check-pull-request.sh
    ```
 
-The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1) → **Mutation** (Infection 100% MSI). All six must pass before merging.
+The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.1, 8.1 on PHP 8.4+ only) → **Mutation** (Infection 100% MSI). All six must pass before merging.
 
 Details: [`docs/ci.md`](docs/ci.md).
 
