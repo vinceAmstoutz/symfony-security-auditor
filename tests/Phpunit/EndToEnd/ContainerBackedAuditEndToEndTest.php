@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\AbnormallyEndedAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ConnectionCutAfterToolAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ExploringAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\FileReadingAuditPlatform;
@@ -286,6 +287,37 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     {
         yield 'sequential attacker' => [[]];
         yield 'concurrent attacker' => [['profile' => 'fast']];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('attackerModeCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_an_answer_that_ended_abnormally_with_nothing_in_it_leaves_every_chunk_errored_and_out_of_the_cache(array $config): void
+    {
+        $kernel = $this->boot(['model' => 'gemini-2.5-flash', 'cache' => ['enabled' => true], ...$config], AbnormallyEndedAuditPlatform::class);
+
+        $this->execute($kernel, 'json');
+        $secondRun = $this->decode($this->execute($kernel, 'json'));
+
+        $attackerStatuses = $this->attackerStatuses($secondRun);
+        self::assertFalse($secondRun['complete']);
+        self::assertContains('errored', $attackerStatuses);
+        self::assertNotContains('analyzed', $attackerStatuses);
+        self::assertNotContains('cached', $attackerStatuses);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function attackerModeCases(): iterable
+    {
+        yield 'sequential structured attacker' => [[]];
+        yield 'sequential json attacker' => [['audit' => ['structured_collection' => false]]];
+        yield 'concurrent structured attacker' => [['profile' => 'fast']];
+        yield 'concurrent json attacker' => [['profile' => 'fast', 'audit' => ['structured_collection' => false]]];
     }
 
     #[RunInSeparateProcess]

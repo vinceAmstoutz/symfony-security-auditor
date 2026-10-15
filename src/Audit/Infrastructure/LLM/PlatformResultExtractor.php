@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\AI\Platform\FinishReason\FinishReason;
-use Symfony\AI\Platform\FinishReason\FinishReasonCase;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Result\DeferredResult;
@@ -40,10 +39,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
  */
 final readonly class PlatformResultExtractor
 {
+    private FinishReasonReader $finishReasonReader;
+
     public function __construct(
         private ?TokenUsageRecorder $tokenUsageRecorder,
         private LoggerInterface $logger = new NullLogger(),
-    ) {}
+    ) {
+        $this->finishReasonReader = new FinishReasonReader($logger);
+    }
 
     /**
      * The usage the provider reported for an answered call, or, when it
@@ -260,35 +263,7 @@ final readonly class PlatformResultExtractor
             return null;
         }
 
-        $this->warnWhenDegraded($finishReason);
-
-        return $this->normalizedStopReason($finishReason);
-    }
-
-    /**
-     * Truncation and content filtering come back as symfony/ai's case values
-     * whatever the provider calls them (`max_tokens`, `MAX_TOKENS`, `length`,
-     * …), so `LLMResponse::isDegraded()` recognizes them; every other reason
-     * keeps the provider's own word.
-     */
-    private function normalizedStopReason(FinishReason $finishReason): string
-    {
-        return $finishReason->is(FinishReasonCase::LENGTH, FinishReasonCase::CONTENT_FILTER)
-            ? $finishReason->getCase()->value
-            : $finishReason->getRaw();
-    }
-
-    private function warnWhenDegraded(FinishReason $finishReason): void
-    {
-        $warning = match (true) {
-            $finishReason->is(FinishReasonCase::LENGTH) => 'LLM response was truncated by the output token limit — findings may be lost; raise max_output_tokens (or the per-agent attacker/reviewer variants)',
-            $finishReason->is(FinishReasonCase::CONTENT_FILTER) => 'LLM response was suppressed by the provider content filter — findings may be lost',
-            default => null,
-        };
-
-        if (null !== $warning) {
-            $this->logger->warning($warning, ['finish_reason' => $finishReason->getRaw()]);
-        }
+        return $this->finishReasonReader->stopReason($finishReason, $this->extractText($deferredResult->getResult()));
     }
 
     /**

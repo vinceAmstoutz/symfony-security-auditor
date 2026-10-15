@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTok
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResultExtractor;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\FailingResultConverter;
@@ -451,6 +452,105 @@ final class PlatformResultExtractorTest extends TestCase
         self::assertSame('tool_use', $stopReason);
     }
 
+    #[DataProvider('abnormalEndsWithNothingInThem')]
+    public function test_it_reads_an_answer_that_ended_abnormally_with_nothing_in_it_as_empty_content(string $rawFinishReason, string $text): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        $stopReason = $platformResultExtractor->extractStopReason(
+            $this->deferredResultAnswering(new TextResult($text), new FinishReason(FinishReasonCase::OTHER, $rawFinishReason)),
+        );
+
+        self::assertSame('empty_content', $stopReason);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function abnormalEndsWithNothingInThem(): iterable
+    {
+        yield 'Gemini malformed function call' => ['MALFORMED_FUNCTION_CALL', ''];
+        yield 'Vertex AI recitation' => ['RECITATION', ''];
+        yield 'Gemini other, whitespace only' => ['OTHER', " \n "];
+        yield 'Gemini unspecified' => ['FINISH_REASON_UNSPECIFIED', ''];
+        yield 'Gemini language' => ['LANGUAGE', ''];
+        yield 'Gemini unexpected tool call' => ['UNEXPECTED_TOOL_CALL', ''];
+        yield 'Gemini too many tool calls' => ['TOO_MANY_TOOL_CALLS', ''];
+        yield 'Gemini missing thought signature' => ['MISSING_THOUGHT_SIGNATURE', ''];
+        yield 'Gemini image prohibited content' => ['IMAGE_PROHIBITED_CONTENT', ''];
+        yield 'Gemini image recitation' => ['IMAGE_RECITATION', ''];
+        yield 'Gemini image other' => ['IMAGE_OTHER', ''];
+        yield 'Gemini no image' => ['NO_IMAGE', ''];
+        yield 'Vertex AI model armor' => ['MODEL_ARMOR', ''];
+        yield 'whatever its case' => ['malformed_function_call', ''];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('unmappedNormalEndsWithNothingInThem')]
+    public function test_it_keeps_the_provider_word_for_an_end_symfony_ai_does_not_map_that_gemini_does_not_name_abnormal(string $rawFinishReason): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        $stopReason = $platformResultExtractor->extractStopReason(
+            $this->deferredResultAnswering(new TextResult(''), new FinishReason(FinishReasonCase::OTHER, $rawFinishReason)),
+        );
+
+        self::assertSame($rawFinishReason, $stopReason);
+        self::assertFalse(LLMResponse::of('', 'm', $stopReason, TokenUsageSnapshot::of(0, 0))->isDegraded());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unmappedNormalEndsWithNothingInThem(): iterable
+    {
+        yield 'a text-generation-inference end of sequence' => ['eos_token'];
+        yield 'a word no provider documents' => ['finished_quietly'];
+    }
+
+    public function test_it_keeps_the_provider_word_for_an_abnormal_end_that_carries_text(): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        $stopReason = $platformResultExtractor->extractStopReason(
+            $this->deferredResultAnswering(new TextResult('[]'), new FinishReason(FinishReasonCase::OTHER, 'RECITATION')),
+        );
+
+        self::assertSame('RECITATION', $stopReason);
+    }
+
+    public function test_it_keeps_the_provider_word_for_a_normal_stop_with_nothing_in_it(): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        $stopReason = $platformResultExtractor->extractStopReason(
+            $this->deferredResultAnswering(new TextResult(''), new FinishReason(FinishReasonCase::STOP, 'STOP')),
+        );
+
+        self::assertSame('STOP', $stopReason);
+    }
+
+    public function test_it_warns_that_an_answer_that_ended_abnormally_with_nothing_in_it_is_no_verdict(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                'LLM response ended abnormally with no content — it is no verdict on the prompt and is answered as empty_content',
+                ['finish_reason' => 'MALFORMED_FUNCTION_CALL'],
+            );
+
+        $platformResultExtractor = new PlatformResultExtractor(null, $logger);
+
+        $stopReason = $platformResultExtractor->extractStopReason(
+            $this->deferredResultAnswering(new TextResult(''), new FinishReason(FinishReasonCase::OTHER, 'MALFORMED_FUNCTION_CALL')),
+        );
+
+        self::assertSame('empty_content', $stopReason);
+    }
+
     public function test_it_joins_the_tool_calls_of_every_tool_call_part_of_a_multi_part_result(): void
     {
         $multiPartResult = new MultiPartResult([
@@ -486,6 +586,15 @@ final class PlatformResultExtractorTest extends TestCase
     {
         $deferredResult = $this->deferredResult();
         $deferredResult->getMetadata()->add('finish_reason', $finishReason);
+
+        return $deferredResult;
+    }
+
+    private function deferredResultAnswering(TextResult $textResult, FinishReason $finishReason): DeferredResult
+    {
+        $textResult->getMetadata()->add('finish_reason', $finishReason);
+        $deferredResult = new DeferredResult(new PlainConverter($textResult), new InMemoryRawResult([], [], (object) []));
+        $deferredResult->getResult();
 
         return $deferredResult;
     }
