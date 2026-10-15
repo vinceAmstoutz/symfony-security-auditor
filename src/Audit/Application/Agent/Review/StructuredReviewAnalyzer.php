@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 use Psr\Log\LoggerInterface;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
@@ -29,7 +30,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 
 /**
  * Reviews findings one at a time, collecting each verdict through a
- * schema-enforced `record_review` tool call. Cache hits short-circuit the LLM.
+ * schema-enforced `record_review` tool call — or reading it from the answer, as
+ * the JSON path does, when the client never offered the tool. Cache hits
+ * short-circuit the LLM.
  *
  * A finding the model cannot review with its whole file in the prompt is
  * recorded as errored and the review goes on with the next one.
@@ -46,6 +49,7 @@ final readonly class StructuredReviewAnalyzer
         private RecordReviewToolFactoryInterface $recordReviewToolFactory,
         private LoggerInterface $logger,
         private int $maxToolIterations,
+        private RecordingToolClients $recordingToolClients,
     ) {}
 
     /**
@@ -116,6 +120,11 @@ final readonly class StructuredReviewAnalyzer
 
         try {
             $llmResponse = $this->llmClient->completeWithTools($systemPrompt, $userMessage, $structuredReviewCollectionSession->toolRegistry, $this->maxToolIterations);
+
+            $this->recordingToolClients->note($this->llmClient, $structuredReviewCollectionSession->recordingToolReached());
+            if ($this->recordingToolClients->ignoresTools($this->llmClient)) {
+                return $this->reviewOutcomeRecorder->applyResponse($vulnerability, $llmResponse, $coverageRecorder, $codeContextForCache);
+            }
 
             $verdicts = $structuredReviewCollectionSession->drain();
 

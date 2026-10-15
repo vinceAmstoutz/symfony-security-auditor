@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolReach;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
@@ -33,6 +34,7 @@ final readonly class StructuredReviewCollectionSession
     private function __construct(
         private ReviewCollector $reviewCollector,
         public ToolRegistry $toolRegistry,
+        private RecordingToolReach $recordingToolReach,
     ) {}
 
     /**
@@ -41,8 +43,22 @@ final readonly class StructuredReviewCollectionSession
     public static function begin(RecordReviewToolFactoryInterface $recordReviewToolFactory, LoggerInterface $logger): self
     {
         $reviewCollector = new ReviewCollector();
+        $recordingToolReach = new RecordingToolReach();
+        $toolRegistry = new ToolRegistry([$recordingToolReach->track($recordReviewToolFactory->create($reviewCollector))], $logger);
 
-        return new self($reviewCollector, new ToolRegistry([$recordReviewToolFactory->create($reviewCollector)], $logger));
+        $recordingToolReach->handOver();
+
+        return new self($reviewCollector, $toolRegistry, $recordingToolReach);
+    }
+
+    /**
+     * Whether the client offered the recording tool to the model or called it:
+     * a client that did neither ignored the tools, and the model's answer text
+     * is all it said about the finding.
+     */
+    public function recordingToolReached(): bool
+    {
+        return $this->recordingToolReach->reached();
     }
 
     /**

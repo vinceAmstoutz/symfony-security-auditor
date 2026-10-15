@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\AttackerC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ConcurrentChunkAnalyzer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
@@ -48,6 +49,7 @@ final class ConcurrentChunkAnalyzerHarness
             3,
             new RecordVulnerabilityToolFactory(),
             $maxConcurrent,
+            RecordingToolClients::forAttacker(new NullLogger()),
         );
     }
 
@@ -63,6 +65,7 @@ final class ConcurrentChunkAnalyzerHarness
             3,
             $recordVulnerabilityToolFactory,
             $maxConcurrent,
+            RecordingToolClients::forAttacker(new NullLogger()),
         );
     }
 
@@ -78,6 +81,7 @@ final class ConcurrentChunkAnalyzerHarness
             3,
             new RecordVulnerabilityToolFactory(),
             $maxConcurrent,
+            RecordingToolClients::forAttacker(new NullLogger()),
         );
     }
 

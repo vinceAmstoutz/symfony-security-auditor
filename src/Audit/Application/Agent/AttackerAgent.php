@@ -100,6 +100,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         );
         $attackerChunkCache = new AttackerChunkCache($attackerScanCollaborators->attackerCache, $attackerLlmCollaborators->vulnerabilityFactory, $logger);
 
+        $recordingToolClients = RecordingToolClients::forAttacker($logger);
         $this->sequentialChunkAnalyzer = new SequentialChunkAnalyzer(
             $attackerLlmCollaborators->llmClient,
             $chunkContextFactory,
@@ -110,6 +111,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             $attackerAnalysisSettings->maxToolIterations,
             $this->useStructuredCollection,
             $attackerLlmCollaborators->recordVulnerabilityToolFactory,
+            $recordingToolClients,
         );
 
         $this->concurrentChunkAnalyzer = $attackerLlmCollaborators->llmClient instanceof ToolBatchCapableLLMClientInterface && $attackerLlmCollaborators->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface
@@ -123,6 +125,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
                 $attackerAnalysisSettings->maxToolIterations,
                 $attackerLlmCollaborators->recordVulnerabilityToolFactory,
                 $this->maxConcurrent,
+                $recordingToolClients,
             )
             : null;
     }

@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
+use Closure;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewOutcomeRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\StructuredReviewAnalyzer;
@@ -82,6 +84,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
             new RecordReviewToolFactory(),
             new NullLogger(),
             4,
+            RecordingToolClients::forReviewer(new NullLogger()),
         );
 
         $reviewed = $structuredReviewAnalyzer->analyze([$vulnerability], [], new NullCoverageRecorder(), true);
@@ -119,7 +122,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
         $reviewerCache->method('get')->willReturn(null);
         $reviewerCache->expects(self::never())->method('store');
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('', 'm', 'max_tool_iterations', TokenUsageSnapshot::of(1, 1)));
+        $llmClient->method('completeWithTools')->willReturnCallback($this->offeringTheRecordingTool(LLMResponse::of('', 'm', 'max_tool_iterations', TokenUsageSnapshot::of(1, 1))));
         $vulnerability = $this->vulnerabilityAt('src/A.php');
         $outcomeLogger = $this->createMock(LoggerInterface::class);
         $outcomeLogger->expects(self::once())->method('warning')->with(
@@ -146,7 +149,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
     public function test_a_review_that_ended_normally_without_a_verdict_is_errored_as_unjudged_not_as_cut_short(): void
     {
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+        $llmClient->method('completeWithTools')->willReturnCallback($this->offeringTheRecordingTool(LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))));
         $vulnerability = $this->vulnerabilityAt('src/A.php');
         $outcomeLogger = $this->createMock(LoggerInterface::class);
         $outcomeLogger->expects(self::once())->method('warning')->with(
@@ -220,6 +223,18 @@ final class StructuredReviewAnalyzerTest extends TestCase
         self::assertSame(['errored', 'validated'], array_column($recordingCoverageRecorder->coverage, 'status'));
     }
 
+    /**
+     * @return Closure(string, string, ToolRegistry): LLMResponse
+     */
+    private function offeringTheRecordingTool(LLMResponse $llmResponse): Closure
+    {
+        return static function (string $system, string $user, ToolRegistry $toolRegistry) use ($llmResponse): LLMResponse {
+            $toolRegistry->definitions();
+
+            return $llmResponse;
+        };
+    }
+
     private function analyzer(LLMClientInterface $llmClient, ReviewerVerdictCache $reviewerVerdictCache, ?LoggerInterface $outcomeLogger = null): StructuredReviewAnalyzer
     {
         $verdictApplier = new VerdictApplier(new NullLogger());
@@ -232,6 +247,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
             new RecordReviewToolFactory(),
             new NullLogger(),
             4,
+            RecordingToolClients::forReviewer(new NullLogger()),
         );
     }
 }

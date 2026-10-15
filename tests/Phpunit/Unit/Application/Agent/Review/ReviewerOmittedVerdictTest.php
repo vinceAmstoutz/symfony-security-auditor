@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Revi
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentStructuredReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
@@ -137,7 +138,7 @@ final class ReviewerOmittedVerdictTest extends TestCase
         $reviewerVerdictCache = new ReviewerVerdictCache($recordingReviewerCache, new NullLogger());
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $reviewed = (new StructuredReviewAnalyzer($llmClient, new ReviewerPromptBuilder(useStructuredCollection: true), $reviewerVerdictCache, $this->reviewOutcomeRecorder($reviewerVerdictCache), new RecordReviewToolFactory(), new NullLogger(), 4))
+        $reviewed = (new StructuredReviewAnalyzer($llmClient, new ReviewerPromptBuilder(useStructuredCollection: true), $reviewerVerdictCache, $this->reviewOutcomeRecorder($reviewerVerdictCache), new RecordReviewToolFactory(), new NullLogger(), 4, RecordingToolClients::forReviewer(new NullLogger())))
             ->analyze([$vulnerability], [], $recordingCoverageRecorder, false);
 
         $this->assertErroredNotRejected($reviewed, $recordingCoverageRecorder, $recordingReviewerCache);
@@ -171,7 +172,7 @@ final class ReviewerOmittedVerdictTest extends TestCase
         $reviewerVerdictCache = new ReviewerVerdictCache($recordingReviewerCache, new NullLogger());
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $reviewed = (new ConcurrentStructuredReviewAnalyzer($llmClient, new ReviewerPromptBuilder(useStructuredCollection: true), $reviewerVerdictCache, $this->reviewOutcomeRecorder($reviewerVerdictCache), new RecordReviewToolFactory(), new NullLogger(), 4, 4))
+        $reviewed = (new ConcurrentStructuredReviewAnalyzer($llmClient, new ReviewerPromptBuilder(useStructuredCollection: true), $reviewerVerdictCache, $this->reviewOutcomeRecorder($reviewerVerdictCache), new RecordReviewToolFactory(), new NullLogger(), 4, 4, RecordingToolClients::forReviewer(new NullLogger())))
             ->analyze([$vulnerability], [], $recordingCoverageRecorder, false);
 
         $this->assertErroredNotRejected($reviewed, $recordingCoverageRecorder, $recordingReviewerCache);

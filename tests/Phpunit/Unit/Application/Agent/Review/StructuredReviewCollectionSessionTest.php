@@ -71,4 +71,37 @@ final class StructuredReviewCollectionSessionTest extends TestCase
 
         self::assertSame([], $second->drain());
     }
+
+    /**
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_session_whose_registry_was_only_built_has_not_reached_its_recording_tool(): void
+    {
+        self::assertFalse(StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger())->recordingToolReached());
+    }
+
+    /**
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_client_reading_the_tool_definitions_to_offer_them_reaches_the_recording_tool(): void
+    {
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+
+        $structuredReviewCollectionSession->toolRegistry->definitions();
+
+        self::assertTrue($structuredReviewCollectionSession->recordingToolReached());
+    }
+
+    /**
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_client_calling_the_recording_tool_reaches_it_and_it_is_still_a_recording_tool(): void
+    {
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+
+        $structuredReviewCollectionSession->toolRegistry->execute('record_review', ['id' => 'VULN-abc123', 'accepted' => true]);
+
+        self::assertTrue($structuredReviewCollectionSession->recordingToolReached());
+        self::assertTrue($structuredReviewCollectionSession->toolRegistry->isRecording('record_review'));
+    }
 }

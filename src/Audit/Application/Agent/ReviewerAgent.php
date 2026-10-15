@@ -88,6 +88,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $verdictApplier = new VerdictApplier($reviewerAgentCollaborators->logger);
         $reviewerVerdictCache = new ReviewerVerdictCache($reviewerAgentCollaborators->reviewerCache, $reviewerAgentCollaborators->logger);
         $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter, $reviewerAgentCollaborators->triageMemoryRecorder);
+        $recordingToolClients = RecordingToolClients::forReviewer($reviewerAgentCollaborators->logger);
 
         $this->sequentialReviewAnalyzer = new SequentialReviewAnalyzer(
             $reviewerAgentCollaborators->llmClient,
@@ -106,6 +107,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
                 $reviewerAgentCollaborators->recordReviewToolFactory,
                 $reviewerAgentCollaborators->logger,
                 $reviewerModeConfiguration->maxToolIterations,
+                $recordingToolClients,
             )
             : null;
 
@@ -129,6 +131,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
                 $reviewerAgentCollaborators->logger,
                 $reviewerModeConfiguration->maxConcurrent,
                 $reviewerModeConfiguration->maxToolIterations,
+                $recordingToolClients,
             )
             : null;
 
@@ -141,6 +144,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             $reviewerAgentCollaborators->logger,
             $reviewerModeConfiguration->maxToolIterations,
             $reviewerAgentCollaborators->recordReviewToolFactory,
+            $recordingToolClients,
         );
     }
 

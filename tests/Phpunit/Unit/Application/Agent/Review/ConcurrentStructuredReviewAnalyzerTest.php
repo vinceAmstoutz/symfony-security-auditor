@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Stringable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentStructuredReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewOutcomeRecorder;
@@ -77,6 +78,7 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
             new NullLogger(),
             1,
             4,
+            RecordingToolClients::forReviewer(new NullLogger()),
         );
 
         $concurrentStructuredReviewAnalyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')], [], new NullCoverageRecorder(), false);
@@ -152,6 +154,7 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
             new NullLogger(),
             4,
             4,
+            RecordingToolClients::forReviewer(new NullLogger()),
         );
 
         $reviewed = $concurrentStructuredReviewAnalyzer->analyze($vulnerabilities, [], $recordingCoverageRecorder, false);

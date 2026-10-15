@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 use Psr\Log\LoggerInterface;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
@@ -51,6 +52,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
         private LoggerInterface $logger,
         private int $maxConcurrent,
         private int $maxToolIterations,
+        private RecordingToolClients $recordingToolClients,
     ) {}
 
     /**
@@ -198,11 +200,23 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             return $this->recordPendingErrors($concurrentReviewBatch, $exception, $coverageRecorder, $reviewed);
         }
 
+        $this->noteRecordingToolReach($concurrentReviewBatch);
         foreach ($concurrentReviewBatch->pendingIndexes as $position => $index) {
             $reviewed[$index] = $this->recordPendingVerdictOrError($index, $responses[$position], $concurrentReviewBatch, $coverageRecorder);
         }
 
         return $reviewed;
+    }
+
+    /**
+     * A client that offered the recording tool for one request of the window
+     * offered it for all of them, though it may have built the schemas once.
+     */
+    private function noteRecordingToolReach(ConcurrentReviewBatch $concurrentReviewBatch): void
+    {
+        foreach ($concurrentReviewBatch->pendingIndexes as $index) {
+            $this->recordingToolClients->note($this->toolBatchCapableLLMClient, $concurrentReviewBatch->sessions[$index]->recordingToolReached());
+        }
     }
 
     private function recordPendingVerdictOrError(int $index, LLMResponse $llmResponse, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
@@ -218,10 +232,16 @@ final readonly class ConcurrentStructuredReviewAnalyzer
      * A conversation cut short (tool-loop cap, token limit, content filter,
      * no content) that recorded no verdict is an error, not a rejection: the
      * finding is recorded as errored and left out of the cache. A verdict the
-     * model did record before the cut-off is genuine and applied as usual.
+     * model did record before the cut-off is genuine and applied as usual. A
+     * client that never offered the tool has its answer read as the JSON path
+     * reads it.
      */
     private function recordPendingVerdict(int $index, LLMResponse $llmResponse, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
+        if ($this->recordingToolClients->ignoresTools($this->toolBatchCapableLLMClient)) {
+            return $this->reviewOutcomeRecorder->applyResponse($concurrentReviewBatch->vulnerabilities[$index], $llmResponse, $coverageRecorder, $concurrentReviewBatch->codeContextForCache($index));
+        }
+
         $verdicts = $concurrentReviewBatch->sessions[$index]->drain();
         $verdict = array_pop($verdicts);
         if (null === $verdict && $llmResponse->isDegraded()) {
