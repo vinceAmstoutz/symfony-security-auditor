@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\SuggestedWaitParser;
 
 /**
  * Invokes the platform behind the rate limiter with transient-failure retry:
@@ -60,6 +61,7 @@ final readonly class RetryingPlatformInvoker
         private ConversionFailureExplainer $conversionFailureExplainer,
         private DegradedAnswerBooker $degradedAnswerBooker,
         private ?BudgetTracker $budgetTracker,
+        private SuggestedWaitParser $suggestedWaitParser = new SuggestedWaitParser(),
     ) {}
 
     /**
@@ -102,7 +104,7 @@ final readonly class RetryingPlatformInvoker
                 }
 
                 $this->budgetTracker?->assertWithinBudget();
-                $this->backOffBeforeNextAttempt($failure, $attempt, $maxAttempts);
+                $this->backOffBeforeNextAttempt($failure, $deferredResult, $attempt, $maxAttempts);
                 ++$attempt;
             }
         }
@@ -144,13 +146,13 @@ final readonly class RetryingPlatformInvoker
     /**
      * @throws InvalidRetryConfigurationException
      */
-    private function backOffBeforeNextAttempt(Throwable $throwable, int $attempt, int $maxAttempts): void
+    private function backOffBeforeNextAttempt(Throwable $throwable, ?DeferredResult $deferredResult, int $attempt, int $maxAttempts): void
     {
         $isRateLimit = $this->transientFailureClassifier->isRateLimit($throwable);
         $serverHintSeconds = $isRateLimit ? $this->retryAfterHeaderParser->parse($throwable) : null;
 
         $delay = $isRateLimit
-            ? $this->retryPolicy->rateLimitDelayMs($attempt, $serverHintSeconds)
+            ? $this->retryPolicy->rateLimitDelayAtLeastMs($attempt, $serverHintSeconds, $this->suggestedWaitParser->milliseconds($throwable, $deferredResult))
             : $this->retryPolicy->delayMs($attempt);
 
         if (null !== $serverHintSeconds) {

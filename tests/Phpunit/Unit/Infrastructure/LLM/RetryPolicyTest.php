@@ -437,6 +437,33 @@ final class RetryPolicyTest extends TestCase
     /**
      * @throws InvalidRetryConfigurationException
      */
+    #[DataProvider('suggestedWaitCases')]
+    public function test_a_longer_wait_the_provider_names_besides_is_waited_out_up_to_the_ceiling(?int $serverHintSeconds, int $suggestedWaitMs, int $expectedMs): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(jitterRatio: 0.0),
+            new RateLimitBackoff(initialDelayMs: 60_000, maxDelayMs: 300_000),
+        );
+
+        self::assertSame($expectedMs, $retryPolicy->rateLimitDelayAtLeastMs(1, $serverHintSeconds, $suggestedWaitMs));
+    }
+
+    /**
+     * @return iterable<string, array{?int, int, int}>
+     */
+    public static function suggestedWaitCases(): iterable
+    {
+        yield 'longer than the server hint' => [1, 8_064, 8_064];
+        yield 'shorter than the server hint' => [30, 8_064, 30_000];
+        yield 'longer than the back-off' => [null, 150_000, 150_000];
+        yield 'shorter than the back-off' => [null, 8_064, 60_000];
+        yield 'past the ceiling' => [1, 360_000, 300_000];
+        yield 'none named' => [7, 0, 7_000];
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_server_hint_is_clamped_to_maximum(): void
     {
         $retryPolicy = new RetryPolicy(

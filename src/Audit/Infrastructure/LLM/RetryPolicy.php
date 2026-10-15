@@ -108,6 +108,18 @@ final readonly class RetryPolicy
     }
 
     /**
+     * Returns `rateLimitDelayMs()`, or the longer wait the provider names
+     * besides (`$suggestedWaitMs`, read by `SuggestedWaitParser`), clamped to
+     * `rateLimitMaxDelayMs` all the same.
+     *
+     * @throws InvalidRetryConfigurationException
+     */
+    public function rateLimitDelayAtLeastMs(int $attempt, ?int $serverHintSeconds, int $suggestedWaitMs): int
+    {
+        return min(max($this->rateLimitDelayMs($attempt, $serverHintSeconds), $suggestedWaitMs), $this->rateLimitBackoff->maxDelayMs);
+    }
+
+    /**
      * Returns the unclamped, unrounded delay so callers can clamp against
      * their own ceiling in float space before rounding — clamping after an
      * `(int)` cast is too late: the exponential term can exceed `PHP_INT_MAX`

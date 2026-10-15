@@ -34,7 +34,7 @@ Each key a profile sets is documented in [Configuration → `audit.*`](configura
 
 Two layers keep you inside provider quotas:
 
-- **Reactive (always on)** — transient `429`/`5xx` responses are retried with jittered exponential backoff (`audit.retry.*`), honoring server `Retry-After` headers.
+- **Reactive (always on)** — transient `429`/`5xx` responses are retried with jittered exponential backoff (`audit.retry.*`), honoring server `Retry-After` headers and, on a `429`, any longer wait the provider names: the one its message asks for (`Please try again in 8.064s.`) or OpenAI's token-window reset (`x-ratelimit-reset-tokens`).
 - **Proactive (opt-in)** — set `audit.rate_limit.requests_per_minute`, `audit.rate_limit.input_tokens_per_minute`, and/or `audit.rate_limit.output_tokens_per_minute` to your provider tier so a token-bucket limiter keeps the steady state inside quota. See [Configuration → `audit.rate_limit.*`](configuration.md#auditrate_limit--proactive-throttling).
 
 Still throttled? Lower `audit.max_iterations`, raise `audit.reviewer_batch_size` (fewer reviewer calls), keep `*_max_concurrent` within your tier, switch the reviewer to a cheaper model with higher limits, and run nightly instead of on every PR.
