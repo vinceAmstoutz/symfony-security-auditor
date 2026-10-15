@@ -19,6 +19,7 @@ use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 
 use function Symfony\Component\String\u;
@@ -100,6 +101,8 @@ final readonly class TransientFailureClassifier
     /** @var list<string> */
     private const array RATE_LIMIT_STATUS_CODES = ['429'];
 
+    private const int RATE_LIMIT_STATUS = 429;
+
     /** @var list<string> */
     private const array REQUEST_TOO_LARGE_STATUS_CODES = ['413'];
 
@@ -175,7 +178,7 @@ final readonly class TransientFailureClassifier
 
     private function readsAsTransient(Throwable $throwable): bool
     {
-        if ($throwable instanceof ServerException || $this->hasInChain($throwable, MalformedToolCallException::class)) {
+        if ($throwable instanceof ServerException || $this->hasInChain($throwable, MalformedToolCallException::class) || $this->hasInChain($throwable, TransientHttpStatusException::class)) {
             return true;
         }
 
@@ -208,18 +211,29 @@ final readonly class TransientFailureClassifier
      * show it in its raw answer (`UnconvertedAnswerException`). That raw
      * answer has the last word: a request it shows refused as too large was
      * never answered, whatever the bridge made of the body that came with the
-     * refusal (`Response does not contain choices.`). A request refused with
-     * any other client error is read by the bridge's message alone, as the
-     * same failure without a status: an empty answer there, a failure that
-     * aborts the run where the bridge named one. Null for any other failure.
+     * refusal (`Response does not contain choices.`), and so is one failed
+     * with a status that clears on its own (`TransientHttpStatusException`).
+     * A request refused with any other client error is read by the bridge's
+     * message alone, as the same failure without a status: an empty answer
+     * there, a failure that aborts the run where the bridge named one. Null
+     * for any other failure.
      */
     public function degradedStopReason(Throwable $throwable): ?string
     {
+        if ($this->hasInChain($throwable, TransientHttpStatusException::class)) {
+            return null;
+        }
+
         $unconvertedAnswerException = $this->firstInChain($throwable, UnconvertedAnswerException::class);
         if ($unconvertedAnswerException instanceof UnconvertedAnswerException && !$unconvertedAnswerException->refusedWithClientError) {
             return $unconvertedAnswerException->stopReason;
         }
 
+        return $this->degradedStopReasonTheBridgeNamed($throwable);
+    }
+
+    private function degradedStopReasonTheBridgeNamed(Throwable $throwable): ?string
+    {
         $joined = $this->joinMessages($throwable);
 
         if ($this->hasInChain($throwable, MaxOutputTokensException::class) || u($joined)->containsAny(self::OUTPUT_LIMIT_HINTS)) {
@@ -299,7 +313,7 @@ final readonly class TransientFailureClassifier
     {
         $joined = $this->joinMessages($throwable);
 
-        if (u($joined)->containsAny(self::RATE_LIMIT_HINTS)) {
+        if (u($joined)->containsAny(self::RATE_LIMIT_HINTS) || self::RATE_LIMIT_STATUS === $this->firstInChain($throwable, TransientHttpStatusException::class)?->status) {
             return true;
         }
 

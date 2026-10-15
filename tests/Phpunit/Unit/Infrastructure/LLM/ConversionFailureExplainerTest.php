@@ -25,6 +25,7 @@ use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ConversionFailureExplainer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\FailingResultConverter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\UnreadableResponse;
@@ -149,10 +150,56 @@ final class ConversionFailureExplainerTest extends TestCase
     public static function statusesThatRefuseNothingCases(): iterable
     {
         yield 'below the client errors' => [399];
-        yield 'a request timeout, which is retried' => [408];
-        yield 'a request that came too early, which is retried' => [425];
-        yield 'a rate limit, which is retried' => [429];
-        yield 'above the client errors' => [500];
+    }
+
+    #[DataProvider('statusesThatClearOnTheirOwnCases')]
+    public function test_a_status_that_clears_on_its_own_fails_the_request_transiently_whatever_body_it_sent(int $status): void
+    {
+        $runtimeException = new RuntimeException('Response does not contain message.');
+        $deferredResult = $this->failedConversionWithStatus($runtimeException, $status, ['error' => 'server busy, please try again.']);
+
+        $throwable = (new ConversionFailureExplainer())->explain($runtimeException, $deferredResult);
+
+        self::assertInstanceOf(TransientHttpStatusException::class, $throwable);
+        self::assertSame($status, $throwable->status);
+        self::assertSame('Response does not contain message.', $throwable->getMessage());
+        self::assertSame($runtimeException, $throwable->getPrevious());
+        self::assertSame($runtimeException, $throwable->statusFreeFailure);
+    }
+
+    public function test_a_status_that_clears_on_its_own_keeps_what_its_raw_answer_shows_for_once_the_retries_are_spent(): void
+    {
+        $badRequestException = new BadRequestException(self::AZURE_FILTERED);
+        $deferredResult = $this->failedConversionWithStatus($badRequestException, 503, $this->azureContentFilterBody());
+
+        $throwable = (new ConversionFailureExplainer())->explain($badRequestException, $deferredResult);
+
+        self::assertInstanceOf(TransientHttpStatusException::class, $throwable);
+        $statusFreeFailure = $throwable->statusFreeFailure;
+        self::assertInstanceOf(UnconvertedAnswerException::class, $statusFreeFailure);
+        self::assertSame('content-filter', $statusFreeFailure->stopReason);
+        self::assertSame($badRequestException, $statusFreeFailure->getPrevious());
+    }
+
+    /** @return iterable<string, array{int}> */
+    public static function statusesThatClearOnTheirOwnCases(): iterable
+    {
+        yield 'a request timeout' => [408];
+        yield 'a request that came too early' => [425];
+        yield 'a rate limit' => [429];
+        yield 'the first server error' => [500];
+        yield 'a service unavailable' => [503];
+        yield 'an overloaded provider' => [529];
+    }
+
+    public function test_a_status_that_clears_on_its_own_does_not_repeat_a_credential_the_failure_quoted(): void
+    {
+        $runtimeException = new RuntimeException('Syntax error for "https://gw.example.com/v1/chat?key=AIzaSECRET".');
+        $deferredResult = $this->failedConversionWithStatus($runtimeException, 502, []);
+
+        $throwable = (new ConversionFailureExplainer())->explain($runtimeException, $deferredResult);
+
+        self::assertStringNotContainsString('AIzaSECRET', $throwable->getMessage());
     }
 
     public function test_a_content_filter_the_raw_answer_names_wins_over_the_status_it_came_with(): void

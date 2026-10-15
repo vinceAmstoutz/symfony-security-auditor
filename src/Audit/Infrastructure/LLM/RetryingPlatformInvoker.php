@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Empt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 
@@ -92,7 +93,7 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
-                $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
+                $failure = $this->explainedFailure($throwable, $deferredResult, $attempt >= $maxAttempts);
                 $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $estimatedInputTokens);
                 $this->rethrowWhenNonTransient($failure);
 
@@ -105,6 +106,18 @@ final readonly class RetryingPlatformInvoker
                 ++$attempt;
             }
         }
+    }
+
+    /**
+     * A status that clears on its own is retried; once the retries are spent,
+     * the failure is read as it reads without the status, as it was before
+     * the status was retried.
+     */
+    private function explainedFailure(Throwable $throwable, ?DeferredResult $deferredResult, bool $retriesSpent): Throwable
+    {
+        $failure = $this->conversionFailureExplainer->explain($throwable, $deferredResult);
+
+        return $retriesSpent && $failure instanceof TransientHttpStatusException ? $failure->statusFreeFailure : $failure;
     }
 
     /**

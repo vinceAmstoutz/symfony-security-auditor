@@ -28,6 +28,7 @@ use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
@@ -97,6 +98,9 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'symfony_empty_reply_from_server' => [self::transportFailure('Empty reply from server')];
         yield 'symfony_send_failure_broken_pipe' => [self::transportFailure('Send failure: Broken pipe')];
         yield 'request_refused_with_a_client_error_whose_bridge_message_reads_as_transient' => [UnconvertedAnswerException::refusedWithStatus(new RuntimeException('Gateway temporarily unavailable'), 403)];
+        yield 'status_that_clears_on_its_own_whose_body_the_bridge_read_as_empty' => [TransientHttpStatusException::from(new PlatformRuntimeException('Response does not contain message.'), 503)];
+        yield 'status_that_clears_on_its_own_whose_page_the_bridge_could_not_decode' => [TransientHttpStatusException::from(new RuntimeException('Syntax error for "http://127.0.0.1:11434/api/chat".'), 502)];
+        yield 'status_that_clears_on_its_own_beneath_a_wrapper' => [new RuntimeException('call failed', previous: TransientHttpStatusException::from(new PlatformRuntimeException('Response does not contain message.'), 408))];
     }
 
     #[DataProvider('connectionCutCarryingAStatusLikeTokenCases')]
@@ -157,6 +161,7 @@ final class TransientFailureClassifierTest extends TestCase
                 previous: new RuntimeException('underlying: 429 rate limit hit'),
             ),
         ];
+        yield 'rate_limit_status_whose_body_the_bridge_read_as_empty' => [TransientHttpStatusException::from(new PlatformRuntimeException('Response does not contain message.'), 429)];
     }
 
     #[DataProvider('nonRateLimitCases')]
@@ -175,6 +180,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'unknown_error' => [new RuntimeException('Something went wrong')];
         yield 'thousands_separated_figure_is_not_a_status_code' => [new RuntimeException('elapsed 1,429 ms')];
         yield 'decimal_figure_is_not_a_status_code' => [new RuntimeException('429.5 units consumed')];
+        yield 'server_error_status_whose_body_the_bridge_read_as_empty' => [TransientHttpStatusException::from(new PlatformRuntimeException('Response does not contain message.'), 503)];
     }
 
     /** @return iterable<string, array{Throwable}> */
@@ -236,6 +242,8 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'request_refused_with_a_client_error_whose_body_the_bridge_read_as_empty_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 422)), 'empty_content'];
         yield 'request_refused_with_a_client_error_the_bridge_named_as_a_failure' => [UnconvertedAnswerException::refusedWithStatus(new AuthenticationException('Unauthorized'), 401), null];
         yield 'request_refused_with_a_client_error_the_bridge_worded_as_a_content_filter' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Unsupported finish reason "content_filter".'), 400), 'content-filter'];
+        yield 'status_that_clears_on_its_own_whose_body_the_bridge_read_as_empty' => [TransientHttpStatusException::from(new PlatformRuntimeException('Response does not contain message.'), 503), null];
+        yield 'status_that_clears_on_its_own_whose_body_the_bridge_read_as_empty_beneath_a_wrapper' => [new RuntimeException('call failed', previous: TransientHttpStatusException::from(new PlatformRuntimeException('Response does not contain message.'), 500)), null];
     }
 
     #[DataProvider('billedStopReasonCases')]
@@ -257,6 +265,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'request_refused_with_a_client_error_whose_body_the_bridge_read_as_empty' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 404), null];
         yield 'request_refused_with_a_client_error_beneath_a_wrapper' => [new RuntimeException('call failed', previous: UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Response does not contain choices.'), 403)), null];
         yield 'request_refused_with_a_client_error_the_bridge_worded_as_a_content_filter' => [UnconvertedAnswerException::refusedWithStatus(new PlatformRuntimeException('Unsupported finish reason "content_filter".'), 400), null];
+        yield 'status_that_clears_on_its_own_whose_body_the_bridge_read_as_empty' => [TransientHttpStatusException::from(new PlatformRuntimeException('Response does not contain message.'), 429), null];
     }
 
     #[DataProvider('emptyContentCases')]
