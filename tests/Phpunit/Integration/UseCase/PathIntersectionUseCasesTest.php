@@ -38,6 +38,8 @@ final class PathIntersectionUseCasesTest extends TestCase
      * @param list<string> $includedPaths
      * @param list<string> $scanPaths
      * @param list<string> $expected
+     *
+     * @throws InvalidAuditContextException
      */
     #[DataProvider('pathScopes')]
     public function test_show_scanned_lists_the_configured_files_under_the_path_and_the_path_itself_only_when_the_configuration_reaches_none_of_it(array $includedPaths, array $scanPaths, array $expected): void

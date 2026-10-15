@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
@@ -32,6 +33,7 @@ final readonly class ListScannedFilesUseCase
     public function __construct(
         private ProjectFileScannerInterface $projectFileScanner,
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
+        private ?SinceClosurePreview $sinceClosurePreview = null,
     ) {}
 
     /**
@@ -41,18 +43,24 @@ final readonly class ListScannedFilesUseCase
      * @param ?string      $diffSinceRef when set, mirrors `EstimateAuditCostUseCase`/
      *                                   `IngestionStage` by narrowing the listing to
      *                                   files changed against this git ref, matching
-     *                                   what an `audit:run --since` would actually scan
+     *                                   what an `audit:run --since` would actually scan,
+     *                                   with the files `audit.since_closure` adds to it
      *
      * @return list<ProjectFile>
+     *
+     * @throws InvalidAuditContextException
      */
     public function execute(string $projectPath, array $scanPaths = [], ?string $diffSinceRef = null): array
     {
-        $files = ScopedScan::resolve($this->projectFileScanner, $projectPath, $scanPaths)->audited->files;
-        if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
-            return $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
+        $scopedScanResult = ScopedScan::resolve($this->projectFileScanner, $projectPath, $scanPaths);
+        $files = $scopedScanResult->audited->files;
+        if (null === $diffSinceRef || !$this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
+            return $files;
         }
 
-        return $files;
+        $changedFiles = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
+
+        return $this->sinceClosurePreview?->auditedFiles($projectPath, $scanPaths, $diffSinceRef, $changedFiles, $scopedScanResult->mappingFiles) ?? $changedFiles;
     }
 
     /**

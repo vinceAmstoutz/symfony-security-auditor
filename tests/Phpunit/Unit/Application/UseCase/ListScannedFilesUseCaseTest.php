@@ -16,16 +16,19 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
 use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\SinceClosureFixture;
 
 final class ListScannedFilesUseCaseTest extends TestCase
 {
     /**
      * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
      */
     public function test_returns_every_scanned_file_when_no_scan_paths_are_given(): void
     {
@@ -44,6 +47,7 @@ final class ListScannedFilesUseCaseTest extends TestCase
 
     /**
      * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
      */
     public function test_lists_a_scan_path_the_configured_scan_does_not_reach_for_a_scanner_that_can_take_it(): void
     {
@@ -60,6 +64,7 @@ final class ListScannedFilesUseCaseTest extends TestCase
 
     /**
      * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
      */
     public function test_lists_only_the_configured_files_under_a_scan_path_the_configured_scan_reaches(): void
     {
@@ -76,6 +81,7 @@ final class ListScannedFilesUseCaseTest extends TestCase
 
     /**
      * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
      */
     public function test_restricts_the_listing_to_the_given_scan_paths(): void
     {
@@ -94,6 +100,7 @@ final class ListScannedFilesUseCaseTest extends TestCase
 
     /**
      * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
      */
     public function test_diff_since_ref_narrows_the_listing_to_changed_files(): void
     {
@@ -118,6 +125,30 @@ final class ListScannedFilesUseCaseTest extends TestCase
 
     /**
      * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_since_closure_lists_the_controllers_a_changed_voter_guards(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Security/PostVoter.php']);
+
+        $listScannedFilesUseCase = new ListScannedFilesUseCase(
+            $this->fixedScanner(SinceClosureFixture::files()),
+            $gitChangedFilesResolver,
+            SinceClosureFixture::preview('direct'),
+        );
+
+        $files = $listScannedFilesUseCase->execute(sys_get_temp_dir(), [], 'main');
+
+        self::assertSame(
+            ['src/Security/PostVoter.php', 'src/Controller/PostController.php'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
      */
     public function test_without_a_diff_since_ref_the_listing_covers_every_file(): void
     {

@@ -1341,6 +1341,93 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_records_the_class_constants_a_guard_names_as_its_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Security\PostVoter;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            #[IsGranted(PostVoter::VIEW)]
+            final class PostController extends AbstractController {
+                #[Route('/post/{id}/edit')]
+                #[IsGranted(subject: 'post', attribute: PostVoter::EDIT)]
+                #[IsGranted('ROLE_USER', subject: PostVoter::SUBJECT)]
+                #[IsGranted(PostVoter::SHARE, 'post')]
+                public function edit($post) {
+                    $this->check($post);
+                    $this->denyAccessUnlessGranted(\App\Security\CommentVoter::DELETE, $post);
+                }
+                private function check($post): void { $this->isGranted(PostVoter::PUBLISH, $post); }
+            }
+            PHP;
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/PostController.php', $source));
+
+        self::assertSame(
+            ['App\Security\PostVoter::EDIT', 'App\Security\PostVoter::SHARE', 'App\Security\PostVoter::VIEW', 'App\Security\CommentVoter::DELETE', 'App\Security\PostVoter::PUBLISH'],
+            $entries[0]->guardConstants(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_no_class_constant_for_a_guard_that_names_none(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Security\PostVoter;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class PostController extends AbstractController {
+                const PATH = '/post';
+                #[Route(path: self::PATH, name: PostVoter::ROUTE)]
+                #[IsGranted('ROLE_USER')]
+                #[IsGranted(new Expression('is_granted("ROLE_ADMIN")'))]
+                public function edit($post, $attribute, $voter, $name) {
+                    $this->denyAccessUnlessGranted();
+                    $this->denyAccessUnlessGranted($attribute);
+                    $this->denyAccessUnlessGranted('POST_EDIT', PostVoter::SUBJECT);
+                    $this->denyAccessUnlessGranted($voter::EDIT);
+                    $this->denyAccessUnlessGranted(PostVoter::{$name});
+                }
+            }
+            PHP;
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/PostController.php', $source));
+
+        self::assertSame([], $entries[0]->guardConstants());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_an_invokable_controller_routed_from_its_class_keeps_the_class_constants_its_guards_name(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Security\PostVoter;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            #[Route('/post/publish')]
+            final class PublishPostController extends AbstractController {
+                #[IsGranted(PostVoter::PUBLISH)]
+                public function __invoke() {}
+            }
+            PHP;
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/PublishPostController.php', $source));
+
+        self::assertSame(['App\Security\PostVoter::PUBLISH'], $this->invokeEntry($entries)->guardConstants());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_treats_an_abstract_action_without_a_body_as_lacking_deny_access(): void
     {
         $source = <<<'PHP'

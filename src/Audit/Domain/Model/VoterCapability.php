@@ -16,14 +16,16 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 final readonly class VoterCapability
 {
     /**
-     * @param list<string> $supportedAttributes attribute names the voter's `supports()` accepts (e.g. `EDIT`, `DELETE`)
-     * @param list<string> $supportedSubjects   fully-qualified or short class names of subjects the voter's `supports()` accepts (e.g. `App\Entity\User`)
+     * @param list<string>          $supportedAttributes attribute names the voter's `supports()` accepts (e.g. `EDIT`, `DELETE`)
+     * @param list<string>          $supportedSubjects   fully-qualified or short class names of subjects the voter's `supports()` accepts (e.g. `App\Entity\User`)
+     * @param array<string, string> $constantValues      the string the voter class's own constants hold, by constant name (e.g. `EDIT` => `POST_EDIT`)
      */
     public function __construct(
         private string $filePath,
         private string $className,
         private array $supportedAttributes,
         private array $supportedSubjects,
+        private array $constantValues = [],
     ) {}
 
     public function filePath(): string
@@ -50,6 +52,14 @@ final readonly class VoterCapability
     public function supportedSubjects(): array
     {
         return $this->supportedSubjects;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function constantValues(): array
+    {
+        return $this->constantValues;
     }
 
     public function coversAttribute(string $attribute): bool

@@ -719,6 +719,27 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_show_scanned_since_lists_the_controllers_the_since_closure_adds_end_to_end(): void
+    {
+        $filesystem = new Filesystem();
+        $filesystem->dumpFile($this->tmpDir.'/src/Security/PostVoter.php', "<?php\nnamespace App\\Security;\nuse Symfony\\Component\\Security\\Core\\Authorization\\Voter\\Voter;\nclass PostVoter extends Voter\n{\n    public const EDIT = 'POST_EDIT';\n    protected function supports(string \$attribute, mixed \$subject): bool { return self::EDIT === \$attribute; }\n}\n");
+        $filesystem->dumpFile($this->tmpDir.'/src/Controller/PostController.php', "<?php\nnamespace App\\Controller;\nuse App\\Security\\PostVoter;\nuse Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;\nuse Symfony\\Component\\Routing\\Attribute\\Route;\nuse Symfony\\Component\\Security\\Http\\Attribute\\IsGranted;\nclass PostController extends AbstractController\n{\n    #[Route('/post/{id}/edit')]\n    #[IsGranted(PostVoter::EDIT)]\n    public function edit() { return 1; }\n}\n");
+        (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
+        (new Process(['git', 'add', 'src'], $this->tmpDir))->mustRun();
+        (new Process(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--quiet', '-m', 'init'], $this->tmpDir))->mustRun();
+        $filesystem->appendToFile($this->tmpDir.'/src/Security/PostVoter.php', "// changed\n");
+
+        $auditCommand = $this->getPrivateService($this->boot(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'direct']]), AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+        self::assertSame(Command::SUCCESS, $commandTester->execute(['project-path' => $this->tmpDir, '--show-scanned' => true, '--since' => 'HEAD']));
+
+        self::assertStringContainsString('src/Security/PostVoter.php', $commandTester->getDisplay());
+        self::assertStringContainsString('src/Controller/PostController.php', $commandTester->getDisplay());
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_file_git_tracks_although_gitignore_matches_it_joins_the_scan_when_asked_to_end_to_end(): void
     {
         $this->commitAnIgnoredFileAndAnotherOne();

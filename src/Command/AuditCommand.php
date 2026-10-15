@@ -226,6 +226,8 @@ final readonly class AuditCommand
 
     /**
      * @param list<string> $scanPaths
+     *
+     * @throws InvalidAuditContextException
      */
     private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths, ?string $since): void
     {

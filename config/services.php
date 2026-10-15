@@ -47,6 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\SinceClosurePreview;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
@@ -506,6 +507,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.since_closure'),
         ]);
 
+    $defaultsConfigurator->set(SinceClosurePreview::class)
+        ->args([
+            service(MappingStage::class),
+            service(DependencyExpansionStage::class),
+        ]);
+
     $defaultsConfigurator->set(AuditOrchestrator::class)
         ->args([
             service(AttackerAgentInterface::class),
@@ -704,12 +711,14 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.max_tool_iterations'),
             service(AttackerPromptBuilderInterface::class),
             service(MappingStage::class),
+            service(SinceClosurePreview::class),
         ]);
 
     $defaultsConfigurator->set(ListScannedFilesUseCase::class)
         ->args([
             service(ProjectFileScannerInterface::class),
             service(GitChangedFilesResolverInterface::class),
+            service(SinceClosurePreview::class),
         ]);
 
     $defaultsConfigurator->set(RunAuditUseCase::class)

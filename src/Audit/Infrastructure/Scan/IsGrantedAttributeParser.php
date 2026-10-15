@@ -89,6 +89,18 @@ final readonly class IsGrantedAttributeParser
     }
 
     /**
+     * The argument an `#[IsGranted]`/`#[Security]` attribute passes as its
+     * value, whatever expression it holds; null for any other attribute, or
+     * one passing no value.
+     */
+    public function valueArgument(Attribute $attribute): ?Arg
+    {
+        $valueArgName = $this->valueArgNameFor($attribute->name->toString());
+
+        return null === $valueArgName ? null : $this->argumentBoundTo($attribute->args, $valueArgName);
+    }
+
+    /**
      * @param array<Attribute> $attributes
      *
      * @return list<string>

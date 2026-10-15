@@ -90,6 +90,7 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
             className: $this->resolveClassName($class),
             supportedAttributes: $attributes,
             supportedSubjects: $subjects,
+            constantValues: ClassConstantStrings::of($class),
         );
     }
 

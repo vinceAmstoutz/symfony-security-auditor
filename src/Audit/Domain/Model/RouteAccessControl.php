@@ -21,6 +21,7 @@ final readonly class RouteAccessControl
      * @param bool         $methodHasIsGrantedAttribute true when the method's `#[IsGranted]`/`#[Security]` carries a value present but not resolvable to a literal string (e.g. an enum case, `new Expression(...)`)
      * @param list<string> $classLevelIsGranted         attribute names referenced by a class-level `#[IsGranted(...)]`
      * @param list<string> $denyAccessAttributes        attribute names passed as the first argument of a reachable `denyAccessUnlessGranted()`/`isGranted()` call
+     * @param list<string> $guardConstants              class constants any of these guards names instead of a literal, each as `Fully\Qualified\Class::NAME`
      */
     public function __construct(
         private string $filePath,
@@ -35,6 +36,7 @@ final readonly class RouteAccessControl
         private bool $methodHasIsGrantedAttribute = false,
         private array $classLevelIsGranted = [],
         private array $denyAccessAttributes = [],
+        private array $guardConstants = [],
     ) {}
 
     public function filePath(): string
@@ -111,6 +113,19 @@ final readonly class RouteAccessControl
     }
 
     /**
+     * The class constants a guard names instead of a literal attribute —
+     * `#[IsGranted(PostVoter::EDIT)]`, `denyAccessUnlessGranted(PostVoter::EDIT)`
+     * — each as `Fully\Qualified\Class::NAME`, for the caller that knows the
+     * value the constant holds.
+     *
+     * @return list<string>
+     */
+    public function guardConstants(): array
+    {
+        return $this->guardConstants;
+    }
+
+    /**
      * Returns a copy routed from the enclosing class's `#[Route]` — the way
      * Symfony routes an invokable single-action controller's `__invoke()` when
      * the method carries no route of its own. All access-control flags are
@@ -133,6 +148,7 @@ final readonly class RouteAccessControl
             methodHasIsGrantedAttribute: $this->methodHasIsGrantedAttribute,
             classLevelIsGranted: $this->classLevelIsGranted,
             denyAccessAttributes: $this->denyAccessAttributes,
+            guardConstants: $this->guardConstants,
         );
     }
 

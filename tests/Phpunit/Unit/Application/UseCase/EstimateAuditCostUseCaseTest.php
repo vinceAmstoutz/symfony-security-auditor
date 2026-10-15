@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\Chunki
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\SinceClosurePreview;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
@@ -34,6 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\MeasuringTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\SinceClosureFixture;
 
 final class EstimateAuditCostUseCaseTest extends TestCase
 {
@@ -511,6 +513,30 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         self::assertSame(2, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'the estimate must reflect only the changed file, not the whole project');
         self::assertSame(1, $auditReport->filesScanned());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_since_closure_prices_the_controllers_a_changed_voter_guards(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Security/PostVoter.php']);
+
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => SinceClosureFixture::files(),
+            'tokenEstimator' => $this->lengthEchoingEstimator(),
+            'maxIterations' => 1,
+            'gitChangedFilesResolver' => $gitChangedFilesResolver,
+            'sinceClosurePreview' => SinceClosureFixture::preview('direct'),
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir, [], 'main');
+
+        self::assertSame(2, $auditReport->filesScanned());
+        self::assertSame(mb_strlen(SinceClosureFixture::VOTER) + mb_strlen(SinceClosureFixture::GUARDED_CONTROLLER), $auditReport->cost()->byRole()['attacker']['input_tokens']);
     }
 
     /**
@@ -1048,6 +1074,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      *     toolRoundTripRatio?: float,
      *     maxToolIterations?: int,
      *     scanner?: ProjectFileScannerInterface,
+     *     sinceClosurePreview?: SinceClosurePreview,
      * } $overrides
      */
     private function makeUseCase(array $overrides = []): EstimateAuditCostUseCase
@@ -1086,6 +1113,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             $toolsEnabled,
             $toolRoundTripRatio,
             $maxToolIterations,
+            sinceClosurePreview: $overrides['sinceClosurePreview'] ?? null,
         );
     }
 

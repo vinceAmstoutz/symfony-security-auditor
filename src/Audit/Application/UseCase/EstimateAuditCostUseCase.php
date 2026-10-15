@@ -106,6 +106,7 @@ final readonly class EstimateAuditCostUseCase
         private int $maxToolIterations = AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS,
         private ?AttackerPromptBuilderInterface $attackerPromptBuilder = null,
         private ?StageInterface $mappingStage = null,
+        private ?SinceClosurePreview $sinceClosurePreview = null,
     ) {}
 
     /**
@@ -116,7 +117,8 @@ final readonly class EstimateAuditCostUseCase
      * @param ?string      $diffSinceRef when set, mirrors `IngestionStage` by
      *                                   narrowing the estimate to files changed
      *                                   against this git ref, matching what an
-     *                                   `audit:run --since` would actually scan
+     *                                   `audit:run --since` would actually scan,
+     *                                   with the files `audit.since_closure` adds
      *
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -133,6 +135,7 @@ final readonly class EstimateAuditCostUseCase
         $files = $scannedFiles;
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             $files = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
+            $files = $this->sinceClosurePreview?->auditedFiles($projectPath, $scanPaths, $diffSinceRef, $files, $scopedScanResult->mappingFiles) ?? $files;
         }
 
         $auditContext->setProjectFiles($files);
