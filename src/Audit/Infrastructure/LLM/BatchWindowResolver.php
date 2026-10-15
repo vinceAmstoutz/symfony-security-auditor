@@ -217,17 +217,17 @@ final readonly class BatchWindowResolver
 
         try {
             $content = $this->platformResultExtractor->extractText($deferredResult->getResult());
-            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult, $dispatchedRequest->estimatedInputTokens);
-            $this->rateLimiter->record($inputTokens, $outputTokens);
+            $tokenUsageSnapshot = TokenUsageSnapshot::of(...$this->platformResultExtractor->extractTokens($deferredResult, $dispatchedRequest->estimatedInputTokens));
+            $this->rateLimiter->record($this->platformResultExtractor->rateLimitedInputTokens($deferredResult, $tokenUsageSnapshot), $tokenUsageSnapshot->outputTokens());
             $reconciled = true;
 
             $llmResponse = LLMResponse::of(
                 $content,
                 $this->model,
                 $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
-                TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
+                $tokenUsageSnapshot,
             )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult));
-            $this->budgetTracker?->recordCall($llmResponse, $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $cacheCreationTokens));
+            $this->budgetTracker?->recordCall($llmResponse, $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $tokenUsageSnapshot->cacheCreationTokens()));
 
             return $llmResponse;
         } catch (Throwable $throwable) {

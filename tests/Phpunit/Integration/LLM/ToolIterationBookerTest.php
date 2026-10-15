@@ -44,7 +44,7 @@ final class ToolIterationBookerTest extends TestCase
 
         $toolIterationBooker->book($this->deferredResult(), TokenUsageSnapshot::of(10, 5, 3, 2));
 
-        self::assertSame([[10, 5]], $fakeRateLimiter->recorded);
+        self::assertSame([[12, 5]], $fakeRateLimiter->recorded);
     }
 
     /**
@@ -76,7 +76,7 @@ final class ToolIterationBookerTest extends TestCase
             $toolIterationBooker->book($this->deferredResult(), TokenUsageSnapshot::of(10, 5, 3, 2));
             self::fail('The budget the round spent must abort the run.');
         } catch (BudgetExceededException) {
-            self::assertSame([[10, 5]], $fakeRateLimiter->recorded);
+            self::assertSame([[12, 5]], $fakeRateLimiter->recorded);
         }
     }
 

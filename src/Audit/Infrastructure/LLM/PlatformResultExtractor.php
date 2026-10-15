@@ -25,6 +25,7 @@ use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
@@ -126,9 +127,55 @@ final readonly class PlatformResultExtractor
     public function extractBilledUsage(DeferredResult $deferredResult, int $estimatedInputTokens): ?TokenUsageSnapshot
     {
         try {
-            $tokenUsage = $deferredResult->getResultConverter()->getTokenUsageExtractor()?->extract($deferredResult->getRawResult());
+            $tokenUsage = $this->usageInRawAnswer($deferredResult);
 
             return $tokenUsage instanceof TokenUsageInterface ? TokenUsageSnapshot::of(...$this->billedTokenCounts($tokenUsage, $estimatedInputTokens)) : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * The input tokens the provider counts against its input-tokens-per-minute
+     * limit for a call booked at `$tokenUsageSnapshot`: the input and the
+     * cache writes, and the cache reads too where the provider counts them
+     * inside its prompt, as OpenAI-style providers do. Anthropic leaves its
+     * cache reads out of that limit. The cost books the cache reads at the
+     * cache rate either way.
+     */
+    public function rateLimitedInputTokens(DeferredResult $deferredResult, TokenUsageSnapshot $tokenUsageSnapshot): int
+    {
+        $cacheReadsCountedInPrompt = $this->countsCacheReadsInPrompt($this->reportedUsage($deferredResult));
+
+        return $tokenUsageSnapshot->inputTokens() + $tokenUsageSnapshot->cacheCreationTokens() + ($cacheReadsCountedInPrompt ? $tokenUsageSnapshot->cacheReadTokens() : 0);
+    }
+
+    /**
+     * A usage that reports no prompt has its input booked at the estimated
+     * input tokens, which count the whole prompt, its cached share included.
+     */
+    private function countsCacheReadsInPrompt(TokenUsageInterface $tokenUsage): bool
+    {
+        $promptTokens = $tokenUsage->getPromptTokens();
+
+        return null !== $promptTokens && 0 !== $this->cachedTokensInsidePrompt($tokenUsage, $promptTokens);
+    }
+
+    /**
+     * The usage of an answered call, or of one its bridge failed to convert,
+     * which only its raw answer reports: an empty one when it reports none.
+     */
+    private function reportedUsage(DeferredResult $deferredResult): TokenUsageInterface
+    {
+        $tokenUsage = $deferredResult->getMetadata()->all()['token_usage'] ?? null;
+
+        return $tokenUsage instanceof TokenUsageInterface ? $tokenUsage : $this->usageInRawAnswer($deferredResult) ?? new TokenUsage();
+    }
+
+    private function usageInRawAnswer(DeferredResult $deferredResult): ?TokenUsageInterface
+    {
+        try {
+            return $deferredResult->getResultConverter()->getTokenUsageExtractor()?->extract($deferredResult->getRawResult());
         } catch (Throwable) {
             return null;
         }

@@ -66,7 +66,7 @@ final readonly class DegradedAnswerBooker
         $reportedUsage = $deferredResult instanceof DeferredResult ? $this->platformResultExtractor->extractBilledUsage($deferredResult, $estimatedInputTokens) : null;
         $billedUsage = $reportedUsage ?? TokenUsageSnapshot::of($estimatedInputTokens, 0);
 
-        $this->rateLimiter->record($billedUsage->inputTokens(), $billedUsage->outputTokens());
+        $this->rateLimiter->record($this->rateLimitedInputTokens($deferredResult, $billedUsage), $billedUsage->outputTokens());
         $this->budgetTracker?->recordCall(LLMResponse::of('', $this->model, $stopReason, $billedUsage), $this->oneHourCacheCreationTokens($deferredResult, $billedUsage));
         $this->tokenUsageRecorder?->record($billedUsage->inputTokens(), $billedUsage->outputTokens(), $billedUsage->cacheReadTokens(), $billedUsage->cacheCreationTokens());
         $this->logBooking($stopReason, $reportedUsage, $estimatedInputTokens);
@@ -81,6 +81,11 @@ final readonly class DegradedAnswerBooker
         return $deferredResult instanceof DeferredResult
             ? $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $tokenUsageSnapshot->cacheCreationTokens())
             : 0;
+    }
+
+    private function rateLimitedInputTokens(?DeferredResult $deferredResult, TokenUsageSnapshot $tokenUsageSnapshot): int
+    {
+        return $deferredResult instanceof DeferredResult ? $this->platformResultExtractor->rateLimitedInputTokens($deferredResult, $tokenUsageSnapshot) : $tokenUsageSnapshot->inputTokens();
     }
 
     private function logBooking(string $stopReason, ?TokenUsageSnapshot $tokenUsageSnapshot, int $estimatedInputTokens): void

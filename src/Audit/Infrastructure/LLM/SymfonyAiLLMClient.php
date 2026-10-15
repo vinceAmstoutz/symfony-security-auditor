@@ -214,7 +214,8 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             throw $throwable;
         }
 
-        $this->rateLimiter->record($inputTokens, $outputTokens);
+        $tokenUsageSnapshot = TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
+        $this->rateLimiter->record($this->platformResultExtractor->rateLimitedInputTokens($deferredResult, $tokenUsageSnapshot), $outputTokens);
 
         $this->logger->debug('symfony/ai platform responded', [
             'content_length' => \strlen($content),
@@ -226,7 +227,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $content,
             $this->model,
             $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
-            TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
+            $tokenUsageSnapshot,
         )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult));
         $this->budgetTracker?->recordCall($llmResponse, $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $cacheCreationTokens));
         $this->budgetTracker?->assertWithinBudget();

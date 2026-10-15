@@ -35,10 +35,14 @@ final readonly class RawUsageExtractor implements TokenUsageExtractorInterface
 
         $promptTokens = $usage['prompt_tokens'] ?? null;
         $completionTokens = $usage['completion_tokens'] ?? null;
+        $totalTokens = $usage['total_tokens'] ?? null;
+        $cachedTokens = \is_array($usage['prompt_tokens_details'] ?? null) ? $usage['prompt_tokens_details']['cached_tokens'] ?? null : null;
 
         return new TokenUsage(
             promptTokens: \is_int($promptTokens) ? $promptTokens : null,
             completionTokens: \is_int($completionTokens) ? $completionTokens : null,
+            cachedTokens: \is_int($cachedTokens) ? $cachedTokens : null,
+            totalTokens: \is_int($totalTokens) ? $totalTokens : null,
         );
     }
 }

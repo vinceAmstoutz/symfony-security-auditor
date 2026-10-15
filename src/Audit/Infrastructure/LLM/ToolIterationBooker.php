@@ -43,7 +43,7 @@ final readonly class ToolIterationBooker
      */
     public function book(DeferredResult $deferredResult, TokenUsageSnapshot $tokenUsageSnapshot): void
     {
-        $this->rateLimiter->record($tokenUsageSnapshot->inputTokens(), $tokenUsageSnapshot->outputTokens());
+        $this->rateLimiter->record($this->platformResultExtractor->rateLimitedInputTokens($deferredResult, $tokenUsageSnapshot), $tokenUsageSnapshot->outputTokens());
 
         if (!$this->budgetTracker instanceof BudgetTracker) {
             return;
