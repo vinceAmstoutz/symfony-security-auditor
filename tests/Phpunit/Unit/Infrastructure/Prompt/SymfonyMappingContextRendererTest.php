@@ -14,14 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
 use ErrorException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\SymfonyMappingContextRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
 
 final class SymfonyMappingContextRendererTest extends TestCase
 {
@@ -97,6 +100,35 @@ final class SymfonyMappingContextRendererTest extends TestCase
         self::assertStringContainsString('- GET /admin — src/Controller/X.php::index — COVERED_BY access_control[ROLE_PROJECT]', $rendered);
     }
 
+    /**
+     * @param list<AccessControlRule> $projectRules
+     * @param list<AccessControlRule> $applicationRules
+     */
+    #[DataProvider('declaredRulesOfAnApplicationCases')]
+    public function test_a_route_is_walked_through_the_declared_rules_of_its_application(array $projectRules, array $applicationRules, string $applicationLabel, string $projectLabel): void
+    {
+        $apiRoute = new RouteAccessControl('apps/api/src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $projectRoute = new RouteAccessControl('src/Controller/X.php', 'index', '/admin', ['GET'], true, [], false, false);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
+            routeAccessMap: ['^/admin' => ['ROLE_PROJECT']],
+            routeAccessControls: [$apiRoute, $projectRoute],
+            applicationAccessControls: ['apps/api/' => new ApplicationAccessControl(['^/admin' => ['ROLE_API']], [], $applicationRules)],
+            accessControlRules: $projectRules,
+        ));
+
+        $rendered = SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
+
+        self::assertStringContainsString(\sprintf('- GET /admin — apps/api/src/Controller/X.php::index — %s', $applicationLabel), $rendered);
+        self::assertStringContainsString(\sprintf('- GET /admin — src/Controller/X.php::index — %s', $projectLabel), $rendered);
+    }
+
+    /** @return iterable<string, array{0: list<AccessControlRule>, 1: list<AccessControlRule>, 2: string, 3: string}> */
+    public static function declaredRulesOfAnApplicationCases(): iterable
+    {
+        yield 'the application checks nothing first' => [[new AccessControlRule('^/admin', [], true)], [new AccessControlRule('^/', [], false)], 'LACKS_ACCESS_CHECK', 'COVERED_BY access_control[ROLE_PROJECT]'];
+        yield 'the project checks nothing first' => [[new AccessControlRule('^/', [], false)], [new AccessControlRule('^/admin', [], true)], 'COVERED_BY access_control[ROLE_API]', 'LACKS_ACCESS_CHECK'];
+    }
+
     public function test_it_renders_nothing_when_every_configuration_file_was_read(): void
     {
         self::assertSame('', SymfonyMappingContextRenderer::renderUnreadableConfiguration(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())));
@@ -153,6 +185,32 @@ final class SymfonyMappingContextRendererTest extends TestCase
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: $firewallRules, applicationAccessControls: ['apps/api/' => new ApplicationAccessControl([], ['main'])]));
 
         self::assertStringEndsWith("- ^/area50\n- … and 1 more\n\n", SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping));
+    }
+
+    #[DataProvider('firstMatchingRulesWithoutRolesCases')]
+    public function test_a_first_matching_rule_without_roles_leaves_the_route_lacking_an_access_check(string $accessControl): void
+    {
+        $securityYaml = "security:\n    access_control:\n".$accessControl;
+        $symfonyYamlSecurityConfigParser = new SymfonyYamlSecurityConfigParser();
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(
+                routeAccessMap: $symfonyYamlSecurityConfigParser->parseAccessControl($securityYaml),
+                routeAccessControls: [new RouteAccessControl('src/Controller/AdminController.php', 'users', '/admin/users', ['GET'], true, [], false, false, 'admin_users')],
+                accessControlRules: $symfonyYamlSecurityConfigParser->parseAccessControlRules($securityYaml),
+            ),
+        );
+
+        self::assertStringContainsString('- GET /admin/users — src/Controller/AdminController.php::users — LACKS_ACCESS_CHECK', SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function firstMatchingRulesWithoutRolesCases(): iterable
+    {
+        yield 'a path-only catch-all listed first' => ["        - { path: ^/ }\n        - { path: ^/admin, roles: ROLE_ADMIN }\n"];
+        yield 'a route-only rule listed first' => ["        - { route: admin_users }\n        - { path: ^/admin, roles: ROLE_ADMIN }\n"];
+        yield 'an attributes-only rule listed first' => ["        - { path: ^/admin, attributes: { _format: json } }\n        - { path: ^/admin, roles: ROLE_ADMIN }\n"];
+        yield 'a rule for other methods, then a broader https rule, then the roles rule' => ["        - { path: ^/admin, roles: ROLE_ADMIN, methods: [POST] }\n        - { path: ^/, requires_channel: https }\n        - { path: ^/admin, roles: ROLE_ADMIN }\n"];
     }
 
     public function test_a_route_covered_only_by_yaml_is_never_ruled_out_as_broken_access_control(): void

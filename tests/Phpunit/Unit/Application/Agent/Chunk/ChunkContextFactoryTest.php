@@ -163,8 +163,7 @@ final class ChunkContextFactoryTest extends TestCase
     /**
      * Project scanning makes no ordering guarantee, so two scans of the same
      * unchanged codebase must not produce different cache keys merely because
-     * the parsers visited the same routes and form bindings in a different
-     * order.
+     * the parsers visited the same form bindings in a different order.
      *
      * @throws InvalidProjectFileException
      */
@@ -187,7 +186,7 @@ final class ChunkContextFactoryTest extends TestCase
             formBindings: [$formBindingA, $formBindingB],
         )));
         $reverseOrder = new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
-            routeAccessMap: ['^/reports' => ['ROLE_USER'], '^/admin' => ['ROLE_ADMIN']],
+            routeAccessMap: ['^/admin' => ['ROLE_ADMIN'], '^/reports' => ['ROLE_USER']],
             formBindings: [$formBindingB, $formBindingA],
         )));
 

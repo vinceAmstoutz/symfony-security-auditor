@@ -181,6 +181,26 @@ final readonly class SymfonyMapping
         return $this->accessControlMap->routeAccessMapFor($controllerFilePath);
     }
 
+    /**
+     * @return list<AccessControlRule>
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function accessControlRules(): array
+    {
+        return $this->accessControlMap->accessControlRules();
+    }
+
+    /**
+     * @return list<AccessControlRule>
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function accessControlRulesFor(string $controllerFilePath): array
+    {
+        return $this->accessControlMap->accessControlRulesFor($controllerFilePath);
+    }
+
     /** @return list<RouteAccessControl> */
     public function routeAccessControls(): array
     {

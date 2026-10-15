@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AccessControlRuleMatcher;
 
@@ -35,6 +36,66 @@ final class AccessControlRuleMatcherTest extends TestCase
         $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', $routePath, $routeMethods, true, [], false, false, $routeName);
 
         self::assertSame($expectedRoles, AccessControlRuleMatcher::rolesFor($routeAccessControl, $routeAccessMap));
+    }
+
+    /**
+     * @param list<string>            $routeMethods
+     * @param list<AccessControlRule> $accessControlRules
+     */
+    #[DataProvider('declaredRuleCases')]
+    public function test_the_first_declared_rule_that_matches_some_requests_of_the_route_decides_whether_it_is_checked(array $routeMethods, array $accessControlRules, bool $checked): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', '/admin/users', $routeMethods, true, [], false, false, 'admin_users');
+
+        self::assertSame($checked ? ['ROLE_MAP'] : null, AccessControlRuleMatcher::rolesFor($routeAccessControl, ['^/admin' => ['ROLE_MAP']], $accessControlRules));
+    }
+
+    /**
+     * @return iterable<string, array{0: list<string>, 1: list<AccessControlRule>, 2: bool}>
+     */
+    public static function declaredRuleCases(): iterable
+    {
+        yield 'no declared rule' => [['GET'], [], true];
+        yield 'a rule checking nothing for every method' => [['GET'], [new AccessControlRule('^/admin', [], false)], false];
+        yield 'a rule checking nothing for the route method' => [['GET'], [new AccessControlRule('^/admin', ['GET'], false)], false];
+        yield 'a rule checking nothing for the route method written in lower case' => [['get'], [new AccessControlRule('^/admin', ['GET'], false)], false];
+        yield 'a rule checking nothing for another method' => [['GET'], [new AccessControlRule('^/admin', ['POST'], false)], true];
+        yield 'a rule checking nothing for one of the route methods' => [['GET', 'POST'], [new AccessControlRule('^/admin', ['POST'], false)], false];
+        yield 'a rule checking nothing for some methods of a route answering every method' => [[], [new AccessControlRule('^/admin', ['GET'], false)], false];
+        yield 'a rule checking nothing for another path' => [['GET'], [new AccessControlRule('^/other', [], false)], true];
+        yield 'a rule checking nothing for the route name' => [['GET'], [new AccessControlRule('route: admin_users', [], false)], false];
+        yield 'a rule checking nothing for another route name' => [['GET'], [new AccessControlRule('route: admin_export', [], false)], true];
+        yield 'a checking rule for every method, then one checking nothing' => [['GET'], [new AccessControlRule('^/admin', [], true), new AccessControlRule('^/', [], false)], true];
+        yield 'a checking rule for the route methods, then one checking nothing' => [['GET', 'POST'], [new AccessControlRule('^/admin', ['GET', 'POST', 'PUT'], true), new AccessControlRule('^/', [], false)], true];
+        yield 'a checking rule for some route methods, then one checking nothing' => [['GET', 'POST'], [new AccessControlRule('^/admin', ['GET'], true), new AccessControlRule('^/', [], false)], false];
+        yield 'a checking rule for some methods of a route answering every method, then one checking nothing' => [[], [new AccessControlRule('^/admin', ['GET'], true), new AccessControlRule('^/', [], false)], false];
+        yield 'a checking rule for another method, then one checking nothing' => [['GET'], [new AccessControlRule('^/admin', ['POST'], true), new AccessControlRule('^/', [], false)], false];
+        yield 'a checking rule of another path, then one checking nothing' => [['GET'], [new AccessControlRule('^/other', [], true), new AccessControlRule('^/', [], false)], false];
+    }
+
+    /**
+     * @param list<string>            $routeMethods
+     * @param list<AccessControlRule> $accessControlRules
+     * @param list<string>|false|null $expectedRoles
+     */
+    #[DataProvider('undecidableDeclaredRuleCases')]
+    public function test_a_declared_rule_whose_pattern_cannot_be_decided_leaves_the_route_undetermined_only_when_it_would_decide_it(array $routeMethods, array $accessControlRules, array|false|null $expectedRoles): void
+    {
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'index', self::CATASTROPHIC_ROUTE, $routeMethods, true, [], false, false);
+
+        self::assertSame($expectedRoles, AccessControlRuleMatcher::rolesFor($routeAccessControl, ['^/a' => ['ROLE_A']], $accessControlRules));
+    }
+
+    /**
+     * @return iterable<string, array{0: list<string>, 1: list<AccessControlRule>, 2: list<string>|false|null}>
+     */
+    public static function undecidableDeclaredRuleCases(): iterable
+    {
+        yield 'a rule checking nothing' => [['GET'], [new AccessControlRule(self::CATASTROPHIC_PATTERN, [], false), new AccessControlRule('^/a', [], true)], false];
+        yield 'a checking rule for every request of the route' => [['GET'], [new AccessControlRule(self::CATASTROPHIC_PATTERN, [], true), new AccessControlRule('^/a', [], true)], false];
+        yield 'a checking rule for some requests of the route, then one checking nothing' => [['GET', 'POST'], [new AccessControlRule(self::CATASTROPHIC_PATTERN, ['GET'], true), new AccessControlRule('^/a', [], false)], null];
+        yield 'a rule checking nothing for another method, then a checking rule' => [['GET'], [new AccessControlRule(self::CATASTROPHIC_PATTERN, ['POST'], false), new AccessControlRule('^/a', [], true)], ['ROLE_A']];
+        yield 'a rule checking nothing after the checking rule that settles the route' => [['GET'], [new AccessControlRule('^/a', [], true), new AccessControlRule(self::CATASTROPHIC_PATTERN, [], false)], ['ROLE_A']];
     }
 
     /**

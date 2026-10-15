@@ -16,12 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 use Override;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProductionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ImportAwareSecurityConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RuleOrderAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecurityConfigParserInterface
+final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecurityConfigParserInterface, RuleOrderAwareSecurityConfigParserInterface
 {
     private const string PRODUCTION_ENVIRONMENT_BLOCK = 'when@prod';
 
@@ -59,6 +61,20 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
     public function productionConfiguration(array $files, array $scanPaths): ProductionConfiguration
     {
         return $this->kernelConfigurationLoader->filesInLoadOrder($files, $scanPaths);
+    }
+
+    /**
+     * Every rule with a path or a route, those that check nothing included.
+     */
+    #[Override]
+    public function parseAccessControlRules(string $configContent): array
+    {
+        $accessControlRules = [];
+        foreach ($this->securitySections($configContent) as $section) {
+            $accessControlRules = [...$accessControlRules, ...$this->accessControlRulesOf($section)];
+        }
+
+        return $accessControlRules;
     }
 
     #[Override]
@@ -134,6 +150,38 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
         $routeAccessMap[$target] = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
 
         return $routeAccessMap;
+    }
+
+    /**
+     * @param array<string, mixed> $section
+     *
+     * @return list<AccessControlRule>
+     */
+    private function accessControlRulesOf(array $section): array
+    {
+        $entries = $section['access_control'] ?? null;
+
+        $accessControlRules = [];
+        foreach (\is_array($entries) ? $entries : [] as $entry) {
+            $accessControlRules = [...$accessControlRules, ...$this->accessControlRuleOf($this->mapOf($entry))];
+        }
+
+        return $accessControlRules;
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     *
+     * @return list<AccessControlRule> the rule, or none for an entry without a path or a route
+     */
+    private function accessControlRuleOf(array $entry): array
+    {
+        $target = $this->targetOf($entry);
+        if (null === $target) {
+            return [];
+        }
+
+        return [new AccessControlRule($target, $this->accessControlRequirementReader->methodsOf($entry), $this->accessControlRequirementReader->restricts($entry))];
     }
 
     /**

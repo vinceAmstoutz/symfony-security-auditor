@@ -25,9 +25,11 @@ final readonly class ApplicationAccessControl
     /**
      * @param array<string, list<string>> $routeAccessMap
      * @param list<string>                $firewallRules
+     * @param list<AccessControlRule>     $accessControlRules the rules in the order the application declares them, when the parser gave them
      */
     public function __construct(
         public array $routeAccessMap,
         public array $firewallRules,
+        public array $accessControlRules = [],
     ) {}
 }

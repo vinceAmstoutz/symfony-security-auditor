@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chun
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
@@ -60,9 +61,33 @@ final class ChunkContextKeyDeriverTest extends TestCase
             $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], ['main'])]),
             $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], ['other'])]),
             $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A'], '^/b' => ['ROLE_B']], [])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/b' => ['ROLE_B'], '^/a' => ['ROLE_A']], [])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], [], [new AccessControlRule('^/a', [], true)])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], [], [new AccessControlRule('^/', [], false), new AccessControlRule('^/a', [], true)])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], [], [new AccessControlRule('^/a', [], true), new AccessControlRule('^/', [], false)])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl([], [], [new AccessControlRule('^/a', [], true)])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_A']], []), 'apps/web/' => new ApplicationAccessControl(['^/w' => ['ROLE_W']], [])]),
+            $this->keyForApplications(['apps/api/' => new ApplicationAccessControl(['^/a' => ['ROLE_B']], []), 'apps/web/' => new ApplicationAccessControl(['^/w' => ['ROLE_W']], [])]),
         ];
 
         self::assertSame($keys, array_values(array_unique($keys)));
+    }
+
+    public function test_the_order_of_the_access_control_rules_changes_the_key(): void
+    {
+        $keys = [
+            $this->keyForRules(['^/admin' => ['ROLE_ADMIN'], '^/' => ['requires_channel: https']], []),
+            $this->keyForRules(['^/' => ['requires_channel: https'], '^/admin' => ['ROLE_ADMIN']], []),
+            $this->keyForRules([], [new AccessControlRule('^/', [], false)]),
+            $this->keyForRules([], [new AccessControlRule('^/', [], true)]),
+            $this->keyForRules([], [new AccessControlRule('^/a', [], false), new AccessControlRule('^/b', [], true)]),
+            $this->keyForRules([], [new AccessControlRule('^/b', [], true), new AccessControlRule('^/a', [], false)]),
+            $this->keyForRules(['^/admin' => ['ROLE_ADMIN']], [new AccessControlRule('^/admin', [], true)]),
+            $this->keyForRules(['^/admin' => ['ROLE_ADMIN']], []),
+        ];
+
+        self::assertSame($keys, array_values(array_unique($keys)));
+        self::assertSame('', $this->keyForRules([], []));
     }
 
     public function test_the_candidate_preamble_alone_yields_a_key_of_its_own(): void
@@ -135,6 +160,18 @@ final class ChunkContextKeyDeriverTest extends TestCase
         return (new ChunkContextKeyDeriver())->derive('', '', '', '', SymfonyMapping::of(
             ProjectFileInventory::fromGroups([]),
             new AccessControlMap(firewallRules: ['main'], applicationAccessControls: $applicationAccessControls),
+        ));
+    }
+
+    /**
+     * @param array<string, list<string>> $routeAccessMap
+     * @param list<AccessControlRule>     $accessControlRules
+     */
+    private function keyForRules(array $routeAccessMap, array $accessControlRules): string
+    {
+        return (new ChunkContextKeyDeriver())->derive('', '', '', '', SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(routeAccessMap: $routeAccessMap, accessControlRules: $accessControlRules),
         ));
     }
 }

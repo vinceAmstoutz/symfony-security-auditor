@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -111,7 +112,7 @@ final readonly class ChunkContextKeyDeriver
 
         $signatures = [
             ...$applicationSecurityMap->perimeterRules(),
-            ...$this->routeAccessMapSignatures($symfonyMapping->routeAccessMap()),
+            ...$this->accessControlSignatures('', $symfonyMapping->routeAccessMap(), $symfonyMapping->accessControlRules()),
             ...$this->unreadableConfigurationSignatures($symfonyMapping->unreadableConfigurationFiles()),
             ...$this->applicationAccessControlSignatures($symfonyMapping->applicationAccessControls()),
             ...$this->routeAccessControlSignatures($symfonyMapping->routeAccessControls()),
@@ -130,18 +131,26 @@ final readonly class ChunkContextKeyDeriver
     }
 
     /**
-     * @param array<string, list<string>> $routeAccessMap
+     * The application applies the first `access_control` rule that matches a
+     * request, so the rules count in the order they are declared: the map and
+     * the declared rules each go into one signature that keeps that order,
+     * rather than one per rule that the fingerprint would sort.
      *
-     * @return list<string>
+     * @param array<string, list<string>> $routeAccessMap
+     * @param list<AccessControlRule>     $accessControlRules
+     *
+     * @return list<string> none for a mapping without access control rules
      */
-    private function routeAccessMapSignatures(array $routeAccessMap): array
+    private function accessControlSignatures(string $owner, array $routeAccessMap, array $accessControlRules): array
     {
-        $signatures = [];
-        foreach ($routeAccessMap as $pattern => $roles) {
-            $signatures[] = \sprintf('%s=%s', $pattern, implode(',', $roles));
+        if ([] === $routeAccessMap && [] === $accessControlRules) {
+            return [];
         }
 
-        return $signatures;
+        return [
+            \sprintf('%saccess control map: %s', $owner, serialize($routeAccessMap)),
+            \sprintf('%saccess control rules: %s', $owner, serialize($accessControlRules)),
+        ];
     }
 
     /**
@@ -163,9 +172,7 @@ final readonly class ChunkContextKeyDeriver
     {
         $signatures = [];
         foreach ($applicationAccessControls as $applicationFolder => $applicationAccessControl) {
-            foreach ($this->routeAccessMapSignatures($applicationAccessControl->routeAccessMap) as $ruleSignature) {
-                $signatures[] = \sprintf('application %s rule: %s', $applicationFolder, $ruleSignature);
-            }
+            $signatures = [...$signatures, ...$this->accessControlSignatures(\sprintf('application %s ', $applicationFolder), $applicationAccessControl->routeAccessMap, $applicationAccessControl->accessControlRules)];
 
             foreach ($applicationAccessControl->firewallRules as $firewallRule) {
                 $signatures[] = \sprintf('application %s firewall: %s', $applicationFolder, $firewallRule);

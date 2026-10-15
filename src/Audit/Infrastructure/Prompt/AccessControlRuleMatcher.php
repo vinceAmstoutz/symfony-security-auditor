@@ -13,12 +13,16 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 
 /**
  * Finds the roles of the `security.yaml` `access_control` rule that governs a
  * route: the first rule, in the order the map lists them, whose path pattern
- * matches it or that is keyed by its route name.
+ * matches it or that is keyed by its route name. Symfony applies the first
+ * rule, in the order they are declared, that matches a request, and a rule
+ * without roles or an expression checks nothing, so a route such a rule
+ * matches first has no governing roles.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -36,10 +40,26 @@ final readonly class AccessControlRuleMatcher
      * Symfony applies, so the route is neither covered nor uncovered.
      *
      * @param array<string, list<string>> $routeAccessMap
+     * @param list<AccessControlRule>     $accessControlRules the rules in the order they are declared, when the parser gave them
      *
-     * @return list<string>|false|null the governing rule's roles, null when no rule governs the route, false when it cannot be told
+     * @return list<string>|false|null the governing rule's roles, null when no rule governs the route or the first one Symfony applies to some of its requests checks nothing, false when it cannot be told
      */
-    public static function rolesFor(RouteAccessControl $routeAccessControl, array $routeAccessMap): array|false|null
+    public static function rolesFor(RouteAccessControl $routeAccessControl, array $routeAccessMap, array $accessControlRules = []): array|false|null
+    {
+        $checksNothing = self::firstMatchingRuleChecksNothing($routeAccessControl, $accessControlRules);
+        if (false !== $checksNothing) {
+            return true === $checksNothing ? null : false;
+        }
+
+        return self::governingRoles($routeAccessControl, $routeAccessMap);
+    }
+
+    /**
+     * @param array<string, list<string>> $routeAccessMap
+     *
+     * @return list<string>|false|null
+     */
+    private static function governingRoles(RouteAccessControl $routeAccessControl, array $routeAccessMap): array|false|null
     {
         foreach ($routeAccessMap as $target => $roles) {
             $governs = self::ruleGoverns($target, $roles, $routeAccessControl);
@@ -57,6 +77,77 @@ final readonly class AccessControlRuleMatcher
     private static function ruleGoverns(string $target, array $roles, RouteAccessControl $routeAccessControl): ?bool
     {
         return self::methodsAreCovered($roles, $routeAccessControl->routeMethods()) ? self::targetGoverns($target, $routeAccessControl) : false;
+    }
+
+    /**
+     * Walks the rules in the order they are declared, passing those that do
+     * not decide the route: the first that does checks nothing, or checks
+     * something and matches all of its requests. A rule whose path pattern
+     * cannot be decided for the route leaves the answer open.
+     *
+     * @param list<AccessControlRule> $accessControlRules
+     *
+     * @return bool|null false when a rule that checks something settles the route, or none decides it; null when it cannot be told
+     */
+    private static function firstMatchingRuleChecksNothing(RouteAccessControl $routeAccessControl, array $accessControlRules): ?bool
+    {
+        $routeMethods = array_map(strtoupper(...), $routeAccessControl->routeMethods());
+        foreach ($accessControlRules as $accessControlRule) {
+            $governs = self::declaredRuleGoverns($accessControlRule, $routeAccessControl, $routeMethods);
+            if (false !== $governs) {
+                return self::checksNothing($accessControlRule, $governs);
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $routeMethods upper-case; empty for every method
+     *
+     * @return bool|null null when the rule's path pattern cannot be decided for the route
+     */
+    private static function declaredRuleGoverns(AccessControlRule $accessControlRule, RouteAccessControl $routeAccessControl, array $routeMethods): ?bool
+    {
+        return self::decidesTheRoute($accessControlRule, $routeMethods) ? self::targetGoverns($accessControlRule->target, $routeAccessControl) : false;
+    }
+
+    /**
+     * @return bool|null null when it cannot be told whether the rule governs the route
+     */
+    private static function checksNothing(AccessControlRule $accessControlRule, ?bool $governs): ?bool
+    {
+        return null === $governs ? null : !$accessControlRule->restricts;
+    }
+
+    /**
+     * @param list<string> $routeMethods upper-case; empty for every method
+     */
+    private static function decidesTheRoute(AccessControlRule $accessControlRule, array $routeMethods): bool
+    {
+        if (!self::ruleMatchesSomeRequests($accessControlRule->methods, $routeMethods)) {
+            return false;
+        }
+
+        return !$accessControlRule->restricts || self::ruleMatchesEveryRequest($accessControlRule->methods, $routeMethods);
+    }
+
+    /**
+     * @param list<string> $ruleMethods
+     * @param list<string> $routeMethods upper-case; empty for every method
+     */
+    private static function ruleMatchesSomeRequests(array $ruleMethods, array $routeMethods): bool
+    {
+        return [] === $ruleMethods || [] === $routeMethods || [] !== array_intersect($routeMethods, $ruleMethods);
+    }
+
+    /**
+     * @param list<string> $ruleMethods
+     * @param list<string> $routeMethods upper-case; empty for every method
+     */
+    private static function ruleMatchesEveryRequest(array $ruleMethods, array $routeMethods): bool
+    {
+        return [] === $ruleMethods || ([] !== $routeMethods && [] === array_diff($routeMethods, $ruleMethods));
     }
 
     /**

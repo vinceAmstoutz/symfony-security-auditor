@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
@@ -159,7 +160,7 @@ final readonly class SymfonyMappingContextRenderer
             $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->routeMethods()));
             $path = self::sanitizeLine($routeAccessControl->routePath() ?? '(unresolved)');
             $checks = self::accessCheckLabelsFor($routeAccessControl);
-            $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $symfonyMapping->routeAccessMapFor($routeAccessControl->filePath()));
+            $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $symfonyMapping->routeAccessMapFor($routeAccessControl->filePath()), $symfonyMapping->accessControlRulesFor($routeAccessControl->filePath()));
             $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, self::sanitizeLine($routeAccessControl->filePath()), $routeAccessControl->methodName(), $checkLabel);
         }
 
@@ -269,14 +270,15 @@ final readonly class SymfonyMappingContextRenderer
     /**
      * @param list<string>                $checks
      * @param array<string, list<string>> $routeAccessMap
+     * @param list<AccessControlRule>     $accessControlRules
      */
-    private static function checkLabelFor(array $checks, RouteAccessControl $routeAccessControl, array $routeAccessMap): string
+    private static function checkLabelFor(array $checks, RouteAccessControl $routeAccessControl, array $routeAccessMap, array $accessControlRules): string
     {
         if ([] !== $checks) {
             return implode(' + ', $checks);
         }
 
-        return self::firewallCoverageLabel(AccessControlRuleMatcher::rolesFor($routeAccessControl, $routeAccessMap));
+        return self::firewallCoverageLabel(AccessControlRuleMatcher::rolesFor($routeAccessControl, $routeAccessMap, $accessControlRules));
     }
 
     /**

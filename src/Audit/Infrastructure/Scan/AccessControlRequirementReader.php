@@ -41,6 +41,28 @@ final readonly class AccessControlRequirementReader
     }
 
     /**
+     * A rule checks something only with roles or an `allow_if` expression.
+     * A roles value the parser cannot read as text, such as a `!php/const`
+     * it cannot resolve, still names roles; an empty list or text names none.
+     *
+     * @param array<string, mixed> $entry
+     */
+    public function restricts(array $entry): bool
+    {
+        return $this->namesRoles($entry, 'roles') || $this->namesRoles($entry, 'role') || \is_string($entry['allow_if'] ?? null);
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     *
+     * @return list<string> upper-case; empty for every method
+     */
+    public function methodsOf(array $entry): array
+    {
+        return array_map(strtoupper(...), $this->stringListOf($entry['methods'] ?? null));
+    }
+
+    /**
      * @param array<string, mixed> $entry
      *
      * @return list<string>
@@ -95,6 +117,14 @@ final readonly class AccessControlRequirementReader
             array_keys($scalarValues),
             $scalarValues,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     */
+    private function namesRoles(array $entry, string $key): bool
+    {
+        return \array_key_exists($key, $entry) && [] !== $entry[$key] && '' !== $entry[$key];
     }
 
     /**

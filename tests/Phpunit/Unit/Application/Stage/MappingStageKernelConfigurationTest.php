@@ -20,6 +20,7 @@ use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -166,7 +167,7 @@ final class MappingStageKernelConfigurationTest extends TestCase
 
         self::assertSame([], $symfonyMapping->routeAccessMap());
         self::assertSame([], $symfonyMapping->toApplicationSecurityMap()->perimeterRules());
-        self::assertEquals(['apps/api/' => new ApplicationAccessControl(['^/admin' => ['ROLE_ADMIN']], ['^/'])], $symfonyMapping->applicationAccessControls());
+        self::assertEquals(['apps/api/' => new ApplicationAccessControl(['^/admin' => ['ROLE_ADMIN']], ['^/'], [new AccessControlRule('^/admin', [], true)])], $symfonyMapping->applicationAccessControls());
         self::assertSame(['^/admin' => ['ROLE_ADMIN']], $symfonyMapping->routeAccessMapFor('apps/api/src/Controller/AdminController.php'));
     }
 

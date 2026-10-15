@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
 
 final class SymfonyYamlSecurityConfigParserTest extends TestCase
@@ -359,6 +360,37 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         yield 'a security package below another directory' => ['src/config/packages/security.yaml', false];
         yield 'a distributed security package' => ['config/packages/security.yaml.dist', false];
         yield 'an xml production package' => ['config/packages/prod/security.xml', false];
+    }
+
+    public function test_it_gives_the_access_control_rules_in_the_order_they_are_declared(): void
+    {
+        $accessControlRules = $this->symfonyYamlSecurityConfigParser->parseAccessControlRules(<<<'YAML'
+            when@prod:
+                security:
+                    access_control:
+                        - { path: ^/prod, roles: ROLE_PROD }
+            security:
+                access_control:
+                    - { path: ^/admin, roles: ROLE_ADMIN, methods: [get, POST] }
+                    - { path: ^/ }
+                    - { route: admin_export, requires_channel: https }
+                    - { roles: ROLE_NOWHERE }
+                    - not a rule
+                    - { path: ^/admin, roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertEquals([
+            new AccessControlRule('^/admin', ['GET', 'POST'], true),
+            new AccessControlRule('^/', [], false),
+            new AccessControlRule('route: admin_export', [], false),
+            new AccessControlRule('^/admin', [], true),
+            new AccessControlRule('^/prod', [], true),
+        ], $accessControlRules);
+    }
+
+    public function test_it_gives_no_access_control_rule_for_a_document_without_a_list(): void
+    {
+        self::assertSame([], $this->symfonyYamlSecurityConfigParser->parseAccessControlRules("security:\n    access_control: ~\n"));
     }
 
     public function test_it_keys_route_based_entries_by_route_name(): void

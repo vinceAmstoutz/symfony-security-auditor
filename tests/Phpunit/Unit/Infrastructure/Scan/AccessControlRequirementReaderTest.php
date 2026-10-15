@@ -70,4 +70,39 @@ final class AccessControlRequirementReaderTest extends TestCase
             ['ROLE_A', 'allow_if: x', 'methods: GET', 'ips: 10.0.0.1', 'port: 443'],
         ];
     }
+
+    /**
+     * @param array<string, mixed> $entry
+     */
+    #[DataProvider('restrictionCases')]
+    public function test_it_tells_whether_a_rule_checks_anything(array $entry, bool $restricts): void
+    {
+        self::assertSame($restricts, (new AccessControlRequirementReader())->restricts($entry));
+    }
+
+    /** @return iterable<string, array{0: array<string, mixed>, 1: bool}> */
+    public static function restrictionCases(): iterable
+    {
+        yield 'roles' => [['roles' => ['ROLE_A']], true];
+        yield 'roles as text' => [['roles' => 'ROLE_A'], true];
+        yield 'a role' => [['role' => 'ROLE_A'], true];
+        yield 'roles the parser could not read' => [['roles' => null], true];
+        yield 'a role the parser could not read' => [['role' => null], true];
+        yield 'roles holding a value the parser could not read' => [['roles' => [null]], true];
+        yield 'an expression' => [['allow_if' => "is_granted('A')"], true];
+        yield 'an expression the parser could not read' => [['allow_if' => null], false];
+        yield 'empty roles' => [['roles' => []], false];
+        yield 'blank roles' => [['roles' => ''], false];
+        yield 'an empty role' => [['role' => []], false];
+        yield 'empty roles and an expression' => [['roles' => [], 'allow_if' => 'true'], true];
+        yield 'request matchers only' => [['methods' => ['GET'], 'ips' => ['10.0.0.1'], 'host' => 'x', 'port' => 80, 'requires_channel' => 'https'], false];
+        yield 'nothing' => [[], false];
+    }
+
+    public function test_it_gives_the_methods_of_a_rule_in_upper_case(): void
+    {
+        self::assertSame(['GET', 'POST'], (new AccessControlRequirementReader())->methodsOf(['methods' => ['get', 'POST']]));
+        self::assertSame(['GET', 'PUT'], (new AccessControlRequirementReader())->methodsOf(['methods' => 'get, put']));
+        self::assertSame([], (new AccessControlRequirementReader())->methodsOf([]));
+    }
 }

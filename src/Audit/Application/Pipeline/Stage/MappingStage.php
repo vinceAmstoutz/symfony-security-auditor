@@ -17,6 +17,7 @@ use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
@@ -33,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInte
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ImportAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LoadOrderAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProductionAwareSecurityConfigParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RuleOrderAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
@@ -74,7 +76,7 @@ final readonly class MappingStage implements StageInterface
         $projectFileInventory = ProjectFileInventory::fromFiles($files);
         $controllerLikeFiles = $this->controllerLikeFiles($files);
 
-        [$routeAccessMap, $firewallRules, $unreadableConfigurationFiles, $applicationAccessControls] = $this->extractSecurityConfig($files, ScanPathFilter::normalize($auditContext->scanPaths()));
+        [$routeAccessMap, $firewallRules, $unreadableConfigurationFiles, $applicationAccessControls, $accessControlRules] = $this->extractSecurityConfig($files, ScanPathFilter::normalize($auditContext->scanPaths()));
         $routeAccessControls = $this->parseControllerAccessControls($controllerLikeFiles);
         $voterCapabilities = $this->parseVoterCapabilities($projectFileInventory->voters());
         $formBindings = $this->parseFormBindings($controllerLikeFiles);
@@ -89,6 +91,7 @@ final readonly class MappingStage implements StageInterface
                 $formBindings,
                 $unreadableConfigurationFiles,
                 $applicationAccessControls,
+                $accessControlRules,
             ),
         );
 
@@ -190,7 +193,7 @@ final readonly class MappingStage implements StageInterface
      * @param list<ProjectFile> $files
      * @param list<string>      $scanPaths
      *
-     * @return array{array<string, list<string>>, list<string>, list<string>, array<string, ApplicationAccessControl>}
+     * @return array{array<string, list<string>>, list<string>, list<string>, array<string, ApplicationAccessControl>, list<AccessControlRule>}
      */
     private function extractSecurityConfig(array $files, array $scanPaths): array
     {
@@ -206,6 +209,7 @@ final readonly class MappingStage implements StageInterface
             $applicationAccessControl->firewallRules,
             array_keys($productionConfiguration->unreadableFiles),
             array_map($this->accessControlOf(...), $productionConfiguration->applicationFiles),
+            $applicationAccessControl->accessControlRules,
         ];
     }
 
@@ -216,13 +220,15 @@ final readonly class MappingStage implements StageInterface
     {
         $routeAccessMap = [];
         $firewallRules = [];
+        $accessControlRules = [];
         foreach ($configurationFiles as $configurationFile) {
             $content = $configurationFile->content();
             $routeAccessMap = $this->mergeRouteAccessMaps($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
             $firewallRules = [...$firewallRules, ...$this->securityConfigParser->parseFirewallRules($content)];
+            $accessControlRules = [...$accessControlRules, ...$this->accessControlRulesOf($content)];
         }
 
-        return new ApplicationAccessControl($routeAccessMap, $firewallRules);
+        return new ApplicationAccessControl($routeAccessMap, $firewallRules, $accessControlRules);
     }
 
     /**
@@ -236,6 +242,14 @@ final readonly class MappingStage implements StageInterface
         }
 
         return new ProductionConfiguration($this->configurationFilesInLoadOrder($files));
+    }
+
+    /**
+     * @return list<AccessControlRule> the rules in the order the file declares them, when the parser gives them
+     */
+    private function accessControlRulesOf(string $content): array
+    {
+        return $this->securityConfigParser instanceof RuleOrderAwareSecurityConfigParserInterface ? $this->securityConfigParser->parseAccessControlRules($content) : [];
     }
 
     /**
