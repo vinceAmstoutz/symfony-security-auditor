@@ -1,0 +1,62 @@
+{
+    "scenario": "standalone/init-generic",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "init --provider='generic.default' --model='gpt-4o' --base-url='http://127.0.0.1:9' --env-var='COMPAT_API_KEY'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        " Downloading the generic provider bridge with composer — this can take a minute…",
+                        "",
+                        " [OK] Configuration written to",
+                        "      <WORKSPACE>/home/config/symfony-security-auditor/config.yaml.",
+                        "",
+                        " ------------------ -----------------",
+                        "  Provider           generic.default",
+                        "  Model              gpt-4o",
+                        "  API key variable   COMPAT_API_KEY",
+                        " ------------------ -----------------",
+                        "",
+                        " ! [NOTE] No key stored. Export COMPAT_API_KEY before auditing, or run \"auth:set\" at any time to store it. Keeping the",
+                        " !        key out of your shell history: docs/configuration.md#providing-the-api-key"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "home/config/symfony-security-auditor/config.yaml": {
+                "lines": [
+                    "provider: generic.default",
+                    "platform:",
+                    "    generic: { default: { base_url: 'http://127.0.0.1:9', api_key: '%env(COMPAT_API_KEY)%' } }",
+                    "model: gpt-4o"
+                ]
+            },
+            "home/data/symfony-security-auditor/composer.json": {
+                "json": {
+                    "config": {
+                        "platform": {
+                            "php": "<PHP-VERSION>"
+                        }
+                    },
+                    "require": {
+                        "symfony/ai-platform": "<PACKAGE-VERSION>"
+                    }
+                }
+            }
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

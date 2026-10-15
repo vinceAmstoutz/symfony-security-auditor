@@ -1,0 +1,36 @@
+{
+    "scenario": "standalone/project-config-provider",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In ProjectConfigPlatformOverrideException.php line <LINE>:",
+                        "",
+                        "  The project config \"<WORKSPACE>/cwd/.symfony-security-auditor.yaml\" declares \"",
+                        "  provider\", but LLM connection settings are read from your user config only — a repository you audit must not be abl",
+                        "  e to point your API credentials at another endpoint. Configure the platform in your user config instead."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

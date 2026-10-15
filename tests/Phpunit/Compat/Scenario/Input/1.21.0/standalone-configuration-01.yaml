@@ -1,0 +1,8 @@
+# ~/.config/symfony-security-auditor/config.yaml
+provider: generic.my_gateway
+platform:
+    generic:
+        my_gateway:
+            base_url: 'https://your-gateway.example'
+            api_key: '%env(GATEWAY_TOKEN)%'
+model: 'your-model'

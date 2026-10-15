@@ -1,0 +1,36 @@
+{
+    "scenario": "standalone/user-config-offline-only-remote",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In NonLocalPlatformEndpointException.php line <LINE>:",
+                        "",
+                        "  privacy.offline_only is enabled, but the \"generic\" platform would send your source code to \"https://gateway.example",
+                        "  \", which is not a loopback or private-range address. Point it at a local platform (e.g. Ollama on http://localhost:",
+                        "  11434) or disable privacy.offline_only."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

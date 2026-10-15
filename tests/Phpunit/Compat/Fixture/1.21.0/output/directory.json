@@ -1,0 +1,37 @@
+{
+    "scenario": "output/directory",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json' --output='{workspace}/out'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        " [ERROR] Unexpected error: The report cannot be written to \"<WORKSPACE>/out\":",
+                        "         choose an --output path that is a writable file or lies under a writable directory, before the audit spends",
+                        "         anything."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

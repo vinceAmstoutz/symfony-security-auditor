@@ -1,0 +1,9 @@
+symfony_security_auditor:
+    scan:
+        included_paths:
+            - 'src/Controller'
+            - 'src/Form'
+            - 'src/Voter'
+            - 'config'
+            - 'templates'
+            - 'public/index.php'

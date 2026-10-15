@@ -1,0 +1,37 @@
+{
+    "scenario": "standalone/project-config-parameter-reference",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In MalformedProjectConfigException.php line <LINE>:",
+                        "",
+                        "  Config file \"<WORKSPACE>/cwd/.symfony-security-auditor.yaml\" sets \"model\" to a",
+                        "   value holding a container reference (\"%name%\", \"%env(VAR)%\", \"%%\" or the \"env_…\" placeholder of one), which would",
+                        "  read your environment into a setting the audited repository chose. Write the value itself (a single \"%\" stays text)",
+                        "  , or set it in your user config."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

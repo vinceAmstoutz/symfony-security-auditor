@@ -1,0 +1,46 @@
+{
+    "scenario": "standalone/init-existing-not-forced",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "init --provider='openai' --model='gpt-4o'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [WARNING] Aborted; the existing configuration was left untouched (use --force to overwrite)."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "home/config/symfony-security-auditor/config.yaml": {
+                "lines": [
+                    "provider: 'openai'",
+                    "platform:",
+                    "    openai:",
+                    "        api_key: '%env(OPENAI_API_KEY)%'",
+                    "model: 'gpt-4.1'",
+                    "audit:",
+                    "    fail_on: high",
+                    "    budget:",
+                    "        max_cost_usd: 5",
+                    "http_timeout: 900"
+                ]
+            },
+            "home/data/symfony-security-auditor/composer.json": null
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

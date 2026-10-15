@@ -1,0 +1,43 @@
+{
+    "scenario": "run/budget-unpriced-model",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json'",
+                "exit": 2,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        " [WARNING] No published pricing for the configured model(s): compat-unpriced-model. Cost reporting will show $0.00 for",
+                        "           these — correct for local or self-hosted models (e.g. Ollama, LM Studio); otherwise the name is likely a typo",
+                        "           or an unlisted model.",
+                        "",
+                        " [WARNING] A cost budget (audit.budget.max_cost_usd = 5) is set but cannot be enforced for the unpriced model(s) above —",
+                        "           real spend may exceed it.",
+                        "",
+                        " [ERROR] Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with",
+                        "         published pricing, or remove audit.budget.max_cost_usd."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

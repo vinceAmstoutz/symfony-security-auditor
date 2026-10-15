@@ -1,0 +1,42 @@
+{
+    "scenario": "format/junit-no-finding",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='junit'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+                        "<testsuites>",
+                        "  <testsuite name=\"symfony-security-auditor\" tests=\"0\" failures=\"0\" errors=\"0\"/>",
+                        "</testsuites>"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/HomeController.php",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Service/Clean.php"
+            ]
+        }
+    }
+}

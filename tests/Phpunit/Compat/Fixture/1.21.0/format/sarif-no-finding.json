@@ -1,0 +1,65 @@
+{
+    "scenario": "format/sarif-no-finding",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='sarif'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+                        "version": "2.1.0",
+                        "runs": [
+                            {
+                                "tool": {
+                                    "driver": {
+                                        "name": "Symfony Security Auditor",
+                                        "version": "<VERSION>",
+                                        "informationUri": "https://github.com/vinceamstoutz/symfony-security-auditor",
+                                        "rules": []
+                                    }
+                                },
+                                "results": [],
+                                "invocations": [
+                                    {
+                                        "executionSuccessful": true
+                                    }
+                                ],
+                                "properties": {
+                                    "input_tokens": 200,
+                                    "output_tokens": 20,
+                                    "total_tokens": 220,
+                                    "estimated_cost_usd": 0.0007,
+                                    "primary_model": "gpt-4o"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/HomeController.php",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Service/Clean.php"
+            ]
+        }
+    }
+}

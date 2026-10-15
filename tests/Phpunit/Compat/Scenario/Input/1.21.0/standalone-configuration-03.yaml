@@ -1,0 +1,7 @@
+# ~/.config/symfony-security-auditor/config.yaml
+provider: anthropic
+platform:
+    anthropic:
+        api_key: '%env(ANTHROPIC_API_KEY)%'
+model: claude-opus-4-8
+# scan:, audit:, cache: are all accepted here too, unwrapped.

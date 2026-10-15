@@ -1,0 +1,258 @@
+{
+    "scenario": "format/sarif-to-file",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='sarif' --output='{workspace}/out/report.sarif'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------",
+                        "",
+                        " The audit makes many LLM calls — typically several minutes, 20+ minutes on large projects.",
+                        " Live progress and findings stream below as they happen.",
+                        "",
+                        "Auditing 7 file(s) — 4 controller(s)",
+                        "Iteration 1/3",
+                        "  Analyzing chunk 1/5",
+                        "  [CRITICAL] broken_access_control — src/Controller/AdminController.php:7",
+                        "  ✓ chunk 1/5 done",
+                        "  Analyzing chunk 2/5",
+                        "  [HIGH] sql_injection — src/Controller/ApiController.php:7",
+                        "  [MEDIUM] ssrf — src/Controller/ApiController.php:1",
+                        "  ✓ chunk 2/5 done",
+                        "  Analyzing chunk 3/5",
+                        "  [HIGH] missing_csrf_protection — src/Controller/LowConfController.php:1",
+                        "  ✓ chunk 3/5 done",
+                        "  Analyzing chunk 4/5",
+                        "  [MEDIUM] insecure_direct_object_reference — src/Controller/UserController.php:1",
+                        "  ✓ chunk 4/5 done",
+                        "  Analyzing chunk 5/5",
+                        "  ✓ chunk 5/5 done",
+                        "Reviewing 4 finding(s)…",
+                        "  [VALIDATED] broken_access_control — src/Controller/AdminController.php:7",
+                        "  [VALIDATED] sql_injection — src/Controller/ApiController.php:7",
+                        "  [REJECTED] ssrf — src/Controller/ApiController.php:1",
+                        "  [VALIDATED] insecure_direct_object_reference — src/Controller/UserController.php:1",
+                        "  3 validated, 1 rejected",
+                        "Iteration 2/3",
+                        "  Analyzing chunk 1/5",
+                        "  [CRITICAL] broken_access_control — src/Controller/AdminController.php:7",
+                        "  ✓ chunk 1/5 done",
+                        "  Analyzing chunk 2/5",
+                        "  [HIGH] sql_injection — src/Controller/ApiController.php:7",
+                        "  [MEDIUM] ssrf — src/Controller/ApiController.php:1",
+                        "  ✓ chunk 2/5 done",
+                        "  Analyzing chunk 3/5",
+                        "  [HIGH] missing_csrf_protection — src/Controller/LowConfController.php:1",
+                        "  ✓ chunk 3/5 done",
+                        "  Analyzing chunk 4/5",
+                        "  [MEDIUM] insecure_direct_object_reference — src/Controller/UserController.php:1",
+                        "  ✓ chunk 4/5 done",
+                        "  Analyzing chunk 5/5",
+                        "  ✓ chunk 5/5 done",
+                        "Reviewing 4 finding(s)…",
+                        "  [VALIDATED] broken_access_control — src/Controller/AdminController.php:7",
+                        "  [VALIDATED] sql_injection — src/Controller/ApiController.php:7",
+                        "  [REJECTED] ssrf — src/Controller/ApiController.php:1",
+                        "  [VALIDATED] insecure_direct_object_reference — src/Controller/UserController.php:1",
+                        "  3 validated, 1 rejected",
+                        "",
+                        " [OK] Report saved to <WORKSPACE>/out/report.sarif",
+                        "",
+                        " [OK] Audit complete. Risk: MEDIUM | Vulnerabilities: 3"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "out/report.sarif": {
+                "json": {
+                    "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+                    "version": "2.1.0",
+                    "runs": [
+                        {
+                            "tool": {
+                                "driver": {
+                                    "name": "Symfony Security Auditor",
+                                    "version": "<VERSION>",
+                                    "informationUri": "https://github.com/vinceamstoutz/symfony-security-auditor",
+                                    "rules": [
+                                        {
+                                            "id": "OWASP A01:2025 - Broken Access Control",
+                                            "name": "broken_access_control",
+                                            "shortDescription": {
+                                                "text": "Broken Access Control"
+                                            },
+                                            "helpUri": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/",
+                                            "properties": {
+                                                "tags": [
+                                                    "external/cwe/cwe-284",
+                                                    "external/cwe/cwe-639"
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "id": "OWASP A05:2025 - Injection",
+                                            "name": "sql_injection",
+                                            "shortDescription": {
+                                                "text": "Injection"
+                                            },
+                                            "helpUri": "https://owasp.org/Top10/2025/A05_2025-Injection/",
+                                            "properties": {
+                                                "tags": [
+                                                    "external/cwe/cwe-89"
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "results": [
+                                {
+                                    "ruleId": "OWASP A01:2025 - Broken Access Control",
+                                    "level": "error",
+                                    "message": {
+                                        "text": "Unprotected admin"
+                                    },
+                                    "partialFingerprints": {
+                                        "symfonySecurityAuditor/v1": "SSA-A075585EE3E2"
+                                    },
+                                    "locations": [
+                                        {
+                                            "physicalLocation": {
+                                                "artifactLocation": {
+                                                    "uri": "src/Controller/AdminController.php"
+                                                },
+                                                "region": {
+                                                    "startLine": 7,
+                                                    "endLine": 8
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "security-severity": "9.3",
+                                        "cvssV4_0Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"
+                                    }
+                                },
+                                {
+                                    "ruleId": "OWASP A05:2025 - Injection",
+                                    "level": "error",
+                                    "message": {
+                                        "text": "SQLi in api"
+                                    },
+                                    "partialFingerprints": {
+                                        "symfonySecurityAuditor/v1": "SSA-5107B0CC98DF"
+                                    },
+                                    "locations": [
+                                        {
+                                            "physicalLocation": {
+                                                "artifactLocation": {
+                                                    "uri": "src/Controller/ApiController.php"
+                                                },
+                                                "region": {
+                                                    "startLine": 7,
+                                                    "endLine": 7
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "security-severity": "8.1",
+                                        "cvssV4_0Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N"
+                                    }
+                                },
+                                {
+                                    "ruleId": "OWASP A01:2025 - Broken Access Control",
+                                    "level": "note",
+                                    "message": {
+                                        "text": "DOWNGRADE idor"
+                                    },
+                                    "partialFingerprints": {
+                                        "symfonySecurityAuditor/v1": "SSA-456321EA35C6"
+                                    },
+                                    "locations": [
+                                        {
+                                            "physicalLocation": {
+                                                "artifactLocation": {
+                                                    "uri": "src/Controller/UserController.php"
+                                                },
+                                                "region": {
+                                                    "startLine": 1,
+                                                    "endLine": 1
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "security-severity": "3.1",
+                                        "cvssV4_0Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:L/VI:N/VA:N/SC:N/SI:N/SA:N"
+                                    }
+                                }
+                            ],
+                            "invocations": [
+                                {
+                                    "executionSuccessful": true
+                                }
+                            ],
+                            "properties": {
+                                "input_tokens": 2600,
+                                "output_tokens": 260,
+                                "total_tokens": 2860,
+                                "estimated_cost_usd": 0.0091,
+                                "primary_model": "gpt-4o"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php"
+            ]
+        }
+    }
+}

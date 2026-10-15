@@ -1,0 +1,329 @@
+{
+    "scenario": "cache/written-by-release",
+    "artifacts": {
+        "shared-cache/2e/2e3a93042588914ddaccbcc8d294c64484709f1ef4cf281c2e8f71f81a7d64ca.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6Imluc2VjdXJlX2RpcmVjdF9vYmplY3RfcmVmZXJlbmNlIiwic2V2ZXJpdHkiOiJtZWRpdW0iLCJ0aXRsZSI6IkRPV05HUkFERSBpZG9yIiwiY29uZmlkZW5jZSI6MC42LCJsaW5lX2VuZCI6MSwiZmlsZV9wYXRoIjoic3JjL0NvbnRyb2xsZXIvVXNlckNvbnRyb2xsZXIucGhwIiwiZGVzY3JpcHRpb24iOiJkZXNjIiwibGluZV9zdGFydCI6MSwidnVsbmVyYWJsZV9jb2RlIjoiY29kZSIsImF0dGFja192ZWN0b3IiOiJ2ZWN0b3IiLCJwcm9vZiI6InByb29mIiwicmVtZWRpYXRpb24iOiJmaXgifV0="
+        },
+        "shared-cache/35/35125b5381e9de194e4e08b48c11d1808c5ffc59b95f1a71f4f56817addcae86.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6Im1pc3NpbmdfY3NyZl9wcm90ZWN0aW9uIiwic2V2ZXJpdHkiOiJoaWdoIiwidGl0bGUiOiJsb3cgY29uZiIsImNvbmZpZGVuY2UiOjAuNTksImxpbmVfZW5kIjoxLCJmaWxlX3BhdGgiOiJzcmMvQ29udHJvbGxlci9Mb3dDb25mQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJsaW5lX3N0YXJ0IjoxLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9XQ=="
+        },
+        "shared-cache/40/409af0a272d85cf6a3fc19b367c40b3872064a6de1cb557755d3f341a30b9b50.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6ImJyb2tlbl9hY2Nlc3NfY29udHJvbCIsInNldmVyaXR5IjoiY3JpdGljYWwiLCJ0aXRsZSI6IlVucHJvdGVjdGVkIGFkbWluIiwiY29uZmlkZW5jZSI6MC45NSwibGluZV9zdGFydCI6NywibGluZV9lbmQiOjgsImZpbGVfcGF0aCI6InNyYy9Db250cm9sbGVyL0FkbWluQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9XQ=="
+        },
+        "shared-cache/52/5227e34d3f7fe244e137bfda76669e54aef8df831de545d78c3986867c39d38f.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6InNxbF9pbmplY3Rpb24iLCJzZXZlcml0eSI6ImhpZ2giLCJ0aXRsZSI6IlNRTGkgaW4gYXBpIiwiY29uZmlkZW5jZSI6MC45LCJsaW5lX3N0YXJ0Ijo3LCJsaW5lX2VuZCI6NywiZmlsZV9wYXRoIjoic3JjL0NvbnRyb2xsZXIvQXBpQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9LHsidHlwZSI6InNzcmYiLCJzZXZlcml0eSI6Im1lZGl1bSIsInRpdGxlIjoiUkVKRUNUIG1lIiwiY29uZmlkZW5jZSI6MC44LCJsaW5lX2VuZCI6MSwiZmlsZV9wYXRoIjoic3JjL0NvbnRyb2xsZXIvQXBpQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJsaW5lX3N0YXJ0IjoxLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9XQ=="
+        },
+        "shared-cache/5d/5d9f42e0fe4c4aec734dc38ec9c2dd3b2dfcbf9fd0c74c192a1a5474438611f6.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6Im1pc3NpbmdfY3NyZl9wcm90ZWN0aW9uIiwic2V2ZXJpdHkiOiJoaWdoIiwidGl0bGUiOiJsb3cgY29uZiIsImNvbmZpZGVuY2UiOjAuNTksImxpbmVfZW5kIjoxLCJmaWxlX3BhdGgiOiJzcmMvQ29udHJvbGxlci9Mb3dDb25mQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJsaW5lX3N0YXJ0IjoxLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9XQ=="
+        },
+        "shared-cache/a9/a903b8236ce6bfe6009d8f94fa6bf769de7d95fbfdc9ed9f62cb7f5d800688bb.json": {
+            "mode": "644",
+            "base64": "W10="
+        },
+        "shared-cache/b0/b0941fcbbaaf6124328dbfcbe41430eae485eaa49376c9e597f9d799613c4fa3.json": {
+            "mode": "644",
+            "base64": "W10="
+        },
+        "shared-cache/b7/b76deae051d0c210c1ca1a96ee2f92fabc6018a1e7f8d6f87bcfea997caf94fb.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6InNxbF9pbmplY3Rpb24iLCJzZXZlcml0eSI6ImhpZ2giLCJ0aXRsZSI6IlNRTGkgaW4gYXBpIiwiY29uZmlkZW5jZSI6MC45LCJsaW5lX3N0YXJ0Ijo3LCJsaW5lX2VuZCI6NywiZmlsZV9wYXRoIjoic3JjL0NvbnRyb2xsZXIvQXBpQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9LHsidHlwZSI6InNzcmYiLCJzZXZlcml0eSI6Im1lZGl1bSIsInRpdGxlIjoiUkVKRUNUIG1lIiwiY29uZmlkZW5jZSI6MC44LCJsaW5lX2VuZCI6MSwiZmlsZV9wYXRoIjoic3JjL0NvbnRyb2xsZXIvQXBpQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJsaW5lX3N0YXJ0IjoxLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9XQ=="
+        },
+        "shared-cache/e9/e9c782a2bea34e388c743c7876075c760c08b5ae0e1213cda4f9126f281a0e58.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6Imluc2VjdXJlX2RpcmVjdF9vYmplY3RfcmVmZXJlbmNlIiwic2V2ZXJpdHkiOiJtZWRpdW0iLCJ0aXRsZSI6IkRPV05HUkFERSBpZG9yIiwiY29uZmlkZW5jZSI6MC42LCJsaW5lX2VuZCI6MSwiZmlsZV9wYXRoIjoic3JjL0NvbnRyb2xsZXIvVXNlckNvbnRyb2xsZXIucGhwIiwiZGVzY3JpcHRpb24iOiJkZXNjIiwibGluZV9zdGFydCI6MSwidnVsbmVyYWJsZV9jb2RlIjoiY29kZSIsImF0dGFja192ZWN0b3IiOiJ2ZWN0b3IiLCJwcm9vZiI6InByb29mIiwicmVtZWRpYXRpb24iOiJmaXgifV0="
+        },
+        "shared-cache/fc/fce05a65fc4b013581c7eb8854ae0444f318cddf4e1eb1e189cadec77e12a051.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6ImJyb2tlbl9hY2Nlc3NfY29udHJvbCIsInNldmVyaXR5IjoiY3JpdGljYWwiLCJ0aXRsZSI6IlVucHJvdGVjdGVkIGFkbWluIiwiY29uZmlkZW5jZSI6MC45NSwibGluZV9zdGFydCI6NywibGluZV9lbmQiOjgsImZpbGVfcGF0aCI6InNyYy9Db250cm9sbGVyL0FkbWluQ29udHJvbGxlci5waHAiLCJkZXNjcmlwdGlvbiI6ImRlc2MiLCJ2dWxuZXJhYmxlX2NvZGUiOiJjb2RlIiwiYXR0YWNrX3ZlY3RvciI6InZlY3RvciIsInByb29mIjoicHJvb2YiLCJyZW1lZGlhdGlvbiI6ImZpeCJ9XQ=="
+        },
+        "shared-cache/reviewer/28/2868e27f30f1ded2f9f368394041c0c81bb826e9531032914b1f314744bd56ae.json": {
+            "mode": "644",
+            "base64": "eyJpZCI6IlZVTE4tRDlENkRBNzAiLCJhY2NlcHRlZCI6dHJ1ZSwicmV2aWV3ZXJfbm90ZXMiOiJDb25maXJtZWQifQ=="
+        },
+        "shared-cache/reviewer/68/6820debe76dba2410060bb44370e335878a60bf69d0bfe6e89ba3244f1776d29.json": {
+            "mode": "644",
+            "base64": "eyJpZCI6IlZVTE4tQzMwOERCRUEiLCJhY2NlcHRlZCI6dHJ1ZSwicmV2aWV3ZXJfbm90ZXMiOiJDb25maXJtZWQiLCJhZGp1c3RlZF9zZXZlcml0eSI6ImxvdyJ9"
+        },
+        "shared-cache/reviewer/7e/7e7257cd47ba2ff3cc8cbf84fadb4bf79c0d251f9ce307a188322feaff4eb941.json": {
+            "mode": "644",
+            "base64": "eyJpZCI6IlZVTE4tNENGRUFDODkiLCJhY2NlcHRlZCI6dHJ1ZSwicmV2aWV3ZXJfbm90ZXMiOiJDb25maXJtZWQifQ=="
+        },
+        "shared-cache/reviewer/9b/9b65bdb5befdb91739909ba9bdc3718df0f341eaf9c594bae72e89c2f7dbaab6.json": {
+            "mode": "644",
+            "base64": "eyJpZCI6IlZVTE4tMTExQzJBQUYiLCJhY2NlcHRlZCI6ZmFsc2UsInJldmlld2VyX25vdGVzIjoiTm90IGV4cGxvaXRhYmxlIn0="
+        },
+        "shared-cache/triage-memory/972567ec067c3958.json": {
+            "mode": "644",
+            "base64": "W3sidHlwZSI6InNzcmYiLCJmaWxlIjoic3JjL0NvbnRyb2xsZXIvQXBpQ29udHJvbGxlci5waHAiLCJ0aXRsZSI6IlJFSkVDVCBtZSIsImxpbmUiOjEsInJlYXNvbiI6Ik5vdCBleHBsb2l0YWJsZSJ9XQ=="
+        }
+    },
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "audit_id": "AUDIT-<ID>",
+                        "project": "<WORKSPACE>/project",
+                        "started_at": "<TIMESTAMP>",
+                        "completed_at": "<TIMESTAMP>",
+                        "duration_seconds": 0,
+                        "files_scanned": 7,
+                        "complete": true,
+                        "risk_score": 19,
+                        "risk_level": "MEDIUM",
+                        "score": 81,
+                        "grade": "C",
+                        "total_vulnerabilities": 3,
+                        "by_severity": {
+                            "critical": 1,
+                            "high": 1,
+                            "medium": 0,
+                            "low": 1,
+                            "info": 0
+                        },
+                        "vulnerabilities": [
+                            {
+                                "id": "VULN-D9D6DA70",
+                                "fingerprint": "SSA-A075585EE3E2",
+                                "type": "broken_access_control",
+                                "category": "Broken Access Control",
+                                "owasp": "OWASP A01:2025 - Broken Access Control",
+                                "cwe": "CWE-284",
+                                "severity": "critical",
+                                "severity_score": 10,
+                                "title": "Unprotected admin",
+                                "description": "desc",
+                                "file": "src/Controller/AdminController.php",
+                                "line_start": 7,
+                                "line_end": 8,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.95,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N",
+                                    "base_score": 9.3
+                                }
+                            },
+                            {
+                                "id": "VULN-4CFEAC89",
+                                "fingerprint": "SSA-5107B0CC98DF",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "SQLi in api",
+                                "description": "desc",
+                                "file": "src/Controller/ApiController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-C308DBEA",
+                                "fingerprint": "SSA-456321EA35C6",
+                                "type": "insecure_direct_object_reference",
+                                "category": "Broken Access Control",
+                                "owasp": "OWASP A01:2025 - Broken Access Control",
+                                "cwe": "CWE-639",
+                                "severity": "low",
+                                "severity_score": 2,
+                                "title": "DOWNGRADE idor",
+                                "description": "desc",
+                                "file": "src/Controller/UserController.php",
+                                "line_start": 1,
+                                "line_end": 1,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.6,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:L/VI:N/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 3.1
+                                }
+                            }
+                        ],
+                        "cost": {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                            "estimated_cost_usd": 0.0,
+                            "primary_model": "gpt-4o",
+                            "by_role": [],
+                            "by_model": []
+                        },
+                        "scope": {
+                            "since": null,
+                            "paths": []
+                        },
+                        "coverage": [
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/LowConfController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/UserController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "templates/base.html.twig",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "config/packages/security.yaml",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Service/Clean.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/UserController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/LowConfController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/UserController.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "templates/base.html.twig",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "config/packages/security.yaml",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Service/Clean.php",
+                                "status": "cached"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/UserController.php",
+                                "status": "validated"
+                            }
+                        ]
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

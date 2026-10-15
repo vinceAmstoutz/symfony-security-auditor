@@ -1,0 +1,44 @@
+{
+    "scenario": "format/github-incomplete-run",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='github'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "::warning title=Audit incomplete::Audit incomplete: 1 file(s) could not be fully analyzed (a scan or LLM call failed, or the run was aborted), so this report cannot vouch that the project is free of vulnerabilities."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------",
+                        "",
+                        "",
+                        " [WARNING] Audit incomplete: 1 file(s) could not be fully analyzed, so the absence of findings there proves nothing.",
+                        "           Risk: SAFE | Vulnerabilities: 0. Pass --fail-on-incomplete to fail the run when this happens."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/HomeController.php",
+                "refused-too-long model=gpt-4o files=src/Controller/HugeController.php",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Service/Clean.php"
+            ]
+        }
+    }
+}

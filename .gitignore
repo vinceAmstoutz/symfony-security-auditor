@@ -2,6 +2,7 @@
 /var/
 composer.lock
 !/tools/bc-check/composer.lock
+!/tests/Phpunit/Compat/composer.lock
 .phpunit.cache/
 infection/
 /build/coverage/

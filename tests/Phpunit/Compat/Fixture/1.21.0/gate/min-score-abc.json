@@ -1,0 +1,31 @@
+{
+    "scenario": "gate/min-score-abc",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json' --min-score='abc'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        "",
+                        "  The value \"abc\" is not valid for the \"min-score\" option. Expected a value of type \"int\".",
+                        "",
+                        "",
+                        "audit:run [-f|--format FORMAT] [-o|--output OUTPUT] [--dry-run] [--show-scanned] [--no-cache] [-p|--path PATH] [--since SINCE] [--baseline BASELINE] [--generate-baseline GENERATE-BASELINE] [--fail-on FAIL-ON] [--min-score MIN-SCORE] [--fail-on-incomplete] [--] [<project-path>]"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

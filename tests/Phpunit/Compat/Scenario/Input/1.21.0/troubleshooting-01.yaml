@@ -1,0 +1,4 @@
+symfony_security_auditor:
+    max_output_tokens: 4096
+    attacker_max_output_tokens: 8192 # optional, for chunks with many findings
+    reviewer_max_output_tokens: 2048 # optional, reviewer needs less headroom

@@ -1,0 +1,31 @@
+{
+    "scenario": "standalone/auth-status-invalid-name",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "auth:status --env-var='1-not-a-name'",
+                "exit": 2,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [ERROR] \"1-not-a-name\" is not a valid environment variable name (letters, digits, and underscores only; must not start",
+                        "         with a digit)."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

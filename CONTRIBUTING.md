@@ -136,6 +136,24 @@ docker compose exec php var/bc-check/vendor/bin/roave-backward-compatibility-che
 
 A break the maintainer accepted goes into `.roave-backward-compatibility-check.xml` as an `ignored-regex` that is the reported line itself, with every metacharacter escaped, right after a `<!-- CHANGELOG: "…" -->` comment naming the bold summary of its bullet under `## [Unreleased]`. `RoaveBaselineTest` refuses a pattern with a wildcard and an entry no such bullet announces.
 
+### Behaviour Replay
+
+`tests/Phpunit/Compat/` replays, in-process and against a scripted provider, a few hundred scenarios recorded from the last release: every `audit:run` option alone, the nine formats, the exit codes `0` to `3`, `--path`, `--since`, `--dry-run` and `--show-scanned`, an incomplete run, baselines, `audit:diff`, `audit:trend` and `audit:baseline` on reports the release wrote, the configurations its docs showed, the standalone binary's configuration stack, guards, `init` and credential commands, reading the release's cache directory, `mcp:serve`'s tools, and the public PHP API (`RunAuditUseCase` and the Domain models' accessors). Each scenario runs in a workspace of its own under the system's temporary directory, with an isolated home, no network and no API key, and touches nothing outside it: a path a scenario names outside its workspace is refused, and a report written to the discard device goes to a device node of the workspace's own wherever the process could replace the system's `/dev/null`.
+
+The recordings live in `tests/Phpunit/Compat/Fixture/<release>/`, one JSON file per scenario: the exit code and both output streams of each command, the files it wrote, and a summary of each request the model received (the tools offered, the files sent), with paths, timestamps, dates, durations, run ids and the PHP and package versions normalized; every command runs under the `C` locale and a 120-column terminal. Each workspace path has the same length, so the console wraps it as it did when recording: the suite refuses a `TMPDIR` longer than 22 characters. `environment.json` notes the PHP and package versions they were recorded with, and the suite refuses to replay on another minor version of either, so the CI job installs `tests/Phpunit/Compat/composer.lock`: refresh it with `bin/castor compat:lock` when `composer.json` changes. A scenario that writes to the discard device is recorded only by a user that cannot write `/dev`, or from a release that writes a device in place; `environment.json` lists the ones the recorder left out.
+
+**When a scenario fails**, the message lists each difference by its path in the recording (for instance `runs.0.stdout.json.vulnerabilities.1.severity`) or, for text output, by the line lost (`-`) or gained (`+`). A key a JSON report gained is not a difference: [Versioning](docs/versioning.md) lets a `MINOR` add keys to the reports. Restore the released behaviour, or, for a change the maintainer accepted, add an entry to `tests/Phpunit/Compat/accepted-differences.php`: the scenarios it shows in (a name, or a pattern where `*` matches any run of characters, which must show the difference in every scenario it names), its path (`*` matches one segment, `**` any number), a `match` pattern for what changed (the `-line` or `+line` of a text, or `recorded -> replayed` of a value, as JSON), a one-line reason, and the bold summary of its bullet under `## [Unreleased]`. Keep the path and the pattern as narrow as the change: an entry covering a whole scenario stops that scenario from guarding anything else, so pin a broad new behaviour in an ordinary test instead. A difference only in what the scripted provider received (`llm.*`, such as a tool added to a request or files grouped differently) is marked `'internal' => true` instead of citing a bullet. A difference with no bullet to cite is a break to fix, not one to accept.
+
+### Keeping Up With 1.x
+
+The recordings stay those of the last release until the next one is tagged; only the accepted differences follow the branch. When `1.x` moves and the suite reports differences, replay every scenario and print a draft entry for each difference not yet accepted, grouped by path and change, and the entries that no longer show:
+
+```bash
+bin/castor compat:draft
+```
+
+Review the drafts one by one: give each a reason and its bullet, widen a path only where every difference under it is the same change, and fix what is a break.
+
 ### Recording From a New Release
 
 Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch, and empty the `accepted-differences.php` files and the `<baseline>` of `.roave-backward-compatibility-check.xml`, whose entries described differences from the previous release:
@@ -144,7 +162,7 @@ Once a release is tagged, record the fixtures from it in a pull request on its `
 bin/castor compat:record X.Y.Z
 ```
 
-The task checks the tag out under `var/compat/X.Y.Z`, installs its dependencies, and runs the recorders against it.
+The task checks the tag out under `var/compat/X.Y.Z`, installs its dependencies, and runs the recorders against it, the behaviour one as your own user, so the scenarios writing to the discard device are recorded too. To record a scenario added since, run `docker compose exec --user "$(id -u):$(id -g)" php php tools/Compat/record.php var/compat/X.Y.Z X.Y.Z <scenario>`.
 
 ## Evaluating Detection Quality
 

@@ -1,0 +1,109 @@
+{
+    "scenario": "api/run-audit-use-case-since",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "api:run-audit <since>='HEAD'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "@class": "VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\AuditReport",
+                        "auditId()": "AUDIT-<ID>",
+                        "completedAt()": "<TIMESTAMP>",
+                        "consumedBaselineFingerprints()": [],
+                        "cost()": {
+                            "@class": "VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\AuditCost",
+                            "byRole()": [],
+                            "estimatedCostUsd()": 0.0,
+                            "hasPublishedPricing()": true,
+                            "inputTokens()": 0,
+                            "outputTokens()": 0,
+                            "primaryModel()": "gpt-4o",
+                            "toArray()": {
+                                "input_tokens": 0,
+                                "output_tokens": 0,
+                                "total_tokens": 0,
+                                "estimated_cost_usd": 0.0,
+                                "primary_model": "gpt-4o",
+                                "by_role": {
+                                    "@class": "stdClass"
+                                },
+                                "by_model": {
+                                    "@class": "stdClass"
+                                }
+                            },
+                            "totalTokens()": 0
+                        },
+                        "coverage()": [],
+                        "durationSeconds()": 0,
+                        "filesDiscovered()": 8,
+                        "filesScanned()": 0,
+                        "fingerprints()": [],
+                        "grade()": "SecurityGrade::A",
+                        "hasNoVerdict()": false,
+                        "isComplete()": true,
+                        "normalizedScore()": 100,
+                        "projectPath()": "<WORKSPACE>/project",
+                        "riskLevel()": "SAFE",
+                        "riskLevelEnum()": "RiskLevel::Safe",
+                        "riskScore()": 0,
+                        "startedAt()": "<TIMESTAMP>",
+                        "toArray()": {
+                            "audit_id": "AUDIT-<ID>",
+                            "project": "<WORKSPACE>/project",
+                            "started_at": "<TIMESTAMP>",
+                            "completed_at": "<TIMESTAMP>",
+                            "duration_seconds": 0,
+                            "files_scanned": 0,
+                            "complete": true,
+                            "risk_score": 0,
+                            "risk_level": "SAFE",
+                            "score": 100,
+                            "grade": "A",
+                            "total_vulnerabilities": 0,
+                            "by_severity": {
+                                "critical": 0,
+                                "high": 0,
+                                "medium": 0,
+                                "low": 0,
+                                "info": 0
+                            },
+                            "vulnerabilities": [],
+                            "cost": {
+                                "input_tokens": 0,
+                                "output_tokens": 0,
+                                "total_tokens": 0,
+                                "estimated_cost_usd": 0.0,
+                                "primary_model": "gpt-4o",
+                                "by_role": {
+                                    "@class": "stdClass"
+                                },
+                                "by_model": {
+                                    "@class": "stdClass"
+                                }
+                            },
+                            "scope": {
+                                "since": "HEAD",
+                                "paths": []
+                            },
+                            "coverage": []
+                        },
+                        "totalVulnerabilities()": 0,
+                        "unanalyzedFiles()": [],
+                        "vulnerabilities()": []
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

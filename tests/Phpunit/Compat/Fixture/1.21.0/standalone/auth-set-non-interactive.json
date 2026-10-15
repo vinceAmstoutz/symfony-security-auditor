@@ -1,0 +1,30 @@
+{
+    "scenario": "standalone/auth-set-non-interactive",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "auth:set --env-var='OTHER_API_KEY'",
+                "exit": 2,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [ERROR] Nothing to store. Re-run this command on a terminal that can prompt, or export OTHER_API_KEY instead."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

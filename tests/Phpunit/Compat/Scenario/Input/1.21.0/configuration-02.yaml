@@ -1,0 +1,5 @@
+# config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    model: 'llama3.2'
+    privacy:
+        offline_only: true

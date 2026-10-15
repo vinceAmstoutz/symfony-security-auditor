@@ -1,0 +1,38 @@
+{
+    "scenario": "standalone/init-unknown-provider",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "init --provider='nope' --model='x'",
+                "exit": 2,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [ERROR] \"nope\" is not a platform the bundled symfony/ai-bundle declares, so nothing was written and no bridge was",
+                        "         installed. Pick one of albert, amazeeai, anthropic, azure.<instance>, bedrock.<instance>, cartesia,",
+                        "         cerebras, cohere, decart, deepgram, deepseek, dockermodelrunner, edenai, elevenlabs, fireworks, gemini,",
+                        "         generic.<instance>, higgsfield, huggingface, lmstudio, minimax, mistral, ollama, openai,",
+                        "         openresponses.<instance>, openrouter, ovh, perplexity, scaleway, together, transformersphp, typesafe, venice,",
+                        "         vertexai, voyage."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "home/config/symfony-security-auditor/config.yaml": null,
+            "home/data/symfony-security-auditor/composer.json": null
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

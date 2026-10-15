@@ -91,8 +91,24 @@ function compatRecord(string $tagOrCheckout): void
     }
 
     run(['docker', 'compose', 'exec', 'php', 'php', 'tools/Compat/record-configuration.php', $checkout, $release]);
+    run(['docker', 'compose', 'exec', '--user', sprintf('%d:%d', posix_getuid(), posix_getgid()), 'php', 'php', 'tools/Compat/record.php', $checkout, $release]);
 
-    io()->success(sprintf('Recorded the compatibility fixtures from %s. Empty the accepted-differences.php files: they list differences from the previous release.', $release));
+    io()->success(sprintf('Recorded the compatibility fixtures from %s. Empty the accepted-differences.php files and the roave baseline: they list differences from the previous release.', $release));
+}
+
+#[AsTask(name: 'compat:lock', description: 'Refresh the dependencies the compatibility job installs (tests/Phpunit/Compat/composer.lock) after composer.json changed')]
+function compatLock(): void
+{
+    run(['docker', 'compose', 'exec', 'php', 'composer', 'update', '--no-interaction', '--no-progress']);
+    fs()->copy('composer.lock', 'tests/Phpunit/Compat/composer.lock', true);
+
+    io()->success('tests/Phpunit/Compat/composer.lock now pins what composer.json resolves to on the container\'s PHP. Run the compatibility suite before committing it: a new console or bridge release may change what a scenario prints.');
+}
+
+#[AsTask(name: 'compat:draft', description: 'Replay the compatibility scenarios on this tree and print draft accepted-differences.php entries for every difference not yet accepted')]
+function compatDraft(): void
+{
+    run(['docker', 'compose', 'exec', 'php', 'php', 'tools/Compat/draft-accepted.php']);
 }
 
 #[AsTask(name: 'eval', description: 'Audit a ground-truth fixture and score detection precision/recall against its manifest')]

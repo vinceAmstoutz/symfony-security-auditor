@@ -1,0 +1,100 @@
+{
+    "scenario": "standalone/format-executive",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='executive'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "  EXECUTIVE SUMMARY — SECURITY AUDIT",
+                        "  <WORKSPACE>/project",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "",
+                        "  Audited : <TIMESTAMP> (7 files, <DURATION>)",
+                        "  Audit ID: AUDIT-<ID>",
+                        "",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "  RISK LEVEL: MEDIUM  (Score: 19)",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "",
+                        "  Plan remediation: no single finding is decisive, but together they",
+                        "  weaken defence in depth and shorten the path to a breach.",
+                        "",
+                        "  3 validated finding(s) across 3 file(s).",
+                        "",
+                        "  BY SEVERITY",
+                        "  🔴 CRITICAL                                         1",
+                        "  🟠 HIGH                                             1",
+                        "  🟢 LOW                                              1",
+                        "",
+                        "  BY TYPE",
+                        "  broken_access_control                              1",
+                        "  insecure_direct_object_reference                   1",
+                        "  sql_injection                                      1",
+                        "",
+                        "  TOP AFFECTED FILES (of 3)",
+                        "  src/Controller/AdminController.php                 1",
+                        "  src/Controller/ApiController.php                   1",
+                        "  src/Controller/UserController.php                  1",
+                        "",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "  Findings are validated by a reviewer agent but not human-triaged.",
+                        "  Run with --format=console for the full technical detail of each one.",
+                        "──────────────────────────────────────────────────────────────────────"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "API key: compat…6789",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php"
+            ]
+        }
+    }
+}

@@ -1,0 +1,60 @@
+{
+    "scenario": "standalone/auth-remove",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "auth:remove",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [OK] Forgot the stored key for COMPAT_API_KEY. Audits need COMPAT_API_KEY in the environment again — the key itself is",
+                        "      still valid with your provider, so revoke it there too if that was the point."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            },
+            {
+                "command": "auth:status",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [WARNING] No API key resolves for COMPAT_API_KEY: it is not exported, and nothing is stored for it.",
+                        "",
+                        " Pick whichever fits how you work:",
+                        " --------------------------------------- ------------------------------------------------------------",
+                        "  auth:set                                store the key on this machine, in a file only you can read",
+                        "  export COMPAT_API_KEY=…                 this shell only",
+                        "  COMPAT_API_KEY=$(pass show …) audit .   straight from a password manager, nothing written to disk",
+                        " --------------------------------------- ------------------------------------------------------------"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "home/config/symfony-security-auditor/credentials.json": {
+                "json": []
+            }
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

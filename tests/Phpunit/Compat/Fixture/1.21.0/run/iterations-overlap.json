@@ -1,0 +1,141 @@
+{
+    "scenario": "run/iterations-overlap",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "audit_id": "AUDIT-<ID>",
+                        "project": "<WORKSPACE>/project",
+                        "started_at": "<TIMESTAMP>",
+                        "completed_at": "<TIMESTAMP>",
+                        "duration_seconds": 0,
+                        "files_scanned": 1,
+                        "complete": true,
+                        "risk_score": 7,
+                        "risk_level": "LOW",
+                        "score": 93,
+                        "grade": "B",
+                        "total_vulnerabilities": 1,
+                        "by_severity": {
+                            "critical": 0,
+                            "high": 1,
+                            "medium": 0,
+                            "low": 0,
+                            "info": 0
+                        },
+                        "vulnerabilities": [
+                            {
+                                "id": "VULN-90BA32C9",
+                                "fingerprint": "SSA-954A0002B430",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "Iteration one",
+                                "description": "desc",
+                                "file": "src/Controller/X.php",
+                                "line_start": 7,
+                                "line_end": 9,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.8,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            }
+                        ],
+                        "cost": {
+                            "input_tokens": 800,
+                            "output_tokens": 80,
+                            "total_tokens": 880,
+                            "estimated_cost_usd": 0.0028,
+                            "primary_model": "gpt-4o",
+                            "by_role": [],
+                            "by_model": {
+                                "gpt-4o": {
+                                    "model": "gpt-4o",
+                                    "input_tokens": 800,
+                                    "output_tokens": 80,
+                                    "cache_read_tokens": 0,
+                                    "cache_creation_tokens": 0,
+                                    "estimated_cost_usd": 0.0028,
+                                    "billed_models": [
+                                        "gpt-4o"
+                                    ]
+                                }
+                            }
+                        },
+                        "scope": {
+                            "since": null,
+                            "paths": []
+                        },
+                        "coverage": [
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/X.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/X.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/X.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/X.php",
+                                "status": "validated"
+                            }
+                        ]
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/X.php",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/X.php",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1"
+            ]
+        }
+    }
+}

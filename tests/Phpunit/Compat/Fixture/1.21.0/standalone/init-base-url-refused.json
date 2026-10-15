@@ -1,0 +1,34 @@
+{
+    "scenario": "standalone/init-base-url-refused",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "init --provider='openai' --model='gpt-4o' --base-url='http://127.0.0.1:9'",
+                "exit": 2,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [ERROR] --base-url applies to the platforms that expose one (albert, amazeeai, generic.<instance>,",
+                        "         openresponses.<instance>); \"openai\" has no base_url key."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "home/config/symfony-security-auditor/config.yaml": null,
+            "home/data/symfony-security-auditor/composer.json": null
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

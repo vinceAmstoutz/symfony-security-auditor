@@ -296,11 +296,13 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: vendor
-          key: composer-compat-${{ hashFiles('composer.json') }}
-          restore-keys: composer-compat-
+          key: composer-compat-${{ hashFiles('tests/Phpunit/Compat/composer.lock') }}
 
-      - name: Install dependencies
-        run: composer update --no-interaction --prefer-dist --no-progress
+      - name: Install the locked dependencies the recordings replay on
+        run: |
+          cp tests/Phpunit/Compat/composer.lock composer.lock
+          composer validate --no-check-publish --no-check-all
+          composer install --no-interaction --prefer-dist --no-progress
 
       - name: Compare with the fixtures recorded from the last release
         run: vendor/bin/phpunit -c phpunit.compat.xml

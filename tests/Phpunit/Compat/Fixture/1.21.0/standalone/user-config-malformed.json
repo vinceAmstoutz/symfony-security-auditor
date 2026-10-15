@@ -1,0 +1,35 @@
+{
+    "scenario": "standalone/user-config-malformed",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In MalformedProjectConfigException.php line <LINE>:",
+                        "",
+                        "  Config file \"<WORKSPACE>/home/config/symfony-security-auditor/config.yaml\" is",
+                        "  not valid YAML: Malformed inline YAML string at line 2."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}
