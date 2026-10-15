@@ -22,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitCha
 
 final class ProcessGitChangedFilesResolverTest extends TestCase
 {
+    private const int RACY_TIMESTAMP = 1_700_000_000;
+
     private string $tmpDir;
 
     private Filesystem $filesystem;
@@ -557,6 +559,35 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
+     * A checkout shipped with its own `.git` directory — an archive, a build
+     * context — can carry an index whose entries git finds racily clean once
+     * extracted and a `.git/config` that relaxes the stat check to what the
+     * extraction keeps, so `git diff-files` re-hashes the file through the
+     * repository's own clean filter.
+     *
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_does_not_execute_the_clean_filter_of_an_extracted_checkout_whose_index_is_racily_clean(): void
+    {
+        $this->initRepo();
+        $this->writeFile('.gitattributes', '*.php filter=dangerous');
+        $this->writeFile('src/Foo.php', '<?php // committed');
+        touch($this->tmpDir.'/src/Foo.php', self::RACY_TIMESTAMP);
+        $this->stage('.');
+        $this->runGit(['git', 'commit', '-m', 'init']);
+
+        $marker = $this->tmpDir.'-clean-filter-pwned';
+        $this->runGit(['git', 'config', 'filter.dangerous.clean', \sprintf('sh -c "touch %s; cat"', $marker)]);
+        $this->runGit(['git', 'config', 'core.checkStat', 'minimal']);
+        $this->runGit(['git', 'config', 'core.trustctime', 'false']);
+        touch($this->tmpDir.'/.git/index', self::RACY_TIMESTAMP);
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->extractedCheckout(), 'HEAD');
+
+        self::assertFileDoesNotExist($marker);
+    }
+
+    /**
      * @throws GitChangedFilesUnavailableException
      */
     public function test_it_wraps_a_git_diff_timeout_instead_of_leaking_a_raw_process_exception(): void
@@ -612,6 +643,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->filesystem->remove($this->tmpDir);
         $this->filesystem->remove($this->tmpDir.'-fsmonitor-pwned');
         $this->filesystem->remove($this->tmpDir.'-clean-filter-pwned');
+        $this->filesystem->remove([$this->tmpDir.'-checkout.tar', $this->tmpDir.'-extracted']);
     }
 
     private function initRepo(): void
@@ -648,6 +680,17 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     private function createBranch(string $name): void
     {
         $this->runGit(['git', 'checkout', '-b', $name]);
+    }
+
+    private function extractedCheckout(): string
+    {
+        $archive = $this->tmpDir.'-checkout.tar';
+        $extracted = $this->tmpDir.'-extracted';
+        $this->filesystem->mkdir($extracted);
+        (new Process(['tar', '-cf', $archive, '-C', $this->tmpDir, '.']))->mustRun();
+        (new Process(['tar', '-xf', $archive, '-C', $extracted]))->mustRun();
+
+        return $extracted;
     }
 
     private function writeFile(string $relativePath, string $content): void

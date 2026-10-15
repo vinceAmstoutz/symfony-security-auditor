@@ -51,7 +51,10 @@ use function Symfony\Component\String\u;
  *      command live in the audited (untrusted) repo's own `.gitattributes`/
  *      `.git/config`, making it as exploitable as the `core.fsmonitor` hook
  *      neutralized below. `diff-files` reports the same "did this tracked
- *      file change" answer without ever invoking a content filter.
+ *      file change" answer from the stat data alone, and re-hashes a file —
+ *      through that filter — only when its stat matches a racily clean index
+ *      entry: the stat check forced below makes a checkout shipped with its
+ *      own `.git` directory never match.
  *
  *   4. `git ls-files --others --exclude-standard`
  *      — new files never staged at all, minus what a `.gitignore` leaves out.
@@ -188,7 +191,11 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      * control characters alike — `core.quotepath=off` alone only covers the former.
      * `core.fsmonitor=` neutralizes the audited (untrusted) repo's own local config:
      * otherwise a hostile `core.fsmonitor` hook set in its `.git/config` runs as an
-     * arbitrary command on this working-tree comparison. `--` ends the revisions: a
+     * arbitrary command on this working-tree comparison. `core.checkStat=default`
+     * and `core.trustctime=true` restore git's own stat check over that config:
+     * relaxed to what an extraction keeps, it lets an archived index entry match
+     * the extracted file, which git then re-hashes through the repo's
+     * `filter.<name>.clean` command. `--` ends the revisions: a
      * file of the audited repo named `HEAD` or `main...HEAD` would otherwise make git
      * refuse the argument as both a revision and a filename.
      *
@@ -196,7 +203,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      */
     private function buildDefaultGitDiffProcess(array $argv, string $projectPath): Process
     {
-        return new Process(['git', '-c', 'core.quotepath=off', '-c', 'core.fsmonitor=', ...$argv, '-z', '--'], $projectPath);
+        return new Process(['git', '-c', 'core.quotepath=off', '-c', 'core.fsmonitor=', '-c', 'core.checkStat=default', '-c', 'core.trustctime=true', ...$argv, '-z', '--'], $projectPath);
     }
 
     /**
