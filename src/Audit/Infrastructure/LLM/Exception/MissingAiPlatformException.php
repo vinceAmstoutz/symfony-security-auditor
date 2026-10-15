@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 /** @internal not part of the BC promise — see docs/versioning.md */
 final class MissingAiPlatformException extends LLMProviderException
 {
-    public static function create(): self
+    private static function create(): self
     {
         return new self('No AI platform is configured. Enable a platform (e.g. "anthropic") in config/packages/ai.yaml and set its API key — the symfony/ai-bundle recipe ships with every platform commented out.');
     }
