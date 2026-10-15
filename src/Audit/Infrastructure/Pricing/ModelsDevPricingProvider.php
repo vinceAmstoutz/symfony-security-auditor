@@ -248,24 +248,22 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /** @return PricedCost|null */
     private function costEntry(int|string $provider, string $model): ?array
     {
-        $providerData = $this->catalog()[$provider] ?? null;
-        if (!\is_array($providerData)) {
-            return null;
-        }
-
-        $models = $providerData['models'] ?? null;
-        if (!\is_array($models)) {
-            return null;
-        }
-
-        $entry = $models[$model] ?? null;
-        if (!\is_array($entry)) {
-            return null;
-        }
-
-        $cost = $entry['cost'] ?? null;
+        $models = $this->arrayAt($this->arrayAt($this->catalog(), $provider), 'models');
+        $cost = $this->arrayAt($models, $model)['cost'] ?? null;
 
         return ModelsDevCatalog::isPricedCost($cost) ? $cost : null;
+    }
+
+    /**
+     * @param array<array-key, mixed> $array
+     *
+     * @return array<array-key, mixed>
+     */
+    private function arrayAt(array $array, int|string $key): array
+    {
+        $value = $array[$key] ?? null;
+
+        return \is_array($value) ? $value : [];
     }
 
     /** @param PricedCost $cost */
