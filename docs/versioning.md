@@ -154,9 +154,9 @@ If you find yourself depending on an internal class, please open an issue — we
 
 When a public-API element needs to be removed:
 
-1. It is marked as deprecated in a `MINOR` release. The deprecation appears in [`CHANGELOG.md`](../CHANGELOG.md) under `### Deprecated`, with a clear migration path.
+1. It is marked as deprecated in a `MINOR` release. The deprecation appears in [`CHANGELOG.md`](../CHANGELOG.md) under `### Deprecations 💀`, with a clear migration path.
 2. The deprecated element keeps working for at least the rest of the current `MAJOR` cycle.
-3. Removal happens in the next `MAJOR` release at the earliest, listed under `### Removed` in the changelog.
+3. Removal happens in the next `MAJOR` release at the earliest, listed under `### Breaking Changes 💥` in the changelog.
 
 Every deprecated public-API element emits a **runtime deprecation** for the rest of the current `MAJOR` cycle, so callers find it in their deprecation log and CI (`failOnDeprecation`) before the removal lands — not as a hard fatal on the day they upgrade. Config keys use the Config component's `setDeprecated()`; PHP methods, classes, and arguments use `trigger_deprecation('vinceamstoutz/symfony-security-auditor', '<since>', '<message>')` (from `symfony/deprecation-contracts`). The `@deprecated` PHPDoc tag is added alongside it for static analysis and IDE hints. The only deprecations documented in the changelog _without_ a runtime trigger are those with no runtime call site to attach one to.
 

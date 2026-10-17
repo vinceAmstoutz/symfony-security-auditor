@@ -109,11 +109,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Build the What's Changed release notes
+      - name: Build the release notes from the changelog
         id: notes
         env:
           VERSION: ${{ needs.detect.outputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -124,27 +123,8 @@ jobs:
             exit 1
           fi
 
-          {
-            echo "## What's Changed"
-            echo
-          } > release-notes.md
-
-          git log --reverse --format='%H %s' "${previous_tag}..HEAD" | while IFS=' ' read -r sha rest; do
-            pr_number="$(printf '%s\n' "$rest" | grep -oE '\(#[0-9]+\)$' | tr -d '(#)' || true)"
-            [ -z "$pr_number" ] && continue
-
-            description="$(printf '%s\n' "$rest" | sed -E 's/[[:space:]]*\(#[0-9]+\)$//')"
-
-            author_login="$(gh pr view "$pr_number" --repo "$REPO" --json author --jq '.author.login' 2>/dev/null || true)"
-            [ -z "$author_login" ] && author_login="vinceAmstoutz"
-
-            printf -- '- %s by @%s in https://github.com/%s/pull/%s\n' "$description" "$author_login" "$REPO" "$pr_number" >> release-notes.md
-          done
-
-          {
-            echo
-            printf '**Full Changelog**: https://github.com/%s/compare/%s...%s\n' "$REPO" "$previous_tag" "$VERSION"
-          } >> release-notes.md
+          CHANGELOG_REQUIRE_LINKS=all sh .github/scripts/check-changelog.sh CHANGELOG.md
+          PREVIOUS_TAG="$previous_tag" sh .github/scripts/release-notes.sh "$VERSION" CHANGELOG.md > release-notes.md
 
       - name: Create and push the tag
         env:

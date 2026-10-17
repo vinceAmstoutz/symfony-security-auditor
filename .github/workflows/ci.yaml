@@ -171,6 +171,12 @@ jobs:
       - name: Pull request check tests
         run: sh tests/Shell/pull_request_check_test.sh
 
+      - name: Changelog check tests
+        run: sh tests/Shell/changelog_check_test.sh
+
+      - name: Changelog check
+        run: sh .github/scripts/check-changelog.sh CHANGELOG.md
+
   zizmor:
     name: zizmor (GitHub Actions security scan)
     runs-on: ubuntu-latest
