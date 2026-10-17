@@ -514,6 +514,58 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    #[DataProvider('projectConfigsPastTheNestingLimitsOnTheLineOfAParent')]
+    #[RunInSeparateProcess]
+    public function test_the_audit_command_skips_a_config_of_the_project_it_names_that_nests_past_the_limits_on_the_line_of_a_parent_and_goes_on(int $levels, int $pathLength, string $reason): void
+    {
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "scan:\n    included_paths:\n        ".str_repeat('- ', $levels).str_repeat('s', $pathLength)."\n");
+        (new Filesystem())->dumpFile($projectDirectory.'/src/Controller/HomeController.php', "<?php\nclass HomeController {}\n");
+
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
+
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it: Config file "%s" %s', $projectDirectory.'/.symfony-security-auditor.yaml', $projectDirectory.'/.symfony-security-auditor.yaml', $reason)), $display);
+    }
+
+    /**
+     * @return iterable<string, array{int, int, string}>
+     */
+    public static function projectConfigsPastTheNestingLimitsOnTheLineOfAParent(): iterable
+    {
+        yield 'compact block sequences' => [40, 3, 'nests more than 32 levels deep'];
+        yield 'a long line under compact levels' => [28, 150_000, 'nests more of its content than any configuration needs'];
+    }
+
+    #[RunInSeparateProcess]
+    public function test_the_audit_command_layers_a_config_of_the_project_it_names_whose_path_holds_percent_signs(): void
+    {
+        $projectDirectory = $this->configHome.'/audited-%x%';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "audit:\n    baseline: security-baseline.json\n");
+        (new Filesystem())->dumpFile($projectDirectory.'/src/Controller/HomeController.php', "<?php\nclass HomeController {}\n");
+
+        [$statusCode, $display] = $this->audit($projectDirectory, '--dry-run');
+
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s is layered over the configuration read before it', $projectDirectory.'/.symfony-security-auditor.yaml')), $display);
+        self::assertStringNotContainsString('wasskipped', $display);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_audit_command_skips_a_config_of_the_project_it_names_whose_baseline_is_not_one_and_goes_on(): void
+    {
+        $projectDirectory = $this->configHome.'/audited';
+        (new Filesystem())->dumpFile($projectDirectory.'/.symfony-security-auditor.yaml', "audit:\n    fail_on: safe\n    baseline: security-baseline.json\n");
+        (new Filesystem())->dumpFile($projectDirectory.'/security-baseline.json', 'not a baseline');
+        (new Filesystem())->dumpFile($projectDirectory.'/src/Controller/HomeController.php', "<?php\nclass HomeController {}\n");
+
+        [$statusCode, $display] = $this->audit($projectDirectory);
+
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Audited project config %s was skipped and the run goes on without it: Baseline file "%s" is not valid JSON', $projectDirectory.'/.symfony-security-auditor.yaml', $projectDirectory.'/security-baseline.json')), $display);
+    }
+
     public function test_the_audit_command_rebuilds_without_a_rejected_project_config_the_way_it_built_the_first_time(): void
     {
         $this->writeConfig("platform:\n    generic:\n        default:\n            base_url: 'http://localhost'\n            api_key: '%env(SSA_ABSENT_KEY_FOR_REBUILD)%'\n");

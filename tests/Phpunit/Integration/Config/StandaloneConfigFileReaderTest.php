@@ -161,6 +161,103 @@ final class StandaloneConfigFileReaderTest extends TestCase
     }
 
     /**
+     * @throws MalformedProjectConfigException
+     */
+    #[DataProvider('filesNestedPastTheLimitOnTheLineOfAParent')]
+    public function test_a_file_nesting_past_the_limit_on_the_line_of_a_parent_is_refused_before_it_is_parsed(string $yaml): void
+    {
+        $this->filesystem->dumpFile($this->configFile, $yaml);
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage(\sprintf('Config file "%s" nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.', $this->configFile));
+
+        (new StandaloneConfigFileReader())->read($this->configFile);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function filesNestedPastTheLimitOnTheLineOfAParent(): iterable
+    {
+        yield 'compact block sequences' => [str_repeat('- ', 33)."item\n"];
+        yield 'compact mappings inside sequences' => [str_repeat('- key: ', 17)."item\n"];
+        yield 'complex-key markers' => [str_repeat('? ', 33)."key\n"];
+        yield 'merge keys holding sequences' => ["base:\n    ".str_repeat('<<: - ', 16)."item\n"];
+        yield 'quoted keys' => [str_repeat('"key": ', 33)."item\n"];
+        yield 'anchors and tags between the markers' => [str_repeat('- &node !!seq ', 33)."item\n"];
+        yield 'markers separated by tabs' => [str_repeat("-\t", 33)."item\n"];
+        yield 'compact levels on top of indented ones' => [self::nestedTo(20, 'a', str_repeat('- ', 14)."item\n")];
+        yield 'compact levels in a file with Windows line endings' => [str_replace("\n", "\r\n", self::nestedTo(30, 'a', "- - - - item\n"))];
+        yield 'indented levels in a file breaking its lines with carriage returns alone' => [str_replace("\n", "\r", self::nestedTo(33))];
+        yield 'block sequences in a file breaking its lines with carriage returns alone' => [implode('', array_map(static fn (int $level): string => str_repeat(' ', $level)."-\r", range(0, 32)))];
+    }
+
+    /**
+     * @param array<array-key, mixed> $expected
+     *
+     * @throws MalformedProjectConfigException
+     */
+    #[DataProvider('filesNestedToTheLimitOnTheLineOfAParent')]
+    public function test_a_file_nesting_to_the_limit_on_the_line_of_a_parent_is_read(string $yaml, array $expected): void
+    {
+        $this->filesystem->dumpFile($this->configFile, $yaml);
+
+        self::assertSame($expected, (new StandaloneConfigFileReader())->read($this->configFile));
+    }
+
+    /**
+     * @return iterable<string, array{string, array<array-key, mixed>}>
+     */
+    public static function filesNestedToTheLimitOnTheLineOfAParent(): iterable
+    {
+        yield 'compact block sequences' => [str_repeat('- ', 32)."item\n", self::listedTo(32)];
+        yield 'compact levels on top of indented ones' => [self::nestedTo(20, 'a', str_repeat('- ', 13)."item\n"), self::nestedValueTo(20, 'a', self::listedTo(13))];
+        yield 'a line closing the compact levels before it' => [str_repeat('- ', 32)."item\n".str_repeat('- ', 32)."item\n", [...self::listedTo(32), ...self::listedTo(32)]];
+        yield 'a flow sequence holding a mapping' => [self::nestedTo(32, 'a', "leaf: [{k: v}]\n"), self::nestedValueTo(32, 'a', ['leaf' => [['k' => 'v']]])];
+        yield 'a flow mapping' => [self::nestedTo(32, 'a', "leaf: {k: v}\n"), self::nestedValueTo(32, 'a', ['leaf' => ['k' => 'v']])];
+        yield 'a comment after a key' => [self::nestedTo(32, 'a', "leaf: # note: none\n"), self::nestedValueTo(32, 'a', ['leaf' => null])];
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    public function test_a_file_nesting_a_long_line_under_compact_levels_is_refused_before_the_parser_copies_it_once_per_level(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, "scan:\n    included_paths:\n        ".str_repeat('- ', 28).str_repeat('s', 160_000)."\n");
+
+        memory_reset_peak_usage();
+        $memoryBefore = memory_get_usage();
+        $refusal = $this->refusalOf($this->configFile);
+        $peakMegabytes = (memory_get_peak_usage() - $memoryBefore) / 1_048_576;
+
+        self::assertSame(\sprintf('Config file "%s" nests more of its content than any configuration needs: its lines, each counted once for every level it sits in, add up to more than 4194304 bytes, so it was not parsed.', $this->configFile), $refusal);
+        self::assertLessThan(8, $peakMegabytes);
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    public function test_a_file_whose_lines_counted_once_per_level_add_up_to_the_limit_is_read(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, $this->fileNestingExactly(4_194_304));
+
+        self::assertSame([str_repeat('k', 17) => self::nestedValueTo(32, 'a', null)], (new StandaloneConfigFileReader())->read($this->configFile));
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
+    public function test_a_file_whose_lines_counted_once_per_level_add_up_past_the_limit_is_refused_before_it_is_parsed(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, $this->fileNestingExactly(4_194_305));
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage('add up to more than 4194304 bytes, so it was not parsed.');
+
+        (new StandaloneConfigFileReader())->read($this->configFile);
+    }
+
+    /**
      * @param array<array-key, mixed> $expected
      *
      * @throws MalformedProjectConfigException
@@ -194,27 +291,65 @@ final class StandaloneConfigFileReaderTest extends TestCase
         self::assertSame([], (new StandaloneConfigFileReader())->read($this->configFile));
     }
 
-    private static function nestedTo(int $levels, string $key = 'a'): string
+    private static function nestedTo(int $levels, string $key = 'a', string $leaf = "leaf: 1\n"): string
     {
         $yaml = '';
         for ($level = 0; $level < $levels - 1; ++$level) {
             $yaml .= str_repeat(' ', $level).$key.":\n";
         }
 
-        return $yaml.str_repeat(' ', $levels - 1)."leaf: 1\n";
+        return $yaml.str_repeat(' ', $levels - 1).$leaf;
     }
 
     /**
      * @return array<string, mixed>
      */
-    private static function nestedValueTo(int $levels, string $key = 'a'): array
+    private static function nestedValueTo(int $levels, string $key = 'a', mixed $leaf = ['leaf' => 1]): array
     {
-        $value = ['leaf' => 1];
-        for ($level = 1; $level < $levels; ++$level) {
+        $value = [$key => $leaf];
+        for ($level = 2; $level < $levels; ++$level) {
             $value = [$key => $value];
         }
 
         return $value;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private static function listedTo(int $levels): array
+    {
+        $value = ['item'];
+        for ($level = 1; $level < $levels; ++$level) {
+            $value = [$value];
+        }
+
+        return $value;
+    }
+
+    private function fileNestingExactly(int $nestedBytes): string
+    {
+        $chainBytes = 13_615;
+        $keyLength = (($nestedBytes - $chainBytes - 1) % 32) + 1;
+        $commentLength = intdiv($nestedBytes - $chainBytes - $keyLength, 32);
+
+        $yaml = str_repeat('k', $keyLength).":\n";
+        for ($level = 1; $level < 32; ++$level) {
+            $yaml .= str_repeat(' ', $level)."a:\n";
+        }
+
+        return $yaml.str_repeat(' ', 32).'#'.str_repeat('x', $commentLength)."\n";
+    }
+
+    private function refusalOf(string $configFile): ?string
+    {
+        try {
+            (new StandaloneConfigFileReader())->read($configFile);
+        } catch (MalformedProjectConfigException $malformedProjectConfigException) {
+            return $malformedProjectConfigException->getMessage();
+        }
+
+        return null;
     }
 
     private function paddedTo(int $bytes): string

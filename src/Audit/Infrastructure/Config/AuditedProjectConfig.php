@@ -51,4 +51,47 @@ final readonly class AuditedProjectConfig
     {
         return null !== $this->skipReason;
     }
+
+    /**
+     * The baseline the file names, a relative one anchored to the project, or
+     * null when it names none.
+     */
+    public function baseline(): ?string
+    {
+        $baseline = $this->audit()['baseline'] ?? null;
+
+        return \is_string($baseline) ? $baseline : null;
+    }
+
+    /**
+     * What the file sets, spelled as the container reads it back: the anchored
+     * baseline carries the project's folder, whose `%` signs the file itself
+     * could never hold as text, so they are escaped.
+     *
+     * @return array<array-key, mixed>
+     */
+    public function configForContainer(): array
+    {
+        $baseline = $this->baseline();
+        if (null === $baseline) {
+            return $this->config;
+        }
+
+        $audit = $this->audit();
+        $audit['baseline'] = ContainerParameterSyntax::escape($baseline);
+        $config = $this->config;
+        $config['audit'] = $audit;
+
+        return $config;
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function audit(): array
+    {
+        $audit = $this->config['audit'] ?? null;
+
+        return \is_array($audit) ? $audit : [];
+    }
 }

@@ -54,6 +54,11 @@ final class MalformedProjectConfigException extends RuntimeException
         return new self(TerminalText::escaped(\sprintf('Config file "%s" nests more than %d levels deep, far more than any configuration needs, so it was not parsed.', $configFile, $maxDepth)));
     }
 
+    public static function forHeavilyNestedFile(string $configFile, int $maxNestedBytes): self
+    {
+        return new self(TerminalText::escaped(\sprintf('Config file "%s" nests more of its content than any configuration needs: its lines, each counted once for every level it sits in, add up to more than %d bytes, so it was not parsed.', $configFile, $maxNestedBytes)));
+    }
+
     /**
      * Refused before the file is read: a link committed in the audited
      * repository could point at any file of the user's, and a parse error

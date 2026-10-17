@@ -41,6 +41,13 @@ final readonly class StandaloneConfigFileReader
     private const int MAX_DEPTH = 32;
 
     /**
+     * Eight times the largest file read, which no configuration comes near:
+     * the parser keeps a few copies of each block it opens, so this bounds
+     * what any file it is handed can take, whatever its shape.
+     */
+    private const int MAX_NESTED_BYTES = 4_194_304;
+
+    /**
      * @return array<array-key, mixed>
      *
      * @throws MalformedProjectConfigException
@@ -82,38 +89,23 @@ final readonly class StandaloneConfigFileReader
             throw MalformedProjectConfigException::forOversizedFile($configFile, self::MAX_BYTES);
         }
 
-        if (is_readable($configFile) && $this->nestingDepth((new Filesystem())->readFile($configFile)) > self::MAX_DEPTH) {
-            throw MalformedProjectConfigException::forDeeplyNestedFile($configFile, self::MAX_DEPTH);
+        if (is_readable($configFile)) {
+            $this->assertShallowEnough($configFile, YamlNesting::of((new Filesystem())->readFile($configFile), self::MAX_DEPTH));
         }
     }
 
     /**
-     * How many indentation levels are open at once, read from the lines alone:
-     * each deeper line opens one, a shallower one closes those it leaves.
-     * Blank and comment lines open none, since they nest nothing.
+     * @throws MalformedProjectConfigException
      */
-    private function nestingDepth(string $contents): int
+    private function assertShallowEnough(string $configFile, YamlNesting $yamlNesting): void
     {
-        $openIndents = [];
-        $depth = 0;
-        foreach (explode("\n", $contents) as $line) {
-            $indent = $this->structuralIndent($line);
-            if (null === $indent) {
-                continue;
-            }
-
-            $openIndents = [...array_filter($openIndents, static fn (int $openIndent): bool => $openIndent < $indent), $indent];
-            $depth = max($depth, \count($openIndents));
+        if ($yamlNesting->depth > self::MAX_DEPTH) {
+            throw MalformedProjectConfigException::forDeeplyNestedFile($configFile, self::MAX_DEPTH);
         }
 
-        return $depth;
-    }
-
-    private function structuralIndent(string $line): ?int
-    {
-        $content = ltrim($line, ' ');
-
-        return '' === trim($content) || str_starts_with($content, '#') ? null : \strlen($line) - \strlen($content);
+        if ($yamlNesting->nestedBytes > self::MAX_NESTED_BYTES) {
+            throw MalformedProjectConfigException::forHeavilyNestedFile($configFile, self::MAX_NESTED_BYTES);
+        }
     }
 
     /**

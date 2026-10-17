@@ -77,6 +77,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
@@ -544,9 +545,27 @@ final readonly class StandaloneApplicationFactory
         $cacheDir = $this->xdgConfigPathResolver->cacheDir();
 
         try {
-            return $this->standaloneContainerFactory->create($standaloneConfig, $cacheDir);
+            $containerBuilder = $this->standaloneContainerFactory->create($standaloneConfig, $cacheDir);
+            $this->assertAuditedProjectBaselineReadable($standaloneConfig->auditedProjectConfig);
+
+            return $containerBuilder;
         } catch (Throwable $throwable) {
             return $this->containerWithoutAuditedProjectConfig($standaloneConfig, $throwable, $credentialsRequired, $cacheDir);
+        }
+    }
+
+    /**
+     * The baseline the audited project's own file names is decoded as the
+     * audit will decode it, so one it cannot read gets that file skipped
+     * rather than stopping the run, as any other part of the file would.
+     *
+     * @throws MalformedBaselineFileException
+     */
+    private function assertAuditedProjectBaselineReadable(?AuditedProjectConfig $auditedProjectConfig): void
+    {
+        $baseline = $auditedProjectConfig?->baseline();
+        if (null !== $baseline) {
+            (new Baseline())->entries($baseline);
         }
     }
 

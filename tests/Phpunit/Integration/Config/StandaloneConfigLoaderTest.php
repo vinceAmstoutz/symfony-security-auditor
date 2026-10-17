@@ -467,6 +467,31 @@ final class StandaloneConfigLoaderTest extends TestCase
     }
 
     /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_the_baseline_of_an_audited_project_whose_path_holds_percent_signs_is_spelled_as_the_container_reads_it_back(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/pro%x%ject/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: base%line.json\n");
+
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $projectConfigFile);
+
+        self::assertSame(['baseline' => $this->configHome.'/pro%%x%%ject/base%%line.json'], $standaloneConfig->auditConfig['audit']);
+        self::assertInstanceOf(AuditedProjectConfig::class, $standaloneConfig->auditedProjectConfig);
+        self::assertSame($this->configHome.'/pro%x%ject/base%line.json', $standaloneConfig->auditedProjectConfig->baseline());
+    }
+
+    /**
      * @param Closure(Filesystem, string): string $placeBaseline
      *
      * @throws MissingEnvironmentVariableException
@@ -876,6 +901,93 @@ final class StandaloneConfigLoaderTest extends TestCase
     private static function nestedPast(int $levels): string
     {
         return implode('', array_map(static fn (int $level): string => str_repeat(' ', $level)."a:\n", range(0, $levels - 1))).str_repeat(' ', $levels)."leaf: 1\n";
+    }
+
+    private function compactlyNesting(int $levels, int $pathLength): string
+    {
+        return "scan:\n  included_paths:\n    ".str_repeat('- ', $levels).str_repeat('s', $pathLength)."\n";
+    }
+
+    /**
+     * @return iterable<string, array{int, int, string}>
+     */
+    public static function filesPastTheNestingLimitsOnTheLineOfAParent(): iterable
+    {
+        yield 'compact block sequences' => [40, 3, 'nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.'];
+        yield 'a long line under compact levels' => [28, 150_000, 'nests more of its content than any configuration needs: its lines, each counted once for every level it sits in, add up to more than 4194304 bytes, so it was not parsed.'];
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('filesPastTheNestingLimitsOnTheLineOfAParent')]
+    public function test_a_working_directory_config_nesting_past_the_limits_on_the_line_of_a_parent_stops_the_load_with_a_clear_error(int $levels, int $pathLength, string $reason): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $workingFile = $this->workingDirectoryConfigFile();
+        $this->filesystem->dumpFile($workingFile, $this->compactlyNesting($levels, $pathLength));
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage(\sprintf('Config file "%s" %s', $workingFile, $reason));
+
+        $this->loader($workingFile)->load();
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('filesPastTheNestingLimitsOnTheLineOfAParent')]
+    public function test_a_user_config_nesting_past_the_limits_on_the_line_of_a_parent_stops_the_load_with_a_clear_error(int $levels, int $pathLength, string $reason): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n".$this->compactlyNesting($levels, $pathLength));
+
+        $this->expectException(MalformedProjectConfigException::class);
+        $this->expectExceptionMessage(\sprintf('Config file "%s" %s', $this->configHome.'/symfony-security-auditor/config.yaml', $reason));
+
+        $this->loader()->load();
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('filesPastTheNestingLimitsOnTheLineOfAParent')]
+    public function test_an_audited_project_config_nesting_past_the_limits_on_the_line_of_a_parent_is_skipped_with_its_reason(int $levels, int $pathLength, string $reason): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectFile = $this->auditedProjectConfigFile();
+        $this->filesystem->dumpFile($projectFile, $this->compactlyNesting($levels, $pathLength));
+
+        $auditedProjectConfig = $this->loader()->load(auditedProjectConfigFile: $projectFile)->auditedProjectConfig;
+
+        self::assertInstanceOf(AuditedProjectConfig::class, $auditedProjectConfig);
+        self::assertSame(\sprintf('Config file "%s" %s', $projectFile, $reason), $auditedProjectConfig->skipReason);
     }
 
     private static function aliasBomb(): string
@@ -1958,7 +2070,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
         $this->filesystem->dumpFile($projectConfigFile, "audit:\n  baseline: 'baseline-100%.json'\n");
 
-        self::assertSame(['baseline' => $this->configHome.'/project/baseline-100%.json'], $this->loader()->load(auditedProjectConfigFile: $projectConfigFile)->auditConfig['audit']);
+        $standaloneConfig = $this->loader()->load(auditedProjectConfigFile: $projectConfigFile);
+
+        self::assertInstanceOf(AuditedProjectConfig::class, $standaloneConfig->auditedProjectConfig);
+        self::assertSame($this->configHome.'/project/baseline-100%.json', $standaloneConfig->auditedProjectConfig->baseline());
+        self::assertSame(['baseline' => $this->configHome.'/project/baseline-100%%.json'], $standaloneConfig->auditConfig['audit']);
     }
 
     /**

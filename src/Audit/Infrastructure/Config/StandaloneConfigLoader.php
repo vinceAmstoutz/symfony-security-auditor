@@ -60,7 +60,7 @@ final readonly class StandaloneConfigLoader
         $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($workingDirectoryConfig, $credentialsRequired);
         $workingDirectoryTimeout = $this->projectTimeout($projectConfig, $userTimeout) ?? $userTimeout;
         $auditedProjectConfig = $this->auditedProjectConfig($auditedProjectConfigFile, $workingDirectoryConfig, $userTimeout);
-        $rawConfig = $this->merge($workingDirectoryConfig, $auditedProjectConfig->config ?? []);
+        $rawConfig = $this->merge($workingDirectoryConfig, $auditedProjectConfig?->configForContainer() ?? []);
         $auditConfig = array_diff_key($rawConfig, array_flip([...GuardedProjectConfigReader::PLATFORM_KEYS, HttpTimeout::KEY]));
 
         return new StandaloneConfig(

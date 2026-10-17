@@ -307,6 +307,31 @@ final class StandaloneContainerFactoryTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_it_reads_back_the_baseline_of_an_audited_project_whose_path_holds_percent_signs_as_the_file_it_names(): void
+    {
+        $auditedProjectConfig = AuditedProjectConfig::layered('/repo-%x%/.symfony-security-auditor.yaml', ['audit' => ['baseline' => '/repo-%x%/base%line.json']], null);
+
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                $auditedProjectConfig->configForContainer(),
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+                auditedProjectConfig: $auditedProjectConfig,
+            ),
+            $this->cacheDir,
+        );
+
+        self::assertSame('/repo-%x%/base%line.json', $containerBuilder->getParameter('symfony_security_auditor.audit.baseline'));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_it_takes_a_working_directory_holding_percent_signs_literally(): void
     {
         $workingDirectory = sys_get_temp_dir().'/ssa-%x%-'.bin2hex(random_bytes(6));
