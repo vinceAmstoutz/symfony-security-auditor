@@ -24,54 +24,84 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
  * which the finding now trades for its project file, and the types it was
  * reported as before its own type existed — the fingerprints
  * `Vulnerability::fingerprintCandidates()` lists after the finding's own.
+ * Only the spellings the baseline's entries name are tried, so each finding
+ * has a handful of names whatever the size of the baseline.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class FormerFindingNames
 {
     /**
-     * Whether `$baselineEntry` holds `$diffFinding` under one of its names. A
-     * report written before 1.22 names each finding as the model did, so only
-     * its own fingerprint matches it, as it always did.
+     * @param array<string, array<string, string>> $spellingsByForm the files the entries name, under their comparable form
      */
-    public static function holds(BaselineEntry $baselineEntry, DiffFinding $diffFinding, LoadedReport $loadedReport): bool
-    {
-        return null !== $loadedReport->projectPath
-            && \in_array($baselineEntry->fingerprint, self::formerFingerprintsOf($diffFinding, $baselineEntry->file(), $loadedReport->projectPath), true);
-    }
+    private function __construct(
+        private ?string $projectPath,
+        private array $spellingsByForm,
+    ) {}
 
     /**
-     * @return list<string>
+     * @param list<BaselineEntry> $baselineEntries
      */
-    private static function formerFingerprintsOf(DiffFinding $diffFinding, ?string $entryFile, string $projectPath): array
+    public static function in(LoadedReport $loadedReport, array $baselineEntries): self
     {
-        $fingerprints = [];
-        foreach (self::spellingsOf($diffFinding, $entryFile, $projectPath) as $filePath) {
-            foreach (self::typesOf($diffFinding) as $type) {
-                $fingerprints[] = Vulnerability::fingerprintOf($type, $filePath, $diffFinding->title);
+        $spellingsByForm = [];
+        foreach ($baselineEntries as $baselineEntry) {
+            $file = $baselineEntry->file();
+            if (null !== $file) {
+                $spellingsByForm[EchoedFilePath::comparable($file)][$file] = $file;
             }
         }
 
-        return $fingerprints;
+        return new self($loadedReport->projectPath, $spellingsByForm);
     }
 
     /**
-     * The finding's own path, then the entry's when it names the same file.
+     * Each fingerprint an entry holds `$diffFinding` under, with the file the
+     * entry has to name for it — null when the entry may name any file: the
+     * finding's own path, then each spelling of its file an entry names, with
+     * the finding's type and the types it was reported as before. A report
+     * written before 1.22 names each finding as the model did, so the finding
+     * has no such name and only its own fingerprint matches it, as it always
+     * did.
      *
-     * @return list<string>
+     * @return list<array{string|null, string}>
      */
-    private static function spellingsOf(DiffFinding $diffFinding, ?string $entryFile, string $projectPath): array
+    public function of(DiffFinding $diffFinding): array
     {
-        return [
-            $diffFinding->file,
-            ...(null !== $entryFile && EchoedFilePath::denotesProjectFile($entryFile, $diffFinding->file, $projectPath) ? [$entryFile] : []),
-        ];
+        if (null === $this->projectPath) {
+            return [];
+        }
+
+        $types = $this->typesOf($diffFinding);
+        $names = [];
+        foreach ([null, ...$this->spellingsOf($diffFinding->file, $this->projectPath)] as $entryFile) {
+            foreach ($types as $type) {
+                $names[] = [$entryFile, Vulnerability::fingerprintOf($type, $entryFile ?? $diffFinding->file, $diffFinding->title)];
+            }
+        }
+
+        return $names;
     }
 
     /**
      * @return list<string>
      */
-    private static function typesOf(DiffFinding $diffFinding): array
+    private function spellingsOf(string $file, string $projectPath): array
+    {
+        $spellings = [];
+        foreach (EchoedFilePath::projectFileForms($file, $projectPath) as $form) {
+            foreach ($this->spellingsByForm[$form] ?? [] as $spelling) {
+                $spellings[] = $spelling;
+            }
+        }
+
+        return $spellings;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function typesOf(DiffFinding $diffFinding): array
     {
         return [
             $diffFinding->type,

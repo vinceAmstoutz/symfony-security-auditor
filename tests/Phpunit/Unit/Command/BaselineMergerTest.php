@@ -13,13 +13,18 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Random\Engine\Xoshiro256StarStar;
+use Random\Randomizer;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMergePlan;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
@@ -27,9 +32,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\PairwiseBaselineMerge;
 
 final class BaselineMergerTest extends TestCase
 {
+    private const int GENERATED_CASES = 200;
+
+    private const int THOUSANDS = 2000;
+
+    private const array GENERATED_FILES = ['src/Foo.php', 'src/Bar.php'];
+
+    private const array GENERATED_TYPES = ['xss', 'twig_injection', 'sensitive_data_exposure', 'sql_injection', 'custom_type'];
+
+    private const array GENERATED_TITLES = ['Injection', 'Other'];
+
+    private const array GENERATED_STATUSES = ['analyzed', 'errored', null];
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -652,6 +670,274 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
+     * @param list<array<string, string>> $entries
+     * @param list<string>                $expectedNewTypes
+     *
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('entriesInOrderOfAcceptance')]
+    public function test_a_finding_spends_the_credit_of_the_first_entry_holding_it_under_a_former_name(array $entries, array $expectedNewTypes): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([$this->findingInFoo('xss', 'Injection'), $this->findingInFoo('twig_injection', 'Injection')]);
+        $baseline = $this->writeBaseline($entries);
+
+        $newFindings = $this->baselineMerger->plan($report, $baseline, false)->newFindings;
+
+        self::assertSame($expectedNewTypes, array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->type, $newFindings));
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, string>>, list<string>}>
+     */
+    public static function entriesInOrderOfAcceptance(): iterable
+    {
+        $twigEntry = self::respelledEntryInFoo('twig_injection');
+        $sensitiveDataEntry = self::respelledEntryInFoo('sensitive_data_exposure');
+
+        yield 'the entry the second finding also needs comes first' => [[$twigEntry, $sensitiveDataEntry], ['twig_injection']];
+        yield 'the entry only the first finding holds comes first' => [[$sensitiveDataEntry, $twigEntry], []];
+    }
+
+    /**
+     * @param list<array<string, string>> $vulnerabilities
+     * @param list<array<string, string>> $expectedKeptEntries
+     * @param list<string>                $expectedNewTypes
+     *
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('findingsInReportOrder')]
+    public function test_prune_spends_the_first_finding_of_the_report_an_entry_holds_under_a_former_name(array $vulnerabilities, int $expectedPrunedCount, array $expectedKeptEntries, array $expectedNewTypes): void
+    {
+        $report = $this->writeCompleteReportOfTheProject($vulnerabilities);
+        $baseline = $this->writeBaseline([self::respelledEntryInFoo('twig_injection'), self::respelledEntryInFoo('sensitive_data_exposure')]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(
+            [$expectedPrunedCount, $expectedKeptEntries, $expectedNewTypes],
+            [
+                $baselineMergePlan->prunedCount,
+                array_map(static fn (BaselineEntry $baselineEntry): array|string => $baselineEntry->raw, $baselineMergePlan->keptEntries),
+                array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->type, $baselineMergePlan->newFindings),
+            ],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, string>>, int, list<array<string, string>>, list<string>}>
+     */
+    public static function findingsInReportOrder(): iterable
+    {
+        $xss = ['fingerprint' => Vulnerability::fingerprintOf('xss', 'src/Foo.php', 'Injection'), 'type' => 'xss', 'file' => 'src/Foo.php', 'title' => 'Injection', 'severity' => 'high'];
+        $twig = ['fingerprint' => Vulnerability::fingerprintOf('twig_injection', 'src/Foo.php', 'Injection'), 'type' => 'twig_injection', 'file' => 'src/Foo.php', 'title' => 'Injection', 'severity' => 'high'];
+
+        yield 'the finding both entries hold comes first' => [[$xss, $twig], 1, [self::respelledEntryInFoo('twig_injection')], ['twig_injection']];
+        yield 'the finding one entry holds alone comes first' => [[$twig, $xss], 0, [self::respelledEntryInFoo('twig_injection'), self::respelledEntryInFoo('sensitive_data_exposure')], []];
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_spends_the_first_finding_an_entry_holds_whether_it_holds_it_under_its_own_path_or_another_spelling(): void
+    {
+        $respelledFinding = ['fingerprint' => Vulnerability::fingerprintOf('xss', './src/Foo.php', 'Injection'), 'type' => 'xss', 'file' => './src/Foo.php', 'title' => 'Injection', 'severity' => 'high'];
+        $report = $this->writeCompleteReportOfTheProject([$respelledFinding, $this->findingInFoo('xss', 'Injection')]);
+        $twigEntry = $this->entryInFoo('twig_injection', 'src/Foo.php', 'Injection');
+        $baseline = $this->writeGenerated('baseline.json', [$twigEntry, $respelledFinding['fingerprint']]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(
+            [1, [$twigEntry], [$this->findingInFoo('xss', 'Injection')]],
+            [$baselineMergePlan->prunedCount, $this->rawOf($baselineMergePlan->keptEntries), $this->arraysOf($baselineMergePlan->newFindings)],
+        );
+    }
+
+    /**
+     * @param array<string, string> $heldEntry
+     *
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('entriesHoldingEveryOccurrence')]
+    public function test_prune_spends_the_first_occurrence_an_entry_holds_whatever_fingerprint_the_report_lists_it_under(array $heldEntry): void
+    {
+        $listedUnder = static fn (string $fingerprint): array => ['fingerprint' => $fingerprint, 'type' => 'xss', 'file' => 'src/Foo.php', 'title' => 'Injection', 'severity' => 'high'];
+        $report = $this->writeCompleteReportOfTheProject([$listedUnder('SSA-00000000000A'), $listedUnder('SSA-00000000000B'), $listedUnder('SSA-00000000000A')]);
+        $baseline = $this->writeBaseline([$heldEntry, ['fingerprint' => 'SSA-00000000000B', 'type' => 'xss', 'file' => 'src/Foo.php', 'title' => 'Injection']]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(
+            [0, 2, ['SSA-00000000000A']],
+            [$baselineMergePlan->prunedCount, \count($baselineMergePlan->keptEntries), array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->fingerprint, $baselineMergePlan->newFindings)],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function entriesHoldingEveryOccurrence(): iterable
+    {
+        yield 'an entry naming no file, under a former type' => [['fingerprint' => Vulnerability::fingerprintOf('twig_injection', 'src/Foo.php', 'Injection'), 'type' => 'twig_injection']];
+        yield 'an entry naming the file under another spelling' => [self::respelledEntryInFoo('twig_injection')];
+    }
+
+    /**
+     * @param list<array<string, string>> $entries
+     *
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[DataProvider('baselinesRepeatingAnEntry')]
+    public function test_a_finding_spends_the_credit_of_the_first_of_the_entries_sharing_a_fingerprint(array $entries): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([$this->findingInFoo('xss', 'Injection'), $this->findingInFoo('sensitive_data_exposure', 'Injection')]);
+        $baseline = $this->writeBaseline($entries);
+
+        self::assertSame([], $this->baselineMerger->plan($report, $baseline, false)->newFindings);
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, string>>}>
+     */
+    public static function baselinesRepeatingAnEntry(): iterable
+    {
+        $entryNamingNoFile = static fn (string $type): array => ['fingerprint' => Vulnerability::fingerprintOf($type, 'src/Foo.php', 'Injection'), 'type' => $type];
+        yield 'entries naming no file' => [[$entryNamingNoFile('twig_injection'), $entryNamingNoFile('sensitive_data_exposure'), $entryNamingNoFile('twig_injection')]];
+        yield 'entries naming the file under another spelling' => [[self::respelledEntryInFoo('twig_injection'), self::respelledEntryInFoo('sensitive_data_exposure'), self::respelledEntryInFoo('twig_injection')]];
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_an_entry_covers_one_finding_through_its_attacker_fingerprint_and_another_under_a_former_name(): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([
+            $this->findingInFoo('sql_injection', 'Other'),
+            $this->findingInFoo('xss', 'Injection'),
+            $this->findingInFoo('xss', 'Injection'),
+        ]);
+        $baseline = $this->writeBaseline([[
+            ...self::respelledEntryInFoo('twig_injection'),
+            'attacker_fingerprint' => Vulnerability::fingerprintOf('sql_injection', 'src/Foo.php', 'Other'),
+        ]]);
+
+        $outcomeOf = static fn (BaselineMergePlan $baselineMergePlan): array => [
+            $baselineMergePlan->prunedCount,
+            \count($baselineMergePlan->keptEntries),
+            array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $baselineMergePlan->newFindings),
+        ];
+
+        self::assertSame(
+            [[0, 1, ['Injection']], [0, 1, ['Injection']]],
+            [$outcomeOf($this->baselineMerger->plan($report, $baseline, true)), $outcomeOf($this->baselineMerger->plan($report, $baseline, false))],
+        );
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_entries_holding_one_finding_under_several_spellings_each_cover_one_occurrence_of_it(): void
+    {
+        $report = $this->writeCompleteReportOfTheProject([
+            $this->findingInFoo('sql_injection', 'Injection'),
+            $this->findingInFoo('sql_injection', 'Injection'),
+            $this->findingInFoo('sql_injection', 'Other'),
+        ]);
+        $dotSlashEntry = $this->entryInFoo('sql_injection', './src/Foo.php', 'Injection');
+        $backslashEntry = $this->entryInFoo('sql_injection', 'src\\Foo.php', 'Injection');
+        $baseline = $this->writeBaseline([$dotSlashEntry, $backslashEntry, $dotSlashEntry]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertSame(
+            [1, [$dotSlashEntry, $backslashEntry], ['Other']],
+            [
+                $baselineMergePlan->prunedCount,
+                array_map(static fn (BaselineEntry $baselineEntry): array|string => $baselineEntry->raw, $baselineMergePlan->keptEntries),
+                array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $baselineMergePlan->newFindings),
+            ],
+        );
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[MaximumDuration(4000)]
+    public function test_the_merge_and_the_prune_match_the_pairwise_specification_on_generated_reports_and_baselines(): void
+    {
+        $randomizer = new Randomizer(new Xoshiro256StarStar(hash('sha256', 'audit:baseline', true)));
+        $reportFindingsLoader = new ReportFindingsLoader($this->filesystem);
+        $baselineFile = new Baseline($this->filesystem);
+
+        for ($case = 0; $case < self::GENERATED_CASES; ++$case) {
+            $report = $this->writeGenerated(\sprintf('report-%d.json', $case), $this->generatedReport($randomizer));
+            $baseline = $this->writeGenerated(\sprintf('baseline-%d.json', $case), $this->generatedEntries($randomizer));
+
+            foreach ([true, false] as $prune) {
+                [$keptEntries, $newFindings, $prunedCount] = PairwiseBaselineMerge::plan($reportFindingsLoader->load($report), $baselineFile->entries($baseline), $prune);
+                $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, $prune);
+
+                self::assertSame(
+                    [$prunedCount, $this->rawOf($keptEntries), $this->arraysOf($newFindings)],
+                    [$baselineMergePlan->prunedCount, $this->rawOf($baselineMergePlan->keptEntries), $this->arraysOf($baselineMergePlan->newFindings)],
+                    \sprintf('generated case %d, prune %s', $case, $prune ? 'on' : 'off'),
+                );
+            }
+        }
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    #[MaximumDuration(4000)]
+    public function test_a_report_and_a_baseline_of_thousands_of_findings_merge_in_linear_time(): void
+    {
+        $findings = [];
+        $entries = [];
+        for ($index = 0; $index < self::THOUSANDS; ++$index) {
+            $findings[] = $this->findingIn(\sprintf('src/Found%d.php', $index));
+            $entries[] = $this->entryInFoo('sql_injection', \sprintf('src/Accepted%d.php', $index), 'Injection');
+        }
+
+        $report = $this->tmpDir.'/report.json';
+        $this->filesystem->dumpFile($report, json_encode([
+            'project' => '/abs/project',
+            'vulnerabilities' => $findings,
+            'coverage' => array_map(static fn (array $finding): array => ['stage' => 'attacker', 'file' => $finding['file'], 'status' => 'analyzed'], $findings),
+            'suppressed_fingerprints' => [],
+        ], \JSON_THROW_ON_ERROR));
+        $baseline = $this->writeBaseline($entries);
+
+        $startedAt = hrtime(true);
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+        $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+
+        self::assertSame(
+            [0, self::THOUSANDS, self::THOUSANDS],
+            [$baselineMergePlan->prunedCount, \count($baselineMergePlan->keptEntries), \count($baselineMergePlan->newFindings)],
+        );
+        self::assertLessThan(2.0, $elapsedSeconds);
+    }
+
+    /**
      * @throws MalformedBaselineFileException
      * @throws MalformedReportFileException
      * @throws ReportFileNotReadableException
@@ -784,6 +1070,173 @@ final class BaselineMergerTest extends TestCase
             'title' => $title,
             'severity' => 'high',
         ];
+    }
+
+    /**
+     * @return array{fingerprint: string, type: string, file: string, title: string, severity: string}
+     */
+    private function findingIn(string $file): array
+    {
+        return [
+            'fingerprint' => Vulnerability::fingerprintOf('sql_injection', $file, 'Injection'),
+            'type' => 'sql_injection',
+            'file' => $file,
+            'title' => 'Injection',
+            'severity' => 'high',
+        ];
+    }
+
+    /**
+     * An entry a baseline written before 1.22 holds the `Injection` finding of
+     * `src/Foo.php` under: the path the model echoed with a leading `./`, and
+     * the type it was reported as.
+     *
+     * @return array<string, string>
+     */
+    private static function respelledEntryInFoo(string $type): array
+    {
+        return [
+            'fingerprint' => Vulnerability::fingerprintOf($type, './src/Foo.php', 'Injection'),
+            'type' => $type,
+            'file' => './src/Foo.php',
+            'title' => 'Injection',
+            'added_at' => '2025-11-20',
+        ];
+    }
+
+    /**
+     * A report over two files of `/abs/project` whose findings are drawn from a
+     * few types, files and titles so that they collide, sometimes listed under
+     * a fingerprint of another finding, with any coverage, completeness and
+     * suppressed baseline fingerprints, and written by either release.
+     *
+     * @return array<string, mixed>
+     */
+    private function generatedReport(Randomizer $randomizer): array
+    {
+        $findings = [];
+        for ($index = $randomizer->getInt(0, 6); $index > 0; --$index) {
+            [$type, $file, $title] = $this->generatedName($randomizer, false);
+            [$listedType, $listedFile, $listedTitle] = 0 === $randomizer->getInt(0, 9) ? $this->generatedName($randomizer, false) : [$type, $file, $title];
+            $findings[] = ['fingerprint' => Vulnerability::fingerprintOf($listedType, $listedFile, $listedTitle), 'type' => $type, 'file' => $file, 'title' => $title, 'severity' => 'high'];
+        }
+
+        $suppressedBaselineFingerprints = [];
+        for ($index = $randomizer->getInt(0, 2); $index > 0; --$index) {
+            $suppressedBaselineFingerprints[] = Vulnerability::fingerprintOf(...$this->generatedName($randomizer, true));
+        }
+
+        $report = [
+            'complete' => 1 === $randomizer->getInt(0, 1),
+            'scope' => ['since' => null, 'paths' => []],
+            'vulnerabilities' => $findings,
+            'coverage' => $this->generatedCoverage($randomizer),
+            'suppressed_baseline_fingerprints' => $suppressedBaselineFingerprints,
+        ];
+        $release = $randomizer->getInt(0, 5);
+        if ($release > 0) {
+            $report['suppressed_fingerprints'] = [];
+        }
+
+        if ($release > 1) {
+            $report['project'] = '/abs/project';
+        }
+
+        return $report;
+    }
+
+    /**
+     * Each generated case gets files of its own, written in place: replacing a
+     * file, as `Filesystem::dumpFile()` does through a rename, waits on the
+     * disk on ext4 and made this test take seconds.
+     *
+     * @param array<array-key, mixed> $contents
+     */
+    private function writeGenerated(string $name, array $contents): string
+    {
+        $path = \sprintf('%s/%s', $this->tmpDir, $name);
+        file_put_contents($path, json_encode($contents, \JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    /**
+     * @return list<array{stage: string, file: string, status: string}>
+     */
+    private function generatedCoverage(Randomizer $randomizer): array
+    {
+        $coverage = [];
+        foreach (self::GENERATED_FILES as $file) {
+            $status = self::GENERATED_STATUSES[$randomizer->getInt(0, \count(self::GENERATED_STATUSES) - 1)];
+            if (null !== $status) {
+                $coverage[] = ['stage' => 'attacker', 'file' => $file, 'status' => $status];
+            }
+        }
+
+        return $coverage;
+    }
+
+    /**
+     * Entries naming a finding under any spelling of its file and any type it
+     * was reported as, at times under a fingerprint of another finding, with or
+     * without an attacker fingerprint or a file, or as a bare fingerprint.
+     *
+     * @return list<array<string, string>|string>
+     */
+    private function generatedEntries(Randomizer $randomizer): array
+    {
+        $entries = [];
+        for ($index = $randomizer->getInt(0, 6); $index > 0; --$index) {
+            [$type, $file, $title] = $this->generatedName($randomizer, true);
+            $fingerprint = Vulnerability::fingerprintOf(...(0 === $randomizer->getInt(0, 3) ? $this->generatedName($randomizer, true) : [$type, $file, $title]));
+            $entry = ['fingerprint' => $fingerprint, 'type' => $type, 'file' => $file, 'title' => $title];
+            if (0 === $randomizer->getInt(0, 3)) {
+                $entry['attacker_fingerprint'] = Vulnerability::fingerprintOf(...$this->generatedName($randomizer, false));
+            }
+
+            $entries[] = match ($randomizer->getInt(0, 7)) {
+                0 => $fingerprint,
+                1 => array_diff_key($entry, ['file' => true]),
+                default => $entry,
+            };
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @return array{string, string, string}
+     */
+    private function generatedName(Randomizer $randomizer, bool $respelled): array
+    {
+        $file = self::GENERATED_FILES[$randomizer->getInt(0, \count(self::GENERATED_FILES) - 1)];
+        $spellings = [$file, './'.$file, '/'.$file, str_replace('/', '\\', $file), '/abs/project/'.$file, 'lib/'.$file];
+
+        return [
+            self::GENERATED_TYPES[$randomizer->getInt(0, \count(self::GENERATED_TYPES) - 1)],
+            $respelled ? $spellings[$randomizer->getInt(0, \count($spellings) - 1)] : $file,
+            self::GENERATED_TITLES[$randomizer->getInt(0, \count(self::GENERATED_TITLES) - 1)],
+        ];
+    }
+
+    /**
+     * @param list<BaselineEntry> $entries
+     *
+     * @return list<array<array-key, mixed>|string>
+     */
+    private function rawOf(array $entries): array
+    {
+        return array_map(static fn (BaselineEntry $baselineEntry): array|string => $baselineEntry->raw, $entries);
+    }
+
+    /**
+     * @param list<DiffFinding> $findings
+     *
+     * @return list<array{fingerprint: string, type: string, file: string, title: string, severity: string}>
+     */
+    private function arraysOf(array $findings): array
+    {
+        return array_map(static fn (DiffFinding $diffFinding): array => $diffFinding->toArray(), $findings);
     }
 
     /**
