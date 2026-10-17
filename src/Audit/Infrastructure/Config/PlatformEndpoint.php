@@ -40,9 +40,9 @@ final readonly class PlatformEndpoint
         }
 
         $scheme = $uri->getScheme();
-        $host = $uri->getHost();
+        $host = $uri->getRawHost();
 
-        return null === $scheme || null === $host ? null : new self($scheme, $host, $uri->getPort());
+        return null === $scheme || null === $host ? null : new self($scheme, strtolower($host), $uri->getPort());
     }
 
     /**
