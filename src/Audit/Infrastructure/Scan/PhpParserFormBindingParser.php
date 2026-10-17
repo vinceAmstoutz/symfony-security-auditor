@@ -146,7 +146,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
     }
 
     /**
-     * @return list<FormBinding>
+     * @return array<string, FormBinding>
      */
     private function bindingsForMethod(string $filePath, ClassMethod $classMethod, ReachableCallIndex $reachableCallIndex): array
     {
@@ -160,7 +160,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
             $bindings[$formClass] = new FormBinding($filePath, $classMethod->name->toString(), $formClass);
         }
 
-        return array_values($bindings);
+        return $bindings;
     }
 
     /**

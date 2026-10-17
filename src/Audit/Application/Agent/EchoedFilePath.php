@@ -43,7 +43,7 @@ final readonly class EchoedFilePath
      * Whether `$path` names the file with these paths, compared as
      * {@see self::resolve()} compares them.
      */
-    public static function denotes(string $path, string $relativePath, string $absolutePath): bool
+    private static function denotes(string $path, string $relativePath, string $absolutePath): bool
     {
         $echoed = self::comparable($path);
 

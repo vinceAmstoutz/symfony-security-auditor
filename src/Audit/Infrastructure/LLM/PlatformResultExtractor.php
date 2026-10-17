@@ -25,6 +25,7 @@ use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
+use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
@@ -177,8 +178,15 @@ final readonly class PlatformResultExtractor
 
     private function usageInRawAnswer(DeferredResult $deferredResult): ?TokenUsageInterface
     {
+        $tokenUsageExtractor = $deferredResult->getResultConverter()->getTokenUsageExtractor();
+
+        return $tokenUsageExtractor instanceof TokenUsageExtractorInterface ? $this->extractedUsage($tokenUsageExtractor, $deferredResult) : null;
+    }
+
+    private function extractedUsage(TokenUsageExtractorInterface $tokenUsageExtractor, DeferredResult $deferredResult): ?TokenUsageInterface
+    {
         try {
-            return $deferredResult->getResultConverter()->getTokenUsageExtractor()?->extract($deferredResult->getRawResult());
+            return $tokenUsageExtractor->extract($deferredResult->getRawResult());
         } catch (Throwable) {
             return null;
         }
