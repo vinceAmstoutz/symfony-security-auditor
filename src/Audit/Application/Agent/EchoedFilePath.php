@@ -40,23 +40,25 @@ final readonly class EchoedFilePath
     }
 
     /**
-     * Whether `$path` names the file with these paths, compared as
-     * {@see self::resolve()} compares them.
-     */
-    private static function denotes(string $path, string $relativePath, string $absolutePath): bool
-    {
-        $echoed = self::comparable($path);
-
-        return self::comparable($relativePath) === $echoed || self::comparable($absolutePath) === $echoed;
-    }
-
-    /**
      * Whether `$path` names the file `$relativePath` of the project at
-     * `$projectPath`, by its relative or its absolute path.
+     * `$projectPath`, by its relative or its absolute path, compared as
+     * {@see self::resolve()} compares them.
      */
     public static function denotesProjectFile(string $path, string $relativePath, string $projectPath): bool
     {
-        return self::denotes($path, $relativePath, \sprintf('%s/%s', $projectPath, $relativePath));
+        return \in_array(self::comparable($path), self::projectFileForms($relativePath, $projectPath), true);
+    }
+
+    /**
+     * The comparable forms of the file `$relativePath` of the project at
+     * `$projectPath`: a path names it exactly when its own comparable form is
+     * one of them.
+     *
+     * @return array{string, string}
+     */
+    public static function projectFileForms(string $relativePath, string $projectPath): array
+    {
+        return [self::comparable($relativePath), self::comparable(\sprintf('%s/%s', $projectPath, $relativePath))];
     }
 
     /**
@@ -92,7 +94,11 @@ final readonly class EchoedFilePath
         return $denoted;
     }
 
-    private static function comparable(string $path): string
+    /**
+     * The path on forward slashes without a leading `./` or `/`, the form two
+     * spellings of one file share.
+     */
+    public static function comparable(string $path): string
     {
         return b($path)->replace('\\', '/')->replaceMatches('#^(?:\./|/)+#', '')->toString();
     }
