@@ -48,7 +48,7 @@ while ([] !== $queue || [] !== $running) {
     usleep(50_000);
 }
 
-fwrite(\STDERR, "Draft entries for tests/Phpunit/Compat/accepted-differences.php follow: give each a reason and its CHANGELOG bullet, widen a path only where every difference under it is the same change, and drop any that is a break to fix.\n");
+fwrite(\STDERR, "Draft entries for tests/Phpunit/Compat/accepted-differences.php follow: give each a reason and the pull request (#123) that its CHANGELOG bullet links, widen a path only where every difference under it is the same change, and drop any that is a break to fix.\n");
 fwrite(\STDOUT, $draftEntries->entries());
 foreach ($draftEntries->stale() as $line) {
     fwrite(\STDERR, sprintf("No longer shows, take the scenario out of the entry: %s\n", $line));

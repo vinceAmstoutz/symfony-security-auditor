@@ -14,9 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat;
 
 /**
- * The bold summaries of the `CHANGELOG.md` bullets under `## [Unreleased]`:
- * a difference from the last release is accepted only when the release about
- * to ship announces it, not when an older release happened to word it.
+ * The pull requests, as `#123`, that the `CHANGELOG.md` bullets under
+ * `## [Unreleased]` link: a difference from the last release is accepted only
+ * when the release about to ship announces it, not when an older release
+ * happened to word it.
  */
 final readonly class UnreleasedChangelog
 {
@@ -25,16 +26,16 @@ final readonly class UnreleasedChangelog
     /**
      * @return list<string>
      */
-    public static function summaries(): array
+    public static function references(): array
     {
         $section = 1 === preg_match('/^## \[Unreleased\]\R(.*?)(?=^## \[)/ms', (string) file_get_contents(self::CHANGELOG), $match) ? $match[1] : '';
-        preg_match_all('/^- \*\*(.+?)\*\*/m', $section, $bullets);
+        preg_match_all('/\[#(\d+)\]\(https:\/\/github\.com\/[^\/)]+\/[^\/)]+\/pull\/\1\)/', $section, $links);
 
-        return $bullets[1];
+        return array_values(array_unique(array_map(static fn (string $number): string => '#'.$number, $links[1])));
     }
 
-    public static function announces(string $summary): bool
+    public static function announces(string $reference): bool
     {
-        return \in_array($summary, self::summaries(), true);
+        return \in_array($reference, self::references(), true);
     }
 }

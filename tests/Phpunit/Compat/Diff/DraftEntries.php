@@ -89,7 +89,7 @@ final class DraftEntries
         $entries = [];
         foreach ($this->drafts as $draft) {
             $entries[] = \sprintf(
-                "    [\n        'scenarios' => %s,\n        'path' => %s,\n        'match' => %s,\n        'reason' => 'TODO',\n        'changelog' => 'TODO',\n    ],\n",
+                "    [\n        'scenarios' => %s,\n        'path' => %s,\n        'match' => %s,\n        'reason' => 'TODO',\n        'changelog' => '#TODO',\n    ],\n",
                 var_export($draft['scenarios'], true),
                 var_export($draft['path'], true),
                 var_export($this->pattern($draft['subject']), true),

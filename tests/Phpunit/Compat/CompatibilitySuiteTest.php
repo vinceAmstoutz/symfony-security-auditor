@@ -158,7 +158,7 @@ final class CompatibilitySuiteTest extends TestCase
         }
 
         foreach (array_filter($acceptedDifference->changelog, static fn (string $bullet): bool => !UnreleasedChangelog::announces($bullet)) as $bullet) {
-            $problems[] = \sprintf('%s cites a bullet ## [Unreleased] in CHANGELOG.md does not hold: "%s"', $acceptedDifference->path, $bullet);
+            $problems[] = \sprintf('%s cites a pull request no bullet under ## [Unreleased] in CHANGELOG.md links: "%s"', $acceptedDifference->path, $bullet);
         }
 
         return $problems;
