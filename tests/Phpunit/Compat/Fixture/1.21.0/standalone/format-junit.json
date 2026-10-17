@@ -1,0 +1,95 @@
+{
+    "scenario": "standalone/format-junit",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='junit'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+                        "<testsuites>",
+                        "  <testsuite name=\"symfony-security-auditor\" tests=\"3\" failures=\"3\" errors=\"0\">",
+                        "    <testcase classname=\"broken_access_control\" name=\"Unprotected admin (src/Controller/AdminController.php:7)\">",
+                        "      <failure type=\"critical\" message=\"Unprotected admin\">desc",
+                        "",
+                        "Severity: critical",
+                        "Location: src/Controller/AdminController.php:7-8",
+                        "OWASP: OWASP A01:2025 - Broken Access Control",
+                        "CWE: CWE-284",
+                        "Remediation: fix</failure>",
+                        "    </testcase>",
+                        "    <testcase classname=\"sql_injection\" name=\"SQLi in api (src/Controller/ApiController.php:7)\">",
+                        "      <failure type=\"high\" message=\"SQLi in api\">desc",
+                        "",
+                        "Severity: high",
+                        "Location: src/Controller/ApiController.php:7-7",
+                        "OWASP: OWASP A05:2025 - Injection",
+                        "CWE: CWE-89",
+                        "Remediation: fix</failure>",
+                        "    </testcase>",
+                        "    <testcase classname=\"insecure_direct_object_reference\" name=\"DOWNGRADE idor (src/Controller/UserController.php:1)\">",
+                        "      <failure type=\"low\" message=\"DOWNGRADE idor\">desc",
+                        "",
+                        "Severity: low",
+                        "Location: src/Controller/UserController.php:1-1",
+                        "OWASP: OWASP A01:2025 - Broken Access Control",
+                        "CWE: CWE-639",
+                        "Remediation: fix</failure>",
+                        "    </testcase>",
+                        "  </testsuite>",
+                        "</testsuites>"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "API key: compat…6789",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php"
+            ]
+        }
+    }
+}

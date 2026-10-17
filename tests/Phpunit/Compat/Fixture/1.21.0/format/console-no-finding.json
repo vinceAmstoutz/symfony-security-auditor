@@ -1,0 +1,71 @@
+{
+    "scenario": "format/console-no-finding",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='console'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------",
+                        "",
+                        " The audit makes many LLM calls — typically several minutes, 20+ minutes on large projects.",
+                        " Live progress and findings stream below as they happen.",
+                        "",
+                        "Auditing 2 file(s) — 1 controller(s)",
+                        "Iteration 1/3",
+                        "  Analyzing chunk 1/2",
+                        "  ✓ chunk 1/2 done",
+                        "  Analyzing chunk 2/2",
+                        "  ✓ chunk 2/2 done",
+                        "No new findings this pass.",
+                        "",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "  🔍 SYMFONY LLM AUDIT REPORT — AUDIT-<ID>",
+                        "  vinceamstoutz/symfony-security-auditor",
+                        "  https://github.com/vinceamstoutz/symfony-security-auditor",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "",
+                        "  Project : <WORKSPACE>/project",
+                        "  Started : <TIMESTAMP>",
+                        "  Duration: <DURATION>",
+                        "  Files   : 2 scanned",
+                        "  Tokens  : 200 in / 20 out (gpt-4o)",
+                        "  Cost    : $0.0007 (published rates)",
+                        "",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "  RISK LEVEL: SAFE  (Score: 0)",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "",
+                        "  ✅  No validated vulnerabilities found.",
+                        "",
+                        " [OK] Audit complete. Risk: SAFE | Vulnerabilities: 0"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/HomeController.php",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Service/Clean.php"
+            ]
+        }
+    }
+}

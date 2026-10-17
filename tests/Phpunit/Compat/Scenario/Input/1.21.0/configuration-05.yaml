@@ -1,0 +1,23 @@
+# config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    attacker_model: 'claude-opus-5'
+    reviewer_model: 'claude-haiku-4-5-20251001'
+    scan:
+        included_paths:
+            - 'src'
+            - 'config'
+            - 'templates'
+            - 'public/index.php'
+        respect_gitignore: true
+        max_file_size_kb: 256
+        secret_scrubbing:
+            enabled: true
+            additional_patterns:
+                - '/MY_INTERNAL_TOKEN-[A-Z0-9]{16}/'
+    audit:
+        max_iterations: 5
+        min_confidence: 0.7
+        reviewer_batch_size: 5
+        tools_enabled: true
+    cache:
+        enabled: true

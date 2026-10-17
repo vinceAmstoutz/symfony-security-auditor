@@ -1,0 +1,62 @@
+{
+    "scenario": "standalone/init-force-same-provider",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "init --provider='openai' --model='gpt-4o' --force=true",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        " Downloading the openai provider bridge with composer — this can take a minute…",
+                        "",
+                        " [OK] Configuration written to",
+                        "      <WORKSPACE>/home/config/symfony-security-auditor/config.yaml.",
+                        "",
+                        " ------------------ ----------------",
+                        "  Provider           openai",
+                        "  Model              gpt-4o",
+                        "  API key variable   OPENAI_API_KEY",
+                        " ------------------ ----------------",
+                        "",
+                        " ! [NOTE] No key stored. Export OPENAI_API_KEY before auditing, or run \"auth:set\" at any time to store it. Keeping the",
+                        " !        key out of your shell history: docs/configuration.md#providing-the-api-key"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "home/config/symfony-security-auditor/config.yaml": {
+                "lines": [
+                    "provider: openai",
+                    "platform:",
+                    "    openai: { api_key: '%env(OPENAI_API_KEY)%' }",
+                    "model: gpt-4o"
+                ]
+            },
+            "home/data/symfony-security-auditor/composer.json": {
+                "json": {
+                    "config": {
+                        "platform": {
+                            "php": "<PHP-VERSION>"
+                        }
+                    },
+                    "require": {
+                        "symfony/ai-platform": "<PACKAGE-VERSION>"
+                    }
+                }
+            }
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

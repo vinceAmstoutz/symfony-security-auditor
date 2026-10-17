@@ -1,0 +1,39 @@
+{
+    "scenario": "standalone/auth-status-environment",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "auth:status",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        " ----------------- --------------------------------------------------------------------------------------------------------",
+                        "  Variable          COMPAT_API_KEY",
+                        "  Source            the environment",
+                        "  Key               compat…6789",
+                        "  Fingerprint       SHA256:876f2b5044e5b44d",
+                        "  Credential file   <WORKSPACE>/home/config/symfony-security-auditor/credentials.json",
+                        " ----------------- --------------------------------------------------------------------------------------------------------",
+                        "",
+                        "",
+                        " ! [NOTE] A key is also stored on this machine, but the exported COMPAT_API_KEY wins. Unset it to go back to the stored",
+                        " !        one."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

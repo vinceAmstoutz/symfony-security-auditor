@@ -1,0 +1,2 @@
+symfony_security_auditor:
+    model: 'llama3.2'  # or any model pulled via `ollama pull`

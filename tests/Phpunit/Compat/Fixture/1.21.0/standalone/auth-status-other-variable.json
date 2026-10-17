@@ -1,0 +1,37 @@
+{
+    "scenario": "standalone/auth-status-other-variable",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "auth:status --env-var='OTHER_API_KEY'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " [WARNING] No API key resolves for OTHER_API_KEY: it is not exported, and nothing is stored for it.",
+                        "",
+                        " Pick whichever fits how you work:",
+                        " -------------------------------------- ------------------------------------------------------------",
+                        "  auth:set                               store the key on this machine, in a file only you can read",
+                        "  export OTHER_API_KEY=…                 this shell only",
+                        "  OTHER_API_KEY=$(pass show …) audit .   straight from a password manager, nothing written to disk",
+                        " -------------------------------------- ------------------------------------------------------------"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

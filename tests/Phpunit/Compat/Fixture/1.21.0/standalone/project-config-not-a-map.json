@@ -1,0 +1,36 @@
+{
+    "scenario": "standalone/project-config-not-a-map",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In ProjectConfigUserOnlyKeyException.php line <LINE>:",
+                        "",
+                        "  The project config \"<WORKSPACE>/cwd/.symfony-security-auditor.yaml\" sets \"audi",
+                        "  t\" to something other than a map, which would drop every setting of that section in your user config — a repository",
+                        "   you audit may override single keys beneath it, never the section itself."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

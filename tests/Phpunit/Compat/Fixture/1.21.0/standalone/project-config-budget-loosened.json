@@ -1,0 +1,36 @@
+{
+    "scenario": "standalone/project-config-budget-loosened",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In ProjectConfigUserOnlyKeyException.php line <LINE>:",
+                        "",
+                        "  The project config \"<WORKSPACE>/cwd/.symfony-security-auditor.yaml\" sets \"audi",
+                        "  t.budget.max_cost_usd\" to something other than a number at or below the cap in your user config — a repository you",
+                        "  audit may tighten the budget, never loosen it."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

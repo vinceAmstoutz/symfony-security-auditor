@@ -1,0 +1,65 @@
+{
+    "scenario": "format/github",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='github'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "::error file=src/Controller/AdminController.php,line=7,endLine=8,title=Unprotected admin::desc%0A%0ARemediation: fix",
+                        "::error file=src/Controller/ApiController.php,line=7,title=SQLi in api::desc%0A%0ARemediation: fix",
+                        "::notice file=src/Controller/UserController.php,line=1,title=DOWNGRADE idor::desc%0A%0ARemediation: fix"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php"
+            ]
+        }
+    }
+}

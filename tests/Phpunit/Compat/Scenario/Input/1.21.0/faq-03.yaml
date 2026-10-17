@@ -1,0 +1,5 @@
+symfony_security_auditor:
+    max_output_tokens: 4096
+    # or, split per agent:
+    attacker_max_output_tokens: 8192
+    reviewer_max_output_tokens: 2048

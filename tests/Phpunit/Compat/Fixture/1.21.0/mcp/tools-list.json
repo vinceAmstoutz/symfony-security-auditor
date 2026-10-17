@@ -1,0 +1,71 @@
+{
+    "scenario": "mcp/tools-list",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "mcp:serve",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "mcp-responses.json": {
+                "json": [
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "result": {
+                            "protocolVersion": "<DATE>",
+                            "capabilities": {
+                                "logging": [],
+                                "completions": [],
+                                "tools": []
+                            },
+                            "serverInfo": {
+                                "name": "symfony-security-auditor",
+                                "version": "<VERSION>"
+                            }
+                        }
+                    },
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "result": {
+                            "tools": [
+                                {
+                                    "name": "audit",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "path": {
+                                                "type": "string",
+                                                "description": "Absolute path to the Symfony project directory to audit."
+                                            }
+                                        },
+                                        "required": [
+                                            "path"
+                                        ]
+                                    },
+                                    "description": "Run the AI-powered multi-agent security audit on a Symfony project directory and return the JSON report of the vulnerabilities found."
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

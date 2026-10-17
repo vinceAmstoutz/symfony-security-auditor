@@ -5,8 +5,9 @@ RUN apk add --no-cache \
         git \
         unzip \
         libzip-dev \
+        icu-dev \
         $PHPIZE_DEPS \
-    && docker-php-ext-install zip \
+    && docker-php-ext-install zip bcmath intl \
     && pecl install pcov \
     && docker-php-ext-enable pcov \
     && apk del $PHPIZE_DEPS

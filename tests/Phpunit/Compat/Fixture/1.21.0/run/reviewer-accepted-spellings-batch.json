@@ -1,0 +1,442 @@
+{
+    "scenario": "run/reviewer-accepted-spellings-batch",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "audit_id": "AUDIT-<ID>",
+                        "project": "<WORKSPACE>/project",
+                        "started_at": "<TIMESTAMP>",
+                        "completed_at": "<TIMESTAMP>",
+                        "duration_seconds": 0,
+                        "files_scanned": 14,
+                        "complete": true,
+                        "risk_score": 49,
+                        "risk_level": "HIGH",
+                        "score": 51,
+                        "grade": "D",
+                        "total_vulnerabilities": 7,
+                        "by_severity": {
+                            "critical": 0,
+                            "high": 7,
+                            "medium": 0,
+                            "low": 0,
+                            "info": 0
+                        },
+                        "vulnerabilities": [
+                            {
+                                "id": "VULN-32960B08",
+                                "fingerprint": "SSA-D3A2FB8D547E",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "T_float",
+                                "description": "desc",
+                                "file": "src/Controller/T_floatController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-5597D156",
+                                "fingerprint": "SSA-996B153E2160",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "T_int1",
+                                "description": "desc",
+                                "file": "src/Controller/T_int1Controller.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-9E9B1EB0",
+                                "fingerprint": "SSA-C391D9554785",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "T_int2",
+                                "description": "desc",
+                                "file": "src/Controller/T_int2Controller.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-CFF909C5",
+                                "fingerprint": "SSA-E5A995DE2964",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "T_str_no",
+                                "description": "desc",
+                                "file": "src/Controller/T_str_noController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-508E8DD3",
+                                "fingerprint": "SSA-0AF624D5EE95",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "T_str_rejected",
+                                "description": "desc",
+                                "file": "src/Controller/T_str_rejectedController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-64429669",
+                                "fingerprint": "SSA-3822DA4D36B2",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "T_str_yes",
+                                "description": "desc",
+                                "file": "src/Controller/T_str_yesController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-B33F251C",
+                                "fingerprint": "SSA-5BDCEE5E2769",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "T_true",
+                                "description": "desc",
+                                "file": "src/Controller/T_trueController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            }
+                        ],
+                        "cost": {
+                            "input_tokens": 1500,
+                            "output_tokens": 150,
+                            "total_tokens": 1650,
+                            "estimated_cost_usd": 0.00525,
+                            "primary_model": "gpt-4o",
+                            "by_role": [],
+                            "by_model": {
+                                "gpt-4o": {
+                                    "model": "gpt-4o",
+                                    "input_tokens": 1500,
+                                    "output_tokens": 150,
+                                    "cache_read_tokens": 0,
+                                    "cache_creation_tokens": 0,
+                                    "estimated_cost_usd": 0.00525,
+                                    "billed_models": [
+                                        "gpt-4o"
+                                    ]
+                                }
+                            }
+                        },
+                        "scope": {
+                            "since": null,
+                            "paths": []
+                        },
+                        "coverage": [
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_arrController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_emptyController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_falseController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_floatController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_int0Controller.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_int1Controller.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_int2Controller.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_missingController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_nullController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_str_falseController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_str_noController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_str_rejectedController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_str_yesController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/T_trueController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_arrController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_emptyController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_falseController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_floatController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_int0Controller.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_int1Controller.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_int2Controller.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_missingController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_nullController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_str_falseController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_str_noController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_str_rejectedController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_str_yesController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/T_trueController.php",
+                                "status": "validated"
+                            }
+                        ]
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker-json model=gpt-4o files=src/Controller/T_arrController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_emptyController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_falseController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_floatController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_int0Controller.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_int1Controller.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_int2Controller.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_missingController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_nullController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_str_falseController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_str_noController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_str_rejectedController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_str_yesController.php",
+                "attacker-json model=gpt-4o files=src/Controller/T_trueController.php",
+                "reviewer-json model=gpt-4o findings=14"
+            ]
+        }
+    }
+}

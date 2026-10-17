@@ -1,0 +1,17 @@
+#!/bin/sh
+# Offline stand-in for Composer: the compatibility suite never reaches Packagist.
+case "$1" in
+    --version|-V)
+        echo 'Composer version 2.8.12 2025-09-19 13:41:59'
+        ;;
+    audit)
+        echo '{"advisories":{"symfony/http-kernel":[{"advisoryId":"PKSA-compat-0001","packageName":"symfony/http-kernel","affectedVersions":"<5.4.20","title":"Compat advisory","cve":"CVE-2099-0001","link":"https://example.com/advisory","reportedAt":"2026-01-01T00:00:00+00:00","sources":[{"name":"GitHub","remoteId":"GHSA-compat"}],"severity":"high"}]},"abandoned":[]}'
+        exit 1
+        ;;
+    require)
+        ;;
+    *)
+        echo "composer: unsupported command $1" >&2
+        exit 1
+        ;;
+esac

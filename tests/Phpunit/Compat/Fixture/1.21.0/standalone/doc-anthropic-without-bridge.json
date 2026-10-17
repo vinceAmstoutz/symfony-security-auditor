@@ -1,0 +1,36 @@
+{
+    "scenario": "standalone/doc-anthropic-without-bridge",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In ProviderBridgeException.php line <LINE>:",
+                        "",
+                        "  The \"anthropic\" provider bridge (symfony/ai-anthropic-platform) is not installed under the standalone data director",
+                        "  y. Run \"symfony-security-auditor init --provider=anthropic\" to download it; a \"composer require\" in the audited pro",
+                        "  ject does not help, the binary never loads that project's vendor directory."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

@@ -1,0 +1,9 @@
+# config/packages/ai.yaml
+ai:
+  platform:
+    ollama:
+      endpoint: 'http://localhost:11434'
+
+# config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    model: 'llama3.3'  # or any model from `ollama pull`

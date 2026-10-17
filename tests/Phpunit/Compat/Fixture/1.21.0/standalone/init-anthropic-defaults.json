@@ -1,0 +1,62 @@
+{
+    "scenario": "standalone/init-anthropic-defaults",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "init --provider='anthropic'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        " Downloading the anthropic provider bridge with composer — this can take a minute…",
+                        "",
+                        " [OK] Configuration written to",
+                        "      <WORKSPACE>/home/config/symfony-security-auditor/config.yaml.",
+                        "",
+                        " ------------------ -------------------",
+                        "  Provider           anthropic",
+                        "  Model              claude-opus-4-8",
+                        "  API key variable   ANTHROPIC_API_KEY",
+                        " ------------------ -------------------",
+                        "",
+                        " ! [NOTE] No key stored. Export ANTHROPIC_API_KEY before auditing, or run \"auth:set\" at any time to store it. Keeping",
+                        " !        the key out of your shell history: docs/configuration.md#providing-the-api-key"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": {
+            "home/config/symfony-security-auditor/config.yaml": {
+                "lines": [
+                    "provider: anthropic",
+                    "platform:",
+                    "    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }",
+                    "model: claude-opus-4-8"
+                ]
+            },
+            "home/data/symfony-security-auditor/composer.json": {
+                "json": {
+                    "config": {
+                        "platform": {
+                            "php": "<PHP-VERSION>"
+                        }
+                    },
+                    "require": {
+                        "symfony/ai-platform": "<PACKAGE-VERSION>"
+                    }
+                }
+            }
+        },
+        "llm": {
+            "lines": []
+        }
+    }
+}

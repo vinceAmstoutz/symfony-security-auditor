@@ -1,0 +1,38 @@
+{
+    "scenario": "standalone/user-config-missing-api-key",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In MissingEnvironmentVariableException.php line <LINE>:",
+                        "",
+                        "  No API key available. Your config reads it from \"COMPAT_API_KEY\", which is not set in the environment and has nothi",
+                        "  ng stored for it. Fix it in whichever way suits you: run \"auth:set --env-var=COMPAT_API_KEY\" to store the key on th",
+                        "  is machine (kept in an owner-only file, so no shell export is needed again); or export COMPAT_API_KEY in your shell",
+                        "  ; or pass it per run from a password manager, e.g. COMPAT_API_KEY=$(pass show anthropic/api-key) symfony-security-a",
+                        "  uditor audit . — run \"auth:status --env-var=COMPAT_API_KEY\" to see what is currently resolved."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

@@ -1,0 +1,60 @@
+{
+    "scenario": "format/executive-no-finding",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='executive'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "  EXECUTIVE SUMMARY — SECURITY AUDIT",
+                        "  <WORKSPACE>/project",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "",
+                        "  Audited : <TIMESTAMP> (2 files, <DURATION>)",
+                        "  Audit ID: AUDIT-<ID>",
+                        "",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "  RISK LEVEL: SAFE  (Score: 0)",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "",
+                        "  No validated findings: this audit identified no business exposure",
+                        "  in the scanned surface.",
+                        "",
+                        "  No validated vulnerabilities found.",
+                        "",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "  Findings are validated by a reviewer agent but not human-triaged.",
+                        "  Run with --format=console for the full technical detail of each one.",
+                        "──────────────────────────────────────────────────────────────────────"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/HomeController.php",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Service/Clean.php"
+            ]
+        }
+    }
+}

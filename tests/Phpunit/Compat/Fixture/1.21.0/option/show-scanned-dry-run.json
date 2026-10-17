@@ -1,0 +1,67 @@
+{
+    "scenario": "option/show-scanned-dry-run",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --show-scanned=true --dry-run=true",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Scanned files (7)",
+                        "-----------------",
+                        "",
+                        " config (1)",
+                        " * config/packages/security.yaml",
+                        "",
+                        " controller (4)",
+                        " * src/Controller/AdminController.php",
+                        " * src/Controller/ApiController.php",
+                        " * src/Controller/LowConfController.php",
+                        " * src/Controller/UserController.php",
+                        "",
+                        " template (1)",
+                        " * templates/base.html.twig",
+                        "",
+                        " php · uncategorized (1)",
+                        " * src/Service/Clean.php",
+                        "",
+                        "  7 file(s) in scope.",
+                        "",
+                        "Estimating audit cost (dry run)...",
+                        "----------------------------------",
+                        "",
+                        " * Model : gpt-4o",
+                        " * Tokens: 205,722 in / 30,859 out (total: 236,581)",
+                        " * Cost  : $0.8229 (estimate)",
+                        " *   attacker (gpt-4o): $0.8221 — 205,533 in / 30,830 out",
+                        " *   reviewer (gpt-4o): $0.0008 — 189 in / 29 out",
+                        "",
+                        " Reviewer input is projected at ~0% of attacker input in this estimate — a flat pre-run heuristic, not a measurement; actual cost scales with real findings.",
+                        " Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.",
+                        "",
+                        "  Dry run complete."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

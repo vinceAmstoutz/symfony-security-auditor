@@ -1,0 +1,35 @@
+{
+    "scenario": "standalone/auth-status-stored",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "auth:status",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        " ----------------- --------------------------------------------------------------------------------------------------------",
+                        "  Variable          COMPAT_API_KEY",
+                        "  Source            stored on this machine",
+                        "  Key               stored…6789",
+                        "  Fingerprint       SHA256:a8af3e7c6a912a06",
+                        "  Credential file   <WORKSPACE>/home/config/symfony-security-auditor/credentials.json",
+                        " ----------------- --------------------------------------------------------------------------------------------------------"
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

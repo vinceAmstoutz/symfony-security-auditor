@@ -1,0 +1,3 @@
+symfony_security_auditor:
+    cache:
+        dir: '{workspace}/symfony-security-auditor/cache'

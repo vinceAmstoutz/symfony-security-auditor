@@ -1,0 +1,32 @@
+{
+    "scenario": "format/unknown",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='yaml'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        "",
+                        "  The value \"yaml\" is not valid for the \"format\" option. Supported values are \"console\", \"executive\", \"json\", \"sarif\"",
+                        "  , \"html\", \"markdown\", \"junit\", \"github\", \"github-comment\".",
+                        "",
+                        "",
+                        "audit:run [-f|--format FORMAT] [-o|--output OUTPUT] [--dry-run] [--show-scanned] [--no-cache] [-p|--path PATH] [--since SINCE] [--baseline BASELINE] [--generate-baseline GENERATE-BASELINE] [--fail-on FAIL-ON] [--min-score MIN-SCORE] [--fail-on-incomplete] [--] [<project-path>]"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

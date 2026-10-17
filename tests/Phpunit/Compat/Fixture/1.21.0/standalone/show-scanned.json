@@ -1,0 +1,52 @@
+{
+    "scenario": "standalone/show-scanned",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --show-scanned=true",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "API key: compat…6789",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Scanned files (7)",
+                        "-----------------",
+                        "",
+                        " config (1)",
+                        " * config/packages/security.yaml",
+                        "",
+                        " controller (4)",
+                        " * src/Controller/AdminController.php",
+                        " * src/Controller/ApiController.php",
+                        " * src/Controller/LowConfController.php",
+                        " * src/Controller/UserController.php",
+                        "",
+                        " template (1)",
+                        " * templates/base.html.twig",
+                        "",
+                        " php · uncategorized (1)",
+                        " * src/Service/Clean.php",
+                        "",
+                        "  7 file(s) in scope."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}
