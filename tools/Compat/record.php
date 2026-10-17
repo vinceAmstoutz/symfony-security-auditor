@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario\ScenarioCatalog;
 
 $checkout = $argv[1] ?? '';
 $release = $argv[2] ?? '';
-$only = array_slice($argv, 3);
+$only = array_slice($argv ?? [], 3);
 
 if (!is_file(sprintf('%s/vendor/autoload.php', $checkout)) || 1 !== preg_match('/^\d+\.\d+\.\d+$/', $release)) {
     fwrite(\STDERR, "Usage: php tools/Compat/record.php <checkout-with-vendor> <X.Y.Z> [scenario ...]\n");
