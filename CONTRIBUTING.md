@@ -117,7 +117,7 @@ A `1.x` upgrade must not break what a user wrote or built against the last relea
 docker compose exec php vendor/bin/phpunit -c phpunit.compat.xml
 ```
 
-It runs as the **Compatibility** CI job, on PHP 8.3 and Symfony 7.4. A difference is accepted only with the bold summary of the `CHANGELOG.md` bullet under `## [Unreleased]` that announces it; an accepted difference that no longer shows fails too, so the list never outlives what it describes. The fixtures are written only by the recorders, which seal them: a fixture edited by hand fails. Record them again instead.
+It runs as the **Compatibility** CI job, on PHP 8.3 and Symfony 7.4. A difference is accepted only with the pull request (`'#123'`) that a `CHANGELOG.md` bullet under `## [Unreleased]` links to announce it; an accepted difference that no longer shows fails too, so the list never outlives what it describes. The fixtures are written only by the recorders, which seal them: a fixture edited by hand fails. Record them again instead.
 
 ### Configuration Snapshot
 
@@ -134,7 +134,7 @@ docker compose exec php composer install --working-dir=tools/bc-check
 docker compose exec php var/bc-check/vendor/bin/roave-backward-compatibility-check --from=1.21.0
 ```
 
-A break the maintainer accepted goes into `.roave-backward-compatibility-check.xml` as an `ignored-regex` that is the reported line itself, with every metacharacter escaped, right after a `<!-- CHANGELOG: "…" -->` comment naming the bold summary of its bullet under `## [Unreleased]`. `RoaveBaselineTest` refuses a pattern with a wildcard and an entry no such bullet announces.
+A break the maintainer accepted goes into `.roave-backward-compatibility-check.xml` as an `ignored-regex` that is the reported line itself, with every metacharacter escaped, right after a `<!-- CHANGELOG: "#123" -->` comment naming the pull request that a bullet under `## [Unreleased]` links. `RoaveBaselineTest` refuses a pattern with a wildcard and an entry no such bullet announces.
 
 ### Behaviour Replay
 
@@ -285,7 +285,7 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
 2. Create a feature branch: `git checkout -b feat/my-feature`.
 3. Write tests for your change (unit + integration where applicable).
 4. Mind backward compatibility — the project follows [Semantic Versioning 2.0.0](https://semver.org); any change that affects the public API surface listed in [`docs/versioning.md`](docs/versioning.md) needs a deprecation cycle and a `feat!:` commit.
-5. Ensure all checks pass: `bin/castor lint`.
+5. Ensure all checks pass: `bin/castor lint`. A behavior change also adds one line to `CHANGELOG.md` under `## [Unreleased]`, in the sections and voice of [`.claude/rules/changelog.md`](.claude/rules/changelog.md); `sh .github/scripts/check-changelog.sh` checks it.
 6. Open a pull request and fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md): a title of 50 characters or fewer, a `## Summary` of 500 or fewer, only the boxes you tick — the license box included — and no section beyond the template's four. The `Pull request target` check fails the pull request otherwise — run it first:
 
    ```bash

@@ -50,4 +50,4 @@ Out of scope (report upstream):
 
 ## Public Disclosure
 
-Once a fix is released, the advisory is published and credited. The CHANGELOG entry will reference the CVE (if assigned) under `### Security`.
+Once a fix is released, the advisory is published and credited. The CHANGELOG entry will cite the CVE or GHSA id under `### Security 🔒`. That section is reserved for such fixes: the changelog check fails an entry there without an id.

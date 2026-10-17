@@ -94,7 +94,7 @@ final class ConfigurationCompatibilityTest extends TestCase
 
         foreach ($this->acceptedChanges() as $acceptedParameterChange) {
             if (!UnreleasedChangelog::announces($acceptedParameterChange->changelog)) {
-                $problems[] = \sprintf('"%s" names no bullet under ## [Unreleased] in CHANGELOG.md: %s', implode('", "', $acceptedParameterChange->parameters), $acceptedParameterChange->changelog);
+                $problems[] = \sprintf('"%s" cites a pull request no bullet under ## [Unreleased] in CHANGELOG.md links: %s', implode('", "', $acceptedParameterChange->parameters), $acceptedParameterChange->changelog);
             }
 
             if ([] === array_filter($changed, $acceptedParameterChange->covers(...))) {

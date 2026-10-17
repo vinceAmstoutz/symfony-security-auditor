@@ -45,7 +45,7 @@ final class RoaveBaselineTest extends TestCase
             }
         }
 
-        self::assertSame([], $unannounced, 'Put a <!-- CHANGELOG: "..." --> comment naming the bold summary of its bullet under ## [Unreleased] right before each ignored-regex.');
+        self::assertSame([], $unannounced, 'Put a <!-- CHANGELOG: "#123" --> comment naming the pull request that a bullet under ## [Unreleased] links right before each ignored-regex.');
     }
 
     public function test_every_accepted_break_is_one_reported_line(): void
@@ -59,7 +59,7 @@ final class RoaveBaselineTest extends TestCase
     }
 
     /**
-     * @return array<string, string|null> each accepted pattern, with the CHANGELOG summary its comment names
+     * @return array<string, string|null> each accepted pattern, with the pull request its CHANGELOG comment names
      */
     private function acceptedBreaks(): array
     {
