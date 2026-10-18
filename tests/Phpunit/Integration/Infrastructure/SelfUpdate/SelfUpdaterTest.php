@@ -592,6 +592,18 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function test_it_keeps_a_release_newer_than_the_latest_one(): void
+    {
+        $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')))->run('2.0.0', false);
+
+        self::assertSame(SelfUpdateStatus::AlreadyUpToDate, $selfUpdateResult->status);
+        self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function test_it_takes_a_snapshot_build_back_to_the_latest_release(): void
     {
         $payload = 'RELEASE-BINARY';
