@@ -159,20 +159,29 @@ final readonly class GuardedProjectConfigReader
     }
 
     /**
-     * A known cap, given as a number no higher than the number before it for
-     * that cap; a cap left open can only be tightened.
+     * A known cap, given as a finite number no higher than the number before
+     * it for that cap; a cap left open can only be tightened, which an
+     * infinite cap or a NaN never does.
      *
      * @param array<array-key, mixed> $baseBudget
      */
     private function tightensCap(int|string $cap, mixed $value, array $baseBudget): bool
     {
-        if (!\in_array($cap, self::BUDGET_CAPS, true) || (!\is_int($value) && !\is_float($value))) {
+        if (!\in_array($cap, self::BUDGET_CAPS, true) || !$this->isFiniteNumber($value)) {
             return false;
         }
 
         $baseCap = $baseBudget[$cap] ?? null;
 
         return (!\is_int($baseCap) && !\is_float($baseCap)) || $value <= $baseCap;
+    }
+
+    /**
+     * @phpstan-assert-if-true int|float $value
+     */
+    private function isFiniteNumber(mixed $value): bool
+    {
+        return \is_int($value) || (\is_float($value) && is_finite($value));
     }
 
     /**

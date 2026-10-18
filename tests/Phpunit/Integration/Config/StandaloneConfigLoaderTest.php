@@ -884,6 +884,8 @@ final class StandaloneConfigLoaderTest extends TestCase
         yield 'a SARIF import path' => [$user, '', "profile: fast\nscan:\n  import_sarif:\n    - /etc/passwd\n", 'declares "scan.import_sarif"'];
         yield 'a budget loosened against the user config' => [$budgetedUser, '', "profile: fast\naudit:\n  budget:\n    max_tokens: 6000\n", 'sets "audit.budget.max_tokens"'];
         yield 'a budget loosened against the working directory config' => [$budgetedUser, "audit:\n  budget:\n    max_tokens: 3000\n", "profile: fast\naudit:\n  budget:\n    max_tokens: 4000\n", 'sets "audit.budget.max_tokens"'];
+        yield 'an infinite cost cap where the user set none' => [$user, '', "profile: fast\naudit:\n  budget:\n    max_cost_usd: .inf\n", 'sets "audit.budget.max_cost_usd"'];
+        yield 'a cost cap that is not a number where the user set none' => [$user, '', "profile: fast\naudit:\n  budget:\n    max_cost_usd: .nan\n", 'sets "audit.budget.max_cost_usd"'];
         yield 'a section of the user config erased' => [$user."audit:\n  fail_on: low\n", '', "profile: fast\naudit: ~\n", 'sets "audit" to something other than a map'];
         yield 'a section of the working directory config erased' => [$user, "scan:\n  max_file_size_kb: 256\n", "profile: fast\nscan: none\n", 'sets "scan" to something other than a map'];
         yield 'a file that is not YAML' => [$user, '', "profile: fast\nmodel: [unclosed\n", 'is not valid YAML'];
