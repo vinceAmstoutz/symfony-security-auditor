@@ -265,7 +265,7 @@ expected="## New Features ✨
 
 - Single author ([#12]($pr_url/12)) by @alice
 - Two authors, one of them twice ([#12]($pr_url/12), [#14]($pr_url/14), [#15]($pr_url/15)) by @alice and @bob
-- Only a bot ([#16]($pr_url/16))
+- Only a bot ([#16]($pr_url/16)) by @dependabot
 - No author on record ([#17]($pr_url/17))
 - Three authors ([#12]($pr_url/12), [#14]($pr_url/14), [#18]($pr_url/18)) by @alice, @bob and @erin
 - Thanks to a reporter (thanks @dave) ([#12]($pr_url/12)) by @alice
@@ -274,7 +274,7 @@ expected="## New Features ✨
 
 **Full Changelog**: https://github.com/o/r/compare/1.0.0...1.1.0"
 if [ "$credited" = "$expected" ]; then
-  echo "ok - every entry is credited to all its pull request authors in link order, once each, bots left out, and a thanked reporter stays in the text"
+  echo "ok - every entry is credited to all its pull request authors in link order, once each, a bot by its app name, and a thanked reporter stays in the text"
 else
   echo "NOT OK - credits differ:"
   printf '%s\n' "$credited"

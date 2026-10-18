@@ -14,8 +14,8 @@
 # Credits come from the GitHub API through `gh` (set GH_TOKEN, or log in): an
 # entry that ends with pull request or commit links gets ` by @author` appended
 # (`by @a and @b` for two, `by @a, @b and @c` for more, in the order the links
-# come), leaving out a bot (a login ending in `[bot]`). An author that cannot be
-# looked up leaves the entry as it is with a
+# come); a bot is credited by its app name (`dependabot[bot]` is `@dependabot`).
+# An author that cannot be looked up leaves the entry as it is with a
 # ::warning::, since a missing credit must never block a release. Set
 # CREDIT_AUTHORS=0 to print the notes without any lookup.
 
@@ -95,7 +95,8 @@ credit_authors() {
         key = "commit:" substr(token, 9)
       }
       login = who[key]
-      if (login == "" || login ~ /\[bot\]$/ || (login in seen)) {
+      sub(/\[bot\]$/, "", login)
+      if (login == "" || (login in seen)) {
         continue
       }
       seen[login] = 1
