@@ -78,18 +78,14 @@ final readonly class AuditTarget
         return 1 === \count($projects) ? reset($projects) : null;
     }
 
-    private static function enclosingProject(string $path): ?string
+    private static function enclosingProject(string $directory): ?string
     {
-        $directory = $path;
-        while (!is_file(Path::join($directory, self::COMPOSER_FILE))) {
-            $parent = Path::getDirectory($directory);
-            if ($parent === $directory) {
-                return null;
-            }
-
-            $directory = $parent;
+        if (is_file(Path::join($directory, self::COMPOSER_FILE))) {
+            return $directory;
         }
 
-        return $directory;
+        $parent = Path::getDirectory($directory);
+
+        return $parent === $directory ? null : self::enclosingProject($parent);
     }
 }
