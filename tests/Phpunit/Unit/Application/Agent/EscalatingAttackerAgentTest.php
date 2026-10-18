@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
@@ -26,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -478,6 +480,45 @@ final class EscalatingAttackerAgentTest extends TestCase
         );
 
         self::assertSame([$notJudged, $deepReturned, $deepRecordedOnly], $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidAuditContextException
+     */
+    #[DataProvider('deepPassAborts')]
+    public function test_a_cheap_finding_the_deep_pass_judged_before_it_aborted_is_not_left_to_recover(Throwable $throwable): void
+    {
+        $vulnerability = $this->makeVulnerability('src/Controller/A.php', title: 'cheap A');
+        $notJudged = $this->makeVulnerability('src/Controller/Other.php', title: 'cheap other');
+        $deepRecorded = $this->makeVulnerability('src/Controller/A.php', VulnerabilitySeverity::CRITICAL, 'deep A');
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+
+        try {
+            $this->callAnalyze(
+                new EscalatingAttackerAgent($this->makeRecordingAttacker([$vulnerability, $notJudged]), new RecordingAttackerAgent([$deepRecorded], $throwable, coverageStatus: 'analyzed'), new NullLogger()),
+                [$this->makeFile('src/Controller/A.php')],
+                SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+                $auditContext,
+            );
+            self::fail('expected the deep pass abort');
+        } catch (BudgetExceededException|LLMProviderException $exception) {
+            self::assertSame($throwable, $exception);
+        }
+
+        self::assertSame([$notJudged, $deepRecorded], $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * @return iterable<string, array{Throwable}>
+     */
+    public static function deepPassAborts(): iterable
+    {
+        yield 'a budget cap' => [BudgetExceededException::forTokens(500, 100)];
+        yield 'a provider failure' => [new LLMProviderException('Provider overloaded')];
     }
 
     /**

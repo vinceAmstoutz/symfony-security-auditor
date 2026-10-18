@@ -70,6 +70,34 @@ final class AuditOrchestratorEscalationTest extends TestCase
         self::assertSame(1, $deepAttacker->callCount);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_cheap_finding_the_deep_pass_judged_before_a_provider_failure_stopped_it_is_absent_from_the_partial_result(): void
+    {
+        $providerFailure = new LLMProviderException('Provider overloaded');
+        $cheapAttacker = new RecordingAttackerAgent([$this->finding('cheap')]);
+        $deepAttacker = new RecordingAttackerAgent([], $providerFailure, coverageStatus: 'analyzed');
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturn(AuditOrchestratorHarness::reviewerAcceptResponse());
+        $auditContext = AuditOrchestratorHarness::contextWithMapping($this->tmpDir);
+
+        try {
+            $this->orchestratorWith(new EscalatingAttackerAgent($cheapAttacker, $deepAttacker, new NullLogger()), $reviewerLlm)->orchestrate($auditContext);
+            self::fail('expected the provider failure');
+        } catch (LLMProviderException $llmProviderException) {
+            self::assertSame($providerFailure, $llmProviderException);
+        }
+
+        self::assertSame([], $auditContext->vulnerabilities());
+    }
+
     #[Override]
     protected function setUp(): void
     {

@@ -85,16 +85,19 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
         ]);
 
         $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder($coverageRecorder);
-        $expensiveFindings = $this->expensiveAttacker->analyze(
-            $attackerAnalysisRequest->withFilesAndCandidateFindings($hotFiles, $cheapFindings),
-            $statusTrackingCoverageRecorder,
-        );
 
-        $analyzedByExpensive = $statusTrackingCoverageRecorder->conclusiveFiles();
-        $this->withdrawFromRecovery($coverageRecorder, array_filter(
-            $cheapFindings,
-            fn (Vulnerability $vulnerability): bool => $this->isJudged($vulnerability, $analyzedByExpensive),
-        ));
+        try {
+            $expensiveFindings = $this->expensiveAttacker->analyze(
+                $attackerAnalysisRequest->withFilesAndCandidateFindings($hotFiles, $cheapFindings),
+                $statusTrackingCoverageRecorder,
+            );
+        } finally {
+            $analyzedByExpensive = $statusTrackingCoverageRecorder->conclusiveFiles();
+            $this->withdrawFromRecovery($coverageRecorder, array_filter(
+                $cheapFindings,
+                fn (Vulnerability $vulnerability): bool => $this->isJudged($vulnerability, $analyzedByExpensive),
+            ));
+        }
 
         return $this->merge($cheapFindings, $expensiveFindings, $analyzedByExpensive);
     }
@@ -104,7 +107,9 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
      * recovery while the cheap pass ran. Left there, the orchestrator's drain
      * of recovered findings would bring it back and undo the discard, so it
      * leaves the buffer and only a finding this pass keeps, or one a chunk
-     * recorded but could not return, stays recoverable.
+     * recorded but could not return, stays recoverable. A deep pass a budget
+     * cap or a provider failure stopped has judged the files it finished
+     * first, so their discards hold in the partial report too.
      *
      * @param array<Vulnerability> $discarded
      */
