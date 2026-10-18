@@ -59,7 +59,7 @@ final readonly class ChunkAnswerHydrator
 
         try {
             /** @var list<array<string, mixed>> $rawData */
-            $rawData = $llmResponse->parseJson();
+            $rawData = $this->asFindingList($llmResponse->parseJson());
         } catch (JsonException $jsonException) {
             $this->logger->error('Failed to parse attacker agent JSON response', [
                 'error' => $jsonException->getMessage(),
@@ -118,11 +118,23 @@ final readonly class ChunkAnswerHydrator
     private function parseablePayload(LLMResponse $llmResponse): array
     {
         try {
-            $decoded = $llmResponse->parseJson();
+            return $this->asFindingList($llmResponse->parseJson());
         } catch (JsonException) {
             return [];
         }
+    }
 
+    /**
+     * A model that found a single weakness may answer it as a bare finding
+     * object instead of a one-element array: it is read as that one finding
+     * rather than as a list of its field values.
+     *
+     * @param array<array-key, mixed> $decoded
+     *
+     * @return list<mixed>
+     */
+    private function asFindingList(array $decoded): array
+    {
         return array_is_list($decoded) ? $decoded : [$decoded];
     }
 }
