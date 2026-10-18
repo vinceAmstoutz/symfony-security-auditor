@@ -1258,6 +1258,69 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(240, $budgetTracker->tokensUsed());
     }
 
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function cheapClientReplacements(): iterable
+    {
+        yield 'the cheap client aliasing the custom client' => [UsageReportingLLMClient::class];
+        yield 'the cheap client aliasing the replaced reviewer client' => ['security_auditor.reviewer_client'];
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    #[DataProvider('cheapClientReplacements')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_custom_llm_client_replacing_the_escalation_cheap_client_has_its_usage_booked_once_a_call(string $aliasTarget): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['escalation' => ['enabled' => true]]], registerHostServices: function (ContainerBuilder $containerBuilder) use ($aliasTarget): void {
+            $this->replaceBothClientsWithAUsageReportingOne($containerBuilder);
+            $containerBuilder->setAlias('security_auditor.cheap_attacker_client', $aliasTarget);
+        });
+
+        foreach (['security_auditor.cheap_attacker_client', 'security_auditor.reviewer_client'] as $clientId) {
+            $llmClient = $this->getPrivateService($kernel, $clientId);
+            self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+            $llmClient->complete('system', 'user');
+        }
+
+        $tokenUsageRecorder = $this->getPrivateService($kernel, TokenUsageRecorder::class);
+        self::assertInstanceOf(TokenUsageRecorder::class, $tokenUsageRecorder);
+        self::assertSame([200, 40], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens()]);
+        $budgetTracker = $this->getPrivateService($kernel, BudgetTracker::class);
+        self::assertInstanceOf(BudgetTracker::class, $budgetTracker);
+        self::assertSame(240, $budgetTracker->tokensUsed());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_escalation_cheap_client_stays_the_bundled_client_on_the_platform_when_only_the_other_two_are_replaced(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']]], registerHostServices: $this->replaceBothClientsWithAUsageReportingOne(...));
+        $llmClient = $this->getPrivateService($kernel, 'security_auditor.cheap_attacker_client');
+        self::assertInstanceOf(SymfonyAiLLMClient::class, $llmClient);
+        self::assertSame('gpt-4o-mini', $llmClient->model());
+
+        $llmResponse = $llmClient->complete('system', 'user');
+
+        $tokenUsageRecorder = $this->getPrivateService($kernel, TokenUsageRecorder::class);
+        self::assertInstanceOf(TokenUsageRecorder::class, $tokenUsageRecorder);
+        self::assertGreaterThan(0, $llmResponse->inputTokens());
+        self::assertSame([$llmResponse->inputTokens(), $llmResponse->outputTokens()], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens()]);
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_a_custom_llm_client_is_stopped_once_it_spends_the_token_budget(): void
