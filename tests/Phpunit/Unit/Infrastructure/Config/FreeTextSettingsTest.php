@@ -88,6 +88,33 @@ final class FreeTextSettingsTest extends TestCase
             ['scan' => ['custom_risk_patterns' => ['php' => ['a' => ['regex' => 5, 'description' => null]]], 'secret_scrubbing' => ['additional_patterns' => [true]]]],
         ];
         yield 'an empty configuration' => [[], []];
+        yield 'the name of a risk-pattern bucket' => [
+            ['scan' => ['custom_risk_patterns' => [self::UNRESOLVABLE => ['a' => ['regex' => '/x/', 'description' => 'd']]]]],
+            ['scan' => ['custom_risk_patterns' => [self::ESCAPED => ['a' => ['regex' => '/x/', 'description' => 'd']]]]],
+        ];
+        yield 'the label of every risk pattern' => [
+            ['scan' => ['custom_risk_patterns' => ['php' => ['first' => ['regex' => '/x/', 'description' => 'd'], self::UNRESOLVABLE => ['regex' => '/y/', 'description' => 'e'], 'last' => ['regex' => '/z/', 'description' => 'f']]]]],
+            ['scan' => ['custom_risk_patterns' => ['php' => ['first' => ['regex' => '/x/', 'description' => 'd'], self::ESCAPED => ['regex' => '/y/', 'description' => 'e'], 'last' => ['regex' => '/z/', 'description' => 'f']]]]],
+        ];
+        yield 'the name of a custom skill' => [
+            ['audit' => ['custom_skills' => [self::UNRESOLVABLE => ['file_type' => 'controller', 'instructions' => 'i']]]],
+            ['audit' => ['custom_skills' => [self::ESCAPED => ['file_type' => 'controller', 'instructions' => 'i']]]],
+        ];
+        yield 'a key that is not a name, even holding the same pair' => [
+            ['audit' => [self::UNRESOLVABLE => 'a', 'custom_skills' => ['pricing' => [self::UNRESOLVABLE => 'b']]], 'scan' => ['secret_scrubbing' => [self::UNRESOLVABLE => 'c'], 'custom_risk_patterns' => ['php' => ['a' => [self::UNRESOLVABLE => 'd']]]], self::UNRESOLVABLE => 'e'],
+            ['audit' => [self::UNRESOLVABLE => 'a', 'custom_skills' => ['pricing' => [self::UNRESOLVABLE => 'b']]], 'scan' => ['secret_scrubbing' => [self::UNRESOLVABLE => 'c'], 'custom_risk_patterns' => ['php' => ['a' => [self::UNRESOLVABLE => 'd']]]], self::UNRESOLVABLE => 'e'],
+        ];
+        yield 'a name that is a number' => [
+            ['audit' => ['custom_skills' => [2024 => ['file_type' => 'controller', 'instructions' => 'i']]]],
+            ['audit' => ['custom_skills' => [2024 => ['file_type' => 'controller', 'instructions' => 'i']]]],
+        ];
+    }
+
+    public function test_it_leaves_a_reference_the_container_can_resolve_in_a_name(): void
+    {
+        $config = ['audit' => ['custom_skills' => ['in %kernel.project_dir% and %env(HOME)% and 100%%' => ['file_type' => 'controller', 'instructions' => 'i']]]];
+
+        self::assertSame($config, FreeTextSettings::literalIn($config, new ParameterBag(['kernel.project_dir' => '/srv/app'])));
     }
 
     public function test_it_leaves_a_reference_the_container_can_resolve_in_a_free_text_setting(): void

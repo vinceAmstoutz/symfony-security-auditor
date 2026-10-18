@@ -17,10 +17,12 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 /**
  * The settings a user fills with prose or a regex (a risk pattern, a scrubbing
- * pattern, a skill's instructions), where a `%` is far more likely to be text
- * than a container reference. A path setting is left alone on purpose: a
- * `%LOCALAPPDATA%` there is an environment reference the user meant, and
- * taking it literally would create a folder of that name instead of stopping.
+ * pattern, a skill's instructions), and the names a user gives (a risk-pattern
+ * bucket or label, a skill), which the container reads too, where a `%` is far
+ * more likely to be text than a container reference. A path setting is left
+ * alone on purpose: a `%LOCALAPPDATA%` there is an environment reference the
+ * user meant, and taking it literally would create a folder of that name
+ * instead of stopping.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -31,6 +33,12 @@ final readonly class FreeTextSettings
         ['scan', 'custom_risk_patterns', null, null, 'description'],
         ['scan', 'secret_scrubbing', 'additional_patterns', null],
         ['audit', 'custom_skills', null, 'instructions'],
+    ];
+
+    private const array NAME_PATHS = [
+        ['scan', 'custom_risk_patterns', null],
+        ['scan', 'custom_risk_patterns', null, null],
+        ['audit', 'custom_skills', null],
     ];
 
     /**
@@ -51,11 +59,22 @@ final readonly class FreeTextSettings
      */
     private static function walk(array $config, ParameterBagInterface $parameterBag, array $parentPath): array
     {
+        $walked = [];
+
         foreach ($config as $key => $value) {
-            $config[$key] = self::walkValue($value, $parameterBag, [...$parentPath, (string) $key]);
+            $path = [...$parentPath, (string) $key];
+            $walked[self::walkKey($key, $parameterBag, $path)] = self::walkValue($value, $parameterBag, $path);
         }
 
-        return $config;
+        return $walked;
+    }
+
+    /**
+     * @param list<string> $path
+     */
+    private static function walkKey(int|string $key, ParameterBagInterface $parameterBag, array $path): int|string
+    {
+        return \is_string($key) && self::isAt(self::NAME_PATHS, $path) ? ContainerParameterSyntax::escapeUnresolvable($key, $parameterBag) : $key;
     }
 
     /**
@@ -65,17 +84,18 @@ final readonly class FreeTextSettings
     {
         return match (true) {
             \is_array($value) => self::walk($value, $parameterBag, $path),
-            \is_string($value) && self::isFreeText($path) => ContainerParameterSyntax::escapeUnresolvable($value, $parameterBag),
+            \is_string($value) && self::isAt(self::PATHS, $path) => ContainerParameterSyntax::escapeUnresolvable($value, $parameterBag),
             default => $value,
         };
     }
 
     /**
-     * @param list<string> $path
+     * @param list<list<string|null>> $patterns
+     * @param list<string>            $path
      */
-    private static function isFreeText(array $path): bool
+    private static function isAt(array $patterns, array $path): bool
     {
-        foreach (self::PATHS as $pattern) {
+        foreach ($patterns as $pattern) {
             if (self::matches($pattern, $path)) {
                 return true;
             }

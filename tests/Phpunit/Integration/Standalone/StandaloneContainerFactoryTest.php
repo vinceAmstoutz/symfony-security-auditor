@@ -244,6 +244,31 @@ final class StandaloneContainerFactoryTest extends TestCase
         yield 'an additional scrubbing pattern' => [['scan' => ['secret_scrubbing' => ['additional_patterns' => ['/key=%secret%/']]]], 'symfony_security_auditor.scan.secret_scrubbing.additional_patterns', ['0'], '/key=%secret%/'];
         yield 'a doubled percent sign, which the container still reads as one' => [$pattern('/100%%/', 'd'), 'symfony_security_auditor.scan.custom_risk_patterns', ['php', 'sprintf_sql', 'regex'], '/100%/'];
         yield 'a reference to a parameter the container has' => [$pattern('/x/', 'in %kernel.project_dir%'), 'symfony_security_auditor.scan.custom_risk_patterns', ['php', 'sprintf_sql', 'description'], 'in '.getcwd()];
+        yield 'the label of a risk pattern, whose pair the container keeps doubled as it never unescapes a key' => [['scan' => ['custom_risk_patterns' => ['php' => ['rate%limit%check' => ['regex' => '/x/', 'description' => 'd']]]]], 'symfony_security_auditor.scan.custom_risk_patterns', ['php', 'rate%%limit%%check', 'regex'], '/x/'];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_takes_a_custom_skill_name_holding_an_unresolvable_percent_pair_literally(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['audit' => ['custom_skills' => ['my%skill%' => ['file_type' => 'controller', 'instructions' => 'i']]]],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+            ),
+            $this->cacheDir,
+        );
+
+        $configuredAttackerSkill = $containerBuilder->getDefinition('security_auditor.custom_skill.0')->getArgument(0);
+        self::assertInstanceOf(Definition::class, $configuredAttackerSkill);
+        self::assertSame('my%skill%', $containerBuilder->getParameterBag()->unescapeValue($configuredAttackerSkill->getArgument(0)));
     }
 
     /**
