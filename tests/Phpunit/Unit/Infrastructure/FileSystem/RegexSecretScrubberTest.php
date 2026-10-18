@@ -23,6 +23,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem\Fixture\RecordingPhpDataMaskFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem\Fixture\SodiumVaultKeyFile;
 
 final class RegexSecretScrubberTest extends TestCase
@@ -2077,5 +2078,47 @@ final class RegexSecretScrubberTest extends TestCase
         $input = "PASSPORT_NUMBER=AB123456\nBYPASS_CACHE=true\nMAX_PW_LENGTH=8\nPASS_RATE=0.85\npassport: 'AB123456'\n";
 
         self::assertSame($input, $this->regexSecretScrubber->scrub($input));
+    }
+
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
+    public function test_a_php_file_no_credential_assignment_or_call_is_found_in_is_never_tokenized(): void
+    {
+        $recordingPhpDataMaskFactory = new RecordingPhpDataMaskFactory();
+        $regexSecretScrubber = new RegexSecretScrubber(phpDataMaskFactory: $recordingPhpDataMaskFactory(...));
+
+        $regexSecretScrubber->scrub("<?php\n\nfinal class UserController\n{\n    public function index(): Response\n    {\n        return new Response('hello');\n    }\n}\n");
+
+        self::assertSame([], $recordingPhpDataMaskFactory->maskedContents);
+    }
+
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
+    public function test_a_php_file_every_credential_assignment_and_call_pass_leaves_as_written_is_tokenized_once(): void
+    {
+        $recordingPhpDataMaskFactory = new RecordingPhpDataMaskFactory();
+        $regexSecretScrubber = new RegexSecretScrubber(phpDataMaskFactory: $recordingPhpDataMaskFactory(...));
+        $code = "<?php\nconst API_KEY = self::DEFAULT_KEY;\n\$options = ['password' => \$request->get('password')];\n\$user->setPassword(\$plain);\n";
+
+        $scrubbed = $regexSecretScrubber->scrub($code);
+
+        self::assertSame([$code, $code], [$scrubbed, ...$recordingPhpDataMaskFactory->maskedContents]);
+    }
+
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
+    public function test_a_php_file_is_tokenized_again_only_once_a_pass_has_redacted_it(): void
+    {
+        $recordingPhpDataMaskFactory = new RecordingPhpDataMaskFactory();
+        $regexSecretScrubber = new RegexSecretScrubber(phpDataMaskFactory: $recordingPhpDataMaskFactory(...));
+        $redacted = "<?php\nconst API_KEY = '***REDACTED:env_assignment***';\n\$options = ['password' => \$request->get('password')];\n\$user->setPassword(\$plain);\n";
+        $code = str_replace('***REDACTED:env_assignment***', 'abcd1234efgh', $redacted);
+
+        $scrubbed = $regexSecretScrubber->scrub($code);
+
+        self::assertSame([$redacted, $code, $redacted], [$scrubbed, ...$recordingPhpDataMaskFactory->maskedContents]);
     }
 }

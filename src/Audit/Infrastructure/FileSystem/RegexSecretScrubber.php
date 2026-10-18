@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
+use Closure;
 use Override;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -152,9 +153,10 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     private array $patterns;
 
     /**
-     * @param list<string> $additionalPatterns extra PCRE patterns merged with the defaults.
-     *                                         Each pattern is given a synthetic label
-     *                                         `custom_<index>` for redaction reporting.
+     * @param list<string>                  $additionalPatterns extra PCRE patterns merged with the defaults.
+     *                                                          Each pattern is given a synthetic label
+     *                                                          `custom_<index>` for redaction reporting.
+     * @param ?Closure(string): PhpDataMask $phpDataMaskFactory defaults to PhpDataMask::of; tests inject a recording one
      *
      * @throws SecretScrubberConfigurationException
      */
@@ -162,6 +164,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
         array $additionalPatterns = [],
         private LoggerInterface $logger = new NullLogger(),
         private OffsetCaptureReplacer $offsetCaptureReplacer = new OffsetCaptureReplacer(),
+        private ?Closure $phpDataMaskFactory = null,
     ) {
         $patterns = $this->defaultPatterns();
         foreach ($additionalPatterns as $index => $pattern) {
@@ -284,13 +287,14 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     #[Override]
     public function scrub(string $content): string
     {
+        $phpDataMaskMemo = new PhpDataMaskMemo($this->phpDataMaskFactory ?? PhpDataMask::of(...));
         foreach ($this->patterns as $label => $pattern) {
             $result = match (SecretPatternLabel::tryFrom($label)) {
-                SecretPatternLabel::EnvAssignment => $this->redactEnvAssignments($pattern, $content),
-                SecretPatternLabel::InlineAssignment => $this->redactInlineAssignments($pattern, $content),
+                SecretPatternLabel::EnvAssignment => $this->redactEnvAssignments($pattern, $content, $phpDataMaskMemo),
+                SecretPatternLabel::InlineAssignment => $this->redactInlineAssignments($pattern, $content, $phpDataMaskMemo),
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
                 SecretPatternLabel::BlockScalar => preg_replace_callback($pattern, $this->redactBlockScalar(...), $content),
-                SecretPatternLabel::CallArgument => $this->redactCallArguments($pattern, $content),
+                SecretPatternLabel::CallArgument => $this->redactCallArguments($pattern, $content, $phpDataMaskMemo),
                 SecretPatternLabel::XmlParameter => preg_replace_callback($pattern, $this->redactXmlParameter(...), $content),
                 SecretPatternLabel::PemPrivateKey => $this->redactPrivateKeys($pattern, $content),
                 SecretPatternLabel::BearerToken => preg_replace_callback($pattern, $this->redactBearerToken(...), $content),
@@ -376,11 +380,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
             : 1 === preg_match(self::PHP_EXPRESSION, explode(' ', strtr($value, "\t", ' '))[0]);
     }
 
-    private function redactEnvAssignments(string $pattern, string $content): ?string
+    private function redactEnvAssignments(string $pattern, string $content, PhpDataMaskMemo $phpDataMaskMemo): ?string
     {
-        $phpDataMask = PhpDataMask::of($content);
-
-        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactEnvAssignment($match, $phpDataMask));
+        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactEnvAssignment($match, $phpDataMaskMemo->of($content)));
     }
 
     /**
@@ -422,11 +424,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
         return \sprintf('%s%s%s%s%s', $match[1][0], $match[3][0], $quote, SecretPatternLabel::EnvAssignment->placeholder(), $quote);
     }
 
-    private function redactInlineAssignments(string $pattern, string $content): ?string
+    private function redactInlineAssignments(string $pattern, string $content, PhpDataMaskMemo $phpDataMaskMemo): ?string
     {
-        $phpDataMask = PhpDataMask::of($content);
-
-        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactInlineAssignment($match, $phpDataMask));
+        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactInlineAssignment($match, $phpDataMaskMemo->of($content)));
     }
 
     /**
@@ -537,11 +537,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
      * the user handed over beside a password included, provided PHP reads it as a string: a
      * scrubbed file still parses.
      */
-    private function redactCallArguments(string $pattern, string $content): ?string
+    private function redactCallArguments(string $pattern, string $content, PhpDataMaskMemo $phpDataMaskMemo): ?string
     {
-        $phpDataMask = PhpDataMask::of($content);
-
-        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $match[1][0].$this->redactArgumentLiterals($match[2], $phpDataMask));
+        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $match[1][0].$this->redactArgumentLiterals($match[2], $phpDataMaskMemo->of($content)));
     }
 
     /**
