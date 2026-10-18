@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassif
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
 final class StatusTrackingCoverageRecorderTest extends TestCase
@@ -121,6 +122,60 @@ final class StatusTrackingCoverageRecorderTest extends TestCase
         $statusTrackingCoverageRecorder->recordCoverage('reviewer', 'src/Reviewed.php', 'analyzed');
 
         self::assertSame(['src/Analyzed.php', 'src/Cached.php'], $statusTrackingCoverageRecorder->analyzedFiles());
+    }
+
+    public function test_it_lists_the_files_the_attacker_left_analyzed_on_more_than_a_partial_look(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Judged.php', 'analyzed');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Inconclusive.php', 'analyzed');
+        $statusTrackingCoverageRecorder->recordInconclusiveAnalysis('attacker', 'src/Inconclusive.php');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Cached.php', 'cached');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Errored.php', 'errored');
+
+        self::assertSame(['src/Judged.php', 'src/Cached.php'], $statusTrackingCoverageRecorder->conclusiveFiles());
+        self::assertSame(['src/Judged.php', 'src/Inconclusive.php', 'src/Cached.php'], $statusTrackingCoverageRecorder->analyzedFiles());
+    }
+
+    public function test_a_file_judged_again_after_a_partial_look_is_conclusive(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'analyzed');
+        $statusTrackingCoverageRecorder->recordInconclusiveAnalysis('attacker', 'src/A.php');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'analyzed');
+
+        self::assertSame(['src/A.php'], $statusTrackingCoverageRecorder->conclusiveFiles());
+    }
+
+    public function test_a_partial_look_of_another_stage_leaves_the_attacker_files_conclusive(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new RecordingCoverageRecorder());
+
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'analyzed');
+        $statusTrackingCoverageRecorder->recordInconclusiveAnalysis('reviewer', 'src/A.php');
+
+        self::assertSame(['src/A.php'], $statusTrackingCoverageRecorder->conclusiveFiles());
+    }
+
+    public function test_it_forwards_a_partial_look_to_the_recorder_it_wraps(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        (new StatusTrackingCoverageRecorder($recordingCoverageRecorder))->recordInconclusiveAnalysis('attacker', 'src/A.php');
+
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/A.php']], $recordingCoverageRecorder->inconclusive);
+    }
+
+    public function test_it_keeps_a_partial_look_when_the_recorder_it_wraps_does_not(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new NullCoverageRecorder());
+
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/A.php', 'analyzed');
+        $statusTrackingCoverageRecorder->recordInconclusiveAnalysis('attacker', 'src/A.php');
+
+        self::assertSame([], $statusTrackingCoverageRecorder->conclusiveFiles());
     }
 
     /**

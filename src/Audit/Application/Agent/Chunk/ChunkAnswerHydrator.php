@@ -36,7 +36,7 @@ final readonly class ChunkAnswerHydrator
     private ChunkOutcomeRecorder $chunkOutcomeRecorder;
 
     public function __construct(
-        private AttackerChunkCache $attackerChunkCache,
+        AttackerChunkCache $attackerChunkCache,
         private VulnerabilityFactory $vulnerabilityFactory,
         private LoggerInterface $logger,
     ) {
@@ -52,14 +52,9 @@ final readonly class ChunkAnswerHydrator
             return $this->hydrateIncompleteAnswer($chunk, $llmResponse, $this->parseablePayload($llmResponse), $coverageRecorder);
         }
 
+        $chunkContext = $chunkContext->answeredBy($llmResponse);
         if ($llmResponse->isEmpty()) {
-            if ($chunkContext->cacheable) {
-                $this->attackerChunkCache->store($chunk, $chunkContext->contextKey, []);
-            }
-
-            ChunkCoverageRecorder::record($chunk, 'analyzed', $coverageRecorder);
-
-            return VulnerabilityHydrationResult::empty();
+            return $this->settle($chunk, $chunkContext, [], $coverageRecorder);
         }
 
         try {

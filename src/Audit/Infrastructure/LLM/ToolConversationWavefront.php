@@ -44,7 +44,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
  * conversation WITHOUT blocking, then resolves them, executes the requested
  * tools against that conversation's own registry, and queues the follow-up
  * round. On an async transport (the symfony/ai DeferredResult contract) the
- * per-round invocations overlap on the wire. Any dispatch or resolution
+ * per-round invocations overlap on the wire. A conversation whose last round
+ * still asks to read gets one closing request ({@see FinalRound}), and one
+ * that reads again ends at the iteration cap. Any dispatch or resolution
  * failure first retries the same conversation through
  * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
  * sequential path uses — once the budget allows another call. When every
@@ -109,7 +111,7 @@ final readonly class ToolConversationWavefront
 
         $states = $this->initializeConversationStates($window);
 
-        for ($round = 0; $round < $maxToolIterations && !ConversationState::allAnswered($states); ++$round) {
+        for ($round = 0; $round <= $maxToolIterations && !ConversationState::allAnswered($states); ++$round) {
             $states = ConversationState::enterRound($states, $round, $maxToolIterations);
             $states = $this->runWavefrontRound($platform, $states, $window, $maxToolIterations);
         }
@@ -357,12 +359,12 @@ final readonly class ToolConversationWavefront
             return $this->runToolCalls($conversationState, $platformResult, $toolLLMRequest);
         }
 
-        return $conversationState->withResponse(LLMResponse::of(
+        return $conversationState->withResponse(FinalRound::settled(LLMResponse::of(
             $this->platformResultExtractor->extractText($platformResult),
             $this->model,
             $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
             $conversationState->tokenUsage(),
-        ));
+        ), $conversationState->roundsLeft, $conversationState->toolsRan));
     }
 
     /**
@@ -437,7 +439,7 @@ final readonly class ToolConversationWavefront
 
         $toolResults = [];
         foreach ($toolCalls as $position => $toolCall) {
-            $result = $toolLLMRequest->tools->execute($toolCall->getName(), $toolCall->getArguments());
+            $result = FinalRound::resultOf($toolLLMRequest->tools, $toolCall, $conversationState->roundsLeft);
             $conversationState->bag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $conversationState->roundsLeft, $position === array_key_last($toolCalls)))));
             $toolResults[] = $result;
         }

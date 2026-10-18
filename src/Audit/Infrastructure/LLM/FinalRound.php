@@ -26,17 +26,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * own, because a provider may refuse a user turn right after one — and a last
  * round that records its answer (a recording tool took the call in, rather than
  * refusing it) ends the conversation instead of asking for one more round to
- * say it is done.
+ * say it is done. A last round that asks to read instead gets one closing
+ * request: its reading calls are answered without being run, since nothing
+ * they return could reach a later round. An answer given on either reached the
+ * round limit, so it may rest on less than the model wanted to look at.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class FinalRound
 {
+    public const string NOT_RUN = '[Auditor notice: round limit reached, not run. Record each finding you still hold with the recording tool, or answer in text.]';
+
     public const string NOTICE = '[Auditor notice: the next round is your last. Nothing you read or search after this reaches you, so do not call a reading or searching tool again. Record each finding you still hold with the recording tool, or give the final answer the instructions above ask for. With nothing to report, answer without calling a tool.]';
 
-    private static function isLast(int $roundsLeft): bool
+    private static function isFinal(int $roundsLeft): bool
     {
-        return 1 === $roundsLeft;
+        return $roundsLeft <= 1;
     }
 
     public static function carried(string $toolResult, int $roundsLeft, bool $isLastResult): string
@@ -49,13 +54,22 @@ final readonly class FinalRound
         return \sprintf("%s\n\n%s", $toolResult, self::NOTICE);
     }
 
+    public static function resultOf(ToolRegistry $toolRegistry, ToolCall $toolCall, int $roundsLeft): string
+    {
+        if (self::isFinal($roundsLeft) && !$toolRegistry->isRecording($toolCall->getName())) {
+            return self::NOT_RUN;
+        }
+
+        return $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
+    }
+
     /**
      * @param list<ToolCall> $toolCalls
      * @param list<string>   $toolResults the answer to each call, in the same order
      */
     public static function isConcludedBy(int $roundsLeft, ToolRegistry $toolRegistry, array $toolCalls, array $toolResults): bool
     {
-        if (!self::isLast($roundsLeft)) {
+        if (!self::isFinal($roundsLeft)) {
             return false;
         }
 
@@ -73,6 +87,11 @@ final readonly class FinalRound
      */
     public static function answer(string $model, TokenUsageSnapshot $tokenUsageSnapshot): LLMResponse
     {
-        return LLMResponse::of('', $model, 'end_turn', $tokenUsageSnapshot);
+        return LLMResponse::of('', $model, 'end_turn', $tokenUsageSnapshot)->withReachedToolCap();
+    }
+
+    public static function settled(LLMResponse $llmResponse, int $roundsLeft, bool $toolsRan): LLMResponse
+    {
+        return self::isFinal($roundsLeft) && $toolsRan ? $llmResponse->withReachedToolCap() : $llmResponse;
     }
 }

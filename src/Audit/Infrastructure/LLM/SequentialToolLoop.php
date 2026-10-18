@@ -39,8 +39,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 /**
  * Drives one autonomous tool-using conversation sequentially: invokes the
  * platform with retry, executes requested tools against the registry, feeds
- * results back, and returns the model's final textual response — or an
- * empty `max_tool_iterations` response at the iteration cap.
+ * results back, and returns the model's final textual response. A last round
+ * that still asks to read gets one closing request ({@see FinalRound}); one
+ * that reads again ends as an empty `max_tool_iterations` response.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -75,7 +76,7 @@ final readonly class SequentialToolLoop
 
         $conversationState = $this->openConversation($systemPrompt, $userMessage, $toolRegistry);
 
-        for ($iteration = 0; $iteration < $maxToolIterations; ++$iteration) {
+        for ($iteration = 0; $iteration <= $maxToolIterations; ++$iteration) {
             $this->budgetTracker?->assertWithinBudget();
             $deferredResult = $this->invokeOrEndConversation($conversationState, $iteration);
             if ($deferredResult instanceof LLMResponse) {
@@ -85,7 +86,7 @@ final readonly class SequentialToolLoop
             $platformResult = $deferredResult->getResult();
             $conversationState = $this->bookIteration($conversationState, $deferredResult);
             if ([] === $this->platformResultExtractor->extractToolCalls($platformResult)) {
-                return $this->textResponseAndLog($conversationState, $deferredResult, $platformResult, $iteration);
+                return $this->textResponseAndLog($conversationState, $deferredResult, $platformResult, $iteration, $maxToolIterations - $iteration);
             }
 
             $afterToolCalls = $this->runToolCalls($conversationState, $platformResult, $toolRegistry, $iteration, $maxToolIterations - $iteration);
@@ -175,7 +176,7 @@ final readonly class SequentialToolLoop
     /**
      * @throws InvalidTokenUsageException
      */
-    private function textResponseAndLog(ConversationState $conversationState, DeferredResult $deferredResult, ResultInterface $platformResult, int $iteration): LLMResponse
+    private function textResponseAndLog(ConversationState $conversationState, DeferredResult $deferredResult, ResultInterface $platformResult, int $iteration, int $roundsLeft): LLMResponse
     {
         $content = $this->platformResultExtractor->extractText($platformResult);
         $this->logger->debug('Tool-using loop ended with text response', [
@@ -185,12 +186,12 @@ final readonly class SequentialToolLoop
             'output_tokens' => $conversationState->output,
         ]);
 
-        return LLMResponse::of(
+        return FinalRound::settled(LLMResponse::of(
             $content,
             $this->model,
             $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
             $conversationState->tokenUsage(),
-        );
+        ), $roundsLeft, $conversationState->toolsRan);
     }
 
     /**
@@ -206,7 +207,7 @@ final readonly class SequentialToolLoop
 
         $toolResults = [];
         foreach ($toolCalls as $position => $toolCall) {
-            $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
+            $result = FinalRound::resultOf($toolRegistry, $toolCall, $roundsLeft);
             $conversationState->bag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $roundsLeft, $position === array_key_last($toolCalls)))));
             $toolResults[] = $result;
             $this->logger->debug('Tool invoked', [

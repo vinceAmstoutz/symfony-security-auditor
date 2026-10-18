@@ -59,6 +59,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ConnectionCutAft
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ExploringAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\FileReadingAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\NoticeIgnoringAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAuditPlatform;
 
@@ -280,6 +281,34 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
         self::assertTrue($report['complete']);
         self::assertSame(1, $report['total_vulnerabilities']);
+    }
+
+    /**
+     * @param array<string, mixed> $audit
+     */
+    #[DataProvider('closingRequestCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_an_attacker_that_reads_past_its_last_round_gets_a_closing_request_and_its_chunks_without_a_finding_are_retried_next_run(array $audit): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true], 'audit' => $audit], NoticeIgnoringAuditPlatform::class);
+
+        $firstRun = $this->decode($this->execute($kernel, 'json'));
+        $secondRun = $this->decode($this->execute($kernel, 'json'));
+
+        self::assertSame([true, 1], [$firstRun['complete'], $firstRun['total_vulnerabilities']]);
+        self::assertSame([true, 1], [$secondRun['complete'], $secondRun['total_vulnerabilities']]);
+        self::assertSame(['analyzed', 'cached'], $this->distinctSorted($this->attackerStatuses($secondRun)));
+        self::assertSame([], array_diff($this->filesWithFindings($secondRun), $this->cachedFiles($secondRun)));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function closingRequestCases(): iterable
+    {
+        yield 'sequential attacker' => [['max_tool_iterations' => 2]];
+        yield 'concurrent attacker' => [['max_tool_iterations' => 2, 'attacker_max_concurrent' => 4]];
     }
 
     /**
@@ -760,6 +789,36 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         sort($files);
 
         return $files;
+    }
+
+    /**
+     * @param array<array-key, mixed> $report
+     *
+     * @return list<string>
+     */
+    private function cachedFiles(array $report): array
+    {
+        $cached = [];
+        foreach ($this->entriesOf($report, 'coverage') as $entry) {
+            if ('attacker' === $this->fieldOf($entry, 'stage') && 'cached' === $this->fieldOf($entry, 'status')) {
+                $cached[] = $this->fieldOf($entry, 'file');
+            }
+        }
+
+        return $cached;
+    }
+
+    /**
+     * @param list<string> $values
+     *
+     * @return list<string>
+     */
+    private function distinctSorted(array $values): array
+    {
+        $distinct = array_values(array_unique($values));
+        sort($distinct);
+
+        return $distinct;
     }
 
     /**

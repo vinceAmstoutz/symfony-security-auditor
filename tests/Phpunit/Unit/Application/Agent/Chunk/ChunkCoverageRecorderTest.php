@@ -51,4 +51,31 @@ final class ChunkCoverageRecorderTest extends TestCase
 
         ChunkCoverageRecorder::recordErrored([ProjectFile::create('src/A.php', 'src/A.php', '<?php')], 'tool-call limit reached', $coverageRecorder);
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chunk_judged_on_a_partial_look_is_recorded_analyzed_and_inconclusive_for_each_of_its_files(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        ChunkCoverageRecorder::recordInconclusive([ProjectFile::create('src/A.php', 'src/A.php', '<?php'), ProjectFile::create('src/B.php', 'src/B.php', '<?php')], $recordingCoverageRecorder);
+
+        self::assertSame(
+            [['stage' => 'attacker', 'filePath' => 'src/A.php', 'status' => 'analyzed'], ['stage' => 'attacker', 'filePath' => 'src/B.php', 'status' => 'analyzed']],
+            $recordingCoverageRecorder->coverage,
+        );
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/A.php'], ['stage' => 'attacker', 'filePath' => 'src/B.php']], $recordingCoverageRecorder->inconclusive);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_chunk_judged_on_a_partial_look_is_still_recorded_analyzed_when_the_recorder_keeps_no_partial_looks(): void
+    {
+        $coverageRecorder = $this->createMock(CoverageRecorderInterface::class);
+        $coverageRecorder->expects(self::once())->method('recordCoverage')->with('attacker', 'src/A.php', 'analyzed');
+
+        ChunkCoverageRecorder::recordInconclusive([ProjectFile::create('src/A.php', 'src/A.php', '<?php')], $coverageRecorder);
+    }
 }

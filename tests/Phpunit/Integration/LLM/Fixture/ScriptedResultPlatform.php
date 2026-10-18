@@ -25,11 +25,13 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\ResultInterface;
+use Symfony\AI\Platform\TokenUsage\TokenUsage;
 
 /**
  * Test fake: answers each invocation with the next scripted result and keeps
  * the messages and the options each request carried, so a test can read what
- * the model was sent on every round.
+ * the model was sent on every round. Given a token usage, every answer reports
+ * it, so a test can count what the rounds were billed.
  */
 final class ScriptedResultPlatform implements PlatformInterface
 {
@@ -44,6 +46,7 @@ final class ScriptedResultPlatform implements PlatformInterface
      */
     public function __construct(
         private array $results,
+        private ?TokenUsage $tokenUsage = null,
     ) {}
 
     #[Override]
@@ -60,11 +63,16 @@ final class ScriptedResultPlatform implements PlatformInterface
             throw new RuntimeException('ScriptedResultPlatform invoked more times than scripted.');
         }
 
-        return new DeferredResult(
+        $deferredResult = new DeferredResult(
             new PlainConverter($result),
             new InMemoryRawResult(['text' => ''], [], (object) []),
             $options,
         );
+        if ($this->tokenUsage instanceof TokenUsage) {
+            $deferredResult->getMetadata()->add('token_usage', $this->tokenUsage);
+        }
+
+        return $deferredResult;
     }
 
     #[Override]

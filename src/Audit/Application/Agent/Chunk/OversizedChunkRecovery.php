@@ -88,7 +88,7 @@ final readonly class OversizedChunkRecovery
      * A half cut short or errored is left out of the cache by the analyzers,
      * and so is the whole chunk then: a cache entry replays as the model's
      * complete verdict, which the merged findings only are once every file
-     * ended analyzed or served from the cache.
+     * ended analyzed or served from the cache, and none on a partial look.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -99,7 +99,7 @@ final readonly class OversizedChunkRecovery
         }
 
         $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $chunk);
-        if ([] !== array_diff($paths, $statusTrackingCoverageRecorder->analyzedFiles())) {
+        if ([] !== array_diff($paths, $statusTrackingCoverageRecorder->conclusiveFiles())) {
             return;
         }
 

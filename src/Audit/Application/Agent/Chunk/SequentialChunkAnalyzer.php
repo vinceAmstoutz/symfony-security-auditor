@@ -258,7 +258,7 @@ final readonly class SequentialChunkAnalyzer
             return $this->vulnerabilityFactory->fromList($rawData, $chunk);
         }
 
-        return $this->chunkAnswerHydrator->settle($chunk, $chunkContext, $rawData, $coverageRecorder);
+        return $this->chunkAnswerHydrator->settle($chunk, $chunkContext->answeredBy($llmResponse), $rawData, $coverageRecorder);
     }
 
     /**

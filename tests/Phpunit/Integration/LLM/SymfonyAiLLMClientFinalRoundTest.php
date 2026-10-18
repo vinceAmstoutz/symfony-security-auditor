@@ -23,11 +23,18 @@ use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\TokenUsage\TokenUsage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
@@ -35,9 +42,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Miss
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\FinalRound;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\CountingReadingTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\CountingRecordingTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedResultTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\RefusingRecordingTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedResultPlatform;
@@ -133,19 +143,21 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_a_last_round_that_only_reads_is_still_a_cut_short_answer(): void
+    public function test_a_closing_request_that_still_reads_is_a_cut_short_answer(): void
     {
         $toolCallCounter = new ToolCallCounter();
+        $readings = new ToolCallCounter();
         $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
             $this->callOf('lookup'),
             $this->callOf('lookup'),
         ]);
 
-        $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry($toolCallCounter), 2);
+        $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->countingRegistry($readings, $toolCallCounter), 2);
 
         self::assertSame('max_tool_iterations', $llmResponse->stopReason());
         self::assertTrue($llmResponse->isDegraded());
-        self::assertSame(0, $toolCallCounter->calls);
+        self::assertSame([0, 1, 3], [$toolCallCounter->calls, $readings->calls, \count($scriptedResultPlatform->requests)]);
     }
 
     /**
@@ -312,6 +324,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
             $this->callOf('lookup'),
             $this->callOf('record'),
             $this->callOf('lookup'),
+            $this->callOf('lookup'),
         ]);
 
         $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
@@ -321,7 +334,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
 
         self::assertSame(['end_turn', 'max_tool_iterations'], [$responses[0]->stopReason(), $responses[1]->stopReason()]);
         self::assertSame([1, 0], [$recordingCounter->calls, $readingCounter->calls]);
-        self::assertCount(4, $scriptedResultPlatform->requests);
+        self::assertCount(5, $scriptedResultPlatform->requests);
     }
 
     /**
@@ -395,6 +408,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
         $scriptedResultPlatform = new ScriptedResultPlatform([
             $this->callOf('lookup'),
             $this->callOf('refuse'),
+            $this->callOf('refuse'),
         ]);
 
         $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->refusingRegistry(), 2);
@@ -444,6 +458,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
         $scriptedResultPlatform = new ScriptedResultPlatform([
             $this->callOf('lookup'),
             $this->callOf('lookup'),
+            $this->callOf('lookup'),
         ]);
         $toolRegistry = new ToolRegistry([new FixedResultTool('lookup', RecordingToolInterface::RECORDED)], new NullLogger());
 
@@ -466,6 +481,7 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
     {
         $scriptedResultPlatform = new ScriptedResultPlatform([
             $this->callOf('lookup'),
+            $this->callOf('refuse'),
             $this->callOf('refuse'),
         ]);
 
@@ -503,6 +519,328 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
         self::assertSame(1, $toolCallCounter->calls);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_last_round_that_only_reads_gets_one_closing_request_whose_text_answer_reached_the_round_limit(): void
+    {
+        $toolCallCounter = new ToolCallCounter();
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+            new MultiPartResult([new TextResult('[]')]),
+        ]);
+
+        $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->countingRegistry($toolCallCounter, new ToolCallCounter()), 2);
+
+        self::assertSame(['[]', 'end_turn', true, false], [$llmResponse->content(), $llmResponse->stopReason(), $llmResponse->reachedToolCap(), $llmResponse->isDegraded()]);
+        self::assertSame([1, 3], [$toolCallCounter->calls, \count($scriptedResultPlatform->requests)]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_closing_request_that_records_ends_the_conversation_at_the_round_limit(): void
+    {
+        $toolCallCounter = new ToolCallCounter();
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+            $this->callOf('lookup', 'record'),
+        ]);
+
+        $llmResponse = $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry($toolCallCounter), 2);
+
+        self::assertSame(['end_turn', true], [$llmResponse->stopReason(), $llmResponse->reachedToolCap()]);
+        self::assertSame([1, 3], [$toolCallCounter->calls, \count($scriptedResultPlatform->requests)]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_the_closing_request_answers_each_reading_call_unrun_and_offers_the_same_tools(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('lookup', 'lookup'),
+            new MultiPartResult([new TextResult('[]')]),
+        ]);
+
+        $this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 2);
+
+        self::assertSame([FinalRound::NOT_RUN, FinalRound::NOT_RUN], $this->toolResultsOf($scriptedResultPlatform, 2, 2));
+        self::assertEquals($scriptedResultPlatform->options[0]['tools'], $scriptedResultPlatform->options[2]['tools']);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_text_answer_on_the_last_round_reached_the_round_limit(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            new MultiPartResult([new TextResult('[]')]),
+        ]);
+
+        self::assertTrue($this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 2)->reachedToolCap());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_text_answer_before_the_last_round_did_not_reach_the_round_limit(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            new MultiPartResult([new TextResult('[]')]),
+        ]);
+
+        self::assertFalse($this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 3)->reachedToolCap());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_last_round_that_records_reached_the_round_limit(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('record'),
+        ]);
+
+        self::assertTrue($this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 2)->reachedToolCap());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     * @throws InvalidAuditBudgetException
+     */
+    public function test_the_closing_request_is_held_to_the_budget(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([$this->callOf('lookup'), new MultiPartResult([new TextResult('[]')])], new TokenUsage(promptTokens: 100, completionTokens: 10));
+
+        try {
+            $this->budgetedClient($scriptedResultPlatform, new BudgetTracker(AuditBudget::forTokens(150), new CostCalculator(new FixedPricingProvider(0.0, 0.0))))->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 1);
+            self::fail('The closing request must be held to the budget.');
+        } catch (BudgetExceededException) {
+            self::assertCount(2, $scriptedResultPlatform->requests);
+        }
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     * @throws InvalidAuditBudgetException
+     */
+    public function test_the_closing_request_is_booked_like_any_round(): void
+    {
+        $budgetTracker = new BudgetTracker(AuditBudget::forTokens(1_000_000), new CostCalculator(new FixedPricingProvider(0.0, 0.0)));
+        $scriptedResultPlatform = new ScriptedResultPlatform([$this->callOf('lookup'), new MultiPartResult([new TextResult('[]')])], new TokenUsage(promptTokens: 100, completionTokens: 10));
+
+        $this->budgetedClient($scriptedResultPlatform, $budgetTracker)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), 1);
+
+        self::assertSame(220, $budgetTracker->tokensUsed());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_concurrent_last_round_that_only_reads_gets_one_closing_request_whose_answer_reached_the_round_limit(): void
+    {
+        $readings = new ToolCallCounter();
+        $toolCallCounter = new ToolCallCounter();
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+            new MultiPartResult([new TextResult('[]')]),
+            $this->callOf('record'),
+        ]);
+
+        $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'answers', 'tools' => $this->countingRegistry($readings, new ToolCallCounter())],
+            ['system' => 's', 'user' => 'records', 'tools' => $this->countingRegistry(new ToolCallCounter(), $toolCallCounter)],
+        ], 4, 2);
+
+        self::assertSame([['[]', 'end_turn', true], ['', 'end_turn', true]], array_map(static fn (LLMResponse $llmResponse): array => [$llmResponse->content(), $llmResponse->stopReason(), $llmResponse->reachedToolCap()], $responses));
+        self::assertSame([1, 1, 6], [$readings->calls, $toolCallCounter->calls, \count($scriptedResultPlatform->requests)]);
+        self::assertSame([FinalRound::NOT_RUN], $this->toolResultsOf($scriptedResultPlatform, 4, 1));
+        self::assertEquals($scriptedResultPlatform->options[0]['tools'], $scriptedResultPlatform->options[4]['tools']);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_concurrent_closing_request_that_still_reads_is_a_cut_short_answer(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+        ]);
+
+        $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $this->registry(new ToolCallCounter())],
+        ], 4, 2);
+
+        self::assertSame(['max_tool_iterations', false], [$responses[0]->stopReason(), $responses[0]->reachedToolCap()]);
+        self::assertCount(3, $scriptedResultPlatform->requests);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_concurrent_text_answer_on_the_last_round_reached_the_round_limit_and_one_before_it_did_not(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([
+            $this->callOf('lookup'),
+            $this->callOf('lookup'),
+            new MultiPartResult([new TextResult('[]')]),
+            $this->callOf('lookup'),
+            new MultiPartResult([new TextResult('[]')]),
+        ]);
+
+        $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'early', 'tools' => $this->registry(new ToolCallCounter())],
+            ['system' => 's', 'user' => 'last', 'tools' => $this->registry(new ToolCallCounter())],
+        ], 4, 3);
+
+        self::assertSame([false, true], [$responses[0]->reachedToolCap(), $responses[1]->reachedToolCap()]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     * @throws InvalidAuditBudgetException
+     */
+    public function test_a_concurrent_closing_request_is_held_to_the_budget(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([$this->callOf('lookup'), new MultiPartResult([new TextResult('[]')])], new TokenUsage(promptTokens: 100, completionTokens: 10));
+
+        try {
+            $this->budgetedClient($scriptedResultPlatform, new BudgetTracker(AuditBudget::forTokens(150), new CostCalculator(new FixedPricingProvider(0.0, 0.0))))->completeBatchWithTools([
+                ['system' => 's', 'user' => 'u', 'tools' => $this->registry(new ToolCallCounter())],
+            ], 4, 1);
+            self::fail('The closing request must be held to the budget.');
+        } catch (BudgetExceededException) {
+            self::assertCount(2, $scriptedResultPlatform->requests);
+        }
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     * @throws InvalidAuditBudgetException
+     */
+    public function test_a_concurrent_closing_request_is_booked_like_any_round(): void
+    {
+        $budgetTracker = new BudgetTracker(AuditBudget::forTokens(1_000_000), new CostCalculator(new FixedPricingProvider(0.0, 0.0)));
+        $scriptedResultPlatform = new ScriptedResultPlatform([$this->callOf('lookup'), new MultiPartResult([new TextResult('[]')])], new TokenUsage(promptTokens: 100, completionTokens: 10));
+
+        $this->budgetedClient($scriptedResultPlatform, $budgetTracker)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $this->registry(new ToolCallCounter())],
+        ], 4, 1);
+
+        self::assertSame(220, $budgetTracker->tokensUsed());
+    }
+
     private function client(ScriptedResultPlatform $scriptedResultPlatform): SymfonyAiLLMClient
     {
         return new SymfonyAiLLMClient(new PlatformBinding($scriptedResultPlatform, 'm', new NullLogger()));
@@ -517,6 +855,36 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
             new FixedResultTool('lookup', 'a file'),
             new CountingRecordingTool('record', $toolCallCounter),
         ], new NullLogger());
+    }
+
+    private function budgetedClient(ScriptedResultPlatform $scriptedResultPlatform, BudgetTracker $budgetTracker): SymfonyAiLLMClient
+    {
+        return new SymfonyAiLLMClient(
+            new PlatformBinding($scriptedResultPlatform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder(), budgetTracker: $budgetTracker),
+        );
+    }
+
+    /**
+     * @throws InvalidToolRegistryException
+     */
+    private function countingRegistry(ToolCallCounter $readings, ToolCallCounter $records): ToolRegistry
+    {
+        return new ToolRegistry([
+            new CountingReadingTool('lookup', $readings),
+            new CountingRecordingTool('record', $records),
+        ], new NullLogger());
+    }
+
+    /**
+     * @return list<?string> the tool results the request ends with
+     */
+    private function toolResultsOf(ScriptedResultPlatform $scriptedResultPlatform, int $request, int $count): array
+    {
+        return array_map(
+            static fn (MessageInterface $message): ?string => $message instanceof ToolCallMessage ? $message->asText() : null,
+            \array_slice($scriptedResultPlatform->requests[$request], -$count),
+        );
     }
 
     /**

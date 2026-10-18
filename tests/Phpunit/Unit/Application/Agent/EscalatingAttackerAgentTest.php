@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\InconclusiveAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
 
 final class EscalatingAttackerAgentTest extends TestCase
@@ -545,6 +546,29 @@ final class EscalatingAttackerAgentTest extends TestCase
         );
 
         self::assertSame([$vulnerability], $result);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_cheap_finding_on_a_file_the_deep_pass_reached_its_last_tool_round_on_without_a_finding_is_kept(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/Controller/A.php', title: 'cheap A');
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+
+        $result = $this->callAnalyze(
+            new EscalatingAttackerAgent($this->makeRecordingAttacker([$vulnerability]), new InconclusiveAttackerAgent(), new NullLogger()),
+            [$this->makeFile('src/Controller/A.php')],
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            $auditContext,
+        );
+
+        self::assertSame([$vulnerability], $result);
+        self::assertSame([$vulnerability], $auditContext->drainFoundVulnerabilities());
     }
 
     /**

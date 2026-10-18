@@ -186,7 +186,7 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws TransientLLMFailureException
      */
-    public function test_complete_batch_with_tools_caps_iterations_and_warns(): void
+    public function test_complete_batch_with_tools_stops_after_a_closing_request_that_still_reads_and_warns(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
 
@@ -215,7 +215,7 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
 
         self::assertSame('max_tool_iterations', $responses[0]->stopReason());
         self::assertSame('', $responses[0]->content());
-        self::assertSame(2, $platformInvocationLog->invocations);
+        self::assertSame(3, $platformInvocationLog->invocations);
 
         $capLogs = array_values(array_filter(
             $warnings,
@@ -281,10 +281,12 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
             [
                 new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])]),
                 new MultiPartResult([new ToolCallResult([new ToolCall('2', 'record')])]),
+                new MultiPartResult([new ToolCallResult([new ToolCall('3', 'record')])]),
             ],
             [
                 new TokenUsage(promptTokens: 7, completionTokens: 3),
                 new TokenUsage(promptTokens: 11, completionTokens: 5),
+                new TokenUsage(promptTokens: 13, completionTokens: 2),
             ],
         );
 
@@ -298,7 +300,7 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
             static fn (array $entry): array => $entry[1],
             array_filter($warnings, static fn (array $entry): bool => 'Tool-using loop hit iteration cap' === $entry[0]),
         ));
-        self::assertSame([['max_iterations' => 2, 'input_tokens' => 18, 'output_tokens' => 8]], $capContexts);
+        self::assertSame([['max_iterations' => 2, 'input_tokens' => 31, 'output_tokens' => 10]], $capContexts);
     }
 
     /**

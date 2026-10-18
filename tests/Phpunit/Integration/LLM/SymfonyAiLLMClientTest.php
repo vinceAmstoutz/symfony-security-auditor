@@ -1382,7 +1382,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_complete_with_tools_stops_at_iteration_cap_and_warns(): void
+    public function test_complete_with_tools_stops_after_a_closing_request_that_still_reads_and_warns(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
         $toolRegistry = new ToolRegistry([$tool], new NullLogger());
@@ -1403,7 +1403,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 new MultiPartResult([new ToolCallResult([new ToolCall('2', 'lookup')])]),
                 new MultiPartResult([new ToolCallResult([new ToolCall('3', 'lookup')])]),
             ],
-            [new TokenUsage(promptTokens: 10, completionTokens: 3), new TokenUsage(promptTokens: 20, completionTokens: 5)],
+            [new TokenUsage(promptTokens: 10, completionTokens: 3), new TokenUsage(promptTokens: 20, completionTokens: 5), new TokenUsage(promptTokens: 30, completionTokens: 7)],
         );
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
@@ -1411,15 +1411,15 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertSame('', $llmResponse->content());
         self::assertSame('max_tool_iterations', $llmResponse->stopReason());
-        self::assertSame(30, $llmResponse->inputTokens());
-        self::assertSame(8, $llmResponse->outputTokens());
+        self::assertSame(60, $llmResponse->inputTokens());
+        self::assertSame(15, $llmResponse->outputTokens());
 
         $capLogs = array_values(array_filter(
             $warnings,
             static fn (array $entry): bool => 'Tool-using loop hit iteration cap' === $entry[0],
         ));
         self::assertCount(1, $capLogs);
-        self::assertSame(['max_iterations' => 2, 'input_tokens' => 30, 'output_tokens' => 8], $capLogs[0][1]);
+        self::assertSame(['max_iterations' => 2, 'input_tokens' => 60, 'output_tokens' => 15], $capLogs[0][1]);
     }
 
     /**
@@ -1433,7 +1433,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_complete_with_tools_invokes_platform_exact_max_iterations_times_when_all_iterations_return_tool_calls(): void
+    public function test_complete_with_tools_invokes_platform_max_iterations_times_plus_one_closing_request_when_every_round_reads(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
         $toolRegistry = new ToolRegistry([$tool], new NullLogger());
@@ -1451,7 +1451,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 2);
 
-        self::assertSame(2, $platformInvocationLog->invocations);
+        self::assertSame(3, $platformInvocationLog->invocations);
     }
 
     /**

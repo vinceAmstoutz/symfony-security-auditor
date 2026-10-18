@@ -38,6 +38,7 @@ final readonly class LLMResponse
         private int $cacheReadTokens,
         private int $cacheCreationTokens,
         private ?string $reportedModel = null,
+        private bool $reachedToolCap = false,
     ) {}
 
     public static function of(
@@ -125,12 +126,38 @@ final readonly class LLMResponse
             $this->cacheReadTokens,
             $this->cacheCreationTokens,
             $reportedModel,
+            $this->reachedToolCap,
         );
     }
 
     public function reportedModel(): ?string
     {
         return $this->reportedModel;
+    }
+
+    /**
+     * The same response, marked as the answer of a tool-using conversation
+     * that reached its last allowed round: the model may have looked at less
+     * than it wanted to, so an answer that found nothing is no verdict to keep.
+     */
+    public function withReachedToolCap(): self
+    {
+        return new self(
+            $this->content,
+            $this->inputTokens,
+            $this->outputTokens,
+            $this->model,
+            $this->stopReason,
+            $this->cacheReadTokens,
+            $this->cacheCreationTokens,
+            $this->reportedModel,
+            true,
+        );
+    }
+
+    public function reachedToolCap(): bool
+    {
+        return $this->reachedToolCap;
     }
 
     public function totalTokens(): int

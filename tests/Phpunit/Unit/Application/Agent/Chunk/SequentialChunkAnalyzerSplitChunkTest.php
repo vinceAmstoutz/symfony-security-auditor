@@ -321,6 +321,53 @@ final class SequentialChunkAnalyzerSplitChunkTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_split_chunk_is_not_cached_whole_when_a_half_reached_the_tool_cap_without_a_finding(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user): LLMResponse {
+            if (str_contains($user, 'src/A.php') && str_contains($user, 'src/B.php')) {
+                throw new LLMRequestTooLargeException('prompt is too long');
+            }
+
+            if (str_contains($user, 'src/B.php')) {
+                return LLMResponse::of('[]', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))->withReachedToolCap();
+            }
+
+            return self::jsonAnswer('from A');
+        });
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $attackerCache->expects(self::once())->method('store')->with(
+            self::callback(static fn (array $chunk): bool => ['src/A.php'] === self::pathsOf($chunk)),
+            self::anything(),
+        );
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        [$vulnerabilities] = $this->analyzer($llmClient, $attackerCache, false)->analyze(
+            [[$this->makeFile('src/A.php'), $this->makeFile('src/B.php')]],
+            $this->request(),
+            $recordingCoverageRecorder,
+            null,
+            new RiskMarkerIndex([]),
+        );
+
+        self::assertSame(['from A'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'filePath' => 'src/A.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'filePath' => 'src/B.php', 'status' => 'analyzed'],
+            ],
+            $recordingCoverageRecorder->coverage,
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_the_findings_of_a_cached_half_are_recorded_when_the_cache_serves_it(): void
     {

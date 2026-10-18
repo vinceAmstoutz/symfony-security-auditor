@@ -25,7 +25,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * lost, so the chunk is recorded `errored` and left out of the cache instead —
  * the findings that did hydrate are kept, the report says the chunk could not
  * be fully analyzed, and the next run asks the model again rather than
- * replaying the lossy answer as the model's complete verdict.
+ * replaying the lossy answer as the model's complete verdict. A chunk answered
+ * at the tool-call limit with no finding is `analyzed` but left out of the
+ * cache too: the model may have looked at less than it wanted to, so the next
+ * run looks again.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -48,6 +51,15 @@ final readonly class ChunkOutcomeRecorder
                 'dropped' => $vulnerabilityHydrationResult->dropsByReason(),
             ]);
             ChunkCoverageRecorder::record($chunk, 'errored', $coverageRecorder);
+
+            return;
+        }
+
+        if ($chunkContext->reachedToolCap && [] === $rawVulnerabilities) {
+            $this->logger->info('Attacker reached its last tool round without a finding; the chunk is recorded as analyzed and left out of the cache, so the next run looks again', [
+                'files' => array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $chunk),
+            ]);
+            ChunkCoverageRecorder::recordInconclusive($chunk, $coverageRecorder);
 
             return;
         }

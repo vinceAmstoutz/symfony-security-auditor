@@ -41,7 +41,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  *      `cached`) is dropped, since the deep pass re-reports what it confirms
  *      and its silence is a discard — so a refined location or type never
  *      reaches the reviewer twice; cheap findings on files it did not judge
- *      (cold files, or hot files it errored on) pass through, deduplicated
+ *      (cold files, hot files it errored on, or hot files it reached its
+ *      last tool round on without a finding) pass through, deduplicated
  *      by Vulnerability::id(). A discarded cheap finding also leaves the
  *      coverage recorder's recoverable findings, so draining them after the
  *      pass cannot bring it back.
@@ -89,7 +90,7 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
             $statusTrackingCoverageRecorder,
         );
 
-        $analyzedByExpensive = $statusTrackingCoverageRecorder->analyzedFiles();
+        $analyzedByExpensive = $statusTrackingCoverageRecorder->conclusiveFiles();
         $this->withdrawFromRecovery($coverageRecorder, array_filter(
             $cheapFindings,
             fn (Vulnerability $vulnerability): bool => $this->isJudged($vulnerability, $analyzedByExpensive),

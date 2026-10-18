@@ -65,6 +65,37 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_a_response_has_not_reached_the_tool_round_limit_unless_marked(): void
+    {
+        self::assertFalse(LLMResponse::of('[]', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50))->reachedToolCap());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_response_marked_at_the_tool_round_limit_keeps_everything_else(): void
+    {
+        $llmResponse = LLMResponse::of('[]', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50, 7, 3))
+            ->withReportedModel('claude-opus-20260101')
+            ->withReachedToolCap();
+
+        self::assertTrue($llmResponse->reachedToolCap());
+        self::assertSame(['[]', 'claude-opus', 'claude-opus-20260101', 'end_turn'], [$llmResponse->content(), $llmResponse->model(), $llmResponse->reportedModel(), $llmResponse->stopReason()]);
+        self::assertSame([100, 50, 7, 3], [$llmResponse->inputTokens(), $llmResponse->outputTokens(), $llmResponse->cacheReadTokens(), $llmResponse->cacheCreationTokens()]);
+        self::assertFalse($llmResponse->isDegraded());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_naming_the_reported_model_keeps_the_tool_round_limit_mark(): void
+    {
+        self::assertTrue(LLMResponse::of('[]', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50))->withReachedToolCap()->withReportedModel('claude-opus-20260101')->reachedToolCap());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_tokens_default_to_zero_when_not_supplied(): void
     {
         $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50));

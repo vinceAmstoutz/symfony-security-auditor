@@ -491,6 +491,6 @@ final readonly class ConcurrentChunkAnalyzer
             return;
         }
 
-        $this->chunkOutcomeRecorder->record($pendingChunk->chunk, $pendingChunk->chunkContext, $rawData, $vulnerabilityHydrationResult, $coverageRecorder);
+        $this->chunkOutcomeRecorder->record($pendingChunk->chunk, $pendingChunk->chunkContext->answeredBy($llmResponse), $rawData, $vulnerabilityHydrationResult, $coverageRecorder);
     }
 }

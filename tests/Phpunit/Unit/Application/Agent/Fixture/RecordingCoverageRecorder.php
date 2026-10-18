@@ -17,6 +17,7 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\FailureReasonRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\InconclusiveAnalysisRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRecorderInterface;
 
 /**
@@ -26,13 +27,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRe
  * without mocking the port. Drain semantics mirror the production recorder
  * (return-and-clear).
  */
-final class RecordingCoverageRecorder implements CoverageRecorderInterface, RejectedFindingRecorderInterface, FailureReasonRecorderInterface
+final class RecordingCoverageRecorder implements CoverageRecorderInterface, RejectedFindingRecorderInterface, FailureReasonRecorderInterface, InconclusiveAnalysisRecorderInterface
 {
     /** @var list<array{stage: string, filePath: string, status: string}> */
     public array $coverage = [];
 
     /** @var list<array{stage: string, filePath: string, reason: string}> */
     public array $failureReasons = [];
+
+    /** @var list<array{stage: string, filePath: string}> */
+    public array $inconclusive = [];
 
     /** @var list<Vulnerability> */
     public array $reviewed = [];
@@ -53,6 +57,12 @@ final class RecordingCoverageRecorder implements CoverageRecorderInterface, Reje
     public function recordFailureReason(string $stage, string $filePath, string $reason): void
     {
         $this->failureReasons[] = ['stage' => $stage, 'filePath' => $filePath, 'reason' => $reason];
+    }
+
+    #[Override]
+    public function recordInconclusiveAnalysis(string $stage, string $filePath): void
+    {
+        $this->inconclusive[] = ['stage' => $stage, 'filePath' => $filePath];
     }
 
     #[Override]
