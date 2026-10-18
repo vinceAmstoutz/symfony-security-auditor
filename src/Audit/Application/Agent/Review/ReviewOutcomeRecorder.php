@@ -174,8 +174,9 @@ final readonly class ReviewOutcomeRecorder
             return $this->recordErrored($vulnerability, $coverageRecorder);
         }
 
-        if (null !== $codeContextForCache) {
-            $this->reviewerVerdictCache->store($vulnerability, $codeContextForCache, $this->verdictApplier->normalize($rawData));
+        $cacheContext = ReviewerVerdictCache::contextFor($llmResponse, $codeContextForCache);
+        if (null !== $cacheContext) {
+            $this->reviewerVerdictCache->store($vulnerability, $cacheContext, $this->verdictApplier->normalize($rawData));
         }
 
         return $this->recordVerdict($vulnerability, $rawData, $coverageRecorder);

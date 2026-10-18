@@ -232,7 +232,7 @@ final readonly class BatchReviewAnalyzer
     private function readBatchAnswer(array $batch, LLMResponse $llmResponse, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
     {
         try {
-            return $this->applyBatchResponse($batch, $llmResponse, $cacheContexts, $coverageRecorder);
+            return $this->applyBatchResponse($batch, $llmResponse, ReviewerVerdictCache::contextsFor($llmResponse, $cacheContexts), $coverageRecorder);
         } catch (JsonException $jsonException) {
             $this->logger->error('Failed to parse reviewer batch response', [
                 'batch_size' => \count($batch),
@@ -336,7 +336,7 @@ final readonly class BatchReviewAnalyzer
 
         return $llmResponse->isDegraded()
             ? $this->applyIncompleteBatch($batch, $llmResponse->stopReason(), $rawData, $cacheContexts, $coverageRecorder)
-            : $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
+            : $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, ReviewerVerdictCache::contextsFor($llmResponse, $cacheContexts));
     }
 
     /**

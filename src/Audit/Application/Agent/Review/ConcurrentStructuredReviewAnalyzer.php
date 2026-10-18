@@ -248,8 +248,9 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             return $this->reviewOutcomeRecorder->recordIncompleteResponse($concurrentReviewBatch->vulnerabilities[$index], $llmResponse, $coverageRecorder);
         }
 
-        if (!$concurrentReviewBatch->bypassCache) {
-            $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index], $verdict);
+        $cacheContext = ReviewerVerdictCache::contextFor($llmResponse, $concurrentReviewBatch->codeContextForCache($index));
+        if (null !== $cacheContext) {
+            $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $cacheContext, $verdict);
         }
 
         return $this->reviewOutcomeRecorder->recordVerdict($concurrentReviewBatch->vulnerabilities[$index], $verdict, $coverageRecorder);

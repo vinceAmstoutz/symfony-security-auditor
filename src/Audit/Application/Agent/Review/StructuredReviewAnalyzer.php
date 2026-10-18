@@ -149,7 +149,8 @@ final readonly class StructuredReviewAnalyzer
      * A conversation cut short (tool-loop cap, token limit, content filter,
      * no content) that recorded no verdict is an error, not a rejection: the
      * finding is recorded as errored and left out of the cache. A verdict the
-     * model did record before the cut-off is genuine and applied as usual.
+     * model did record before the cut-off is genuine and applied as usual,
+     * though one given at the tool-call limit is not cached.
      *
      * @param array<string, mixed>|null $verdict
      */
@@ -159,8 +160,9 @@ final readonly class StructuredReviewAnalyzer
             return $this->reviewOutcomeRecorder->recordIncompleteResponse($vulnerability, $llmResponse, $coverageRecorder);
         }
 
-        if (null !== $codeContextForCache) {
-            $this->reviewerVerdictCache->store($vulnerability, $codeContextForCache, $verdict);
+        $cacheContext = ReviewerVerdictCache::contextFor($llmResponse, $codeContextForCache);
+        if (null !== $cacheContext) {
+            $this->reviewerVerdictCache->store($vulnerability, $cacheContext, $verdict);
         }
 
         return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
