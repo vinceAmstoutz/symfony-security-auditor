@@ -550,6 +550,7 @@ final class StandaloneConfigLoaderTest extends TestCase
 
             return $projectDirectory.'/security-baseline.json';
         }, $outsideTheProject];
+        yield 'a kernel handle that exists but has no real path' => [static fn (Filesystem $filesystem, string $projectDirectory): string => '/proc/self/ns/net', $outsideTheProject];
         yield 'a link to a file of the project one byte past a mebibyte' => [static function (Filesystem $filesystem, string $projectDirectory): string {
             $filesystem->dumpFile($projectDirectory.'/shared/baseline.json', '['.str_repeat(' ', 1_048_575).']');
             $filesystem->symlink($projectDirectory.'/shared/baseline.json', $projectDirectory.'/security-baseline.json');

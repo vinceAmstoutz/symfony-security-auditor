@@ -44,9 +44,9 @@ final readonly class AuditedProjectBaseline
 
         $realBaseline = realpath($baseline);
         $realProject = realpath(\dirname($projectConfigFile));
-        \assert(false !== $realBaseline && false !== $realProject, 'realpath() must succeed for paths file_exists() found');
+        \assert(false !== $realProject, 'realpath() must succeed for the folder of a config file just read');
 
-        if (!is_file($realBaseline) || !Path::isBasePath($realProject, $realBaseline)) {
+        if (false === $realBaseline || !is_file($realBaseline) || !Path::isBasePath($realProject, $realBaseline)) {
             throw MalformedProjectConfigException::forBaselineOutsideProject($projectConfigFile, $baseline);
         }
 
