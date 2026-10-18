@@ -78,6 +78,9 @@ final readonly class EchoedFilePath
     }
 
     /**
+     * The relative paths of the known files `$echoed` denotes, each once
+     * however many times the known files list it.
+     *
      * @param list<ProjectFile> $knownFiles
      *
      * @return list<string>
@@ -87,11 +90,11 @@ final readonly class EchoedFilePath
         $denoted = [];
         foreach ($knownFiles as $knownFile) {
             if (self::comparable($knownFile->relativePath()) === $echoed || self::comparable($knownFile->absolutePath()) === $echoed) {
-                $denoted[] = $knownFile->relativePath();
+                $denoted[$knownFile->relativePath()] = $knownFile->relativePath();
             }
         }
 
-        return $denoted;
+        return array_values($denoted);
     }
 
     /**

@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
@@ -35,6 +37,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\Au
 final class AuditOrchestratorEchoedPathTest extends TestCase
 {
     private const string FILE_CONTENT = "<?php\n\$connection->query(\$id);\n";
+
+    private const string OTHER_FILE_CONTENT = "<?php\n\$bar->query(\$id);\n";
 
     private string $tmpDir;
 
@@ -102,6 +106,46 @@ final class AuditOrchestratorEchoedPathTest extends TestCase
         AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
 
         self::assertSame(['src/Controller/Foo.php'], array_values(array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $auditContext->vulnerabilities())));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    #[DataProvider('spellingsFromAnotherChunk')]
+    public function test_one_weakness_two_chunks_report_in_two_spellings_is_one_finding_reviewed_with_its_code(string $echoedPath): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnCallback(static fn (string $system, string $user): LLMResponse => AuditOrchestratorHarness::attackerResponse([
+            AuditOrchestratorHarness::vulnerabilityPayload(filePath: str_contains($user, 'src/Controller/Foo.php') ? $echoedPath : 'src/Controller/Bar.php'),
+        ]));
+        $reviewerMessages = [];
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$reviewerMessages): LLMResponse {
+            $reviewerMessages[] = $user;
+
+            return AuditOrchestratorHarness::reviewerAcceptResponse();
+        });
+        $auditContext = $this->context();
+        $auditContext->setProjectFiles([...$auditContext->projectFiles(), ProjectFile::create('src/Controller/Bar.php', '/app/src/Controller/Bar.php', self::OTHER_FILE_CONTENT)]);
+
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm, ['maxIterations' => 1, 'fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)])->orchestrate($auditContext);
+
+        self::assertSame(['src/Controller/Bar.php'], array_values(array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $auditContext->vulnerabilities())));
+        self::assertSame([true], array_map(static fn (string $message): bool => str_contains($message, '$bar->query($id);'), $reviewerMessages));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function spellingsFromAnotherChunk(): iterable
+    {
+        yield 'as an absolute path' => ['/app/src/Controller/Bar.php'];
+        yield 'with a leading dot slash' => ['./src/Controller/Bar.php'];
+        yield 'with backslashes' => ['src\Controller\Bar.php'];
     }
 
     #[Override]

@@ -65,7 +65,7 @@ final readonly class ChunkContextFactory
         $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
         $userMessage = $this->prependContext($userMessage, $chunkPreambles);
 
-        return new ChunkContext($systemPrompt, $userMessage, $chunkCacheCoordinates->contextKey, $chunkCacheCoordinates->cacheable, array_sum(array_map(static fn (ProjectFile $projectFile): int => \strlen($projectFile->content()), $slicedChunk)));
+        return new ChunkContext($systemPrompt, $userMessage, $chunkCacheCoordinates->contextKey, $chunkCacheCoordinates->cacheable, array_sum(array_map(static fn (ProjectFile $projectFile): int => \strlen($projectFile->content()), $slicedChunk)), knownFiles: $attackerAnalysisRequest->knownFilesFor($chunk));
     }
 
     /**

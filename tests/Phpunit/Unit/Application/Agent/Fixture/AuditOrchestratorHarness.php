@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmColl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
@@ -53,6 +54,7 @@ final class AuditOrchestratorHarness
      *     maxIterations?: int,
      *     minConfidence?: float,
      *     recordingProgressReporter?: RecordingProgressReporter,
+     *     fileChunker?: FileChunker,
      * } $overrides
      */
     public static function orchestrator(
@@ -72,6 +74,7 @@ final class AuditOrchestratorHarness
                     new NullAttackerCache(),
                     new NullStaticPreScanner(),
                     new NullProgressReporter(),
+                    $overrides['fileChunker'] ?? null,
                 ),
                 new AttackerAnalysisSettings(),
                 new NullLogger(),

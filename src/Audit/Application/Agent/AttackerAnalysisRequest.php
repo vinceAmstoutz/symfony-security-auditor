@@ -67,6 +67,20 @@ final readonly class AttackerAnalysisRequest
     }
 
     /**
+     * The files a finding reported on `$chunk` is named by: the chunk's own,
+     * then every file the investigation tools may open, so a finding another
+     * chunk's file was reported under is named by that file too.
+     *
+     * @param list<ProjectFile> $chunk
+     *
+     * @return list<ProjectFile>
+     */
+    public function knownFilesFor(array $chunk): array
+    {
+        return [...$chunk, ...$this->filesForTools()];
+    }
+
+    /**
      * @param list<ProjectFile>   $files
      * @param list<Vulnerability> $candidateFindings
      */

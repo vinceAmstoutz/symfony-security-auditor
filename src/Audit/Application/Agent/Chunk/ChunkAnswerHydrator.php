@@ -49,7 +49,7 @@ final readonly class ChunkAnswerHydrator
     public function hydrateJsonAnswer(array $chunk, LLMResponse $llmResponse, ChunkContext $chunkContext, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
         if ($llmResponse->isDegraded()) {
-            return $this->hydrateIncompleteAnswer($chunk, $llmResponse, $this->parseablePayload($llmResponse), $coverageRecorder);
+            return $this->hydrateIncompleteAnswer($chunk, $llmResponse, $this->parseablePayload($llmResponse), $coverageRecorder, $chunkContext->knownFiles);
         }
 
         $chunkContext = $chunkContext->answeredBy($llmResponse);
@@ -79,7 +79,7 @@ final readonly class ChunkAnswerHydrator
      */
     public function settle(array $chunk, ChunkContext $chunkContext, array $rawData, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
-        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData, $chunk);
+        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData, $chunkContext->knownFiles);
         $this->chunkOutcomeRecorder->record($chunk, $chunkContext, $rawData, $vulnerabilityHydrationResult, $coverageRecorder);
 
         return $vulnerabilityHydrationResult;
@@ -95,8 +95,9 @@ final readonly class ChunkAnswerHydrator
      *
      * @param list<ProjectFile> $chunk
      * @param list<mixed>       $rawData
+     * @param list<ProjectFile> $knownFiles the files its findings are named by
      */
-    public function hydrateIncompleteAnswer(array $chunk, LLMResponse $llmResponse, array $rawData, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    public function hydrateIncompleteAnswer(array $chunk, LLMResponse $llmResponse, array $rawData, CoverageRecorderInterface $coverageRecorder, array $knownFiles): VulnerabilityHydrationResult
     {
         $this->logger->warning('Attacker response was cut short; the chunk is recorded as errored and left out of the cache', [
             'stop_reason' => $llmResponse->stopReason(),
@@ -105,7 +106,7 @@ final readonly class ChunkAnswerHydrator
         ]);
         ChunkCoverageRecorder::recordErrored($chunk, ChunkFailureReason::fromStopReason($llmResponse->stopReason()), $coverageRecorder);
 
-        return $this->vulnerabilityFactory->fromList($rawData, $chunk);
+        return $this->vulnerabilityFactory->fromList($rawData, $knownFiles);
     }
 
     /**

@@ -97,7 +97,7 @@ final readonly class ConcurrentChunkAnalyzer
         foreach ($chunks as $index => $chunk) {
             $this->reportChunkStarted($index, $totalChunks);
 
-            $cached = $this->servedCachedResult($chunk, $this->chunkContextFactory->cacheCoordinates($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $this->attackerChunkCache->isContextAware()), $statusTrackingCoverageRecorder);
+            $cached = $this->servedCachedResult($chunk, $this->chunkContextFactory->cacheCoordinates($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $this->attackerChunkCache->isContextAware()), $attackerAnalysisRequest, $statusTrackingCoverageRecorder);
             if ($cached instanceof VulnerabilityHydrationResult) {
                 $cachedResults[$index] = $cached;
                 $this->recordFoundVulnerabilities($cached, $statusTrackingCoverageRecorder);
@@ -124,7 +124,7 @@ final readonly class ConcurrentChunkAnalyzer
     /**
      * @param list<ProjectFile> $chunk
      */
-    private function servedCachedResult(array $chunk, ChunkCacheCoordinates $chunkCacheCoordinates, CoverageRecorderInterface $coverageRecorder): ?VulnerabilityHydrationResult
+    private function servedCachedResult(array $chunk, ChunkCacheCoordinates $chunkCacheCoordinates, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder): ?VulnerabilityHydrationResult
     {
         if (!$chunkCacheCoordinates->cacheable) {
             return null;
@@ -135,7 +135,7 @@ final readonly class ConcurrentChunkAnalyzer
             return null;
         }
 
-        return $this->attackerChunkCache->served($chunk, $cached, $coverageRecorder);
+        return $this->attackerChunkCache->served($chunk, $cached, $coverageRecorder, $attackerAnalysisRequest->knownFilesFor($chunk));
     }
 
     /**
@@ -365,7 +365,7 @@ final readonly class ConcurrentChunkAnalyzer
      */
     private function analyzeChunkAlone(array $chunk, ChunkAnalysisScope $chunkAnalysisScope, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
-        $cached = $this->servedCachedResult($chunk, $this->chunkContextFactory->cacheCoordinates($chunk, $chunkAnalysisScope->attackerAnalysisRequest, $chunkAnalysisScope->riskMarkerIndex, $this->attackerChunkCache->isContextAware()), $coverageRecorder);
+        $cached = $this->servedCachedResult($chunk, $this->chunkContextFactory->cacheCoordinates($chunk, $chunkAnalysisScope->attackerAnalysisRequest, $chunkAnalysisScope->riskMarkerIndex, $this->attackerChunkCache->isContextAware()), $chunkAnalysisScope->attackerAnalysisRequest, $coverageRecorder);
         if ($cached instanceof VulnerabilityHydrationResult) {
             $this->recordFoundVulnerabilities($cached, $coverageRecorder);
 
@@ -434,7 +434,7 @@ final readonly class ConcurrentChunkAnalyzer
      */
     private function recordDrainedFindings(PendingChunk $pendingChunk, CoverageRecorderInterface $coverageRecorder): void
     {
-        $vulnerabilities = $this->vulnerabilityFactory->fromList($pendingChunk->session->drain(), $pendingChunk->chunk)->vulnerabilities();
+        $vulnerabilities = $this->vulnerabilityFactory->fromList($pendingChunk->session->drain(), $pendingChunk->chunkContext->knownFiles)->vulnerabilities();
         foreach ($vulnerabilities as $vulnerability) {
             $coverageRecorder->recordFoundVulnerability($vulnerability);
         }
@@ -455,7 +455,7 @@ final readonly class ConcurrentChunkAnalyzer
     private function hydrateRecorded(PendingChunk $pendingChunk, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
         $rawData = $pendingChunk->session->drain();
-        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData, $pendingChunk->chunk);
+        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData, $pendingChunk->chunkContext->knownFiles);
         $this->recordOutcome($pendingChunk, $llmResponse, $rawData, $vulnerabilityHydrationResult, $coverageRecorder);
 
         return $vulnerabilityHydrationResult;

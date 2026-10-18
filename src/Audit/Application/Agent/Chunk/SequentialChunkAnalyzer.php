@@ -147,7 +147,7 @@ final readonly class SequentialChunkAnalyzer
     {
         $chunkContext = $this->chunkContextFactory->create($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $this->attackerChunkCache->isContextAware());
 
-        $servedFromCache = $this->servedFromCacheOrNull($chunk, $chunkContext->cacheable, $chunkContext->contextKey, $coverageRecorder);
+        $servedFromCache = $this->servedFromCacheOrNull($chunk, $chunkContext, $coverageRecorder);
 
         if ($servedFromCache instanceof VulnerabilityHydrationResult) {
             return $this->recordedFindings($servedFromCache, $coverageRecorder);
@@ -206,19 +206,19 @@ final readonly class SequentialChunkAnalyzer
     /**
      * @param list<ProjectFile> $chunk
      */
-    private function servedFromCacheOrNull(array $chunk, bool $cacheable, string $contextKey, CoverageRecorderInterface $coverageRecorder): ?VulnerabilityHydrationResult
+    private function servedFromCacheOrNull(array $chunk, ChunkContext $chunkContext, CoverageRecorderInterface $coverageRecorder): ?VulnerabilityHydrationResult
     {
-        if (!$cacheable) {
+        if (!$chunkContext->cacheable) {
             return null;
         }
 
-        $cached = $this->attackerChunkCache->get($chunk, $contextKey);
+        $cached = $this->attackerChunkCache->get($chunk, $chunkContext->contextKey);
 
         if (null === $cached) {
             return null;
         }
 
-        return $this->attackerChunkCache->served($chunk, $cached, $coverageRecorder);
+        return $this->attackerChunkCache->served($chunk, $cached, $coverageRecorder, $chunkContext->knownFiles);
     }
 
     /**
@@ -235,7 +235,7 @@ final readonly class SequentialChunkAnalyzer
         try {
             $llmResponse = $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
         } catch (Throwable $throwable) {
-            $this->recordDrainedFindings($structuredVulnerabilityCollectionSession, $chunk, $coverageRecorder);
+            $this->recordDrainedFindings($structuredVulnerabilityCollectionSession, $chunkContext->knownFiles, $coverageRecorder);
 
             throw $throwable;
         }
@@ -248,14 +248,14 @@ final readonly class SequentialChunkAnalyzer
         $rawData = $structuredVulnerabilityCollectionSession->drain();
 
         if ($llmResponse->isDegraded()) {
-            return $this->chunkAnswerHydrator->hydrateIncompleteAnswer($chunk, $llmResponse, $rawData, $coverageRecorder);
+            return $this->chunkAnswerHydrator->hydrateIncompleteAnswer($chunk, $llmResponse, $rawData, $coverageRecorder, $chunkContext->knownFiles);
         }
 
         $refusedCalls = $structuredVulnerabilityCollectionSession->unsettledRefusals();
         if ($refusedCalls > 0) {
             $this->refusedRecordingRecorder->record($chunk, \count($rawData), $refusedCalls, $coverageRecorder);
 
-            return $this->vulnerabilityFactory->fromList($rawData, $chunk);
+            return $this->vulnerabilityFactory->fromList($rawData, $chunkContext->knownFiles);
         }
 
         return $this->chunkAnswerHydrator->settle($chunk, $chunkContext->answeredBy($llmResponse), $rawData, $coverageRecorder);
@@ -268,11 +268,11 @@ final readonly class SequentialChunkAnalyzer
      * even though `drainFoundVulnerabilities()` exists precisely to let a
      * caller recover candidates found before a mid-run abort.
      *
-     * @param list<ProjectFile> $chunk
+     * @param list<ProjectFile> $knownFiles
      */
-    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, array $chunk, CoverageRecorderInterface $coverageRecorder): void
+    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, array $knownFiles, CoverageRecorderInterface $coverageRecorder): void
     {
-        $this->recordFindings($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain(), $chunk)->vulnerabilities(), $coverageRecorder);
+        $this->recordFindings($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain(), $knownFiles)->vulnerabilities(), $coverageRecorder);
     }
 
     /**

@@ -82,12 +82,13 @@ final readonly class AttackerChunkCache
     /**
      * @param list<ProjectFile>                $chunk
      * @param array<int, array<string, mixed>> $cached
+     * @param list<ProjectFile>                $knownFiles the files its findings are named by
      */
-    public function served(array $chunk, array $cached, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    public function served(array $chunk, array $cached, CoverageRecorderInterface $coverageRecorder, array $knownFiles): VulnerabilityHydrationResult
     {
         $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
         ChunkCoverageRecorder::record($chunk, 'cached', $coverageRecorder);
 
-        return $this->vulnerabilityFactory->fromList(array_values($cached), $chunk);
+        return $this->vulnerabilityFactory->fromList(array_values($cached), $knownFiles);
     }
 }
