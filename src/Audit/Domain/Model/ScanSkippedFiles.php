@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
  * How a coverage ledger records the files the scan matched and left out over
- * the size limit or unreadable: a `skipped` entry under the `scan` stage. It informs, and nothing gates on it: neither
+ * the size limit, unreadable or symlinked: a `skipped` entry under the `scan` stage. It informs, and nothing gates on it: neither
  * {@see UnanalyzedFiles} nor {@see AnalyzedFiles} reads it, so the report
  * stays complete, exactly as it did when such a file was silently dropped.
  *

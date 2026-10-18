@@ -18,7 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 /**
  * Opt-in extension of {@see ProjectFileScannerInterface} for scanners that
  * know which files they matched and still left out because they were over the
- * size limit or could not be read. `IngestionStage` checks `instanceof` and
+ * size limit, could not be read or are symbolic links, which a scan never
+ * follows. `IngestionStage` checks `instanceof` and
  * lists each in the report's coverage as `skipped` under the `scan` stage:
  * the report shows the file was left out, and nothing gates on it, so the
  * report stays complete as it did when such a file was dropped silently. A

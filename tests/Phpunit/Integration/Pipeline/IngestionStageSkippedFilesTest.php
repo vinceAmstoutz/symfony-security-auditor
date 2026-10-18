@@ -259,14 +259,32 @@ final class IngestionStageSkippedFilesTest extends TestCase
             },
             false,
         ];
-        yield 'a symlinked file' => [
-            static function (string $root) use ($oversized): void {
-                mkdir($root.'/src', 0o777, true);
-                file_put_contents($root.'/Target.php', $oversized);
-                symlink($root.'/Target.php', $root.'/src/Link.php');
-            },
-            false,
-        ];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_symlinked_file_or_directory_is_recorded_as_skipped_and_leaves_the_report_complete(): void
+    {
+        $this->filesystem->dumpFile($this->tmpDir.'/src/Controller/HomeController.php', '<?php');
+        $this->filesystem->dumpFile($this->tmpDir.'/lib/AdminController.php', '<?php');
+        $this->filesystem->dumpFile($this->tmpDir.'/lib/Admin/UserController.php', '<?php');
+        symlink($this->tmpDir.'/lib/AdminController.php', $this->tmpDir.'/src/Controller/AdminController.php');
+        symlink($this->tmpDir.'/lib/Admin', $this->tmpDir.'/src/Controller/Admin');
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $bufferingLogger = new BufferingLogger();
+        (new IngestionStage(new ProjectFileScanner(new NullLogger()), $bufferingLogger))->process($auditContext);
+
+        self::assertSame(
+            [['stage' => 'scan', 'file' => 'src/Controller/Admin', 'status' => 'skipped'], ['stage' => 'scan', 'file' => 'src/Controller/AdminController.php', 'status' => 'skipped']],
+            $auditContext->coverage(),
+        );
+        self::assertTrue(AuditReport::fromContext($auditContext)->isComplete());
+        self::assertContains(
+            ['warning', 'The scan left a file out, so it is not analyzed', ['file' => 'src/Controller/AdminController.php', 'reason' => 'it is a symbolic link, which the scan never follows']],
+            $bufferingLogger->cleanLogs(),
+        );
     }
 
     /**
