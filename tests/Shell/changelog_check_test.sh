@@ -11,6 +11,8 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 check="$script_dir/.github/scripts/check-changelog.sh"
 notes="$script_dir/.github/scripts/release-notes.sh"
+CREDIT_AUTHORS=0
+export CREDIT_AUTHORS
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -226,6 +228,70 @@ if printf '%s\n' "$output" | grep -qF 'no release section'; then
 else
   echo "NOT OK - a version is matched exactly: [$output]"
   failures=$((failures + 1))
+fi
+
+stub_bin="$work/bin"
+mkdir -p "$stub_bin"
+cat >"$stub_bin/gh" <<'STUB'
+#!/bin/sh
+key=$(printf '%s' "$2" | sed -E 's|.*/issues/([0-9]+)$|pr:\1|; s|.*/commits/([0-9a-f]+)$|commit:\1|')
+line=$(grep "^$key	" "$GH_STUB_AUTHORS" || true)
+[ -n "$line" ] || exit 1
+printf '%s\n' "${line#*	}"
+STUB
+chmod +x "$stub_bin/gh"
+
+printf 'pr:12\talice\npr:14\tbob\npr:15\talice\npr:16\tdependabot[bot]\npr:17\t\ncommit:abc1234abc1234abc1234abc1234abc1234abcd\tcarol\n' >"$work/authors"
+
+pr_url="https://github.com/o/r/pull"
+commit_url="https://github.com/o/r/commit/abc1234abc1234abc1234abc1234abc1234abcd"
+cat >"$work/credit-changelog.md" <<EOF
+## [1.1.0] — 2026-05-24
+
+### New Features ✨
+
+- Single author ([#12]($pr_url/12))
+- Two authors, one of them twice ([#12]($pr_url/12), [#14]($pr_url/14), [#15]($pr_url/15))
+- Only a bot ([#16]($pr_url/16))
+- No author on record ([#17]($pr_url/17))
+- Already thanked in the entry (thanks @alice) ([#12]($pr_url/12))
+- A lookup that fails ([#99]($pr_url/99))
+- A change with no pull request ([\`abc1234\`]($commit_url))
+EOF
+
+credited=$(PATH="$stub_bin:$PATH" GH_STUB_AUTHORS="$work/authors" CREDIT_AUTHORS=1 REPO=o/r PREVIOUS_TAG=1.0.0 sh "$notes" 1.1.0 "$work/credit-changelog.md" 2>"$work/credit-stderr")
+expected="## New Features ✨
+
+- Single author ([#12]($pr_url/12)) by @alice
+- Two authors, one of them twice ([#12]($pr_url/12), [#14]($pr_url/14), [#15]($pr_url/15)) by @alice, @bob
+- Only a bot ([#16]($pr_url/16))
+- No author on record ([#17]($pr_url/17))
+- Already thanked in the entry (thanks @alice) ([#12]($pr_url/12))
+- A lookup that fails ([#99]($pr_url/99))
+- A change with no pull request ([\`abc1234\`]($commit_url)) by @carol
+
+**Full Changelog**: https://github.com/o/r/compare/1.0.0...1.1.0"
+if [ "$credited" = "$expected" ]; then
+  echo "ok - every entry is credited to its pull request authors, once each, bots and thanked authors left out"
+else
+  echo "NOT OK - credits differ:"
+  printf '%s\n' "$credited"
+  failures=$((failures + 1))
+fi
+
+if grep -qF '::warning::Could not look up the author of #99' "$work/credit-stderr"; then
+  echo "ok - a failed lookup is a warning on stderr, never an error and never part of the notes"
+else
+  echo "NOT OK - a failed lookup is reported as a warning: [$(cat "$work/credit-stderr")]"
+  failures=$((failures + 1))
+fi
+
+uncredited=$(PATH="$stub_bin:$PATH" GH_STUB_AUTHORS="$work/authors" CREDIT_AUTHORS=0 REPO=o/r sh "$notes" 1.1.0 "$work/credit-changelog.md")
+if printf '%s\n' "$uncredited" | grep -qF ' by @'; then
+  echo "NOT OK - CREDIT_AUTHORS=0 still credits: [$uncredited]"
+  failures=$((failures + 1))
+else
+  echo "ok - CREDIT_AUTHORS=0 prints the notes without any lookup"
 fi
 
 if [ "$failures" -eq 0 ]; then

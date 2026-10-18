@@ -101,7 +101,7 @@ tests/Phpunit/
   Integration/       # Wire real classes, no LLM calls
   EndToEnd/          # Full pipeline, uses stub LLM client; StandaloneAuditFromOutsideProjectEndToEndTest runs the real bin/symfony-security-auditor in a process of its own, from a folder that is not the audited project, to pin how the project argument and `--path` resolve
   Compat/            # Compatibility checks (phpunit.compat.xml): Configuration/ (the bundle configuration and container parameters against Fixture/<release>.json, accepted-differences.php), Api/RoaveBaselineTest (each accepted API break tied to its CHANGELOG bullet), the behaviour replay — Scenario/ (the catalog), Runner/ (runs a scenario in a workspace of its own on whichever checkout is autoloaded, normalizes what it observes), Platform/ (the scripted provider), Mcp/ (a scripted MCP client), Diff/, Fixture/<release>/ (the recordings and environment.json, written by tools/Compat/record.php), accepted-differences.php, composer.lock (what the Compatibility job installs) — UnreleasedChangelog, FixtureSeal
-tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh; pull_request_check_test.sh — covers .github/scripts/check-pull-request.sh; changelog_check_test.sh — covers .github/scripts/check-changelog.sh and release-notes.sh)
+tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh; pull_request_check_test.sh — covers .github/scripts/check-pull-request.sh; changelog_check_test.sh — covers .github/scripts/check-changelog.sh and release-notes.sh, author credits included)
 config/services.php  # DI wiring for all bundle services
 docs/
   architecture.md    # Layer overview, data flow, domain model details
