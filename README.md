@@ -98,7 +98,13 @@ Both detect your OS and CPU, download the matching binary and **abort** rather t
 symfony-security-auditor init
 ```
 
-Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows), downloads the provider bridge you pick with `composer`, and asks for your API key — pasted invisibly, never echoed, never in your shell history. Press Enter to skip the key and store it later with `auth:set`, or keep using an environment variable. The file takes the bundle's keys without the `symfony_security_auditor:` wrapper, plus a `platform:` block handed to `symfony/ai` — see [configuration](docs/configuration.md#standalone-configuration).
+`init` walks you through three things:
+
+- **The config file:** `~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows.
+- **The provider bridge:** the package that talks to your AI provider, downloaded with `composer`.
+- **Your API key:** pasted invisibly, never echoed, never in your shell history. Press Enter to skip it and run `auth:set` later, or keep using an environment variable.
+
+The config takes the bundle's keys without the `symfony_security_auditor:` wrapper, plus a `platform:` block handed to `symfony/ai` — see [configuration](docs/configuration.md#standalone-configuration).
 
 ### 3. Run
 
