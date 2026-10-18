@@ -8,7 +8,6 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
-- `mcp:serve`, the `audit` MCP tool and its input schema are marked experimental: they may change in any release and are no longer covered by the backward compatibility promise ([#633](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/633))
 - Every push to `1.x` publishes a `snapshot` pre-release, versioned like `1.21.0+14.g4531440`, so a fix can be tried before it ships: `self-update --snapshot`, or the installers with `SSA_VERSION=snapshot`; a plain `self-update` takes a snapshot back to the latest release ([#631](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/631))
 - `audit.tools_scope` (`audited` by default, or `scanned`) sets which files the `read_file`, `grep` and `list_files` tools may open: `scanned` lets a `--since` or `--path` run follow a changed controller into unchanged files, at the price of sending them to the provider on request; a standalone project file may not set it ([#490](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/490), [#550](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/550))
 - With `audit.tools_scope: scanned`, the reviewer judges a finding the attacker recorded in a file read through the tools against that file's code, not an empty file ([#521](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/521))
@@ -148,6 +147,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### Core 🧱
 
+- `mcp:serve`, the `audit` MCP tool and its input schema are marked experimental: they may change in any release and are no longer covered by the backward compatibility promise ([#633](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/633))
 - Cached attacker and reviewer answers refresh once after upgrading ([#442](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/442), [#449](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/449), [#467](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/467), [#517](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/517), [#615](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/615))
 - A custom `RecordVulnerabilityToolFactoryInterface` tool implements `RecordingToolInterface` and answers `RecordingToolInterface::RECORDED` for a call it took in; any other answer counts as a refusal ([#410](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/410), [#474](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/474))
 - Custom security-config parsers can implement `LoadOrderAwareSecurityConfigParserInterface` (since 1.22) to order configuration files as Symfony loads them ([#511](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/511))
