@@ -48,7 +48,7 @@ The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
 
 The auditor ships two maintained ways to run it — pick the one that fits:
 
-- **[Standalone CLI](#standalone-tool-binary) (recommended)** — one download, configured once, audits any project with zero footprint in it (like PHPStan or Psalm). Best for most users, and for auditing a project you don't want to add a dependency to.
+- **[Standalone CLI](#standalone-tool-binary) (recommended)** — one download, configured once, audits any project with zero footprint in it. Best for most users, and for auditing a project you don't want to add a dependency to.
 - **[Symfony bundle](#use-it-as-a-symfony-bundle)** — wired into a Symfony app via Flex. Pick this to extend the auditor (custom services, decorated ports) or to pin it in the app's `dev` dependencies.
 
 > [!TIP]
@@ -57,7 +57,7 @@ The auditor ships two maintained ways to run it — pick the one that fits:
 
 ## Standalone tool (binary)
 
-Run the auditor like PHPStan or Psalm — one install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** with its own PHP runtime for Linux, macOS, and Windows.
+One install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** with its own PHP runtime for Linux, macOS, and Windows.
 
 ### Requirements
 
@@ -257,7 +257,7 @@ The second snippet is the shape Claude Desktop, Cursor, Windsurf and Gemini CLI 
 - **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them.
 - **CI-ready** — a reusable [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.21.0`) plus GitLab CI templates, with SARIF upload to Code Scanning and an optional shields.io badge tracking the report's letter grade. See [CI Integration](docs/ci.md).
 - **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let you plug in custom providers, agents, stages, advisory feeds, or report formats; project-specific attacker skills need only configuration, no PHP.
-- **Bundle or standalone** — install as a Symfony bundle, or run it like PHPStan/Psalm from a single self-contained binary configured once at the user level to audit any project with zero footprint, kept current with `self-update` and preflighted with `doctor` (see [Standalone tool](#standalone-tool-binary)).
+- **Bundle or standalone** — install as a Symfony bundle, or run it from a single self-contained binary configured once at the user level to audit any project with zero footprint, kept current with `self-update` and preflighted with `doctor` (see [Standalone tool](#standalone-tool-binary)).
 
 ## Security by design
 
