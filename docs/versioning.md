@@ -53,7 +53,6 @@ Default values for these keys are also part of the contract. Changing a default 
 - The command name `audit:diff` (see [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)), its `previous-report` and `current-report` arguments, its `--format` option (`console` or `json`), and its exit codes (`0` on a successful comparison, `1` when a report file is missing or is not valid JSON).
 - The command name `audit:trend` (see [CLI Reference → `audit:trend`](configuration.md#audittrend--tracking-findings-across-reports)), its `reports` argument, its `--format` option (`console`, `json` or `html`), its JSON output shape (the `points` array), and its exit codes (`0` on a successful trend, `1` when fewer than two reports are given or a report file is missing or is not valid JSON).
 - The command name `audit:baseline` (see [CLI Reference → `audit:baseline`](configuration.md#auditbaseline--maintaining-the-accepted-finding-baseline)), its arguments, options, and exit codes.
-- The command name `mcp:serve` (see [CLI Reference → `mcp:serve`](configuration.md#mcpserve--model-context-protocol-server)) and the names and input schemas of the MCP tools it exposes (`audit`).
 
 ### Standalone executable & XDG configuration
 
@@ -136,6 +135,12 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 ### Bundle class
 
 `VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle` — referenced from `config/bundles.php`. Its existence and FQCN are stable.
+
+## Experimental features
+
+A feature marked **experimental** is shipped for early feedback and is **not** covered by the BC promise above: its commands, options, tool names and schemas may change or be removed in any release, including a `MINOR` or `PATCH` one, without a deprecation cycle. The changelog still records every change to it.
+
+- `mcp:serve` — the Model Context Protocol server (see [CLI Reference → `mcp:serve`](configuration.md#mcpserve--model-context-protocol-server)), its `audit` tool and that tool's input schema.
 
 ## Internal — what is NOT covered
 

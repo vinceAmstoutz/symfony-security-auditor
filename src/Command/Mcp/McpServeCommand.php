@@ -22,7 +22,7 @@ final readonly class McpServeCommand
 {
     public const string NAME = 'mcp:serve';
 
-    public const string DESCRIPTION = 'Start a Model Context Protocol (MCP) server over stdio exposing the auditor as tools';
+    public const string DESCRIPTION = 'Start a Model Context Protocol (MCP) server over stdio exposing the auditor as tools (experimental)';
 
     public function __construct(
         private McpServerFactoryInterface $mcpServerFactory,

@@ -934,6 +934,8 @@ Exit codes: `0` on success, `1` if the report is missing or malformed, the basel
 
 ### `mcp:serve` — Model Context Protocol server
 
+> [!WARNING] `mcp:serve` is **experimental**: the command, the `audit` tool and its input schema may change in any release, including a `MINOR` or `PATCH` one, and are not covered by the [backward compatibility promise](versioning.md#experimental-features).
+
 Starts a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, exposing the auditor as MCP **tools** so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can run an audit on demand. The server is built on the official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC on stdin/stdout, so the command prints nothing else to stdout: while it runs, PHP notices and warnings are displayed on stderr whatever `display_errors` says, so a stray one cannot corrupt the protocol stream.
 
 It is available both ways the auditor ships, the standalone binary _since 1.21_:

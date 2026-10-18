@@ -53,7 +53,7 @@ The auditor ships two maintained ways to run it — pick the one that fits:
 
 > [!TIP]
 >
-> Both expose the same `audit` command, options, and output formats — see the [CLI reference](docs/configuration.md#cli-reference) — and both can serve the auditor to your AI assistant over [MCP](#use-it-from-your-ai-assistant-mcp).
+> Both expose the same `audit` command, options, and output formats — see the [CLI reference](docs/configuration.md#cli-reference) — and both can serve the auditor to your AI assistant over [MCP](#use-it-from-your-ai-assistant-mcp) (experimental).
 
 ## Standalone tool (binary)
 
@@ -275,6 +275,10 @@ bin/console audit:run --dry-run
 
 ## Use it from your AI assistant (MCP)
 
+> [!WARNING]
+>
+> **`mcp:serve` is experimental.** The command, the `audit` tool and its input schema may change in any release, including a `MINOR` or `PATCH` one, and are not covered by the [backward compatibility promise](docs/versioning.md#experimental-features).
+
 `mcp:serve` starts a [Model Context Protocol](https://modelcontextprotocol.io) server, so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can audit a project on request and read back the JSON report. It works from the standalone binary and from the bundle alike:
 
 ```bash
@@ -314,7 +318,7 @@ The second snippet is the shape Claude Desktop, Cursor, Windsurf and Gemini CLI 
 - **Rate-limit aware** — reactive retry with `Retry-After`-aware exponential backoff plus an optional proactive token-bucket limiter keep you inside provider quotas (see [Cost & Performance](docs/cost-and-performance.md#avoiding-rate-limits-429)).
 - **Actionable findings** — optionally attach a copy-pasteable reproduction (curl/console/payload) and a suggested patch to every high-severity finding; each one also carries a heuristic CVSS v4.0 estimate.
 - **Nine output formats** — `console`, `executive` (stakeholder summary: risk level, business impact, severity/type/hotspot distributions, no per-finding detail), `json`, `sarif` (GitHub Code Scanning / GitLab Security Dashboard), `html` (self-contained, shareable), `markdown` (PR-friendly), `junit` (CI test-report panels), `github` (inline PR annotations, no SARIF upload step), and `github-comment` (PR comment headlined by the grade and score, self-updating on rerun). Baseline suppression: `--generate-baseline` accepts known findings, `--baseline` drops them from the report and exit code so only new findings fail CI; `--min-score` gates on the normalized score independently of `--fail-on`.
-- **Callable from your AI assistant** — `mcp:serve` exposes the audit as an MCP tool to Claude Code, Claude Desktop, Cursor, VS Code and any other MCP client, from the binary or the bundle (see [Use it from your AI assistant](#use-it-from-your-ai-assistant-mcp)).
+- **Callable from your AI assistant (experimental)** — `mcp:serve` exposes the audit as an MCP tool to Claude Code, Claude Desktop, Cursor, VS Code and any other MCP client, from the binary or the bundle (see [Use it from your AI assistant](#use-it-from-your-ai-assistant-mcp)).
 - **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them.
 - **CI-ready** — a reusable [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.21.0`) plus GitLab CI templates, with SARIF upload to Code Scanning and an optional shields.io badge tracking the report's letter grade. See [CI Integration](docs/ci.md).
 - **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let you plug in custom providers, agents, stages, advisory feeds, or report formats; project-specific attacker skills need only configuration, no PHP.
