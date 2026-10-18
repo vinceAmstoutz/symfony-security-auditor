@@ -12,9 +12,10 @@
 # Exits 1 when the version has no section or the section holds no entry.
 #
 # Credits come from the GitHub API through `gh` (set GH_TOKEN, or log in): an
-# entry that ends with pull request or commit links gets ` by @author` appended,
-# leaving out a bot (a login ending in `[bot]`) and anyone the entry already
-# thanks. An author that cannot be looked up leaves the entry as it is with a
+# entry that ends with pull request or commit links gets ` by @author` appended
+# (`by @a and @b` for two, `by @a, @b and @c` for more, in the order the links
+# come), leaving out a bot (a login ending in `[bot]`). An author that cannot be
+# looked up leaves the entry as it is with a
 # ::warning::, since a missing credit must never block a release. Set
 # CREDIT_AUTHORS=0 to print the notes without any lookup.
 
@@ -82,8 +83,9 @@ credit_authors() {
   /^- / && /\)$/ {
     line = $0
     rest = line
-    credit = ""
+    count = 0
     delete seen
+    delete names
     while (match(rest, /\[#[0-9]+\]\(|\/commit\/[0-9a-f]+/)) {
       token = substr(rest, RSTART, RLENGTH)
       rest = substr(rest, RSTART + RLENGTH)
@@ -97,12 +99,13 @@ credit_authors() {
         continue
       }
       seen[login] = 1
-      if (line ~ ("@" login "([^A-Za-z0-9-]|$)")) {
-        continue
-      }
-      credit = credit (credit == "" ? "" : ", ") "@" login
+      names[++count] = "@" login
     }
-    if (credit != "") {
+    if (count > 0) {
+      credit = names[1]
+      for (i = 2; i <= count; i++) {
+        credit = credit (i == count ? " and " : ", ") names[i]
+      }
       line = line " by " credit
     }
     print line

@@ -241,7 +241,7 @@ printf '%s\n' "${line#*	}"
 STUB
 chmod +x "$stub_bin/gh"
 
-printf 'pr:12\talice\npr:14\tbob\npr:15\talice\npr:16\tdependabot[bot]\npr:17\t\ncommit:abc1234abc1234abc1234abc1234abc1234abcd\tcarol\n' >"$work/authors"
+printf 'pr:12\talice\npr:14\tbob\npr:15\talice\npr:16\tdependabot[bot]\npr:17\t\npr:18\terin\ncommit:abc1234abc1234abc1234abc1234abc1234abcd\tcarol\n' >"$work/authors"
 
 pr_url="https://github.com/o/r/pull"
 commit_url="https://github.com/o/r/commit/abc1234abc1234abc1234abc1234abc1234abcd"
@@ -254,7 +254,8 @@ cat >"$work/credit-changelog.md" <<EOF
 - Two authors, one of them twice ([#12]($pr_url/12), [#14]($pr_url/14), [#15]($pr_url/15))
 - Only a bot ([#16]($pr_url/16))
 - No author on record ([#17]($pr_url/17))
-- Already thanked in the entry (thanks @alice) ([#12]($pr_url/12))
+- Three authors ([#12]($pr_url/12), [#14]($pr_url/14), [#18]($pr_url/18))
+- Thanks to a reporter (thanks @dave) ([#12]($pr_url/12))
 - A lookup that fails ([#99]($pr_url/99))
 - A change with no pull request ([\`abc1234\`]($commit_url))
 EOF
@@ -263,16 +264,17 @@ credited=$(PATH="$stub_bin:$PATH" GH_STUB_AUTHORS="$work/authors" CREDIT_AUTHORS
 expected="## New Features ✨
 
 - Single author ([#12]($pr_url/12)) by @alice
-- Two authors, one of them twice ([#12]($pr_url/12), [#14]($pr_url/14), [#15]($pr_url/15)) by @alice, @bob
+- Two authors, one of them twice ([#12]($pr_url/12), [#14]($pr_url/14), [#15]($pr_url/15)) by @alice and @bob
 - Only a bot ([#16]($pr_url/16))
 - No author on record ([#17]($pr_url/17))
-- Already thanked in the entry (thanks @alice) ([#12]($pr_url/12))
+- Three authors ([#12]($pr_url/12), [#14]($pr_url/14), [#18]($pr_url/18)) by @alice, @bob and @erin
+- Thanks to a reporter (thanks @dave) ([#12]($pr_url/12)) by @alice
 - A lookup that fails ([#99]($pr_url/99))
 - A change with no pull request ([\`abc1234\`]($commit_url)) by @carol
 
 **Full Changelog**: https://github.com/o/r/compare/1.0.0...1.1.0"
 if [ "$credited" = "$expected" ]; then
-  echo "ok - every entry is credited to its pull request authors, once each, bots and thanked authors left out"
+  echo "ok - every entry is credited to all its pull request authors in link order, once each, bots left out, and a thanked reporter stays in the text"
 else
   echo "NOT OK - credits differ:"
   printf '%s\n' "$credited"
