@@ -139,6 +139,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### Performance Improvements 🚀
 
+- An attacker pass no longer spends time growing with the square of the file count to tell how each chunk ended: on 20,000 files that bookkeeping drops from 3.2 s to under 0.01 s per pass
 - Grouping a large project's files into feature chunks takes seconds instead of minutes (1,000 controllers and 10,000 files: 14.8 s to 0.08 s), with the same chunks ([#458](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/458))
 - A controller whose public actions call each other in a long chain no longer stalls the mapping stage (6,000 methods map in under half a second) ([#469](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/469))
 - One very long line no longer holds the pre-scan or the code slicer for minutes on a PHP build without PCRE JIT: the gap in several pre-scan patterns is bounded to 512 characters ([#517](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/517))

@@ -119,10 +119,8 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface,
      */
     public function chunkStatus(array $chunk): string
     {
-        $analyzed = array_flip($this->analyzedFiles());
-
         foreach ($chunk as $projectFile) {
-            if (!\array_key_exists($projectFile->relativePath(), $analyzed)) {
+            if (!\in_array($this->lastAttackerStatus[$projectFile->relativePath()] ?? null, self::ANALYZED_STATUSES, true)) {
                 return 'errored';
             }
         }

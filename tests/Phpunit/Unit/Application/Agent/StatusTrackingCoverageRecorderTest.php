@@ -190,6 +190,8 @@ final class StatusTrackingCoverageRecorderTest extends TestCase
         $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
         $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Cached.php', 'cached');
         $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Errored.php', 'errored');
+        $statusTrackingCoverageRecorder->recordCoverage('attacker', 'src/Partial.php', 'analyzed');
+        $statusTrackingCoverageRecorder->recordInconclusiveAnalysis('attacker', 'src/Partial.php');
 
         $chunk = array_map(static fn (string $file): ProjectFile => ProjectFile::create($file, $file, '<?php'), $files);
 
@@ -204,6 +206,26 @@ final class StatusTrackingCoverageRecorderTest extends TestCase
         yield 'every file analyzed or served from the cache' => [['src/Analyzed.php', 'src/Cached.php'], 'analyzed'];
         yield 'a file whose call failed' => [['src/Analyzed.php', 'src/Errored.php'], 'errored'];
         yield 'a file the attacker never reached' => [['src/Analyzed.php', 'src/Unreached.php'], 'errored'];
+        yield 'a file judged on a partial look' => [['src/Analyzed.php', 'src/Partial.php'], 'analyzed'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_telling_how_a_chunk_ended_allocates_nothing_in_proportion_to_the_files_the_pass_already_recorded(): void
+    {
+        $statusTrackingCoverageRecorder = new StatusTrackingCoverageRecorder(new NullCoverageRecorder());
+        for ($file = 0; $file < 20_000; ++$file) {
+            $statusTrackingCoverageRecorder->recordCoverage('attacker', \sprintf('src/Service/S%d.php', $file), 'analyzed');
+        }
+
+        $chunk = [ProjectFile::create('src/Service/S0.php', '/app/src/Service/S0.php', '<?php')];
+        $memoryBefore = memory_get_usage();
+        memory_reset_peak_usage();
+        $status = $statusTrackingCoverageRecorder->chunkStatus($chunk);
+        $bytesAllocated = memory_get_peak_usage() - $memoryBefore;
+
+        self::assertSame(['analyzed', true], [$status, $bytesAllocated < 65_536]);
     }
 
     /**
