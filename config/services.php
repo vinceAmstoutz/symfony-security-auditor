@@ -807,6 +807,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(UnpricedModelBudgetGuardInterface::class),
             service('logger'),
             service(BaselineFilePathsHolder::class),
+            service(ListScannedFilesUseCase::class),
         ]);
 
     $defaultsConfigurator->set(McpServerFactory::class)

@@ -37,7 +37,7 @@ final class AuditCommandInput
 
     private const int HIGHEST_MIN_SCORE = 100;
 
-    #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory.')]
+    #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory. A folder that holds no composer.json and no file scan.included_paths reaches audits the Composer project it lies in, narrowed to that folder, and reads a --path relative to it.')]
     public ?string $projectPath = null;
 
     #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit, github or github-comment. Defaults to the audit.format config key, console when it is unset.', name: 'format', shortcut: 'f')]

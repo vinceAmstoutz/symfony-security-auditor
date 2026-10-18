@@ -393,6 +393,47 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
+    public function test_a_folder_of_the_project_named_as_the_project_audits_the_project_scoped_to_it(): void
+    {
+        $process = $this->audit(['../project/src', '--show-scanned'], $this->elsewhere);
+
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly([...self::COMMAND_FILES, 'src/Controller/BlogController.php', 'src/Entity/User.php', 'src/Kernel.php'], $this->displayOf($process));
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Project: %s', $this->project)), $display);
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Auditing "%1$s" --path src: "%1$s/src" is not a project root, it holds no composer.json.', $this->project)), $display);
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_the_config_of_the_project_applies_to_a_folder_of_it_named_as_the_project(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/src/Controller/Huge.php', \sprintf("<?php\n/* %s */\nclass Huge {}\n", str_repeat('x', 3000)));
+        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "scan:\n  max_file_size_kb: 1\n");
+
+        $process = $this->audit([$this->project.'/src/Controller', '--show-scanned'], $this->elsewhere);
+
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly(['src/Controller/BlogController.php'], $this->displayOf($process));
+        self::assertStringNotContainsString('Huge.php', $display);
+        self::assertStringContainsString($this->withoutWhitespace('Audited project config '.$this->project.'/.symfony-security-auditor.yaml is layered'), $display);
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_path_into_the_project_from_a_folder_that_is_none_audits_the_project_with_its_config(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/.symfony-security-auditor.yaml', "scan:\n  max_file_size_kb: 64\n");
+
+        $process = $this->audit(['--path', '../project/src/Command', '--show-scanned'], $this->elsewhere);
+
+        $display = $this->withoutWhitespace($this->displayOf($process));
+        self::assertSame(0, $process->getExitCode());
+        $this->assertListsExactly(self::COMMAND_FILES, $this->displayOf($process));
+        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Project: %s', $this->project)), $display);
+        self::assertStringContainsString($this->withoutWhitespace('Audited project config '.$this->project.'/.symfony-security-auditor.yaml is layered'), $display);
+    }
+
+    #[MaximumDuration(4000)]
     public function test_naming_a_directory_inside_the_project_as_the_project_is_refused_before_anything_is_scanned(): void
     {
         $process = $this->audit(['src/Command', '--show-scanned'], $this->elsewhere);

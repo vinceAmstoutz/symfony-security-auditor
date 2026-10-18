@@ -65,6 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpd
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ThrottledUpdateAvailabilityNotifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditTarget;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthRemoveCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
@@ -439,17 +440,21 @@ final readonly class StandaloneApplicationFactory
     /**
      * Where the project being audited would keep its own configuration file —
      * the folder the command line names, the working directory when it names
-     * none — or null when the working directory it is relative to cannot be
-     * told, which the audit command then reports itself. The loader layers that
-     * file over the working directory's when it exists and is another file.
+     * none, or the Composer project either lies in when it is not a project
+     * itself, as the audit command reads it — or null when the working
+     * directory it is relative to cannot be told, which the audit command then
+     * reports itself. The loader layers that file over the working directory's
+     * when it exists and is another file.
      */
     private function auditedProjectConfigFileNamedBy(StandaloneApplication $standaloneApplication): ?string
     {
+        $auditCommand = $this->standaloneConsoleCommandFactory->describe(AuditCommand::class);
         $auditCommandInput = new AuditCommandInput();
-        $auditCommandInput->projectPath = $standaloneApplication->projectPathGivenTo($this->standaloneConsoleCommandFactory->describe(AuditCommand::class));
+        $auditCommandInput->projectPath = $standaloneApplication->projectPathGivenTo($auditCommand);
+        $auditCommandInput->paths = $standaloneApplication->scanPathsGivenTo($auditCommand);
 
         try {
-            return self::projectConfigFileIn($auditCommandInput->resolvedProjectPath());
+            return self::projectConfigFileIn(AuditTarget::named($auditCommandInput->resolvedProjectPath(), $auditCommandInput->scanPaths())->projectPath);
         } catch (WorkingDirectoryUnavailableException) {
             return null;
         }

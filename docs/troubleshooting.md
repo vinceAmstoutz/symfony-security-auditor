@@ -212,7 +212,7 @@ An absolute `--path` inside the project is accepted, and one outside it is refus
 
 ### `[ERROR] The scan found no file to audit, so the run has no verdict`
 
-The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files inside `scan.included_paths` (default: `src/`, `config/`, `templates/`, `public/index.php`, and the root dotenv files — the Symfony Flex skeleton). If nothing is found, the path is wrong, the layout is non-standard, or `scan.respect_gitignore` is filtering everything out. A log line `No included paths exist in project` at `warning` level confirms the allow-list resolved to nothing.
+The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files inside `scan.included_paths` (default: `src/`, `config/`, `templates/`, `public/index.php`, and the root dotenv files — the Symfony Flex skeleton). If nothing is found, the path is wrong, the layout is non-standard, or `scan.respect_gitignore` is filtering everything out. _Since 1.22_ naming a folder of the project as the project is not one of them: `audit /path/to/project/src` audits `/path/to/project` narrowed to `src` and says so in a `[NOTE] Auditing "/path/to/project" --path src: "/path/to/project/src" is not a project root, it holds no composer.json.` note, where an earlier release scanned `src` for a `src/` of its own and found nothing. A log line `No included paths exist in project` at `warning` level confirms the allow-list resolved to nothing.
 
 ### Audit exits with code `1` even though risk is LOW
 

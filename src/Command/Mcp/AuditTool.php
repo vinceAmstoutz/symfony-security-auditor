@@ -21,19 +21,24 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedExceptionInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditTarget;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineFilePathsHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ScanPathOutsideProjectException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ScanPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
 /** @internal not part of the BC promise — the MCP tool *name* (`audit`) is public, but the PHP class itself is for internal use only. */
@@ -51,6 +56,7 @@ final readonly class AuditTool
         private UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard,
         private LoggerInterface $logger = new NullLogger(),
         private BaselineFilePathsHolder $baselineFilePathsHolder = new BaselineFilePathsHolder(),
+        private ListScannedFilesUseCase $listScannedFilesUseCase = new ListScannedFilesUseCase(new ProjectFileScanner(new NullLogger())),
     ) {}
 
     /**
@@ -67,12 +73,20 @@ final readonly class AuditTool
     public function audit(string $path): string
     {
         try {
-            return $this->reportRenderer->render($this->auditReport($this->canonicalPath($path)));
+            return $this->reportRenderer->render($this->auditReport(AuditTarget::named($this->canonicalPath($path), [], $this->holdsScanFiles(...))));
         } catch (AuditAbortedExceptionInterface $auditAbortedException) {
             throw $this->abortedRunFailure($auditAbortedException);
         } catch (Throwable $throwable) {
             throw $this->toolCallFailure($throwable);
         }
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    private function holdsScanFiles(string $directory): bool
+    {
+        return [] !== $this->listScannedFilesUseCase->execute($directory);
     }
 
     private function abortedRunFailure(AuditAbortedExceptionInterface $auditAbortedException): ToolCallException
@@ -109,15 +123,18 @@ final readonly class AuditTool
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
+     * @throws ScanPathOutsideProjectException
      */
-    private function auditReport(string $projectPath): AuditReport
+    private function auditReport(AuditTarget $auditTarget): AuditReport
     {
+        $projectPath = $auditTarget->projectPath;
+        $this->auditedProjectPathHolder->set($projectPath);
         $this->unpricedModelBudgetGuard->warnWhenBudgetCannotBeEnforced($this->logger);
         $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback(null));
         $this->baselineFilePathsHolder->set($projectPath, $this->baselineProcessor->filePaths(null));
 
         $auditReport = $this->findingTypeFilter->apply(
-            $this->runAuditUseCase->execute($projectPath, acceptedFingerprints: $this->baselineProcessor->acceptedFingerprints(null)),
+            $this->runAuditUseCase->execute($projectPath, ScanPathResolver::resolve($auditTarget->scanPaths, $projectPath), acceptedFingerprints: $this->baselineProcessor->acceptedFingerprints(null)),
         );
         $this->assertVerdict($auditReport);
 
@@ -151,9 +168,6 @@ final readonly class AuditTool
             throw InvalidProjectPathException::forNonAbsolutePath($path);
         }
 
-        $canonicalPath = Path::canonicalize($path);
-        $this->auditedProjectPathHolder->set($canonicalPath);
-
-        return $canonicalPath;
+        return Path::canonicalize($path);
     }
 }

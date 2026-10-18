@@ -24,6 +24,14 @@ interface AuditPresenterInterface
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void;
 
     /**
+     * Says that the run audits the project enclosing the directory named,
+     * which is not a project, narrowed to the paths it names.
+     *
+     * @param list<string> $scanPaths project-relative, none when the project itself was named
+     */
+    public function enclosingProject(SymfonyStyle $symfonyStyle, string $folder, string $projectPath, array $scanPaths): void;
+
+    /**
      * @param list<string> $configNotices
      */
     public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void;

@@ -221,6 +221,41 @@ final class StandaloneApplicationTest extends TestCase
         self::assertNull($standaloneApplication->projectPathGivenTo($this->auditCommandDescribed()));
     }
 
+    /**
+     * @param list<string> $expected
+     */
+    #[DataProvider('pathsGivenOnTheCommandLine')]
+    public function test_it_reads_the_paths_the_audit_command_line_gives(string $commandLine, array $expected): void
+    {
+        $standaloneApplication = $this->applicationWithTheAuditOptions();
+        $standaloneApplication->doRun(new StringInput($commandLine), new BufferedOutput());
+
+        self::assertSame($expected, $standaloneApplication->scanPathsGivenTo($this->auditCommandDescribed()));
+    }
+
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function pathsGivenOnTheCommandLine(): iterable
+    {
+        yield 'one path' => [\sprintf('%s /srv/app --path src', AuditCommand::ALIAS), ['src']];
+        yield 'several, with the shortcut' => [\sprintf('%s -p src/Command --path ../config /srv/app', AuditCommand::ALIAS), ['src/Command', '../config']];
+        yield 'none' => [\sprintf('%s /srv/app --dry-run', AuditCommand::ALIAS), []];
+        yield 'a project that merely looks like the option' => [\sprintf('%s -- --path', AuditCommand::ALIAS), []];
+    }
+
+    public function test_it_reads_no_path_before_any_command_line_was_run(): void
+    {
+        self::assertSame([], $this->applicationWithTheAuditOptions()->scanPathsGivenTo($this->auditCommandDescribed()));
+    }
+
+    public function test_it_reads_no_path_from_a_command_line_the_audit_command_cannot_bind(): void
+    {
+        $standaloneApplication = $this->applicationWithTheAuditOptions();
+        $standaloneApplication->setAutoExit(false);
+        $standaloneApplication->run(new StringInput(\sprintf('%s --path src --env-var KEY', self::FAILING_COMMAND)), new BufferedOutput());
+
+        self::assertSame([], $standaloneApplication->scanPathsGivenTo($this->auditCommandDescribed()));
+    }
+
     private function auditCommandDescribed(): Command
     {
         return (new StandaloneConsoleCommandFactory())->describe(AuditCommand::class);

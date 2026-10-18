@@ -52,6 +52,14 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     #[Override]
+    public function enclosingProject(SymfonyStyle $symfonyStyle, string $folder, string $projectPath, array $scanPaths): void
+    {
+        $paths = implode('', array_map(fn (string $scanPath): string => \sprintf(' --path %s', $this->sanitizeForWarning($scanPath)), $scanPaths));
+
+        $symfonyStyle->note(\sprintf('Auditing "%s"%s: "%s" is not a project root, it holds no composer.json.', $this->sanitizeForWarning($projectPath), $paths, $this->sanitizeForWarning($folder)));
+    }
+
+    #[Override]
     public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void
     {
         foreach ($configNotices as $configNotice) {

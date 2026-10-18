@@ -507,7 +507,7 @@ symfony-security-auditor init \
 The standalone binary reads its configuration as an ordered stack of layers, each overriding the keys it sets in the layers before it. This lets a repository pin its own audit settings (chunking strategy, `fail_on`, scan scope, …) while the API credentials stay in the shared user config. The effective precedence, highest first, is:
 
 1. CLI options (`--fail-on`, `--format`, …)
-2. The `.symfony-security-auditor.yaml` of the audited project, when `audit <project-path>` names a folder other than the one you run from and that folder holds one
+2. The `.symfony-security-auditor.yaml` of the audited project, when `audit <project-path>` names a folder other than the one you run from and that folder holds one — _since 1.22_, of the Composer project it lies in when the folder is not a project itself (see `project-path`)
 3. The `.symfony-security-auditor.yaml` of the folder you run the command from (the working directory, `$PWD`)
 4. The user-level `config.yaml`
 5. Built-in defaults
@@ -683,7 +683,7 @@ bin/console audit [<project-path>] [options]
 
 | Name | Required | Default | Description |
 | --- | --- | --- | --- |
-| `project-path` | no | `getcwd()` | Path to the Symfony project to audit. Defaults to current dir. |
+| `project-path` | no | `getcwd()` | Path to the Symfony project to audit. Defaults to current dir. _Since 1.22_ a folder that is not a project — it holds no `composer.json` and no file `scan.included_paths` reaches — names a part of the Composer project it lies in, the nearest folder above it holding a `composer.json`: `audit app/src` audits `app` with `--path src`, a `--path` given beside it is read relative to it (`audit app/src --path Controller` is `--path src/Controller`), and the header names the project audited. The same holds for the `--path` values of a run from a working directory that is not a project, so `audit --path app/src/Controller` run from the folder above `app` audits `app`. The project's own `.symfony-security-auditor.yaml` applies to such a run. An earlier release scanned such a folder as a project and found no file; a folder the configured scan finds files in is still audited as the project, as before, and one that is not a directory is still refused by its own name. |
 
 ### Options
 

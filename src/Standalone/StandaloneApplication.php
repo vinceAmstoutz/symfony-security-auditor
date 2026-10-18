@@ -151,6 +151,32 @@ final class StandaloneApplication extends Application
      */
     public function projectPathGivenTo(Command $command): ?string
     {
+        $projectPath = $this->inputBoundTo($command)?->getArgument('project-path');
+
+        return \is_string($projectPath) && '' !== trim($projectPath) ? $projectPath : null;
+    }
+
+    /**
+     * The `--path` values the command line gives the audit command, read
+     * before the command is built so the project they lie in can supply its
+     * own configuration.
+     *
+     * @return list<string>
+     */
+    public function scanPathsGivenTo(Command $command): array
+    {
+        $scanPaths = [];
+        foreach ((array) $this->inputBoundTo($command)?->getOption('path') as $scanPath) {
+            if (\is_string($scanPath)) {
+                $scanPaths[] = $scanPath;
+            }
+        }
+
+        return $scanPaths;
+    }
+
+    private function inputBoundTo(Command $command): ?InputInterface
+    {
         if (!$this->input instanceof InputInterface) {
             return null;
         }
@@ -163,9 +189,7 @@ final class StandaloneApplication extends Application
             return null;
         }
 
-        $projectPath = $input->getArgument('project-path');
-
-        return \is_string($projectPath) && '' !== trim($projectPath) ? $projectPath : null;
+        return $input;
     }
 
     private function definitionWithApplicationOf(Command $command): InputDefinition

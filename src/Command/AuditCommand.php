@@ -91,7 +91,8 @@ final readonly class AuditCommand
     ): int {
         $auditCommandInput->applyDefaults($this->auditCommandDefaults);
 
-        $projectPath = $auditCommandInput->resolvedProjectPath();
+        $auditTarget = AuditTarget::named($auditCommandInput->resolvedProjectPath(), $auditCommandInput->scanPaths(), $this->holdsScanFiles(...));
+        $projectPath = $auditTarget->projectPath;
         $this->auditedProjectPathHolder->set($projectPath);
 
         $displayStyle = $this->displayStyle($symfonyStyle, $auditCommandInput);
@@ -99,17 +100,29 @@ final readonly class AuditCommand
 
         try {
             $this->assertProjectIsDirectory($projectPath);
-            $scanPaths = ScanPathResolver::resolve($auditCommandInput->scanPaths(), $projectPath);
+            $scanPaths = ScanPathResolver::resolve($auditTarget->scanPaths, $projectPath);
         } catch (InvalidAuditContextException|ScanPathOutsideProjectException $exception) {
             $this->auditPresenter->error($displayStyle, $exception);
 
             return ExitCode::Failure->value;
         }
 
+        if (null !== $auditTarget->folder) {
+            $this->auditPresenter->enclosingProject($displayStyle, $auditTarget->folder, $projectPath, $scanPaths);
+        }
+
         $this->auditPresenter->preflightWarnings($displayStyle, $this->secretScrubbingEnabled, $this->configNotices);
         $this->warnAboutMinScoreOutsideRange($displayStyle, $auditCommandInput);
 
         return $this->runAuditFlow($input, $symfonyStyle, $auditCommandInput, $projectPath, $scanPaths);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    private function holdsScanFiles(string $directory): bool
+    {
+        return [] !== $this->listScannedFilesUseCase->execute($directory);
     }
 
     private function warnAboutMinScoreOutsideRange(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): void

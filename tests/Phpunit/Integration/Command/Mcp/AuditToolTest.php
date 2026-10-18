@@ -25,6 +25,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
@@ -40,6 +41,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
@@ -165,6 +167,46 @@ final class AuditToolTest extends TestCase
         $auditTool->audit($this->projectPath.'/nested/..');
 
         self::assertSame($this->projectPath, $auditedProjectPathHolder->path());
+    }
+
+    /**
+     * @throws ToolCallException
+     */
+    public function test_it_audits_the_project_a_folder_lies_in_narrowed_to_that_folder(): void
+    {
+        (new Filesystem())->dumpFile($this->projectPath.'/composer.json', '{}');
+        (new Filesystem())->mkdir($this->projectPath.'/src/Controller');
+        $auditedProjectPathHolder = $this->auditedProjectPathHolder();
+
+        $report = $this->decodedReport($this->auditTool(auditedProjectPathHolder: $auditedProjectPathHolder)->audit($this->projectPath.'/src/Controller'));
+
+        self::assertSame($this->projectPath, $report['project']);
+        self::assertSame(['since' => null, 'paths' => ['src/Controller']], $report['scope']);
+        self::assertSame($this->projectPath, $auditedProjectPathHolder->path());
+    }
+
+    /**
+     * @throws ToolCallException
+     */
+    public function test_a_folder_the_configured_scan_finds_files_in_stays_the_project_as_in_1_21(): void
+    {
+        (new Filesystem())->dumpFile($this->projectPath.'/composer.json', '{}');
+        (new Filesystem())->dumpFile($this->projectPath.'/packages/legacy/lib/Legacy.php', '<?php final class Legacy {}');
+        $auditTool = new AuditTool(
+            new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()),
+            new JsonReportRenderer(),
+            $this->auditedProjectPathHolder(),
+            new BaselineProcessor(new Baseline()),
+            new FindingTypeFilter(),
+            new ReviewerFeedbackHolder(),
+            $this->budgetGuard(),
+            listScannedFilesUseCase: new ListScannedFilesUseCase(new ProjectFileScanner(new NullLogger(), ['lib'])),
+        );
+
+        $report = $this->decodedReport($auditTool->audit($this->projectPath.'/packages/legacy'));
+
+        self::assertSame($this->projectPath.'/packages/legacy', $report['project']);
+        self::assertSame(['since' => null, 'paths' => []], $report['scope']);
     }
 
     /**
