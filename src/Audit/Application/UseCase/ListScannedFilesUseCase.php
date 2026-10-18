@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInt
 
 /**
  * Resolves the exact set of files an audit would ingest — the project scan
- * narrowed by the same scan-path filter the real run applies — without
+ * scoped to the `--path` values as the real run scopes it — without
  * invoking the LLM. Backs the `--show-scanned` console option so a user can
  * confirm their `included_paths` / `--path` configuration matches the files
  * they expect before paying for a run.
@@ -37,7 +37,7 @@ final readonly class ListScannedFilesUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative paths to narrow
+     * @param list<string> $scanPaths    optional project-relative paths to scope
      *                                   the listing to, as a run does; empty list
      *                                   (the default) lists every scanned file
      * @param ?string      $diffSinceRef when set, mirrors `EstimateAuditCostUseCase`/

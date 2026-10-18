@@ -31,12 +31,12 @@ final class IngestionStagePathIntersectionTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_a_path_wider_than_the_configured_scope_audits_only_the_part_of_it_the_scope_reaches(): void
+    public function test_a_path_wider_than_the_configured_scope_audits_every_file_under_it(): void
     {
         $auditContext = $this->ingest(['src/Controller'], ['src']);
 
-        self::assertSame(['src/Controller/A.php'], $this->relativePaths($auditContext->projectFiles()));
-        self::assertSame(1, AuditReport::fromContext($auditContext)->filesDiscovered());
+        self::assertSame(['src/Controller/A.php', 'src/Service/B.php'], $this->relativePaths($auditContext->projectFiles()));
+        self::assertSame(2, AuditReport::fromContext($auditContext)->filesDiscovered());
     }
 
     /**
@@ -63,12 +63,12 @@ final class IngestionStagePathIntersectionTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
-    public function test_when_one_of_several_paths_meets_the_configured_scope_the_others_add_nothing(): void
+    public function test_each_of_several_paths_is_scanned_whether_the_configured_scope_reaches_it_or_not(): void
     {
         $auditContext = $this->ingest(['src'], ['src/Controller', 'apps/api']);
 
-        self::assertSame(['src/Controller/A.php'], $this->relativePaths($auditContext->projectFiles()));
-        self::assertSame(['src/Controller/A.php', 'src/Service/B.php'], $this->relativePaths($auditContext->mappingFiles()));
+        self::assertSame(['apps/api/src/ApiController.php', 'src/Controller/A.php'], $this->relativePaths($auditContext->projectFiles()));
+        self::assertSame(['src/Controller/A.php', 'src/Service/B.php', 'apps/api/src/ApiController.php'], $this->relativePaths($auditContext->mappingFiles()));
     }
 
     /**
@@ -115,7 +115,7 @@ final class IngestionStagePathIntersectionTest extends TestCase
         (new Filesystem())->dumpFile($this->tmpDir.'/src/Controller/Big.php', $oversize);
         (new Filesystem())->dumpFile($this->tmpDir.'/src/Service/Big.php', $oversize);
 
-        $auditContext = $this->ingest(['src/Controller'], ['src/Service', 'src/Controller'], 1);
+        $auditContext = $this->ingest(['src'], ['src/Controller'], 1);
 
         self::assertSame([['stage' => 'scan', 'file' => 'src/Controller/Big.php', 'status' => 'skipped']], $auditContext->coverage());
         self::assertSame(['src/Controller/A.php'], $this->relativePaths($auditContext->projectFiles()));

@@ -42,7 +42,7 @@ final class PathIntersectionUseCasesTest extends TestCase
      * @throws InvalidAuditContextException
      */
     #[DataProvider('pathScopes')]
-    public function test_show_scanned_lists_the_configured_files_under_the_path_and_the_path_itself_only_when_the_configuration_reaches_none_of_it(array $includedPaths, array $scanPaths, array $expected): void
+    public function test_show_scanned_lists_the_files_under_the_paths_in_place_of_the_configured_scope(array $includedPaths, array $scanPaths, array $expected): void
     {
         $files = (new ListScannedFilesUseCase(new ProjectFileScanner(new NullLogger(), $includedPaths)))->execute($this->projectDir, $scanPaths);
 
@@ -83,10 +83,10 @@ final class PathIntersectionUseCasesTest extends TestCase
      */
     public static function pathScopes(): iterable
     {
-        yield 'a path wider than the configured scope' => [['src/Controller'], ['src'], ['src/Controller/A.php']];
+        yield 'a path wider than the configured scope' => [['src/Controller'], ['src'], ['src/Controller/A.php', 'src/Service/B.php']];
         yield 'a path inside the configured scope' => [['src', 'config'], ['src/Service'], ['src/Service/B.php']];
         yield 'a path the configured scope does not reach' => [['src'], ['apps/api'], ['apps/api/src/ApiController.php']];
-        yield 'one path the configured scope reaches and one it does not' => [['src'], ['apps/api', 'src/Service'], ['src/Service/B.php']];
+        yield 'one path the configured scope reaches and one it does not' => [['src'], ['apps/api', 'src/Service'], ['apps/api/src/ApiController.php', 'src/Service/B.php']];
         yield 'no path' => [['src/Controller', 'config'], [], ['config/packages/security.yaml', 'src/Controller/A.php']];
     }
 

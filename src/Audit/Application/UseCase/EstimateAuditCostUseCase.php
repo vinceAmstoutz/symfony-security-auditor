@@ -110,7 +110,7 @@ final readonly class EstimateAuditCostUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative paths to narrow
+     * @param list<string> $scanPaths    optional project-relative paths to scope
      *                                   the estimate to, as a run does; empty list
      *                                   (the default) estimates over the configured
      *                                   scan surface
@@ -232,7 +232,7 @@ final readonly class EstimateAuditCostUseCase
      * route access-control, voter and form sections — which grows with the
      * routes of the project, not with the chunk. The pipeline maps every file
      * it scanned, however a git diff then narrows the files to audit, and the
-     * configured scope besides when `--path` narrows the scan, with the
+     * configured scope besides when `--path` scopes the scan, with the
      * `--path` values that pick the configuration of a monorepo application.
      *
      * @param list<string>      $scanPaths

@@ -185,7 +185,7 @@ final class StagesTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      */
-    public function test_ingestion_stage_audits_the_configured_files_under_a_context_scan_path_without_scanning_it_again(): void
+    public function test_ingestion_stage_scans_a_context_scan_path_in_place_of_the_configured_files_under_it(): void
     {
         $recordingScopedScanner = new RecordingScopedScanner(
             [
@@ -198,8 +198,8 @@ final class StagesTest extends TestCase
 
         (new IngestionStage($recordingScopedScanner, new NullLogger()))->process($auditContext);
 
-        self::assertSame(['src/Configured.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
-        self::assertSame([['scan', null]], $recordingScopedScanner->calls);
+        self::assertSame(['src/Configured.php', 'src/Unconfigured.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()));
+        self::assertSame([['scan', null], ['scanWithin', ['src']]], $recordingScopedScanner->calls);
     }
 
     /**

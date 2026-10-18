@@ -13,23 +13,25 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
 /**
  * The files a run covers, given its `--path` values. Without a path it is the
- * configured scan surface. With paths, it is the part of that surface under
- * them, and nothing else: a path only narrows what `scan.included_paths`
- * reaches. Only when no file of the configured surface lies under any of the
- * paths — a monorepo folder the configuration leaves out — are the paths
- * scanned themselves, by a scanner that can be told where to look, so a run
- * that would find nothing audits what was asked for.
- * The files the Symfony mapping is read from are a wider set: `--path` only
- * narrows what is audited, so the configured scope still supplies the security
- * configuration, voters and forms that decide how each audited route is guarded.
+ * configured scan surface. With paths, the paths replace `scan.included_paths`
+ * for the run: a scanner that can be told where to look scans them themselves,
+ * under every other rule it applies, so `--path src` audits all of `src` even
+ * when the configuration narrows the scope to `src/Controller`. A path equal
+ * to the project root names no path and keeps the configured scope. A scanner
+ * that cannot be told where to look keeps the part of the configured surface
+ * under the paths, as it always did.
+ * The files the Symfony mapping is read from are a wider set: the configured
+ * scope plus the files the paths reached, each once, so the security
+ * configuration, voters and forms that decide how each audited route is
+ * guarded are still read when `--path` names a single folder.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -47,25 +49,27 @@ final readonly class ScopedScan
             return new ScopedScanResult($configured, $configured->files);
         }
 
-        $narrowed = ScanPathFilter::apply($configured->files, $paths);
-        if ([] !== $narrowed) {
-            return new ScopedScanResult(new ProjectFileScan($narrowed, self::skippedUnder($configured->skippedFiles, $paths)), $configured->files);
+        $within = self::within($projectFileScanner, $projectPath, $paths);
+        if (!$within instanceof ProjectFileScan) {
+            return new ScopedScanResult(new ProjectFileScan(ScanPathFilter::apply($configured->files, $paths), []), $configured->files);
         }
 
-        $within = self::within($projectFileScanner, $projectPath, $paths);
-
-        return new ScopedScanResult($within, [...$configured->files, ...$within->files]);
+        return new ScopedScanResult($within, self::eachFileOnce([...$configured->files, ...$within->files]));
     }
 
     /**
-     * @param list<SkippedFile>      $skippedFiles
-     * @param non-empty-list<string> $paths
+     * @param list<ProjectFile> $files
      *
-     * @return list<SkippedFile>
+     * @return list<ProjectFile>
      */
-    private static function skippedUnder(array $skippedFiles, array $paths): array
+    private static function eachFileOnce(array $files): array
     {
-        return array_values(array_filter($skippedFiles, static fn (SkippedFile $skippedFile): bool => ScanPathFilter::includes($skippedFile->relativePath, $paths)));
+        $byRelativePath = [];
+        foreach ($files as $file) {
+            $byRelativePath[$file->relativePath()] ??= $file;
+        }
+
+        return array_values($byRelativePath);
     }
 
     private static function configured(ProjectFileScannerInterface $projectFileScanner, string $projectPath): ProjectFileScan
@@ -80,7 +84,7 @@ final readonly class ScopedScan
     /**
      * @param non-empty-list<string> $paths
      */
-    private static function within(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $paths): ProjectFileScan
+    private static function within(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $paths): ?ProjectFileScan
     {
         if ($projectFileScanner instanceof SkippedFileReportingProjectFileScannerInterface) {
             return $projectFileScanner->scanReportingSkippedFiles($projectPath, $paths);
@@ -90,6 +94,6 @@ final readonly class ScopedScan
             return new ProjectFileScan($projectFileScanner->scanWithin($projectPath, $paths), []);
         }
 
-        return new ProjectFileScan([], []);
+        return null;
     }
 }

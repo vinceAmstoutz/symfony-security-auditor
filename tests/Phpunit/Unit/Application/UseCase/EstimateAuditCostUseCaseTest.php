@@ -475,7 +475,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      */
-    public function test_a_scan_path_the_configured_scan_reaches_is_estimated_from_the_configured_files_under_it(): void
+    public function test_a_scan_path_the_configured_scan_reaches_is_estimated_from_every_file_under_it(): void
     {
         $recordingScopedScanner = new RecordingScopedScanner(
             [$this->makeProjectFile('src/Configured.php', 'cccccccc'), $this->makeProjectFile('config/services.yaml', 'yy')],
@@ -485,8 +485,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir, ['src']);
 
-        self::assertSame(8, $auditReport->cost()->byRole()['attacker']['input_tokens']);
-        self::assertSame([['scan', null]], $recordingScopedScanner->calls);
+        self::assertSame(20, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+        self::assertSame([['scan', null], ['scanWithin', ['src']]], $recordingScopedScanner->calls);
     }
 
     /**

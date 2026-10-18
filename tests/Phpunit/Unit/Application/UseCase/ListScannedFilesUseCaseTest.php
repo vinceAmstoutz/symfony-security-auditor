@@ -66,7 +66,7 @@ final class ListScannedFilesUseCaseTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      */
-    public function test_lists_only_the_configured_files_under_a_scan_path_the_configured_scan_reaches(): void
+    public function test_lists_every_file_under_a_scan_path_the_configured_scan_reaches(): void
     {
         $recordingScopedScanner = new RecordingScopedScanner(
             [$this->makeProjectFile('src/Configured.php'), $this->makeProjectFile('config/services.yaml')],
@@ -75,8 +75,8 @@ final class ListScannedFilesUseCaseTest extends TestCase
 
         $files = (new ListScannedFilesUseCase($recordingScopedScanner))->execute('/project', ['src']);
 
-        self::assertSame(['src/Configured.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
-        self::assertSame([['scan', null]], $recordingScopedScanner->calls);
+        self::assertSame(['src/Configured.php', 'src/Unconfigured.php'], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files));
+        self::assertSame([['scan', null], ['scanWithin', ['src']]], $recordingScopedScanner->calls);
     }
 
     /**

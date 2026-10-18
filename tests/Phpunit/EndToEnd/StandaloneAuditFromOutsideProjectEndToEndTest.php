@@ -186,7 +186,7 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
     }
 
     #[MaximumDuration(4000)]
-    public function test_a_path_wider_than_the_included_paths_of_the_user_config_audits_only_the_configured_part(): void
+    public function test_a_path_wider_than_the_included_paths_of_the_user_config_audits_every_file_under_it(): void
     {
         $this->filesystem->dumpFile(
             $this->base.'/config/symfony-security-auditor/config.yaml',
@@ -198,8 +198,9 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
 
         self::assertSame(0, $process->getExitCode());
         self::assertSame(0, $widerPathAndOneOutside->getExitCode());
-        $this->assertListsExactly(['src/Controller/BlogController.php'], $this->displayOf($process));
-        $this->assertListsExactly(['src/Controller/BlogController.php'], $this->displayOf($widerPathAndOneOutside));
+        $srcFiles = [...self::COMMAND_FILES, 'src/Controller/BlogController.php', 'src/Entity/User.php', 'src/Kernel.php'];
+        $this->assertListsExactly($srcFiles, $this->displayOf($process));
+        $this->assertListsExactly([...$srcFiles, 'apps/api/config/services.yaml', 'apps/api/src/ApiController.php'], $this->displayOf($widerPathAndOneOutside));
     }
 
     #[MaximumDuration(4000)]

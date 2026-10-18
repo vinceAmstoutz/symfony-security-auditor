@@ -17,12 +17,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
  * Opt-in companion of {@see ProjectFileScannerInterface} for a scanner that can
- * be told where to look: a run whose `--path` values lie under no file of the
- * configured scan surface (`scan.included_paths`) scans them itself, so a
- * monorepo folder the configuration leaves out can still be audited. The
- * files of the configured surface that do lie under the paths are never
- * widened. A scanner without it keeps working: such a run audits no file, as
- * before.
+ * be told where to look: the `--path` values of a run replace the configured
+ * scan surface (`scan.included_paths`) and are scanned themselves, so
+ * `--path apps/api` reaches a monorepo folder the configuration leaves out and
+ * `--path src` audits all of `src` when the configuration narrows it. A scanner
+ * without it keeps working: such a run audits the files of the configured
+ * surface under the paths, as before.
  */
 interface ScopedProjectFileScannerInterface extends ProjectFileScannerInterface
 {
