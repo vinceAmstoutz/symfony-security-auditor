@@ -33,6 +33,14 @@ final class AuditCostTest extends TestCase
         self::assertSame('gpt-4o', $auditCost->primaryModel());
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_total_past_the_largest_token_count_is_held_at_it(): void
+    {
+        self::assertSame(\PHP_INT_MAX, AuditCost::of(\PHP_INT_MAX, 1, 0.0, 'gpt-4o')->totalTokens());
+    }
+
     public function test_zero_factory_constructs_empty_cost_for_model(): void
     {
         $auditCost = AuditCost::zero('claude-haiku-4-5-20251001');
@@ -156,6 +164,18 @@ final class AuditCostTest extends TestCase
     {
         $auditCost = AuditCost::of(2_000, 2_000, 0.0, 'ollama/llama3.2')->withUsageByModel([
             'ollama/llama3.2' => ['model' => 'ollama/llama3.2', 'input_tokens' => 2_000, 'output_tokens' => 2_000, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        self::assertFalse($auditCost->hasPublishedPricing());
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_has_published_pricing_spots_an_unpriced_role_whose_spend_is_past_the_largest_token_count(): void
+    {
+        $auditCost = AuditCost::of(\PHP_INT_MAX, 1, 0.0, 'ollama/llama3.2', [
+            'attacker' => ['model' => 'ollama/llama3.2', 'input_tokens' => \PHP_INT_MAX, 'output_tokens' => 1, 'estimated_cost_usd' => 0.0],
         ]);
 
         self::assertFalse($auditCost->hasPublishedPricing());

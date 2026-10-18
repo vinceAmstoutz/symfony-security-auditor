@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -113,6 +114,75 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
         self::assertSame(50, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_an_iteration_count_too_large_to_count_holds_the_estimate_at_the_largest_token_count(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 10),
+            'maxIterations' => \PHP_INT_MAX,
+        ]);
+
+        $auditCost = $estimateAuditCostUseCase->execute($this->tmpDir)->cost();
+
+        self::assertSame(\PHP_INT_MAX, $auditCost->byRole()['attacker']['input_tokens']);
+        self::assertSame(\PHP_INT_MAX, $auditCost->byRole()['reviewer']['input_tokens']);
+        self::assertSame(\PHP_INT_MAX, $auditCost->inputTokens());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    #[DataProvider('toolRoundLimitsNearTheLargestTokenCount')]
+    public function test_a_tool_round_limit_is_counted_exactly_below_the_largest_token_count_and_held_there_past_it(int $perRoundTokens, int $maxToolIterations, int $attackerInputTokens, int $reviewerInputTokens, int $inputTokens): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator($perRoundTokens),
+            'maxIterations' => 1,
+            'toolsEnabled' => true,
+            'toolRoundTripRatio' => 1.0,
+            'maxToolIterations' => $maxToolIterations,
+        ]);
+
+        $auditCost = $estimateAuditCostUseCase->execute($this->tmpDir)->cost();
+
+        self::assertSame($attackerInputTokens, $auditCost->byRole()['attacker']['input_tokens']);
+        self::assertSame($reviewerInputTokens, $auditCost->byRole()['reviewer']['input_tokens']);
+        self::assertSame($inputTokens, $auditCost->inputTokens());
+    }
+
+    /**
+     * @return iterable<string, array{int, int, int, int, int}>
+     */
+    public static function toolRoundLimitsNearTheLargestTokenCount(): iterable
+    {
+        yield 'a count of two to the sixty-third' => [8, \PHP_INT_MAX, \PHP_INT_MAX, 2, \PHP_INT_MAX];
+        yield 'the largest count a float holds below it' => [1024, 72_057_594_037_927_920, 9_223_372_036_854_774_784, 205, 9_223_372_036_854_774_989];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_count_too_large_for_a_float_to_hold_exactly_stays_exact(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 1),
+            'maxIterations' => 9_007_199_254_740_993,
+        ]);
+
+        self::assertSame(9_007_199_254_740_993, $estimateAuditCostUseCase->execute($this->tmpDir)->cost()->byRole()['attacker']['input_tokens']);
     }
 
     /**

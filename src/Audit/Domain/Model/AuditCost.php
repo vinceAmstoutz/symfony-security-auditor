@@ -84,7 +84,7 @@ final readonly class AuditCost
 
     public function totalTokens(): int
     {
-        return $this->inputTokens + $this->outputTokens;
+        return $this->heldAtLargestCount($this->inputTokens + $this->outputTokens);
     }
 
     public function estimatedCostUsd(): float
@@ -139,10 +139,20 @@ final readonly class AuditCost
      */
     private function billableTokens(array $entry): int
     {
-        return $entry['input_tokens']
+        return $this->heldAtLargestCount($entry['input_tokens']
             + $entry['output_tokens']
             + ($entry['cache_read_tokens'] ?? 0)
-            + ($entry['cache_creation_tokens'] ?? 0);
+            + ($entry['cache_creation_tokens'] ?? 0));
+    }
+
+    /**
+     * A sum of counts past the largest integer, which only a `--dry-run`
+     * estimate for an iteration setting far beyond any run reaches, is held
+     * at that integer instead of turning into a float.
+     */
+    private function heldAtLargestCount(int|float $tokens): int
+    {
+        return \is_int($tokens) ? $tokens : \PHP_INT_MAX;
     }
 
     /**

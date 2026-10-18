@@ -150,19 +150,19 @@ final readonly class EstimateAuditCostUseCase
         $attackerPerRoundInput = $fileContentPerRoundInput + $this->systemPromptTokens($chunks) + (\count($chunks) * $this->mappingPromptTokens($projectPath, $scanPaths, $scopedScanResult->mappingFiles));
 
         if ($this->toolsEnabled) {
-            $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * $this->toolRoundTripMultiplier());
+            $attackerPerRoundInput = $this->tokenCount($attackerPerRoundInput * $this->toolRoundTripMultiplier());
         }
 
-        $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
+        $attackerInputTokens = $this->tokenCount($attackerPerRoundInput * $this->maxIterations);
         $attackerOutputTokens = (int) ceil($attackerInputTokens * $this->outputRatio);
         $attackerCostUsd = $this->costCalculator->costForCall($attackerInputTokens, $attackerOutputTokens, $this->primaryModel);
 
         $reviewerModel = '' === $this->reviewerModel ? $this->primaryModel : $this->reviewerModel;
-        $reviewerInputTokens = (int) ceil($fileContentPerRoundInput * $this->maxIterations * $this->reviewerInputRatio);
+        $reviewerInputTokens = $this->tokenCount($fileContentPerRoundInput * $this->maxIterations * $this->reviewerInputRatio);
         $reviewerOutputTokens = (int) ceil($reviewerInputTokens * $this->outputRatio);
         $reviewerCostUsd = $this->costCalculator->costForCall($reviewerInputTokens, $reviewerOutputTokens, $reviewerModel);
 
-        $estimatedInputTokens = $attackerInputTokens + $reviewerInputTokens;
+        $estimatedInputTokens = $this->tokenCount($attackerInputTokens + $reviewerInputTokens);
         $estimatedOutputTokens = $attackerOutputTokens + $reviewerOutputTokens;
         $estimatedCostUsd = $attackerCostUsd + $reviewerCostUsd;
 
@@ -193,6 +193,20 @@ final readonly class EstimateAuditCostUseCase
         ]);
 
         return AuditReport::fromContext($auditContext, $auditCost);
+    }
+
+    /**
+     * A count the arithmetic above carried past the largest integer, which
+     * only an iteration setting far beyond any run reaches, is held at that
+     * integer; any other count is the one it computed, rounded up.
+     */
+    private function tokenCount(int|float $tokens): int
+    {
+        if (\is_int($tokens)) {
+            return $tokens;
+        }
+
+        return $tokens < \PHP_INT_MAX ? (int) ceil($tokens) : \PHP_INT_MAX;
     }
 
     /**
