@@ -40,16 +40,6 @@ final readonly class EchoedFilePath
     }
 
     /**
-     * Whether `$path` names the file `$relativePath` of the project at
-     * `$projectPath`, by its relative or its absolute path, compared as
-     * {@see self::resolve()} compares them.
-     */
-    public static function denotesProjectFile(string $path, string $relativePath, string $projectPath): bool
-    {
-        return \in_array(self::comparable($path), self::projectFileForms($relativePath, $projectPath), true);
-    }
-
-    /**
      * The comparable forms of the file `$relativePath` of the project at
      * `$projectPath`: a path names it exactly when its own comparable form is
      * one of them.
