@@ -24,6 +24,7 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      current: ${{ steps.guard.outputs.current }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,6 +53,25 @@ jobs:
           count="$(git rev-list --count "${release}..HEAD")"
           echo "version=${release}+${count}.g$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Skip a commit older than the published snapshot
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # A re-run of an older push would otherwise overwrite the snapshot
+          # with that older commit's binaries and move the tag back. Runs are
+          # serialized by the concurrency group, so the tag read here is final.
+          published="$(gh api "repos/${GH_REPO}/git/ref/tags/snapshot" --jq '.object.sha' 2>/dev/null || true)"
+          if [ -n "$published" ] && [ "$published" != "$GITHUB_SHA" ] && git merge-base --is-ancestor "$GITHUB_SHA" "$published" 2>/dev/null; then
+            echo "::notice::The snapshot already holds ${published}, which contains ${GITHUB_SHA}; nothing to publish."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create the snapshot pre-release on the first run
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,6 +88,7 @@ jobs:
   build:
     name: Build
     needs: prepare
+    if: needs.prepare.outputs.current == 'true'
     permissions:
       contents: write
     uses: ./.github/workflows/release.yaml # zizmor: ignore[self-repository] -- the documented local-call form; actionlint does not yet accept the `$/` one
