@@ -285,7 +285,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     private function collectFilesFrom(Finder $finder, string $projectPath, Closure $reader, array $trackedIgnored): ProjectFileScan
     {
         $trackedIgnoredScan = $this->scanTrackedIgnored(clone $finder, $trackedIgnored, $projectPath, $reader);
-        $projectFileScan = $this->scanFinder($finder->ignoreVCSIgnored($this->respectGitignore), $projectPath, $reader);
+        $projectFileScan = (new GitignoreRespectingWalk($this->respectGitignore, $this->logger))->scan($finder, $projectPath, fn (Finder $finder): ProjectFileScan => $this->scanFinder($finder, $projectPath, $reader));
 
         return new ProjectFileScan(
             array_merge($projectFileScan->files, $trackedIgnoredScan->files),
