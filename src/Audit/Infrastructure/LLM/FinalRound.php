@@ -35,7 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  */
 final readonly class FinalRound
 {
-    public const string NOT_RUN = '[Auditor notice: round limit reached, not run. Record each finding you still hold with the recording tool, or answer in text.]';
+    public const string NOT_RUN = '[Auditor notice: round limit reached, not run. Record what you still hold with the recording tool, or give the final answer the instructions above ask for.]';
 
     public const string NOTICE = '[Auditor notice: the next round is your last. Nothing you read or search after this reaches you, so do not call a reading or searching tool again. Record each finding you still hold with the recording tool, or give the final answer the instructions above ask for. With nothing to report, answer without calling a tool.]';
 
