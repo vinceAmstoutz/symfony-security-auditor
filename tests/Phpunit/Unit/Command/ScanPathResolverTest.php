@@ -13,13 +13,17 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ScanPathOutsideProjectException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ScanPathResolver;
 
 final class ScanPathResolverTest extends TestCase
 {
+    private string $root;
+
     /**
      * @param list<string> $scanPaths
      * @param list<string> $expected
@@ -119,5 +123,74 @@ final class ScanPathResolverTest extends TestCase
         $this->expectExceptionMessage('relative to the project root, for example --path src/Controller');
 
         ScanPathResolver::resolve(['/somewhere/else'], '/home/vince/demo');
+    }
+
+    /**
+     * @param list<string> $expected
+     *
+     * @throws ScanPathOutsideProjectException
+     */
+    #[DataProvider('pathsSpelledThroughALinkToTheProject')]
+    public function test_an_absolute_scan_path_inside_the_project_is_made_relative_however_a_link_spells_either(string $scanPath, string $projectPath, array $expected): void
+    {
+        self::assertSame($expected, ScanPathResolver::resolve([$this->root.$scanPath], $this->root.$projectPath));
+    }
+
+    /**
+     * @return iterable<string, array{string, string, list<string>}>
+     */
+    public static function pathsSpelledThroughALinkToTheProject(): iterable
+    {
+        yield 'the path through a linked working directory, the project by its real path' => ['/linked-project/src/Controller', '/real/project', ['src/Controller']];
+        yield 'the path by its real path, the project through a link' => ['/real/project/src', '/linked-project', ['src']];
+        yield 'the project root itself through a link' => ['/linked-project', '/real/project', []];
+    }
+
+    /**
+     * @throws ScanPathOutsideProjectException
+     */
+    #[DataProvider('pathsOutsideAnExistingProject')]
+    public function test_an_absolute_scan_path_whose_real_path_lies_outside_the_project_is_refused(string $scanPath): void
+    {
+        $this->expectException(ScanPathOutsideProjectException::class);
+        $this->expectExceptionMessage(\sprintf('The --path "%s" lies outside the project "%s"', $this->root.$scanPath, $this->root.'/real/project'));
+
+        ScanPathResolver::resolve([$this->root.$scanPath], $this->root.'/real/project');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function pathsOutsideAnExistingProject(): iterable
+    {
+        yield 'a link to another folder' => ['/linked-other/src'];
+        yield 'another folder' => ['/real/other/src'];
+        yield 'a folder that does not exist' => ['/missing/src'];
+    }
+
+    /**
+     * @throws ScanPathOutsideProjectException
+     */
+    public function test_an_existing_absolute_scan_path_outside_a_project_that_does_not_exist_is_refused(): void
+    {
+        $this->expectException(ScanPathOutsideProjectException::class);
+
+        ScanPathResolver::resolve([$this->root.'/real/other/src'], $this->root.'/missing-project');
+    }
+
+    #[Override]
+    protected function setUp(): void
+    {
+        $this->root = sys_get_temp_dir().'/'.uniqid('scan-path-resolver-', true);
+        $filesystem = new Filesystem();
+        $filesystem->mkdir([$this->root.'/real/project/src/Controller', $this->root.'/real/other/src']);
+        $filesystem->symlink($this->root.'/real/project', $this->root.'/linked-project');
+        $filesystem->symlink($this->root.'/real/other', $this->root.'/linked-other');
+    }
+
+    #[Override]
+    protected function tearDown(): void
+    {
+        (new Filesystem())->remove($this->root);
     }
 }

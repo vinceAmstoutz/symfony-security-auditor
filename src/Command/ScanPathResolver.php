@@ -50,17 +50,38 @@ final readonly class ScanPathResolver
                 continue;
             }
 
-            if (!Path::isBasePath($projectRoot, $absolutePath)) {
+            $relative = self::relativeToProject($absolutePath, $projectRoot);
+            if (null === $relative) {
                 throw ScanPathOutsideProjectException::forPath($scanPath, $projectPath);
             }
 
-            $relative = Path::makeRelative($absolutePath, $projectRoot);
             if ('' !== $relative) {
                 $resolved[] = $relative;
             }
         }
 
         return $resolved;
+    }
+
+    /**
+     * Compared as typed, and failing that by the real paths of both, as the
+     * scanner compares them: a shell's `$PWD` keeps the symbolic link that
+     * `getcwd()`, which names the project, resolves (macOS `/tmp` is
+     * `/private/tmp`).
+     */
+    private static function relativeToProject(string $absolutePath, string $projectRoot): ?string
+    {
+        if (Path::isBasePath($projectRoot, $absolutePath)) {
+            return Path::makeRelative($absolutePath, $projectRoot);
+        }
+
+        $realPath = realpath($absolutePath);
+        $realProjectRoot = realpath($projectRoot);
+        if (false === $realPath || false === $realProjectRoot || !Path::isBasePath($realProjectRoot, $realPath)) {
+            return null;
+        }
+
+        return Path::makeRelative($realPath, $realProjectRoot);
     }
 
     private static function withForwardSlashes(string $path): string
