@@ -22,6 +22,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
  */
 final readonly class MarkdownTextEscaper
 {
+    private const string INERT_AT_SIGN = "@\u{2060}";
+
     public static function fences(string $text): string
     {
         $sanitized = TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'));
@@ -33,11 +35,14 @@ final readonly class MarkdownTextEscaper
      * A backtick/tilde run would open a code fence, `#` a fake heading, and
      * `[`/`]` a live link — each would swallow or rewrite everything rendered
      * after it. `<`/`>` are HTML-entity-encoded since CommonMark passes raw
-     * inline HTML through verbatim. `@` is encoded the same way because GitHub
-     * autolinks a bare `@handle` into a live profile mention, notifying that
-     * account when a report is posted as a pull-request comment. A backslash
-     * already present is escaped first, so it can't combine with an escape
-     * added below into a sequence CommonMark still parses as live.
+     * inline HTML through verbatim. `@` is followed by a word joiner (U+2060),
+     * which renders as nothing: GitHub turns a bare `@handle` into a live
+     * profile mention, notifying that account when a report is posted as a
+     * pull-request comment, and a `user@host` address, `mailto:` and `xmpp:`
+     * ones included, into a live link, both from the text an entity decodes
+     * to, so an encoded `@` would defuse neither. A backslash already present
+     * is escaped first, so it can't combine with an escape added below into a
+     * sequence CommonMark still parses as live.
      */
     private static function escapeStructuralMarkers(string $text): string
     {
@@ -45,7 +50,7 @@ final readonly class MarkdownTextEscaper
 
         return str_replace(
             ['`', '~', '#', '<', '>', '[', ']', '@'],
-            ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]', '&#64;'],
+            ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]', self::INERT_AT_SIGN],
             $backslashesEscaped,
         );
     }
@@ -53,8 +58,8 @@ final readonly class MarkdownTextEscaper
     /**
      * GFM turns a bare `scheme://` URL or `www.` address into a live link with
      * no markup around it, so a finding could render a clickable attacker link.
-     * The colon of `://` and the dot after `www` are entity-encoded the way
-     * `@` is, which also defuses an email address.
+     * The colon of `://` and the dot after `www` are entity-encoded; an email
+     * address is defused at its `@` ({@see self::escapeStructuralMarkers()}).
      */
     private static function bareAutolinks(string $text): string
     {

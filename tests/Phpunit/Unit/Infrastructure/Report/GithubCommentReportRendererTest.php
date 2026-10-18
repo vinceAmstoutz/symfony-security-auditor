@@ -349,8 +349,22 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     {
         $output = $this->renderer->render($this->makeReport($this->titled('Ping @octocat about this')));
 
-        self::assertStringContainsString('Ping &#64;octocat about this', $output);
+        self::assertStringContainsString("Ping @\u{2060}octocat about this", $output);
         self::assertStringNotContainsString('@octocat', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_email_address_in_a_title_cannot_forge_a_mail_link(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->titled('Report to mailto:security@evil.example')));
+
+        self::assertStringContainsString("| Report to mailto:security@\u{2060}evil.example |", $output);
+        self::assertStringNotContainsString('security@evil.example', $output);
     }
 
     /**

@@ -396,6 +396,31 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_keeps_every_email_address_and_mention_of_finding_text_from_becoming_live(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Report to security@evil.example', 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('cc @octocat', 'mailto:a@evil.example', 'proof', 'xmpp:b@evil.example/home'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('claude@20250101'), $vulnerability));
+
+        self::assertStringContainsString("**Model:** claude@\u{2060}20250101 ·", $output);
+        self::assertStringContainsString("### 🟠 HIGH — Report to security@\u{2060}evil.example\n", $output);
+        self::assertStringContainsString("\ncc @\u{2060}octocat\n", $output);
+        self::assertStringContainsString("**Attack vector:** mailto:a@\u{2060}evil.example\n", $output);
+        self::assertStringContainsString("**Remediation:** xmpp:b@\u{2060}evil.example/home", $output);
+        self::assertDoesNotMatchRegularExpression('/@(?!\x{2060})/u', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_neutralizes_an_unterminated_code_fence_in_a_description_so_it_does_not_swallow_later_findings(): void
     {
         $vulnerability = Vulnerability::of(

@@ -38,7 +38,24 @@ final class MarkdownTextEscaperTest extends TestCase
         yield 'a www address' => ['Visit www.evil.example now', 'Visit www&#46;evil.example now'];
         yield 'a www address in capitals' => ['WWW.EVIL.example', 'WWW&#46;EVIL.example'];
         yield 'every www address of a text' => ['www.a.example www.b.example', 'www&#46;a.example www&#46;b.example'];
-        yield 'an email address' => ['mail a@b.example now', 'mail a&#64;b.example now'];
+    }
+
+    #[DataProvider('addressesAndMentions')]
+    public function test_it_keeps_an_email_address_or_a_mention_from_becoming_a_live_link(string $text, string $expected): void
+    {
+        self::assertSame($expected, MarkdownTextEscaper::fences($text));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function addressesAndMentions(): iterable
+    {
+        yield 'an email address' => ['mail a@b.example now', "mail a@\u{2060}b.example now"];
+        yield 'a mailto address' => ['mailto:security@evil.example', "mailto:security@\u{2060}evil.example"];
+        yield 'an xmpp address' => ['xmpp:bot@evil.example/home', "xmpp:bot@\u{2060}evil.example/home"];
+        yield 'a mention' => ['cc @octocat', "cc @\u{2060}octocat"];
+        yield 'every at sign of a text' => ['a@b.example cc @octocat', "a@\u{2060}b.example cc @\u{2060}octocat"];
     }
 
     #[DataProvider('plainText')]
