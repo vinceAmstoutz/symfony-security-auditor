@@ -76,7 +76,7 @@ final readonly class SequentialToolLoop
 
         $conversationState = $this->openConversation($systemPrompt, $userMessage, $toolRegistry);
 
-        for ($iteration = 0; $iteration <= $maxToolIterations; ++$iteration) {
+        foreach (FinalRound::rounds($maxToolIterations) as $iteration) {
             $this->budgetTracker?->assertWithinBudget();
             $deferredResult = $this->invokeOrEndConversation($conversationState, $iteration);
             if ($deferredResult instanceof LLMResponse) {

@@ -44,6 +44,18 @@ final readonly class FinalRound
         return $roundsLeft <= 1;
     }
 
+    /**
+     * The number of every round a conversation may take: the allowed ones and
+     * the closing request after them. A finite list, so a loop over it ends
+     * whatever happens to its counter.
+     *
+     * @return list<int>
+     */
+    public static function rounds(int $maxToolIterations): array
+    {
+        return $maxToolIterations < 0 ? [] : range(0, $maxToolIterations);
+    }
+
     public static function carried(string $toolResult, int $roundsLeft, bool $isLastResult): string
     {
         return 2 === $roundsLeft && $isLastResult ? self::announcedIn($toolResult) : $toolResult;

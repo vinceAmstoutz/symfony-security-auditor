@@ -111,8 +111,9 @@ final readonly class ToolConversationWavefront
 
         $states = $this->initializeConversationStates($window);
 
-        for ($round = 0; $round <= $maxToolIterations && !ConversationState::allAnswered($states); ++$round) {
-            $states = ConversationState::enterRound($states, $round, $maxToolIterations);
+        $rounds = FinalRound::rounds($maxToolIterations);
+        while ([] !== $rounds && !ConversationState::allAnswered($states)) {
+            $states = ConversationState::enterRound($states, array_shift($rounds), $maxToolIterations);
             $states = $this->runWavefrontRound($platform, $states, $window, $maxToolIterations);
         }
 
