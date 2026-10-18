@@ -57,70 +57,40 @@ The auditor ships two maintained ways to run it — pick the one that fits:
 
 ## Standalone tool (binary)
 
-Run the auditor like PHPStan or Psalm — one install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** that bundles its own PHP runtime (nothing to install on the host to run audits — see [Requirements](#requirements)) for Linux, macOS, and Windows.
+Run the auditor like PHPStan or Psalm — one install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** with its own PHP runtime for Linux, macOS, and Windows.
 
 ### Requirements
 
-**Running audits needs nothing but the binary.** It bundles its own PHP runtime, so there is no PHP, Composer or Symfony to install, whatever the audited project uses — only an API key for your provider (not even that for a local model such as [Ollama](#supported-platforms)).
+Running audits needs nothing but the binary and an API key for your provider (not even that for a local model such as [Ollama](#supported-platforms)).
 
-**The one-time [`init`](#2-configure--the-guided-init) is the exception: it needs `composer`, and the PHP it runs on, on your machine**, because it downloads the package that talks to your AI provider. It checks for both before asking you anything and, when one is missing, says which. Install them once, with network access to `packagist.org` and `github.com`:
+**The one-time [`init`](#2-configure--the-guided-init) also needs `composer` and PHP on your machine**, to download the package that talks to your AI provider. It checks for both before asking anything and says which one is missing.
 
 | System | Install PHP and Composer |
 | --- | --- |
 | Debian, Ubuntu, WSL | `sudo apt update && sudo apt install -y php-cli php-curl php-mbstring php-xml unzip composer` |
 | macOS | `brew install composer` (installs PHP with it) |
-| Windows | PHP from <https://windows.php.net/download/>, then the Composer installer from <https://getcomposer.org/download/>; open a new terminal afterwards |
+| Windows | PHP from <https://windows.php.net/download/>, then the Composer installer from <https://getcomposer.org/download/> |
 | Other Linux | the `php-cli`, `composer` and `unzip` packages of your package manager |
 
-> [!NOTE]
->
-> **On WSL, install them inside WSL.** A Windows Composer reached through `/mnt/c/…` cannot run there: it looks for a PHP of its own and finds none (`…/composer: 14: php: not found`).
-
-Two features use a tool of their own: `--since` needs `git`, and the live CVE lookups of an audit use `composer audit` when `composer` is present — without it the audit runs without advisory data.
+On WSL, install them inside WSL: a Windows Composer reached through `/mnt/c/…` cannot find a PHP there. `--since` needs `git`, and live CVE lookups use `composer audit` when `composer` is present.
 
 ### 1. Install
 
-**One command — Linux, macOS, and Windows (under WSL):**
-
 ```bash
+# Linux, macOS, Windows under WSL
 curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
 ```
 
-`install.sh` detects your OS and CPU architecture, downloads the matching binary, and verifies its SHA-256 checksum before installing — anywhere you have a POSIX shell.
-
-**Native Windows (PowerShell)** — when you are not using WSL; Git Bash / MSYS / Cygwin users need this installer too (`install.sh` detects those shells and points here):
-
 ```powershell
+# Native Windows (PowerShell, Git Bash, MSYS, Cygwin)
 irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.ps1 | iex
 ```
 
+Both detect your OS and CPU, download the matching binary and **abort** rather than install one whose SHA-256 checksum they cannot verify. You can also download an asset from the [latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest) and check it with its `.sha256` file.
+
 > [!TIP]
 >
-> **One command, installed _and_ configured.** Set `SSA_INIT=1` and the installer runs the guided [`init`](#2-configure--the-guided-init) for you right after downloading, so you skip step 2. With a terminal attached it prompts for your provider and offers to store your API key at the end, leaving you ready to audit; in a pipe or CI it takes the Anthropic defaults and stores no key, so export one or run `auth:set` before auditing. `init` fetches the provider bridge with `composer`, so composer must be available for this combined step; it checks that first, before asking anything, and when composer does not run it says why and how to install it on macOS, Linux or Windows.
->
-> ```bash
-> curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
-> ```
->
-> ```powershell
-> $env:SSA_INIT = '1'; irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.ps1 | iex
-> ```
-
-Or download the binary for your platform straight from the [latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest):
-
-| Platform            | Asset                                         |
-| ------------------- | --------------------------------------------- |
-| Linux x86-64        | `symfony-security-auditor-linux-x86_64`       |
-| Linux arm64         | `symfony-security-auditor-linux-aarch64`      |
-| macOS Intel         | `symfony-security-auditor-macos-x86_64`       |
-| macOS Apple Silicon | `symfony-security-auditor-macos-arm64`        |
-| Windows x86-64      | `symfony-security-auditor-windows-x86_64.exe` |
-
-Every binary ships with a `.sha256` checksum, and the install scripts **abort** rather than install a binary they cannot verify. To check a manual download yourself:
-
-```bash
-sha256sum -c symfony-security-auditor-linux-x86_64.sha256
-```
+> Set `SSA_INIT=1` on either command and the installer runs the guided [`init`](#2-configure--the-guided-init) right after downloading (`$env:SSA_INIT = '1'` in PowerShell). With a terminal it prompts for your provider and API key; in a pipe or CI it takes the Anthropic defaults and stores no key.
 
 ### 2. Configure — the guided `init`
 
@@ -128,9 +98,7 @@ sha256sum -c symfony-security-auditor-linux-x86_64.sha256
 symfony-security-auditor init
 ```
 
-Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows), downloads the provider bridge you pick, and finally asks for your API key — pasted invisibly, never echoed, never in your shell history. `init` fetches that bridge with `composer`, so composer must be available for this one-time setup step — `init` checks that first, before asking anything, and when composer does not run it says why and how to install it on macOS, Linux or Windows; running audits afterward needs only the binary. The file is rootless (the same keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:` block handed verbatim to `symfony/ai`. See [configuration](docs/configuration.md#standalone-configuration) for the format and provider switching.
-
-Press Enter at the key prompt to skip it — you can store the key any time with `auth:set`, or keep using an environment variable and store nothing at all.
+Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows), downloads the provider bridge you pick with `composer`, and asks for your API key — pasted invisibly, never echoed, never in your shell history. Press Enter to skip the key and store it later with `auth:set`, or keep using an environment variable. The file takes the bundle's keys without the `symfony_security_auditor:` wrapper, plus a `platform:` block handed to `symfony/ai` — see [configuration](docs/configuration.md#standalone-configuration).
 
 ### 3. Run
 
@@ -138,14 +106,7 @@ Press Enter at the key prompt to skip it — you can store the key any time with
 symfony-security-auditor audit /path/to/your/symfony/project
 ```
 
-`audit` is an alias for `audit:run`; every option documented in the [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`, `--dry-run`, `--since`, `--fail-on`, …) works identically.
-
-Every run names the key it is about to spend, masked:
-
-```text
-API key: sk-ant…qF4A
-Project: /path/to/your/symfony/project
-```
+`audit` is an alias for `audit:run`; every option of the [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`, `--dry-run`, `--since`, `--fail-on`, …) works identically. Every run names the key it is about to spend, masked (`API key: sk-ant…qF4A`).
 
 #### Managing the stored key
 
@@ -155,25 +116,7 @@ Project: /path/to/your/symfony/project
 | `auth:status` | Show which key an audit would use, where it came from, and its SHA-256 fingerprint — never the key |
 | `auth:remove` | Forget the stored key on this machine |
 
-The key is kept in `credentials.json` next to your config, created `0600` on Linux/macOS (and inside the `%APPDATA%` profile directory, protected by its inherited ACL, on Windows). An audit **refuses to read it** if other users on the machine can, and tells you to rotate the key and `chmod 600` the file.
-
-**An exported variable always wins**, so nothing changes for Docker, Kubernetes, CI, or a per-run secret-manager prefix:
-
-```bash
-ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .
-```
-
-Rather not store the key at all, and no secret manager to read it from? Prompt for it per shell — `read -rs` keeps it off the screen, and a bare `export` keeps it out of `~/.bash_history`:
-
-```bash
-# read the key your config references & keep it out of your shell history
-printf 'Anthropic API key: '; read -rs ANTHROPIC_API_KEY; echo
-export ANTHROPIC_API_KEY
-```
-
-> [!TIP]
->
-> Storing nothing is a perfectly good choice. [Providing the API key](docs/configuration.md#providing-the-api-key) covers the environment variable, a mounted secret file (`%env(file:…)%`), a password manager, and a CI secret store — and how they rank against the stored key.
+The key lives in an owner-only `credentials.json` next to your config, which an audit refuses to read if other users can. **An exported variable always wins**, so Docker, Kubernetes and CI are unchanged: `ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .`. Storing nothing is fine too — [Providing the API key](docs/configuration.md#providing-the-api-key) covers environment variables, mounted secret files, password managers and CI secrets.
 
 ### 4. Keep it up to date
 
@@ -182,15 +125,7 @@ symfony-security-auditor self-update          # download + verify + replace, if 
 symfony-security-auditor self-update --check  # only report whether a newer version exists
 ```
 
-`self-update` fetches the latest release for your platform, **verifies its checksum before replacing the binary**, and swaps it in place — see the [CLI reference](docs/configuration.md#self-update--updating-the-standalone-binary).
-
-Want a fix before it ships? Every push to the development branch publishes a `snapshot` pre-release, reporting a version such as `1.21.0+14.g4531440` (the last release, the commits since, the commit it was built from). A plain `self-update` takes you back to the latest release:
-
-```bash
-symfony-security-auditor self-update --snapshot
-# or, from scratch
-curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_VERSION=snapshot sh
-```
+`self-update` verifies the checksum before replacing the binary — see the [CLI reference](docs/configuration.md#self-update--updating-the-standalone-binary). `self-update --snapshot` (or `SSA_VERSION=snapshot` with the installers) installs the pre-release built from every push to the development branch; a plain `self-update` returns to the latest release.
 
 ## Use it as a Symfony bundle
 
