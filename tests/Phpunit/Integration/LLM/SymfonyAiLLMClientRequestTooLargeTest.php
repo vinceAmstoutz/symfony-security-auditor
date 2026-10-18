@@ -330,6 +330,30 @@ final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
      * @throws NegativeTokenCountException
      * @throws InvalidRetryConfigurationException
      */
+    public function test_a_conversation_the_rate_limit_window_cannot_fit_holds_back_none_dispatched_after_it_in_the_same_round(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([
+            new ToolCallResult([new ToolCall('call-1', 'lookup', [])]),
+            new TextResult('ok'),
+        ], []);
+        $symfonyAiLLMClient = $this->clientRefusingEstimatesAbove(100, $scriptedTokenUsagePlatform, new NullLogger());
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => str_repeat('x', 4000), 'tools' => new ToolRegistry([new FixedResultTool('lookup', 'a file')], new NullLogger())],
+            ['system' => 's', 'user' => 'fits', 'tools' => new ToolRegistry([new FixedResultTool('lookup', 'a file')], new NullLogger())],
+        ], 2, 1);
+
+        self::assertSame(['ok', 'end_turn', 2], [$responses[1]->content(), $responses[1]->stopReason(), $scriptedTokenUsagePlatform->invocations]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_complete_batch_with_tools_ends_a_conversation_the_rate_limit_window_cannot_fit_after_a_tool_ran_as_an_empty_response(): void
     {
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([
