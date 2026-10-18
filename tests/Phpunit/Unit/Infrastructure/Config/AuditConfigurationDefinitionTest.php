@@ -230,6 +230,146 @@ final class AuditConfigurationDefinitionTest extends TestCase
 
     /**
      * @param non-empty-list<string> $path
+     * @param array<string, mixed>   $siblings
+     */
+    #[DataProvider('valuesThatAreNoTextOnATextKey')]
+    public function test_a_text_key_refuses_a_value_that_is_no_text(array $path, array $siblings, mixed $value, string $type): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "string", but got "%s".', implode('.', $path), $type));
+
+        $this->process([$this->textSetting($path, $siblings, $value)]);
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>, array<string, mixed>, mixed, string}>
+     */
+    public static function valuesThatAreNoTextOnATextKey(): iterable
+    {
+        foreach (self::textKeys() as $name => [$path, $siblings]) {
+            yield $name.' set to a number' => [$path, $siblings, 5, 'int'];
+            yield $name.' set to a decimal' => [$path, $siblings, 4.1, 'float'];
+            yield $name.' set to a switch' => [$path, $siblings, false, 'bool'];
+        }
+
+        yield 'cache.dir set to null' => [['cache', 'dir'], [], null, 'null'];
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     * @param array<string, mixed>   $siblings
+     */
+    #[DataProvider('textKeys')]
+    public function test_a_text_key_still_reads_text(array $path, array $siblings): void
+    {
+        $processed = $this->process([$this->textSetting($path, $siblings, 'var/audit')]);
+
+        self::assertSame('var/audit', $this->valueAt($processed, $path));
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     * @param array<string, mixed>   $siblings
+     */
+    #[DataProvider('textKeys')]
+    public function test_a_text_key_set_to_a_list_keeps_the_message_it_had(array $path, array $siblings): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "scalar", but got "array".', implode('.', $path)));
+
+        $this->process([$this->textSetting($path, $siblings, ['var/audit'])]);
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('textKeysTakingAnEmptyString')]
+    public function test_a_text_key_still_takes_an_empty_string(array $path): void
+    {
+        $processed = $this->process([self::nested($path, '')]);
+
+        self::assertSame('', $this->valueAt($processed, $path));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>}>
+     */
+    public static function textKeysTakingAnEmptyString(): iterable
+    {
+        yield 'cache.dir' => [['cache', 'dir']];
+        yield from self::optionalTextKeys();
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     */
+    #[DataProvider('optionalTextKeys')]
+    public function test_an_explicit_null_on_an_optional_text_key_resets_the_value_an_earlier_configuration_set(array $path): void
+    {
+        $processed = $this->process([self::nested($path, 'var/audit'), self::nested($path, null)]);
+
+        self::assertNull($this->valueAt($processed, $path));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>}>
+     */
+    public static function optionalTextKeys(): iterable
+    {
+        yield 'audit.baseline' => [['audit', 'baseline']];
+        yield 'audit.output' => [['audit', 'output']];
+        yield 'audit.report_path_prefix' => [['audit', 'report_path_prefix']];
+    }
+
+    public function test_the_instructions_of_a_custom_skill_set_to_null_keep_the_message_they_had(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The path "symfony_security_auditor.audit.custom_skills.pricing.instructions" cannot contain an empty value, but got null.');
+
+        $this->process([['audit' => ['custom_skills' => ['pricing' => ['file_type' => 'controller', 'instructions' => null]]]]]);
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     * @param array<string, mixed>   $siblings
+     * @param array<string, mixed>   $standIns
+     */
+    #[DataProvider('envPlaceholderStandInsOnATextKey')]
+    public function test_a_text_key_takes_an_env_placeholder_whatever_stand_in_symfony_checks_it_with(array $path, array $siblings, array $standIns): void
+    {
+        BaseNode::setPlaceholder(self::ENV_PLACEHOLDER, $standIns);
+
+        $processed = $this->process([$this->textSetting($path, $siblings, self::ENV_PLACEHOLDER)]);
+
+        self::assertSame(self::ENV_PLACEHOLDER, $this->valueAt($processed, $path));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>, array<string, mixed>, array<string, mixed>}>
+     */
+    public static function envPlaceholderStandInsOnATextKey(): iterable
+    {
+        foreach (self::textKeys() as $name => [$path, $siblings]) {
+            yield $name.' read through a variable with no default' => [$path, $siblings, ['string' => '']];
+            yield $name.' read through a variable whose default is null' => [$path, $siblings, ['string' => null]];
+            yield $name.' read through a typed processor' => [$path, $siblings, ['int' => 0]];
+        }
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-list<string>, array<string, mixed>}>
+     */
+    public static function textKeys(): iterable
+    {
+        yield 'cache.dir' => [['cache', 'dir'], []];
+        yield 'audit.baseline' => [['audit', 'baseline'], []];
+        yield 'audit.output' => [['audit', 'output'], []];
+        yield 'audit.report_path_prefix' => [['audit', 'report_path_prefix'], []];
+        yield 'the instructions of a custom skill' => [['audit', 'custom_skills', 'pricing', 'instructions'], ['file_type' => 'controller']];
+    }
+
+    /**
+     * @param non-empty-list<string> $path
      */
     #[DataProvider('modelKeys')]
     public function test_a_model_key_still_reads_a_model_name(array $path): void
@@ -354,6 +494,20 @@ final class AuditConfigurationDefinitionTest extends TestCase
         $key = array_shift($path);
 
         return [$key => [] === $path ? $value : self::nested($path, $value)];
+    }
+
+    /**
+     * @param non-empty-list<string> $path
+     * @param array<string, mixed>   $siblings the keys the text key's parent requires beside it
+     *
+     * @return array<array-key, mixed>
+     */
+    private function textSetting(array $path, array $siblings, mixed $value): array
+    {
+        $key = array_pop($path);
+        $parent = $siblings + [$key => $value];
+
+        return [] === $path ? $parent : self::nested($path, $parent);
     }
 
     /**

@@ -568,6 +568,30 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'audit.escalation.cheap_model' => [['audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 5]]], 'symfony_security_auditor.audit.escalation.cheap_model'];
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('textKeysSetToNoText')]
+    public function test_bundle_refuses_a_text_key_set_to_no_text_with_a_configuration_error_naming_it(array $config, string $path, string $type): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "%s".', $path, $type));
+
+        $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string, string}>
+     */
+    public static function textKeysSetToNoText(): iterable
+    {
+        yield 'cache.dir set to null' => [['cache' => ['dir' => null]], 'symfony_security_auditor.cache.dir', 'null'];
+        yield 'audit.baseline set to a switch' => [['audit' => ['baseline' => true]], 'symfony_security_auditor.audit.baseline', 'bool'];
+        yield 'audit.output set to a number' => [['audit' => ['output' => 5]], 'symfony_security_auditor.audit.output', 'int'];
+        yield 'audit.report_path_prefix set to a number' => [['audit' => ['report_path_prefix' => 123]], 'symfony_security_auditor.audit.report_path_prefix', 'int'];
+        yield 'the instructions of a custom skill set to a number' => [['audit' => ['custom_skills' => ['pricing' => ['file_type' => 'controller', 'instructions' => 5]]]], 'symfony_security_auditor.audit.custom_skills.pricing.instructions', 'int'];
+    }
+
     public function test_bundle_accepts_a_null_attacker_model_falling_back_to_model(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'attacker_model' => null]);
