@@ -42,7 +42,8 @@ final readonly class BatchVerdictApplier
     /**
      * A finding whose id appears in `$codeContexts` has its matched verdict
      * persisted to the reviewer cache, so a subsequent batched run reuses it
-     * instead of calling the LLM again. Bypassed runs pass no contexts.
+     * instead of calling the LLM again. Bypassed runs pass no contexts. A
+     * rejection given at the tool-call limit is left out of triage memory.
      *
      * @param list<Vulnerability>      $batch
      * @param array<int|string, mixed> $rawData
@@ -50,7 +51,7 @@ final readonly class BatchVerdictApplier
      *
      * @return list<Vulnerability>
      */
-    public function applyBatchReview(array $batch, array $rawData, CoverageRecorderInterface $coverageRecorder, array $codeContexts = []): array
+    public function applyBatchReview(array $batch, array $rawData, CoverageRecorderInterface $coverageRecorder, array $codeContexts = [], bool $atToolCap = false): array
     {
         $reviewsById = $this->indexReviewsById($rawData);
 
@@ -61,6 +62,7 @@ final readonly class BatchVerdictApplier
                 $reviewsById[$vulnerability->id()] ?? null,
                 $coverageRecorder,
                 $codeContexts,
+                $atToolCap,
             );
         }
 
@@ -138,7 +140,7 @@ final readonly class BatchVerdictApplier
      * @param array<string, mixed>|null $review
      * @param array<string, string>     $codeContexts
      */
-    private function reviewVulnerability(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder, array $codeContexts): Vulnerability
+    private function reviewVulnerability(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder, array $codeContexts, bool $atToolCap): Vulnerability
     {
         if (null === $review || !$this->verdictApplier->hasVerdict($review)) {
             return $this->recordUnjudged($vulnerability, $coverageRecorder);
@@ -157,7 +159,9 @@ final readonly class BatchVerdictApplier
         );
         $coverageRecorder->recordReviewedFinding($applied);
 
-        RejectionTriageRecorder::record($this->verdictApplier, $this->triageMemoryRecorder, $applied, $review);
+        if (!$atToolCap) {
+            RejectionTriageRecorder::record($this->verdictApplier, $this->triageMemoryRecorder, $applied, $review);
+        }
 
         return $applied;
     }

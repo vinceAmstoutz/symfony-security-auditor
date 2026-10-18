@@ -191,7 +191,7 @@ final readonly class SequentialToolLoop
             $this->model,
             $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
             $conversationState->tokenUsage(),
-        ), $roundsLeft, $conversationState->toolsRan);
+        ), $roundsLeft, $conversationState->askedToRead);
     }
 
     /**
@@ -216,10 +216,10 @@ final readonly class SequentialToolLoop
             ]);
         }
 
-        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults), FinalRound::asksToRead($toolRegistry, $toolCalls));
 
         return FinalRound::isConcludedBy($roundsLeft, $toolRegistry, $toolCalls, $toolResults)
-            ? FinalRound::answer($this->model, $conversationState->tokenUsage())
+            ? FinalRound::answer($this->model, $conversationState->tokenUsage(), $conversationState->askedToRead)
             : $conversationState;
     }
 

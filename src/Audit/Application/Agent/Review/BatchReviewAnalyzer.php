@@ -255,7 +255,7 @@ final readonly class BatchReviewAnalyzer
     private function applyBatchResponse(array $batch, LLMResponse $llmResponse, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
     {
         if ($llmResponse->isDegraded()) {
-            return $this->applyIncompleteBatch($batch, $llmResponse->stopReason(), $llmResponse->isEmpty() ? [] : $llmResponse->parseJson(), $cacheContexts, $coverageRecorder);
+            return $this->applyIncompleteBatch($batch, $llmResponse, $llmResponse->isEmpty() ? [] : $llmResponse->parseJson(), $cacheContexts, $coverageRecorder);
         }
 
         if ($llmResponse->isEmpty()) {
@@ -265,7 +265,7 @@ final readonly class BatchReviewAnalyzer
         /** @var array<int|string, mixed> $rawData */
         $rawData = $llmResponse->parseJson();
 
-        return $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
+        return $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts, $llmResponse->reachedToolCap());
     }
 
     /**
@@ -310,7 +310,7 @@ final readonly class BatchReviewAnalyzer
             $rawData = $structuredReviewCollectionSession->drain();
 
             return [] !== $rawData
-                ? $this->applyPartialBatchReviewInOriginalOrder($batch, $rawData, $cacheContexts, $coverageRecorder)
+                ? $this->applyPartialBatchReviewInOriginalOrder($batch, $rawData, $cacheContexts, $coverageRecorder, false)
                 : $this->batchVerdictApplier->recordBatchError($batch, $exception, $coverageRecorder);
         }
     }
@@ -335,8 +335,8 @@ final readonly class BatchReviewAnalyzer
         $rawData = $structuredReviewCollectionSession->drain();
 
         return $llmResponse->isDegraded()
-            ? $this->applyIncompleteBatch($batch, $llmResponse->stopReason(), $rawData, $cacheContexts, $coverageRecorder)
-            : $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, ReviewerVerdictCache::contextsFor($llmResponse, $cacheContexts));
+            ? $this->applyIncompleteBatch($batch, $llmResponse, $rawData, $cacheContexts, $coverageRecorder)
+            : $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, ReviewerVerdictCache::contextsFor($llmResponse, $cacheContexts), $llmResponse->reachedToolCap());
     }
 
     /**
@@ -352,15 +352,15 @@ final readonly class BatchReviewAnalyzer
      *
      * @return list<Vulnerability>
      */
-    private function applyIncompleteBatch(array $batch, string $stopReason, array $rawData, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
+    private function applyIncompleteBatch(array $batch, LLMResponse $llmResponse, array $rawData, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
     {
         $this->logger->warning('Reviewer batch response was cut short; the findings it never reached are recorded as errored', [
             'batch_size' => \count($batch),
-            'stop_reason' => $stopReason,
+            'stop_reason' => $llmResponse->stopReason(),
             'verdicts_kept' => \count($this->batchVerdictApplier->reachedIds($rawData)),
         ]);
 
-        return $this->applyPartialBatchReviewInOriginalOrder($batch, $rawData, $cacheContexts, $coverageRecorder);
+        return $this->applyPartialBatchReviewInOriginalOrder($batch, $rawData, ReviewerVerdictCache::contextsFor($llmResponse, $cacheContexts), $coverageRecorder, $llmResponse->reachedToolCap());
     }
 
     /**
@@ -379,12 +379,12 @@ final readonly class BatchReviewAnalyzer
      *
      * @return list<Vulnerability>
      */
-    private function applyPartialBatchReviewInOriginalOrder(array $batch, array $rawData, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
+    private function applyPartialBatchReviewInOriginalOrder(array $batch, array $rawData, array $cacheContexts, CoverageRecorderInterface $coverageRecorder, bool $atToolCap): array
     {
         [$reachedBatch, $unreachedBatch] = $this->partitionByReached($batch, $rawData);
 
         $byId = [];
-        foreach ($this->batchVerdictApplier->applyBatchReview($reachedBatch, $rawData, $coverageRecorder, $cacheContexts) as $vulnerability) {
+        foreach ($this->batchVerdictApplier->applyBatchReview($reachedBatch, $rawData, $coverageRecorder, $cacheContexts, $atToolCap) as $vulnerability) {
             $byId[$vulnerability->id()] = $vulnerability;
         }
 

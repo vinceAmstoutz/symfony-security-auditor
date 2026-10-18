@@ -46,11 +46,14 @@ final readonly class ReviewOutcomeRecorder
      * A null payload — empty response or no recorded verdict — or one with no
      * `accepted` flag is a review the model never made: the finding is
      * recorded as errored, never as rejected, so it is not reported to the
-     * attacker as a rejection and is reviewed again on the next run.
+     * attacker as a rejection and is reviewed again on the next run. A
+     * rejection given at the tool-call limit is applied but left out of
+     * triage memory, as it is left out of the cache: it may rest on less than
+     * the reviewer wanted to read.
      *
      * @param array<string, mixed>|list<array<string, mixed>>|null $review
      */
-    public function recordVerdict(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    public function recordVerdict(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder, bool $atToolCap = false): Vulnerability
     {
         if (null === $review || !$this->verdictApplier->hasVerdict($review)) {
             return $this->recordUnjudged($vulnerability, $coverageRecorder);
@@ -65,7 +68,9 @@ final readonly class ReviewOutcomeRecorder
         );
         $coverageRecorder->recordReviewedFinding($reviewed);
 
-        RejectionTriageRecorder::record($this->verdictApplier, $this->triageMemoryRecorder, $reviewed, $review);
+        if (!$atToolCap) {
+            RejectionTriageRecorder::record($this->verdictApplier, $this->triageMemoryRecorder, $reviewed, $review);
+        }
 
         return $reviewed;
     }
@@ -179,6 +184,6 @@ final readonly class ReviewOutcomeRecorder
             $this->reviewerVerdictCache->store($vulnerability, $cacheContext, $this->verdictApplier->normalize($rawData));
         }
 
-        return $this->recordVerdict($vulnerability, $rawData, $coverageRecorder);
+        return $this->recordVerdict($vulnerability, $rawData, $coverageRecorder, $llmResponse->reachedToolCap());
     }
 }

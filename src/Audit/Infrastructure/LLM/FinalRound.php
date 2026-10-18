@@ -28,8 +28,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * refusing it) ends the conversation instead of asking for one more round to
  * say it is done. A last round that asks to read instead gets one closing
  * request: its reading calls are answered without being run, since nothing
- * they return could reach a later round. An answer given on either reached the
- * round limit, so it may rest on less than the model wanted to look at.
+ * they return could reach a later round. An answer given on either by a model
+ * that called a reading tool reached the round limit, so it may rest on less
+ * than the model wanted to look at; one that only ever recorded lost nothing
+ * to the limit.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -83,15 +85,31 @@ final readonly class FinalRound
     }
 
     /**
-     * @throws InvalidTokenUsageException
+     * @param list<ToolCall> $toolCalls
      */
-    public static function answer(string $model, TokenUsageSnapshot $tokenUsageSnapshot): LLMResponse
+    public static function asksToRead(ToolRegistry $toolRegistry, array $toolCalls): bool
     {
-        return LLMResponse::of('', $model, 'end_turn', $tokenUsageSnapshot)->withReachedToolCap();
+        foreach ($toolCalls as $toolCall) {
+            if (!$toolRegistry->isRecording($toolCall->getName())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    public static function settled(LLMResponse $llmResponse, int $roundsLeft, bool $toolsRan): LLMResponse
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public static function answer(string $model, TokenUsageSnapshot $tokenUsageSnapshot, bool $askedToRead): LLMResponse
     {
-        return self::isFinal($roundsLeft) && $toolsRan ? $llmResponse->withReachedToolCap() : $llmResponse;
+        $llmResponse = LLMResponse::of('', $model, 'end_turn', $tokenUsageSnapshot);
+
+        return $askedToRead ? $llmResponse->withReachedToolCap() : $llmResponse;
+    }
+
+    public static function settled(LLMResponse $llmResponse, int $roundsLeft, bool $askedToRead): LLMResponse
+    {
+        return self::isFinal($roundsLeft) && $askedToRead ? $llmResponse->withReachedToolCap() : $llmResponse;
     }
 }

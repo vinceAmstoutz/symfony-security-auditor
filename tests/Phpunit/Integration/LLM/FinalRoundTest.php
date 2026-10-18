@@ -88,7 +88,7 @@ final class FinalRoundTest extends TestCase
      * @throws InvalidTokenUsageException
      */
     #[DataProvider('finalRounds')]
-    public function test_a_text_answer_on_a_final_round_after_a_tool_ran_reached_the_round_limit(int $roundsLeft): void
+    public function test_a_text_answer_on_a_final_round_after_asking_to_read_reached_the_round_limit(int $roundsLeft): void
     {
         self::assertTrue(FinalRound::settled($this->textAnswer(), $roundsLeft, true)->reachedToolCap());
     }
@@ -104,7 +104,7 @@ final class FinalRoundTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
-    public function test_a_text_answer_on_the_only_round_with_no_tool_run_did_not_reach_the_round_limit(): void
+    public function test_a_text_answer_on_a_final_round_without_asking_to_read_did_not_reach_the_round_limit(): void
     {
         self::assertFalse(FinalRound::settled($this->textAnswer(), 1, false)->reachedToolCap());
     }
@@ -112,11 +112,45 @@ final class FinalRoundTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
-    public function test_the_answer_that_concludes_a_final_round_reached_the_round_limit(): void
+    public function test_the_answer_that_concludes_a_final_round_after_asking_to_read_reached_the_round_limit(): void
     {
-        $llmResponse = FinalRound::answer('m', TokenUsageSnapshot::of(3, 2));
+        $llmResponse = FinalRound::answer('m', TokenUsageSnapshot::of(3, 2), true);
 
         self::assertSame(['', 'end_turn', true], [$llmResponse->content(), $llmResponse->stopReason(), $llmResponse->reachedToolCap()]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_the_answer_that_concludes_a_final_round_without_asking_to_read_did_not_reach_the_round_limit(): void
+    {
+        $llmResponse = FinalRound::answer('m', TokenUsageSnapshot::of(3, 2), false);
+
+        self::assertSame(['', 'end_turn', false], [$llmResponse->content(), $llmResponse->stopReason(), $llmResponse->reachedToolCap()]);
+    }
+
+    /**
+     * @param list<string> $toolNames
+     *
+     * @throws InvalidToolRegistryException
+     */
+    #[DataProvider('roundsOfCalls')]
+    public function test_a_round_asks_to_read_when_one_of_its_calls_is_not_a_recording_one(array $toolNames, bool $asksToRead): void
+    {
+        $toolCalls = array_map(static fn (string $toolName): ToolCall => new ToolCall('1', $toolName), $toolNames);
+
+        self::assertSame($asksToRead, FinalRound::asksToRead($this->registry(new ToolCallCounter(), new ToolCallCounter()), $toolCalls));
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, bool}>
+     */
+    public static function roundsOfCalls(): iterable
+    {
+        yield 'only recording calls' => [['record', 'record'], false];
+        yield 'a reading call after a recording one' => [['record', 'read'], true];
+        yield 'a reading call before a recording one' => [['read', 'record'], true];
+        yield 'a call to a tool the registry does not hold' => [['record', 'unknown'], true];
     }
 
     /**

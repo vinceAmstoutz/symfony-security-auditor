@@ -253,7 +253,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $cacheContext, $verdict);
         }
 
-        return $this->reviewOutcomeRecorder->recordVerdict($concurrentReviewBatch->vulnerabilities[$index], $verdict, $coverageRecorder);
+        return $this->reviewOutcomeRecorder->recordVerdict($concurrentReviewBatch->vulnerabilities[$index], $verdict, $coverageRecorder, $llmResponse->reachedToolCap());
     }
 
     /**

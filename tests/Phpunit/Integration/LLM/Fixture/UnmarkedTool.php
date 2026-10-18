@@ -11,38 +11,25 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
-/**
- * Tells the turn's {@see RecordingToolReach} every time the client reads the
- * wrapped tool's definition or calls it.
- *
- * @internal not part of the BC promise — see docs/versioning.md
- */
-final readonly class ReachTrackingTool implements ToolInterface
+final readonly class UnmarkedTool implements ToolInterface
 {
-    public function __construct(
-        private ToolInterface $tool,
-        private RecordingToolReach $recordingToolReach,
-    ) {}
+    public function __construct(private ToolInterface $tool) {}
 
     #[Override]
     public function definition(): ToolDefinition
     {
-        $this->recordingToolReach->note();
-
         return $this->tool->definition();
     }
 
     #[Override]
     public function execute(array $arguments): string
     {
-        $this->recordingToolReach->note();
-
         return $this->tool->execute($arguments);
     }
 }

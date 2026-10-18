@@ -73,9 +73,26 @@ final class ConversationStateTest extends TestCase
     {
         $entered = ConversationState::enterRound([$this->state(null)], 1, 4)[0];
 
-        $conversationState = $entered->withRecordedTokens(1, 1, 1, 1)->withExecutedTools(10)->withResponse(LLMResponse::of('done', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+        $conversationState = $entered->withRecordedTokens(1, 1, 1, 1)->withExecutedTools(10, false)->withResponse(LLMResponse::of('done', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
 
         self::assertSame(3, $conversationState->roundsLeft);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_call_to_read_is_remembered_through_every_later_transition_of_a_conversation(): void
+    {
+        $asked = $this->state(null)->withExecutedTools(10, true)->withExecutedTools(10, false);
+
+        $conversationState = ConversationState::enterRound([$asked], 1, 4)[0]->withRecordedTokens(1, 1, 1, 1)->withResponse(LLMResponse::of('done', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+
+        self::assertTrue($conversationState->askedToRead);
+    }
+
+    public function test_a_conversation_that_only_recorded_never_asked_to_read(): void
+    {
+        self::assertFalse($this->state(null)->withExecutedTools(10, false)->withExecutedTools(10, false)->askedToRead);
     }
 
     /**

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\AI\Platform\Message\MessageInterface;
@@ -660,6 +661,82 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
     }
 
     /**
+     * @param list<ResultInterface> $answers
+     *
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('conversationsThatOnlyRecord')]
+    public function test_a_last_round_reached_by_a_model_that_only_records_did_not_reach_the_round_limit(array $answers, int $maxToolIterations): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform($answers);
+
+        self::assertFalse($this->client($scriptedResultPlatform)->completeWithTools('sys', 'usr', $this->registry(new ToolCallCounter()), $maxToolIterations)->reachedToolCap());
+    }
+
+    /**
+     * @param list<ResultInterface> $answers
+     *
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     */
+    #[DataProvider('conversationsThatOnlyRecord')]
+    public function test_a_concurrent_last_round_reached_by_a_model_that_only_records_did_not_reach_the_round_limit(array $answers, int $maxToolIterations): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform($answers);
+
+        $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $this->registry(new ToolCallCounter())],
+        ], 4, $maxToolIterations);
+
+        self::assertFalse($responses[0]->reachedToolCap());
+    }
+
+    /**
+     * @return iterable<string, array{list<ResultInterface>, int}>
+     */
+    public static function conversationsThatOnlyRecord(): iterable
+    {
+        yield 'the only round records' => [[self::recordingCall()], 1];
+        yield 'the last round records again' => [[self::recordingCall(), self::recordingCall()], 2];
+        yield 'the last round answers in text' => [[self::recordingCall(), new MultiPartResult([new TextResult('[]')])], 2];
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_concurrent_last_round_that_records_after_reading_reached_the_round_limit(): void
+    {
+        $scriptedResultPlatform = new ScriptedResultPlatform([$this->callOf('lookup'), $this->callOf('record')]);
+
+        $responses = $this->client($scriptedResultPlatform)->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $this->registry(new ToolCallCounter())],
+        ], 4, 2);
+
+        self::assertTrue($responses[0]->reachedToolCap());
+    }
+
+    /**
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
@@ -907,6 +984,11 @@ final class SymfonyAiLLMClientFinalRoundTest extends TestCase
         }
 
         return new MultiPartResult([new ToolCallResult($toolCalls)]);
+    }
+
+    private static function recordingCall(): ResultInterface
+    {
+        return new MultiPartResult([new ToolCallResult([new ToolCall('0', 'record')])]);
     }
 
     private function lastText(ScriptedResultPlatform $scriptedResultPlatform, int $request): ?string

@@ -33,9 +33,9 @@ final class RecordingToolReach
 
     private bool $reached = false;
 
-    public function track(ToolInterface $tool): ToolInterface
+    public function track(ToolInterface $tool): RecordingToolInterface
     {
-        return $tool instanceof RecordingToolInterface ? new ReachTrackingRecordingTool($tool, $this) : new ReachTrackingTool($tool, $this);
+        return new ReachTrackingRecordingTool($tool, $this);
     }
 
     public function handOver(): void

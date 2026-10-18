@@ -23,8 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
  * options, the token counters accumulated across rounds, whether a tool has
  * already run (a conversation that ran one cannot be restarted from scratch),
  * the finalized response once it has one, the running estimate the rate
- * limiter reserves against, and how many rounds it has left, the one in
- * flight included.
+ * limiter reserves against, how many rounds it has left, the one in flight
+ * included, and whether the model ever called a tool that does not record (a
+ * conversation that only recorded lost nothing to the round limit).
  *
  * Updates are copy-on-write — `$bag` is a mutable collaborator whose contents
  * are appended in place, but every scalar transition returns a new instance.
@@ -47,6 +48,7 @@ final readonly class ConversationState
         public ?LLMResponse $response,
         public int $estimatedInputTokens,
         public int $roundsLeft = 0,
+        public bool $askedToRead = false,
     ) {}
 
     /**
@@ -105,6 +107,7 @@ final readonly class ConversationState
             $this->response,
             $this->estimatedInputTokens,
             $this->roundsLeft,
+            $this->askedToRead,
         );
     }
 
@@ -121,10 +124,11 @@ final readonly class ConversationState
             $llmResponse,
             $this->estimatedInputTokens,
             $this->roundsLeft,
+            $this->askedToRead,
         );
     }
 
-    public function withExecutedTools(int $estimatedToolResultTokens): self
+    public function withExecutedTools(int $estimatedToolResultTokens, bool $askedToRead): self
     {
         return new self(
             $this->bag,
@@ -137,6 +141,7 @@ final readonly class ConversationState
             $this->response,
             $this->estimatedInputTokens + $estimatedToolResultTokens,
             $this->roundsLeft,
+            $this->askedToRead || $askedToRead,
         );
     }
 
@@ -153,6 +158,7 @@ final readonly class ConversationState
             $this->response,
             $this->estimatedInputTokens,
             $roundsLeft,
+            $this->askedToRead,
         );
     }
 }

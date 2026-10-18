@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Revi
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchVerdictApplier;
@@ -48,16 +49,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingTriageMemory;
 
 final class ReviewAtTheToolCapTest extends TestCase
 {
+    private const string PARTIAL_LOOK = 'Probably sanitized by a service it could not open before the round limit';
+
     private RecordingReviewerCache $recordingReviewerCache;
 
     private ReviewerVerdictCache $reviewerVerdictCache;
 
+    private RecordingTriageMemory $recordingTriageMemory;
+
     #[Override]
     protected function setUp(): void
     {
+        $this->recordingTriageMemory = new RecordingTriageMemory();
         $this->recordingReviewerCache = new RecordingReviewerCache();
         $this->reviewerVerdictCache = new ReviewerVerdictCache($this->recordingReviewerCache, new NullLogger());
     }
@@ -70,19 +77,19 @@ final class ReviewAtTheToolCapTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
-    public function test_a_verdict_recorded_at_the_tool_cap_is_applied_but_not_cached(): void
+    public function test_a_verdict_recorded_at_the_tool_cap_is_applied_but_neither_cached_nor_remembered(): void
     {
         $vulnerability = $this->vulnerabilityAt('src/A.php');
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('completeWithTools')->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
-            $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false]);
+            $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false, 'reviewer_notes' => self::PARTIAL_LOOK]);
 
             return self::cappedAnswer('');
         });
 
         $reviewed = $this->structuredAnalyzer($llmClient)->analyze([$vulnerability], [], new NullCoverageRecorder(), false);
 
-        self::assertSame([false, []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored]);
+        self::assertSame([false, [], []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored, $this->recordingTriageMemory->reasons]);
     }
 
     /**
@@ -91,11 +98,11 @@ final class ReviewAtTheToolCapTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      * @throws InvalidTokenUsageException
      */
-    public function test_a_json_verdict_answered_at_the_tool_cap_is_applied_but_not_cached(): void
+    public function test_a_json_verdict_answered_at_the_tool_cap_is_applied_but_neither_cached_nor_remembered(): void
     {
-        $vulnerability = $this->reviewOutcomeRecorder()->applyResponse($this->vulnerabilityAt('src/A.php'), self::cappedAnswer('{"accepted": false}'), new NullCoverageRecorder(), 'code-context');
+        $vulnerability = $this->reviewOutcomeRecorder()->applyResponse($this->vulnerabilityAt('src/A.php'), self::cappedAnswer((string) json_encode(['accepted' => false, 'reviewer_notes' => self::PARTIAL_LOOK])), new NullCoverageRecorder(), 'code-context');
 
-        self::assertSame([false, []], [$vulnerability->isReviewerValidated(), $this->recordingReviewerCache->stored]);
+        self::assertSame([false, [], []], [$vulnerability->isReviewerValidated(), $this->recordingReviewerCache->stored, $this->recordingTriageMemory->reasons]);
     }
 
     /**
@@ -106,14 +113,14 @@ final class ReviewAtTheToolCapTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
-    public function test_a_verdict_a_window_member_recorded_at_the_tool_cap_is_applied_but_not_cached(): void
+    public function test_a_verdict_a_window_member_recorded_at_the_tool_cap_is_applied_but_neither_cached_nor_remembered(): void
     {
         $vulnerability = $this->vulnerabilityAt('src/A.php');
         $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willReturnCallback(static function (array $requests) use ($vulnerability): array {
             self::assertIsArray($requests[0]);
             self::assertInstanceOf(ToolRegistry::class, $requests[0]['tools']);
-            $requests[0]['tools']->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false]);
+            $requests[0]['tools']->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false, 'reviewer_notes' => self::PARTIAL_LOOK]);
 
             return [self::cappedAnswer('')];
         });
@@ -121,7 +128,7 @@ final class ReviewAtTheToolCapTest extends TestCase
 
         $reviewed = $concurrentStructuredReviewAnalyzer->analyze([$vulnerability], [], new NullCoverageRecorder(), false);
 
-        self::assertSame([false, []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored]);
+        self::assertSame([false, [], []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored, $this->recordingTriageMemory->reasons]);
     }
 
     /**
@@ -133,15 +140,15 @@ final class ReviewAtTheToolCapTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      */
-    public function test_a_json_batch_answered_at_the_tool_cap_is_applied_but_not_cached(): void
+    public function test_a_json_batch_answered_at_the_tool_cap_is_applied_but_neither_cached_nor_remembered(): void
     {
         $vulnerability = $this->vulnerabilityAt('src/A.php');
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('completeWithTools')->willReturn(self::cappedAnswer((string) json_encode([['id' => $vulnerability->id(), 'accepted' => false]])));
+        $llmClient->method('completeWithTools')->willReturn(self::cappedAnswer((string) json_encode([['id' => $vulnerability->id(), 'accepted' => false, 'reviewer_notes' => self::PARTIAL_LOOK]])));
 
         $reviewed = $this->batchAnalyzer($llmClient)->analyze([$vulnerability], [], new ReviewBatchSettings(5, false, false, new NullCoverageRecorder(), new ToolRegistry([], new NullLogger())));
 
-        self::assertSame([false, []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored]);
+        self::assertSame([false, [], []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored, $this->recordingTriageMemory->reasons]);
     }
 
     /**
@@ -152,19 +159,42 @@ final class ReviewAtTheToolCapTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
-    public function test_a_structured_batch_recorded_at_the_tool_cap_is_applied_but_not_cached(): void
+    public function test_a_structured_batch_recorded_at_the_tool_cap_is_applied_but_neither_cached_nor_remembered(): void
     {
         $vulnerability = $this->vulnerabilityAt('src/A.php');
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('completeWithTools')->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
-            $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false]);
+            $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false, 'reviewer_notes' => self::PARTIAL_LOOK]);
 
             return self::cappedAnswer('');
         });
 
         $reviewed = $this->batchAnalyzer($llmClient)->analyze([$vulnerability], [], new ReviewBatchSettings(5, true, false, new NullCoverageRecorder(), null));
 
-        self::assertSame([false, []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored]);
+        self::assertSame([false, [], []], [$reviewed[0]->isReviewerValidated(), $this->recordingReviewerCache->stored, $this->recordingTriageMemory->reasons]);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_rejection_a_batch_recorded_before_its_conversation_failed_is_remembered(): void
+    {
+        $vulnerability = $this->vulnerabilityAt('src/A.php');
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
+            $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false, 'reviewer_notes' => self::PARTIAL_LOOK]);
+
+            throw new RuntimeException('the conversation broke after recording');
+        });
+
+        $this->batchAnalyzer($llmClient)->analyze([$vulnerability], [], new ReviewBatchSettings(5, true, false, new NullCoverageRecorder(), null));
+
+        self::assertSame([self::PARTIAL_LOOK], $this->recordingTriageMemory->reasons);
     }
 
     /**
@@ -177,7 +207,7 @@ final class ReviewAtTheToolCapTest extends TestCase
 
     private function reviewOutcomeRecorder(): ReviewOutcomeRecorder
     {
-        return new ReviewOutcomeRecorder(new VerdictApplier(new NullLogger()), $this->reviewerVerdictCache, new NullLogger(), new NullProgressReporter());
+        return new ReviewOutcomeRecorder(new VerdictApplier(new NullLogger()), $this->reviewerVerdictCache, new NullLogger(), new NullProgressReporter(), $this->recordingTriageMemory);
     }
 
     private function structuredAnalyzer(LLMClientInterface $llmClient): StructuredReviewAnalyzer
@@ -192,7 +222,7 @@ final class ReviewAtTheToolCapTest extends TestCase
         return new BatchReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(useStructuredCollection: true),
-            new BatchVerdictApplier($verdictApplier, $this->reviewerVerdictCache, new NullLogger(), new NullProgressReporter()),
+            new BatchVerdictApplier($verdictApplier, $this->reviewerVerdictCache, new NullLogger(), new NullProgressReporter(), $this->recordingTriageMemory),
             $this->reviewerVerdictCache,
             $this->reviewOutcomeRecorder(),
             new NullLogger(),

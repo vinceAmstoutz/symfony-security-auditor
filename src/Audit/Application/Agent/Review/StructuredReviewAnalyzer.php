@@ -165,7 +165,7 @@ final readonly class StructuredReviewAnalyzer
             $this->reviewerVerdictCache->store($vulnerability, $cacheContext, $verdict);
         }
 
-        return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
+        return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder, $llmResponse->reachedToolCap());
     }
 
     private function recordAbortOrRecoveredVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, string $status, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache): void

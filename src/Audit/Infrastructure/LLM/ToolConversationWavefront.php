@@ -364,7 +364,7 @@ final readonly class ToolConversationWavefront
             $this->model,
             $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
             $conversationState->tokenUsage(),
-        ), $conversationState->roundsLeft, $conversationState->toolsRan));
+        ), $conversationState->roundsLeft, $conversationState->askedToRead));
     }
 
     /**
@@ -444,10 +444,10 @@ final readonly class ToolConversationWavefront
             $toolResults[] = $result;
         }
 
-        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults));
+        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults), FinalRound::asksToRead($toolLLMRequest->tools, $toolCalls));
 
         return FinalRound::isConcludedBy($conversationState->roundsLeft, $toolLLMRequest->tools, $toolCalls, $toolResults)
-            ? $conversationState->withResponse(FinalRound::answer($this->model, TokenUsageSnapshot::of($conversationState->input, $conversationState->output, $conversationState->cacheRead, $conversationState->cacheCreation)))
+            ? $conversationState->withResponse(FinalRound::answer($this->model, TokenUsageSnapshot::of($conversationState->input, $conversationState->output, $conversationState->cacheRead, $conversationState->cacheCreation), $conversationState->askedToRead))
             : $conversationState;
     }
 
