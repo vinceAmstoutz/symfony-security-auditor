@@ -1092,6 +1092,36 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString('|collect-json|', $jsonSalt);
     }
 
+    /**
+     * @return iterable<string, array{array<string, mixed>, string, string}>
+     */
+    public static function toolsScopeKeySaltSegments(): iterable
+    {
+        yield 'tools on the audited files, by default' => [['tools_enabled' => true, 'max_tool_iterations' => 7, 'reviewer_tools_enabled' => true, 'reviewer_max_tool_iterations' => 3], '|tools-on-7|', '|tools-on-3|'];
+        yield 'tools on the audited files, named' => [['tools_enabled' => true, 'max_tool_iterations' => 7, 'reviewer_tools_enabled' => true, 'reviewer_max_tool_iterations' => 3, 'tools_scope' => 'audited'], '|tools-on-7|', '|tools-on-3|'];
+        yield 'tools on every scanned file' => [['tools_enabled' => true, 'max_tool_iterations' => 7, 'reviewer_tools_enabled' => true, 'reviewer_max_tool_iterations' => 3, 'tools_scope' => 'scanned'], '|tools-on-7-scanned|', '|tools-on-3-scanned|'];
+        yield 'no tools, whatever their scope' => [['tools_enabled' => false, 'reviewer_tools_enabled' => false, 'tools_scope' => 'scanned'], '|tools-off|', '|tools-off|'];
+    }
+
+    /**
+     * @param array<string, mixed> $audit
+     */
+    #[DataProvider('toolsScopeKeySaltSegments')]
+    public function test_bundle_key_salts_fold_in_the_tools_scope_only_when_the_tools_are_on(array $audit, string $attackerToolsSegment, string $reviewerToolsSegment): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => $audit + ['escalation' => ['enabled' => true]]]);
+
+        foreach (['symfony_security_auditor.cache.key_salt', 'symfony_security_auditor.cache.cheap_attacker_key_salt'] as $attackerSaltParameter) {
+            $attackerKeySalt = $containerBuilder->getParameter($attackerSaltParameter);
+            self::assertIsString($attackerKeySalt);
+            self::assertStringContainsString($attackerToolsSegment, $attackerKeySalt);
+        }
+
+        $reviewerKeySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+        self::assertIsString($reviewerKeySalt);
+        self::assertStringEndsWith(\sprintf('%sbatch-1|max-output-4096', $reviewerToolsSegment), $reviewerKeySalt);
+    }
+
     public function test_bundle_propagates_secret_scrubbing_config_to_parameters(): void
     {
         $containerBuilder = $this->loadParameters([

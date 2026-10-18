@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecuti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -162,7 +163,17 @@ final readonly class ContainerParameterRegistrar
             return 'off';
         }
 
-        return \sprintf('on-%d', $auditExecutionConfiguration->reviewerMaxToolIterations);
+        return \sprintf('on-%d%s', $auditExecutionConfiguration->reviewerMaxToolIterations, $this->toolsScopeSalt($auditExecutionConfiguration));
+    }
+
+    /**
+     * Empty for the `audited` scope, so the keys of a configuration that never
+     * names a scope stay those of earlier releases, while a `scanned` run,
+     * whose tools may read files an `audited` one may not, keys apart.
+     */
+    private function toolsScopeSalt(AuditExecutionConfiguration $auditExecutionConfiguration): string
+    {
+        return ToolsScope::Scanned === $auditExecutionConfiguration->toolsScope ? '-scanned' : '';
     }
 
     /**
@@ -220,7 +231,7 @@ final readonly class ContainerParameterRegistrar
             return 'off';
         }
 
-        return \sprintf('on-%d', $bundleConfiguration->audit->maxToolIterations);
+        return \sprintf('on-%d%s', $bundleConfiguration->audit->maxToolIterations, $this->toolsScopeSalt($bundleConfiguration->audit));
     }
 
     private function codeSlicingSalt(BundleConfiguration $bundleConfiguration): string
