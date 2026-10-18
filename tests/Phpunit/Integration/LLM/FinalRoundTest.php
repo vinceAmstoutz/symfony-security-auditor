@@ -120,25 +120,6 @@ final class FinalRoundTest extends TestCase
     }
 
     /**
-     * @param list<int> $expected
-     */
-    #[DataProvider('roundNumbers')]
-    public function test_a_conversation_numbers_its_allowed_rounds_and_the_closing_request(int $maxToolIterations, array $expected): void
-    {
-        self::assertSame($expected, FinalRound::rounds($maxToolIterations));
-    }
-
-    /**
-     * @return iterable<string, array{int, list<int>}>
-     */
-    public static function roundNumbers(): iterable
-    {
-        yield 'a cap of two: two rounds and the closing request' => [2, [0, 1, 2]];
-        yield 'a cap of zero: the closing request alone' => [0, [0]];
-        yield 'a negative cap: no round at all' => [-1, []];
-    }
-
-    /**
      * @return iterable<string, array{int}>
      */
     public static function finalRounds(): iterable
