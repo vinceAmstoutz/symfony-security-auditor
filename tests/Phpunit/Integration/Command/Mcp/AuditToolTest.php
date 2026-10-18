@@ -21,6 +21,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
@@ -207,6 +208,35 @@ final class AuditToolTest extends TestCase
 
         self::assertSame($this->projectPath.'/packages/legacy', $report['project']);
         self::assertSame(['since' => null, 'paths' => []], $report['scope']);
+    }
+
+    /**
+     * @throws ToolCallException
+     */
+    public function test_telling_a_folder_the_configured_scan_finds_files_in_for_the_project_reads_none_of_them(): void
+    {
+        (new Filesystem())->dumpFile($this->projectPath.'/composer.json', '{}');
+        (new Filesystem())->dumpFile($this->projectPath.'/packages/legacy/lib/Legacy.php', '<?php final class Legacy {}');
+        $reads = [];
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), ['lib'], fileReader: static function (SplFileInfo $splFile) use (&$reads): string {
+            $reads[] = $splFile->getFilename();
+
+            return $splFile->getContents();
+        });
+        $auditTool = new AuditTool(
+            new RunAuditUseCase(new SingleFileAuditPipeline(), new NullLogger()),
+            new JsonReportRenderer(),
+            $this->auditedProjectPathHolder(),
+            new BaselineProcessor(new Baseline()),
+            new FindingTypeFilter(),
+            new ReviewerFeedbackHolder(),
+            $this->budgetGuard(),
+            listScannedFilesUseCase: new ListScannedFilesUseCase($projectFileScanner),
+        );
+
+        $report = $this->decodedReport($auditTool->audit($this->projectPath.'/packages/legacy'));
+
+        self::assertSame([$this->projectPath.'/packages/legacy', []], [$report['project'], $reads]);
     }
 
     /**

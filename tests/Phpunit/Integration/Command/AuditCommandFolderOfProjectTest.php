@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
+use Closure;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -20,6 +21,7 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\SplFileInfo;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
@@ -153,6 +155,24 @@ final class AuditCommandFolderOfProjectTest extends TestCase
         self::assertStringNotContainsString('is not a project root', $display);
     }
 
+    public function test_telling_a_folder_the_configured_scan_finds_files_in_for_the_project_reads_none_of_them(): void
+    {
+        mkdir($this->project.'/packages/legacy/lib', 0o777, true);
+        file_put_contents($this->project.'/packages/legacy/lib/Legacy.php', '<?php final class Legacy {}');
+        file_put_contents($this->project.'/packages/legacy/lib/Other.php', '<?php final class Other {}');
+        $reads = [];
+        $commandTester = $this->makeCommandTester(['lib'], static function (SplFileInfo $splFile) use (&$reads): string {
+            $reads[] = $splFile->getFilename();
+
+            return $splFile->getContents();
+        });
+
+        $commandTester->execute(['project-path' => $this->project.'/packages/legacy', '--show-scanned' => true]);
+
+        sort($reads);
+        self::assertSame(['Legacy.php', 'Other.php'], $reads);
+    }
+
     public function test_a_directory_holding_a_composer_json_stays_the_project_even_with_nothing_to_scan(): void
     {
         mkdir($this->project.'/packages/tool', 0o777, true);
@@ -251,12 +271,13 @@ final class AuditCommandFolderOfProjectTest extends TestCase
     }
 
     /**
-     * @param list<string> $includedPaths
+     * @param list<string>                  $includedPaths
+     * @param ?Closure(SplFileInfo): string $fileReader
      */
-    private function makeCommandTester(array $includedPaths = ProjectFileScanner::DEFAULT_INCLUDED_PATHS): CommandTester
+    private function makeCommandTester(array $includedPaths = ProjectFileScanner::DEFAULT_INCLUDED_PATHS, ?Closure $fileReader = null): CommandTester
     {
         $modelsDevPricingProvider = new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/../UseCase/Fixture/pricing-catalog.json');
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), $includedPaths);
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), $includedPaths, fileReader: $fileReader);
 
         return new CommandTester(new AuditCommand(
             new RunAuditUseCase(new NothingAnalyzedPipeline(), new NullLogger()),

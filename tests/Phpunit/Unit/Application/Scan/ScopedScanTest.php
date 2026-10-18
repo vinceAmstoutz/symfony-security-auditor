@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\FixedScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\ReadSharingScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingReportingScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
 
@@ -199,6 +200,32 @@ final class ScopedScanTest extends TestCase
         self::assertSame([$skippedFile], $scopedScanResult->audited->skippedFiles);
         self::assertSame([$projectFile, $outside], $scopedScanResult->mappingFiles);
         self::assertSame([[], ['apps/api']], $recordingReportingScanner->requestedPaths);
+    }
+
+    /**
+     * @param list<string>                           $scanPaths
+     * @param list<array{string, list<string>|null}> $expectedCalls
+     *
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('pathsWithAndWithoutOne')]
+    public function test_a_scanner_that_can_share_its_reads_scans_the_configured_scope_and_the_paths_through_the_scanner_sharing_them(array $scanPaths, array $expectedCalls): void
+    {
+        $configured = [$this->file('src/A.php')];
+        $recordingScopedScanner = new RecordingScopedScanner($configured, [$this->file('src/A.php')]);
+
+        $scopedScanResult = ScopedScan::resolve(new ReadSharingScanner($recordingScopedScanner), '/project', $scanPaths);
+
+        self::assertSame([$configured, $expectedCalls], [$scopedScanResult->mappingFiles, $recordingScopedScanner->calls]);
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, list<array{string, list<string>|null}>}>
+     */
+    public static function pathsWithAndWithoutOne(): iterable
+    {
+        yield 'no path' => [[], [['scan', null]]];
+        yield 'a path' => [['src'], [['scan', null], ['scanWithin', ['src']]]];
     }
 
     /**

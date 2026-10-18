@@ -17,6 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProbingProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
 /**
@@ -61,6 +62,20 @@ final readonly class ListScannedFilesUseCase
         $changedFiles = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
 
         return $this->sinceClosurePreview?->auditedFiles($projectPath, $scanPaths, $diffSinceRef, $changedFiles, $scopedScanResult->mappingFiles) ?? $changedFiles;
+    }
+
+    /**
+     * Whether the configured scan reaches a file in the project, as a run asks
+     * of a directory holding no `composer.json`: a scanner that can probe
+     * answers without reading a file, any other is asked through a whole scan.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function holdsAFile(string $projectPath): bool
+    {
+        return $this->projectFileScanner instanceof ProbingProjectFileScannerInterface
+            ? $this->projectFileScanner->reachesAFile($projectPath)
+            : [] !== $this->execute($projectPath);
     }
 
     /**

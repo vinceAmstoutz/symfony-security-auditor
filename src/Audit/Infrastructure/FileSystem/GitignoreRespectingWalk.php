@@ -13,19 +13,19 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
-use Closure;
+use Generator;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 
 /**
  * Walks a Finder with the project's `.gitignore` files applied when the scan
  * respects them. Finder's own `ignoreVCSIgnored()` stops the whole walk on a
  * `.gitignore` that is not a file, such as a directory a repository commits
  * under that name, so the walk is made again with {@see ReadableGitignores},
- * which reads the same rules and finds none in it.
+ * which reads the same rules and finds none in it. A file the stopped walk
+ * already gave comes again; the scan reads it once and keeps it once.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -37,18 +37,18 @@ final readonly class GitignoreRespectingWalk
     ) {}
 
     /**
-     * @param Closure(Finder): ProjectFileScan $scan
+     * @return Generator<SplFileInfo>
      */
-    public function scan(Finder $finder, string $projectPath, Closure $scan): ProjectFileScan
+    public function files(Finder $finder, string $projectPath): Generator
     {
         $readableGitignoreWalk = clone $finder;
 
         try {
-            return $scan($finder->ignoreVCSIgnored($this->respectGitignore));
+            yield from $finder->ignoreVCSIgnored($this->respectGitignore);
         } catch (RuntimeException) {
             $readableGitignores = ReadableGitignores::of($projectPath, $this->logger);
 
-            return $scan($readableGitignoreWalk->filter(static fn (SplFileInfo $splFile): bool => !$readableGitignores->ignore($splFile)));
+            yield from $readableGitignoreWalk->filter(static fn (SplFileInfo $splFile): bool => !$readableGitignores->ignore($splFile));
         }
     }
 }

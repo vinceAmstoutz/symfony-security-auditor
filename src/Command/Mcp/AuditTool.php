@@ -86,7 +86,7 @@ final readonly class AuditTool
      */
     private function holdsScanFiles(string $directory): bool
     {
-        return [] !== $this->listScannedFilesUseCase->execute($directory);
+        return $this->listScannedFilesUseCase->holdsAFile($directory);
     }
 
     private function abortedRunFailure(AuditAbortedExceptionInterface $auditAbortedException): ToolCallException

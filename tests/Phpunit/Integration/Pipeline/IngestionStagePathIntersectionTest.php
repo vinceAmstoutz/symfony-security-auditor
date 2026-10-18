@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Pipeline;
 
+use Closure;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\SplFileInfo;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -135,15 +137,34 @@ final class IngestionStagePathIntersectionTest extends TestCase
     }
 
     /**
-     * @param list<string> $includedPaths
-     * @param list<string> $scanPaths
+     * @throws InvalidAuditContextException
+     */
+    public function test_a_file_the_configured_scope_and_a_path_both_reach_is_read_once(): void
+    {
+        $reads = [];
+        $reader = static function (SplFileInfo $splFile) use (&$reads): string {
+            $reads[] = $splFile->getFilename();
+
+            return $splFile->getContents();
+        };
+
+        $auditContext = $this->ingest(['src', 'config'], ['src'], fileReader: $reader);
+
+        sort($reads);
+        self::assertSame([['src/Controller/A.php', 'src/Service/B.php'], ['A.php', 'B.php', 'security.yaml']], [$this->relativePaths($auditContext->projectFiles()), $reads]);
+    }
+
+    /**
+     * @param list<string>                  $includedPaths
+     * @param list<string>                  $scanPaths
+     * @param ?Closure(SplFileInfo): string $fileReader
      *
      * @throws InvalidAuditContextException
      */
-    private function ingest(array $includedPaths, array $scanPaths, int $maxFileSizeKb = ProjectFileScanner::DEFAULT_MAX_FILE_SIZE_KB): AuditContext
+    private function ingest(array $includedPaths, array $scanPaths, int $maxFileSizeKb = ProjectFileScanner::DEFAULT_MAX_FILE_SIZE_KB, ?Closure $fileReader = null): AuditContext
     {
         $auditContext = AuditContext::forProject($this->tmpDir, $scanPaths);
-        (new IngestionStage(new ProjectFileScanner(new NullLogger(), $includedPaths, maxFileSizeKb: $maxFileSizeKb), new NullLogger()))->process($auditContext);
+        (new IngestionStage(new ProjectFileScanner(new NullLogger(), $includedPaths, maxFileSizeKb: $maxFileSizeKb, fileReader: $fileReader), new NullLogger()))->process($auditContext);
 
         return $auditContext;
     }

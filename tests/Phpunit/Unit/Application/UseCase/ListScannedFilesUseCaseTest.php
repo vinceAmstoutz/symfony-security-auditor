@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
@@ -22,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Scan\Fixture\RecordingScopedScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\ProbingScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\SinceClosureFixture;
 
 final class ListScannedFilesUseCaseTest extends TestCase
@@ -169,6 +171,47 @@ final class ListScannedFilesUseCaseTest extends TestCase
             ['src/Changed.php', 'src/Unchanged.php'],
             array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files),
         );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    #[DataProvider('probeAnswers')]
+    public function test_a_scanner_that_can_probe_tells_whether_a_directory_holds_a_file_without_scanning_it(bool $reachesAFile): void
+    {
+        $probingScanner = new ProbingScanner($reachesAFile);
+
+        $holdsAFile = (new ListScannedFilesUseCase($probingScanner))->holdsAFile('/project');
+
+        self::assertSame([$reachesAFile, ['/project'], []], [$holdsAFile, $probingScanner->probedProjectPaths, $probingScanner->scannedProjectPaths]);
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function probeAnswers(): iterable
+    {
+        yield 'it reaches a file' => [true];
+        yield 'it reaches none' => [false];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_any_other_scanner_holds_a_file_when_its_scan_finds_one(): void
+    {
+        $listScannedFilesUseCase = new ListScannedFilesUseCase($this->fixedScanner([$this->makeProjectFile('lib/Legacy.php')]));
+
+        self::assertTrue($listScannedFilesUseCase->holdsAFile('/project'));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_any_other_scanner_holds_no_file_when_its_scan_finds_none(): void
+    {
+        self::assertFalse((new ListScannedFilesUseCase($this->fixedScanner([])))->holdsAFile('/project'));
     }
 
     /**

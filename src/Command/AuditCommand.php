@@ -122,7 +122,7 @@ final readonly class AuditCommand
      */
     private function holdsScanFiles(string $directory): bool
     {
-        return [] !== $this->listScannedFilesUseCase->execute($directory);
+        return $this->listScannedFilesUseCase->holdsAFile($directory);
     }
 
     private function warnAboutMinScoreOutsideRange(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): void

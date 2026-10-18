@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
+use CallbackFilterIterator;
 use Closure;
 use FilesystemIterator;
+use Generator;
 use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Path;
@@ -27,12 +29,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PathAwareSecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProbingProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReadSharingProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class ProjectFileScanner implements ScopedProjectFileScannerInterface, SkippedFileReportingProjectFileScannerInterface
+final readonly class ProjectFileScanner implements ScopedProjectFileScannerInterface, SkippedFileReportingProjectFileScannerInterface, ReadSharingProjectFileScannerInterface, ProbingProjectFileScannerInterface
 {
     /** @var list<string> */
     private const array PHP_EXTENSIONS = ['php'];
@@ -76,6 +80,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents; tests inject a stub
      * @param ?GitTrackedIgnoredFiles       $gitTrackedIgnoredFiles the files git tracks although a `.gitignore` pattern matches them are scanned too, so pass it only with `$respectGitignore`; none runs no git process
      * @param bool                          $includeDotfiles        whether a directory walk also reads dot files and dot directories; version-control directories (`.git`, `.svn`, `CVS`, …) are left out either way
+     * @param ?ScannedContents              $scannedContents        what the scans of one run share, set by {@see sharingReads()}; none shares nothing between scans
      */
     public function __construct(
         private LoggerInterface $logger,
@@ -86,7 +91,14 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         private ?SecretScrubberInterface $secretScrubber = null,
         private ?GitTrackedIgnoredFiles $gitTrackedIgnoredFiles = null,
         private bool $includeDotfiles = false,
+        private ?ScannedContents $scannedContents = null,
     ) {}
+
+    #[Override]
+    public function sharingReads(): self
+    {
+        return new self($this->logger, $this->includedPaths, $this->respectGitignore, $this->maxFileSizeKb, $this->fileReader, $this->secretScrubber, $this->gitTrackedIgnoredFiles, $this->includeDotfiles, new ScannedContents());
+    }
 
     /**
      * @return list<ProjectFile>
@@ -138,19 +150,51 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         }
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
+        $scannedContents = $this->scannedContents ?? new ScannedContents();
+        $contentOf = fn (SplFileInfo $splFile, string $relativePath): string => $scannedContents->of($splFile->getPathname(), fn (): string => $this->scrubbed($relativePath, $reader($splFile)));
 
-        $trackedIgnored = $this->gitTrackedIgnoredFiles?->in($projectPath) ?? [];
-        $directoryScan = $this->scanDirectories($directories, $projectPath, $reader, $trackedIgnored);
-        $explicitFileScan = $this->scanExplicitFiles($explicitFiles, $projectPath, $reader, $trackedIgnored);
-
+        $outcomes = iterator_to_array($this->outcomes($directories, $explicitFiles, $projectPath, $contentOf), false);
         $projectFileScan = $this->inRelativePathOrder($this->eachFileOnce(new ProjectFileScan(
-            array_merge($directoryScan->files, $explicitFileScan->files),
-            array_merge($directoryScan->skippedFiles, $explicitFileScan->skippedFiles),
+            array_values(array_filter($outcomes, static fn (ProjectFile|SkippedFile|null $outcome): bool => $outcome instanceof ProjectFile)),
+            array_values(array_filter($outcomes, static fn (ProjectFile|SkippedFile|null $outcome): bool => $outcome instanceof SkippedFile)),
         )));
 
         $this->logger->info('Scan complete', ['files' => \count($projectFileScan->files)]);
 
         return $projectFileScan;
+    }
+
+    /**
+     * The configured scan stops at the first file it would keep, given an
+     * empty content in place of reading and scrubbing each one.
+     */
+    #[Override]
+    public function reachesAFile(string $projectPath): bool
+    {
+        [$directories, $explicitFiles] = $this->resolveRoots($projectPath, $this->includedPaths);
+        $reachedFiles = new CallbackFilterIterator(
+            $this->outcomes($directories, $explicitFiles, $projectPath, static fn (): string => ''),
+            static fn (ProjectFile|SkippedFile|null $outcome): bool => $outcome instanceof ProjectFile,
+        );
+        $reachedFiles->rewind();
+
+        return $reachedFiles->valid();
+    }
+
+    /**
+     * What the scan finds in each file the roots reach, one file at a time.
+     *
+     * @param list<string>                         $directories
+     * @param list<string>                         $explicitFiles
+     * @param Closure(SplFileInfo, string): string $contentOf
+     *
+     * @return Generator<ProjectFile|SkippedFile|null>
+     */
+    private function outcomes(array $directories, array $explicitFiles, string $projectPath, Closure $contentOf): Generator
+    {
+        $trackedIgnored = $this->gitTrackedIgnoredFiles?->in($projectPath) ?? [];
+        yield from $this->scanDirectories($directories, $projectPath, $contentOf, $trackedIgnored);
+        yield from $this->scanExplicitFiles($explicitFiles, $projectPath, $contentOf, $trackedIgnored);
     }
 
     /**
@@ -213,14 +257,16 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * @param list<string>                 $directories
-     * @param Closure(SplFileInfo): string $reader
-     * @param list<string>                 $trackedIgnored
+     * @param list<string>                         $directories
+     * @param Closure(SplFileInfo, string): string $contentOf
+     * @param list<string>                         $trackedIgnored
+     *
+     * @return Generator<ProjectFile|SkippedFile|null>
      */
-    private function scanDirectories(array $directories, string $projectPath, Closure $reader, array $trackedIgnored): ProjectFileScan
+    private function scanDirectories(array $directories, string $projectPath, Closure $contentOf, array $trackedIgnored): Generator
     {
         if ([] === $directories) {
-            return new ProjectFileScan([], []);
+            return;
         }
 
         $finder = (new Finder())
@@ -230,7 +276,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
             ->name($this->finderNamePatterns())
             ->filter($this->entersReadableDirectory(...), true);
 
-        return $this->collectFilesFrom($finder, $projectPath, $reader, $trackedIgnored);
+        yield from $this->collectFilesFrom($finder, $projectPath, $contentOf, $trackedIgnored);
     }
 
     private function entersReadableDirectory(SplFileInfo $splFile): bool
@@ -254,14 +300,14 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * @param list<string>                 $explicitFiles
-     * @param Closure(SplFileInfo): string $reader
-     * @param list<string>                 $trackedIgnored
+     * @param list<string>                         $explicitFiles
+     * @param Closure(SplFileInfo, string): string $contentOf
+     * @param list<string>                         $trackedIgnored
+     *
+     * @return Generator<ProjectFile|SkippedFile|null>
      */
-    private function scanExplicitFiles(array $explicitFiles, string $projectPath, Closure $reader, array $trackedIgnored): ProjectFileScan
+    private function scanExplicitFiles(array $explicitFiles, string $projectPath, Closure $contentOf, array $trackedIgnored): Generator
     {
-        $files = [];
-        $skippedFiles = [];
         foreach ($explicitFiles as $explicitFile) {
             $explicitFinder = (new Finder())
                 ->files()
@@ -270,40 +316,36 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
                 ->depth('== 0')
                 ->name(basename($explicitFile));
 
-            $explicitFileScan = $this->collectFilesFrom($explicitFinder, $projectPath, $reader, $trackedIgnored);
-            $files = array_merge($files, $explicitFileScan->files);
-            $skippedFiles = array_merge($skippedFiles, $explicitFileScan->skippedFiles);
+            yield from $this->collectFilesFrom($explicitFinder, $projectPath, $contentOf, $trackedIgnored);
         }
-
-        return new ProjectFileScan($files, $skippedFiles);
     }
 
     /**
-     * @param Closure(SplFileInfo): string $reader
-     * @param list<string>                 $trackedIgnored files git tracks although a .gitignore pattern matches them: still part of the repository, so still audited
+     * @param Closure(SplFileInfo, string): string $contentOf
+     * @param list<string>                         $trackedIgnored files git tracks although a .gitignore pattern matches them: still part of the repository, so still audited
+     *
+     * @return Generator<ProjectFile|SkippedFile|null>
      */
-    private function collectFilesFrom(Finder $finder, string $projectPath, Closure $reader, array $trackedIgnored): ProjectFileScan
+    private function collectFilesFrom(Finder $finder, string $projectPath, Closure $contentOf, array $trackedIgnored): Generator
     {
-        $trackedIgnoredScan = $this->scanTrackedIgnored(clone $finder, $trackedIgnored, $projectPath, $reader);
-        $projectFileScan = (new GitignoreRespectingWalk($this->respectGitignore, $this->logger))->scan($finder, $projectPath, fn (Finder $finder): ProjectFileScan => $this->scanFinder($finder, $projectPath, $reader));
-
-        return new ProjectFileScan(
-            array_merge($projectFileScan->files, $trackedIgnoredScan->files),
-            array_merge($projectFileScan->skippedFiles, $trackedIgnoredScan->skippedFiles),
-        );
+        $trackedIgnoredFinder = clone $finder;
+        yield from $this->scanFinder((new GitignoreRespectingWalk($this->respectGitignore, $this->logger))->files($finder, $projectPath), $projectPath, $contentOf);
+        yield from $this->scanTrackedIgnored($trackedIgnoredFinder, $trackedIgnored, $projectPath, $contentOf);
     }
 
     /**
-     * @param list<string>                 $trackedIgnored
-     * @param Closure(SplFileInfo): string $reader
+     * @param list<string>                         $trackedIgnored
+     * @param Closure(SplFileInfo, string): string $contentOf
+     *
+     * @return Generator<ProjectFile|SkippedFile|null>
      */
-    private function scanTrackedIgnored(Finder $finder, array $trackedIgnored, string $projectPath, Closure $reader): ProjectFileScan
+    private function scanTrackedIgnored(Finder $finder, array $trackedIgnored, string $projectPath, Closure $contentOf): Generator
     {
         if ([] === $trackedIgnored) {
-            return new ProjectFileScan([], []);
+            return;
         }
 
-        return $this->scanFinder($this->onlyPaths($finder, $trackedIgnored, $projectPath), $projectPath, $reader);
+        yield from $this->scanFinder($this->onlyPaths($finder, $trackedIgnored, $projectPath), $projectPath, $contentOf);
     }
 
     /**
@@ -317,25 +359,16 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * @param Closure(SplFileInfo): string $reader
+     * @param iterable<SplFileInfo>                $splFiles
+     * @param Closure(SplFileInfo, string): string $contentOf
+     *
+     * @return Generator<ProjectFile|SkippedFile|null>
      */
-    private function scanFinder(Finder $finder, string $projectPath, Closure $reader): ProjectFileScan
+    private function scanFinder(iterable $splFiles, string $projectPath, Closure $contentOf): Generator
     {
-        $files = [];
-        $skippedFiles = [];
-        /** @var SplFileInfo $splFile */
-        foreach ($finder as $splFile) {
-            $outcome = $this->scanFile($splFile, $projectPath, $reader);
-            if ($outcome instanceof ProjectFile) {
-                $files[] = $outcome;
-            }
-
-            if ($outcome instanceof SkippedFile) {
-                $skippedFiles[] = $outcome;
-            }
+        foreach ($splFiles as $splFile) {
+            yield $this->scanFile($splFile, $projectPath, $contentOf);
         }
-
-        return new ProjectFileScan($files, $skippedFiles);
     }
 
     /**
@@ -469,9 +502,9 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      * so anything but a regular file is reported unreadable without being
      * opened.
      *
-     * @param Closure(SplFileInfo): string $reader
+     * @param Closure(SplFileInfo, string): string $contentOf
      */
-    private function scanFile(SplFileInfo $splFile, string $projectPath, Closure $reader): ProjectFile|SkippedFile|null
+    private function scanFile(SplFileInfo $splFile, string $projectPath, Closure $contentOf): ProjectFile|SkippedFile|null
     {
         if ($splFile->isLink()) {
             $this->logger->warning('Skipped symlinked file', ['path' => $splFile->getPathname()]);
@@ -492,7 +525,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
                 return new SkippedFile($relativePath, SkippedFileReason::TooLarge);
             }
 
-            $content = $this->scrubbed($relativePath, $reader($splFile));
+            $content = $contentOf($splFile, $relativePath);
 
             return AmbiguousContent::skipped($relativePath, $content) ?? ProjectFile::create(
                 relativePath: $relativePath,

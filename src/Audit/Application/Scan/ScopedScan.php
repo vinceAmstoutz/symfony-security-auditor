@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReadSharingProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
@@ -31,7 +32,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingP
  * The files the Symfony mapping is read from are a wider set: the configured
  * scope plus the files the paths reached, each once, so the security
  * configuration, voters and forms that decide how each audited route is
- * guarded are still read when `--path` names a single folder.
+ * guarded are still read when `--path` names a single folder. A scanner that
+ * can share its reads scans both through the scanner sharing them, so a file
+ * both reach is read and scrubbed once.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -42,6 +45,7 @@ final readonly class ScopedScan
      */
     public static function resolve(ProjectFileScannerInterface $projectFileScanner, string $projectPath, array $scanPaths): ScopedScanResult
     {
+        $projectFileScanner = $projectFileScanner instanceof ReadSharingProjectFileScannerInterface ? $projectFileScanner->sharingReads() : $projectFileScanner;
         $configured = self::configured($projectFileScanner, $projectPath);
         $paths = ScanPathFilter::normalize($scanPaths);
 
