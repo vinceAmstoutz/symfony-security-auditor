@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\KnownFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
@@ -267,10 +268,8 @@ final readonly class SequentialChunkAnalyzer
      * a later round aborted it — otherwise they vanish with the exception
      * even though `drainFoundVulnerabilities()` exists precisely to let a
      * caller recover candidates found before a mid-run abort.
-     *
-     * @param list<ProjectFile> $knownFiles
      */
-    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, array $knownFiles, CoverageRecorderInterface $coverageRecorder): void
+    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, KnownFiles $knownFiles, CoverageRecorderInterface $coverageRecorder): void
     {
         $this->recordFindings($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain(), $knownFiles)->vulnerabilities(), $coverageRecorder);
     }

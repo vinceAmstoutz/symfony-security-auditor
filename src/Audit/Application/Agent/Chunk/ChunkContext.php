@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\KnownFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
@@ -28,9 +28,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
  */
 final readonly class ChunkContext
 {
-    /**
-     * @param list<ProjectFile> $knownFiles
-     */
     public function __construct(
         public string $systemPrompt,
         public string $userMessage,
@@ -38,7 +35,7 @@ final readonly class ChunkContext
         public bool $cacheable,
         public int $promptedFileBytes,
         public bool $reachedToolCap = false,
-        public array $knownFiles = [],
+        public KnownFiles $knownFiles = new KnownFiles(),
     ) {}
 
     public function answeredBy(LLMResponse $llmResponse): self

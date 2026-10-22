@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 use JsonException;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\KnownFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
@@ -95,9 +96,9 @@ final readonly class ChunkAnswerHydrator
      *
      * @param list<ProjectFile> $chunk
      * @param list<mixed>       $rawData
-     * @param list<ProjectFile> $knownFiles the files its findings are named by
+     * @param KnownFiles        $knownFiles the files its findings are named by
      */
-    public function hydrateIncompleteAnswer(array $chunk, LLMResponse $llmResponse, array $rawData, CoverageRecorderInterface $coverageRecorder, array $knownFiles): VulnerabilityHydrationResult
+    public function hydrateIncompleteAnswer(array $chunk, LLMResponse $llmResponse, array $rawData, CoverageRecorderInterface $coverageRecorder, KnownFiles $knownFiles): VulnerabilityHydrationResult
     {
         $this->logger->warning('Attacker response was cut short; the chunk is recorded as errored and left out of the cache', [
             'stop_reason' => $llmResponse->stopReason(),

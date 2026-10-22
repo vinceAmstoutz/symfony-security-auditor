@@ -185,8 +185,13 @@ final class AttackerAnalysisRequestTest extends TestCase
         $toolFile = ProjectFile::create('src/C.php', '/app/src/C.php', '<?php');
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
-        self::assertSame([$projectFile, $file], (new AttackerAnalysisRequest([$file], $symfonyMapping))->knownFilesFor([$projectFile]));
-        self::assertSame([$projectFile, $file, $toolFile], (new AttackerAnalysisRequest([$file], $symfonyMapping, toolFiles: [$file, $toolFile]))->knownFilesFor([$projectFile]));
+        $names = static fn (AttackerAnalysisRequest $attackerAnalysisRequest): array => array_map(
+            static fn (string $echoedPath): string => $attackerAnalysisRequest->knownFilesFor([$projectFile])->name($echoedPath),
+            ['./src/A.php', './src/B.php', './src/C.php'],
+        );
+
+        self::assertSame(['src/A.php', 'src/B.php', './src/C.php'], $names(new AttackerAnalysisRequest([$file], $symfonyMapping)));
+        self::assertSame(['src/A.php', 'src/B.php', 'src/C.php'], $names(new AttackerAnalysisRequest([$file], $symfonyMapping, toolFiles: [$file, $toolFile])));
     }
 
     public function test_candidate_findings_default_to_empty(): void
