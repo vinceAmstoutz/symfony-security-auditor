@@ -743,6 +743,13 @@ return [
         'changelog' => '#473',
     ],
     [
+        'scenarios' => ['run/scan-layout', 'run/scan-layout-formats', 'run/scan-layout-git', 'run/scan-layout-included-paths', 'run/scan-layout-no-gitignore'],
+        'path' => 'runs.*.stdout.json.coverage.*',
+        'match' => '/^(?:<absent> -> \\{"stage":"scan","file":"src\\/Controller\\/LinkToAdmin\\.php","status":"skipped"\\}$|<absent> -> \\{"stage":"scan","file":"src\\/ServiceLink","status":"skipped"\\}$)/',
+        'reason' => 'A symlinked file or directory the scan does not follow is now listed in `coverage` as `skipped` under the `scan` stage, as a file over the size limit is; the report stays complete.',
+        'changelog' => '#473',
+    ],
+    [
         'scenarios' => ['run/since', 'run/since-tools', 'standalone/since'],
         'path' => 'runs.*.stdout.json.by_severity.*',
         'match' => '/^0 -> 1$/',
