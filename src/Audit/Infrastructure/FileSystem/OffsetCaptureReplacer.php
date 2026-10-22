@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
+use Closure;
+
 /**
  * `preg_replace_callback()` that hands the callback where each group sits in the content.
  *
@@ -31,14 +33,35 @@ final readonly class OffsetCaptureReplacer
      */
     public function replace(string $pattern, string $content, callable $replacement): ?string
     {
+        return $this->replaceSharing($pattern, $content, static fn (): null => null, $replacement);
+    }
+
+    /**
+     * {@see replace()} for a replacement that needs what only the whole content tells: `$shared`
+     * works it out once, before the first match is replaced, and not at all when nothing matches.
+     *
+     * @template TShared
+     *
+     * @param Closure(): TShared                                                     $shared
+     * @param callable(array<int|string, array{0: string, 1: int}>, TShared): string $replacement given each match as its groups, each a `[text, offset]` pair, and what `$shared` worked out
+     *
+     * @return string|null null when the PCRE engine refuses to evaluate the pattern
+     */
+    public function replaceSharing(string $pattern, string $content, Closure $shared, callable $replacement): ?string
+    {
         if (false === preg_match_all($pattern, $content, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE)) {
             return null;
         }
 
+        if ([] === $matches) {
+            return $content;
+        }
+
+        $sharedValue = $shared();
         $replaced = '';
         $cursor = 0;
         foreach ($matches as $match) {
-            $replaced .= substr($content, $cursor, $match[0][1] - $cursor).$replacement($match);
+            $replaced .= substr($content, $cursor, $match[0][1] - $cursor).$replacement($match, $sharedValue);
             $cursor = $match[0][1] + \strlen($match[0][0]);
         }
 

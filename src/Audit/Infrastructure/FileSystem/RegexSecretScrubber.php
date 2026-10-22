@@ -382,7 +382,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
 
     private function redactEnvAssignments(string $pattern, string $content, PhpDataMaskMemo $phpDataMaskMemo): ?string
     {
-        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactEnvAssignment($match, $phpDataMaskMemo->of($content)));
+        return $this->offsetCaptureReplacer->replaceSharing($pattern, $content, static fn (): PhpDataMask => $phpDataMaskMemo->of($content), $this->redactEnvAssignment(...));
     }
 
     /**
@@ -426,7 +426,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
 
     private function redactInlineAssignments(string $pattern, string $content, PhpDataMaskMemo $phpDataMaskMemo): ?string
     {
-        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $this->redactInlineAssignment($match, $phpDataMaskMemo->of($content)));
+        return $this->offsetCaptureReplacer->replaceSharing($pattern, $content, static fn (): PhpDataMask => $phpDataMaskMemo->of($content), $this->redactInlineAssignment(...));
     }
 
     /**
@@ -539,7 +539,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
      */
     private function redactCallArguments(string $pattern, string $content, PhpDataMaskMemo $phpDataMaskMemo): ?string
     {
-        return $this->offsetCaptureReplacer->replace($pattern, $content, fn (array $match): string => $match[1][0].$this->redactArgumentLiterals($match[2], $phpDataMaskMemo->of($content)));
+        return $this->offsetCaptureReplacer->replaceSharing($pattern, $content, static fn (): PhpDataMask => $phpDataMaskMemo->of($content), fn (array $match, PhpDataMask $phpDataMask): string => $match[1][0].$this->redactArgumentLiterals($match[2], $phpDataMask));
     }
 
     /**
