@@ -140,6 +140,23 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
         self::assertSame(['src/Controller/HomeController.php'], $this->scannedPathsOfAnAppWhoseParentIgnores('app/src/Controller/Rooted.php'));
     }
 
+    public function test_the_gitignore_files_of_a_git_repository_two_levels_above_the_project_apply(): void
+    {
+        $this->filesystem->mkdir($this->project.'/.git');
+        $this->filesystem->mirror($this->project.'/src', $this->project.'/apps/app/src');
+        $this->put('.gitignore', "apps/app/src/Controller/Rooted.php\n");
+        $this->put('apps/app/src/Controller/Rooted.php');
+
+        self::assertSame(['src/Controller/HomeController.php'], $this->relativePaths((new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true))->scan($this->project.'/apps/app')));
+    }
+
+    public function test_a_project_that_is_a_git_repository_of_its_own_leaves_out_the_rules_of_the_repository_around_it(): void
+    {
+        $this->filesystem->mkdir([$this->project.'/.git', $this->project.'/app/.git']);
+
+        self::assertSame(['src/Controller/HomeController.php', 'src/Controller/Rooted.php'], $this->scannedPathsOfAnAppWhoseParentIgnores('app/src/Controller/Rooted.php'));
+    }
+
     public function test_a_gitignore_above_a_project_outside_any_git_repository_does_not_apply(): void
     {
         self::assertSame(['src/Controller/HomeController.php', 'src/Controller/Rooted.php'], $this->scannedPathsOfAnAppWhoseParentIgnores('app/src/Controller/Rooted.php'));
@@ -154,6 +171,22 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
 
         try {
             $files = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true))->scan($link);
+        } finally {
+            $this->filesystem->remove($link);
+        }
+
+        self::assertSame(['src/Controller/HomeController.php'], $this->relativePaths($files));
+    }
+
+    public function test_a_project_inside_a_symlinked_directory_has_its_rules_applied(): void
+    {
+        $this->put('src/.gitignore', "Generated.php\n");
+        $this->put('src/Controller/Generated.php');
+        $link = sys_get_temp_dir().'/linked_parent_'.bin2hex(random_bytes(6));
+        $this->filesystem->symlink(\dirname($this->project), $link);
+
+        try {
+            $files = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true))->scan($link.'/'.basename($this->project));
         } finally {
             $this->filesystem->remove($link);
         }

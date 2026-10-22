@@ -77,7 +77,7 @@ final class ReadableGitignores
 
     private static function normalized(string $path): string
     {
-        return '\\' === \DIRECTORY_SEPARATOR ? str_replace('\\', '/', $path) : $path;
+        return strtr($path, \DIRECTORY_SEPARATOR, '/');
     }
 
     private function isIgnored(string $path): bool
