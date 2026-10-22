@@ -141,6 +141,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 ### Performance Improvements 🚀
 
 - With `audit.static_prescan.lean_mode` on, an attacker pass no longer spends time growing with the square of the file count to set aside the files the pre-scan did not flag: on 40,000 files that step drops from 5.1 s to 0.01 s per pass
+- Code slicing (`audit.code_slicing.enabled`, on under the `fast` profile) reads a line of plain ASCII about four times faster, with the same slices: on a code base of 5,000 PHP files, slicing drops from 42.6 s to 13.5 s per attacker pass
 - An attacker pass no longer spends time growing with the square of the file count to tell how each chunk ended: on 20,000 files that bookkeeping drops from 3.2 s to under 0.01 s per pass
 - Grouping a large project's files into feature chunks takes seconds instead of minutes (1,000 controllers and 10,000 files: 14.8 s to 0.08 s), with the same chunks ([#458](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/458))
 - A controller whose public actions call each other in a long chain no longer stalls the mapping stage (6,000 methods map in under half a second) ([#469](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/469))

@@ -199,6 +199,29 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    #[DataProvider('linesHoldingControlOrNonAsciiCharacters')]
+    public function test_a_line_is_retained_or_elided_by_the_same_rules_whatever_text_it_holds(string $line, bool $retained): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20).$line."\n".str_repeat("        \$x = 1;\n", 20);
+
+        $sliced = (new RegexCodeSlicer(10))->slice(ProjectFile::create('src/Big.php', '/app/src/Big.php', $content));
+
+        self::assertSame($retained, str_contains($sliced, $line));
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function linesHoldingControlOrNonAsciiCharacters(): iterable
+    {
+        yield 'a declaration indented with tabs, form feeds, vertical tabs and NUL bytes' => ["\t\r\x0B\x0C\0public function show(): void", true];
+        yield 'a declaration indented with no-break spaces' => ["\u{A0}\u{A0}public function show(): void", true];
+        yield 'an opening tag after a byte-order mark' => ["\u{FEFF}<?php", true];
+        yield 'a sink call followed by an accented comment' => ['        $hash = md5($input); // empreinte calculée', true];
+        yield 'an assignment of accented text' => ["        \$label = 'Café';", false];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_multiline_method_signature_parameters_are_retained(): void
     {
         $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)

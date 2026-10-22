@@ -145,27 +145,56 @@ final readonly class SecurityRelevantLineClassifier implements LineRetentionDeci
      */
     private const string BARE_KEYWORD_PATTERN = '/\b(?:exec|rand|include|include_once|require|require_once)\b/';
 
+    private const string NON_ASCII_BYTE = '/[^\x00-\x7F]/';
+
+    /**
+     * The leading characters `u()->trimStart()` drops that a line of ASCII
+     * alone can hold.
+     */
+    private const string ASCII_LEADING_SPACE = " \t\n\r\0\x0B\x0C";
+
     #[Override]
     public function isRetained(string $line, LineRetentionContext $lineRetentionContext): bool
     {
-        if ($this->isStructural($line)) {
-            return true;
-        }
-
-        return $this->containsSecurityToken($line);
+        return $this->isStructuralOrHoldsSecurityToken($line) || 1 === preg_match(self::BARE_KEYWORD_PATTERN, $line);
     }
 
-    private function isStructural(string $line): bool
+    /**
+     * A line of ASCII alone holds no grapheme, normalization form or Unicode
+     * space that would set its bytes apart from its text, so it is matched
+     * byte by byte, with the same outcome and many times faster than as a
+     * Unicode string; any other line is read as Unicode text.
+     */
+    private function isStructuralOrHoldsSecurityToken(string $line): bool
     {
-        return u($line)->trimStart()->startsWith(self::STRUCTURAL_PREFIXES);
-    }
+        if (1 === preg_match(self::NON_ASCII_BYTE, $line)) {
+            $text = u($line);
 
-    private function containsSecurityToken(string $line): bool
-    {
-        if (u($line)->containsAny(self::SECURITY_TOKENS)) {
-            return true;
+            return $text->trimStart()->startsWith(self::STRUCTURAL_PREFIXES) || $text->containsAny(self::SECURITY_TOKENS);
         }
 
-        return 1 === preg_match(self::BARE_KEYWORD_PATTERN, $line);
+        return $this->startsWithStructuralPrefix(ltrim($line, self::ASCII_LEADING_SPACE)) || $this->holdsSecurityToken($line);
+    }
+
+    private function startsWithStructuralPrefix(string $line): bool
+    {
+        foreach (self::STRUCTURAL_PREFIXES as $structuralPrefix) {
+            if (str_starts_with($line, $structuralPrefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function holdsSecurityToken(string $line): bool
+    {
+        foreach (self::SECURITY_TOKENS as $securityToken) {
+            if (str_contains($line, $securityToken)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
