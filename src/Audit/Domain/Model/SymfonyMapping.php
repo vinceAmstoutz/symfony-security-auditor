@@ -182,6 +182,14 @@ final readonly class SymfonyMapping
     }
 
     /**
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function applicationFolderFor(string $controllerFilePath): ?string
+    {
+        return $this->accessControlMap->applicationFolderFor($controllerFilePath);
+    }
+
+    /**
      * @return list<AccessControlRule>
      *
      * @internal not part of the BC promise — see docs/versioning.md

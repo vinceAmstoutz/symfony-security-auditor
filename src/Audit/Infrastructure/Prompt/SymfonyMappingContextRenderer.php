@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
@@ -156,15 +155,40 @@ final readonly class SymfonyMappingContextRenderer
         $lines = ['## Route Access-Control Map'];
         $lines[] = 'Each line describes a controller action: HTTP method(s), route path, source location, and the access-control surface (class- and method-level `#[IsGranted]`, `denyAccessUnlessGranted()` body calls). A line whose surface is empty is tagged at the end: routes with no enforcement at all carry the LACKS marker — treat those as primary candidates for `broken_access_control` and `missing_voter`. Routes with no attribute or body check whose path matches an `access_control` rule of the production `security.yaml` carry a firewall-covered marker listing the gating roles. That coverage is read from the repository\'s YAML, not verified against the running application, so it lowers the priority of `broken_access_control` there without ruling it out: still report it when the rule may not apply to the action or the gating role is too permissive for it.';
 
-        foreach ($routeAccessControls as $routeAccessControl) {
+        $firewallRoles = self::firewallRolesOf($symfonyMapping, $routeAccessControls);
+        foreach ($routeAccessControls as $index => $routeAccessControl) {
             $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->routeMethods()));
             $path = self::sanitizeLine($routeAccessControl->routePath() ?? '(unresolved)');
             $checks = self::accessCheckLabelsFor($routeAccessControl);
-            $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $symfonyMapping->routeAccessMapFor($routeAccessControl->filePath()), $symfonyMapping->accessControlRulesFor($routeAccessControl->filePath()));
+            $checkLabel = self::checkLabelFor($checks, $firewallRoles[$index]);
             $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, self::sanitizeLine($routeAccessControl->filePath()), $routeAccessControl->methodName(), $checkLabel);
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
+    }
+
+    /**
+     * The roles of the `access_control` rule that governs each route, the
+     * routes of one application matched against its rules together.
+     *
+     * @param list<RouteAccessControl> $routeAccessControls
+     *
+     * @return array<int, list<string>|false|null> by the index of each route
+     */
+    private static function firewallRolesOf(SymfonyMapping $symfonyMapping, array $routeAccessControls): array
+    {
+        $routesByApplication = [];
+        foreach ($routeAccessControls as $index => $routeAccessControl) {
+            $routesByApplication[$symfonyMapping->applicationFolderFor($routeAccessControl->filePath()) ?? ''][$index] = $routeAccessControl;
+        }
+
+        $firewallRoles = [];
+        foreach ($routesByApplication as $routes) {
+            $controllerFilePath = $routes[array_key_first($routes)]->filePath();
+            $firewallRoles += AccessControlRuleMatcher::rolesForEach($routes, $symfonyMapping->routeAccessMapFor($controllerFilePath), $symfonyMapping->accessControlRulesFor($controllerFilePath));
+        }
+
+        return $firewallRoles;
     }
 
     /**
@@ -268,17 +292,16 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * @param list<string>                $checks
-     * @param array<string, list<string>> $routeAccessMap
-     * @param list<AccessControlRule>     $accessControlRules
+     * @param list<string>            $checks
+     * @param list<string>|false|null $firewallRoles
      */
-    private static function checkLabelFor(array $checks, RouteAccessControl $routeAccessControl, array $routeAccessMap, array $accessControlRules): string
+    private static function checkLabelFor(array $checks, array|false|null $firewallRoles): string
     {
         if ([] !== $checks) {
             return implode(' + ', $checks);
         }
 
-        return self::firewallCoverageLabel(AccessControlRuleMatcher::rolesFor($routeAccessControl, $routeAccessMap, $accessControlRules));
+        return self::firewallCoverageLabel($firewallRoles);
     }
 
     /**

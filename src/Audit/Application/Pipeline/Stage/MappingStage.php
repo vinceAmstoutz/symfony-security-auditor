@@ -294,7 +294,7 @@ final readonly class MappingStage implements StageInterface
     }
 
     /**
-     * Mirrors {@see SymfonyYamlSecurityConfigParser::recordAccessControlEntry()}'s
+     * Mirrors {@see SymfonyYamlSecurityConfigParser::accessControlOf()}'s
      * first-match-wins semantics across config files: a rule for a path already
      * covered by an earlier file is appended as an `or: …` requirement instead of
      * replacing it, so no file's rule is silently dropped.

@@ -28,11 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
  */
 final readonly class AccessControlRuleMatcher
 {
-    private const string DELIMITER_CANDIDATES = '#~!%@';
-
     private const string ROUTE_TARGET_PREFIX = 'route: ';
-
-    private const int PATTERN_BACKTRACK_LIMIT = 10_000;
 
     /**
      * A rule whose path pattern cannot be decided for the route, before any
@@ -46,70 +42,126 @@ final readonly class AccessControlRuleMatcher
      */
     public static function rolesFor(RouteAccessControl $routeAccessControl, array $routeAccessMap, array $accessControlRules = []): array|false|null
     {
-        $checksNothing = self::firstMatchingRuleChecksNothing($routeAccessControl, $accessControlRules);
+        return self::rolesForEach([$routeAccessControl], $routeAccessMap, $accessControlRules)[0];
+    }
+
+    /**
+     * The roles {@see self::rolesFor()} finds for each of several routes the
+     * same rules govern, each rule matched against every route it has yet to
+     * decide before the next one is read, so its path pattern is compiled
+     * once for all of them.
+     *
+     * @param array<int, RouteAccessControl> $routeAccessControls
+     * @param array<string, list<string>>    $routeAccessMap
+     * @param list<AccessControlRule>        $accessControlRules  the rules in the order they are declared, when the parser gave them
+     *
+     * @return array<int, list<string>|false|null> by the key of each route, in the order given
+     */
+    public static function rolesForEach(array $routeAccessControls, array $routeAccessMap, array $accessControlRules = []): array
+    {
+        $routeMethods = array_map(static fn (RouteAccessControl $routeAccessControl): array => array_map(strtoupper(...), $routeAccessControl->routeMethods()), $routeAccessControls);
+        $routePaths = array_filter(array_map(static fn (RouteAccessControl $routeAccessControl): ?string => $routeAccessControl->routePath(), $routeAccessControls), static fn (?string $routePath): bool => null !== $routePath);
+        $governingRoles = self::governingRoles($routeAccessControls, $routeAccessMap, $routeMethods, $routePaths);
+
+        $roles = [];
+        foreach (self::firstMatchingRuleChecksNothing($routeAccessControls, $accessControlRules, $routeMethods, $routePaths) as $index => $checksNothing) {
+            $roles[$index] = self::rolesOf($checksNothing, $governingRoles[$index]);
+        }
+
+        return $roles;
+    }
+
+    /**
+     * @param list<string>|false|null $governingRoles
+     *
+     * @return list<string>|false|null
+     */
+    private static function rolesOf(?bool $checksNothing, array|false|null $governingRoles): array|false|null
+    {
         if (false !== $checksNothing) {
             return true === $checksNothing ? null : false;
         }
 
-        return self::governingRoles($routeAccessControl, $routeAccessMap);
+        return $governingRoles;
     }
 
     /**
-     * @param array<string, list<string>> $routeAccessMap
+     * @param array<int, RouteAccessControl> $routeAccessControls
+     * @param array<string, list<string>>    $routeAccessMap
+     * @param array<int, list<string>>       $routeMethods        upper-case, by the key of each route; empty for every method
+     * @param array<int, string>             $routePaths          by the key of each route that has a path
      *
-     * @return list<string>|false|null
+     * @return array<int, list<string>|false|null> by the key of each route
      */
-    private static function governingRoles(RouteAccessControl $routeAccessControl, array $routeAccessMap): array|false|null
+    private static function governingRoles(array $routeAccessControls, array $routeAccessMap, array $routeMethods, array $routePaths): array
     {
+        $governingRoles = array_map(static fn (): null => null, $routeAccessControls);
+        $ungoverned = $routeAccessControls;
         foreach ($routeAccessMap as $target => $roles) {
-            $governs = self::ruleGoverns($target, $roles, $routeAccessControl);
-            if (false !== $governs) {
-                return true === $governs ? $roles : false;
+            foreach (self::routesGovernedBy($target, $roles, $ungoverned, $routeMethods, $routePaths) as $index => $governs) {
+                $governingRoles[$index] = true === $governs ? $roles : false;
+                unset($ungoverned[$index]);
             }
         }
 
-        return null;
+        return $governingRoles;
     }
 
     /**
-     * @param list<string> $roles
+     * @param list<string>                   $roles
+     * @param array<int, RouteAccessControl> $routeAccessControls
+     * @param array<int, list<string>>       $routeMethods        upper-case, by the key of each route; empty for every method
+     * @param array<int, string>             $routePaths          by the key of each route that has a path
+     *
+     * @return array<int, ?bool> the routes the rule governs, true, or may govern, null
      */
-    private static function ruleGoverns(string $target, array $roles, RouteAccessControl $routeAccessControl): ?bool
+    private static function routesGovernedBy(string $target, array $roles, array $routeAccessControls, array $routeMethods, array $routePaths): array
     {
-        return self::methodsAreCovered($roles, $routeAccessControl->routeMethods()) ? self::targetGoverns($target, $routeAccessControl) : false;
+        $requiredMethods = array_map(self::methodsRequiredBy(...), self::alternativesOf($roles));
+        $covered = array_filter($routeAccessControls, static fn (int $index): bool => self::methodsAreCovered($requiredMethods, $routeMethods[$index]), \ARRAY_FILTER_USE_KEY);
+
+        return array_filter(self::targetGovernsEach($target, $covered, $routePaths), static fn (?bool $governs): bool => false !== $governs);
     }
 
     /**
      * Walks the rules in the order they are declared, passing those that do
-     * not decide the route: the first that does checks nothing, or checks
+     * not decide a route: the first that does checks nothing, or checks
      * something and matches all of its requests. A rule whose path pattern
      * cannot be decided for the route leaves the answer open.
      *
-     * @param list<AccessControlRule> $accessControlRules
+     * @param array<int, RouteAccessControl> $routeAccessControls
+     * @param list<AccessControlRule>        $accessControlRules
+     * @param array<int, list<string>>       $routeMethods        upper-case, by the key of each route; empty for every method
+     * @param array<int, string>             $routePaths          by the key of each route that has a path
      *
-     * @return bool|null false when a rule that checks something settles the route, or none decides it; null when it cannot be told
+     * @return array<int, ?bool> by the key of each route, in the order given: false when a rule that checks something settles the route, or none decides it; null when it cannot be told
      */
-    private static function firstMatchingRuleChecksNothing(RouteAccessControl $routeAccessControl, array $accessControlRules): ?bool
+    private static function firstMatchingRuleChecksNothing(array $routeAccessControls, array $accessControlRules, array $routeMethods, array $routePaths): array
     {
-        $routeMethods = array_map(strtoupper(...), $routeAccessControl->routeMethods());
+        $checksNothing = array_map(static fn (): bool => false, $routeAccessControls);
+        $undecided = $routeAccessControls;
         foreach ($accessControlRules as $accessControlRule) {
-            $governs = self::declaredRuleGoverns($accessControlRule, $routeAccessControl, $routeMethods);
-            if (false !== $governs) {
-                return self::checksNothing($accessControlRule, $governs);
+            foreach (self::routesDecidedBy($accessControlRule, $undecided, $routeMethods, $routePaths) as $index => $governs) {
+                $checksNothing[$index] = self::checksNothing($accessControlRule, $governs);
+                unset($undecided[$index]);
             }
         }
 
-        return false;
+        return $checksNothing;
     }
 
     /**
-     * @param list<string> $routeMethods upper-case; empty for every method
+     * @param array<int, RouteAccessControl> $routeAccessControls
+     * @param array<int, list<string>>       $routeMethods        upper-case, by the key of each route; empty for every method
+     * @param array<int, string>             $routePaths          by the key of each route that has a path
      *
-     * @return bool|null null when the rule's path pattern cannot be decided for the route
+     * @return array<int, ?bool> the routes the rule decides, true, or may decide, null
      */
-    private static function declaredRuleGoverns(AccessControlRule $accessControlRule, RouteAccessControl $routeAccessControl, array $routeMethods): ?bool
+    private static function routesDecidedBy(AccessControlRule $accessControlRule, array $routeAccessControls, array $routeMethods, array $routePaths): array
     {
-        return self::decidesTheRoute($accessControlRule, $routeMethods) ? self::targetGoverns($accessControlRule->target, $routeAccessControl) : false;
+        $decided = array_filter($routeAccessControls, static fn (int $index): bool => self::decidesTheRoute($accessControlRule, $routeMethods[$index]), \ARRAY_FILTER_USE_KEY);
+
+        return array_filter(self::targetGovernsEach($accessControlRule->target, $decided, $routePaths), static fn (?bool $governs): bool => false !== $governs);
     }
 
     /**
@@ -153,66 +205,26 @@ final readonly class AccessControlRuleMatcher
     /**
      * A target is either `route: <name>`
      * ({@see SymfonyYamlSecurityConfigParser::targetOf()}), which governs the
-     * route of that name, or the `path` pattern of a rule.
+     * route of that name, or the `path` pattern of a rule, which governs no
+     * route without a path.
+     *
+     * @param array<int, RouteAccessControl> $routeAccessControls
+     * @param array<int, string>             $routePaths          by the key of each route that has a path
+     *
+     * @return array<int, ?bool> by the key of each route; null when the pattern cannot be decided for it
      */
-    private static function targetGoverns(string $target, RouteAccessControl $routeAccessControl): ?bool
+    private static function targetGovernsEach(string $target, array $routeAccessControls, array $routePaths): array
     {
         if (str_starts_with($target, self::ROUTE_TARGET_PREFIX)) {
-            $routeName = $routeAccessControl->routeName();
-
-            return null !== $routeName && $target === self::ROUTE_TARGET_PREFIX.$routeName;
+            return array_map(static fn (RouteAccessControl $routeAccessControl): bool => self::targetNames($target, $routeAccessControl->routeName()), $routeAccessControls);
         }
 
-        $routePath = $routeAccessControl->routePath();
-
-        return null === $routePath ? false : self::pathPatternMatches($target, $routePath);
+        return PathPatternVerdicts::of($target, array_intersect_key($routePaths, $routeAccessControls)) + array_fill_keys(array_keys($routeAccessControls), false);
     }
 
-    /**
-     * Symfony treats the `access_control` `path` as a regular expression, so
-     * it is matched as one; a malformed pattern, or one containing every
-     * delimiter candidate, simply fails to match rather than throwing.
-     */
-    private static function pathPatternMatches(string $pattern, string $routePath): ?bool
+    private static function targetNames(string $target, ?string $routeName): bool
     {
-        $delimiter = self::delimiterAvoiding($pattern);
-
-        return null === $delimiter ? false : self::patternMatches($delimiter.$pattern.$delimiter, $routePath);
-    }
-
-    /**
-     * `preg_match()` raises a warning for a pattern that does not compile
-     * (`^/(admin`) and returns false; a warning-throwing error handler
-     * (Symfony debug, `mcp:serve`) would abort the prompt build on a pattern
-     * taken from the audited repository, so the warning is captured here and
-     * the pattern simply matches nothing.
-     *
-     * A pattern from the repository may also backtrack catastrophically
-     * (`^/(a+)+z$` against a long route path), and each route meets each
-     * rule, so a match gets {@see self::PATTERN_BACKTRACK_LIMIT} steps rather
-     * than `pcre.backtrack_limit`'s million. One it cannot decide within them
-     * returns null: the pattern may match the route, so it cannot be told.
-     */
-    private static function patternMatches(string $delimitedPattern, string $routePath): ?bool
-    {
-        $compilationError = null;
-        set_error_handler(static function (int $severity, string $message) use (&$compilationError): bool {
-            $compilationError = $message;
-
-            return true;
-        });
-
-        $backtrackLimit = ini_set('pcre.backtrack_limit', self::PATTERN_BACKTRACK_LIMIT);
-
-        $matched = preg_match($delimitedPattern, $routePath);
-        ini_set('pcre.backtrack_limit', $backtrackLimit);
-        restore_error_handler();
-
-        if (false !== $matched) {
-            return 1 === $matched;
-        }
-
-        return null === $compilationError ? null : false;
+        return null !== $routeName && $target === self::ROUTE_TARGET_PREFIX.$routeName;
     }
 
     /**
@@ -224,18 +236,18 @@ final readonly class AccessControlRuleMatcher
      * with no declared methods answers to every HTTP verb, so a
      * method-restricted rule can never fully cover it. A second (or third, …)
      * `access_control` rule for the same path is recorded as one `or: ...`
-     * entry per rule ({@see SymfonyYamlSecurityConfigParser::recordAccessControlEntry()}),
+     * entry per rule ({@see SymfonyYamlSecurityConfigParser::accessControlOf()}),
      * each its own independent alternative Symfony tries in turn — the path
      * is covered for a route if ANY alternative covers it, not just the
      * first.
      *
-     * @param list<string> $roles
-     * @param list<string> $routeMethods
+     * @param list<list<string>|null> $requiredMethods the methods each alternative of a rule is limited to, as {@see self::methodsRequiredBy()} reads them
+     * @param list<string>            $routeMethods    upper-case; empty for every method
      */
-    private static function methodsAreCovered(array $roles, array $routeMethods): bool
+    private static function methodsAreCovered(array $requiredMethods, array $routeMethods): bool
     {
-        foreach (self::alternativesOf($roles) as $alternative) {
-            if (self::alternativeCoversMethods($alternative, $routeMethods)) {
+        foreach ($requiredMethods as $requiredMethod) {
+            if (self::alternativeCoversMethods($requiredMethod, $routeMethods)) {
                 return true;
             }
         }
@@ -247,7 +259,7 @@ final readonly class AccessControlRuleMatcher
      * Splits the flat, possibly-`or:`-joined roles list into one string per
      * alternative rule: the base rule's own list items joined into a single
      * string, then each `or:` entry on its own. The leading `or: ` marker is
-     * left on those entries — {@see self::alternativeCoversMethods()} locates
+     * left on those entries — {@see self::methodsRequiredBy()} locates
      * the `methods:` requirement anywhere in the string, so the marker never
      * affects the check.
      *
@@ -282,38 +294,23 @@ final readonly class AccessControlRuleMatcher
      * requirement value can contain, so the match is unambiguous regardless
      * of what precedes or follows it.
      *
-     * @param list<string> $routeMethods
+     * @return list<string>|null null when the alternative is not limited to some methods
      */
-    private static function alternativeCoversMethods(string $alternative, array $routeMethods): bool
+    private static function methodsRequiredBy(string $alternative): ?array
     {
-        if (1 !== preg_match('/methods:\s*([A-Z|]+)/', $alternative, $matches)) {
-            return true;
-        }
-
-        if ([] === $routeMethods) {
-            return false;
-        }
-
-        $ruleMethods = explode('|', $matches[1]);
-        $upperRouteMethods = array_map(strtoupper(...), $routeMethods);
-
-        return [] === array_diff($upperRouteMethods, $ruleMethods);
+        return 1 === preg_match('/methods:\s*([A-Z|]+)/', $alternative, $matches) ? explode('|', $matches[1]) : null;
     }
 
     /**
-     * Picks a PCRE delimiter guaranteed absent from the pattern, so the pattern
-     * can never prematurely close or corrupt the delimited expression — unlike
-     * a fixed delimiter (`#`, `{}`, …), which a sufficiently adversarial pattern
-     * can always collide with.
+     * @param list<string>|null $alternativeMethods
+     * @param list<string>      $routeMethods       upper-case; empty for every method
      */
-    private static function delimiterAvoiding(string $pattern): ?string
+    private static function alternativeCoversMethods(?array $alternativeMethods, array $routeMethods): bool
     {
-        foreach (str_split(self::DELIMITER_CANDIDATES) as $candidate) {
-            if (!str_contains($pattern, $candidate)) {
-                return $candidate;
-            }
+        if (null === $alternativeMethods) {
+            return true;
         }
 
-        return null;
+        return [] !== $routeMethods && [] === array_diff($routeMethods, $alternativeMethods);
     }
 }

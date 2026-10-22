@@ -129,6 +129,31 @@ final class AccessControlRuleMatcherTest extends TestCase
         yield 'pattern needing one backtracking step past ten thousand' => [str_repeat('/a', 9_998).'/', ['GET'], null, ['(*NO_JIT)^(?:/a)*$' => ['ROLE_X']], false];
     }
 
+    public function test_each_route_walked_through_the_rules_at_once_gets_the_roles_of_the_rule_that_governs_it_alone(): void
+    {
+        $routeAccessControls = [
+            3 => new RouteAccessControl('src/Controller/X.php', 'users', '/admin/users', ['GET'], true, [], false, false, 'admin_users'),
+            5 => new RouteAccessControl('src/Controller/X.php', 'open', '/open', ['get'], true, [], false, false, 'open'),
+            7 => new RouteAccessControl('src/Controller/X.php', 'export', '/export', ['GET', 'POST'], true, [], false, false, 'export'),
+            9 => new RouteAccessControl('src/Controller/X.php', 'named', null, ['GET'], true, [], false, false, 'admin_index'),
+            11 => new RouteAccessControl('src/Controller/X.php', 'slow', self::CATASTROPHIC_ROUTE, ['GET'], true, [], false, false, 'slow'),
+            13 => new RouteAccessControl('src/Controller/X.php', 'login', '/login', ['GET'], true, [], false, false, 'login'),
+        ];
+        $accessControlRules = [
+            new AccessControlRule(self::CATASTROPHIC_PATTERN, [], false),
+            new AccessControlRule('^/login', ['POST'], false),
+            new AccessControlRule('^/admin', [], true),
+            new AccessControlRule('^/export', ['GET'], true),
+            new AccessControlRule('^/(open|admin|export)', ['GET'], false),
+        ];
+        $routeAccessMap = ['^/admin' => ['ROLE_ADMIN'], 'route: admin_index' => ['ROLE_NAME'], '^/login' => ['ROLE_LOGIN', 'methods: POST'], '^/' => ['ROLE_ANY']];
+
+        self::assertSame(
+            [3 => ['ROLE_ADMIN'], 5 => null, 7 => null, 9 => ['ROLE_NAME'], 11 => false, 13 => ['ROLE_ANY']],
+            AccessControlRuleMatcher::rolesForEach($routeAccessControls, $routeAccessMap, $accessControlRules),
+        );
+    }
+
     public function test_the_backtrack_limit_in_place_before_matching_is_back_afterwards(): void
     {
         $previousLimit = \ini_get('pcre.backtrack_limit');

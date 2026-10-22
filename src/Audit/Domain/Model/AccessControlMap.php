@@ -157,15 +157,29 @@ final readonly class AccessControlMap
         ));
     }
 
-    private function applicationAccessControlFor(string $controllerFilePath): ?ApplicationAccessControl
+    /**
+     * The folder of the nearest application holding a controller file whose
+     * configuration was read, whose rules govern its routes; none when the
+     * project's rules govern them.
+     *
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function applicationFolderFor(string $controllerFilePath): ?string
     {
         foreach ($this->applicationFoldersNearestFirst() as $applicationFolder) {
             if (str_starts_with($controllerFilePath, $applicationFolder)) {
-                return $this->applicationAccessControls[$applicationFolder];
+                return $applicationFolder;
             }
         }
 
         return null;
+    }
+
+    private function applicationAccessControlFor(string $controllerFilePath): ?ApplicationAccessControl
+    {
+        $applicationFolder = $this->applicationFolderFor($controllerFilePath);
+
+        return null === $applicationFolder ? null : $this->applicationAccessControls[$applicationFolder];
     }
 
     /**

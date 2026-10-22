@@ -332,6 +332,22 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame(['^/' => ['ROLE_PROJECT']], $symfonyMapping->routeAccessMapFor('apps-other/X.php'));
     }
 
+    public function test_it_names_the_folder_of_the_nearest_application_holding_a_controller_and_none_for_one_the_project_governs(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(
+            applicationAccessControls: [
+                'apps/' => new ApplicationAccessControl([], []),
+                'apps/api/' => new ApplicationAccessControl([], []),
+                'apps/api/v2/' => new ApplicationAccessControl([], []),
+            ],
+        ));
+
+        self::assertSame(
+            ['apps/api/', 'apps/api/v2/', 'apps/', null, null],
+            array_map($symfonyMapping->applicationFolderFor(...), ['apps/api/src/X.php', 'apps/api/v2/src/X.php', 'apps/web/src/X.php', 'src/X.php', 'apps-other/X.php']),
+        );
+    }
+
     /**
      * @deprecated covers the four Symfony-named accessors deprecated in 1.19 until they are removed in 2.0 — each must keep returning what its neutral counterpart does.
      */

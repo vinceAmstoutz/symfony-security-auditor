@@ -113,43 +113,51 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
      */
     private function accessControlOf(array $section, array $routeAccessMap): array
     {
-        $entries = $section['access_control'] ?? null;
-        if (!\is_array($entries)) {
-            return $routeAccessMap;
-        }
+        foreach ($this->recordedEntriesOf($section) as [$target, $requirements]) {
+            if (\array_key_exists($target, $routeAccessMap)) {
+                $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $requirements));
 
-        foreach ($entries as $entry) {
-            $routeAccessMap = $this->recordAccessControlEntry($this->mapOf($entry), $routeAccessMap);
+                continue;
+            }
+
+            $routeAccessMap[$target] = $requirements;
         }
 
         return $routeAccessMap;
     }
 
     /**
-     * @param array<string, mixed>        $entry
-     * @param array<string, list<string>> $routeAccessMap
+     * @param array<string, mixed> $section
      *
-     * @return array<string, list<string>>
+     * @return list<array{string, list<string>}> the target and requirements of each entry that has both, in the order declared
      */
-    private function recordAccessControlEntry(array $entry, array $routeAccessMap): array
+    private function recordedEntriesOf(array $section): array
+    {
+        $entries = $section['access_control'] ?? null;
+
+        $recordedEntries = [];
+        foreach (\is_array($entries) ? $entries : [] as $entry) {
+            $recordedEntries[] = $this->recordAccessControlEntry($this->mapOf($entry));
+        }
+
+        return array_merge(...$recordedEntries);
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     *
+     * @return list<array{string, list<string>}> the entry's target and requirements, or none for an entry without a target or a requirement
+     */
+    private function recordAccessControlEntry(array $entry): array
     {
         $target = $this->targetOf($entry);
         if (null === $target || !$this->accessControlRequirementReader->hasAnyRequirementKey($entry)) {
-            return $routeAccessMap;
+            return [];
         }
 
         $requirements = $this->accessControlRequirementReader->requirementsOf($entry);
 
-        if (\array_key_exists($target, $routeAccessMap)) {
-            $orRequirements = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
-            $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $orRequirements));
-
-            return $routeAccessMap;
-        }
-
-        $routeAccessMap[$target] = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
-
-        return $routeAccessMap;
+        return [[$target, [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements]];
     }
 
     /**
@@ -163,10 +171,10 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
 
         $accessControlRules = [];
         foreach (\is_array($entries) ? $entries : [] as $entry) {
-            $accessControlRules = [...$accessControlRules, ...$this->accessControlRuleOf($this->mapOf($entry))];
+            $accessControlRules[] = $this->accessControlRuleOf($this->mapOf($entry));
         }
 
-        return $accessControlRules;
+        return array_merge(...$accessControlRules);
     }
 
     /**
