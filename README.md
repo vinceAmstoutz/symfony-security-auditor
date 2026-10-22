@@ -240,6 +240,8 @@ claude mcp add --transport stdio symfony-security-auditor -- symfony-security-au
 
 The second snippet is the shape Claude Desktop, Cursor, Windsurf and Gemini CLI read; with the bundle, use `"command": "php"` and `"args": ["/absolute/path/to/bin/console", "mcp:serve"]`.
 
+With the binary, the server reads its configuration once, when it starts — your user config and the `.symfony-security-auditor.yaml` of the folder it starts in — and applies it to every project it audits, never the audited project's own file: start it from the project it will audit (see [Per-project overrides](docs/configuration.md#per-project-overrides)).
+
 > [!NOTE]
 >
 > The audit still runs on **your configured provider and model**, not on the assistant's, so it needs the same API key as a CLI run — with the binary, store it once with `auth:set` so a desktop client finds it. Point the auditor at a local Ollama and it needs no key at all. Setup for every client, including VS Code and Codex CLI: [`mcp:serve`](docs/configuration.md#mcpserve--model-context-protocol-server).

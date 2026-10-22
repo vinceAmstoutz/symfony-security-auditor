@@ -527,7 +527,7 @@ ai:
             api_key: '%env(ANTHROPIC_API_KEY)%'
 ```
 
-The `loadExtension()` method (receiving `$config`, `ContainerConfigurator`, `ContainerBuilder`) imports `config/services.php`, then registers two `SymfonyAiLLMClient` service definitions (`security_auditor.attacker_client` and `security_auditor.reviewer_client`). Each receives `PlatformInterface`, the resolved model name (`attacker_model` or `reviewer_model`, falling back to `model`) and the default temperature, so `AttackerAgent` and `ReviewerAgent` each receive the correct client. Sets `LLMClientInterface::class` as a private alias to the attacker client.
+The `loadExtension()` method (receiving `$config`, `ContainerConfigurator`, `ContainerBuilder`) imports `config/services.php`, then registers two `SymfonyAiLLMClient` service definitions (`security_auditor.attacker_client` and `security_auditor.reviewer_client`), and a third, `security_auditor.cheap_attacker_client`, when `audit.escalation.enabled` is on. Each receives `PlatformInterface`, the resolved model name (`attacker_model` or `reviewer_model`, falling back to `model`; `audit.escalation.cheap_model`, falling back to the reviewer model, for the third) and the default temperature, so `AttackerAgent` and `ReviewerAgent` each receive the correct client, and the escalation's cheap first pass its own. Sets `LLMClientInterface::class` as a private alias to the attacker client.
 
 `AttackerCacheInterface` is aliased to `FilesystemAttackerCache` when `cache.enabled: true`, otherwise to `NullAttackerCache`. `AdvisoryDatabaseInterface` is aliased to `ComposerAuditAdvisoryDatabase` (the default backed by `composer audit --format=json --locked`).
 

@@ -512,7 +512,7 @@ The standalone binary reads its configuration as an ordered stack of layers, eac
 4. The user-level `config.yaml`
 5. Built-in defaults
 
-So user < working directory < audited project < command line: `symfony-security-auditor audit backend`, run from a monorepo root whose `.symfony-security-auditor.yaml` pins `fail_on` and the scan scope, applies the root's file and then `backend/.symfony-security-auditor.yaml` over it, key by key. When the project is the folder you run from (no `project-path`, or one naming it), its file is read once, as the working directory's. The working directory's file is read exactly as in 1.21.0, which read no other. _Since 1.22_ the audited project's file is read as well, on top of it. `mcp:serve` reads the working directory's file only, since one server audits whichever project each tool call names.
+So user < working directory < audited project < command line: `symfony-security-auditor audit backend`, run from a monorepo root whose `.symfony-security-auditor.yaml` pins `fail_on` and the scan scope, applies the root's file and then `backend/.symfony-security-auditor.yaml` over it, key by key. When the project is the folder you run from (no `project-path`, or one naming it), its file is read once, as the working directory's. The working directory's file is read exactly as in 1.21.0, which read no other. _Since 1.22_ the audited project's file is read as well, on top of it. `mcp:serve` reads the working directory's file only, since one server audits whichever project each tool call names: it reads that file once, when it starts, and applies it to every project its `audit` tool is asked about. Start it from the project it will audit.
 
 The audit header names every file read, lowest priority first — `Project config <path> is layered over your user config: …` for the working directory's, `Audited project config <path> is layered over the configuration read before it: …` for the audited project's — so a setting that comes from the checkout rather than from your own file is never silent.
 
@@ -944,6 +944,8 @@ It is available both ways the auditor ships, the standalone binary _since 1.21_:
 symfony-security-auditor mcp:serve   # standalone binary, reads your user-level config.yaml
 bin/console mcp:serve                # Symfony bundle, reads the application's configuration
 ```
+
+The standalone server builds its configuration once, when it starts, from your user config and the `.symfony-security-auditor.yaml` of the folder it was started in, and applies it to every project the `audit` tool is asked about: unlike `audit <project-path>`, it does not layer the audited project's own `.symfony-security-auditor.yaml` over it (see [Per-project overrides](#per-project-overrides)). Start the server from the project it will audit, so that project's file applies.
 
 Exposed tools:
 
