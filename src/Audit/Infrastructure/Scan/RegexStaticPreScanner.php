@@ -469,7 +469,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 }
             }
 
-            $markers = [...$markers, ...$this->unmappedAccessControlMarkers($file)];
+            array_push($markers, ...$this->unmappedAccessControlMarkers($file));
         }
 
         return $markers;

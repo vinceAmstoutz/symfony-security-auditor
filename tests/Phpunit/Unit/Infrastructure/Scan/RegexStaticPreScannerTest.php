@@ -2043,6 +2043,32 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_lists_each_file_s_markers_after_those_of_the_files_before_it(): void
+    {
+        $unreadable = '<?php $a = '.str_repeat('[', 5001).str_repeat(']', 5001).";\nunserialize(\$x);";
+
+        $markers = $this->regexStaticPreScanner->scan([
+            ProjectFile::create('src/Controller/AController.php', '/app/src/Controller/AController.php', $unreadable),
+            ProjectFile::create('src/Service/B.php', '/app/src/Service/B.php', "<?php\n\nunserialize(\$x);"),
+            ProjectFile::create('src/Controller/CController.php', '/app/src/Controller/CController.php', $unreadable),
+        ]);
+
+        self::assertSame(
+            [
+                ['src/Controller/AController.php', 2, 'unserialize_call'],
+                ['src/Controller/AController.php', 1, 'unmapped_access_control'],
+                ['src/Service/B.php', 3, 'unserialize_call'],
+                ['src/Controller/CController.php', 2, 'unserialize_call'],
+                ['src/Controller/CController.php', 1, 'unmapped_access_control'],
+            ],
+            array_map(static fn (RiskMarker $riskMarker): array => [$riskMarker->filePath(), $riskMarker->line(), $riskMarker->pattern()], $markers),
+        );
+    }
+
+    /**
      * @return list<RiskMarker>
      *
      * @throws InvalidProjectFileException

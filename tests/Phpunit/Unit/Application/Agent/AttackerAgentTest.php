@@ -2186,6 +2186,35 @@ final class AttackerAgentTest extends TestCase
     }
 
     /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_lean_mode_records_as_skipped_only_the_files_the_pre_scan_left_unflagged(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+        $file = static fn (string $name, string $content): ProjectFile => ProjectFile::create(\sprintf('src/Service/%s.php', $name), \sprintf('/app/src/Service/%s.php', $name), $content);
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->callAnalyze(
+            $this->makeAttackerAgent($llmClient, ['staticPreScanner' => new RegexStaticPreScanner(), 'leanMode' => true]),
+            [$file('CleanA', '<?php'), $file('RiskyA', "<?php\nunserialize(\$x);"), $file('CleanB', '<?php'), $file('RiskyB', "<?php\nunserialize(\$x);")],
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            $recordingCoverageRecorder,
+        );
+
+        self::assertSame(
+            ['src/Service/CleanA.php', 'src/Service/CleanB.php'],
+            array_column(array_filter($recordingCoverageRecorder->coverage, static fn (array $entry): bool => 'skipped' === $entry['status']), 'filePath'),
+        );
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
      */
