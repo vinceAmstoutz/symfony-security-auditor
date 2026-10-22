@@ -163,7 +163,7 @@ services:
         public: true
 ```
 
-With `audit.escalation.enabled`, the cheap first pass runs on a third client, `security_auditor.cheap_attacker_client`, which the bundle builds on the symfony/ai platform with `audit.escalation.cheap_model` whatever the other two are: replace it as well, or the cheap pass still sends the code to that platform, and stops the run when there is none. _Since 1.22_ its usage is booked like theirs. Its answers are cached apart from the main pass's, under `security_auditor.cheap_attacker_cache` rather than `AttackerCacheInterface`, so a cheap answer is never served to the expensive model: to keep them in your own store, point that id at an `AttackerCacheInterface` service of its own.
+With `audit.escalation.enabled`, the cheap first pass runs on a third client, `security_auditor.cheap_attacker_client`, which the bundle builds on the symfony/ai platform with `audit.escalation.cheap_model` whatever the other two are: replace it as well, or the cheap pass still sends the code to that platform, and stops the run when there is none. _Since 1.22_ its usage is booked like theirs, and `audit:run` notes before the run starts that the cheap pass stays on that platform when either of them is replaced and this one is not. Its answers are cached apart from the main pass's, under `security_auditor.cheap_attacker_cache` rather than `AttackerCacheInterface`, so a cheap answer is never served to the expensive model: to keep them in your own store, point that id at an `AttackerCacheInterface` service of its own.
 
 ```yaml
 # config/services.yaml

@@ -65,6 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CheapAttackerClientNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
@@ -108,6 +109,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     {
         $container->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
         $container->addCompilerPass(new UnselectedPlatformsPass(PlatformInterface::class));
+        $container->addCompilerPass(new CheapAttackerClientNoticePass());
     }
 
     #[Override]

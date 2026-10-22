@@ -1347,6 +1347,18 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_audit_run_notes_the_escalation_cheap_client_still_on_the_platform_when_only_the_other_two_are_replaced(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']]], registerHostServices: $this->replaceBothClientsWithAUsageReportingOne(...));
+
+        self::assertSame(
+            ['audit.escalation is enabled and an application client replaces security_auditor.attacker_client and security_auditor.reviewer_client but not security_auditor.cheap_attacker_client: the cheap first pass still runs on the bundled client, which sends the code to the symfony/ai platform with audit.escalation.cheap_model. Replace security_auditor.cheap_attacker_client as well (see docs/extending.md), or set audit.escalation.enabled: false.'],
+            $kernel->getContainer()->getParameter('symfony_security_auditor.config_notices'),
+        );
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_custom_llm_client_is_stopped_once_it_spends_the_token_budget(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 100]]], registerHostServices: $this->replaceBothClientsWithAUsageReportingOne(...));
