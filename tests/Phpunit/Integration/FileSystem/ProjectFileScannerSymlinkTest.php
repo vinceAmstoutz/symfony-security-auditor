@@ -69,6 +69,30 @@ final class ProjectFileScannerSymlinkTest extends TestCase
         self::assertSame([['Skipped symlinked directory', ['path' => $this->project.'/src/Controller/Admin']]], $warningCollectingLogger->warnings);
     }
 
+    /**
+     * @param list<string> $includedPaths
+     */
+    #[DataProvider('directoriesListedInsideAnother')]
+    public function test_a_directory_listed_inside_another_listed_one_is_walked_once(array $includedPaths): void
+    {
+        $this->link('lib/AdminController.php', 'src/Controller/Admin/AdminController.php');
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        (new ProjectFileScanner($warningCollectingLogger, $includedPaths))->scanReportingSkippedFiles($this->project);
+
+        self::assertSame([['Skipped symlinked file', ['path' => $this->project.'/src/Controller/Admin/AdminController.php']]], $warningCollectingLogger->warnings);
+    }
+
+    /**
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function directoriesListedInsideAnother(): iterable
+    {
+        yield 'its parent listed before it' => [['src/Controller', 'src/Controller/Admin']];
+        yield 'its parent listed after it' => [['src/Controller/Admin', 'src/Controller']];
+        yield 'a farther ancestor listed' => [['src', 'src/Controller/Admin']];
+    }
+
     public function test_a_symlinked_directory_is_reported_under_its_repaired_name(): void
     {
         $this->link('lib/Admin', "src/Controller/Adm\xFFin");
