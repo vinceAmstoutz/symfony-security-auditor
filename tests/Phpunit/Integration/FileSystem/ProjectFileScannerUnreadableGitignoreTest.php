@@ -13,23 +13,17 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
-use Closure;
 use Override;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
 
 final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
 {
-    private const int UNPRIVILEGED_USER_ID = 65534;
-
     private Filesystem $filesystem;
 
     private string $project;
@@ -62,65 +56,7 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
 
         $this->scannedPaths($warningCollectingLogger);
 
-        self::assertSame([['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
-    }
-
-    public function test_a_gitignore_the_scan_cannot_read_holds_no_rule_and_a_warning_names_it(): void
-    {
-        $this->put('src/Controller/Sub/.gitignore', "Generated.php\n");
-        $this->put('src/Controller/Sub/Generated.php');
-        $this->scannedPaths();
-        $this->filesystem->chmod($this->project.'/src/Controller/Sub/.gitignore', 0o000);
-        $warningCollectingLogger = new WarningCollectingLogger();
-
-        $paths = $this->asUnprivilegedUser(fn (): array => $this->scannedPaths($warningCollectingLogger));
-
-        self::assertSame(
-            [
-                ['src/Controller/HomeController.php', 'src/Controller/Sub/Generated.php'],
-                [
-                    ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']],
-                    ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/Sub/.gitignore']],
-                ],
-            ],
-            [$paths, $warningCollectingLogger->warnings],
-        );
-    }
-
-    public function test_a_gitignore_that_is_a_device_is_never_read_and_a_warning_names_it(): void
-    {
-        $this->filesystem->mkdir($this->project.'/src/Controller/Sub');
-        $this->filesystem->symlink('/dev/null', $this->project.'/src/Controller/Sub/.gitignore');
-        $this->put('src/Controller/Sub/Kept.php');
-        $warningCollectingLogger = new WarningCollectingLogger();
-
-        $this->scannedPaths($warningCollectingLogger);
-
-        self::assertSame(
-            [
-                ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']],
-                ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/Sub/.gitignore']],
-            ],
-            $warningCollectingLogger->warnings,
-        );
-    }
-
-    public function test_a_gitignore_that_holds_no_rule_is_named_once_when_a_symlinked_directory_points_beside_it(): void
-    {
-        $this->filesystem->mkdir([$this->project.'/src/Controller/Admin', $this->project.'/src/Legacy']);
-        $this->filesystem->symlink($this->project.'/src/Controller/Admin', $this->project.'/src/Legacy/Admin');
-
-        $warningCollectingLogger = new WarningCollectingLogger();
-
-        $this->scannedPaths($warningCollectingLogger);
-
-        self::assertSame(
-            [
-                ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']],
-                ['Skipped symlinked directory', ['path' => $this->project.'/src/Legacy/Admin']],
-            ],
-            $warningCollectingLogger->warnings,
-        );
+        self::assertSame([['Read no rule from a .gitignore that is not a file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
     }
 
     public function test_the_rules_of_the_other_gitignore_files_still_apply(): void
@@ -157,53 +93,6 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
         $this->put('src/Controller/Generated/Kept.php');
 
         self::assertSame(['src/Controller/HomeController.php'], $this->scannedPaths());
-    }
-
-    public function test_a_file_two_directories_below_an_ignored_directory_is_left_out_with_it(): void
-    {
-        $this->put('src/.gitignore', "Generated/\n");
-        $this->put('src/Controller/Generated/Sub/Deep/A.php');
-
-        self::assertSame(['src/Controller/HomeController.php'], $this->scannedPaths());
-    }
-
-    public function test_a_scanned_folder_a_rule_of_the_repository_ignores_gives_no_file(): void
-    {
-        $this->filesystem->mkdir([$this->project.'/.git', $this->project.'/src/.gitignore']);
-        $this->put('.gitignore', "src/Controller/\n");
-
-        self::assertSame([], $this->relativePaths((new ProjectFileScanner(new NullLogger(), ['src/Controller'], respectGitignore: true))->scan($this->project)));
-    }
-
-    public function test_a_symlinked_file_whose_target_lies_in_an_ignored_directory_is_left_out_unreported(): void
-    {
-        $this->filesystem->mkdir($this->project.'/.git');
-        $this->put('.gitignore', "var/\n");
-        $this->put('var/Cache.php');
-        $this->filesystem->symlink($this->project.'/var/Cache.php', $this->project.'/src/Controller/Cache.php');
-
-        self::assertSame([['src/Controller/HomeController.php'], []], $this->outcome());
-    }
-
-    public function test_a_gitignore_below_a_directory_the_rules_already_ignore_is_never_read(): void
-    {
-        $this->filesystem->mkdir([$this->project.'/.git', $this->project.'/var/sub/.gitignore']);
-        $this->put('.gitignore', "var/\n");
-        $this->put('var/sub/deep/Cache.php');
-        $this->filesystem->symlink($this->project.'/var/sub/deep/Cache.php', $this->project.'/src/Controller/Cache.php');
-        $warningCollectingLogger = new WarningCollectingLogger();
-
-        $this->scannedPaths($warningCollectingLogger);
-
-        self::assertSame([['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
-    }
-
-    public function test_a_symlinked_file_inside_an_ignored_directory_whose_target_is_not_ignored_is_reported_as_a_symbolic_link(): void
-    {
-        $this->put('src/.gitignore', "Generated/\n");
-        $this->filesystem->symlink($this->project.'/src/Controller/HomeController.php', $this->project.'/src/Controller/Generated/Link.php');
-
-        self::assertSame([['src/Controller/HomeController.php'], [['src/Controller/Generated/Link.php', SkippedFileReason::Symlink]]], $this->outcome());
     }
 
     public function test_a_directory_only_rule_ignores_a_directory_and_not_a_file_of_that_name(): void
@@ -273,55 +162,6 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
         self::assertSame(['src/Controller/HomeController.php', 'src/Controller/Rooted.php'], $this->scannedPathsOfAnAppWhoseParentIgnores('app/src/Controller/Rooted.php'));
     }
 
-    /**
-     * @param list<string> $includedPaths
-     */
-    #[DataProvider('includedPathOrders')]
-    public function test_a_scanned_folder_that_is_a_git_repository_of_its_own_leaves_out_the_rules_around_it_whatever_the_order_of_the_included_paths(array $includedPaths): void
-    {
-        $this->filesystem->mkdir([$this->project.'/.git', $this->project.'/lib/.git', $this->project.'/config/.gitignore']);
-        $this->put('.gitignore', "lib/Generated.php\n");
-        $this->put('lib/Generated.php');
-        $this->put('config/services.yaml', 'services: {}');
-
-        self::assertSame(['config/services.yaml', 'lib/Generated.php'], $this->relativePaths((new ProjectFileScanner(new NullLogger(), $includedPaths, respectGitignore: true))->scan($this->project)));
-    }
-
-    /**
-     * @return iterable<string, array{list<string>}>
-     */
-    public static function includedPathOrders(): iterable
-    {
-        yield 'the repository first' => [['lib', 'config']];
-        yield 'the repository last' => [['config', 'lib']];
-    }
-
-    public function test_outside_any_git_repository_a_scanned_folder_reads_only_the_gitignore_files_inside_it(): void
-    {
-        $this->put('.gitignore', "src/Controller/Generated.php\n");
-        $this->put('src/Controller/Generated.php');
-
-        self::assertSame(['src/Controller/Generated.php', 'src/Controller/HomeController.php'], $this->scannedPaths());
-    }
-
-    public function test_outside_any_git_repository_an_included_file_reads_only_the_gitignore_files_of_its_folder(): void
-    {
-        $this->filesystem->mkdir($this->project.'/public/.gitignore');
-        $this->put('.gitignore', "public/index.php\n");
-        $this->put('public/index.php');
-
-        self::assertSame(['public/index.php'], $this->relativePaths((new ProjectFileScanner(new NullLogger(), ['public/index.php'], respectGitignore: true))->scan($this->project)));
-    }
-
-    public function test_outside_any_git_repository_a_symlinked_directory_onto_one_a_gitignore_above_the_scanned_folder_names_is_reported(): void
-    {
-        $this->put('.gitignore', "src/Controller/Admin/\n");
-        $this->filesystem->mkdir($this->project.'/src/Controller/Admin');
-        $this->filesystem->symlink($this->project.'/src/Controller/Admin', $this->project.'/src/Legacy/Admin');
-
-        self::assertSame([['src/Controller/HomeController.php'], [['src/Legacy/Admin', SkippedFileReason::Symlink]]], $this->outcome());
-    }
-
     public function test_a_project_reached_through_a_symlink_has_its_rules_applied(): void
     {
         $this->put('src/.gitignore', "Generated.php\n");
@@ -363,44 +203,11 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
     }
 
     /**
-     * @param Closure(): list<string> $action
-     *
-     * @return list<string>
-     */
-    private function asUnprivilegedUser(Closure $action): array
-    {
-        if (0 !== posix_geteuid()) {
-            return $action();
-        }
-
-        self::assertTrue(posix_seteuid(self::UNPRIVILEGED_USER_ID));
-
-        try {
-            return $action();
-        } finally {
-            posix_seteuid(0);
-        }
-    }
-
-    /**
      * @return list<string>
      */
     private function scannedPaths(LoggerInterface $logger = new NullLogger()): array
     {
         return $this->relativePaths((new ProjectFileScanner($logger, ['src'], respectGitignore: true))->scan($this->project));
-    }
-
-    /**
-     * @return array{list<string>, list<array{string, SkippedFileReason}>}
-     */
-    private function outcome(): array
-    {
-        $projectFileScan = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true))->scanReportingSkippedFiles($this->project);
-
-        return [
-            $this->relativePaths($projectFileScan->files),
-            array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles),
-        ];
     }
 
     /**

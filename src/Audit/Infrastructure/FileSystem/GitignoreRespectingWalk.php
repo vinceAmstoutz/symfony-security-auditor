@@ -20,14 +20,12 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
- * Walks one directory with a Finder, with the `.gitignore` files applied as
- * Finder's own `ignoreVCSIgnored()` applies them from that directory when the
- * scan respects them. Finder stops the walk on a `.gitignore` that is not a
- * file, such as a directory a repository commits under that name, or that it
- * cannot read, so the walk of that directory is made again with
- * {@see ReadableGitignores}, which reads the same rules from the same
- * directory and finds none in it: a file the stopped walk already gave comes
- * again, and the scan reads it once and keeps it once.
+ * Walks a Finder with the project's `.gitignore` files applied when the scan
+ * respects them. Finder's own `ignoreVCSIgnored()` stops the whole walk on a
+ * `.gitignore` that is not a file, such as a directory a repository commits
+ * under that name, so the walk is made again with {@see ReadableGitignores},
+ * which reads the same rules and finds none in it. A file the stopped walk
+ * already gave comes again; the scan reads it once and keeps it once.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -39,18 +37,18 @@ final readonly class GitignoreRespectingWalk
     ) {}
 
     /**
-     * @param string $directory the one directory the finder walks
-     *
      * @return Generator<SplFileInfo>
      */
-    public function files(Finder $finder, string $directory): Generator
+    public function files(Finder $finder, string $projectPath): Generator
     {
         $readableGitignoreWalk = clone $finder;
 
         try {
             yield from $finder->ignoreVCSIgnored($this->respectGitignore);
         } catch (RuntimeException) {
-            yield from ReadableGitignores::of($directory, $this->logger)->applyTo($readableGitignoreWalk);
+            $readableGitignores = ReadableGitignores::of($projectPath, $this->logger);
+
+            yield from $readableGitignoreWalk->filter(static fn (SplFileInfo $splFile): bool => !$readableGitignores->ignore($splFile));
         }
     }
 }
