@@ -40,7 +40,9 @@ final readonly class MarkdownTextEscaper
      * profile mention, notifying that account when a report is posted as a
      * pull-request comment, and a `user@host` address, `mailto:` and `xmpp:`
      * ones included, into a live link, both from the text an entity decodes
-     * to, so an encoded `@` would defuse neither. A backslash already present
+     * to, so an encoded `@` would defuse neither: `&` is encoded before the
+     * others, so no character reference the text writes, `&commat;` among
+     * them, decodes to the character it names. A backslash already present
      * is escaped first, so it can't combine with an escape added below into a
      * sequence CommonMark still parses as live.
      */
@@ -49,8 +51,8 @@ final readonly class MarkdownTextEscaper
         $backslashesEscaped = str_replace('\\', '\\\\', $text);
 
         return str_replace(
-            ['`', '~', '#', '<', '>', '[', ']', '@'],
-            ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]', self::INERT_AT_SIGN],
+            ['&', '`', '~', '#', '<', '>', '[', ']', '@'],
+            ['&amp;', '\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]', self::INERT_AT_SIGN],
             $backslashesEscaped,
         );
     }

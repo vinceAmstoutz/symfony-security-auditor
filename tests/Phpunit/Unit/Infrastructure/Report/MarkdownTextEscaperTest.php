@@ -56,6 +56,25 @@ final class MarkdownTextEscaperTest extends TestCase
         yield 'an xmpp address' => ['xmpp:bot@evil.example/home', "xmpp:bot@\u{2060}evil.example/home"];
         yield 'a mention' => ['cc @octocat', "cc @\u{2060}octocat"];
         yield 'every at sign of a text' => ['a@b.example cc @octocat', "a@\u{2060}b.example cc @\u{2060}octocat"];
+        yield 'a mention written with a named reference' => ['cc &commat;octocat', 'cc &amp;commat;octocat'];
+        yield 'an email address written with a named reference' => ['ops&commat;evil.example', 'ops&amp;commat;evil.example'];
+        yield 'a mention written with a numeric reference' => ['cc &#64;octocat', 'cc &amp;\\#64;octocat'];
+    }
+
+    #[DataProvider('ampersands')]
+    public function test_it_shows_an_ampersand_as_written_and_encodes_angle_brackets_once(string $text, string $expected): void
+    {
+        self::assertSame($expected, MarkdownTextEscaper::fences($text));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function ampersands(): iterable
+    {
+        yield 'an ampersand' => ['a && b', 'a &amp;&amp; b'];
+        yield 'a character reference' => ['&lt;b&gt;', '&amp;lt;b&amp;gt;'];
+        yield 'angle brackets' => ['<b>', '&lt;b&gt;'];
     }
 
     #[DataProvider('plainText')]
