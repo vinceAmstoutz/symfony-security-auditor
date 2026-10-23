@@ -6,6 +6,8 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
+## [1.22.0] — 2026-10-23 — Steadfast
+
 ### New Features ✨
 
 - Every push to `1.x` publishes a `snapshot` pre-release, versioned like `1.21.0+14.g4531440`, so a fix can be tried before it ships: `self-update --snapshot`, or the installers with `SSA_VERSION=snapshot`; a plain `self-update` takes a snapshot back to the latest release ([#631](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/631))
@@ -920,6 +922,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The secret scrubber no longer relies on a temporary error handler around its regular expressions ([#9](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/9))
 - The bundle is meant to be registered in the `dev` and `test` environments only ([#9](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/9))
 
+[1.22.0]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.22.0
 [1.21.0]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.21.0
 [1.20.1]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.1
 [1.20.0]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.0
