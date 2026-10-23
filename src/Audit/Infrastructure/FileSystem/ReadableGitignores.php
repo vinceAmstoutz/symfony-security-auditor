@@ -23,10 +23,10 @@ use Symfony\Component\String\AbstractString;
 use function Symfony\Component\String\b;
 
 /**
- * The `.gitignore` rules of a project, read the way Finder's
+ * The `.gitignore` rules of a walked directory, read the way Finder's
  * `ignoreVCSIgnored()` reads them: the `.gitignore` files from the root of the
- * git repository holding the project, or of the project itself, down to the
- * file; the last matching rule of the deepest one decides, and a file inside
+ * git repository holding the directory, or of the directory itself, down to
+ * the file; the last matching rule of the deepest one decides, and a file inside
  * an ignored directory is ignored with it. A `.gitignore` that is not a file,
  * such as a directory a repository commits under that name, holds no rule.
  * Each path is decided once, from the verdict the walk carries down from the
@@ -54,16 +54,16 @@ final class ReadableGitignores
         private readonly LoggerInterface $logger,
     ) {}
 
-    public static function of(string $projectPath, LoggerInterface $logger): self
+    public static function of(string $walkedDirectory, LoggerInterface $logger): self
     {
-        $realProjectPath = self::normalized((new Filesystem())->readlink($projectPath, true) ?? $projectPath);
-        foreach ([$realProjectPath, ...self::ancestorsOf($realProjectPath)] as $directory) {
+        $realWalkedDirectory = self::normalized((new Filesystem())->readlink($walkedDirectory, true) ?? $walkedDirectory);
+        foreach ([$realWalkedDirectory, ...self::ancestorsOf($realWalkedDirectory)] as $directory) {
             if (file_exists(\sprintf('%s/.git', $directory))) {
                 return new self($directory, $logger);
             }
         }
 
-        return new self($realProjectPath, $logger);
+        return new self($realWalkedDirectory, $logger);
     }
 
     /**

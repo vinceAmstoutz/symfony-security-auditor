@@ -265,18 +265,17 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      */
     private function scanDirectories(array $directories, string $projectPath, Closure $contentOf, array $trackedIgnored): Generator
     {
-        if ([] === $directories) {
-            return;
+        foreach ($directories as $directory) {
+            $finder = (new Finder())
+                ->files()
+                ->ignoreDotFiles(!$this->includeDotfiles)
+                ->in($directory)
+                ->name($this->finderNamePatterns())
+                ->filter($this->entersReadableDirectory(...), true);
+
+            yield from $this->collectFilesFrom($finder, $directory, $projectPath, $contentOf, $trackedIgnored);
         }
 
-        $finder = (new Finder())
-            ->files()
-            ->ignoreDotFiles(!$this->includeDotfiles)
-            ->in($directories)
-            ->name($this->finderNamePatterns())
-            ->filter($this->entersReadableDirectory(...), true);
-
-        yield from $this->collectFilesFrom($finder, $projectPath, $contentOf, $trackedIgnored);
         yield from (new SymlinkedDirectories($this->logger))->in($directories, $projectPath, $this->includeDotfiles, $this->respectGitignore);
     }
 
@@ -317,20 +316,21 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
                 ->depth('== 0')
                 ->name(basename($explicitFile));
 
-            yield from $this->collectFilesFrom($explicitFinder, $projectPath, $contentOf, $trackedIgnored);
+            yield from $this->collectFilesFrom($explicitFinder, \dirname($explicitFile), $projectPath, $contentOf, $trackedIgnored);
         }
     }
 
     /**
+     * @param string                               $directory      the directory the finder walks
      * @param Closure(SplFileInfo, string): string $contentOf
      * @param list<string>                         $trackedIgnored files git tracks although a .gitignore pattern matches them: still part of the repository, so still audited
      *
      * @return Generator<ProjectFile|SkippedFile>
      */
-    private function collectFilesFrom(Finder $finder, string $projectPath, Closure $contentOf, array $trackedIgnored): Generator
+    private function collectFilesFrom(Finder $finder, string $directory, string $projectPath, Closure $contentOf, array $trackedIgnored): Generator
     {
         $trackedIgnoredFinder = clone $finder;
-        yield from $this->scanFinder((new GitignoreRespectingWalk($this->respectGitignore, $this->logger))->files($finder, $projectPath), $projectPath, $contentOf);
+        yield from $this->scanFinder((new GitignoreRespectingWalk($this->respectGitignore, $this->logger))->files($finder, $directory), $projectPath, $contentOf);
         yield from $this->scanTrackedIgnored($trackedIgnoredFinder, $trackedIgnored, $projectPath, $contentOf);
     }
 

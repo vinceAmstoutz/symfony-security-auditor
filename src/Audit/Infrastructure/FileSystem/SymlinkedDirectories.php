@@ -38,17 +38,19 @@ final readonly class SymlinkedDirectories
      */
     public function in(array $directories, string $projectPath, bool $includeDotfiles, bool $respectGitignore): array
     {
-        $finder = (new Finder())
-            ->directories()
-            ->ignoreDotFiles(!$includeDotfiles)
-            ->ignoreUnreadableDirs()
-            ->in($directories)
-            ->filter(static fn (SplFileInfo $splFileInfo): bool => $splFileInfo->isLink());
-
         $skippedFiles = [];
-        foreach ((new GitignoreRespectingWalk($respectGitignore, $this->logger))->files($finder, $projectPath) as $symlinkedDirectory) {
-            $this->logger->warning('Skipped symlinked directory', ['path' => $symlinkedDirectory->getPathname()]);
-            $skippedFiles[] = new SkippedFile(Utf8Normalizer::normalize(Path::makeRelative($symlinkedDirectory->getPathname(), $projectPath)), SkippedFileReason::Symlink);
+        foreach ($directories as $directory) {
+            $finder = (new Finder())
+                ->directories()
+                ->ignoreDotFiles(!$includeDotfiles)
+                ->ignoreUnreadableDirs()
+                ->in($directory)
+                ->filter(static fn (SplFileInfo $splFileInfo): bool => $splFileInfo->isLink());
+
+            foreach ((new GitignoreRespectingWalk($respectGitignore, $this->logger))->files($finder, $directory) as $symlinkedDirectory) {
+                $this->logger->warning('Skipped symlinked directory', ['path' => $symlinkedDirectory->getPathname()]);
+                $skippedFiles[] = new SkippedFile(Utf8Normalizer::normalize(Path::makeRelative($symlinkedDirectory->getPathname(), $projectPath)), SkippedFileReason::Symlink);
+            }
         }
 
         return $skippedFiles;

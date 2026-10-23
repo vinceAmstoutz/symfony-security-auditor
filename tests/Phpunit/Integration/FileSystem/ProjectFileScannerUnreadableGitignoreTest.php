@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -209,6 +210,55 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
     public function test_a_gitignore_above_a_project_outside_any_git_repository_does_not_apply(): void
     {
         self::assertSame(['src/Controller/HomeController.php', 'src/Controller/Rooted.php'], $this->scannedPathsOfAnAppWhoseParentIgnores('app/src/Controller/Rooted.php'));
+    }
+
+    /**
+     * @param list<string> $includedPaths
+     */
+    #[DataProvider('includedPathOrders')]
+    public function test_a_scanned_folder_that_is_a_git_repository_of_its_own_leaves_out_the_rules_around_it_whatever_the_order_of_the_included_paths(array $includedPaths): void
+    {
+        $this->filesystem->mkdir([$this->project.'/.git', $this->project.'/lib/.git', $this->project.'/config/.gitignore']);
+        $this->put('.gitignore', "lib/Generated.php\n");
+        $this->put('lib/Generated.php');
+        $this->put('config/services.yaml', 'services: {}');
+
+        self::assertSame(['config/services.yaml', 'lib/Generated.php'], $this->relativePaths((new ProjectFileScanner(new NullLogger(), $includedPaths, respectGitignore: true))->scan($this->project)));
+    }
+
+    /**
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function includedPathOrders(): iterable
+    {
+        yield 'the repository first' => [['lib', 'config']];
+        yield 'the repository last' => [['config', 'lib']];
+    }
+
+    public function test_outside_any_git_repository_a_scanned_folder_reads_only_the_gitignore_files_inside_it(): void
+    {
+        $this->put('.gitignore', "src/Controller/Generated.php\n");
+        $this->put('src/Controller/Generated.php');
+
+        self::assertSame(['src/Controller/Generated.php', 'src/Controller/HomeController.php'], $this->scannedPaths());
+    }
+
+    public function test_outside_any_git_repository_an_included_file_reads_only_the_gitignore_files_of_its_folder(): void
+    {
+        $this->filesystem->mkdir($this->project.'/public/.gitignore');
+        $this->put('.gitignore', "public/index.php\n");
+        $this->put('public/index.php');
+
+        self::assertSame(['public/index.php'], $this->relativePaths((new ProjectFileScanner(new NullLogger(), ['public/index.php'], respectGitignore: true))->scan($this->project)));
+    }
+
+    public function test_outside_any_git_repository_a_symlinked_directory_onto_one_a_gitignore_above_the_scanned_folder_names_is_reported(): void
+    {
+        $this->put('.gitignore', "src/Controller/Admin/\n");
+        $this->filesystem->mkdir($this->project.'/src/Controller/Admin');
+        $this->filesystem->symlink($this->project.'/src/Controller/Admin', $this->project.'/src/Legacy/Admin');
+
+        self::assertSame([['src/Controller/HomeController.php'], [['src/Legacy/Admin', SkippedFileReason::Symlink]]], $this->outcome());
     }
 
     public function test_a_project_reached_through_a_symlink_has_its_rules_applied(): void
