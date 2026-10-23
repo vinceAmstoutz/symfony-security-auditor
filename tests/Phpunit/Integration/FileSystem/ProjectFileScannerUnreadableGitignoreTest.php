@@ -19,6 +19,8 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
 
@@ -93,6 +95,53 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
         $this->put('src/Controller/Generated/Kept.php');
 
         self::assertSame(['src/Controller/HomeController.php'], $this->scannedPaths());
+    }
+
+    public function test_a_file_two_directories_below_an_ignored_directory_is_left_out_with_it(): void
+    {
+        $this->put('src/.gitignore', "Generated/\n");
+        $this->put('src/Controller/Generated/Sub/Deep/A.php');
+
+        self::assertSame(['src/Controller/HomeController.php'], $this->scannedPaths());
+    }
+
+    public function test_a_scanned_folder_a_rule_of_the_repository_ignores_gives_no_file(): void
+    {
+        $this->filesystem->mkdir([$this->project.'/.git', $this->project.'/src/.gitignore']);
+        $this->put('.gitignore', "src/Controller/\n");
+
+        self::assertSame([], $this->relativePaths((new ProjectFileScanner(new NullLogger(), ['src/Controller'], respectGitignore: true))->scan($this->project)));
+    }
+
+    public function test_a_symlinked_file_whose_target_lies_in_an_ignored_directory_is_left_out_unreported(): void
+    {
+        $this->filesystem->mkdir($this->project.'/.git');
+        $this->put('.gitignore', "var/\n");
+        $this->put('var/Cache.php');
+        $this->filesystem->symlink($this->project.'/var/Cache.php', $this->project.'/src/Controller/Cache.php');
+
+        self::assertSame([['src/Controller/HomeController.php'], []], $this->outcome());
+    }
+
+    public function test_a_gitignore_below_a_directory_the_rules_already_ignore_is_never_read(): void
+    {
+        $this->filesystem->mkdir([$this->project.'/.git', $this->project.'/var/sub/.gitignore']);
+        $this->put('.gitignore', "var/\n");
+        $this->put('var/sub/deep/Cache.php');
+        $this->filesystem->symlink($this->project.'/var/sub/deep/Cache.php', $this->project.'/src/Controller/Cache.php');
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        $this->scannedPaths($warningCollectingLogger);
+
+        self::assertSame([['Read no rule from a .gitignore that is not a file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
+    }
+
+    public function test_a_symlinked_file_inside_an_ignored_directory_whose_target_is_not_ignored_is_reported_as_a_symbolic_link(): void
+    {
+        $this->put('src/.gitignore', "Generated/\n");
+        $this->filesystem->symlink($this->project.'/src/Controller/HomeController.php', $this->project.'/src/Controller/Generated/Link.php');
+
+        self::assertSame([['src/Controller/HomeController.php'], [['src/Controller/Generated/Link.php', SkippedFileReason::Symlink]]], $this->outcome());
     }
 
     public function test_a_directory_only_rule_ignores_a_directory_and_not_a_file_of_that_name(): void
@@ -208,6 +257,19 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
     private function scannedPaths(LoggerInterface $logger = new NullLogger()): array
     {
         return $this->relativePaths((new ProjectFileScanner($logger, ['src'], respectGitignore: true))->scan($this->project));
+    }
+
+    /**
+     * @return array{list<string>, list<array{string, SkippedFileReason}>}
+     */
+    private function outcome(): array
+    {
+        $projectFileScan = (new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true))->scanReportingSkippedFiles($this->project);
+
+        return [
+            $this->relativePaths($projectFileScan->files),
+            array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles),
+        ];
     }
 
     /**

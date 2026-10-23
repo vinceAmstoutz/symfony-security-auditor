@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\Gitignore;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\String\AbstractString;
@@ -28,10 +29,15 @@ use function Symfony\Component\String\b;
  * file; the last matching rule of the deepest one decides, and a file inside
  * an ignored directory is ignored with it. A `.gitignore` that is not a file,
  * such as a directory a repository commits under that name, holds no rule.
+ * Each path is decided once, from the verdict the walk carries down from the
+ * directory holding it, since the walk enters a directory before what it
+ * holds; only the walked directory, which the walk never gives, and a
+ * symbolic link, read at its target as Finder reads it, are decided from the
+ * directories holding them.
  *
- * Mutable by design: it keeps the rules it read across the files of a walk,
- * so it opts out of the final readonly rule as a stateful collaborator (see
- * .claude/rules/php-classes.md).
+ * Mutable by design: it keeps the rules it read and the verdicts it reached
+ * across the files of a walk, so it opts out of the final readonly rule as a
+ * stateful collaborator (see .claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -39,6 +45,9 @@ final class ReadableGitignores
 {
     /** @var array<string, array<array{0: string, 1: bool, 2: bool}>> each directory's rules as regex, negated and directory-only, the last rule first */
     private array $rules = [];
+
+    /** @var array<string, bool> whether each path the walk reached, other than a symbolic link, is ignored, by its real path */
+    private array $verdicts = [];
 
     private function __construct(
         private readonly string $baseDirectory,
@@ -57,9 +66,48 @@ final class ReadableGitignores
         return new self($realProjectPath, $logger);
     }
 
-    public function ignore(SplFileInfo $splFile): bool
+    /**
+     * Finder calls a prune filter on each directory before it enters it, and
+     * every filter on each path it yields: the first records the verdict of
+     * every path it is given and enters every directory, as Finder's own
+     * reading does, so the second only reads it back.
+     */
+    public function applyTo(Finder $finder): Finder
     {
-        return $this->isIgnored(self::normalized((new Filesystem())->readlink($splFile->getPathname(), true) ?? $splFile->getPathname()));
+        return $finder
+            ->filter($this->recordVerdict(...), true)
+            ->filter(fn (SplFileInfo $splFile): bool => !$this->ignores($splFile));
+    }
+
+    private function recordVerdict(SplFileInfo $splFile): bool
+    {
+        if (!$splFile->isLink()) {
+            $path = $this->realPathOf($splFile);
+            $this->verdicts[$path] = $this->holdingDirectoryIgnores($splFile, $path) || $this->deepestRuleIgnores($path);
+        }
+
+        return true;
+    }
+
+    /**
+     * The directory holding a path at the top of the walk is the walked
+     * directory itself, which the walk never gives.
+     */
+    private function holdingDirectoryIgnores(SplFileInfo $splFile, string $path): bool
+    {
+        return '' === $splFile->getRelativePath() ? $this->isIgnored(\dirname($path)) : $this->verdicts[\dirname($path)];
+    }
+
+    private function ignores(SplFileInfo $splFile): bool
+    {
+        $path = $this->realPathOf($splFile);
+
+        return $splFile->isLink() ? $this->isIgnored($path) : $this->verdicts[$path];
+    }
+
+    private function realPathOf(SplFileInfo $splFile): string
+    {
+        return self::normalized((new Filesystem())->readlink($splFile->getPathname(), true) ?? $splFile->getPathname());
     }
 
     /**
@@ -80,24 +128,34 @@ final class ReadableGitignores
         return strtr($path, \DIRECTORY_SEPARATOR, '/');
     }
 
+    /**
+     * A path is ignored when the rules ignore it or a directory holding it
+     * below the base, read from the base down: below an ignored directory,
+     * no rule is read.
+     */
     private function isIgnored(string $path): bool
     {
-        $directories = array_filter(self::ancestorsOf($path), fn (string $directory): bool => str_starts_with($directory, $this->baseDirectory));
-        $parent = $directories[0] ?? null;
-        if (null !== $parent && $this->isIgnored($parent)) {
-            return true;
+        foreach ([...array_reverse($this->directoriesHolding($path)), $path] as $candidate) {
+            if ($this->deepestRuleIgnores($candidate)) {
+                return true;
+            }
         }
 
-        return $this->deepestRuleIgnores($path, $directories);
+        return false;
     }
 
     /**
-     * @param array<int, string> $directories the directories holding the path, the deepest first
+     * @return array<int, string> the directories holding the path from the base down, the deepest first
      */
-    private function deepestRuleIgnores(string $path, array $directories): bool
+    private function directoriesHolding(string $path): array
+    {
+        return array_filter(self::ancestorsOf($path), fn (string $directory): bool => str_starts_with($directory, $this->baseDirectory));
+    }
+
+    private function deepestRuleIgnores(string $path): bool
     {
         $isDirectory = is_dir($path);
-        foreach ($directories as $directory) {
+        foreach ($this->directoriesHolding($path) as $directory) {
             $verdict = $this->lastMatchingRuleIgnores($directory, substr($path, \strlen($directory) + 1), $isDirectory);
             if (null !== $verdict) {
                 return $verdict;

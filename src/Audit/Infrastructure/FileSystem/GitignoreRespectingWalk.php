@@ -46,9 +46,7 @@ final readonly class GitignoreRespectingWalk
         try {
             yield from $finder->ignoreVCSIgnored($this->respectGitignore);
         } catch (RuntimeException) {
-            $readableGitignores = ReadableGitignores::of($projectPath, $this->logger);
-
-            yield from $readableGitignoreWalk->filter(static fn (SplFileInfo $splFile): bool => !$readableGitignores->ignore($splFile));
+            yield from ReadableGitignores::of($projectPath, $this->logger)->applyTo($readableGitignoreWalk);
         }
     }
 }
