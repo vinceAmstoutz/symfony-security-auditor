@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMAnswerJsonDecoder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
@@ -60,7 +61,7 @@ final readonly class ChunkAnswerHydrator
 
         try {
             /** @var list<array<string, mixed>> $rawData */
-            $rawData = $this->asFindingList($llmResponse->parseJson());
+            $rawData = $this->findingsIn($llmResponse->parseJson(), $llmResponse->content());
         } catch (JsonException $jsonException) {
             $this->logger->error('Failed to parse attacker agent JSON response', [
                 'error' => $jsonException->getMessage(),
@@ -120,23 +121,38 @@ final readonly class ChunkAnswerHydrator
     private function parseablePayload(LLMResponse $llmResponse): array
     {
         try {
-            return $this->asFindingList($llmResponse->parseJson());
+            $decoded = $llmResponse->parseJson();
         } catch (JsonException) {
             return [];
         }
+
+        return array_is_list($decoded) ? $decoded : [$decoded];
     }
 
     /**
      * A model that found a single weakness may answer it as a bare finding
-     * object instead of a one-element array: it is read as that one finding
-     * rather than as a list of its field values.
+     * object instead of a one-element array: when that object is the answer's
+     * only JSON, it is read as that one finding. Any other object — one
+     * recovered from among several findings written apart, or one keyed by
+     * finding — is read as its values, so a finding it leaves out keeps the
+     * chunk unanalyzed and out of the cache.
      *
      * @param array<array-key, mixed> $decoded
      *
      * @return list<mixed>
      */
-    private function asFindingList(array $decoded): array
+    private function findingsIn(array $decoded, string $answer): array
     {
-        return array_is_list($decoded) ? $decoded : [$decoded];
+        return $this->isLoneFinding($decoded, $answer) ? [$decoded] : array_values($decoded);
+    }
+
+    /**
+     * @param array<array-key, mixed> $decoded
+     */
+    private function isLoneFinding(array $decoded, string $answer): bool
+    {
+        return !array_is_list($decoded)
+            && [] !== array_filter($decoded, static fn (mixed $value): bool => !\is_array($value))
+            && LLMAnswerJsonDecoder::holdsOneValue($answer);
     }
 }

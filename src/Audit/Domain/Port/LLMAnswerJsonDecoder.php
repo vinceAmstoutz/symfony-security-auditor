@@ -46,6 +46,23 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
+     * Whether the answer's JSON is one value alone: the only block at its top
+     * level that can stand for it, with no block left open after it. Values
+     * written apart — one object per line, an object after an array — or one
+     * the output cut off make it one of several, of which `decode()` returns
+     * only one.
+     */
+    public static function holdsOneValue(string $answer): bool
+    {
+        $content = self::withoutWrappingFence($answer);
+        $openerPositions = BalancedBlockScanner::openerPositions($content);
+        $blocks = self::topLevelBlocks($content, $openerPositions);
+
+        return 1 === \count(array_filter($blocks, self::standsForTheAnswer(...)))
+            && self::opensInsideLastBlock($blocks, (int) end($openerPositions));
+    }
+
+    /**
      * Only a Markdown fence around the whole answer is stripped: the same
      * backticks inside a JSON string, such as a finding quoting a code block,
      * are part of the payload.
@@ -150,6 +167,13 @@ final readonly class LLMAnswerJsonDecoder
     private static function canStandForTheAnswer(array $decoded): bool
     {
         return !array_is_list($decoded) || [] !== array_filter($decoded, self::isObject(...));
+    }
+
+    private static function standsForTheAnswer(string $block): bool
+    {
+        $decoded = self::decodeBlock($block);
+
+        return \is_array($decoded) && self::canStandForTheAnswer($decoded);
     }
 
     private static function isObject(mixed $element): bool
