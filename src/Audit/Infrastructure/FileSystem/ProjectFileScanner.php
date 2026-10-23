@@ -141,19 +141,19 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     {
         $this->logger->info('Scanning project', ['path' => $projectPath]);
 
-        [$directories, $explicitFiles] = $this->resolveRoots($projectPath, $roots);
+        [$directories, $explicitFiles, $symlinkedRoots] = $this->resolveRoots($projectPath, $roots);
 
         if ([] === $directories && [] === $explicitFiles) {
             $this->logger->warning($noRootsMessage, $noRootsContext);
 
-            return new ProjectFileScan([], []);
+            return $this->inRelativePathOrder($this->eachFileOnce(new ProjectFileScan([], $symlinkedRoots)));
         }
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
         $scannedContents = $this->scannedContents ?? new ScannedContents();
         $contentOf = fn (SplFileInfo $splFile, string $relativePath): string => $scannedContents->of($splFile->getPathname(), fn (): string => $this->heldContent($this->scrubbed($relativePath, $reader($splFile)), $relativePath));
 
-        $outcomes = iterator_to_array($this->outcomes($directories, $explicitFiles, $projectPath, $contentOf), false);
+        $outcomes = [...iterator_to_array($this->outcomes($directories, $explicitFiles, $projectPath, $contentOf), false), ...$symlinkedRoots];
         $projectFileScan = $this->inRelativePathOrder($this->eachFileOnce(new ProjectFileScan(
             array_values(array_filter($outcomes, static fn (ProjectFile|SkippedFile $outcome): bool => $outcome instanceof ProjectFile)),
             array_values(array_filter($outcomes, static fn (ProjectFile|SkippedFile $outcome): bool => $outcome instanceof SkippedFile)),
@@ -397,34 +397,47 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      *
      * @param list<string> $roots
      *
-     * @return array{0: list<string>, 1: list<string>}
+     * @return array{0: list<string>, 1: list<string>, 2: list<SkippedFile>} the directories and the files to scan, and the roots left out as symbolic links
      */
     private function resolveRoots(string $projectPath, array $roots): array
     {
         $realProjectPath = realpath($projectPath);
         if (false === $realProjectPath) {
-            return [[], []];
+            return [[], [], []];
         }
 
-        return $this->partitionDirectoriesAndFiles($this->scannableRoots($projectPath, $realProjectPath, $roots));
+        [$scannable, $symlinked] = $this->scannableRoots($projectPath, $realProjectPath, $roots);
+
+        return [...$this->partitionDirectoriesAndFiles($scannable), $symlinked];
     }
 
     /**
+     * A root that is a symbolic link is never followed, so it is left out as
+     * one, as a link met inside a walked directory is.
+     *
      * @param list<string> $roots
      *
-     * @return list<string>
+     * @return array{0: list<string>, 1: list<SkippedFile>}
      */
     private function scannableRoots(string $projectPath, string $realProjectPath, array $roots): array
     {
         $scannable = [];
+        $symlinked = [];
         foreach ($roots as $root) {
             $resolved = $projectPath.\DIRECTORY_SEPARATOR.$root;
+            if (is_link($resolved)) {
+                $this->logger->warning('Skipped symlinked included path', ['path' => $resolved]);
+                $symlinked[] = new SkippedFile(Utf8Normalizer::normalize(Path::makeRelative($resolved, $projectPath)), SkippedFileReason::Symlink);
+
+                continue;
+            }
+
             if ($this->isScannable($resolved, $realProjectPath)) {
                 $scannable[] = $resolved;
             }
         }
 
-        return $scannable;
+        return [$scannable, $symlinked];
     }
 
     /**
@@ -453,12 +466,6 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
     private function isScannable(string $resolved, string $realProjectPath): bool
     {
-        if (is_link($resolved)) {
-            $this->logger->warning('Skipped symlinked included path', ['path' => $resolved]);
-
-            return false;
-        }
-
         $realResolved = realpath($resolved);
 
         return false !== $realResolved && $this->isInsideProject($resolved, $realResolved, $realProjectPath);

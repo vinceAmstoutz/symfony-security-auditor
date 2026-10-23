@@ -69,6 +69,28 @@ final class ProjectFileScannerSymlinkTest extends TestCase
         self::assertSame([['Skipped symlinked directory', ['path' => $this->project.'/src/Controller/Admin']]], $warningCollectingLogger->warnings);
     }
 
+    public function test_an_included_path_that_is_a_symlink_is_left_out_as_a_symbolic_link(): void
+    {
+        $this->link('lib/AdminController.php', '.env.local');
+        $this->link('lib/Admin', 'modules');
+
+        self::assertSame(
+            [['src/Controller/HomeController.php'], [['.env.local', SkippedFileReason::Symlink], ['modules', SkippedFileReason::Symlink]]],
+            $this->outcome((new ProjectFileScanner(new NullLogger(), ['src', 'modules', '.env.local']))->scanReportingSkippedFiles($this->project)),
+        );
+    }
+
+    public function test_scan_paths_that_are_only_symlinks_are_each_left_out_once_as_a_symbolic_link(): void
+    {
+        $this->link('lib/AdminController.php', '.env.local');
+        $this->link('lib/Admin', "mod\xFFules");
+
+        self::assertSame(
+            [[], [['.env.local', SkippedFileReason::Symlink], ["mod\u{FF}ules", SkippedFileReason::Symlink]]],
+            $this->outcome((new ProjectFileScanner(new NullLogger(), ['src']))->scanReportingSkippedFiles($this->project, ["mod\xFFules", '.env.local', "./mod\xFFules"])),
+        );
+    }
+
     /**
      * @param list<string> $includedPaths
      */
