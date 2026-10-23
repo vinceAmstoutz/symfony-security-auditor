@@ -117,7 +117,7 @@ A `1.x` upgrade must not break what a user wrote or built against the last relea
 docker compose exec php vendor/bin/phpunit -c phpunit.compat.xml
 ```
 
-It runs as the **Compatibility** CI job, on PHP 8.3 and Symfony 7.4. A difference is accepted only with the pull request (`'#123'`) that a `CHANGELOG.md` bullet under `## [Unreleased]` links to announce it; an accepted difference that no longer shows fails too, so the list never outlives what it describes. The fixtures are written only by the recorders, which seal them: a fixture edited by hand fails. Record them again instead.
+It runs as the **Compatibility** CI job, on PHP 8.3 and Symfony 7.4. A difference is accepted only with the pull request (`'#123'`) that a `CHANGELOG.md` bullet under `## [Unreleased]` links to announce it (from the moment a release is promoted until its recordings replace the previous ones, a bullet of that release counts too); an accepted difference that no longer shows fails too, so the list never outlives what it describes. The fixtures are written only by the recorders, which seal them: a fixture edited by hand fails. Record them again instead.
 
 ### Configuration Snapshot
 
