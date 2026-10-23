@@ -49,7 +49,8 @@ final readonly class AccessControlRuleMatcher
      * The roles {@see self::rolesFor()} finds for each of several routes the
      * same rules govern, each rule matched against every route it has yet to
      * decide before the next one is read, so its path pattern is compiled
-     * once for all of them.
+     * once for all of them. The map is read only for the routes the rules, in
+     * the order they are declared, leave open.
      *
      * @param array<int, RouteAccessControl> $routeAccessControls
      * @param array<string, list<string>>    $routeAccessMap
@@ -61,28 +62,21 @@ final readonly class AccessControlRuleMatcher
     {
         $routeMethods = array_map(static fn (RouteAccessControl $routeAccessControl): array => array_map(strtoupper(...), $routeAccessControl->routeMethods()), $routeAccessControls);
         $routePaths = array_filter(array_map(static fn (RouteAccessControl $routeAccessControl): ?string => $routeAccessControl->routePath(), $routeAccessControls), static fn (?string $routePath): bool => null !== $routePath);
-        $governingRoles = self::governingRoles($routeAccessControls, $routeAccessMap, $routeMethods, $routePaths);
+        $checksNothing = self::firstMatchingRuleChecksNothing($routeAccessControls, $accessControlRules, $routeMethods, $routePaths);
+        $openRoutes = array_filter($routeAccessControls, static fn (int $index): bool => false === $checksNothing[$index], \ARRAY_FILTER_USE_KEY);
 
-        $roles = [];
-        foreach (self::firstMatchingRuleChecksNothing($routeAccessControls, $accessControlRules, $routeMethods, $routePaths) as $index => $checksNothing) {
-            $roles[$index] = self::rolesOf($checksNothing, $governingRoles[$index]);
-        }
-
-        return $roles;
+        return array_replace(
+            array_map(self::rolesSettledBy(...), $checksNothing),
+            self::governingRoles($openRoutes, $routeAccessMap, $routeMethods, $routePaths),
+        );
     }
 
     /**
-     * @param list<string>|false|null $governingRoles
-     *
-     * @return list<string>|false|null
+     * @return ?false null when the first rule Symfony applies to some of the route's requests checks nothing, false when it cannot be told; a route the rules leave open takes its governing roles instead
      */
-    private static function rolesOf(?bool $checksNothing, array|false|null $governingRoles): array|false|null
+    private static function rolesSettledBy(?bool $checksNothing): ?false
     {
-        if (false !== $checksNothing) {
-            return true === $checksNothing ? null : false;
-        }
-
-        return $governingRoles;
+        return null === $checksNothing ? false : null;
     }
 
     /**
