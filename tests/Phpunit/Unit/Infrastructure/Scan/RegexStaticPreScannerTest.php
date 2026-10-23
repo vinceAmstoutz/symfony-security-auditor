@@ -1889,6 +1889,32 @@ final class RegexStaticPreScannerTest extends TestCase
     /**
      * @throws InvalidCustomRiskPatternException
      */
+    #[DataProvider('valuesThatAreNoText')]
+    public function test_a_custom_risk_pattern_that_is_no_text_throws_at_construction_naming_its_key(mixed $regex, string $type): void
+    {
+        $this->expectException(InvalidCustomRiskPatternException::class);
+        $this->expectExceptionMessage(\sprintf('The scan.custom_risk_patterns.php.audit_log.regex setting is not a pattern: expected text, got %s.', $type));
+
+        new RegexStaticPreScanner([
+            'php' => [
+                'audit_log' => ['regex' => $regex, 'description' => 'test'],
+            ],
+        ]);
+    }
+
+    /**
+     * @return iterable<string, array{mixed, string}>
+     */
+    public static function valuesThatAreNoText(): iterable
+    {
+        yield 'a number' => [123, 'int'];
+        yield 'a decimal' => [1.5, 'float'];
+        yield 'a switch' => [true, 'bool'];
+    }
+
+    /**
+     * @throws InvalidCustomRiskPatternException
+     */
     public function test_an_empty_custom_risk_pattern_throws_at_construction(): void
     {
         $this->expectException(InvalidCustomRiskPatternException::class);

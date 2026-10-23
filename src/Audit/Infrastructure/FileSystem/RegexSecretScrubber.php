@@ -153,9 +153,10 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     private array $patterns;
 
     /**
-     * @param list<string>                  $additionalPatterns extra PCRE patterns merged with the defaults.
+     * @param list<mixed>                   $additionalPatterns extra PCRE patterns merged with the defaults.
      *                                                          Each pattern is given a synthetic label
-     *                                                          `custom_<index>` for redaction reporting.
+     *                                                          `custom_<index>` for redaction reporting;
+     *                                                          one that is not text is refused.
      * @param ?Closure(string): PhpDataMask $phpDataMaskFactory defaults to PhpDataMask::of; tests inject a recording one
      *
      * @throws SecretScrubberConfigurationException
@@ -168,6 +169,10 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     ) {
         $patterns = $this->defaultPatterns();
         foreach ($additionalPatterns as $index => $pattern) {
+            if (!\is_string($pattern)) {
+                throw SecretScrubberConfigurationException::forPatternThatIsNoText($index, $pattern);
+            }
+
             $error = $this->validatePattern($pattern);
             if (null !== $error) {
                 throw SecretScrubberConfigurationException::forInvalidPattern($pattern, $error);

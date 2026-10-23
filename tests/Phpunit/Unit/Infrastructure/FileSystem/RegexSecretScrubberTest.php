@@ -1149,6 +1149,29 @@ final class RegexSecretScrubberTest extends TestCase
     /**
      * @throws SecretScrubberConfigurationException
      */
+    #[DataProvider('additionalPatternsThatAreNoText')]
+    public function test_an_additional_pattern_that_is_no_text_throws_at_construction_naming_its_key(mixed $pattern, string $type): void
+    {
+        $this->expectException(SecretScrubberConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('The scan.secret_scrubbing.additional_patterns entry 1 is not a pattern: expected text, got %s.', $type));
+
+        new RegexSecretScrubber(additionalPatterns: ['/INTERNAL-[A-Z0-9]{12}/', $pattern]);
+    }
+
+    /**
+     * @return iterable<string, array{mixed, string}>
+     */
+    public static function additionalPatternsThatAreNoText(): iterable
+    {
+        yield 'a number' => [123, 'int'];
+        yield 'a decimal' => [1.5, 'float'];
+        yield 'a switch' => [false, 'bool'];
+        yield 'null' => [null, 'null'];
+    }
+
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
     public function test_additional_patterns_are_applied(): void
     {
         $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: ['/INTERNAL-[A-Z0-9]{12}/']);

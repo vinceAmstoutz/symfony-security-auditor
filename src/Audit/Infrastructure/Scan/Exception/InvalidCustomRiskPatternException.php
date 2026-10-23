@@ -22,4 +22,9 @@ final class InvalidCustomRiskPatternException extends InvalidArgumentException
     {
         return new self(\sprintf('Invalid custom risk pattern "%s" (bucket "%s") %s: %s', $label, $bucket, $pattern, $error));
     }
+
+    public static function forPatternThatIsNoText(string $bucket, string $label, mixed $regex): self
+    {
+        return new self(\sprintf('The scan.custom_risk_patterns.%s.%s.regex setting is not a pattern: expected text, got %s.', $bucket, $label, get_debug_type($regex)));
+    }
 }

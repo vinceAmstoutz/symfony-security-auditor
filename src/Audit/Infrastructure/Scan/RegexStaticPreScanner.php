@@ -51,23 +51,46 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     private const string UNMAPPED_ACCESS_CONTROL_DESCRIPTION = 'The access-control map could not read this file, whose brackets nest too deeply or hold too many unmatched closers to parse safely: its routes, access checks and voter attributes are missing from the map, so read them in the code.';
 
     /**
-     * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
+     * @var array<string, array<string, array{regex: string, description: string}>>
+     */
+    private array $customPatterns;
+
+    /**
+     * @param array<string, array<string, array{regex: mixed, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket; a regex that is not text is refused
      *
      * @throws InvalidCustomRiskPatternException
      */
     public function __construct(
-        private array $customPatterns = [],
+        array $customPatterns = [],
         private LoggerInterface $logger = new NullLogger(),
         private NestingDepthGuard $nestingDepthGuard = new NestingDepthGuard(),
     ) {
-        foreach ($this->customPatterns as $bucket => $patterns) {
+        $validPatterns = [];
+        foreach ($customPatterns as $bucket => $patterns) {
+            $validPatterns[$bucket] = [];
             foreach ($patterns as $label => $entry) {
-                $error = $this->validatePattern($entry['regex']);
-                if (null !== $error) {
-                    throw InvalidCustomRiskPatternException::forPattern($bucket, $label, $entry['regex'], $error);
-                }
+                $validPatterns[$bucket][$label] = ['regex' => $this->validRegex($bucket, $label, $entry['regex']), 'description' => $entry['description']];
             }
         }
+
+        $this->customPatterns = $validPatterns;
+    }
+
+    /**
+     * @throws InvalidCustomRiskPatternException
+     */
+    private function validRegex(string $bucket, string $label, mixed $regex): string
+    {
+        if (!\is_string($regex)) {
+            throw InvalidCustomRiskPatternException::forPatternThatIsNoText($bucket, $label, $regex);
+        }
+
+        $error = $this->validatePattern($regex);
+        if (null !== $error) {
+            throw InvalidCustomRiskPatternException::forPattern($bucket, $label, $regex, $error);
+        }
+
+        return $regex;
     }
 
     private function validatePattern(string $pattern): ?string

@@ -22,4 +22,9 @@ final class SecretScrubberConfigurationException extends InvalidArgumentExceptio
     {
         return new self(\sprintf('Invalid secret-scrubbing pattern %s: %s', $pattern, $error));
     }
+
+    public static function forPatternThatIsNoText(int $index, mixed $pattern): self
+    {
+        return new self(\sprintf('The scan.secret_scrubbing.additional_patterns entry %d is not a pattern: expected text, got %s.', $index, get_debug_type($pattern)));
+    }
 }
