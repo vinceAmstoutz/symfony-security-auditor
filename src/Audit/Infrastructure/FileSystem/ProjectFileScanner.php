@@ -151,7 +151,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
         $scannedContents = $this->scannedContents ?? new ScannedContents();
-        $contentOf = fn (SplFileInfo $splFile, string $relativePath): string => $scannedContents->of($splFile->getPathname(), fn (): string => $this->scrubbed($relativePath, $reader($splFile)));
+        $contentOf = fn (SplFileInfo $splFile, string $relativePath): string => $scannedContents->of($splFile->getPathname(), fn (): string => $this->heldContent($this->scrubbed($relativePath, $reader($splFile)), $relativePath));
 
         $outcomes = iterator_to_array($this->outcomes($directories, $explicitFiles, $projectPath, $contentOf), false);
         $projectFileScan = $this->inRelativePathOrder($this->eachFileOnce(new ProjectFileScan(
@@ -510,7 +510,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
             return AmbiguousContent::skipped($relativePath, $content) ?? ProjectFile::create(
                 relativePath: $relativePath,
                 absolutePath: $splFile->getPathname(),
-                content: $this->validUtf8Content($content, $relativePath),
+                content: $content,
             );
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to read file', [
@@ -533,6 +533,16 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         }
 
         return $this->secretScrubber?->scrub($content) ?? $content;
+    }
+
+    /**
+     * The content the scanned file holds, kept once for the file and the
+     * reads the scans share; bytes that would read two ways once repaired are
+     * kept as read, so the scan still leaves the file out as ambiguous.
+     */
+    private function heldContent(string $content, string $relativePath): string
+    {
+        return Utf8Normalizer::isAmbiguous($content) ? $content : $this->validUtf8Content($content, $relativePath);
     }
 
     private function validUtf8RelativePath(SplFileInfo $splFile, string $projectPath): string

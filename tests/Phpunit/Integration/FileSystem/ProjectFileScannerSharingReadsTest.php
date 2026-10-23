@@ -113,6 +113,20 @@ final class ProjectFileScannerSharingReadsTest extends TestCase
         self::assertSame(["<?php\n\$password = '***REDACTED:inline_assignment***';\n// read"], array_map(static fn (ProjectFile $projectFile): string => $projectFile->content(), $projectFileScan->files));
     }
 
+    public function test_a_scan_holds_the_content_of_each_file_once(): void
+    {
+        $content = '<?php // '.str_repeat('x', 128 * 1024);
+        foreach (range(1, 32) as $index) {
+            $this->put(\sprintf('src/File%d.php', $index), $content);
+        }
+
+        $before = memory_get_usage();
+        memory_reset_peak_usage();
+        (new ProjectFileScanner(new NullLogger(), ['src']))->scan($this->project);
+
+        self::assertLessThan(1.5 * 32 * \strlen($content), memory_get_peak_usage() - $before);
+    }
+
     public function test_a_file_a_directory_and_its_own_path_both_reach_in_one_scan_is_read_once(): void
     {
         $this->put('src/App.php');
