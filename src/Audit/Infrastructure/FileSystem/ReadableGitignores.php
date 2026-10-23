@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\Gitignore;
@@ -28,7 +29,8 @@ use function Symfony\Component\String\b;
  * git repository holding the directory, or of the directory itself, down to
  * the file; the last matching rule of the deepest one decides, and a file inside
  * an ignored directory is ignored with it. A `.gitignore` that is not a file,
- * such as a directory a repository commits under that name, holds no rule.
+ * such as a directory a repository commits under that name, or that cannot
+ * be read holds no rule.
  * Each path is decided once, from the verdict the walk carries down from the
  * directory holding it, since the walk enters a directory before what it
  * holds; only the walked directory, which the walk never gives, and a
@@ -185,13 +187,27 @@ final class ReadableGitignores
             return [];
         }
 
-        if (!is_file($gitignore)) {
-            $this->logger->warning('Read no rule from a .gitignore that is not a file', ['path' => $gitignore]);
+        $content = $this->contentOf($gitignore);
+        if (null === $content) {
+            $this->logger->warning('Read no rule from a .gitignore that is not a readable file', ['path' => $gitignore]);
 
             return [];
         }
 
-        return array_reverse(array_map(fn (AbstractString $string): array => $this->ruleOf($string->toString()), b((new Filesystem())->readFile($gitignore))->split('~\r\n?|\n~', null, \PREG_SPLIT_NO_EMPTY)));
+        return array_reverse(array_map(fn (AbstractString $string): array => $this->ruleOf($string->toString()), b($content)->split('~\r\n?|\n~', null, \PREG_SPLIT_NO_EMPTY)));
+    }
+
+    /**
+     * Only a regular file is opened: a named pipe waits for a writer, and a
+     * device may never end.
+     */
+    private function contentOf(string $gitignore): ?string
+    {
+        try {
+            return is_file($gitignore) ? (new Filesystem())->readFile($gitignore) : null;
+        } catch (IOException) {
+            return null;
+        }
     }
 
     /**

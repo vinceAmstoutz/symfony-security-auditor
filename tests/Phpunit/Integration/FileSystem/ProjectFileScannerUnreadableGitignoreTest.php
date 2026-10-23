@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
+use Closure;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -27,6 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\Wa
 
 final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
 {
+    private const int UNPRIVILEGED_USER_ID = 65534;
+
     private Filesystem $filesystem;
 
     private string $project;
@@ -59,7 +62,47 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
 
         $this->scannedPaths($warningCollectingLogger);
 
-        self::assertSame([['Read no rule from a .gitignore that is not a file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
+        self::assertSame([['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
+    }
+
+    public function test_a_gitignore_the_scan_cannot_read_holds_no_rule_and_a_warning_names_it(): void
+    {
+        $this->put('src/Controller/Sub/.gitignore', "Generated.php\n");
+        $this->put('src/Controller/Sub/Generated.php');
+        $this->scannedPaths();
+        $this->filesystem->chmod($this->project.'/src/Controller/Sub/.gitignore', 0o000);
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        $paths = $this->asUnprivilegedUser(fn (): array => $this->scannedPaths($warningCollectingLogger));
+
+        self::assertSame(
+            [
+                ['src/Controller/HomeController.php', 'src/Controller/Sub/Generated.php'],
+                [
+                    ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']],
+                    ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/Sub/.gitignore']],
+                ],
+            ],
+            [$paths, $warningCollectingLogger->warnings],
+        );
+    }
+
+    public function test_a_gitignore_that_is_a_device_is_never_read_and_a_warning_names_it(): void
+    {
+        $this->filesystem->mkdir($this->project.'/src/Controller/Sub');
+        $this->filesystem->symlink('/dev/null', $this->project.'/src/Controller/Sub/.gitignore');
+        $this->put('src/Controller/Sub/Kept.php');
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        $this->scannedPaths($warningCollectingLogger);
+
+        self::assertSame(
+            [
+                ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']],
+                ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/Sub/.gitignore']],
+            ],
+            $warningCollectingLogger->warnings,
+        );
     }
 
     public function test_the_rules_of_the_other_gitignore_files_still_apply(): void
@@ -134,7 +177,7 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
 
         $this->scannedPaths($warningCollectingLogger);
 
-        self::assertSame([['Read no rule from a .gitignore that is not a file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
+        self::assertSame([['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']]], $warningCollectingLogger->warnings);
     }
 
     public function test_a_symlinked_file_inside_an_ignored_directory_whose_target_is_not_ignored_is_reported_as_a_symbolic_link(): void
@@ -299,6 +342,26 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
         $this->put('src/Controller/we\\ird/Hidden.php');
 
         self::assertSame(['src/Controller/HomeController.php'], $this->scannedPaths());
+    }
+
+    /**
+     * @param Closure(): list<string> $action
+     *
+     * @return list<string>
+     */
+    private function asUnprivilegedUser(Closure $action): array
+    {
+        if (0 !== posix_geteuid()) {
+            return $action();
+        }
+
+        self::assertTrue(posix_seteuid(self::UNPRIVILEGED_USER_ID));
+
+        try {
+            return $action();
+        } finally {
+            posix_seteuid(0);
+        }
     }
 
     /**
