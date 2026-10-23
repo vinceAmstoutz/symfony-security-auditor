@@ -64,10 +64,12 @@ final readonly class ScanPathResolver
     }
 
     /**
-     * Compared as typed, and failing that by the real paths of both, as the
-     * scanner compares them: a shell's `$PWD` keeps the symbolic link that
-     * `getcwd()`, which names the project, resolves (macOS `/tmp` is
-     * `/private/tmp`).
+     * Compared as typed, and failing that through the folder above it that is
+     * the project once both are resolved: a shell's `$PWD` keeps the symbolic
+     * link that `getcwd()`, which names the project, resolves (macOS `/tmp` is
+     * `/private/tmp`). Only that folder is resolved: the rest of the path
+     * reads as typed, so a link inside the project names itself, as it does
+     * when the project is spelled directly, not the folder it points to.
      */
     private static function relativeToProject(string $absolutePath, string $projectRoot): ?string
     {
@@ -75,13 +77,29 @@ final readonly class ScanPathResolver
             return Path::makeRelative($absolutePath, $projectRoot);
         }
 
-        $realPath = realpath($absolutePath);
         $realProjectRoot = realpath($projectRoot);
-        if (false === $realPath || false === $realProjectRoot || !Path::isBasePath($realProjectRoot, $realPath)) {
+        if (false === $realProjectRoot) {
             return null;
         }
 
-        return Path::makeRelative($realPath, $realProjectRoot);
+        $canonicalPath = Path::canonicalize($absolutePath);
+        foreach (self::foldersOf($canonicalPath) as $folder) {
+            if (realpath($folder) === $realProjectRoot) {
+                return Path::makeRelative($canonicalPath, $folder);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string> the path and each folder above it, nearest first, the root left out
+     */
+    private static function foldersOf(string $path): array
+    {
+        $parent = Path::getDirectory($path);
+
+        return $parent === $path ? [] : [$path, ...self::foldersOf($parent)];
     }
 
     private static function withForwardSlashes(string $path): string

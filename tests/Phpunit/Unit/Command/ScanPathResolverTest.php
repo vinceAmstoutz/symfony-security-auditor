@@ -144,6 +144,10 @@ final class ScanPathResolverTest extends TestCase
         yield 'the path through a linked working directory, the project by its real path' => ['/linked-project/src/Controller', '/real/project', ['src/Controller']];
         yield 'the path by its real path, the project through a link' => ['/real/project/src', '/linked-project', ['src']];
         yield 'the project root itself through a link' => ['/linked-project', '/real/project', []];
+        yield 'a link inside the project to another of its folders, through a linked project' => ['/linked-project/src/alias', '/real/project', ['src/alias']];
+        yield 'a link inside the project to a folder outside it, through a linked project' => ['/linked-project/src/escape', '/real/project', ['src/escape']];
+        yield 'a folder not created yet, through a linked project' => ['/linked-project/src/Fresh', '/real/project', ['src/Fresh']];
+        yield 'a parent folder named back into the project, through a linked project' => ['/linked-project/src/../src/Controller', '/real/project', ['src/Controller']];
     }
 
     /**
@@ -171,6 +175,23 @@ final class ScanPathResolverTest extends TestCase
     /**
      * @throws ScanPathOutsideProjectException
      */
+    public function test_an_absolute_scan_path_outside_the_project_is_refused_when_run_from_the_project(): void
+    {
+        $workingDirectory = (string) getcwd();
+        chdir($this->root.'/real/project');
+
+        try {
+            $this->expectException(ScanPathOutsideProjectException::class);
+
+            ScanPathResolver::resolve([$this->root.'/real/other/src'], $this->root.'/real/project');
+        } finally {
+            chdir($workingDirectory);
+        }
+    }
+
+    /**
+     * @throws ScanPathOutsideProjectException
+     */
     public function test_an_existing_absolute_scan_path_outside_a_project_that_does_not_exist_is_refused(): void
     {
         $this->expectException(ScanPathOutsideProjectException::class);
@@ -186,6 +207,8 @@ final class ScanPathResolverTest extends TestCase
         $filesystem->mkdir([$this->root.'/real/project/src/Controller', $this->root.'/real/other/src']);
         $filesystem->symlink($this->root.'/real/project', $this->root.'/linked-project');
         $filesystem->symlink($this->root.'/real/other', $this->root.'/linked-other');
+        $filesystem->symlink($this->root.'/real/project/src/Controller', $this->root.'/real/project/src/alias');
+        $filesystem->symlink($this->root.'/real/other', $this->root.'/real/project/src/escape');
     }
 
     #[Override]
