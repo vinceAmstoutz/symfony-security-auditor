@@ -139,6 +139,33 @@ final class ConcurrentChunkAnalyzerRefusedRecordingTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      */
+    public function test_a_refused_recording_call_the_model_repeats_in_full_under_another_spelling_of_its_file_leaves_the_window_entry_analyzed_and_cached(): void
+    {
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatchWithTools')->willReturnCallback(static function (array $requests): array {
+            ConcurrentChunkAnalyzerHarness::registryOf($requests[0])->execute('record_vulnerability', [...self::withoutDescription('repeated'), 'file_path' => '/app/src/A.php']);
+            ConcurrentChunkAnalyzerHarness::registryOf($requests[0])->execute('record_vulnerability', ConcurrentChunkAnalyzerHarness::recordedFinding('repeated'));
+
+            return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+        });
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $attackerCache->expects(self::once())->method('store');
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        ConcurrentChunkAnalyzerHarness::analyzerRecordingThrough($llmClient, 4, new DescriptionRequiringToolFactory(), $attackerCache)
+            ->analyze([[ChunkAnalysisInputs::file('src/A.php')]], ChunkAnalysisInputs::request(), $recordingCoverageRecorder, new RiskMarkerIndex([]));
+
+        self::assertSame(['analyzed' => 1], ConcurrentChunkAnalyzerHarness::statusCounts($recordingCoverageRecorder));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
     public function test_a_window_entry_stopped_at_the_tool_cap_after_a_refused_call_keeps_the_cap_as_its_reason(): void
     {
         $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);

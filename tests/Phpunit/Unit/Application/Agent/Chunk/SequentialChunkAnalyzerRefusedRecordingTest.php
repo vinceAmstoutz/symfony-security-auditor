@@ -127,6 +127,31 @@ final class SequentialChunkAnalyzerRefusedRecordingTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
+    public function test_a_refused_recording_call_the_model_repeats_in_full_under_another_spelling_of_its_file_leaves_the_chunk_analyzed_and_cached(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+            $toolRegistry->execute('record_vulnerability', [...self::withoutDescription('repeated'), 'file_path' => '/app/src/A.php']);
+            $toolRegistry->execute('record_vulnerability', SequentialChunkAnalyzerHarness::finding('repeated'));
+
+            return LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1));
+        });
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $attackerCache->expects(self::once())->method('store');
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->analyzer($llmClient, $attackerCache)->analyze([[ChunkAnalysisInputs::file('src/A.php')]], ChunkAnalysisInputs::request(), $recordingCoverageRecorder, null, new RiskMarkerIndex([]));
+
+        self::assertSame([['stage' => 'attacker', 'filePath' => 'src/A.php', 'status' => 'analyzed']], $recordingCoverageRecorder->coverage);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
     public function test_a_chunk_stopped_at_the_tool_cap_after_a_refused_call_keeps_the_cap_as_its_reason(): void
     {
         $llmClient = self::createStub(LLMClientInterface::class);

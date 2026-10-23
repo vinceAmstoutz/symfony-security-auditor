@@ -145,10 +145,12 @@ final readonly class ConcurrentChunkAnalyzer
      */
     private function buildPendingChunk(array $chunk, ChunkAnalysisScope $chunkAnalysisScope): PendingChunk
     {
+        $chunkContext = $this->chunkContextFactory->create($chunk, $chunkAnalysisScope->attackerAnalysisRequest, $chunkAnalysisScope->riskMarkerIndex, $this->attackerChunkCache->isContextAware());
+
         return new PendingChunk(
             $chunk,
-            $this->chunkContextFactory->create($chunk, $chunkAnalysisScope->attackerAnalysisRequest, $chunkAnalysisScope->riskMarkerIndex, $this->attackerChunkCache->isContextAware()),
-            StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $chunkAnalysisScope->toolRegistry?->tools() ?? []),
+            $chunkContext,
+            StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $chunkAnalysisScope->toolRegistry?->tools() ?? [], $chunkContext->knownFiles),
         );
     }
 

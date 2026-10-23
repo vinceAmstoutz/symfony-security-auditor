@@ -35,8 +35,9 @@ final readonly class FindingSignature
 
     /**
      * @param array<string, mixed> $payload
+     * @param KnownFiles           $knownFiles the files the call's path may name, so it reads as the file its finding is named by
      */
-    public static function of(array $payload): self
+    public static function of(array $payload, KnownFiles $knownFiles): self
     {
         $filePath = $payload['file_path'] ?? null;
         $type = $payload['type'] ?? null;
@@ -44,7 +45,7 @@ final readonly class FindingSignature
         $title = $payload['title'] ?? null;
 
         return new self(
-            \is_string($filePath) ? EchoedFilePath::normalize($filePath) : null,
+            \is_string($filePath) ? EchoedFilePath::normalize($knownFiles->name($filePath)) : null,
             \is_string($type) ? strtolower(trim($type)) : null,
             is_numeric($lineStart) ? (int) $lineStart : null,
             \is_string($title) ? $title : null,

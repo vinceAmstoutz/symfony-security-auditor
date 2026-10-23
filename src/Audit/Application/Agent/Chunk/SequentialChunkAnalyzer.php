@@ -231,7 +231,7 @@ final readonly class SequentialChunkAnalyzer
     {
         \assert($this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface);
 
-        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $toolRegistry?->tools() ?? []);
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $toolRegistry?->tools() ?? [], $chunkContext->knownFiles);
 
         try {
             $llmResponse = $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
