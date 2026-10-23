@@ -13,20 +13,25 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
+use Closure;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
 
 final class ProjectFileScannerSymlinkTest extends TestCase
 {
+    private const int UNPRIVILEGED_USER_ID = 65534;
+
     private Filesystem $filesystem;
 
     private string $project;
@@ -67,6 +72,45 @@ final class ProjectFileScannerSymlinkTest extends TestCase
 
         self::assertSame([['src/Controller/HomeController.php'], [['src/Controller/Admin', SkippedFileReason::Symlink]]], $this->outcome($projectFileScan));
         self::assertSame([['Skipped symlinked directory', ['path' => $this->project.'/src/Controller/Admin']]], $warningCollectingLogger->warnings);
+    }
+
+    public function test_a_symlink_that_leads_nowhere_is_neither_scanned_nor_reported(): void
+    {
+        symlink($this->project.'/src/Controller/Missing.php', $this->project.'/src/Controller/Gone.php');
+        symlink($this->project.'/src/Controller/Missing', $this->project.'/src/Controller/Gone');
+        symlink($this->project.'/src/Controller/Loop.php', $this->project.'/src/Controller/Loop.php');
+
+        self::assertSame([['src/Controller/HomeController.php'], []], $this->outcome($this->scan()));
+    }
+
+    public function test_a_symlinked_directory_onto_one_the_scan_cannot_list_is_still_reported(): void
+    {
+        $this->link('lib/Admin', 'src/Controller/Admin');
+        $this->scan();
+        chmod($this->project.'/lib/Admin', 0o000);
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        try {
+            $projectFileScan = $this->asUnprivilegedUser(fn (): ProjectFileScan => $this->scan($warningCollectingLogger));
+        } finally {
+            chmod($this->project.'/lib/Admin', 0o755);
+        }
+
+        self::assertSame([['src/Controller/HomeController.php'], [['src/Controller/Admin', SkippedFileReason::Symlink]]], $this->outcome($projectFileScan));
+        self::assertSame([['Skipped symlinked directory', ['path' => $this->project.'/src/Controller/Admin']]], $warningCollectingLogger->warnings);
+    }
+
+    public function test_a_symlinked_directory_git_tracks_although_a_gitignore_pattern_matches_it_is_not_reported(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/.gitignore', "Admin\n");
+        $this->link('lib/Admin', 'src/Controller/Admin');
+        (new Process(['git', 'init', '--quiet', $this->project]))->mustRun();
+        (new Process(['git', 'add', '--force', 'src/Controller/Admin'], $this->project))->mustRun();
+
+        self::assertSame(
+            [['src/Controller/HomeController.php'], []],
+            $this->outcome((new ProjectFileScanner(new NullLogger(), ['src'], respectGitignore: true, gitTrackedIgnoredFiles: new GitTrackedIgnoredFiles(new NullLogger())))->scanReportingSkippedFiles($this->project)),
+        );
     }
 
     public function test_an_included_path_that_is_a_symlink_is_left_out_as_a_symbolic_link(): void
@@ -187,6 +231,24 @@ final class ProjectFileScannerSymlinkTest extends TestCase
             array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFileScan->files),
             array_map(static fn (SkippedFile $skippedFile): array => [$skippedFile->relativePath, $skippedFile->reason], $projectFileScan->skippedFiles),
         ];
+    }
+
+    /**
+     * @param Closure(): ProjectFileScan $action
+     */
+    private function asUnprivilegedUser(Closure $action): ProjectFileScan
+    {
+        if (0 !== posix_geteuid()) {
+            return $action();
+        }
+
+        self::assertTrue(posix_seteuid(self::UNPRIVILEGED_USER_ID));
+
+        try {
+            return $action();
+        } finally {
+            posix_seteuid(0);
+        }
     }
 
     private function link(string $target, string $link): void

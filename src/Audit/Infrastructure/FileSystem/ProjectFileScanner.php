@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
 use CallbackFilterIterator;
 use Closure;
-use FilesystemIterator;
 use Generator;
 use Override;
 use Psr\Log\LoggerInterface;
@@ -23,7 +22,6 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
-use UnexpectedValueException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
@@ -38,15 +36,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingP
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ProjectFileScanner implements ScopedProjectFileScannerInterface, SkippedFileReportingProjectFileScannerInterface, ReadSharingProjectFileScannerInterface, ProbingProjectFileScannerInterface
 {
-    /** @var list<string> */
-    private const array PHP_EXTENSIONS = ['php'];
-
-    /** @var list<string> */
-    private const array TEMPLATE_EXTENSIONS = ['twig'];
-
-    /** @var list<string> */
-    private const array CONFIG_EXTENSIONS = ['yaml', 'yml', 'xml'];
-
     public const int DEFAULT_MAX_FILE_SIZE_KB = 512;
 
     /**
@@ -265,38 +254,10 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      */
     private function scanDirectories(array $directories, string $projectPath, Closure $contentOf, array $trackedIgnored): Generator
     {
+        $scannedDirectoryWalk = new ScannedDirectoryWalk($this->logger);
         foreach ($directories as $directory) {
-            $finder = (new Finder())
-                ->files()
-                ->ignoreDotFiles(!$this->includeDotfiles)
-                ->in($directory)
-                ->name($this->finderNamePatterns())
-                ->filter($this->entersReadableDirectory(...), true);
-
-            yield from $this->collectFilesFrom($finder, $directory, $projectPath, $contentOf, $trackedIgnored);
+            yield from $this->collectFilesFrom($scannedDirectoryWalk->in($directory, $this->includeDotfiles), $directory, $projectPath, $contentOf, $trackedIgnored);
         }
-
-        yield from (new SymlinkedDirectories($this->logger))->in($directories, $projectPath, $this->includeDotfiles, $this->respectGitignore);
-    }
-
-    private function entersReadableDirectory(SplFileInfo $splFile): bool
-    {
-        if (!$splFile->isDir()) {
-            return true;
-        }
-
-        try {
-            new FilesystemIterator($splFile->getPathname());
-        } catch (UnexpectedValueException $unexpectedValueException) {
-            $this->logger->warning('Skipped unreadable directory', [
-                'path' => $splFile->getPathname(),
-                'error' => $unexpectedValueException->getMessage(),
-            ]);
-
-            return false;
-        }
-
-        return true;
     }
 
     /**
@@ -346,7 +307,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
             return;
         }
 
-        yield from $this->scanFinder($this->onlyPaths($finder, $trackedIgnored, $projectPath), $projectPath, $contentOf);
+        yield from $this->scanFinder($this->onlyPaths($finder->files(), $trackedIgnored, $projectPath), $projectPath, $contentOf);
     }
 
     /**
@@ -370,23 +331,6 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         foreach ($splFiles as $splFile) {
             yield $this->scanFile($splFile, $projectPath, $contentOf);
         }
-    }
-
-    /**
-     * A glob's `*` never matches a leading dot, so each extension is matched
-     * as `.*.ext` too: the dot files a walk reads when `$includeDotfiles`
-     * asks for them.
-     *
-     * @return list<string>
-     */
-    private function finderNamePatterns(): array
-    {
-        $extensions = [...self::PHP_EXTENSIONS, ...self::TEMPLATE_EXTENSIONS, ...self::CONFIG_EXTENSIONS];
-
-        return [
-            ...array_map(static fn (string $extension): string => \sprintf('*.%s', $extension), $extensions),
-            ...array_map(static fn (string $extension): string => \sprintf('.*.%s', $extension), $extensions),
-        ];
     }
 
     /**
@@ -483,11 +427,11 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * Finder's `files()` leaves out directories alone, so a named pipe, a
-     * socket or a device node named like a source file reaches this point:
-     * opening a pipe waits for a writer forever, and a device may never end,
-     * so anything but a regular file is reported unreadable without being
-     * opened.
+     * A walk leaves out only the directories it enters, so a symbolic link to
+     * a directory, and a named pipe, a socket or a device node named like a
+     * source file, reach this point: a link is never followed, opening a pipe
+     * waits for a writer forever, and a device may never end, so anything but
+     * a regular file is reported without being opened.
      *
      * @param Closure(SplFileInfo, string): string $contentOf
      */
@@ -496,7 +440,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
         $relativePath = $this->validUtf8RelativePath($splFile, $projectPath);
 
         if ($splFile->isLink()) {
-            $this->logger->warning('Skipped symlinked file', ['path' => $splFile->getPathname()]);
+            $this->logger->warning($splFile->isDir() ? 'Skipped symlinked directory' : 'Skipped symlinked file', ['path' => $splFile->getPathname()]);
 
             return new SkippedFile($relativePath, SkippedFileReason::Symlink);
         }

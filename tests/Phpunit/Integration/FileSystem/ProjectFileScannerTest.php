@@ -82,13 +82,17 @@ final class ProjectFileScannerTest extends TestCase
         file_put_contents($this->tmpDir.'/src/Service.php', '<?php class Service {}');
         file_put_contents($this->tmpDir.'/templates/base.html.twig', '{{ user.name }}');
         file_put_contents($this->tmpDir.'/config/security.yaml', 'security: {}');
+        file_put_contents($this->tmpDir.'/config/routes.yml', 'home: {}');
+        file_put_contents($this->tmpDir.'/config/services.xml', '<container/>');
 
         $files = $this->projectFileScanner->scan($this->tmpDir);
 
-        self::assertCount(3, $files);
+        self::assertCount(5, $files);
         $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
         sort($paths);
         self::assertContains('config/security.yaml', $paths);
+        self::assertContains('config/routes.yml', $paths);
+        self::assertContains('config/services.xml', $paths);
         self::assertContains('src/Service.php', $paths);
         self::assertContains('templates/base.html.twig', $paths);
     }

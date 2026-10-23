@@ -105,6 +105,24 @@ final class ProjectFileScannerUnreadableGitignoreTest extends TestCase
         );
     }
 
+    public function test_a_gitignore_that_holds_no_rule_is_named_once_when_a_symlinked_directory_points_beside_it(): void
+    {
+        $this->filesystem->mkdir([$this->project.'/src/Controller/Admin', $this->project.'/src/Legacy']);
+        $this->filesystem->symlink($this->project.'/src/Controller/Admin', $this->project.'/src/Legacy/Admin');
+
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        $this->scannedPaths($warningCollectingLogger);
+
+        self::assertSame(
+            [
+                ['Read no rule from a .gitignore that is not a readable file', ['path' => $this->project.'/src/Controller/.gitignore']],
+                ['Skipped symlinked directory', ['path' => $this->project.'/src/Legacy/Admin']],
+            ],
+            $warningCollectingLogger->warnings,
+        );
+    }
+
     public function test_the_rules_of_the_other_gitignore_files_still_apply(): void
     {
         $this->put('src/.gitignore', "Generated.php\n");
