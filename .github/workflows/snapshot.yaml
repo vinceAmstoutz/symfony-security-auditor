@@ -109,3 +109,7 @@ jobs:
           } > snapshot-notes.md
 
           gh release edit snapshot --title "$VERSION" --notes-file snapshot-notes.md --prerelease --latest=false
+
+          # Publishing stamps the release date, which an in-place edit never refreshes.
+          gh release edit snapshot --draft=true
+          gh release edit snapshot --draft=false --prerelease --latest=false
