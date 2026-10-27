@@ -321,25 +321,23 @@ jobs:
         with:
           name: ${{ matrix.asset }}
 
-      - name: Attach the binary and checksum to the release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
+      - name: Attach the binary and checksum to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           # A release event carries its own tag context; a workflow_dispatch
           # rebuild does not, so target the tag explicitly (the input on
           # dispatch, the pushed tag on a release event).
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          # softprops/action-gh-release always sends its draft input (default
-          # false) rather than leaving the field untouched, so every call must
-          # state the release's intended draft state explicitly or it gets
-          # published on the first asset attached.
-          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_draft }}
-          # Replace an asset of the same name instead of erroring or
-          # accumulating duplicates when the workflow is re-dispatched to
-          # repair a partially-published release.
-          overwrite_files: true
-          files: |
-            ${{ matrix.asset }}
-            ${{ matrix.asset }}.sha256
+          TAG: ${{ inputs.tag || github.ref_name }}
+          ASSET: ${{ matrix.asset }}
+        # Uploading only adds assets: the release itself is never edited, so a
+        # draft stays a draft until `finalize` publishes it. An upload action
+        # that re-sent the release's tag and target commit on every call was
+        # refused by GitHub on the snapshot release ("Resource not accessible
+        # by integration"). --clobber replaces an asset of the same name when
+        # the workflow is re-dispatched to repair a partially-published
+        # release.
+        run: gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
 
   installers:
     name: Attach the installers and config schema
@@ -353,21 +351,17 @@ jobs:
           ref: ${{ inputs.ref || inputs.tag || github.ref }}
           persist-credentials: false
 
-      - name: Attach the installers and config schema to the release # zizmor: ignore[superfluous-actions] -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_draft }}
-          overwrite_files: true
-          # Published so the documented URLs can resolve through
-          # `releases/latest/download/` — which always serves the newest
-          # published release — instead of tracking `main`, where an unreleased
-          # change reaches users before the release that carries it.
-          # `resources/schema.json` uploads under its basename, `schema.json`.
-          files: |
-            install.sh
-            install.ps1
-            resources/schema.json
+      - name: Attach the installers and config schema to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        # Published so the documented URLs can resolve through
+        # `releases/latest/download/` — which always serves the newest
+        # published release — instead of tracking `main`, where an unreleased
+        # change reaches users before the release that carries it.
+        # `resources/schema.json` uploads under its basename, `schema.json`.
+        run: gh release upload "$TAG" install.sh install.ps1 resources/schema.json --clobber
 
   prune:
     name: Prune stale release assets
@@ -385,7 +379,7 @@ jobs:
           # Assets this release should carry — keep in sync with the binary
           # matrix above. Any other asset under our own name prefix (e.g. a
           # binary from a since-renamed platform slug like the old `darwin-*`)
-          # is an orphan left behind by overwrite_files and gets pruned, so a
+          # is an orphan left behind by --clobber and gets pruned, so a
           # rebuild after a rename/removal self-heals instead of accumulating
           # duplicates.
           keep='
