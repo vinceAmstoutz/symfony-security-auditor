@@ -160,6 +160,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### Core 🧱
 
+- `mcp:serve` runs on `mcp/sdk` `^0.9`, for the bundle and the standalone binary; in bundle mode an application holding `mcp/sdk` at 0.8 must let it move to 0.9 ([#645](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/645))
 - `mcp:serve`, the `audit` MCP tool and its input schema are marked experimental: they may change in any release and are no longer covered by the backward compatibility promise ([#633](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/633))
 - Cached attacker and reviewer answers refresh once after upgrading ([#442](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/442), [#449](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/449), [#467](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/467), [#517](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/517), [#615](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/615))
 - A custom `RecordVulnerabilityToolFactoryInterface` tool may implement `RecordingToolInterface`, answering `RecordingToolInterface::RECORDED` for a call it took in and anything else for a refusal; one that does not still records on the last tool round ([#410](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/410), [#474](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/474), [#638](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/638))
