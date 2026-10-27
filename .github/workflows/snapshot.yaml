@@ -52,18 +52,21 @@ jobs:
           count="$(git rev-list --count "${release}..HEAD")"
           echo "version=${release}+${count}.g$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Create the snapshot pre-release on the first run
+      - name: Replace the snapshot pre-release with a fresh one
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          # Titled "snapshot" until the first build attaches its binaries, so
+          # A release keeps the date it was first published whatever is edited
+          # afterwards, so each build gets a release of its own; the tag stays.
+          # Titled "snapshot" until this build attaches its binaries, so
           # `self-update --snapshot` refuses it rather than installing nothing.
-          if ! gh release view snapshot >/dev/null 2>&1; then
-            gh release create snapshot --target "$GITHUB_SHA" --prerelease --latest=false --title snapshot --notes "The first snapshot is still building."
+          if gh release view snapshot >/dev/null 2>&1; then
+            gh release delete snapshot --yes
           fi
+          gh release create snapshot --target "$GITHUB_SHA" --prerelease --latest=false --title snapshot --notes "This snapshot is still building."
 
   build:
     name: Build
@@ -109,7 +112,3 @@ jobs:
           } > snapshot-notes.md
 
           gh release edit snapshot --title "$VERSION" --notes-file snapshot-notes.md --prerelease --latest=false
-
-          # Publishing stamps the release date, which an in-place edit never refreshes.
-          gh release edit snapshot --draft=true
-          gh release edit snapshot --draft=false --prerelease --latest=false
