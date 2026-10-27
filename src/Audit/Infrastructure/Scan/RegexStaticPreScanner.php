@@ -299,7 +299,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             ],
             'extension_is_safe_html' => [
                 'regex' => '/[\'"]is_safe[\'"]\s*=>\s*\[\s*[\'"]html[\'"]\s*\]/',
-                'description' => 'is_safe => [\'html\'] declared — verify the returned string is built only from hardcoded markup or sanitized input, not raw user/DB content (stored XSS otherwise)',
+                'description' => "is_safe => ['html'] declared — verify the returned string is built only from hardcoded markup or sanitized input, not raw user/DB content (stored XSS otherwise)",
             ],
         ],
         ProjectFileType::TEMPLATE->value => [
@@ -419,7 +419,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             ],
             'easyadmin_destructive_action' => [
                 'regex' => '/Action::(?:DELETE|BATCH_DELETE)\b/',
-                'description' => 'EasyAdmin DELETE/BATCH_DELETE action referenced in configureActions() — verify it is scoped with ->setPermission(Action::DELETE, \'ROLE_...\'), not left at the dashboard\'s default role',
+                'description' => "EasyAdmin DELETE/BATCH_DELETE action referenced in configureActions() — verify it is scoped with ->setPermission(Action::DELETE, 'ROLE_...'), not left at the dashboard's default role",
             ],
         ],
         ProjectFileType::MESSENGER_HANDLER->value => [
