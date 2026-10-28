@@ -140,7 +140,7 @@ Minimal:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-5'
+    model: 'claude-opus-5-5'
 ```
 
 One-knob preset (`fast` | `balanced` | `thorough`; explicit keys always win):

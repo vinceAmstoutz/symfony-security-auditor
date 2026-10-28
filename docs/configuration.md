@@ -64,7 +64,7 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 > # $schema: https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
 >
 > symfony_security_auditor:
->     model: "claude-opus-5"
+>     model: "claude-opus-5-5"
 > ```
 >
 > This gives key completion, type checking, and inline docs as you edit. The example files under [`examples/configs/`](../examples/configs/) include the modeline. The URL tracks the `main` branch so it always resolves to the current schema — no per-release bump needed.
@@ -208,7 +208,7 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-opus-5'
+    model: 'claude-opus-5-5'
 ```
 
 ### Split mode — separate models per role
@@ -776,7 +776,7 @@ What each format produces. For ready-to-paste pipeline snippets, see [Output For
   messenger_handler_unsafe                           1
   misconfigured_firewall                             1
   sql_injection                                      1
-  twig_injection                                     1
+  xss                                                1
 
   TOP AFFECTED FILES (of 5)
   src/Controller/Admin/UserController.php            3
@@ -805,7 +805,7 @@ _Since 1.19._ A pull-request comment body, sized for a comment rather than a ful
 | Severity | Finding | Location | Type |
 | --- | --- | --- | --- |
 | 🔴 CRITICAL | Unprotected administrative action | `src/Controller/Admin/UserController.php:41` | `broken_access_control` |
-| 🟠 HIGH | Unescaped user input in a Twig template | `src/Twig/ReviewExtension.php:23` | `twig_injection` |
+| 🟠 HIGH | Unescaped user input in a Twig template | `src/Twig/ReviewExtension.php:23` | `xss` |
 
 ---
 
@@ -1080,7 +1080,7 @@ symfony-security-auditor self-update --check  # only report whether a newer vers
 symfony-security-auditor self-update --snapshot  # switch to the latest snapshot
 ```
 
-It queries the GitHub releases API for the latest version (a release tag is accepted only as `X.Y.Z`, with an optional pre-release suffix and an optional leading `v`, and anything else is refused before it reaches a download URL or the terminal) and, when the running binary is older, downloads the asset for your platform (the same OS/arch detection `install.sh` uses) next to the running executable, **verifies its `.sha256` checksum before replacing anything**, and renames it over the executable — an atomic swap — as the command exits, once nothing more is loaded from the running binary. The command therefore reports `Downloaded and verified <new>; it replaces <old> as this command exits.`; if that final swap fails, it prints why on stderr, keeps the previous binary, and exits `1`. Downloads use `curl`, so it must be on the host (as it already is for the install script).
+It queries the GitHub releases API for the latest version (a release tag is accepted only as `X.Y.Z`, with an optional pre-release suffix and an optional leading `v`, and anything else is refused before it reaches a download URL or the terminal) and, when the running binary is older, downloads the asset for your platform (the same OS/arch detection `install.sh` uses) next to the running executable, **verifies its `.sha256` checksum before replacing anything**, and renames it over the executable — an atomic swap — as the command exits, once nothing more is loaded from the running binary. The command therefore reports `Downloaded and verified <new>; it replaces <old> as this command exits.`; if that final swap fails, it prints why on stderr, keeps the previous binary, and exits `1`. Downloads use `curl`, so it must be on the host (as it already is for the install script). While it downloads, a terminal shows how much of the binary has arrived and for how long (`Downloading the new binary: 26.0 MiB received (0:42)`); any other output, such as a CI log, prints `Downloading the new binary…` once.
 
 | Option | Default | Description |
 | --- | --- | --- |

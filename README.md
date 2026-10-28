@@ -10,6 +10,17 @@ AI-powered, multi-agent security auditor for Symfony applications. An adversaria
 >
 > `main` holds **exactly the latest release**, so everything documented here is in the version you install. Development happens on [version branches](docs/versioning.md#branches--maintenance).
 
+## What's new in 1.22
+
+- **Claude Opus 5.5 by default** — `init` lists the providers and the newest models the pricing catalog prices, to pick by number, and suggests `claude-opus-5-5`.
+- **Gates in YAML, config per project** — `audit.min_score`, `audit.fail_on_incomplete`, `audit.format` and `audit.output` live in the configuration, and the standalone binary layers the audited project's own `.symfony-security-auditor.yaml` over your user config. A flag always wins.
+- **Sharper pull-request audits** — `audit.tools_scope: scanned` lets a `--since` or `--path` run follow a changed controller into unchanged files, and `audit.report_path_prefix` puts SARIF and GitHub annotations on the right file in a monorepo.
+- **Honest reports** — `xss` is a finding type of its own, files the scan left out are listed, and a run that found no file reads `UNKNOWN` instead of a clean grade.
+- **Standalone binary, all the commands** — `audit:diff`, `audit:trend` and `audit:baseline` run with no configuration; `self-update` shows its download progress, and `self-update --snapshot` installs the build of every push to `1.x` to try a fix before it ships.
+- **More secrets scrubbed** — Symfony secrets-vault keys, `Authorization` headers, and the credentials passed to PDO, LDAP, Redis, HttpClient and many more are redacted before any code leaves your machine.
+
+Everything else is in the [changelog](CHANGELOG.md).
+
 ## Why this auditor?
 
 Traditional PHP static analysis tools (PHPStan, Psalm) catch type errors. Static SAST tools (Psalm Security, Progpilot) follow taint flows but cannot reason about business logic, missing authorization, or multi-file attack chains. Dependency scanners (Dependabot, Renovate, Snyk) only flag known CVEs in third-party packages. This auditor runs alongside them, **targeting the application-level logic flaws they cannot see**.
@@ -23,6 +34,16 @@ An adversarial **Attacker** agent hunts for vulnerabilities; a skeptical **Revie
 🔀 **Pipeline**: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer) → Report.
 
 ## See it in action
+
+### `doctor` — preflight check
+
+![Doctor — the standalone binary checks its configuration, provider bridge, Composer and pricing catalog](assets/doctor.gif?raw=true)
+
+The standalone binary checks that it is ready to audit before you spend a token: configuration and API key, provider bridge, Composer, and pricing catalog. It exits `1` when a check fails, so it drops into a CI preflight step — see [`doctor`](docs/configuration.md#doctor--preflight-environment-check).
+
+```bash
+symfony-security-auditor doctor
+```
 
 ### `--dry-run` mode
 
@@ -173,7 +194,7 @@ The Flex recipe already created this file — pick your model:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-opus-5'
+    model: 'claude-opus-5-5'
 ```
 
 Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough`:
@@ -253,7 +274,7 @@ With the binary, the server reads its configuration once, when it starts — you
 - **Symfony-aware** — understands Controllers, Voters, Forms, Firewalls, Routes, `#[IsGranted]`, `denyAccessUnlessGranted`, `#[MapRequestPayload]`, Twig/Live Components, and surfaces controllers without proper access checks.
 - **Feature-based chunking** — groups a controller with its entity, repository, form, voter, and templates so the Attacker can follow data flow across files.
 - **Deterministic pre-scan** — a zero-token risk-marker pass flags concrete locations (unserialize, `|raw`, hardcoded secrets, unsafe Doctrine, …) to focus the LLM; optional **lean mode** drops marker-free files to cut tokens. Results from other SAST tools can be imported as markers via SARIF.
-- **Diff mode** — `audit:run --since=main` audits only changed files for fast pull-request CI.
+- **Diff mode** — `audit:run --since=main` audits only changed files for fast pull-request CI; with `audit.tools_scope: scanned` the Attacker can still follow a changed controller into the unchanged files it calls.
 - **Cross-file investigation tools** — Attacker (and optionally Reviewer) can `read_file`, `grep`, `list_files`, and `lookup_advisory` (zero-config live CVE lookups via `composer audit`, backed by Packagist + GitHub Security Advisories).
 - **One-knob profiles** — `fast`, `balanced`, and `thorough` preset the cost/speed/depth levers in a single line; any explicit key still wins.
 - **Tunable for speed & cost** — split-model (powerful Attacker + cheap Reviewer, ~20× cheaper), concurrent Attacker **and** Reviewer calls (`attacker_max_concurrent` / `reviewer_max_concurrent`), Anthropic prompt caching on by default (~90% input-token discount), content-hash caching that skips identical chunks, cheap→expensive escalation, and code slicing.
@@ -262,7 +283,7 @@ With the binary, the server reads its configuration once, when it starts — you
 - **Actionable findings** — optionally attach a copy-pasteable reproduction (curl/console/payload) and a suggested patch to every high-severity finding; each one also carries a heuristic CVSS v4.0 estimate.
 - **Nine output formats** — `console`, `executive` (stakeholder summary: risk level, business impact, severity/type/hotspot distributions, no per-finding detail), `json`, `sarif` (GitHub Code Scanning / GitLab Security Dashboard), `html` (self-contained, shareable), `markdown` (PR-friendly), `junit` (CI test-report panels), `github` (inline PR annotations, no SARIF upload step), and `github-comment` (PR comment headlined by the grade and score, self-updating on rerun). Baseline suppression: `--generate-baseline` accepts known findings, `--baseline` drops them from the report and exit code so only new findings fail CI; `--min-score` gates on the normalized score independently of `--fail-on`.
 - **Callable from your AI assistant (experimental)** — `mcp:serve` exposes the audit as an MCP tool to Claude Code, Claude Desktop, Cursor, VS Code and any other MCP client, from the binary or the bundle (see [Use it from your AI assistant](#use-it-from-your-ai-assistant-mcp)).
-- **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them.
+- **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them, and `audit:baseline` merges, prunes and annotates a baseline — in the bundle and the standalone binary alike.
 - **CI-ready** — a reusable [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.22.0`) plus GitLab CI templates, with SARIF upload to Code Scanning and an optional shields.io badge tracking the report's letter grade. See [CI Integration](docs/ci.md).
 - **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let you plug in custom providers, agents, stages, advisory feeds, or report formats; project-specific attacker skills need only configuration, no PHP.
 - **Bundle or standalone** — install as a Symfony bundle, or run it from a single self-contained binary configured once at the user level to audit any project with zero footprint, kept current with `self-update` and preflighted with `doctor` (see [Standalone tool](#standalone-tool-binary)).
@@ -271,7 +292,7 @@ With the binary, the server reads its configuration once, when it starts — you
 
 The auditor is conservative about what leaves your machine:
 
-- **Secrets are scrubbed before they leave your machine.** With `scan.secret_scrubbing.enabled: true` (the default), credential-shaped strings are redacted from file content _before_ it reaches the LLM: AWS / GitHub / Stripe / Slack / Google API keys, JWTs, PEM private keys, env-style credential assignments, and connection-string URIs with embedded credentials (`postgres://user:pass@host`). Add project-specific shapes with `scan.secret_scrubbing.additional_patterns`.
+- **Secrets are scrubbed before they leave your machine.** With `scan.secret_scrubbing.enabled: true` (the default), credential-shaped strings are redacted from file content _before_ it reaches the LLM: AWS / GitHub / Stripe / Slack / Google API keys, JWTs, PEM private keys, Symfony secrets-vault decryption keys, env-style credential assignments, `Authorization` headers, the credentials passed in code to PDO, LDAP, Redis or HttpClient, and connection-string URIs with embedded credentials (`postgres://user:pass@host`). Add project-specific shapes with `scan.secret_scrubbing.additional_patterns`.
 - **The cache never stores your files.** The filesystem cache keys LLM _responses_ by content hash. An entry holds the findings the model reported, with the short source excerpts it quoted, and the reviewer's reasoning — never a project file — so treat `cache.dir` like a report: keep it out of shared CI caches and public artifacts.
 - **You choose where the code goes.** Source is sent only to the provider you wire in `ai.yaml`. For zero third-party exposure, run fully offline with [Ollama](docs/configuration.md#supported-platforms) — nothing leaves your network. Set [`privacy.offline_only: true`](docs/configuration.md#privacy--data-egress) to have that enforced rather than assumed: the advisory feed is dropped (no `composer audit`) and the standalone CLI refuses to boot against a platform endpoint that is not loopback or private-range. `docs/faq.md` carries a `tcpdump` recipe for verifying it yourself.
 - **Reports are sensitive — they list your weak spots.** On public repos, prefer SARIF → GitHub Code Scanning (collaborator-only) over downloadable CI artifacts. See [Report Visibility](docs/ci.md#report-visibility-on-public-repositories).
