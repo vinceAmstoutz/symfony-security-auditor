@@ -33,7 +33,7 @@ $draftEntries = new DraftEntries();
 while ([] !== $queue || [] !== $running) {
     while (count($running) < $parallel && [] !== $queue) {
         $scenario = array_shift($queue);
-        $running[$scenario] = new Process([\PHP_BINARY, '-d', 'memory_limit=1G', __FILE__, '--scenario', $scenario]);
+        $running[$scenario] = new Process([\PHP_BINARY, '-d', 'memory_limit=2G', __FILE__, '--scenario', $scenario]);
         $running[$scenario]->setTimeout(600);
         $running[$scenario]->start();
     }

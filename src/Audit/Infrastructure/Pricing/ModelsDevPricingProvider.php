@@ -97,6 +97,19 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return $this->priced($model)->cacheCreation;
     }
 
+    /**
+     * The models the listing of `$platform`'s own provider holds, as the
+     * catalog the run prices from has them.
+     *
+     * @return array<array-key, mixed>
+     */
+    public function platformListing(string $platform): array
+    {
+        $provider = PlatformCatalogProviders::providerOf($platform);
+
+        return null === $provider ? [] : $this->arrayAt($this->arrayAt($this->catalog(), $provider), 'models');
+    }
+
     #[Override]
     public function hasModel(string $model): bool
     {

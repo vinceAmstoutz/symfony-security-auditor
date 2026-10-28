@@ -49,7 +49,7 @@ $previousRecordings = glob(sprintf('%s/*.*.*', $fixtureRoot), \GLOB_ONLYDIR);
 
 $failed = 0;
 foreach (array_keys(ScenarioCatalog::all()) as $name) {
-    $process = new Process([\PHP_BINARY, '-d', 'memory_limit=1G', __FILE__, $checkout, $release, $name]);
+    $process = new Process([\PHP_BINARY, '-d', 'memory_limit=2G', __FILE__, $checkout, $release, $name]);
     $process->setTimeout(600);
     $process->run();
     $status = match ($process->getExitCode()) {

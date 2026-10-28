@@ -51,6 +51,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\FilesystemUpdateCheckStore;
@@ -277,6 +278,7 @@ final readonly class StandaloneApplicationFactory
             $this->bridgeInstaller,
             new ComposerPreflight($this->composerAvailabilityChecker()),
             $this->credentialStore,
+            pricedModelList: new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
         );
     }
 

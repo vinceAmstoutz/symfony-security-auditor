@@ -130,7 +130,7 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
         $this->report($whileRunning);
 
         if (!$process->isSuccessful()) {
-            throw SelfUpdateFailedException::forFailedDownload($url);
+            throw SelfUpdateFailedException::forFailedDownload($url, reason: trim($process->getErrorOutput()));
         }
 
         return $process;

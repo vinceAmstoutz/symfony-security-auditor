@@ -1,0 +1,7 @@
+{
+    "openai": {
+        "models": {
+            "42": {"id": "42", "release_date": "2026-01-01", "last_updated": "2099-01-01", "tool_call": true, "cost": {"input": 1, "output": 2}}
+        }
+    }
+}

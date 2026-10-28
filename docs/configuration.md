@@ -467,6 +467,8 @@ A relative path is refused rather than resolved against the directory the comman
 
 Run `symfony-security-auditor init` to generate the file interactively and fetch the provider bridge — into its own composer project under the data directory, pinned to the binary's PHP version and to the `symfony/ai-platform` release the binary bundles, both refreshed on every run. Every bridge that project already requires is required again in the same `composer require`, so a second bridge you fetched by hand moves with the pin.
 
+_Since 1.22._ The prompts list the providers the pricing catalog prices, then the ten newest models that provider's own listing prices and that call tools, newest first. Pick one by its number, or type any other provider (`ollama`, `generic.my_gateway`) or model id, as before.
+
 The binary loads that project ahead of its own classes, so a project holding another `symfony/ai-platform` release — one an older version of the binary installed, 1.20.x included — would replace the bundled one and fail every LLM call. The binary reads the release from the project's `vendor/composer/installed.php` first and leaves such a project unloaded: `audit`, `mcp:serve` and `doctor` then say so and name the command that rebuilds it, `init --provider=<your provider> --force`. `init` rewrites `config.yaml`, so give it your model and connection options again, and `--force` keeps it from stopping at the overwrite question, which `--no-interaction` answers with no.
 
 The file is **rootless** — the same keys as the bundle configuration above, without the `symfony_security_auditor:` wrapper — plus three standalone-only top-level keys:
