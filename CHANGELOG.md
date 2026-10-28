@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
-## [1.22.0] — 2026-10-23 — Steadfast
+## [1.22.0] — 2026-10-29 — Compass
 
 ### New Features ✨
 
