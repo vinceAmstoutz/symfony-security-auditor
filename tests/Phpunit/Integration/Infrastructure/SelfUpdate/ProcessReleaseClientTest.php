@@ -115,6 +115,39 @@ final class ProcessReleaseClientTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
+    public function test_a_download_that_wrote_nothing_reports_no_byte(): void
+    {
+        $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => new Process(['true']));
+        $receivedBytes = [];
+
+        $processReleaseClient->download('https://example.test/asset', $this->workingDirectory.'/asset', static function (int $bytes) use (&$receivedBytes): void {
+            $receivedBytes[] = $bytes;
+        });
+
+        self::assertSame([0], array_values(array_unique($receivedBytes)));
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    #[MaximumDuration(4000)]
+    public function test_a_download_that_outlives_its_process_timeout_fails(): void
+    {
+        $processReleaseClient = new ProcessReleaseClient(static function (array $arguments): Process {
+            $process = Process::fromShellCommandline('sleep 5');
+            $process->setTimeout(0.5);
+
+            return $process;
+        });
+
+        $this->expectException(SelfUpdateFailedException::class);
+
+        $processReleaseClient->download('https://example.test/asset', $this->workingDirectory.'/asset', static function (int $bytes): void {});
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
     public function test_download_writes_the_response_to_the_destination(): void
     {
         $destination = $this->workingDirectory.'/asset';

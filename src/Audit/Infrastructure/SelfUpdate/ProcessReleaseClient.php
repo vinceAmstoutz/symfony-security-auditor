@@ -119,11 +119,10 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
         try {
             $process->start();
             while ($process->isRunning()) {
+                $process->checkTimeout();
                 $this->report($whileRunning);
                 usleep(self::PROGRESS_INTERVAL_MICROSECONDS);
             }
-
-            $process->wait();
         } catch (ExceptionInterface $exception) {
             throw SelfUpdateFailedException::forFailedDownload($url, $exception);
         }

@@ -60,14 +60,8 @@ final readonly class SelfUpdateCommand
         $releaseChannel = $snapshot ? ReleaseChannel::Snapshot : ReleaseChannel::Stable;
         $progressBar = $symfonyStyle->createProgressBar();
         $progressBar->setFormat(' Downloading the new binary: %message% received (%elapsed%)');
-        $progressBar->setMessage(Helper::formatMemory(0));
 
         $selfUpdateResult = $this->selfUpdater->run($this->currentVersion, $check, $releaseChannel, $symfonyStyle->isDecorated() ? $this->downloadProgress($progressBar) : $this->downloadAnnouncement($symfonyStyle));
-
-        if ($symfonyStyle->isDecorated() && SelfUpdateStatus::Updated === $selfUpdateResult->status) {
-            $progressBar->finish();
-            $symfonyStyle->newLine();
-        }
 
         $this->refreshUpdateCheckCache($selfUpdateResult, $releaseChannel);
 
