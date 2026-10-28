@@ -42,6 +42,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### Bugfixes 🐛
 
+- With `scan.respect_gitignore`, a symlinked directory that points into a directory a `.gitignore` ignores stays out of the skipped files on `symfony/finder` 7.4.22 and 8.1.10, as on earlier releases ([#655](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/655))
 - `self-update` says why a download failed, for example `The requested URL returned error: 403`, instead of only naming the URL ([#653](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/653))
 - With `audit.structured_collection: false`, an answer whose only finding is a bare object instead of a one-element array reports it and caches its chunk; findings written apart (one object per line, after an array, or cut off) still leave the chunk unanalyzed and uncached, and an object keyed by finding is read as its findings ([#641](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/641), [#642](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/642))
 - `audit:run --dry-run` with an `audit.max_iterations` or `audit.max_tool_iterations` so large that its token estimate overflows prints the estimate held at the largest token count instead of stopping with an unexpected error ([#641](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/641))
