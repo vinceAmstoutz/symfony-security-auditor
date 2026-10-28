@@ -225,10 +225,10 @@ Locally, only via `LoggerInterface` warnings if the Attacker / Reviewer fails to
 
 | Goal | Recommended setup |
 | --- | --- |
-| Most demanding | `attacker_model: claude-fable-5` + `reviewer_model: claude-haiku-4-5-20251001` |
+| Most demanding | `attacker_model: claude-fable-5` + `reviewer_model: claude-haiku-5-5` |
 | Highest accuracy | `attacker_model: claude-opus-5` + `reviewer_model: claude-opus-5` |
-| Best cost/quality | `attacker_model: claude-opus-5` + `reviewer_model: claude-haiku-4-5-20251001` |
-| Strong + cheaper | `attacker_model: claude-sonnet-5` + `reviewer_model: claude-haiku-4-5-20251001` |
+| Best cost/quality | `attacker_model: claude-opus-5` + `reviewer_model: claude-haiku-5-5` |
+| Strong + cheaper | `attacker_model: claude-sonnet-5` + `reviewer_model: claude-haiku-5-5` |
 | Cheapest paid | `model: deepseek-flash` or `mistral-large-latest` |
 | Offline / free | `model: llama3.3` via Ollama |
 | Enterprise | Azure OpenAI / AWS Bedrock with split-model |
@@ -248,7 +248,7 @@ The two agents want opposite trade-offs, so tune them independently with the spl
   ```yaml
   symfony_security_auditor:
       attacker_model: 'claude-opus-5?effort=high'
-      reviewer_model: 'claude-haiku-4-5-20251001'
+      reviewer_model: 'claude-haiku-5-5'
   ```
 
 - **Reviewer — favour speed.** It validates one finding against context you already hand it, so a faster, cheaper model at lower effort is usually enough; spend the budget on the attacker instead.
@@ -273,7 +273,7 @@ Other params (e.g. `temperature`) flow through the model name, using the query-s
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-haiku-4-5-20251001?temperature=0.1'
+    model: 'claude-haiku-5-5?temperature=0.1'
 ```
 
 > `model`, `attacker_model`, and `reviewer_model` are plain strings, so the expanded `{name, options}` mapping that `symfony/ai-bundle`'s own `ai.yaml` accepts for a model is **not** valid here — only the query-string form above works. See [Configuration → Model Options](configuration.md#model-options).

@@ -72,6 +72,20 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_offers_claude_opus_5_5_as_the_default_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should the auditor use? [claude-opus-5-5]:', $this->unwrappedDisplay($commandTester));
+        self::assertSame(
+            ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-5-5'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
     public function test_it_installs_the_bridge_for_the_chosen_provider_in_the_data_directory(): void
     {
         $commandTester = $this->commandTester();

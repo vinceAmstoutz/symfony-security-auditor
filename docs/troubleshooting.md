@@ -460,7 +460,7 @@ LLM output is **nondeterministic** by design. Set `temperature: 0.0` (or `0.1`) 
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-haiku-4-5-20251001?temperature=0.0'
+    model: 'claude-haiku-5-5?temperature=0.0'
 ```
 
 With `temperature: 0.0` + `cache.enabled: true`, repeated runs on identical code become deterministic.
@@ -500,7 +500,7 @@ To bring a repository of that size into a sane envelope, in the order that helps
 - Confirm Anthropic prompt caching is on — `cache_retention` in `ai.yaml` (default `short`) gives a ~90% input-token discount on cached prompts.
 - Confirm `cache.enabled: true` (default) — repeated chunks skip the LLM entirely.
 - Lower `audit.max_tool_iterations` from `8` to `4` or `5` — caps chatty tool-use loops on each chunk at the cost of less cross-file investigation.
-- Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-4-5-20251001` or `deepseek-flash`).
+- Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-5-5` or `deepseek-flash`).
 - Set a provider-side hard cap. See [CI → Set a spend cap](ci.md#set-a-spend-cap).
 - Run weekly instead of nightly for large monorepos.
 

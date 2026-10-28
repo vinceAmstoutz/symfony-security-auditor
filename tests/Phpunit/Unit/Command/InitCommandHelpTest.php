@@ -20,7 +20,7 @@ final class InitCommandHelpTest extends TestCase
 {
     public function test_it_names_the_model_default_that_no_provider_derives(): void
     {
-        self::assertStringContainsString('claude-opus-4-8 — set it for any other provider, it is not derived from one', InitCommandHelp::HELP);
+        self::assertStringContainsString('claude-opus-5-5 — set it for any other provider, it is not derived from one', InitCommandHelp::HELP);
     }
 
     public function test_it_names_the_env_var_default_as_the_console_will_print_it(): void

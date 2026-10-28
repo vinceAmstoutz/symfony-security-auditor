@@ -27,7 +27,7 @@ final class InitCommandInput
     #[Option(description: 'AI provider to configure (any symfony/ai platform — e.g. anthropic, openai, gemini); defaults to anthropic. Instance-keyed platforms take the instance too, e.g. generic.my_gateway. Skips the prompt when set.')]
     public ?string $provider = null;
 
-    #[Option(description: 'Model the auditor should use; defaults to claude-opus-4-8 for every provider, so set it for any other. Skips the prompt when set.')]
+    #[Option(description: 'Model the auditor should use; defaults to claude-opus-5-5 for every provider, so set it for any other. Skips the prompt when set.')]
     public ?string $model = null;
 
     #[Option(description: 'Environment variable holding the API key; defaults to <PLATFORM>_API_KEY')]

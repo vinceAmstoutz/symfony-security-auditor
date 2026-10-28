@@ -1012,4 +1012,18 @@ return [
         'reason' => 'The scripted provider receives the requests the change accepted by the other entries for this scenario implies: chunks analyzed or reviewed again, a file now audited, or one no longer re-reviewed.',
         'internal' => true,
     ],
+    [
+        'scenarios' => ['standalone/help-init', 'standalone/init-anthropic-defaults'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^(?:-.*claude-opus-4-8.*$|\\+.*claude-opus-5-5.*$)/',
+        'reason' => '`init` defaults to `claude-opus-5-5` instead of `claude-opus-4-8`, and its help says so.',
+        'changelog' => '#650',
+    ],
+    [
+        'scenarios' => ['standalone/init-anthropic-defaults'],
+        'path' => 'files.home/config/symfony-security-auditor/config.yaml.lines',
+        'match' => '/^(?:-model: claude-opus-4-8$|\\+model: claude-opus-5-5$)/',
+        'reason' => '`init` writes `claude-opus-5-5` when no model is given, instead of `claude-opus-4-8`.',
+        'changelog' => '#650',
+    ],
 ];

@@ -35,7 +35,7 @@ Use a powerful model for discovery and a cheap/fast model for validation:
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     attacker_model: 'claude-opus-5'   # deep reasoning for vulnerability discovery
-    reviewer_model: 'claude-haiku-4-5-20251001'  # ~20× cheaper for false-positive filtering
+    reviewer_model: 'claude-haiku-5-5'  # ~20× cheaper for false-positive filtering
 ```
 
 Any supported provider works — see [Configuration](configuration.md#split-model-setup) for all options.
@@ -186,7 +186,7 @@ Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (_s
       - run: echo "found ${{ steps.audit.outputs.findings-count }} findings (${{ steps.audit.outputs.highest-severity }})"
 ```
 
-**Standalone mode** (`mode: standalone`) downloads the checksum-verified standalone binary instead of requiring the bundle in your project's `composer.json` — a host PHP and Composer are still installed by this action (`setup-php` stays `true`) since `init` fetches the provider bridge through Composer even for the standalone binary. Non-Anthropic providers currently require running `symfony-security-auditor init` interactively once outside CI to pick a provider; standalone mode in this action always configures the `anthropic`/`claude-opus-4-8` default non-interactively.
+**Standalone mode** (`mode: standalone`) downloads the checksum-verified standalone binary instead of requiring the bundle in your project's `composer.json` — a host PHP and Composer are still installed by this action (`setup-php` stays `true`) since `init` fetches the provider bridge through Composer even for the standalone binary. Non-Anthropic providers currently require running `symfony-security-auditor init` interactively once outside CI to pick a provider; standalone mode in this action always configures the `anthropic`/`claude-opus-5-5` default non-interactively.
 
 `mode` defaults to `bundle`, not `standalone`, so upgrading to a newer action version never silently changes what an existing workflow does — `bundle` is exactly today's behavior with no `mode` input at all. It also avoids opting every new adopter into the Anthropic-only standalone path by default when they may already have a different provider configured via `config/packages/ai.yaml`. Neither install method is otherwise preferred; see the [Standalone tool](../README.md#standalone-tool-binary) and [bundle](../README.md#use-it-as-a-symfony-bundle) sections for the general tradeoffs.
 

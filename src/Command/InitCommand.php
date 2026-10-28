@@ -115,7 +115,7 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $model = b($initCommandInput->model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
+        $model = b($initCommandInput->model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-5-5'))->trim()->toString();
 
         if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
             return Command::INVALID;

@@ -155,7 +155,7 @@ Split-model (larger attacker, faster reviewer):
 ```yaml
 symfony_security_auditor:
     attacker_model: 'claude-opus-5'
-    reviewer_model: 'claude-haiku-4-5-20251001'
+    reviewer_model: 'claude-haiku-5-5'
 ```
 
 Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code changes.

@@ -26,7 +26,7 @@ final readonly class InitCommandHelp
 
         Defaults:
           <info>--provider</info>  anthropic
-          <info>--model</info>     claude-opus-4-8 — set it for any other provider, it is not derived from one
+          <info>--model</info>     claude-opus-5-5 — set it for any other provider, it is not derived from one
           <info>--env-var</info>   <PLATFORM>_API_KEY, except for a platform you host yourself, which is written without a credential unless you name one
 
         A platform configured per instance needs the instance in <info>--provider</info>, and the endpoint it reaches in <info>--base-url</info>:

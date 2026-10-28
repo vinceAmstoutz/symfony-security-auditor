@@ -141,7 +141,7 @@ When raising `max_output_tokens`, consider raising `audit.rate_limit.output_toke
 | `audit.fix_synthesis.enabled` | `bool` | `false` | After the audit, generate a suggested fix — a minimal unified-diff patch against the vulnerable file — for validated findings ≥ the severity floor, exposed as the `suggested_fix` report field and rendered in console/markdown/html output. Off by default and, unlike PoC synthesis, not implied by any profile; opt in explicitly. Spends extra reviewer-model tokens per finding. A patch the output token limit or a content filter cut short is never attached: the finding keeps its original `remediation` and a warning is logged. |
 | `audit.fix_synthesis.severity_floor` | `critical` \| `high` \| `medium` \| `low` \| `info` | `high` | Minimum severity that triggers fix synthesis. |
 | `audit.escalation.enabled` | `bool` | `false` | Two-pass attacker: a cheap-model sweep runs first; the expensive model only re-analyses files the sweep flagged. Cuts attacker token spend ~3–5× on inert codebases. Uses `escalation.cheap_model` for the first pass, falling back to the reviewer model when unset. |
-| `audit.escalation.cheap_model` | `string` or `null` | `null` | Provider model id for the cheap first pass (e.g. `claude-haiku-4-5-20251001`). Falls back to the reviewer model when `null`. If the resolved cheap model equals the attacker model, escalation saves nothing and `audit:run` prints a pre-flight notice — set a genuinely cheaper model. |
+| `audit.escalation.cheap_model` | `string` or `null` | `null` | Provider model id for the cheap first pass (e.g. `claude-haiku-5-5`). Falls back to the reviewer model when `null`. If the resolved cheap model equals the attacker model, escalation saves nothing and `audit:run` prints a pre-flight notice — set a genuinely cheaper model. |
 | `audit.budget.max_tokens` | `int` (≥ 1) or `null` | `null` | Maximum total tokens (input + output + provider prompt-cache reads/writes, across attacker + reviewer) before the audit aborts cleanly with exit code `2`. `null` = unlimited. |
 | `audit.budget.max_cost_usd` | `float` (≥ 0.01) or `null` | `null` | Maximum estimated cost (USD) before the audit aborts cleanly with exit code `2`. Cost is computed via the configured `PricingProviderInterface`. `null` = unlimited. |
 | `audit.retry.max_attempts` | `int` (≥ 1) | `3` | Total attempts per LLM call, including the first try. `1` disables retries. Transient failures (a provider's HTTP 408, 425, 429 or 5xx, whatever its bridge made of the body that came with it, and network blips) are retried with jittered exponential backoff; a status that persists past the last attempt is then read as its bridge reads it, as before: an empty answer records that chunk as errored and the run goes on; non-transient failures (auth, validation) fail fast. |
@@ -217,7 +217,7 @@ symfony_security_auditor:
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     attacker_model: 'claude-opus-5'   # powerful model for discovery
-    reviewer_model: 'claude-haiku-4-5-20251001'  # faster model for validation
+    reviewer_model: 'claude-haiku-5-5'  # faster model for validation
 ```
 
 ### Full configuration example
@@ -226,7 +226,7 @@ symfony_security_auditor:
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     attacker_model: 'claude-opus-5'
-    reviewer_model: 'claude-haiku-4-5-20251001'
+    reviewer_model: 'claude-haiku-5-5'
     scan:
         included_paths:
             - 'src'
@@ -375,7 +375,7 @@ platform:
 model: 'your-model'
 ```
 
-`init` writes that configuration, and installs `symfony/ai-generic-platform` for you, given `--provider=generic.my_gateway`, `--base-url=https://your-gateway.example`, `--model=your-model` and `--env-var=GATEWAY_TOKEN`. Leave the last two out and `init` prompts for them, or under `--no-interaction` falls back to `claude-opus-4-8` and `GENERIC_API_KEY`.
+`init` writes that configuration, and installs `symfony/ai-generic-platform` for you, given `--provider=generic.my_gateway`, `--base-url=https://your-gateway.example`, `--model=your-model` and `--env-var=GATEWAY_TOKEN`. Leave the last two out and `init` prompts for them, or under `--no-interaction` falls back to `claude-opus-5-5` and `GENERIC_API_KEY`.
 
 The instance name is required: `init` refuses a bare `--provider=generic` and tells you to use `generic.<instance>`, just as it refuses an instance on a platform that takes a single block (`--provider=anthropic.prod`). Its case is preserved, but surrounding whitespace is trimmed, and a hyphen is folded to an underscore the way `symfony/config` will, in both `provider:` and the `platform:` block at once so the two always agree (`generic.my-gateway` is written as `generic.my_gateway`). A name the config file could not be read back with is refused outright: `0`, because YAML writes that block as a sequence entry rather than as a key; `.inf` or `.nan`, because YAML writes those unquoted and then refuses them on the way back in; and a name read as a YAML tag or as the merge key, such as `!php/const` or `<<`, because the block comes back under a different name than `provider:` points at. Two more are refused for what happens after the file is read: a name holding a single quote, a NUL, a carriage return or a newline, or ending in a backslash, because `ai.platform.<platform>.<instance>` would not be a service id the container accepts; and a name holding a `%...%` pair, a whole-value `%env(VAR)%` included, because the container would read it as a reference rather than as a name (`--model` and the connection URLs accept a whole-value `%env(VAR)%`; an instance name is a key, which no environment variable can fill in). Every other number is accepted, subject to the same hyphen fold, so `generic.-1` is written as `generic._1`. A bare `provider: generic` in a hand-written config aborts the run saying so and listing the instances you configured.
 
@@ -412,7 +412,7 @@ Other provider-specific parameters (e.g. `temperature`) can still be passed thro
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-haiku-4-5-20251001?temperature=0.2'
+    model: 'claude-haiku-5-5?temperature=0.2'
 ```
 
 > Sampling parameters are model-specific: the current Claude generation (Opus 4.7/4.8, Opus 5, Sonnet 5, Fable 5) no longer accepts `temperature`, `top_p`, or `top_k`, and rejects such a request outright. Steer those models with `effort` or `thinking` instead.
@@ -439,7 +439,7 @@ ai:
 ```yaml
 symfony_security_auditor:
     attacker_model: 'claude-opus-5'   # deep reasoning for vuln discovery
-    reviewer_model: 'claude-haiku-4-5-20251001'  # fast + cheap for false-positive filtering
+    reviewer_model: 'claude-haiku-5-5'  # fast + cheap for false-positive filtering
 ```
 
 The attacker agent receives all source files grouped into chunks of 10, sorted by security priority (controllers first, then voters, entities, repositories, forms, then everything else). The reviewer agent then evaluates each candidate finding individually and decides whether to accept or escalate it.
@@ -481,11 +481,11 @@ provider: anthropic
 platform:
     anthropic:
         api_key: '%env(ANTHROPIC_API_KEY)%'
-model: claude-opus-4-8
+model: claude-opus-5-5
 # scan:, audit:, cache: are all accepted here too, unwrapped.
 ```
 
-`init` is also scriptable: pass `--provider`, `--model`, `--env-var`, `--base-url`, `--endpoint` and `--no-api-key` to skip the matching prompt. Any option left out falls back to its interactive prompt (or, under `--no-interaction`, to its default — `anthropic`, `claude-opus-4-8`, and `<PLATFORM>_API_KEY` respectively). `--base-url` is only prompted for when `init` can write the platform's block and that block declares one, namely `albert`, `amazeeai`, `generic` and `openresponses`, and all four require it, so an empty answer is rejected with exit code `2` rather than written without it. `azure` declares a `base_url` too but is refused earlier for needing a `deployment`. A platform naming the same field `endpoint` takes `--endpoint` instead (`deepgram`, `elevenlabs`, `minimax`, `ollama`, `together`, `venice`); every other platform either names it differently again (`lmstudio` uses `host_url`) or hosts none, so passing either option with one is rejected with exit code `2` before anything is written. A blank provider or model, or an `--env-var` that is not a valid environment variable name, is rejected with exit code `2` before anything is written. The provider bridge is downloaded **before** the configuration file is replaced, so a failed download (offline, `composer` missing) leaves the previous, working configuration untouched. When a configuration already exists, `init` asks before overwriting it — and declines by default under `--no-interaction` — so scripted reconfiguration needs `--force` to replace the existing file without asking. The `SSA_INIT` installer flag's no-terminal fallback and the GitHub Action run plain `init --no-interaction`, which keeps those Anthropic defaults — pass the options yourself to script any other provider:
+`init` is also scriptable: pass `--provider`, `--model`, `--env-var`, `--base-url`, `--endpoint` and `--no-api-key` to skip the matching prompt. Any option left out falls back to its interactive prompt (or, under `--no-interaction`, to its default — `anthropic`, `claude-opus-5-5`, and `<PLATFORM>_API_KEY` respectively). `--base-url` is only prompted for when `init` can write the platform's block and that block declares one, namely `albert`, `amazeeai`, `generic` and `openresponses`, and all four require it, so an empty answer is rejected with exit code `2` rather than written without it. `azure` declares a `base_url` too but is refused earlier for needing a `deployment`. A platform naming the same field `endpoint` takes `--endpoint` instead (`deepgram`, `elevenlabs`, `minimax`, `ollama`, `together`, `venice`); every other platform either names it differently again (`lmstudio` uses `host_url`) or hosts none, so passing either option with one is rejected with exit code `2` before anything is written. A blank provider or model, or an `--env-var` that is not a valid environment variable name, is rejected with exit code `2` before anything is written. The provider bridge is downloaded **before** the configuration file is replaced, so a failed download (offline, `composer` missing) leaves the previous, working configuration untouched. When a configuration already exists, `init` asks before overwriting it — and declines by default under `--no-interaction` — so scripted reconfiguration needs `--force` to replace the existing file without asking. The `SSA_INIT` installer flag's no-terminal fallback and the GitHub Action run plain `init --no-interaction`, which keeps those Anthropic defaults — pass the options yourself to script any other provider:
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
@@ -1014,7 +1014,7 @@ Standalone only. Writes `config.yaml` and downloads the provider bridge it needs
 | Option | Default | Description |
 | --- | --- | --- |
 | `--provider` | `anthropic` | Any platform the bundled `symfony/ai-bundle` declares; any other — `meta`, which 0.14 dropped, or a misspelling — is refused with exit code `2` before anything is installed, listing the ones it declares. A platform configured per instance takes it too, e.g. `generic.my_gateway`. |
-| `--model` | `claude-opus-4-8` | Used for every provider, not derived from one — set it for anything other than Anthropic. |
+| `--model` | `claude-opus-5-5` | Used for every provider, not derived from one — set it for anything other than Anthropic. |
 | `--env-var` | `<PLATFORM>_API_KEY` | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead. |
 | `--base-url` | prompted when required | _Since 1.21._ The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
 | `--endpoint` | prompted when required | _Since 1.21._ The connection URL under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. For `ollama` and `together` it is the origin; `deepgram`, `elevenlabs`, `minimax` and `venice` take it with the API version path their default carries (`https://api.deepgram.com/v1/`), since the bridge appends only the route. Rejected for any other platform. |
