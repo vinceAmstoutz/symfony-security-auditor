@@ -43,7 +43,7 @@ final readonly class AuditConfigurationDefinition
     {
         $nodeBuilder
                 ->append((new OptionalModelNodeDefinition('model', null))
-                    ->defaultValue('claude-opus-4-8')
+                    ->defaultValue('claude-opus-5-5')
                     ->cannotBeEmpty()
                     ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.'))
                 ->enumNode('profile')

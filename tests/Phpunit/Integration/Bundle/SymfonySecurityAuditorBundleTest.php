@@ -238,12 +238,12 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         ));
     }
 
-    public function test_bundle_default_model_is_claude_opus_4_8(): void
+    public function test_bundle_default_model_is_claude_opus_5_5(): void
     {
         $containerBuilder = $this->loadParameters([]);
 
-        self::assertSame('claude-opus-4-8', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
-        self::assertSame('claude-opus-4-8', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
+        self::assertSame('claude-opus-5-5', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
+        self::assertSame('claude-opus-5-5', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
     public function test_bundle_uses_shared_model_for_both_agents_when_split_overrides_omitted(): void

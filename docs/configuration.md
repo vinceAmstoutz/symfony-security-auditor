@@ -76,7 +76,7 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `profile` | string | `'balanced'` | One-knob preset bundling the cost/speed/depth levers: `fast`, `balanced`, or `thorough`. A profile only fills the keys you left unset — any explicitly configured key always wins. `fast`: one attacker iteration, lean pre-scan, code slicing on, four concurrent attacker and reviewer calls. `balanced`: identical to configuring nothing. `thorough`: balanced plus PoC synthesis. |
-| `model` | string | `'claude-opus-4-8'` | Model name used for both Attacker and Reviewer roles |
+| `model` | string | `'claude-opus-5-5'` | Model name used for both Attacker and Reviewer roles |
 | `attacker_model` | string | `null` | Override: dedicated model for the Attacker role |
 | `reviewer_model` | string | `null` | Override: dedicated model for the Reviewer role |
 | `max_output_tokens` | `int` (≥ 1) | `4096` | Maximum output tokens per LLM call, set as `max_tokens` on every platform request **to a Claude/Anthropic-dialect model**. Default `4096` — `symfony/ai`'s Anthropic bridge would otherwise apply its own much smaller default (~1000) and silently truncate `record_vulnerability` tool-call arguments mid-finding. **Currently a no-op for non-Claude models**: `symfony/ai`'s Gemini and OpenAI Responses bridges reject the `max_tokens` option key outright, so `PlatformOptionsFactory` only forwards it when the configured model name contains `claude`. |
