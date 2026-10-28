@@ -46,9 +46,12 @@ final readonly class SymlinkedDirectories
             ->filter(static fn (SplFileInfo $splFileInfo): bool => $splFileInfo->isLink());
 
         $skippedFiles = [];
+        $readableGitignores = $respectGitignore ? ReadableGitignores::of($projectPath, $this->logger) : null;
         foreach ((new GitignoreRespectingWalk($respectGitignore, $this->logger))->files($finder, $projectPath) as $symlinkedDirectory) {
-            $this->logger->warning('Skipped symlinked directory', ['path' => $symlinkedDirectory->getPathname()]);
-            $skippedFiles[] = new SkippedFile(Utf8Normalizer::normalize(Path::makeRelative($symlinkedDirectory->getPathname(), $projectPath)), SkippedFileReason::Symlink);
+            if (true !== $readableGitignores?->ignore($symlinkedDirectory)) {
+                $this->logger->warning('Skipped symlinked directory', ['path' => $symlinkedDirectory->getPathname()]);
+                $skippedFiles[] = new SkippedFile(Utf8Normalizer::normalize(Path::makeRelative($symlinkedDirectory->getPathname(), $projectPath)), SkippedFileReason::Symlink);
+            }
         }
 
         return $skippedFiles;
