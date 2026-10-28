@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
@@ -27,11 +28,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerPreflight;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerSetupAdvice;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\InitProviderChoices;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
@@ -70,6 +75,42 @@ final class InitCommandTest extends TestCase
             ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
             Yaml::parseFile($this->configFile()),
         );
+    }
+
+    public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) array_search('openai', InitProviderChoices::names(), true), 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_lets_you_pick_the_newest_priced_model_that_calls_tools_by_its_number(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openai', '0', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-new'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_offers_only_the_ten_newest_priced_models(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['mistral', '0', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('old-model', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_offers_claude_opus_5_5_as_the_default_model(): void
@@ -1923,7 +1964,7 @@ final class InitCommandTest extends TestCase
         return $composerAvailabilityChecker;
     }
 
-    private function commandTester(): CommandTester
+    private function commandTester(?PricedModelListInterface $pricedModelList = null): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
         $initCommand = new InitCommand(
@@ -1933,6 +1974,7 @@ final class InitCommandTest extends TestCase
             $this->recordingBridgeInstaller,
             new ComposerPreflight($this->availableComposer()),
             new FilesystemCredentialStore($xdgConfigPathResolver),
+            pricedModelList: $pricedModelList,
         );
 
         return new CommandTester($initCommand);

@@ -1,0 +1,156 @@
+{
+    "openai": {
+        "models": {
+            "gpt-old": {
+                "id": "gpt-old",
+                "release_date": "2024-01-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "gpt-new": {
+                "id": "gpt-new",
+                "release_date": "2026-01-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "gpt-no-tools": {
+                "id": "gpt-no-tools",
+                "release_date": "2026-06-01",
+                "last_updated": "2099-01-01",
+                "tool_call": false,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "gpt-unpriced": {
+                "id": "gpt-unpriced",
+                "release_date": "2026-07-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true
+            }
+        }
+    },
+    "mistral": {
+        "models": {
+            "old-model": {
+                "id": "old-model",
+                "release_date": "2020-01-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-01": {
+                "id": "model-01",
+                "release_date": "2025-01-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-02": {
+                "id": "model-02",
+                "release_date": "2025-02-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-03": {
+                "id": "model-03",
+                "release_date": "2025-03-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-04": {
+                "id": "model-04",
+                "release_date": "2025-04-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-05": {
+                "id": "model-05",
+                "release_date": "2025-05-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-06": {
+                "id": "model-06",
+                "release_date": "2025-06-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-07": {
+                "id": "model-07",
+                "release_date": "2025-07-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-08": {
+                "id": "model-08",
+                "release_date": "2025-08-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-09": {
+                "id": "model-09",
+                "release_date": "2025-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            },
+            "model-10": {
+                "id": "model-10",
+                "release_date": "2025-10-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 2
+                }
+            }
+        }
+    }
+}

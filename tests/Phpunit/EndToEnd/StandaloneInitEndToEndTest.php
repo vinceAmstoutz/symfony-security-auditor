@@ -78,6 +78,16 @@ final class StandaloneInitEndToEndTest extends TestCase
         );
     }
 
+    public function test_the_standalone_init_command_offers_the_models_the_pricing_catalog_lists(): void
+    {
+        $commandTester = $this->initCommandTester();
+        $commandTester->setInputs(['anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should the auditor use? Pick a number, or type any model id', $commandTester->getDisplay());
+    }
+
     private function initCommandTester(): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
