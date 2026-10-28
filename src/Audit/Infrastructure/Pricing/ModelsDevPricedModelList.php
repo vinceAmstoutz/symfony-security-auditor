@@ -35,7 +35,7 @@ final readonly class ModelsDevPricedModelList implements PricedModelListInterfac
         $releaseDates = [];
         foreach ($this->modelsDevPricingProvider->platformListing($platform) as $model => $listing) {
             if (\is_array($listing) && $this->isOffered($listing)) {
-                $releaseDates[(string) $model] = $this->releaseDate($listing);
+                $releaseDates[$model] = $this->releaseDate($listing);
             }
         }
 

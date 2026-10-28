@@ -29,7 +29,7 @@ final readonly class InitProviderChoices
      */
     public static function names(): array
     {
-        $names = array_values(array_diff(array_keys(PlatformCatalogProviders::PROVIDERS), InstanceKeyedPlatforms::NAMES));
+        $names = array_diff(array_keys(PlatformCatalogProviders::PROVIDERS), InstanceKeyedPlatforms::NAMES);
         sort($names);
 
         return $names;
