@@ -138,10 +138,10 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
 
     private static function receivedBytes(string $destination): int
     {
-        clearstatcache(true, $destination);
-        $size = is_file($destination) ? filesize($destination) : false;
+        $handle = is_file($destination) ? fopen($destination, 'r') : false;
+        $stat = false === $handle ? false : fstat($handle);
 
-        return false === $size ? 0 : $size;
+        return false === $stat ? 0 : $stat['size'];
     }
 
     /**
