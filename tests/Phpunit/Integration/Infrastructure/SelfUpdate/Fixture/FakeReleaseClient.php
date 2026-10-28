@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture;
 
+use Closure;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
@@ -44,12 +45,16 @@ final class FakeReleaseClient implements ReleaseClientInterface
      * @throws SelfUpdateFailedException
      */
     #[Override]
-    public function download(string $url, string $destination): void
+    public function download(string $url, string $destination, ?Closure $onProgress = null): void
     {
         ++$this->requests;
 
         try {
             (new Filesystem())->dumpFile($destination, $this->downloadPayload);
+
+            if ($onProgress instanceof Closure) {
+                $onProgress(\strlen($this->downloadPayload));
+            }
 
             if ($this->vanishAfterDownload) {
                 (new Filesystem())->remove($destination);

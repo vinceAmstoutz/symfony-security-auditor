@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -92,6 +93,23 @@ final class ProcessReleaseClientTest extends TestCase
         $this->expectException(SelfUpdateFailedException::class);
 
         $processReleaseClient->get('https://example.test/resource');
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    #[MaximumDuration(4000)]
+    public function test_download_reports_the_bytes_received_while_it_runs_and_once_it_ends(): void
+    {
+        $destination = $this->workingDirectory.'/asset';
+        $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => Process::fromShellCommandline(\sprintf('printf A > %1$s; sleep 1; printf BB >> %1$s', escapeshellarg($arguments[3]))));
+        $receivedBytes = [];
+
+        $processReleaseClient->download('https://example.test/asset', $destination, static function (int $bytes) use (&$receivedBytes): void {
+            $receivedBytes[] = $bytes;
+        });
+
+        self::assertSame([1, 3], array_values(array_unique(array_filter($receivedBytes, static fn (int $bytes): bool => 0 < $bytes))));
     }
 
     /**

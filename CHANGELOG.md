@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
+- `self-update` shows how much of the new binary has arrived while it downloads, and announces the download once on a non-terminal output ([#655](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/655))
 - Every push to `1.x` publishes a `snapshot` pre-release, versioned like `1.21.0+14.g4531440`, so a fix can be tried before it ships: `self-update --snapshot`, or the installers with `SSA_VERSION=snapshot`; a plain `self-update` takes a snapshot back to the latest release ([#631](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/631))
 - `audit.tools_scope` (`audited` by default, or `scanned`) sets which files the `read_file`, `grep` and `list_files` tools may open: `scanned` lets a `--since` or `--path` run follow a changed controller into unchanged files, sending them to the provider on request, and is cached apart from `audited`; a standalone project file may not set it ([#490](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/490), [#550](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/550))
 - With `audit.tools_scope: scanned`, the reviewer judges a finding the attacker recorded in a file read through the tools against that file's code, not an empty file ([#521](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/521))

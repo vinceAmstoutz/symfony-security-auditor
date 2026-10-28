@@ -38,6 +38,33 @@ final class SelfUpdateCommandTest extends TestCase
         self::assertStringContainsString('Downloaded and verified 2.0.0; it replaces 1.0.0 as this command exits.', $this->flattened($commandTester->getDisplay()));
     }
 
+    public function test_it_shows_how_much_of_the_new_binary_has_arrived_on_a_terminal(): void
+    {
+        $commandTester = $this->commandTester(new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0'), [1_048_576, 27_262_976]));
+
+        $commandTester->execute([], ['decorated' => true]);
+
+        self::assertStringContainsString('Downloading the new binary: 26.0 MiB received', $this->flattened($commandTester->getDisplay()));
+    }
+
+    public function test_it_announces_the_download_once_on_a_plain_output(): void
+    {
+        $commandTester = $this->commandTester(new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0'), [1_048_576, 2_097_152, 27_262_976]));
+
+        $commandTester->execute([], ['decorated' => false]);
+
+        self::assertSame(1, substr_count($commandTester->getDisplay(), 'Downloading the new binary'));
+    }
+
+    public function test_it_shows_no_download_when_there_is_nothing_to_download(): void
+    {
+        $commandTester = $this->commandTester(new RecordingSelfUpdater(new SelfUpdateResult(SelfUpdateStatus::AlreadyUpToDate, '1.0.0', '1.0.0')));
+
+        $commandTester->execute([], ['decorated' => true]);
+
+        self::assertStringNotContainsString('Downloading', $commandTester->getDisplay());
+    }
+
     public function test_it_warns_when_the_pricing_catalog_could_not_be_refreshed(): void
     {
         $selfUpdateResult = new SelfUpdateResult(SelfUpdateStatus::Updated, '1.0.0', '2.0.0', PricingCatalogRefreshOutcome::Failed);

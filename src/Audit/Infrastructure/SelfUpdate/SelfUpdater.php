@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 
+use Closure;
 use JsonException;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
@@ -61,7 +62,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
      * @throws UnsupportedSelfUpdatePlatformException
      */
     #[Override]
-    public function run(string $currentVersion, bool $checkOnly, ReleaseChannel $releaseChannel = ReleaseChannel::Stable): SelfUpdateResult
+    public function run(string $currentVersion, bool $checkOnly, ReleaseChannel $releaseChannel = ReleaseChannel::Stable, ?Closure $onDownloadProgress = null): SelfUpdateResult
     {
         $this->gitHubBinaryAssetResolver->assertSupportedPlatform();
 
@@ -83,7 +84,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
             return new SelfUpdateResult(SelfUpdateStatus::UpdateAvailable, $currentVersion, $latestVersion);
         }
 
-        $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestTag));
+        $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestTag), $onDownloadProgress);
 
         return new SelfUpdateResult(
             SelfUpdateStatus::Updated,
@@ -161,15 +162,17 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     }
 
     /**
+     * @param (Closure(int): void)|null $onDownloadProgress
+     *
      * @throws SelfUpdateFailedException
      */
-    private function replaceBinary(GitHubBinaryAsset $gitHubBinaryAsset): void
+    private function replaceBinary(GitHubBinaryAsset $gitHubBinaryAsset, ?Closure $onDownloadProgress): void
     {
         $binaryPath = $this->runningBinaryLocator->path();
         $downloadPath = $this->stageDownloadNextTo($binaryPath, $gitHubBinaryAsset);
 
         try {
-            $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath);
+            $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath, $onDownloadProgress);
             $this->assertChecksumMatches($gitHubBinaryAsset, $downloadPath);
             $this->scheduleInstall($downloadPath, $binaryPath);
         } catch (Throwable $throwable) {

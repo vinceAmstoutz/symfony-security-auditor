@@ -81,6 +81,22 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function test_it_reports_the_download_progress_to_its_caller(): void
+    {
+        $payload = 'NEW-BINARY';
+        $receivedBytes = [];
+
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false, onDownloadProgress: static function (int $bytes) use (&$receivedBytes): void {
+            $receivedBytes[] = $bytes;
+        });
+
+        self::assertSame([10], $receivedBytes);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function test_it_leaves_the_running_binary_in_place_until_the_process_ends(): void
     {
         $payload = 'NEW-BINARY';

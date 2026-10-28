@@ -13,10 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Closure;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\Helper;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
@@ -55,10 +58,46 @@ final readonly class SelfUpdateCommand
         bool $snapshot = false,
     ): int {
         $releaseChannel = $snapshot ? ReleaseChannel::Snapshot : ReleaseChannel::Stable;
-        $selfUpdateResult = $this->selfUpdater->run($this->currentVersion, $check, $releaseChannel);
+        $progressBar = $symfonyStyle->createProgressBar();
+        $progressBar->setFormat(' Downloading the new binary: %message% received (%elapsed%)');
+        $progressBar->setMessage(Helper::formatMemory(0));
+
+        $selfUpdateResult = $this->selfUpdater->run($this->currentVersion, $check, $releaseChannel, $symfonyStyle->isDecorated() ? $this->downloadProgress($progressBar) : $this->downloadAnnouncement($symfonyStyle));
+
+        if ($symfonyStyle->isDecorated() && SelfUpdateStatus::Updated === $selfUpdateResult->status) {
+            $progressBar->finish();
+            $symfonyStyle->newLine();
+        }
+
         $this->refreshUpdateCheckCache($selfUpdateResult, $releaseChannel);
 
         return $this->report($symfonyStyle, $selfUpdateResult, $releaseChannel);
+    }
+
+    /**
+     * @return Closure(int): void
+     */
+    private function downloadAnnouncement(SymfonyStyle $symfonyStyle): Closure
+    {
+        $announced = false;
+
+        return static function () use ($symfonyStyle, &$announced): void {
+            if (!$announced) {
+                $symfonyStyle->writeln(' Downloading the new binary…');
+                $announced = true;
+            }
+        };
+    }
+
+    /**
+     * @return Closure(int): void
+     */
+    private function downloadProgress(ProgressBar $progressBar): Closure
+    {
+        return static function (int $bytes) use ($progressBar): void {
+            $progressBar->setMessage(Helper::formatMemory($bytes));
+            $progressBar->display();
+        };
     }
 
     /**
