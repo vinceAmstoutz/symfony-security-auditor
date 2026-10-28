@@ -24,9 +24,9 @@ final class SelfUpdateFailedException extends RuntimeException
         return new self(\sprintf('Could not determine the latest released version from "%s".', $source), previous: $throwable);
     }
 
-    public static function forFailedDownload(string $url, ?Throwable $throwable = null): self
+    public static function forFailedDownload(string $url, ?Throwable $throwable = null, string $reason = ''): self
     {
-        return new self(\sprintf('Failed to download "%s".', $url), previous: $throwable);
+        return new self('' === $reason ? \sprintf('Failed to download "%s".', $url) : \sprintf('Failed to download "%s": %s', $url, $reason), previous: $throwable);
     }
 
     public static function forUndeterminedBinaryPath(): self

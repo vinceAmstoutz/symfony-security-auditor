@@ -85,11 +85,24 @@ final class ProcessReleaseClientTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
+    public function test_a_failed_request_names_the_reason_curl_gave(): void
+    {
+        $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => Process::fromShellCommandline('printf "curl: (22) The requested URL returned error: 404\n" >&2; exit 22'));
+
+        $this->expectExceptionMessageMatches('~^Failed to download "https://example\.test/resource": curl: \(22\) The requested URL returned error: 404\z~');
+
+        $processReleaseClient->get('https://example.test/resource');
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
     public function test_get_throws_when_the_process_reports_failure(): void
     {
         $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => new Process(['false']));
 
         $this->expectException(SelfUpdateFailedException::class);
+        $this->expectExceptionMessageMatches('~^Failed to download "https://example\.test/resource"\.\z~');
 
         $processReleaseClient->get('https://example.test/resource');
     }
