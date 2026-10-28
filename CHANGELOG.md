@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
+- The default `model` is `claude-opus-5-5`, priced below `claude-opus-4-8` in the pricing catalog; set `model: claude-opus-4-8` to keep the previous default ([#657](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/657))
 - `self-update` shows how much of the new binary has arrived while it downloads, and announces the download once on a non-terminal output ([#656](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/656))
 - Every push to `1.x` publishes a `snapshot` pre-release, versioned like `1.21.0+14.g4531440`, so a fix can be tried before it ships: `self-update --snapshot`, or the installers with `SSA_VERSION=snapshot`; a plain `self-update` takes a snapshot back to the latest release ([#631](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/631))
 - `audit.tools_scope` (`audited` by default, or `scanned`) sets which files the `read_file`, `grep` and `list_files` tools may open: `scanned` lets a `--since` or `--path` run follow a changed controller into unchanged files, sending them to the provider on request, and is cached apart from `audited`; a standalone project file may not set it ([#490](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/490), [#550](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/550))

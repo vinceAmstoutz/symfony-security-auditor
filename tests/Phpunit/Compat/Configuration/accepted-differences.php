@@ -27,4 +27,10 @@ return [
         'reason' => 'The pre-scan cache version went from 31 to 32 when its patterns were bounded.',
         'changelog' => '#517',
     ],
+    [
+        'paths' => ['model'],
+        'narrowings' => ['its default changed to {"value":"claude-opus-5-5"}'],
+        'reason' => 'The default model moved from `claude-opus-4-8` to `claude-opus-5-5`, which the pricing catalog lists cheaper; `model: claude-opus-4-8` keeps the previous one.',
+        'changelog' => '#657',
+    ],
 ];

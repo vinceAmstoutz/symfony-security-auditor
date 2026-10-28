@@ -491,7 +491,7 @@ Extends `AbstractBundle`. All wiring lives directly in this class — no separat
 
 | Key | Default | Purpose |
 | --- | --- | --- |
-| `model` | `'claude-opus-4-8'` | Model name for both Attacker and Reviewer roles |
+| `model` | `'claude-opus-5-5'` | Model name for both Attacker and Reviewer roles |
 | `attacker_model` | `null` | Override: dedicated model for the Attacker role |
 | `reviewer_model` | `null` | Override: dedicated model for the Reviewer role |
 

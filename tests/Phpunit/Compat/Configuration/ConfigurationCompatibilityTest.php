@@ -59,7 +59,20 @@ final class ConfigurationCompatibilityTest extends TestCase
 
         $current = ConfigurationSnapshot::ofPath($nodes, $path);
 
-        self::assertSame([], ContractComparison::narrowings($recorded, $current), \sprintf('"%s" no longer takes what the recorded release took.', $path));
+        self::assertSame([], $this->unacceptedNarrowings($path, ContractComparison::narrowings($recorded, $current)), \sprintf('"%s" no longer takes what the recorded release took: restore it, or accept the change in tests/Phpunit/Compat/Configuration/accepted-differences.php with the CHANGELOG.md bullet that announces it.', $path));
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function test_every_accepted_contract_change_is_announced_and_still_shows(): void
+    {
+        $problems = [];
+        foreach ($this->acceptedContractChanges() as $acceptedContractChange) {
+            $problems = [...$problems, ...$this->contractChangeProblems($acceptedContractChange)];
+        }
+
+        self::assertSame([], $problems);
     }
 
     /**
@@ -159,14 +172,72 @@ final class ConfigurationCompatibilityTest extends TestCase
     }
 
     /**
+     * @return list<string>
+     *
+     * @throws JsonException
+     */
+    private function contractChangeProblems(AcceptedContractChange $acceptedContractChange): array
+    {
+        $problems = UnreleasedChangelog::announces($acceptedContractChange->changelog) ? [] : [\sprintf('"%s" cites a pull request no bullet under ## [Unreleased] in CHANGELOG.md links: %s', implode('", "', $acceptedContractChange->paths), $acceptedContractChange->changelog)];
+        foreach ($acceptedContractChange->paths as $path) {
+            if ([] === array_intersect($acceptedContractChange->narrowings, $this->currentNarrowings($path))) {
+                $problems[] = \sprintf('"%s" no longer differs from the recorded release as accepted: remove the entry.', $path);
+            }
+        }
+
+        return $problems;
+    }
+
+    /**
+     * @return list<string>
+     *
+     * @throws JsonException
+     */
+    private function currentNarrowings(string $path): array
+    {
+        $nodes = ConfigurationTree::nodes();
+        $recorded = self::recording()['paths'];
+
+        return \array_key_exists($path, $recorded) && \array_key_exists($path, $nodes) ? ContractComparison::narrowings($recorded[$path], ConfigurationSnapshot::ofPath($nodes, $path)) : [];
+    }
+
+    /**
+     * @param list<string> $narrowings
+     *
+     * @return list<string>
+     */
+    private function unacceptedNarrowings(string $path, array $narrowings): array
+    {
+        $accepted = $this->acceptedContractChanges();
+
+        return array_values(array_filter($narrowings, static fn (string $narrowing): bool => [] === array_filter($accepted, static fn (AcceptedContractChange $acceptedContractChange): bool => $acceptedContractChange->covers($path, $narrowing))));
+    }
+
+    /**
      * @return list<AcceptedParameterChange>
      */
     private function acceptedChanges(): array
     {
+        return array_values(array_map(static fn (array $entry): AcceptedParameterChange => AcceptedParameterChange::fromArray($entry), array_filter($this->acceptedEntries(), static fn (array $entry): bool => !\array_key_exists('paths', $entry))));
+    }
+
+    /**
+     * @return list<AcceptedContractChange>
+     */
+    private function acceptedContractChanges(): array
+    {
+        return array_values(array_map(static fn (array $entry): AcceptedContractChange => AcceptedContractChange::fromArray($entry), array_filter($this->acceptedEntries(), static fn (array $entry): bool => \array_key_exists('paths', $entry))));
+    }
+
+    /**
+     * @return list<array<mixed>>
+     */
+    private function acceptedEntries(): array
+    {
         $entries = require __DIR__.'/accepted-differences.php';
         self::assertIsArray($entries);
 
-        return array_values(array_map(static fn (mixed $entry): AcceptedParameterChange => AcceptedParameterChange::fromArray(\is_array($entry) ? $entry : []), $entries));
+        return array_values(array_map(static fn (mixed $entry): array => \is_array($entry) ? $entry : [], $entries));
     }
 
     /**
