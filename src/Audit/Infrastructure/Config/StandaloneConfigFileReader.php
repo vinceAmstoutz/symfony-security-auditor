@@ -70,11 +70,8 @@ final readonly class StandaloneConfigFileReader
             return [];
         }
 
-        if ($this->reachesValueLimit($parsed)) {
-            throw MalformedProjectConfigException::forOversizedConfig($configFile, self::VALUE_LIMIT);
-        }
-
-        return $this->foldHyphenatedKeys($parsed);
+        return $this->reachesValueLimit($parsed)
+            ? throw MalformedProjectConfigException::forOversizedConfig($configFile, self::VALUE_LIMIT) : $this->foldHyphenatedKeys($parsed);
     }
 
     /**
