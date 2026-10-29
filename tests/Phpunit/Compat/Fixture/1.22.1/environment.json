@@ -481,7 +481,7 @@
         },
         {
             "scenario": "output/dev-null",
-            "sha256": "80972a7394b91d7338b1dba7ace95474d0370e43ff03586fcdf443fb8ce3db44"
+            "sha256": "ff4eabe8c7b73dc3c92ed5d712e075f633d2fd38b634c2ddf068c53f92ac4492"
         },
         {
             "scenario": "output/directory",
@@ -1001,7 +1001,7 @@
         },
         {
             "scenario": "standalone/output-dev-null",
-            "sha256": "f6f5158e4516813547bc2bb20488362d7df88023ae474f4d01f267ee5ce97725"
+            "sha256": "5e22366f65b4d4068470e18294bff890cd7bcfde2b0dc83f387903238bb20af1"
         },
         {
             "scenario": "standalone/output-file",
@@ -1173,5 +1173,5 @@
         }
     ],
     "unrecorded": [],
-    "seal": "05ec80064bbae59ef12eff4c0a0d5afccc911357a81167bea973b4653e3718b7"
+    "seal": "0c92f466e2f766e74e4fec199a4d283b78e39ba20d5dc02607734824b49648c8"
 }
