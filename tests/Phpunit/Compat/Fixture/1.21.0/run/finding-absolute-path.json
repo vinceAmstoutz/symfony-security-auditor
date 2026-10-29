@@ -29,8 +29,8 @@
                         },
                         "vulnerabilities": [
                             {
-                                "id": "VULN-1119B41E",
-                                "fingerprint": "SSA-939A4A9DABC9",
+                                "id": "VULN-846CF651",
+                                "fingerprint": "SSA-0C216AEF1A42",
                                 "type": "broken_access_control",
                                 "category": "Broken Access Control",
                                 "owasp": "OWASP A01:2025 - Broken Access Control",

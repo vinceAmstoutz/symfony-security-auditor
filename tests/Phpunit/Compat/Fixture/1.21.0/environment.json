@@ -2,12 +2,12 @@
     "release": "1.21.0",
     "php": "8.3.6",
     "packages": {
-        "symfony/console": "v7.4.20",
-        "symfony/config": "v7.4.17",
-        "symfony/dependency-injection": "v7.4.20",
-        "symfony/yaml": "v7.4.20",
-        "symfony/ai-platform": "v0.14.1",
-        "symfony/ai-bundle": "v0.14.1",
+        "symfony/console": "v7.4.22",
+        "symfony/config": "v7.4.22",
+        "symfony/dependency-injection": "v7.4.22",
+        "symfony/yaml": "v7.4.21",
+        "symfony/ai-platform": "v0.15.0",
+        "symfony/ai-bundle": "v0.15.0",
         "mcp/sdk": "v0.9.0"
     },
     "recordings": [
@@ -37,31 +37,31 @@
         },
         {
             "scenario": "baseline/generated-by-release",
-            "sha256": "bce158bd8abebe3ead64a0329711ebd65c87eb28101a80288e334ba2ea7efd9d"
+            "sha256": "43e8033e25394b6ac502fccdba75cf502892455fbb099b52458f2f8314050ee6"
         },
         {
             "scenario": "baseline/generated-by-release-config-key",
-            "sha256": "76d99515f8c10904c8ace39a89e443c659e2aaa60cbcca75b636e4037eaa808d"
+            "sha256": "b8cc160225c1473937a56da53d4d53fa9bc3df678bd9036e70f15357ed5ade64"
         },
         {
             "scenario": "baseline/generated-by-release-console",
-            "sha256": "b4cfa0126ab056644fb44eb8a351a5466ed17b8b9f056c11cde3be7155b44930"
+            "sha256": "51a9e7d9e87e8be098fc39e91a7b7b01406782666eaa620b5c820e5c984334ad"
         },
         {
             "scenario": "baseline/generated-by-release-on-changed-project",
-            "sha256": "703f68a5820ef9592dcc8d2fa816139388c2c7e4422975d22e99d96340ae1fb1"
+            "sha256": "ccc760a85f22dedf04025debcfcf0e922a7d44292cda0b2aaa49a17dc56943f2"
         },
         {
             "scenario": "baseline/generated-by-release-regenerated",
-            "sha256": "f2b98cdf9674952e013a4a7f90165dbba443641aa0b1904b8df9035fa37f7467"
+            "sha256": "d07cedc3aa53c657c7c9d302de60c96725c14811fe51ba928f77b752f38f6eff"
         },
         {
             "scenario": "baseline/generated-by-release-sarif",
-            "sha256": "440a7918f3ff3c5cf54d10bd72ea94cd7e58a314cbc209313dca94f4918a908f"
+            "sha256": "b1cc4bd63884888ffe3f0ba9b86d804141fa48e386921bfd65aa51e1639fd7e6"
         },
         {
             "scenario": "cache/written-by-release",
-            "sha256": "17ae1f92e0606453cbf2c03d80681f42602723b280bc06028e609875b1126b24"
+            "sha256": "8d14bb45c9d534099dce2313b5e671069c66f21fb5ef5be9418df223631579f9"
         },
         {
             "scenario": "cache/written-by-release-batch",
@@ -69,11 +69,11 @@
         },
         {
             "scenario": "cache/written-by-release-changed-project",
-            "sha256": "805abeb86bc45e9a7b7a24f5afd1148633a32a39f2647fb1dec288ad2b8d4c71"
+            "sha256": "2bf3fc584ac61c5ffdabfc705659faf0304ba58f5dbfd4cdc1098e35bc0c8da0"
         },
         {
             "scenario": "cache/written-by-release-no-cache",
-            "sha256": "8b9e08ed30ba7aa4802f42b138b3ad21e5543d75cd6354cf7c479781f9b8d82d"
+            "sha256": "f85534616c38a2a311491acb8403299735094f398eefb329f21700c716fec738"
         },
         {
             "scenario": "config-file/architecture-01",
@@ -501,55 +501,55 @@
         },
         {
             "scenario": "report-commands/baseline-create",
-            "sha256": "ec4420b37e6d781f9cf9b71aba8fc17a2c9ad7b913f916bfb7be163fbbdac152"
+            "sha256": "a18d9911359bd8b760fa4ed92c1c3549796a23befa2fd7afdb05fe57902bfdc5"
         },
         {
             "scenario": "report-commands/baseline-default-file",
-            "sha256": "e4a988e5df09e8fa6ad0d30317ee15b15a22b978392e354aac789675d5530be9"
+            "sha256": "eb3574fcbe4153ebb6ac7274097d4ecae7ba7d73b3eef8de50f21ff5d776e0aa"
         },
         {
             "scenario": "report-commands/baseline-merge",
-            "sha256": "8e45277371fac21e7c50fbabd0d5714d25948f96e99901e08134bc8ac7ba5eaa"
+            "sha256": "8aec456aec1b040cbf98c8eb4523689df04813d1acca3f8e4d2fbce9d7da4f2b"
         },
         {
             "scenario": "report-commands/baseline-prune",
-            "sha256": "27a1d8f0c7eea55ab22bd799fa8079f8b884ab2c380257c15e623704054bba60"
+            "sha256": "73ddd7a0378d4c019ec224b7f3330f1499957382bd7787a8323a3a455c296738"
         },
         {
             "scenario": "report-commands/baseline-prune-scoped",
-            "sha256": "b52a04d17c8c4ae94b26a9be82e0ca8c092d1fd2d03f84cbd2189e4be8acb053"
+            "sha256": "0a2d78a44916e9532c136c5779617355340b6ba5ccd3f63a70babfc523b3452a"
         },
         {
             "scenario": "report-commands/diff",
-            "sha256": "59301dc26c8766f1a85a02bd2d276673ca64ddab6b17d31f89b4367b124facb6"
+            "sha256": "e23adc5ff94ad1baf8063a3ae1d1984da634b9832c92ce246643c2037ffdd5a5"
         },
         {
             "scenario": "report-commands/diff-json",
-            "sha256": "8d6cf6fe5965e17826a0cb2e3145aa3cdd5bdd286ae77ba1c5a830d5648e183f"
+            "sha256": "dabff32cedc98f55ce2da6c735156cf49d62cafa69cebb6011a9de8eb1750e91"
         },
         {
             "scenario": "report-commands/diff-missing-report",
-            "sha256": "24b826f47460002d6dd141236f3bed4cfdcea8c58d14bd90b61c31bd2ebadf79"
+            "sha256": "6e1f787da30162af4e9ce7aba2b1e2881018f00b070261b28514219a341de346"
         },
         {
             "scenario": "report-commands/diff-scoped-json",
-            "sha256": "afc93314efdbca375507bc7f05a45c44501cb8be781da921dac9415113bb4a9e"
+            "sha256": "b4c9c546d23775f5e7b58e7620db0004b2b9941d98e3d3ee124191f23e8e3238"
         },
         {
             "scenario": "report-commands/trend",
-            "sha256": "ec40b23cb053a2919f00c941bd8e00ba182dc2eb1640cb1e3a2044c96a429b61"
+            "sha256": "d71f1432ad21f1145cc7fae3296bd08a904cb6f8549d11dee9efe36793784fc8"
         },
         {
             "scenario": "report-commands/trend-html",
-            "sha256": "756d5b112b1dfa5e408e6eba59ce1c68e86f67155b627f8971d4227b138c1982"
+            "sha256": "bb9d3c6efeca038bfacf389287e885a58c1ce87aa441a3a3b3fb44c6c1917132"
         },
         {
             "scenario": "report-commands/trend-json",
-            "sha256": "af4049f99a5e6dcc810bab6a5649a8b4d6a0a79919f129087c02f7a37046762a"
+            "sha256": "74fb9097324088f02bd9fed00b651080b4904b6af05847466315be427e6f893c"
         },
         {
             "scenario": "report-commands/trend-single-report",
-            "sha256": "d0065f7469b7d76a521adcc0451a23b269de4b7bc8189633f4357bdea05ac595"
+            "sha256": "7f37c606f31923d5a1c294c0b0f7f1be5b3b3cebe9f5380d546f96034925a72e"
         },
         {
             "scenario": "run/advisory-lookup",
@@ -633,7 +633,7 @@
         },
         {
             "scenario": "run/finding-absolute-path",
-            "sha256": "a8dbb62d40afda404234eda7e102606a3b3209caf2218c8586f572072c4a43a8"
+            "sha256": "9e516165c441069df6d4ae0019eadbed20860b36511cb536f338635c0368beaf"
         },
         {
             "scenario": "run/finding-path-spellings",
@@ -1065,7 +1065,7 @@
         },
         {
             "scenario": "standalone/report-commands",
-            "sha256": "bda54b379620531cae25e1e5803f54fc37909ac80a4bea98f06ef0d57dcdccb3"
+            "sha256": "4dbcc4dd909959a71a2f94f8561a9a9a6d86bf2eae2981fd8b0bd563fb7a2a3c"
         },
         {
             "scenario": "standalone/run-alias-audit-run",
@@ -1168,5 +1168,5 @@
         "output/dev-null": "it writes to the discard device, which this release replaces through a rename: record it as a user that cannot write /dev",
         "standalone/output-dev-null": "it writes to the discard device, which this release replaces through a rename: record it as a user that cannot write /dev"
     },
-    "seal": "2e43209a90033e6556e09c3e4c1be92a62b9553ba5e563699c72af14233cb08a"
+    "seal": "bd84ca402cfba8fd4dce3ca7ad0d675d75396da189275ffe7f704e8c0fb36105"
 }
