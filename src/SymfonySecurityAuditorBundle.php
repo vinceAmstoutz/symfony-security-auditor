@@ -66,6 +66,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewer
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CheapAttackerClientNoticePass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
@@ -135,6 +136,14 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $this->registerForAutoconfiguration($builder);
         $container->import('../config/services.php');
 
+        $cliAgent = CliAgentPlatforms::agentIn($config);
+        if (null !== $cliAgent) {
+            $config = CliAgentPlatforms::withToolFreeAudit($config);
+            CliAgentPlatforms::register($builder, [$cliAgent => $config['cli_agent']]);
+        }
+
+        $platformServiceId = null === $cliAgent ? PlatformInterface::class : CliAgentPlatforms::serviceIdOf($cliAgent);
+
         /** @var BundleConfigArray $config */
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
@@ -143,11 +152,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $services = $container->services();
         $this->registerBudget($services, $bundleConfiguration);
         $this->registerRateLimiter($services, $bundleConfiguration);
-        $this->registerLlmClients($services, $bundleConfiguration);
+        $this->registerLlmClients($services, $bundleConfiguration, $platformServiceId);
         $this->registerImplementationAliases($services, $bundleConfiguration);
         $this->registerTrackedIgnoredFiles($services, $bundleConfiguration);
         $this->registerCustomSkills($services, $bundleConfiguration);
-        $this->registerEscalation($services, $bundleConfiguration);
+        $this->registerEscalation($services, $bundleConfiguration, $platformServiceId);
     }
 
     /**
@@ -268,7 +277,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
     }
 
-    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId): void
     {
         $servicesConfigurator->set(RetryAfterHeaderParser::class)->private();
 
@@ -278,6 +287,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration,
                 $bundleConfiguration->llm->attackerModel(),
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
+                $platformServiceId,
             ));
 
         $servicesConfigurator->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -286,6 +296,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration,
                 $bundleConfiguration->llm->reviewerModel(),
                 $bundleConfiguration->llm->reviewerMaxOutputTokens(),
+                $platformServiceId,
             ));
 
         $servicesConfigurator->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
@@ -406,7 +417,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(StaticPreScannerInterface::class, SarifImportingPreScanner::class);
     }
 
-    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId): void
     {
         if (!$bundleConfiguration->audit->escalationEnabled) {
             return;
@@ -420,6 +431,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration,
                 $cheapModel,
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
+                $platformServiceId,
             ));
         $this->bookUsageOf($servicesConfigurator, 'security_auditor.cheap_attacker_client');
 
@@ -470,11 +482,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     /**
      * @return list<mixed>
      */
-    private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens): array
+    private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens, string $platformServiceId): array
     {
         return [
             inline_service(PlatformBinding::class)->args([
-                service(PlatformInterface::class)->nullOnInvalid(),
+                service($platformServiceId)->nullOnInvalid(),
                 $model,
                 service('logger'),
                 $maxOutputTokens,
