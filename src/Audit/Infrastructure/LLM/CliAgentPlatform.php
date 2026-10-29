@@ -46,7 +46,7 @@ final readonly class CliAgentPlatform implements PlatformInterface
     #[Override]
     public function invoke(string|Model $model, array|string|object $input, array $options = []): DeferredResult
     {
-        if ($input instanceof MessageBag && $this->longestPrompt($input) > self::LONGEST_COMMAND_LINE_ARGUMENT) {
+        if ($input instanceof MessageBag && $this->outgrowsOneArgument($input)) {
             throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes one command-line argument of the CLI can carry.', self::LONGEST_COMMAND_LINE_ARGUMENT));
         }
 
@@ -59,17 +59,23 @@ final readonly class CliAgentPlatform implements PlatformInterface
         return $this->platform->getModelCatalog();
     }
 
-    private function longestPrompt(MessageBag $messageBag): int
+    private function outgrowsOneArgument(MessageBag $messageBag): bool
     {
-        return max([0, ...array_map($this->promptLength(...), $messageBag->getMessages())]);
+        foreach ($messageBag->getMessages() as $message) {
+            if (\strlen($this->promptOf($message) ?? '') > self::LONGEST_COMMAND_LINE_ARGUMENT) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    private function promptLength(MessageInterface $message): int
+    private function promptOf(MessageInterface $message): ?string
     {
         return match (true) {
-            $message instanceof UserMessage => \strlen($message->asText() ?? ''),
-            $message instanceof SystemMessage => \strlen((string) $message->getContent()),
-            default => 0,
+            $message instanceof UserMessage => $message->asText(),
+            $message instanceof SystemMessage => (string) $message->getContent(),
+            default => null,
         };
     }
 }

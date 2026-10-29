@@ -103,7 +103,7 @@ final readonly class CliAgentPlatforms
                 ->setArguments([\is_array($settings) ? ($settings['cli_binary'] ?? null) : null, ContainerParameterSyntax::escape(sys_get_temp_dir())]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
                 ->setArguments([new Reference($cliServiceId)])
-                ->addTag(self::PLATFORM_TAG, ['name' => $name]);
+                ->addTag(self::PLATFORM_TAG);
         }
     }
 }
