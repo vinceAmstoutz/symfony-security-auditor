@@ -403,22 +403,6 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_default_process_builder_uses_composer_require_in_the_target_directory(): void
-    {
-        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-anthropic-platform', 'v0.14.1', '/data/bridges');
-
-        $commandLine = $process->getCommandLine();
-        self::assertStringContainsString("'composer'", $commandLine);
-        self::assertStringContainsString("'require'", $commandLine);
-        self::assertStringContainsString("'symfony/ai-anthropic-platform' 'symfony/ai-platform:v0.14.1'", $commandLine);
-        self::assertStringContainsString("'--working-dir=/data/bridges'", $commandLine);
-        self::assertStringContainsString("'--no-interaction'", $commandLine);
-        self::assertNull($process->getTimeout());
-    }
-
-    /**
-     * @throws BridgeInstallationFailedException
-     */
     public function test_embedded_process_builder_runs_this_binary_as_the_downloaded_composer(): void
     {
         $process = $this->embeddedProcess('symfony/ai-anthropic-platform', 'v0.14.1');
@@ -472,25 +456,14 @@ final class ComposerBridgeInstallerTest extends TestCase
         return static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => new Process(['true']);
     }
 
-    public function test_default_process_builder_requires_every_package_before_the_platform_pin(): void
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_embedded_process_builder_names_no_platform_pin_when_there_is_none(): void
     {
-        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-bedrock-platform', 'v0.14.1', '/data/bridges', 'symfony/ai-generic-platform');
+        $process = $this->embeddedProcess('symfony/ai-anthropic-platform', null);
 
-        self::assertStringContainsString("'require' 'symfony/ai-bedrock-platform' 'symfony/ai-generic-platform' 'symfony/ai-platform:v0.14.1'", $process->getCommandLine());
-    }
-
-    public function test_default_process_builder_lets_what_the_bridges_depend_on_move_with_them(): void
-    {
-        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-open-ai-platform', 'v0.14.1', '/data/bridges');
-
-        self::assertStringContainsString("'symfony/ai-platform:v0.14.1' '--with-dependencies' '--working-dir=/data/bridges'", $process->getCommandLine());
-    }
-
-    public function test_default_process_builder_names_no_platform_pin_when_there_is_none(): void
-    {
-        $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-anthropic-platform', null, '/data/bridges');
-
-        self::assertStringContainsString("'require' 'symfony/ai-anthropic-platform' '--with-dependencies' '--working-dir=/data/bridges'", $process->getCommandLine());
+        self::assertStringContainsString(\sprintf("'require' 'symfony/ai-anthropic-platform' '--with-dependencies' '--working-dir=%s'", $this->targetDirectory), $process->getCommandLine());
     }
 
     #[DataProvider('providerPackageCases')]

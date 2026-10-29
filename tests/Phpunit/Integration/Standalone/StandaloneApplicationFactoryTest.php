@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPri
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
 
 final class StandaloneApplicationFactoryTest extends TestCase
 {
@@ -75,6 +76,21 @@ final class StandaloneApplicationFactoryTest extends TestCase
 
         self::assertTrue($standaloneApplication->has('audit:run'));
         self::assertTrue($standaloneApplication->has('audit'));
+    }
+
+    public function test_init_installs_the_bridge_with_the_installer_it_is_given(): void
+    {
+        $recordingBridgeInstaller = new RecordingBridgeInstaller();
+        $dataHome = $this->cacheHome.'/data';
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->cacheHome.'/config',
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'XDG_DATA_HOME' => $dataHome,
+        ], bridgeInstaller: $recordingBridgeInstaller)->create();
+
+        (new CommandTester($standaloneApplication->find('init')))->execute(['--provider' => 'anthropic', '--model' => 'claude-opus-5-5', '--env-var' => 'ANTHROPIC_API_KEY'], ['interactive' => false]);
+
+        self::assertSame([['anthropic', $dataHome.'/symfony-security-auditor']], $recordingBridgeInstaller->installations);
     }
 
     public function test_it_registers_the_audit_command_without_reading_a_config_file(): void

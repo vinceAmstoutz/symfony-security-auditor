@@ -219,13 +219,15 @@ jobs:
         with:
           name: symfony-security-auditor-phar
 
-      - name: Resolve the required extensions plus zlib for the gz-compressed PHAR
+      - name: Resolve the required extensions plus zlib, openssl and zip
         id: extensions
         run: |
           # `spc dump-extensions` scans source usage and emits always-compiled
           # PHP core extensions (date, …) that `spc download`/`build` reject as
           # non-buildable packages; drop them, then append zlib for the
-          # GZ-compressed PHAR wrapper (box.json `compression: GZ`).
+          # GZ-compressed PHAR wrapper (box.json `compression: GZ`), and openssl
+          # and zip for the Composer `init` runs on this PHP: Composer refuses
+          # to start without openssl, and without zip it needs a host `unzip`.
           # `uri` is unbuildable for the mirror-image reason: spc lists it
           # because league/uri-polyfill declares `provide: ext-uri`, and the
           # 8.3 target has no uri extension to compile — so it must be dropped
@@ -233,9 +235,9 @@ jobs:
           # wrong: `uri` is an internal extension on spc main.
           raw="$(./spc dump-extensions . --format=text)"
           filtered="$(printf '%s' "$raw" | tr ',' '\n' \
-            | grep -vxE 'core|standard|date|hash|json|pcre|spl|reflection|random|uri|zlib' \
+            | grep -vxE 'core|standard|date|hash|json|pcre|spl|reflection|random|uri|zlib|openssl|zip' \
             | paste -sd, -)"
-          echo "list=${filtered},zlib" >> "$GITHUB_OUTPUT"
+          echo "list=${filtered},zlib,openssl,zip" >> "$GITHUB_OUTPUT"
 
       - name: Build the static micro PHP runtime
         env:
@@ -282,6 +284,23 @@ jobs:
           if [ -n "$EXPECTED_VERSION" ]; then
             ./"${{ matrix.asset }}" --version | grep -F "$EXPECTED_VERSION"
           fi
+
+      - name: Smoke-test init without a host PHP or Composer
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: |
+          ssa_home="$RUNNER_TEMP/ssa-init-home"
+          mkdir -p "$ssa_home"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            isolated_path="/c/Windows/System32"
+          else
+            isolated_path="$RUNNER_TEMP/ssa-init-path"
+            mkdir -p "$isolated_path"
+            ln -s "$(command -v curl)" "$isolated_path/curl"
+          fi
+          PATH="$isolated_path" SYMFONY_SECURITY_AUDITOR_HOME="$ssa_home" SSA_NO_UPDATE_CHECK=1 \
+            ./"$ASSET" init --no-interaction --provider=anthropic --model=claude-opus-5-5 --env-var=ANTHROPIC_API_KEY
+          test -f "$ssa_home/.local/share/symfony-security-auditor/vendor/symfony/ai-anthropic-platform/composer.json"
 
       - name: Generate the SHA-256 checksum
         run: |

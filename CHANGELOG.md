@@ -10,10 +10,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 - The standalone binary runs on a Claude subscription instead of an API key: `init --provider=claudecode` sets it up, and each call goes through the installed Claude Code CLI with its own tools off ([#677](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/677))
 - The standalone binary runs on a ChatGPT subscription too: `init --provider=codex` sets it up, and each call goes through the installed Codex CLI, read-only and with its shell off ([#678](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/678))
-
-### Core 🧱
-
-- The standalone binary can run a pinned Composer 2.8.12, downloaded on first use and checked against its SHA-256, on its own PHP: the groundwork for an `init` that needs no PHP or Composer on the host
+- `init` installs the provider bridge with its own Composer 2.8.12, downloaded on first use, checked against its SHA-256 and run on the binary's own PHP, so the standalone binary no longer needs PHP or Composer on your machine, only `curl`; `init` no longer checks for Composer before asking anything, and `doctor`'s Composer check now only concerns the `lookup_advisory` tool
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 

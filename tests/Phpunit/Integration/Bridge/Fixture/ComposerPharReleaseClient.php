@@ -41,7 +41,7 @@ final class ComposerPharReleaseClient implements ReleaseClientInterface
     {
         $this->downloadedUrls[] = $url;
 
-        if (null === $this->payload) {
+        if (null === $this->payload || !is_dir(\dirname($destination))) {
             throw SelfUpdateFailedException::forFailedDownload($url);
         }
 

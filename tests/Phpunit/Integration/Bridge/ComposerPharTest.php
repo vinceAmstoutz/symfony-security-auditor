@@ -86,6 +86,18 @@ final class ComposerPharTest extends TestCase
         (new ComposerPhar(new ComposerPharReleaseClient(null)))->in($this->directory);
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_reports_a_directory_it_cannot_create_as_a_failed_bridge_installation(): void
+    {
+        $this->filesystem->dumpFile($this->directory.'/a-file', '');
+
+        $this->expectException(BridgeInstallationFailedException::class);
+
+        (new ComposerPhar(new ComposerPharReleaseClient(self::PAYLOAD)))->in($this->directory.'/a-file/.composer');
+    }
+
     public function test_it_refuses_a_download_whose_checksum_does_not_match_and_keeps_none_of_it(): void
     {
         $composerPhar = new ComposerPhar(new ComposerPharReleaseClient(self::PAYLOAD), sha256: hash('sha256', 'another composer'));
