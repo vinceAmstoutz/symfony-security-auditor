@@ -17,6 +17,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPl
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\PendingBinarySwapCommitter;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
+// Composer ships its own unprefixed symfony/console, so it runs before this binary's autoloader is registered.
+$composerPhar = getenv('SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR');
+if (is_string($composerPhar) && '' !== $composerPhar) {
+    putenv('SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR');
+    unset($_SERVER['SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR'], $_ENV['SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR']);
+    $_SERVER['argv'][0] = $composerPhar;
+
+    require $composerPhar;
+
+    exit(0);
+}
+
 (static function (): void {
     foreach ([__DIR__.'/../vendor/autoload.php', __DIR__.'/../../../autoload.php'] as $autoload) {
         if (is_file($autoload)) {
