@@ -553,7 +553,7 @@ model: gpt-5.6
 
 ### Running on a Claude subscription
 
-The standalone binary can run the audit on a Claude subscription instead of an API key, through the [Claude Code](https://code.claude.com) CLI installed on the machine. `init --provider=claudecode` downloads the bridge and writes:
+_Since 1.23_ the standalone binary can run the audit on a Claude subscription instead of an API key, through the [Claude Code](https://code.claude.com) CLI installed on the machine. `init --provider=claudecode` downloads the bridge and writes:
 
 ```yaml
 provider: claudecode
