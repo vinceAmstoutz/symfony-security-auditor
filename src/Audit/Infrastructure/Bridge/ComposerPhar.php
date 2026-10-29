@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
@@ -52,9 +53,10 @@ final readonly class ComposerPhar
         $download = \sprintf('%s.download', $path);
 
         try {
+            $this->filesystem->mkdir($directory);
             $this->releaseClient->download(\sprintf(self::DOWNLOAD_URL, self::VERSION), $download);
-        } catch (SelfUpdateFailedException $selfUpdateFailedException) {
-            throw BridgeInstallationFailedException::forUndownloadableComposerPhar(self::VERSION, $selfUpdateFailedException);
+        } catch (IOException|SelfUpdateFailedException $failure) {
+            throw BridgeInstallationFailedException::forUndownloadableComposerPhar(self::VERSION, $failure);
         }
 
         if (!$this->isPinnedRelease($download)) {

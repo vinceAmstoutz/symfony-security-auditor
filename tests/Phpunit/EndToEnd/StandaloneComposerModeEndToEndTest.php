@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -62,6 +63,25 @@ final class StandaloneComposerModeEndToEndTest extends TestCase
         $this->filesystem->dumpFile($this->composerPhar, '<?php var_export([getenv(\'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR\'), $_SERVER[\'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR\'] ?? false, $_ENV[\'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR\'] ?? false]);');
 
         self::assertSame(var_export([false, false, false], true), $this->runInComposerMode([])->getOutput());
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_init_installs_the_bridge_with_its_own_composer_rather_than_one_on_the_host(): void
+    {
+        $process = new Process(
+            [\PHP_BINARY, \dirname(__DIR__, 3).'/bin/symfony-security-auditor', 'init', '--no-interaction', '--no-ansi', '--provider=anthropic', '--model=claude-opus-5-5', '--env-var=ANTHROPIC_API_KEY'],
+            $this->base,
+            [
+                'HOME' => $this->base,
+                'PATH' => $this->base.'/empty-path',
+                'XDG_CONFIG_HOME' => $this->base.'/config',
+                'XDG_DATA_HOME' => $this->base.'/data',
+                'SSA_NO_UPDATE_CHECK' => '1',
+            ],
+        );
+        $process->run();
+
+        self::assertStringContainsString('Could not download composer.phar 2.8.12', preg_replace('/\s+/', ' ', $process->getOutput().$process->getErrorOutput()) ?? '');
     }
 
     /**

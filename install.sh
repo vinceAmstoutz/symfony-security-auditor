@@ -19,7 +19,7 @@
 #   SSA_INIT         when "1", run "<binary> init" after installing so a single
 #                    command installs and configures the tool; prompts read from
 #                    /dev/tty when a terminal is attached, else fall back to
-#                    "init --no-interaction" (needs composer, like init itself)
+#                    "init --no-interaction"
 #
 # The SHA-256 checksum is always verified; the install aborts if no checksum
 # tool is available.

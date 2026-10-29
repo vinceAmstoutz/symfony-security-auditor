@@ -1109,7 +1109,7 @@ It runs four checks and prints one line for each:
 | --- | --- |
 | Configuration | `config.yaml` resolves, a `platform:` block is present, and every `%env(...)%` variable the selected platform references is set — an unset API-key variable is reported under the label `API key` instead |
 | Provider bridge | the `symfony/ai-*` bridge autoloader is installed under the data directory (`init` downloads it), holds the `symfony/ai-platform` release the binary bundles, **and the audit actually boots with it** — a leftover bridge from a previously configured provider fails here, and so does one an older version of the binary installed |
-| Composer | a runnable `composer` is reachable — needed only to run `init` or switch providers, not to audit |
+| Composer | a runnable `composer` is reachable — used only by the `lookup_advisory` tool, which audits without advisory data otherwise; `init` runs its own |
 | Pricing catalog | the `symfony/models-dev` catalog the run prices from is there, naming the refreshed one `self-update` wrote when the run can use it and the packaged one is not newer, and the packaged one otherwise |
 
 A missing `composer` or pricing catalog is reported as a **warning** (auditing still works); a missing/invalid configuration or an uninstalled — or unbootable — bridge is a **failure**. The command exits `0` when every check passes or only warns, and `1` when any check fails, so it drops into a CI preflight step:

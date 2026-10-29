@@ -125,15 +125,10 @@ The bridge tree under the data directory was resolved for another PHP than the o
 
 ### `init` fails to install the provider bridge
 
-`init` always runs `composer require symfony/ai-<slug>-platform` under the data directory before it writes the config file. It checks first, before asking anything, that `composer --version` runs (a `--no-interaction` run that finds a configuration and has no `--force` checks nothing, since it leaves that configuration untouched and exits `0` with `Aborted; the existing configuration was left untouched (use --force to overwrite).`), and `BridgeInstallationFailedException` covers what fails after that:
+`init` always runs `composer require symfony/ai-<slug>-platform` under the data directory before it writes the config file, with its own Composer: `composer.phar` 2.8.12, downloaded with `curl` into the data directory's `.composer/` on first use, checked against its SHA-256 and run on the binary's own PHP, so no PHP or Composer is needed on the machine. `BridgeInstallationFailedException` covers what fails:
 
-- **No working `composer`, or a `composer` that cannot find PHP** — the check stops `init` with exit code `1` before it asks a question, says whether Composer (`init cannot continue: Composer, which it uses to download the package for your AI provider, is not installed or does not start.`) or the PHP it runs on (`init cannot continue: Composer is installed, but PHP, which it runs on, is not.`) is missing, prints the first line `composer --version` printed (`sh: 1: exec: composer: not found`, `/mnt/c/ProgramData/ComposerSetup/bin/composer: 14: php: not found` for the Windows shim on a WSL `PATH` with no PHP of its own, `'composer' is not recognized as an internal or external command,` on Windows) and the commands that install Composer with its PHP on your system, then run `init` again:
-  - **Linux, WSL included** — on Debian and Ubuntu, `sudo apt update && sudo apt install -y php-cli php-curl php-mbstring php-xml unzip composer`; elsewhere the `php-cli`, `composer` and `unzip` packages of your package manager.
-  - **macOS** — `brew install composer`, which installs PHP with it; without Homebrew, the installer of <https://getcomposer.org/download/>.
-  - **Windows** — PHP from <https://windows.php.net/download/> and Composer's Windows installer from <https://getcomposer.org/download/>, then a new terminal so that `PATH` holds both.
-
-  Only this download needs them: auditing runs on the binary alone, and `doctor` reports the same line in its `Composer` check.
-
+- **`Could not download composer.phar 2.8.12 to install the provider bridge: <reason>`** — `curl` is missing, or getcomposer.org cannot be reached (offline, a proxy); fix that and run `init` again.
+- **`The downloaded composer.phar 2.8.12 does not match its pinned SHA-256 checksum; it was discarded.`** — something between you and getcomposer.org altered the download; nothing was kept, so run `init` again once the network is trusted.
 - **`composer require` ran but exited non-zero** (no network, or the package does not exist for a misspelled `--provider`):
 
   ```text

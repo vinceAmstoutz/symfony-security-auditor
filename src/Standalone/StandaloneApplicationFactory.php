@@ -27,7 +27,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInsta
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
@@ -74,7 +76,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerPreflight;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
@@ -136,9 +137,10 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * @param array<string, string> $environment
+     * @param array<string, string>     $environment
+     * @param ?BridgeInstallerInterface $bridgeInstaller what `init` installs bridges with; null runs the binary's own Composer
      */
-    public static function fromEnvironment(array $environment, ?string $runningBinaryPath = null): self
+    public static function fromEnvironment(array $environment, ?string $runningBinaryPath = null, ?BridgeInstallerInterface $bridgeInstaller = null): self
     {
         $xdgConfigPathResolver = self::resolverFromEnvironment($environment);
         $resolvedBinaryPath = $runningBinaryPath ?? '';
@@ -154,7 +156,7 @@ final readonly class StandaloneApplicationFactory
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
-            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder(), aiPlatformPin: $bundledAiPlatformVersion),
+            $bridgeInstaller ?? self::bridgeInstaller($resolvedBinaryPath, $pathEnvironment, $bundledAiPlatformVersion),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
@@ -168,6 +170,17 @@ final readonly class StandaloneApplicationFactory
             credentialStore: $filesystemCredentialStore,
             environment: $environment,
             bundledAiPlatformVersion: $bundledAiPlatformVersion,
+        );
+    }
+
+    private static function bridgeInstaller(string $runningBinaryPath, string $pathEnvironment, ?string $bundledAiPlatformVersion): ComposerBridgeInstaller
+    {
+        return new ComposerBridgeInstaller(
+            ComposerBridgeInstaller::embeddedProcessBuilder(
+                new SelfInvocation(new RunningBinaryLocator('/proc/self/exe', $runningBinaryPath, pathEnvironment: $pathEnvironment), $runningBinaryPath),
+                new ComposerPhar(new ProcessReleaseClient(ProcessReleaseClient::defaultProcessBuilder())),
+            ),
+            aiPlatformPin: $bundledAiPlatformVersion,
         );
     }
 
@@ -276,7 +289,6 @@ final readonly class StandaloneApplicationFactory
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->bridgeInstaller,
-            new ComposerPreflight($this->composerAvailabilityChecker()),
             $this->credentialStore,
             pricedModelList: new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
         );

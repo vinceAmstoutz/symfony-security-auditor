@@ -71,7 +71,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     private const string BRIDGE_PACKAGE_PATTERN = '#^symfony/ai-.+-platform$#';
 
     /**
-     * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::defaultProcessBuilder() in production); tests inject a stub
+     * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::embeddedProcessBuilder() in production); tests inject a stub
      * @param string                                               $platformPhpVersion the PHP version the bridge tree must resolve for — defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
      * @param ?string                                              $aiPlatformPin      the `symfony/ai-platform` release the bridge tree is held to — the one this binary bundles ({@see BundledAiPlatformVersion}), so a newer release the bridge would otherwise pull in cannot shadow the bundled classes; null writes no pin
      */
@@ -83,28 +83,15 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     ) {}
 
     /**
+     * Runs this binary itself as `composer.phar`, on its own PHP, so a host
+     * needs neither PHP nor Composer to install a bridge.
+     *
      * The pin is named on the command line as well as in the manifest:
      * composer then moves an already installed `symfony/ai-platform` of
      * another release to it, where the manifest pin alone would only report
      * a conflict. `--with-dependencies` lets what those bridges pulled in
      * move with them — `symfony/ai-open-responses-platform` under the OpenAI
      * bridge — which composer would otherwise hold at its locked release.
-     *
-     * @return Closure(string, ?string, string, string...): Process
-     */
-    public static function defaultProcessBuilder(): Closure
-    {
-        return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process {
-            $process = new Process(['composer', ...self::requireArguments($package, $aiPlatformPin, $targetDirectory, ...$morePackages)]);
-            $process->setTimeout(null);
-
-            return $process;
-        };
-    }
-
-    /**
-     * Runs this binary itself as `composer.phar`, on its own PHP, so a host
-     * needs neither PHP nor Composer to install a bridge.
      *
      * @return Closure(string, ?string, string, string...): Process
      */

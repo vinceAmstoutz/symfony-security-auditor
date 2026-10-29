@@ -84,16 +84,9 @@ One install, many projects, zero footprint in the audited app. Each release ship
 
 Running audits needs nothing but the binary and an API key for your provider (not even that for a local model such as [Ollama](#supported-platforms)).
 
-**The one-time [`init`](#2-configure--the-guided-init) also needs `composer` and PHP on your machine**, to download the package that talks to your AI provider. It checks for both before asking anything and says which one is missing.
+The one-time [`init`](#2-configure--the-guided-init) downloads the package that talks to your AI provider with a Composer it fetches itself and runs on the binary's own PHP, so it needs no PHP or Composer on your machine: only `curl` and network access to getcomposer.org and Packagist.
 
-| System | Install PHP and Composer |
-| --- | --- |
-| Debian, Ubuntu, WSL | `sudo apt update && sudo apt install -y php-cli php-curl php-mbstring php-xml unzip composer` |
-| macOS | `brew install composer` (installs PHP with it) |
-| Windows | PHP from <https://windows.php.net/download/>, then the Composer installer from <https://getcomposer.org/download/> |
-| Other Linux | the `php-cli`, `composer` and `unzip` packages of your package manager |
-
-On WSL, install them inside WSL: a Windows Composer reached through `/mnt/c/…` cannot find a PHP there. `--since` needs `git`, and live CVE lookups use `composer audit` when `composer` is present.
+`--since` needs `git`, and live CVE lookups use `composer audit` when `composer` is present.
 
 ### 1. Install
 

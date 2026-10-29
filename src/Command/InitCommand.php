@@ -18,7 +18,6 @@ use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
-use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
@@ -63,7 +62,6 @@ final readonly class InitCommand
         private StandaloneConfigFactoryInterface $standaloneConfigFactory,
         private StandaloneConfigWriterInterface $standaloneConfigWriter,
         private BridgeInstallerInterface $bridgeInstaller,
-        private ComposerPreflight $composerPreflight,
         private CredentialStoreInterface $credentialStore,
         private Filesystem $filesystem = new Filesystem(),
         private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
@@ -77,26 +75,9 @@ final readonly class InitCommand
      */
     public function __invoke(
         SymfonyStyle $symfonyStyle,
-        InputInterface $input,
         #[MapInput] InitCommandInput $initCommandInput,
     ): int {
-        if ($this->declinesTheOverwriteUnasked($input, $initCommandInput->force)) {
-            return $this->configure($symfonyStyle, $initCommandInput);
-        }
-
-        return $this->composerPreflight->refusal($symfonyStyle) ?? $this->configure($symfonyStyle, $initCommandInput);
-    }
-
-    /**
-     * A run that cannot ask, without `--force`, leaves an existing
-     * configuration as it is, so it goes the way it always went, without
-     * checking first for a Composer it will not use.
-     *
-     * @throws UnresolvableConfigPathException
-     */
-    private function declinesTheOverwriteUnasked(InputInterface $input, bool $force): bool
-    {
-        return !$force && !$input->isInteractive() && $this->filesystem->exists($this->xdgConfigPathResolver->configFile());
+        return $this->configure($symfonyStyle, $initCommandInput);
     }
 
     /**
