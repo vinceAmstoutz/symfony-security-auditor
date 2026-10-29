@@ -21,7 +21,7 @@ final class InitProviderChoicesTest extends TestCase
     public function test_it_lists_the_priced_platforms_a_bare_name_configures_and_the_subscription_clis_in_alphabetical_order(): void
     {
         self::assertSame(
-            ['anthropic', 'cerebras', 'claudecode', 'cohere', 'deepseek', 'edenai', 'fireworks', 'gemini', 'huggingface', 'minimax', 'mistral', 'openai', 'openrouter', 'ovh', 'perplexity', 'scaleway', 'together', 'venice', 'vertexai'],
+            ['anthropic', 'cerebras', 'claudecode', 'codex', 'cohere', 'deepseek', 'edenai', 'fireworks', 'gemini', 'huggingface', 'minimax', 'mistral', 'openai', 'openrouter', 'ovh', 'perplexity', 'scaleway', 'together', 'venice', 'vertexai'],
             InitProviderChoices::names(),
         );
     }
