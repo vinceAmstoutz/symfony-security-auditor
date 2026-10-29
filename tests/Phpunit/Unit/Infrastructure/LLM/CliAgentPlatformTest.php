@@ -17,7 +17,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
+use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
+use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\Result\DeferredResult;
+use Symfony\AI\Platform\Result\InMemoryRawResult;
+use Symfony\AI\Platform\Result\TextResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
 
 final class CliAgentPlatformTest extends TestCase
@@ -42,5 +47,33 @@ final class CliAgentPlatformTest extends TestCase
         $this->expectException(ExceedContextSizeException::class);
 
         (new CliAgentPlatform($platform))->invoke('opus', new MessageBag(Message::forSystem(str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1)), Message::ofUser('Audit this.')));
+    }
+
+    public function test_a_prompt_as_long_as_one_command_line_argument_can_carry_reaches_the_cli_alone_with_its_isolating_options(): void
+    {
+        $messageBag = new MessageBag(Message::ofUser(str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT)));
+        $deferredResult = new DeferredResult(new PlainConverter(new TextResult('OK')), new InMemoryRawResult());
+        $platform = $this->createMock(PlatformInterface::class);
+        $platform->expects(self::once())->method('invoke')->with('opus', $messageBag, ['tools' => [], 'strict_mcp_config' => true])->willReturn($deferredResult);
+
+        self::assertSame($deferredResult, (new CliAgentPlatform($platform))->invoke('opus', $messageBag, ['max_tokens' => 10]));
+    }
+
+    public function test_a_prompt_given_as_text_reaches_the_cli_unmeasured(): void
+    {
+        $deferredResult = new DeferredResult(new PlainConverter(new TextResult('OK')), new InMemoryRawResult());
+        $platform = $this->createMock(PlatformInterface::class);
+        $platform->expects(self::once())->method('invoke')->with('opus', str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1))->willReturn($deferredResult);
+
+        self::assertSame($deferredResult, (new CliAgentPlatform($platform))->invoke('opus', str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1)));
+    }
+
+    public function test_it_answers_with_the_model_catalog_of_the_cli(): void
+    {
+        $modelCatalog = new FallbackModelCatalog();
+        $platform = self::createStub(PlatformInterface::class);
+        $platform->method('getModelCatalog')->willReturn($modelCatalog);
+
+        self::assertSame($modelCatalog, (new CliAgentPlatform($platform))->getModelCatalog());
     }
 }
