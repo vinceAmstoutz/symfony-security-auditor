@@ -40,7 +40,7 @@ use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
-use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\Test\MockPlatformFactory;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\AI\Platform\Tool\Tool;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
@@ -553,7 +553,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_model_returns_configured_model_name(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform(''), 'claude-test', new NullLogger()));
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(MockPlatformFactory::createPlatform(''), 'claude-test', new NullLogger()));
 
         self::assertSame('claude-test', $symfonyAiLLMClient->model());
     }
@@ -630,7 +630,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      */
     public function test_complete_batch_returns_empty_for_no_requests(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('x'), 'm', new NullLogger()));
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(MockPlatformFactory::createPlatform('x'), 'm', new NullLogger()));
 
         self::assertSame([], $symfonyAiLLMClient->completeBatch([], 4));
     }
@@ -646,7 +646,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      */
     public function test_complete_batch_returns_one_response_per_request_in_order(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('batched'), 'm', new NullLogger()));
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(MockPlatformFactory::createPlatform('batched'), 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([
             ['system' => 's1', 'user' => 'u1'],
@@ -671,7 +671,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      */
     public function test_complete_batch_processes_more_requests_than_window_size(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(MockPlatformFactory::createPlatform('ok'), 'm', new NullLogger()));
 
         $requests = [];
         for ($i = 0; $i < 5; ++$i) {
@@ -694,7 +694,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      */
     public function test_complete_batch_clamps_non_positive_window_to_one(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(MockPlatformFactory::createPlatform('ok'), 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([
             ['system' => 's', 'user' => 'u'],
@@ -750,7 +750,7 @@ final class SymfonyAiLLMClientTest extends TestCase
     {
         $fakeRateLimiter = new FakeRateLimiter();
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()),
+            new PlatformBinding(MockPlatformFactory::createPlatform('ok'), 'm', new NullLogger()),
             new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(123)),
             new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
@@ -1124,7 +1124,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         };
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()),
+            new PlatformBinding(MockPlatformFactory::createPlatform('ok'), 'm', new NullLogger()),
             platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $rateLimiter),
         );
 

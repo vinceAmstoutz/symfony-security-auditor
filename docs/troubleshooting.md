@@ -64,7 +64,7 @@ The container the binary builds registers the services `symfony/ai-bundle` expec
 
 ```text
 The provider bridge under "/home/you/.local/share/symfony-security-auditor" was
-installed for symfony/ai-platform v0.12.0, but this binary bundles v0.14.1:
+installed for symfony/ai-platform v0.12.0, but this binary bundles v0.15.0:
 loaded, its classes would replace the bundled ones and fail every LLM call, so
 the binary leaves it unloaded. Rebuild it with "symfony-security-auditor init
 --provider=ollama --force" — init rewrites config.yaml, so give it your model

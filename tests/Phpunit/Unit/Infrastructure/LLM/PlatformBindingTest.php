@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\Test\MockPlatformFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 
@@ -28,7 +28,7 @@ final class PlatformBindingTest extends TestCase
      */
     public function test_it_hands_out_the_platform_it_is_bound_to(): void
     {
-        $inMemoryPlatform = new InMemoryPlatform('answer');
+        $inMemoryPlatform = MockPlatformFactory::createPlatform('answer');
 
         self::assertSame($inMemoryPlatform, (new PlatformBinding($inMemoryPlatform, 'm', new NullLogger(), null, ['ai.platform.anthropic', 'ai.platform.openai']))->platform());
     }

@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
+## [1.22.1] — 2026-10-29 — Waypoint
+
+### Bugfixes 🐛
+
+- The default `model` `claude-opus-5-5`, and `claude-sonnet-5-5` and `claude-haiku-5-5`, run on the Anthropic platform instead of being refused as unknown models ([#662](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/662))
+
+### Core 🧱
+
+- Runs on `symfony/ai` 0.15 (`symfony/ai-bundle` `^0.15`): in bundle mode raise every `symfony/ai-*-platform` bridge your application requires to `^0.15` in the same update, and in the standalone binary rebuild the bridge tree once with `init --force` ([#662](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/662))
+
 ## [1.22.0] — 2026-10-29 — Compass
 
 ### New Features ✨
@@ -929,6 +939,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The secret scrubber no longer relies on a temporary error handler around its regular expressions ([#9](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/9))
 - The bundle is meant to be registered in the `dev` and `test` environments only ([#9](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/9))
 
+[1.22.1]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.22.1
 [1.22.0]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.22.0
 [1.21.0]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.21.0
 [1.20.1]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.20.1

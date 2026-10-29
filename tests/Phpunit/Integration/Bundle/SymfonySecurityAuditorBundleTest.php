@@ -21,8 +21,9 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
+use Symfony\AI\Platform\Bridge\Anthropic\ModelCatalog as AnthropicModelCatalog;
 use Symfony\AI\Platform\PlatformInterface;
-use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\Test\MockPlatformFactory;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -244,6 +245,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertSame('claude-opus-5-5', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
         self::assertSame('claude-opus-5-5', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
+    }
+
+    public function test_bundle_default_model_is_one_the_anthropic_bridge_serves(): void
+    {
+        $defaultModel = $this->loadParameters([])->getParameter('symfony_security_auditor.attacker_model');
+
+        self::assertIsString($defaultModel);
+        self::assertNotSame('', $defaultModel);
+        self::assertSame($defaultModel, (new AnthropicModelCatalog())->getModel($defaultModel)->getName());
     }
 
     public function test_bundle_uses_shared_model_for_both_agents_when_split_overrides_omitted(): void
@@ -2418,7 +2428,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             }
 
             if ($registerPlatform) {
-                $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
+                $containerBuilder->register(PlatformInterface::class, PlatformInterface::class)
+                    ->setFactory([MockPlatformFactory::class, 'createPlatform'])
                     ->setArguments(['stub-response'])
                     ->setPublic(true);
             }

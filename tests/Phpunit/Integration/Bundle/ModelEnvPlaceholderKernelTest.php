@@ -18,7 +18,7 @@ use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\PlatformInterface;
-use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\Test\MockPlatformFactory;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -123,7 +123,8 @@ final class ModelEnvPlaceholderKernelTest extends TestCase
                         'reviewer_model' => '%env(SSA_REVIEWER_MODEL)%',
                         'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => '%env(SSA_CHEAP_MODEL)%']],
                     ]);
-                    $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
+                    $containerBuilder->register(PlatformInterface::class, PlatformInterface::class)
+                        ->setFactory([MockPlatformFactory::class, 'createPlatform'])
                         ->setArguments(['stub-response'])
                         ->setPublic(true);
                 });

@@ -18,7 +18,7 @@ use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\PlatformInterface;
-use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\Test\MockPlatformFactory;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -183,7 +183,8 @@ final class HostAutoconfigurationTest extends TestCase
                         'php_errors' => ['log' => true],
                     ]);
                     $containerBuilder->loadFromExtension('symfony_security_auditor', ['model' => 'gpt-4o']);
-                    $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
+                    $containerBuilder->register(PlatformInterface::class, PlatformInterface::class)
+                        ->setFactory([MockPlatformFactory::class, 'createPlatform'])
                         ->setArguments(['stub-response'])
                         ->setPublic(true);
                     $containerBuilder->addCompilerPass(new class implements CompilerPassInterface {

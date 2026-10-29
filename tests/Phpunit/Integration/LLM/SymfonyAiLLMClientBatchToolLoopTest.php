@@ -38,7 +38,7 @@ use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\ResultConverterInterface;
-use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\Test\MockPlatformFactory;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
@@ -137,7 +137,7 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
      */
     public function test_complete_batch_with_tools_returns_empty_list_for_empty_requests(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(MockPlatformFactory::createPlatform('ok'), 'm', new NullLogger()));
 
         self::assertSame([], $symfonyAiLLMClient->completeBatchWithTools([], 4, 3));
     }
@@ -1055,7 +1055,7 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
         $fakeRateLimiter = new FakeRateLimiter();
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()),
+            new PlatformBinding(MockPlatformFactory::createPlatform('ok'), 'm', new NullLogger()),
             new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(123)),
             new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
