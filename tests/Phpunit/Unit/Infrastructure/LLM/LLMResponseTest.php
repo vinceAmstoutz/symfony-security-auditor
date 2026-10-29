@@ -96,6 +96,40 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_a_response_is_not_answered_through_a_batch_unless_marked(): void
+    {
+        self::assertFalse(LLMResponse::of('[]', 'gpt-4.1', 'stop', TokenUsageSnapshot::of(100, 50))->isBatched());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_response_marked_as_answered_through_a_batch_keeps_everything_else(): void
+    {
+        $llmResponse = LLMResponse::of('[]', 'gpt-4.1', 'stop', TokenUsageSnapshot::of(100, 50, 7, 3))
+            ->withReportedModel('gpt-4.1-2025-04-14')
+            ->withReachedToolCap()
+            ->withBatched();
+
+        self::assertTrue($llmResponse->isBatched());
+        self::assertTrue($llmResponse->reachedToolCap());
+        self::assertSame(['[]', 'gpt-4.1', 'gpt-4.1-2025-04-14', 'stop'], [$llmResponse->content(), $llmResponse->model(), $llmResponse->reportedModel(), $llmResponse->stopReason()]);
+        self::assertSame([100, 50, 7, 3], [$llmResponse->inputTokens(), $llmResponse->outputTokens(), $llmResponse->cacheReadTokens(), $llmResponse->cacheCreationTokens()]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_naming_the_reported_model_or_the_tool_round_limit_keeps_the_batch_mark(): void
+    {
+        $llmResponse = LLMResponse::of('[]', 'gpt-4.1', 'stop', TokenUsageSnapshot::of(100, 50))->withBatched();
+
+        self::assertSame([true, true], [$llmResponse->withReportedModel('gpt-4.1-2025-04-14')->isBatched(), $llmResponse->withReachedToolCap()->isBatched()]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_tokens_default_to_zero_when_not_supplied(): void
     {
         $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50));

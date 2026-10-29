@@ -57,6 +57,10 @@ final class BudgetTracker
             $llmResponse->cacheCreationTokens() - $oneHourCacheCreationTokens,
         ) + $this->costCalculator->costForOneHourCacheWrites($oneHourCacheCreationTokens, $billedModel);
 
+        if ($llmResponse->isBatched()) {
+            $costUsd = $this->costCalculator->batchCost($costUsd);
+        }
+
         $this->tokensUsed += $llmResponse->totalTokens();
         $this->costUsdUsed += $costUsd;
         $this->accumulateModelUsage($llmResponse, $billedModel, $costUsd);

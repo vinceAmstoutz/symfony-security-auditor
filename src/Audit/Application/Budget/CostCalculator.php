@@ -46,6 +46,8 @@ final readonly class CostCalculator
 
     private const float PLAIN_INPUT_PRICE_MULTIPLIER = 1.0;
 
+    private const float BATCH_PRICE_MULTIPLIER = 0.5;
+
     public function __construct(private PricingProviderInterface $pricingProvider) {}
 
     public function costForCall(
@@ -61,6 +63,15 @@ final readonly class CostCalculator
         $cacheCreationCost = ($cacheCreationTokens / self::TOKENS_PER_MILLION) * $this->cacheCreationPrice($model);
 
         return $inputCost + $outputCost + $cacheReadCost + $cacheCreationCost;
+    }
+
+    /**
+     * The cost of a call answered through the provider's batch API, which
+     * bills its input, output and cached input at half the synchronous rate.
+     */
+    public function batchCost(float $synchronousCostUsd): float
+    {
+        return $synchronousCostUsd * self::BATCH_PRICE_MULTIPLIER;
     }
 
     /**

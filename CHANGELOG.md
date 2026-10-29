@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
+### New Features ✨
+
+- A custom LLM client can mark an answer with `LLMResponse::withBatched()`: the budget, the report's cost and its per-model usage then bill that call at the batch rate, half its input, output and cached-input price
+
 ## [1.22.1] — 2026-10-29 — Waypoint
 
 ### Bugfixes 🐛

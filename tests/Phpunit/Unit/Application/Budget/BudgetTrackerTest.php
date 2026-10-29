@@ -166,6 +166,18 @@ final class BudgetTrackerTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_a_call_answered_through_a_batch_costs_half_its_input_output_and_cache_read_rates(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 2.0, outputPrice: 8.0, cacheReadPrice: 0.5);
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4.1', 'stop', TokenUsageSnapshot::of(1_000_000, 1_000_000, 1_000_000, 0))->withBatched());
+
+        self::assertSame(5.25, $budgetTracker->costUsdUsed());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cost_used_accumulates_across_multiple_calls(): void
     {
         // Pins: `$this->costUsdUsed += ...` — if mutated to `=`, the second call

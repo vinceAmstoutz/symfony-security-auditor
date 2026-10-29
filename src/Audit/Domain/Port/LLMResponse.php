@@ -39,6 +39,7 @@ final readonly class LLMResponse
         private int $cacheCreationTokens,
         private ?string $reportedModel = null,
         private bool $reachedToolCap = false,
+        private bool $batched = false,
     ) {}
 
     public static function of(
@@ -127,6 +128,7 @@ final readonly class LLMResponse
             $this->cacheCreationTokens,
             $reportedModel,
             $this->reachedToolCap,
+            $this->batched,
         );
     }
 
@@ -152,12 +154,38 @@ final readonly class LLMResponse
             $this->cacheCreationTokens,
             $this->reportedModel,
             true,
+            $this->batched,
         );
     }
 
     public function reachedToolCap(): bool
     {
         return $this->reachedToolCap;
+    }
+
+    /**
+     * The same response, marked as answered through the provider's batch
+     * API, which bills the call at its own discounted rate.
+     */
+    public function withBatched(): self
+    {
+        return new self(
+            $this->content,
+            $this->inputTokens,
+            $this->outputTokens,
+            $this->model,
+            $this->stopReason,
+            $this->cacheReadTokens,
+            $this->cacheCreationTokens,
+            $this->reportedModel,
+            $this->reachedToolCap,
+            true,
+        );
+    }
+
+    public function isBatched(): bool
+    {
+        return $this->batched;
     }
 
     public function totalTokens(): int
