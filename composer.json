@@ -63,6 +63,7 @@
         "ergebnis/phpunit-slow-test-detector": "^2.24",
         "friendsofphp/php-cs-fixer": "^3.95",
         "phpstan/extension-installer": "^1.4",
+        "phpstan/phpdoc-parser": "~2.3.0",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-deprecation-rules": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0",
