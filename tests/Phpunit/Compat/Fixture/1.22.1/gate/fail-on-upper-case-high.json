@@ -1,0 +1,32 @@
+{
+    "scenario": "gate/fail-on-upper-case-high",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json' --fail-on='HIGH'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        "",
+                        "  The value \"HIGH\" is not valid for the \"fail-on\" option. Supported values are \"safe\", \"low\", \"medium\", \"high\", \"crit",
+                        "  ical\".",
+                        "",
+                        "",
+                        "audit:run [-f|--format FORMAT] [-o|--output OUTPUT] [--no-output] [--dry-run] [--show-scanned] [--no-cache] [-p|--path PATH] [--since SINCE] [--baseline BASELINE] [--generate-baseline GENERATE-BASELINE] [--fail-on FAIL-ON] [--min-score MIN-SCORE] [--fail-on-incomplete|--no-fail-on-incomplete] [--] [<project-path>]"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

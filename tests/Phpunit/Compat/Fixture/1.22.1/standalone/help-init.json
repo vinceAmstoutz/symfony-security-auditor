@@ -1,0 +1,69 @@
+{
+    "scenario": "standalone/help-init",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "help <command_name>='init'",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "Description:",
+                        "  Create the standalone configuration and download the selected provider bridge",
+                        "",
+                        "Usage:",
+                        "  init [options]",
+                        "",
+                        "Options:",
+                        "      --provider=PROVIDER  AI provider to configure (any symfony/ai platform — e.g. anthropic, openai, gemini); defaults to anthropic. Instance-keyed platforms take the instance too, e.g. generic.my_gateway. Skips the prompt when set.",
+                        "      --model=MODEL        Model the auditor should use; defaults to claude-opus-5-5 for every provider, so set it for any other. Skips the prompt when set.",
+                        "      --env-var=ENV-VAR    Environment variable holding the API key; defaults to <PLATFORM>_API_KEY",
+                        "      --base-url=BASE-URL  Base URL of the platform endpoint, required by the platforms that declare one (albert, amazeeai, generic.<instance>, openresponses.<instance>); passing it with any other platform is rejected. Skips the prompt when set.",
+                        "      --endpoint=ENDPOINT  Endpoint the platform should reach, for the platforms that declare one (deepgram, elevenlabs, minimax, ollama, together, venice); passing it with any other platform is rejected. Required for ollama, which declares no default. Skips the prompt when set.",
+                        "      --no-api-key         Write no api_key at all, for the platforms whose key is optional (bedrock, deepgram, elevenlabs, generic, ollama, openresponses); use it for a local server that authenticates nobody",
+                        "      --force              Overwrite an existing configuration without asking",
+                        "  -h, --help               Display help for the given command. When no command is given display help for the list command",
+                        "      --silent             Do not output any message",
+                        "  -q, --quiet              Only errors are displayed. All other output is suppressed",
+                        "  -V, --version            Display this application version",
+                        "      --ansi|--no-ansi     Force (or disable --no-ansi) ANSI output",
+                        "  -n, --no-interaction     Do not ask any interactive question",
+                        "  -v|vv|vvv, --verbose     Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+                        "",
+                        "Help:",
+                        "  The init command writes the standalone configuration and downloads the provider bridge it needs.",
+                        "  Every option it does not receive is asked for. Under --no-interaction the ones with defaults fall back to them, and a platform that requires a --base-url or an --endpoint is refused rather than written half-configured.",
+                        "",
+                        "  Defaults:",
+                        "    --provider  anthropic",
+                        "    --model     claude-opus-5-5 — set it for any other provider, it is not derived from one",
+                        "    --env-var   <PLATFORM>_API_KEY, except for a platform you host yourself, which is written without a credential unless you name one",
+                        "",
+                        "  A platform configured per instance needs the instance in --provider, and the endpoint it reaches in --base-url:",
+                        "",
+                        "    init --provider=openai --model=gpt-5.6 --no-interaction",
+                        "    init --provider=generic.my_gateway --base-url=https://your-gateway.example --env-var=GATEWAY_TOKEN --model=your-model",
+                        "    init --provider=ollama --endpoint=http://localhost:11434 --model=llama3.2 --no-interaction",
+                        "",
+                        "  A platform spells its connection URL one way or the other, never both: --base-url for albert, amazeeai, generic and openresponses, --endpoint for deepgram, elevenlabs, minimax, ollama, together and venice. A --base-url, and the --endpoint of ollama or together, is the origin only: the bridge appends its own path, so do not include a trailing /v1. deepgram, elevenlabs, minimax and venice take the endpoint with its API version path, the way their defaults spell it (https://api.deepgram.com/v1/).",
+                        "  --no-api-key writes no credential at all, for the platforms whose key the bundle leaves optional. Ollama takes that route by default, since a local install authenticates nobody.",
+                        "  A platform whose block it cannot write (azure, cartesia, lmstudio, …) still gets its bridge installed, and the block to complete by hand is printed instead.",
+                        "  cache and failover, which wrap other platforms through services only a Symfony application defines, run from the bundle alone: they are refused, with neither a bridge nor a block."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}
