@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
+### New Features ✨
+
+- The standalone binary runs on a Claude subscription instead of an API key: `init --provider=claudecode` sets it up, and each call goes through the installed Claude Code CLI with its own tools off ([#677](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/677))
+
 ## [1.22.1] — 2026-10-29 — Waypoint
 
 ### Bugfixes 🐛

@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BedrockMantleRoute;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CompoundPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyInstanceName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
@@ -97,7 +98,7 @@ final readonly class InitRefusal
             return \sprintf('"%s" names no platform before the dot. Give the platform first, for example "generic.my_gateway".', $provider);
         }
 
-        if (!DeclaredPlatforms::declares($providerKey)) {
+        if (!DeclaredPlatforms::declares($providerKey) && !CliAgentPlatforms::declares($providerKey)) {
             return \sprintf('"%s" is not a platform the bundled symfony/ai-bundle declares, so nothing was written and no bridge was installed. Pick one of %s.', $provider, implode(', ', DeclaredPlatforms::initShapes()));
         }
 
