@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use Symfony\AI\Platform\Bridge\ClaudeCode\Factory as ClaudeCodeFactory;
+use Symfony\AI\Platform\Bridge\Codex\Factory as CodexFactory;
 use Symfony\AI\Platform\Platform;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
@@ -34,6 +35,7 @@ final readonly class CliAgentPlatforms
      */
     public const array FACTORIES = [
         'claudecode' => ClaudeCodeFactory::class,
+        'codex' => CodexFactory::class,
     ];
 
     /**
@@ -41,6 +43,24 @@ final readonly class CliAgentPlatforms
      */
     public const array DEFAULT_MODELS = [
         'claudecode' => 'opus',
+        'codex' => 'gpt-5.4',
+    ];
+
+    /**
+     * Built-in tools off, the machine's own configuration ignored: Claude
+     * Code takes an empty tool list and no MCP server but the command line's;
+     * Codex runs read-only with its shell and web search off, nothing kept.
+     */
+    private const array ISOLATING_OPTIONS = [
+        'claudecode' => ['tools' => [], 'strict_mcp_config' => true],
+        'codex' => [
+            'sandbox' => 'read-only',
+            'skip_git_repo_check' => true,
+            'ephemeral' => true,
+            'ignore_user_config' => true,
+            'ignore_rules' => true,
+            'config' => ['features.shell_tool=false', 'web_search="disabled"'],
+        ],
     ];
 
     private const array TOOL_FREE_AUDIT = [
@@ -49,6 +69,12 @@ final readonly class CliAgentPlatforms
         'reviewer_tools_enabled' => false,
         'reviewer_structured_collection' => false,
     ];
+
+    /**
+     * The CLIs that join the system and user prompts into one command-line
+     * argument.
+     */
+    private const array SHARED_PROMPT_ARGUMENT = ['codex'];
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
@@ -102,7 +128,7 @@ final readonly class CliAgentPlatforms
                 ->setFactory([self::FACTORIES[$name], 'createPlatform'])
                 ->setArguments([\is_array($settings) ? ($settings['cli_binary'] ?? null) : null, ContainerParameterSyntax::escape(sys_get_temp_dir())]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
-                ->setArguments([new Reference($cliServiceId)])
+                ->setArguments([new Reference($cliServiceId), self::ISOLATING_OPTIONS[$name], \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
                 ->addTag(self::PLATFORM_TAG);
         }
     }

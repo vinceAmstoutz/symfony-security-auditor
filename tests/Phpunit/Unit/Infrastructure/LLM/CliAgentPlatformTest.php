@@ -36,7 +36,7 @@ final class CliAgentPlatformTest extends TestCase
 
         $this->expectException(ExceedContextSizeException::class);
 
-        (new CliAgentPlatform($platform))->invoke('opus', new MessageBag(Message::ofUser(str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1))));
+        (new CliAgentPlatform($platform, ['tools' => [], 'strict_mcp_config' => true]))->invoke('opus', new MessageBag(Message::ofUser(str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1))));
     }
 
     public function test_a_system_prompt_longer_than_one_command_line_argument_can_carry_is_refused_as_too_large(): void
@@ -46,7 +46,7 @@ final class CliAgentPlatformTest extends TestCase
 
         $this->expectException(ExceedContextSizeException::class);
 
-        (new CliAgentPlatform($platform))->invoke('opus', new MessageBag(Message::forSystem(str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1)), Message::ofUser('Audit this.')));
+        (new CliAgentPlatform($platform, ['tools' => [], 'strict_mcp_config' => true]))->invoke('opus', new MessageBag(Message::forSystem(str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1)), Message::ofUser('Audit this.')));
     }
 
     public function test_a_prompt_as_long_as_one_command_line_argument_can_carry_reaches_the_cli_alone_with_its_isolating_options(): void
@@ -56,7 +56,7 @@ final class CliAgentPlatformTest extends TestCase
         $platform = $this->createMock(PlatformInterface::class);
         $platform->expects(self::once())->method('invoke')->with('opus', $messageBag, ['tools' => [], 'strict_mcp_config' => true])->willReturn($deferredResult);
 
-        self::assertSame($deferredResult, (new CliAgentPlatform($platform))->invoke('opus', $messageBag, ['max_tokens' => 10]));
+        self::assertSame($deferredResult, (new CliAgentPlatform($platform, ['tools' => [], 'strict_mcp_config' => true]))->invoke('opus', $messageBag, ['max_tokens' => 10]));
     }
 
     public function test_a_prompt_given_as_text_reaches_the_cli_unmeasured(): void
@@ -65,7 +65,7 @@ final class CliAgentPlatformTest extends TestCase
         $platform = $this->createMock(PlatformInterface::class);
         $platform->expects(self::once())->method('invoke')->with('opus', str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1))->willReturn($deferredResult);
 
-        self::assertSame($deferredResult, (new CliAgentPlatform($platform))->invoke('opus', str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1)));
+        self::assertSame($deferredResult, (new CliAgentPlatform($platform, ['tools' => [], 'strict_mcp_config' => true]))->invoke('opus', str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1)));
     }
 
     public function test_it_answers_with_the_model_catalog_of_the_cli(): void
@@ -74,6 +74,33 @@ final class CliAgentPlatformTest extends TestCase
         $platform = self::createStub(PlatformInterface::class);
         $platform->method('getModelCatalog')->willReturn($modelCatalog);
 
-        self::assertSame($modelCatalog, (new CliAgentPlatform($platform))->getModelCatalog());
+        self::assertSame($modelCatalog, (new CliAgentPlatform($platform, ['tools' => [], 'strict_mcp_config' => true]))->getModelCatalog());
+    }
+
+    public function test_prompts_that_share_one_command_line_argument_are_refused_as_too_large_together(): void
+    {
+        $platform = $this->createMock(PlatformInterface::class);
+        $platform->expects(self::never())->method('invoke');
+
+        $this->expectException(ExceedContextSizeException::class);
+
+        (new CliAgentPlatform($platform, ['sandbox' => 'read-only'], promptsShareOneArgument: true))->invoke('gpt-5.4', $this->framedPrompts(self::LONGEST_COMMAND_LINE_ARGUMENT + 1));
+    }
+
+    public function test_prompts_that_fill_their_shared_command_line_argument_exactly_reach_the_cli(): void
+    {
+        $messageBag = $this->framedPrompts(self::LONGEST_COMMAND_LINE_ARGUMENT);
+        $deferredResult = new DeferredResult(new PlainConverter(new TextResult('OK')), new InMemoryRawResult());
+        $platform = $this->createMock(PlatformInterface::class);
+        $platform->expects(self::once())->method('invoke')->with('gpt-5.4', $messageBag, ['sandbox' => 'read-only'])->willReturn($deferredResult);
+
+        self::assertSame($deferredResult, (new CliAgentPlatform($platform, ['sandbox' => 'read-only'], promptsShareOneArgument: true))->invoke('gpt-5.4', $messageBag));
+    }
+
+    private function framedPrompts(int $framedLength): MessageBag
+    {
+        $system = 'Be terse.';
+
+        return new MessageBag(Message::forSystem($system), Message::ofUser(str_repeat('b', $framedLength - \strlen(\sprintf("[System]\n%s\n\n[User]\n", $system)))));
     }
 }

@@ -35,12 +35,18 @@ use Symfony\AI\Platform\Result\DeferredResult;
  */
 final readonly class CliAgentPlatform implements PlatformInterface
 {
-    private const array ISOLATING_OPTIONS = ['tools' => [], 'strict_mcp_config' => true];
-
     private const int LONGEST_COMMAND_LINE_ARGUMENT = 131071;
 
+    private const int SHARED_ARGUMENT_FRAME = 18;
+
+    /**
+     * @param array<string, mixed> $isolatingOptions        the CLI flags that keep the agent from acting, sent in place of the auditor's options
+     * @param bool                 $promptsShareOneArgument whether the CLI joins the system and user prompts into one argument, framed by `[System]` and `[User]` lines
+     */
     public function __construct(
         private PlatformInterface $platform,
+        private array $isolatingOptions,
+        private bool $promptsShareOneArgument = false,
     ) {}
 
     #[Override]
@@ -50,7 +56,7 @@ final readonly class CliAgentPlatform implements PlatformInterface
             throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes one command-line argument of the CLI can carry.', self::LONGEST_COMMAND_LINE_ARGUMENT));
         }
 
-        return $this->platform->invoke($model, $input, self::ISOLATING_OPTIONS);
+        return $this->platform->invoke($model, $input, $this->isolatingOptions);
     }
 
     #[Override]
@@ -61,13 +67,11 @@ final readonly class CliAgentPlatform implements PlatformInterface
 
     private function outgrowsOneArgument(MessageBag $messageBag): bool
     {
-        foreach ($messageBag->getMessages() as $message) {
-            if (\strlen($this->promptOf($message) ?? '') > self::LONGEST_COMMAND_LINE_ARGUMENT) {
-                return true;
-            }
-        }
+        $lengths = array_map(fn (MessageInterface $message): int => \strlen($this->promptOf($message) ?? ''), $messageBag->getMessages());
 
-        return false;
+        return $this->promptsShareOneArgument
+            ? array_sum($lengths) + self::SHARED_ARGUMENT_FRAME > self::LONGEST_COMMAND_LINE_ARGUMENT
+            : [] !== array_filter($lengths, static fn (int $length): bool => $length > self::LONGEST_COMMAND_LINE_ARGUMENT);
     }
 
     private function promptOf(MessageInterface $message): ?string
