@@ -62,6 +62,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         'transformersphp' => 'transformers-php',
     ];
 
+    private const string COMPOSER_PHAR_VARIABLE = 'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR';
+
     private const string MANIFEST_FILENAME = 'composer.json';
 
     private const string PLATFORM_PACKAGE = 'symfony/ai-platform';
@@ -93,13 +95,47 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     public static function defaultProcessBuilder(): Closure
     {
         return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process {
-            $packages = [$package, ...$morePackages];
-            $required = null === $aiPlatformPin ? $packages : [...$packages, \sprintf('%s:%s', self::PLATFORM_PACKAGE, $aiPlatformPin)];
-            $process = new Process(['composer', 'require', ...$required, '--with-dependencies', \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction']);
+            $process = new Process(['composer', ...self::requireArguments($package, $aiPlatformPin, $targetDirectory, ...$morePackages)]);
             $process->setTimeout(null);
 
             return $process;
         };
+    }
+
+    /**
+     * Runs this binary itself as `composer.phar`, on its own PHP, so a host
+     * needs neither PHP nor Composer to install a bridge.
+     *
+     * @return Closure(string, ?string, string, string...): Process
+     */
+    public static function embeddedProcessBuilder(SelfInvocation $selfInvocation, ComposerPhar $composerPhar): Closure
+    {
+        return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use ($selfInvocation, $composerPhar): Process {
+            $composerDirectory = \sprintf('%s/.composer', $targetDirectory);
+
+            $process = new Process(
+                [...$selfInvocation->command(), ...self::requireArguments($package, $aiPlatformPin, $targetDirectory, ...$morePackages)],
+                env: [
+                    self::COMPOSER_PHAR_VARIABLE => $composerPhar->in($composerDirectory),
+                    'COMPOSER_HOME' => \sprintf('%s/home', $composerDirectory),
+                    'COMPOSER_CACHE_DIR' => \sprintf('%s/cache', $composerDirectory),
+                ],
+            );
+            $process->setTimeout(null);
+
+            return $process;
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function requireArguments(string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): array
+    {
+        $packages = [$package, ...array_values($morePackages)];
+        $required = null === $aiPlatformPin ? $packages : [...$packages, \sprintf('%s:%s', self::PLATFORM_PACKAGE, $aiPlatformPin)];
+
+        return ['require', ...$required, '--with-dependencies', \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction'];
     }
 
     /**
