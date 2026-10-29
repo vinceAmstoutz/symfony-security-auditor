@@ -73,6 +73,20 @@ final readonly class AuditConfigurationDefinition
                     ->defaultFalse()
                     ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call. Sent only to a Claude/Anthropic-dialect model (its name contains `claude`) a gateway serves, never on the `anthropic` and `bedrock` platforms, which have no JSON-object mode for Claude, and currently a no-op for every other model, for the same bridge-compatibility reason as `max_output_tokens`. Default false. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
                 ->end()
+                ->arrayNode('cli_agent')
+                    ->addDefaultsIfNotSet()
+                    ->info("Run the audit on a subscription instead of an API key, through a coding agent's CLI installed on the machine (`claude` for `claudecode`, `codex` for `codex`), in place of the `symfony/ai` platform the application configures. The CLI runs with its own tools off and outside the project, and the attacker and the reviewer answer in JSON. Needs `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform`.")
+                    ->children()
+                        ->enumNode('platform')
+                            ->values([null, ...array_keys(CliAgentPlatforms::FACTORIES)])
+                            ->defaultNull()
+                            ->info('The CLI to run on: `claudecode` (a Claude subscription) or `codex` (a ChatGPT subscription). Null, the default, keeps the `symfony/ai` platform.')
+                        ->end()
+                        ->append((new TextNodeDefinition('cli_binary'))
+                            ->defaultNull()
+                            ->info('Path to the CLI when it is not on the `PATH`.'))
+                    ->end()
+                ->end()
         ;
     }
 

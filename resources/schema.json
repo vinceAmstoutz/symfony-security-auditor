@@ -45,6 +45,21 @@
           "type": "boolean",
           "description": "Send response_format: {type: json_object} on every call to a Claude/Anthropic-dialect model (its name contains claude) a gateway serves. Not sent on the anthropic and bedrock platforms, which have no JSON-object mode for Claude, and a no-op for every other model. Default: false."
         },
+        "cli_agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Run the audit on a subscription instead of an API key, through a coding agent's CLI installed on the machine, in place of the symfony/ai platform the application configures. Since 1.23.",
+          "properties": {
+            "platform": {
+              "enum": [null, "claudecode", "codex"],
+              "description": "claudecode (a Claude subscription, through the claude CLI) or codex (a ChatGPT subscription, through the codex CLI). Default: null, which keeps the symfony/ai platform."
+            },
+            "cli_binary": {
+              "type": ["string", "null"],
+              "description": "Path to the CLI when it is not on the PATH. Default: null."
+            }
+          }
+        },
         "scan": {
           "type": "object",
           "additionalProperties": false,
