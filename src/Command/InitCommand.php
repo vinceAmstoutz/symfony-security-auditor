@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BedrockMantleRoute;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
@@ -288,10 +289,11 @@ final readonly class InitCommand
     private function askModel(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): string
     {
         $pricedModels = $this->pricedModelList?->pricedModels($providerKey->platform) ?? [];
+        $defaultModel = CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? self::DEFAULT_MODEL;
 
         return [] === $pricedModels
-            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
-            : $this->pick($symfonyStyle, 'Which model should the auditor use? Pick a number, or type any model id', $pricedModels, self::DEFAULT_MODEL);
+            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', $defaultModel)
+            : $this->pick($symfonyStyle, 'Which model should the auditor use? Pick a number, or type any model id', $pricedModels, $defaultModel);
     }
 
     /**
@@ -343,7 +345,7 @@ final readonly class InitCommand
      */
     private function resolveApiKeyVariable(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
-        if ($initCommandInput->noApiKey) {
+        if ($initCommandInput->noApiKey || CliAgentPlatforms::declares($providerKey)) {
             return null;
         }
 

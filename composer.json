@@ -75,6 +75,7 @@
         "spaze/phpstan-disallowed-calls": "^4.12",
         "staabm/phpstan-todo-by": "^0.3",
         "symfony/ai-anthropic-platform": "^0.15",
+        "symfony/ai-claude-code-platform": "^0.15",
         "symfony/dotenv": "^7.4 || ^8.0",
         "symfony/error-handler": "^7.4 || ^8.0",
         "symfony/var-dumper": "^7.4 || ^8.0",

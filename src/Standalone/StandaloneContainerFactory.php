@@ -23,6 +23,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
@@ -85,7 +86,9 @@ final readonly class StandaloneContainerFactory
             throw ProviderBridgeException::forBundleFailure($runtimeException) ?? $runtimeException;
         }
 
-        $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), FreeTextSettings::literalIn($standaloneConfig->auditConfig, $containerBuilder->getParameterBag()), $containerBuilder);
+        CliAgentPlatforms::register($containerBuilder, $standaloneConfig->platform->platform);
+
+        $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), FreeTextSettings::literalIn(CliAgentPlatforms::auditConfigFor($standaloneConfig->auditConfig, $standaloneConfig->platform), $containerBuilder->getParameterBag()), $containerBuilder);
 
         $this->announceProjectConfigs($containerBuilder, $standaloneConfig);
         $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
