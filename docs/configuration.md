@@ -83,6 +83,8 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 | `attacker_max_output_tokens` | `int` (≥ 1) | `null` | Override: dedicated max output tokens for the Attacker. Falls back to `max_output_tokens` when `null`. Useful for headroom on detailed tool-call arguments. Same Claude-only caveat as `max_output_tokens` above. |
 | `reviewer_max_output_tokens` | `int` (≥ 1) | `null` | Override: dedicated max output tokens for the Reviewer. Falls back to `max_output_tokens` when `null`. Same Claude-only caveat as `max_output_tokens` above. |
 | `provider_json_mode` | bool | `false` | Send `response_format: {type: json_object}` on every LLM call **to a Claude/Anthropic-dialect model served through a gateway** (`openrouter`, `generic`, …) so the provider enforces JSON output natively. **Not sent on the `anthropic` and `bedrock` platforms**: Anthropic has no JSON-object mode, their bridges would turn it into an empty structured-output schema, and Bedrock's Mantle route refuses it. **Currently a no-op for non-Claude models**, for the same bridge-compatibility reason as `max_output_tokens` above. Default `false`. The prompt contract (_"Return ONLY the JSON array"_) remains authoritative. |
+| `cli_agent.platform` | `string` \| `null` | `null` | _Since 1.23._ Run the audit on a subscription instead of an API key, through a coding agent's CLI installed on the machine: `claudecode` (a Claude subscription, through `claude`) or `codex` (a ChatGPT subscription, through `codex`). The auditor's own calls go to that CLI instead of the `symfony/ai` platform the application configures, which stays the application's. Needs `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform`. See [Running on a Claude subscription](#running-on-a-claude-subscription) for how each call runs and its limits. |
+| `cli_agent.cli_binary` | `string` \| `null` | `null` | _Since 1.23._ Path to the CLI when it is not on the `PATH`. |
 
 `attacker_model` / `reviewer_model` and `attacker_max_output_tokens` / `reviewer_max_output_tokens` fall back to `model` and `max_output_tokens` respectively when not set. Model names must be supported by the platform configured in `ai.yaml`.
 
@@ -565,6 +567,7 @@ model: opus
 - **Requirements.** The `claude` CLI is installed and logged in to the subscription. On a CI runner, set the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints. When `claude` is not on the `PATH`, name it with `cli_binary:` under `claudecode:`.
 - **Models.** Claude Code's aliases: `opus`, `sonnet` or `haiku`.
 - **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
+- **In a Symfony application.** Require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode }` with `model: opus` under `symfony_security_auditor:`. The application's own `symfony/ai` platform is left as it is.
 - **Limits.** The plan's usage limits apply, and its terms decide what automated use it allows. The run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced. A prompt longer than the 128 KiB one command-line argument can carry is split like one the provider refuses as too large. `privacy.offline_only` refuses this platform.
 
 ### Running on a ChatGPT subscription
@@ -581,6 +584,7 @@ model: gpt-5.4
 - **Requirements.** The `codex` CLI is installed and logged in to the subscription. When `codex` is not on the `PATH`, name it with `cli_binary:` under `codex:`.
 - **Models.** The ones the bundled bridge lists: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-5.3-codex-spark` and `gpt-5.2`.
 - **How each call runs.** The auditor runs `codex exec` read-only, with its shell and web search off, the user's Codex configuration and rules ignored, nothing kept of the session, and outside the audited project. As with Claude Code, the attacker and the reviewer answer in JSON.
+- **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex }` with `model: gpt-5.4` under `symfony_security_auditor:`.
 - **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together.
 
 ## Providing the API key
