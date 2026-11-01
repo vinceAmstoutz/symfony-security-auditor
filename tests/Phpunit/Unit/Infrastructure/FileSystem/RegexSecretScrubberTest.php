@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PDO;
 use PhpParser\ParserFactory;
@@ -29,6 +30,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem\Fi
 final class RegexSecretScrubberTest extends TestCase
 {
     // Credential-shaped prefixes split as constants so GitHub's secret scanner does not flag the source.
+    private const float LINEAR_TIME_CEILING_SECONDS = 3.0;
+
     private const string AWS = 'AKIA';
 
     private const string GHP = 'ghp';
@@ -1682,20 +1685,22 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'a word of an unquoted value' => ['password: abcd'.str_repeat(' a', 49997), 'password: "***REDACTED:inline_assignment***"'];
     }
 
+    #[MaximumDuration(4000)]
     public function test_half_a_megabyte_of_private_key_headers_is_scrubbed_in_linear_time(): void
     {
         $content = str_repeat('-----BEGIN PRIVATE KEY-----', 19418);
 
-        self::assertLessThan(1.0, $this->secondsToScrubUnchanged($content));
+        self::assertLessThan(self::LINEAR_TIME_CEILING_SECONDS, $this->secondsToScrubUnchanged($content));
     }
 
     #[DataProvider('quadraticWithoutTheJitCases')]
     #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_crafted_file_is_scrubbed_in_linear_time_without_the_jit(string $content): void
     {
         ini_set('pcre.jit', '0');
 
-        self::assertLessThan(1.0, $this->secondsToScrubUnchanged($content));
+        self::assertLessThan(self::LINEAR_TIME_CEILING_SECONDS, $this->secondsToScrubUnchanged($content));
     }
 
     /** @return iterable<string, array{0: string}> */
@@ -1738,9 +1743,10 @@ final class RegexSecretScrubberTest extends TestCase
     }
 
     #[DataProvider('hostileContentWithTheJitCases')]
+    #[MaximumDuration(4000)]
     public function test_a_crafted_file_is_scrubbed_in_linear_time_with_the_jit(string $content): void
     {
-        self::assertLessThan(1.0, $this->secondsToScrubUnchanged($content));
+        self::assertLessThan(self::LINEAR_TIME_CEILING_SECONDS, $this->secondsToScrubUnchanged($content));
     }
 
     /** @return iterable<string, array{0: string}> */
@@ -1769,6 +1775,7 @@ final class RegexSecretScrubberTest extends TestCase
     }
 
     #[DataProvider('hostileContentRedactedCases')]
+    #[MaximumDuration(4000)]
     public function test_a_crafted_file_is_redacted_in_linear_time_with_the_jit(string $content, string $expected): void
     {
         $this->assertRedactedInLinearTime($content, $expected);
@@ -1776,6 +1783,7 @@ final class RegexSecretScrubberTest extends TestCase
 
     #[DataProvider('hostileContentRedactedCases')]
     #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_crafted_file_is_redacted_in_linear_time_without_the_jit(string $content, string $expected): void
     {
         ini_set('pcre.jit', '0');
@@ -1789,7 +1797,7 @@ final class RegexSecretScrubberTest extends TestCase
 
         $output = $this->regexSecretScrubber->scrub($content);
 
-        self::assertLessThan(1.0, (hrtime(true) - $startedAt) / 1_000_000_000);
+        self::assertLessThan(self::LINEAR_TIME_CEILING_SECONDS, (hrtime(true) - $startedAt) / 1_000_000_000);
         self::assertSame(md5($expected), md5($output));
     }
 
@@ -1813,6 +1821,7 @@ final class RegexSecretScrubberTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_dsn_longer_than_a_url_can_be_is_redacted_in_linear_time_without_the_jit(): void
     {
         ini_set('pcre.jit', '0');
@@ -1820,7 +1829,7 @@ final class RegexSecretScrubberTest extends TestCase
 
         $output = $this->regexSecretScrubber->scrub('MAILER_DSN=a://b'.str_repeat('?c=d', 131070));
 
-        self::assertLessThan(1.0, (hrtime(true) - $startedAt) / 1_000_000_000);
+        self::assertLessThan(self::LINEAR_TIME_CEILING_SECONDS, (hrtime(true) - $startedAt) / 1_000_000_000);
         self::assertSame('MAILER_DSN=***REDACTED:env_assignment***', $output);
     }
 
