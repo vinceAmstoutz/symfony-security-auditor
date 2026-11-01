@@ -178,7 +178,7 @@ final readonly class StandaloneApplicationFactory
         return new ComposerBridgeInstaller(
             ComposerBridgeInstaller::embeddedProcessBuilder(
                 new SelfInvocation(new RunningBinaryLocator('/proc/self/exe', $runningBinaryPath, pathEnvironment: $pathEnvironment), $runningBinaryPath),
-                new ComposerPhar(new ProcessReleaseClient(ProcessReleaseClient::defaultProcessBuilder())),
+                new ComposerPhar(ComposerPhar::bundledPath()),
             ),
             aiPlatformPin: $bundledAiPlatformVersion,
         );

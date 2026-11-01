@@ -125,10 +125,11 @@ The bridge tree under the data directory was resolved for another PHP than the o
 
 ### `init` fails to install the provider bridge
 
-`init` always runs `composer require symfony/ai-<slug>-platform` under the data directory before it writes the config file, with its own Composer: `composer.phar` 2.8.12, downloaded with `curl` into the data directory's `.composer/` on first use, checked against its SHA-256 and run on the binary's own PHP, so no PHP or Composer is needed on the machine. `BridgeInstallationFailedException` covers what fails:
+`init` always runs `composer require symfony/ai-<slug>-platform` under the data directory before it writes the config file, with the Composer the binary bundles: `composer.phar` 2.8.12, copied to the data directory's `.composer/`, checked against its SHA-256 and run on the binary's own PHP, so no PHP or Composer is needed on the machine. `BridgeInstallationFailedException` covers what fails:
 
-- **`Could not download composer.phar 2.8.12 to install the provider bridge: <reason>`** — `curl` is missing, or getcomposer.org cannot be reached (offline, a proxy); fix that and run `init` again.
-- **`The downloaded composer.phar 2.8.12 does not match its pinned SHA-256 checksum; it was discarded.`** — something between you and getcomposer.org altered the download; nothing was kept, so run `init` again once the network is trusted.
+- **`The composer.phar 2.8.12 this binary bundles does not match its pinned SHA-256 checksum; it was discarded. Reinstall the binary.`** — the binary was altered or damaged after its checksum was verified; download it again.
+- **`Could not copy composer.phar 2.8.12 to "<dir>": <reason>`** — the data directory cannot be written (permissions, a full disk).
+- **`This build bundles no composer.phar 2.8.12 …`** — `init` runs from a source checkout rather than a released binary; put that release of `composer.phar` at `resources/composer.phar`.
 - **`composer require` ran but exited non-zero** (no network, or the package does not exist for a misspelled `--provider`):
 
   ```text

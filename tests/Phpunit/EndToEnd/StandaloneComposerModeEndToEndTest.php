@@ -81,7 +81,7 @@ final class StandaloneComposerModeEndToEndTest extends TestCase
         );
         $process->run();
 
-        self::assertStringContainsString('Could not download composer.phar 2.8.12', preg_replace('/\s+/', ' ', $process->getOutput().$process->getErrorOutput()) ?? '');
+        self::assertStringContainsString('This build bundles no composer.phar 2.8.12', preg_replace('/\s+/', ' ', $process->getOutput().$process->getErrorOutput()) ?? '');
     }
 
     /**

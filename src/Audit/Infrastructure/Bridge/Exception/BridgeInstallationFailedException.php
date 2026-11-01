@@ -29,14 +29,19 @@ final class BridgeInstallationFailedException extends RuntimeException
         return new self(\sprintf('Could not start this binary to install the provider bridge: %s', $throwable->getMessage()), previous: $throwable);
     }
 
-    public static function forUndownloadableComposerPhar(string $version, Throwable $throwable): self
+    public static function forUnbundledComposerPhar(string $version, string $bundledPhar): self
     {
-        return new self(\sprintf('Could not download composer.phar %s to install the provider bridge: %s', $version, $throwable->getMessage()), previous: $throwable);
+        return new self(\sprintf('This build bundles no composer.phar %s to install the provider bridge with: "%s" does not exist.', $version, $bundledPhar));
+    }
+
+    public static function forUncopyableComposerPhar(string $version, string $directory, Throwable $throwable): self
+    {
+        return new self(\sprintf('Could not copy composer.phar %s to "%s": %s', $version, $directory, $throwable->getMessage()), previous: $throwable);
     }
 
     public static function forTamperedComposerPhar(string $version): self
     {
-        return new self(\sprintf('The downloaded composer.phar %s does not match its pinned SHA-256 checksum; it was discarded. Run init again.', $version));
+        return new self(\sprintf('The composer.phar %s this binary bundles does not match its pinned SHA-256 checksum; it was discarded. Reinstall the binary.', $version));
     }
 
     public static function forFailedProcess(string $package, string $errorOutput): self

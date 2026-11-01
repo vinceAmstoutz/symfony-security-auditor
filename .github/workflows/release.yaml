@@ -83,6 +83,16 @@ jobs:
       - name: Install production dependencies
         run: composer install --no-interaction --prefer-dist --no-progress --no-dev
 
+      - name: Bundle the pinned Composer
+        run: |
+          # init runs this composer.phar on the binary's own PHP; its version and
+          # checksum are read from ComposerPhar, which checks the copy again.
+          read_pin() { php -r "require 'vendor/autoload.php'; echo VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Infrastructure\\Bridge\\ComposerPhar::$1;"; }
+          version="$(read_pin VERSION)"
+          sha256="$(read_pin SHA256)"
+          curl -fsSL --retry 3 --proto '=https' --tlsv1.2 -o resources/composer.phar "https://getcomposer.org/download/${version}/composer.phar"
+          echo "${sha256}  resources/composer.phar" | sha256sum -c -
+
       - name: Compile the PHAR
         run: box compile --no-interaction
 
@@ -290,15 +300,9 @@ jobs:
           ASSET: ${{ matrix.asset }}
         run: |
           ssa_home="$RUNNER_TEMP/ssa-init-home"
-          mkdir -p "$ssa_home"
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            isolated_path="/c/Windows/System32"
-          else
-            isolated_path="$RUNNER_TEMP/ssa-init-path"
-            mkdir -p "$isolated_path"
-            ln -s "$(command -v curl)" "$isolated_path/curl"
-          fi
-          PATH="$isolated_path" SYMFONY_SECURITY_AUDITOR_HOME="$ssa_home" SSA_NO_UPDATE_CHECK=1 \
+          empty_path="$RUNNER_TEMP/ssa-init-path"
+          mkdir -p "$ssa_home" "$empty_path"
+          PATH="$empty_path" SYMFONY_SECURITY_AUDITOR_HOME="$ssa_home" SSA_NO_UPDATE_CHECK=1 \
             ./"$ASSET" init --no-interaction --provider=anthropic --model=claude-opus-5-5 --env-var=ANTHROPIC_API_KEY
           test -f "$ssa_home/.local/share/symfony-security-auditor/vendor/symfony/ai-anthropic-platform/composer.json"
 

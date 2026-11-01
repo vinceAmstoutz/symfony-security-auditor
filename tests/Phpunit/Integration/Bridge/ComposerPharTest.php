@@ -18,7 +18,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
-use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\ComposerPharReleaseClient;
 
 final class ComposerPharTest extends TestCase
 {
@@ -28,11 +27,16 @@ final class ComposerPharTest extends TestCase
 
     private string $directory;
 
+    private string $bundledPhar;
+
     #[Override]
     protected function setUp(): void
     {
         $this->filesystem = new Filesystem();
         $this->directory = sys_get_temp_dir().'/ssa-composer-phar-'.bin2hex(random_bytes(6));
+        $this->bundledPhar = $this->directory.'/bundled/composer.phar';
+
+        $this->filesystem->dumpFile($this->bundledPhar, self::PAYLOAD);
     }
 
     #[Override]
@@ -44,69 +48,60 @@ final class ComposerPharTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_downloads_composer_into_the_directory(): void
+    public function test_it_copies_the_composer_the_binary_bundles_into_the_directory(): void
     {
-        $composerPhar = new ComposerPhar(new ComposerPharReleaseClient(self::PAYLOAD), sha256: hash('sha256', self::PAYLOAD));
+        $composerPhar = new ComposerPhar($this->bundledPhar, hash('sha256', self::PAYLOAD));
 
-        self::assertStringEqualsFile($composerPhar->in($this->directory), self::PAYLOAD);
+        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), self::PAYLOAD);
     }
 
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_reuses_the_composer_it_downloaded_before(): void
+    public function test_it_replaces_the_composer_an_earlier_release_copied(): void
     {
-        $composerPharReleaseClient = new ComposerPharReleaseClient(self::PAYLOAD);
-        $composerPhar = new ComposerPhar($composerPharReleaseClient, sha256: hash('sha256', self::PAYLOAD));
+        $this->filesystem->dumpFile($this->directory.'/.composer/composer.phar', '<?php // an older composer');
+        $composerPhar = new ComposerPhar($this->bundledPhar, hash('sha256', self::PAYLOAD));
 
-        $composerPhar->in($this->directory);
-        $composerPhar->in($this->directory);
+        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), self::PAYLOAD);
+    }
 
-        self::assertSame(['https://getcomposer.org/download/2.8.12/composer.phar'], $composerPharReleaseClient->downloadedUrls);
+    public function test_it_refuses_a_bundled_composer_whose_checksum_does_not_match_and_keeps_none_of_it(): void
+    {
+        $composerPhar = new ComposerPhar($this->bundledPhar, hash('sha256', 'another composer'));
+
+        try {
+            $composerPhar->in($this->directory.'/.composer');
+            self::fail('A tampered composer.phar was accepted.');
+        } catch (BridgeInstallationFailedException $bridgeInstallationFailedException) {
+            self::assertSame([], glob($this->directory.'/.composer/*'), $bridgeInstallationFailedException->getMessage());
+        }
     }
 
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_replaces_a_composer_that_is_not_the_pinned_release(): void
+    public function test_it_reports_a_build_that_bundles_no_composer_as_a_failed_bridge_installation(): void
     {
-        $this->filesystem->dumpFile($this->directory.'/composer.phar', '<?php // an older composer');
-        $composerPhar = new ComposerPhar(new ComposerPharReleaseClient(self::PAYLOAD), sha256: hash('sha256', self::PAYLOAD));
+        $this->expectExceptionMessage('This build bundles no composer.phar 2.8.12');
 
-        self::assertStringEqualsFile($composerPhar->in($this->directory), self::PAYLOAD);
+        (new ComposerPhar($this->directory.'/absent/composer.phar'))->in($this->directory.'/.composer');
     }
 
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_reports_a_download_that_failed_as_a_failed_bridge_installation(): void
-    {
-        $this->expectException(BridgeInstallationFailedException::class);
-
-        (new ComposerPhar(new ComposerPharReleaseClient(null)))->in($this->directory);
-    }
-
-    /**
-     * @throws BridgeInstallationFailedException
-     */
-    public function test_it_reports_a_directory_it_cannot_create_as_a_failed_bridge_installation(): void
+    public function test_it_reports_a_directory_it_cannot_write_composer_to_as_a_failed_bridge_installation(): void
     {
         $this->filesystem->dumpFile($this->directory.'/a-file', '');
 
-        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessage(\sprintf('Could not copy composer.phar 2.8.12 to "%s/a-file/.composer"', $this->directory));
 
-        (new ComposerPhar(new ComposerPharReleaseClient(self::PAYLOAD)))->in($this->directory.'/a-file/.composer');
+        (new ComposerPhar($this->bundledPhar, hash('sha256', self::PAYLOAD)))->in($this->directory.'/a-file/.composer');
     }
 
-    public function test_it_refuses_a_download_whose_checksum_does_not_match_and_keeps_none_of_it(): void
+    public function test_the_composer_a_release_bundles_sits_in_the_resources_of_the_package(): void
     {
-        $composerPhar = new ComposerPhar(new ComposerPharReleaseClient(self::PAYLOAD), sha256: hash('sha256', 'another composer'));
-
-        try {
-            $composerPhar->in($this->directory);
-            self::fail('A tampered composer.phar was accepted.');
-        } catch (BridgeInstallationFailedException $bridgeInstallationFailedException) {
-            self::assertSame([], glob($this->directory.'/*'), $bridgeInstallationFailedException->getMessage());
-        }
+        self::assertSame(\dirname(__DIR__, 4).'/resources/composer.phar', ComposerPhar::bundledPath());
     }
 }

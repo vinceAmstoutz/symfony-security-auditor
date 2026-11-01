@@ -84,7 +84,7 @@ One install, many projects, zero footprint in the audited app. Each release ship
 
 Running audits needs nothing but the binary and an API key for your provider (not even that for a local model such as [Ollama](#supported-platforms)).
 
-The one-time [`init`](#2-configure--the-guided-init) downloads the package that talks to your AI provider with a Composer it fetches itself and runs on the binary's own PHP, so it needs no PHP or Composer on your machine: only `curl` and network access to getcomposer.org and Packagist.
+The one-time [`init`](#2-configure--the-guided-init) downloads the package that talks to your AI provider with the Composer bundled in the binary, run on its own PHP, so it needs no PHP or Composer on your machine, only network access to Packagist.
 
 `--since` needs `git`, and live CVE lookups use `composer audit` when `composer` is present.
 

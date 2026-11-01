@@ -25,7 +25,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\ComposerPharReleaseClient;
 
 final class ComposerBridgeInstallerTest extends TestCase
 {
@@ -443,7 +442,8 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     private function embeddedProcess(string $package, ?string $aiPlatformPin, string ...$morePackages): Process
     {
-        $composerPhar = new ComposerPhar(new ComposerPharReleaseClient('<?php'), sha256: hash('sha256', '<?php'));
+        $this->filesystem->dumpFile($this->outsideTarget.'/composer.phar', '<?php');
+        $composerPhar = new ComposerPhar($this->outsideTarget.'/composer.phar', hash('sha256', '<?php'));
 
         return (ComposerBridgeInstaller::embeddedProcessBuilder(new SelfInvocation(self::createStub(RunningBinaryLocatorInterface::class), '/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), $composerPhar))($package, $aiPlatformPin, $this->targetDirectory, ...$morePackages);
     }
