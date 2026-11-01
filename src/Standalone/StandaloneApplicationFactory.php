@@ -82,6 +82,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FixCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
@@ -260,6 +261,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
         $standaloneApplication->addCommand(new DiffCommand(new ReportDiffer(), new DiffPresenter()));
         $standaloneApplication->addCommand(new TrendCommand(new ReportTrendAnalyzer(new ReportDiffer()), new TrendPresenter()));
+        $standaloneApplication->addCommand(new FixCommand());
         $standaloneApplication->addCommand(new BaselineCommand(new BaselineMerger(new ReportFindingsLoader(), new Baseline())));
         $standaloneApplication->addCommand($this->lazyMcpServeCommand($standaloneApplication));
         $this->registerUpdateAvailabilityNotice($standaloneApplication);

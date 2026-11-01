@@ -97,6 +97,7 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
             ...$warning,
             $this->table($shown),
             ...$this->truncationNote(\count($shown), \count($vulnerabilities)),
+            ...$this->suggestedFixes($shown),
         ];
     }
 
@@ -133,6 +134,18 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
         }
 
         return [\sprintf('_Showing the %d most severe of %d findings._', $shown, $total)];
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     *
+     * @return list<string>
+     */
+    private function suggestedFixes(array $vulnerabilities): array
+    {
+        $suggestions = array_values(array_filter(array_map(GithubSuggestion::for(...), $vulnerabilities), static fn (?string $suggestion): bool => null !== $suggestion));
+
+        return [] === $suggestions ? [] : ['### Suggested fixes', ...$suggestions];
     }
 
     private function credit(): string
