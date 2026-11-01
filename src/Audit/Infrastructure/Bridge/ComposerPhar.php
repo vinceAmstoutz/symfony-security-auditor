@@ -43,36 +43,40 @@ final readonly class ComposerPhar
     }
 
     /**
+     * @return string Composer's entry script, unpacked from the PHAR: Composer refuses to run from one on a SAPI other than `cli` while `register_argc_argv` is on, which phpmicro hard-codes
+     *
      * @throws BridgeInstallationFailedException
      */
     public function in(string $directory): string
     {
         $path = \sprintf('%s/composer.phar', $directory);
-        $copy = \sprintf('%s.copy', $path);
+        $unpacked = \sprintf('%s/composer', $directory);
 
         if (!is_file($this->bundledPhar)) {
             throw BridgeInstallationFailedException::forUnbundledComposerPhar(self::VERSION, $this->bundledPhar);
         }
 
         try {
-            $this->filesystem->copy($this->bundledPhar, $copy);
+            $this->filesystem->copy($this->bundledPhar, $path, true);
+            $this->assertPinnedRelease($path);
+            $this->filesystem->remove($unpacked);
+            $this->filesystem->mirror(\sprintf('phar://%s', $path), $unpacked);
         } catch (IOException $ioException) {
             throw BridgeInstallationFailedException::forUncopyableComposerPhar(self::VERSION, $directory, $ioException);
         }
 
-        if (!$this->isPinnedRelease($copy)) {
-            $this->filesystem->remove($copy);
+        return \sprintf('%s/bin/composer', $unpacked);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    private function assertPinnedRelease(string $path): void
+    {
+        if (!hash_equals($this->sha256, (string) hash_file('sha256', $path))) {
+            $this->filesystem->remove($path);
 
             throw BridgeInstallationFailedException::forTamperedComposerPhar(self::VERSION);
         }
-
-        $this->filesystem->rename($copy, $path, true);
-
-        return $path;
-    }
-
-    private function isPinnedRelease(string $path): bool
-    {
-        return hash_equals($this->sha256, (string) hash_file('sha256', $path));
     }
 }

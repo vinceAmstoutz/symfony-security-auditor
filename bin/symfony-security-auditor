@@ -18,13 +18,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\PendingBinarySwapCommitter;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 // Composer ships its own unprefixed symfony/console, so it runs before this binary's autoloader is registered.
-$composerPhar = getenv('SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR');
-if (is_string($composerPhar) && '' !== $composerPhar) {
-    putenv('SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR');
-    unset($_SERVER['SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR'], $_ENV['SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR']);
-    $_SERVER['argv'][0] = $composerPhar;
+$composer = getenv('SYMFONY_SECURITY_AUDITOR_COMPOSER');
+if (is_string($composer) && '' !== $composer) {
+    putenv('SYMFONY_SECURITY_AUDITOR_COMPOSER');
+    unset($_SERVER['SYMFONY_SECURITY_AUDITOR_COMPOSER'], $_ENV['SYMFONY_SECURITY_AUDITOR_COMPOSER']);
+    $_SERVER['argv'][0] = $composer;
 
-    require $composerPhar;
+    require $composer;
 
     exit(0);
 }

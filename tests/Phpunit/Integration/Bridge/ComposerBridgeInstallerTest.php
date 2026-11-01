@@ -419,7 +419,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $process = $this->embeddedProcess('symfony/ai-anthropic-platform', 'v0.14.1');
 
         self::assertStringStartsWith("'/usr/bin/php' '/opt/symfony-security-auditor' 'require' 'symfony/ai-anthropic-platform'", $process->getCommandLine());
-        self::assertSame($this->targetDirectory.'/.composer/composer.phar', $process->getEnv()['SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR'] ?? null);
+        self::assertSame($this->targetDirectory.'/.composer/composer/bin/composer', $process->getEnv()['SYMFONY_SECURITY_AUDITOR_COMPOSER'] ?? null);
     }
 
     /**
@@ -454,8 +454,8 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     private function embeddedProcess(string $package, ?string $aiPlatformPin, string ...$morePackages): Process
     {
-        $this->filesystem->dumpFile($this->outsideTarget.'/composer.phar', '<?php');
-        $composerPhar = new ComposerPhar($this->outsideTarget.'/composer.phar', hash('sha256', '<?php'));
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $composerPhar = new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar));
 
         return (ComposerBridgeInstaller::embeddedProcessBuilder(new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), $composerPhar))($package, $aiPlatformPin, $this->targetDirectory, ...$morePackages);
     }

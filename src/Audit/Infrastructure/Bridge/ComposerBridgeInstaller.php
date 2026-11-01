@@ -63,7 +63,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         'claudecode' => 'claude-code',
     ];
 
-    private const string COMPOSER_PHAR_VARIABLE = 'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR';
+    private const string COMPOSER_VARIABLE = 'SYMFONY_SECURITY_AUDITOR_COMPOSER';
 
     private const string MANIFEST_FILENAME = 'composer.json';
 
@@ -104,7 +104,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
             $process = new Process(
                 [...$selfInvocation->command(), ...self::requireArguments($package, $aiPlatformPin, $targetDirectory, ...$morePackages)],
                 env: [
-                    self::COMPOSER_PHAR_VARIABLE => $composerPhar->in($composerDirectory),
+                    self::COMPOSER_VARIABLE => $composerPhar->in($composerDirectory),
                     'COMPOSER_HOME' => \sprintf('%s/home', $composerDirectory),
                     'COMPOSER_CACHE_DIR' => \sprintf('%s/cache', $composerDirectory),
                 ],

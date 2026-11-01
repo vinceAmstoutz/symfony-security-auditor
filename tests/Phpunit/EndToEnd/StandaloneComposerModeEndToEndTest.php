@@ -60,7 +60,7 @@ final class StandaloneComposerModeEndToEndTest extends TestCase
 
     public function test_the_processes_composer_starts_run_this_binary_in_its_usual_mode(): void
     {
-        $this->filesystem->dumpFile($this->composerPhar, '<?php var_export([getenv(\'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR\'), $_SERVER[\'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR\'] ?? false, $_ENV[\'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR\'] ?? false]);');
+        $this->filesystem->dumpFile($this->composerPhar, '<?php var_export([getenv(\'SYMFONY_SECURITY_AUDITOR_COMPOSER\'), $_SERVER[\'SYMFONY_SECURITY_AUDITOR_COMPOSER\'] ?? false, $_ENV[\'SYMFONY_SECURITY_AUDITOR_COMPOSER\'] ?? false]);');
 
         self::assertSame(var_export([false, false, false], true), $this->runInComposerMode([])->getOutput());
     }
@@ -96,7 +96,7 @@ final class StandaloneComposerModeEndToEndTest extends TestCase
                 'HOME' => $this->base,
                 'XDG_CONFIG_HOME' => $this->base.'/config',
                 'XDG_DATA_HOME' => $this->base.'/data',
-                'SYMFONY_SECURITY_AUDITOR_COMPOSER_PHAR' => $this->composerPhar,
+                'SYMFONY_SECURITY_AUDITOR_COMPOSER' => $this->composerPhar,
             ],
         );
         $process->run();

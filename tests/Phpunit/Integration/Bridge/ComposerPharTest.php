@@ -23,6 +23,8 @@ final class ComposerPharTest extends TestCase
 {
     private const string PAYLOAD = '<?php // composer';
 
+    private const string FIXTURE_PHAR = __DIR__.'/../../../Fixture/Composer/composer.phar';
+
     private Filesystem $filesystem;
 
     private string $directory;
@@ -48,11 +50,11 @@ final class ComposerPharTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_copies_the_composer_the_binary_bundles_into_the_directory(): void
+    public function test_it_unpacks_the_composer_the_binary_bundles_so_it_runs_outside_a_phar(): void
     {
-        $composerPhar = new ComposerPhar($this->bundledPhar, hash('sha256', self::PAYLOAD));
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR));
 
-        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), self::PAYLOAD);
+        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), "<?php echo \"fixture composer\";\n");
     }
 
     /**
@@ -61,9 +63,11 @@ final class ComposerPharTest extends TestCase
     public function test_it_replaces_the_composer_an_earlier_release_copied(): void
     {
         $this->filesystem->dumpFile($this->directory.'/.composer/composer.phar', '<?php // an older composer');
-        $composerPhar = new ComposerPhar($this->bundledPhar, hash('sha256', self::PAYLOAD));
+        $this->filesystem->dumpFile($this->directory.'/.composer/composer/bin/composer', '<?php // an older composer');
 
-        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), self::PAYLOAD);
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR));
+
+        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), "<?php echo \"fixture composer\";\n");
     }
 
     public function test_it_refuses_a_bundled_composer_whose_checksum_does_not_match_and_keeps_none_of_it(): void
