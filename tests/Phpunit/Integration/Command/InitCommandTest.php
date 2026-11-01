@@ -103,6 +103,18 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_configures_the_claude_code_cli_with_no_api_key_and_its_opus_model(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'claudecode'], ['interactive' => false]);
+
+        self::assertSame(
+            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'opus'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
     public function test_it_offers_only_the_ten_newest_priced_models(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));

@@ -60,6 +60,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         'lmstudio' => 'lm-studio',
         'dockermodelrunner' => 'docker-model-runner',
         'transformersphp' => 'transformers-php',
+        'claudecode' => 'claude-code',
     ];
 
     private const string MANIFEST_FILENAME = 'composer.json';

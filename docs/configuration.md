@@ -551,6 +551,22 @@ platform:
 model: gpt-5.6
 ```
 
+### Running on a Claude subscription
+
+_Since 1.23_ the standalone binary can run the audit on a Claude subscription instead of an API key, through the [Claude Code](https://code.claude.com) CLI installed on the machine. `init --provider=claudecode` downloads the bridge and writes:
+
+```yaml
+provider: claudecode
+platform:
+    claudecode: {}
+model: opus
+```
+
+- **Requirements.** The `claude` CLI is installed and logged in to the subscription. On a CI runner, set the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints. When `claude` is not on the `PATH`, name it with `cli_binary:` under `claudecode:`.
+- **Models.** Claude Code's aliases: `opus`, `sonnet` or `haiku`.
+- **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
+- **Limits.** The plan's usage limits apply, and its terms decide what automated use it allows. The run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced. A prompt longer than the 128 KiB one command-line argument can carry is split like one the provider refuses as too large. `privacy.offline_only` refuses this platform.
+
 ## Providing the API key
 
 The `platform:` block holds a `%env(...)%` placeholder, never the key itself. Where that value comes from is yours to choose:

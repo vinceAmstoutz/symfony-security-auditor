@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PlatformCatalogProviders;
 
 /**
  * The providers `init` lists to pick from: the platforms the pricing catalog
- * prices that a bare name configures, so a pick always prices the run.
+ * prices that a bare name configures, so a pick always prices the run, and
+ * the coding-agent CLIs that run on the user's subscription.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -29,7 +31,7 @@ final readonly class InitProviderChoices
      */
     public static function names(): array
     {
-        $names = array_diff(array_keys(PlatformCatalogProviders::PROVIDERS), InstanceKeyedPlatforms::NAMES);
+        $names = array_diff(array_keys([...PlatformCatalogProviders::PROVIDERS, ...CliAgentPlatforms::FACTORIES]), InstanceKeyedPlatforms::NAMES);
         sort($names);
 
         return $names;
