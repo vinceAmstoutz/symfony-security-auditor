@@ -17,7 +17,7 @@ use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
-use Symfony\AI\Platform\Exception\ServerException;
+use Symfony\AI\Platform\Exception\RetryableExceptionInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
@@ -178,7 +178,7 @@ final readonly class TransientFailureClassifier
 
     private function readsAsTransient(Throwable $throwable): bool
     {
-        if ($throwable instanceof ServerException || $this->hasInChain($throwable, MalformedToolCallException::class) || $this->hasInChain($throwable, TransientHttpStatusException::class)) {
+        if ($this->hasInChain($throwable, RetryableExceptionInterface::class) || $this->hasInChain($throwable, MalformedToolCallException::class) || $this->hasInChain($throwable, TransientHttpStatusException::class)) {
             return true;
         }
 

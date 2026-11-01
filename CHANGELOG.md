@@ -12,6 +12,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The standalone binary runs on a ChatGPT subscription too: `init --provider=codex` sets it up, and each call goes through the installed Codex CLI, read-only and with its shell off ([#678](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/678))
 - A Symfony application runs the audit on a Claude or ChatGPT subscription too: `cli_agent.platform: claudecode` or `codex` sends the auditor's calls to the installed CLI and leaves the application's own `symfony/ai` platform as it is ([#679](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/679))
 
+### Core 🧱
+
+- A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
+
 ## [1.22.1] — 2026-10-29 — Waypoint
 
 ### Bugfixes 🐛
