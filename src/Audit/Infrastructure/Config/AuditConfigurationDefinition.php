@@ -59,7 +59,7 @@ final readonly class AuditConfigurationDefinition
                 ->integerNode('max_output_tokens')
                     ->defaultValue(4096)
                     ->min(1)
-                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. Sets `max_tokens` in every platform request. Default 4096; symfony/ai's Anthropic bridge otherwise defaults to a much smaller value (~1000) that silently truncates findings.")
+                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. Sent as symfony/ai's `max_output_tokens` on the Anthropic, Bedrock, Gemini, Vertex AI, Mistral, OpenAI and generic-gateway platforms, as `max_tokens` to a Claude model elsewhere. A tool call it cuts off is asked again once with twice the cap. Default 4096; symfony/ai's Anthropic bridge otherwise defaults to a much smaller value (~1000) that silently truncates findings.")
                 ->end()
                 ->append((new NullableIntegerNodeDefinition('attacker_max_output_tokens'))
                     ->defaultNull()
