@@ -84,6 +84,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         PlatformResilienceConfig $platformResilienceConfig = new PlatformResilienceConfig(),
         PlatformAccountingConfig $platformAccountingConfig = new PlatformAccountingConfig(),
     ) {
+        $platformBinding = StreamingPlatform::bind($platformBinding, $platformRequestConfig);
         $this->model = $platformBinding->model;
         $this->logger = $platformBinding->logger;
         $this->temperature = $platformRequestConfig->temperature;

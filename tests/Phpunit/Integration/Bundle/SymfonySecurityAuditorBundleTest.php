@@ -207,9 +207,53 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_provider_streaming_streams_the_calls_of_a_platform_that_reports_usage_in_its_stream(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-sonnet-4-5', 'provider_streaming' => true], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame(['[]', true], [$llmClient->complete('sys', 'usr')->content(), OptionsRecordingPlatform::$lastOptions['stream'] ?? false]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_the_auditor_runs_on_the_claude_code_cli_its_cli_agent_names(): void
     {
         $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_calls_stay_buffered_unless_provider_streaming_is_on(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-sonnet-4-5'], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertArrayNotHasKey('stream', OptionsRecordingPlatform::$lastOptions);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_provider_streaming_leaves_the_calls_to_a_cli_agent_as_they_are(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'provider_streaming' => true, 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
         $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
         self::assertInstanceOf(LLMClientInterface::class, $llmClient);
 

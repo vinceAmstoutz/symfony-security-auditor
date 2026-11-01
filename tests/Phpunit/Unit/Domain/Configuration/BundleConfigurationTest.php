@@ -480,6 +480,19 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
+    public function test_provider_streaming_is_off_unless_turned_on(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $enabledConfig = $config;
+        $enabledConfig['provider_streaming'] = true;
+
+        self::assertSame([false, true], [BundleConfiguration::fromArray($config)->llm->providerStreaming, BundleConfiguration::fromArray($enabledConfig)->llm->providerStreaming]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_tolerates_omitted_provider_json_mode_key_for_bc(): void
     {
         $config = $this->treeBuilderOutput();

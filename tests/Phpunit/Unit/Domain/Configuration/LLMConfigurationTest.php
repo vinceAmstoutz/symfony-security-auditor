@@ -25,6 +25,11 @@ final class LLMConfigurationTest extends TestCase
         self::assertFalse($lLMConfiguration->providerJsonMode);
     }
 
+    public function test_provider_streaming_is_off_by_default(): void
+    {
+        self::assertFalse((new LLMConfiguration('claude-opus-4-7', null, null))->providerStreaming);
+    }
+
     public function test_agent_models_fall_back_to_the_shared_model_when_no_override_is_set(): void
     {
         $lLMConfiguration = new LLMConfiguration('shared-model', null, null);

@@ -23,6 +23,7 @@ final readonly class LLMConfiguration
         private ?int $attackerMaxOutputTokensOverride = null,
         private ?int $reviewerMaxOutputTokensOverride = null,
         public bool $providerJsonMode = false,
+        public bool $providerStreaming = false,
     ) {}
 
     public function attackerModel(): string
