@@ -24,7 +24,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPha
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 
 final class ComposerBridgeInstallerTest extends TestCase
 {
@@ -445,7 +444,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $this->filesystem->dumpFile($this->outsideTarget.'/composer.phar', '<?php');
         $composerPhar = new ComposerPhar($this->outsideTarget.'/composer.phar', hash('sha256', '<?php'));
 
-        return (ComposerBridgeInstaller::embeddedProcessBuilder(new SelfInvocation(self::createStub(RunningBinaryLocatorInterface::class), '/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), $composerPhar))($package, $aiPlatformPin, $this->targetDirectory, ...$morePackages);
+        return (ComposerBridgeInstaller::embeddedProcessBuilder(new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), $composerPhar))($package, $aiPlatformPin, $this->targetDirectory, ...$morePackages);
     }
 
     /**

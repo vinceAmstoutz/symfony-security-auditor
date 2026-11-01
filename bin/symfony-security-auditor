@@ -50,7 +50,11 @@ if (null !== $bridgeTreeWarning) {
     fwrite(\STDERR, $bridgeTreeWarning.\PHP_EOL);
 }
 
-$runningBinaryPath = \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) ? $_SERVER['SCRIPT_FILENAME'] : '';
+$runningBinaryPath = match (true) {
+    \function_exists('micro_get_self_filename') => micro_get_self_filename(),
+    \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) => $_SERVER['SCRIPT_FILENAME'],
+    default => '',
+};
 
 $standaloneApplicationFactory = StandaloneApplicationFactory::fromEnvironment($environment, $runningBinaryPath);
 $pendingBinarySwapCommitter = new PendingBinarySwapCommitter($standaloneApplicationFactory->pendingBinarySwap());

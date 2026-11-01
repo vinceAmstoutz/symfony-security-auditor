@@ -24,9 +24,9 @@ final class BridgeInstallationFailedException extends RuntimeException
         return new self(\sprintf('Could not run composer to install the "%s" provider bridge.', $package), previous: $throwable);
     }
 
-    public static function forUnlocatableBinary(Throwable $throwable): self
+    public static function forUnlocatableBinary(): self
     {
-        return new self(\sprintf('Could not start this binary to install the provider bridge: %s', $throwable->getMessage()), previous: $throwable);
+        return new self('Could not start this binary to install the provider bridge: it did not report its own path.');
     }
 
     public static function forUnbundledComposerPhar(string $version, string $bundledPhar): self

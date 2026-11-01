@@ -9,6 +9,17 @@ on:
   release:
     types:
       - published
+  # A pull request that changes what goes into the binary builds it on every
+  # platform and smoke-tests it; the jobs that publish skip pull requests.
+  pull_request:
+    paths:
+      - '.github/workflows/release.yaml'
+      - 'bin/**'
+      - 'box.json'
+      - 'composer.json'
+      - 'src/Audit/Infrastructure/Bridge/**'
+      - 'src/Audit/Infrastructure/SelfUpdate/**'
+      - 'src/Standalone/**'
   workflow_dispatch:
     inputs:
       tag:
@@ -56,6 +67,11 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  # A newer push to a pull request supersedes the build of the commit before it; release builds are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   phar:
@@ -299,10 +315,19 @@ jobs:
         env:
           ASSET: ${{ matrix.asset }}
         run: |
-          ssa_home="$RUNNER_TEMP/ssa-init-home"
-          empty_path="$RUNNER_TEMP/ssa-init-path"
+          # Git Bash on Windows: the shell reads POSIX paths, the binary a native one.
+          temp_dir="$RUNNER_TEMP"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            temp_dir="$(cygpath -u "$RUNNER_TEMP")"
+          fi
+          ssa_home="$temp_dir/ssa-init-home"
+          empty_path="$temp_dir/ssa-init-path"
           mkdir -p "$ssa_home" "$empty_path"
-          PATH="$empty_path" SYMFONY_SECURITY_AUDITOR_HOME="$ssa_home" SSA_NO_UPDATE_CHECK=1 \
+          binary_home="$ssa_home"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            binary_home="$(cygpath -w "$ssa_home")"
+          fi
+          PATH="$empty_path" SYMFONY_SECURITY_AUDITOR_HOME="$binary_home" SSA_NO_UPDATE_CHECK=1 \
             ./"$ASSET" init --no-interaction --provider=anthropic --model=claude-opus-5-5 --env-var=ANTHROPIC_API_KEY
           test -f "$ssa_home/.local/share/symfony-security-auditor/vendor/symfony/ai-anthropic-platform/composer.json"
 
@@ -327,6 +352,7 @@ jobs:
     name: Publish ${{ matrix.asset }}
     runs-on: ubuntu-latest
     needs: binary
+    if: github.event_name != 'pull_request'
     permissions:
       contents: write
     strategy:
@@ -365,6 +391,7 @@ jobs:
   installers:
     name: Attach the installers and config schema
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     permissions:
       contents: write
     steps:
@@ -390,6 +417,7 @@ jobs:
     name: Prune stale release assets
     runs-on: ubuntu-latest
     needs: binary-publish
+    if: github.event_name != 'pull_request'
     permissions:
       contents: write
     steps:

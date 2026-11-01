@@ -16,8 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Bridge;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 
 final class SelfInvocationTest extends TestCase
 {
@@ -26,12 +24,9 @@ final class SelfInvocationTest extends TestCase
      */
     public function test_the_standalone_binary_is_started_on_its_own(): void
     {
-        $runningBinaryLocator = self::createStub(RunningBinaryLocatorInterface::class);
-        $runningBinaryLocator->method('path')->willReturn('/opt/symfony-security-auditor/symfony-security-auditor');
+        $selfInvocation = new SelfInvocation('C:\Users\me\bin\symfony-security-auditor.exe', 'micro', '');
 
-        $selfInvocation = new SelfInvocation($runningBinaryLocator, 'symfony-security-auditor', 'micro', 'symfony-security-auditor');
-
-        self::assertSame(['/opt/symfony-security-auditor/symfony-security-auditor'], $selfInvocation->command());
+        self::assertSame(['C:\Users\me\bin\symfony-security-auditor.exe'], $selfInvocation->command());
     }
 
     /**
@@ -39,7 +34,7 @@ final class SelfInvocationTest extends TestCase
      */
     public function test_a_php_run_is_started_again_through_the_same_php_and_entry_script(): void
     {
-        $selfInvocation = new SelfInvocation(self::createStub(RunningBinaryLocatorInterface::class), '/app/bin/symfony-security-auditor', 'cli', '/usr/bin/php8.3');
+        $selfInvocation = new SelfInvocation('/app/bin/symfony-security-auditor', 'cli', '/usr/bin/php8.3');
 
         self::assertSame(['/usr/bin/php8.3', '/app/bin/symfony-security-auditor'], $selfInvocation->command());
     }
@@ -47,13 +42,10 @@ final class SelfInvocationTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_a_standalone_binary_that_cannot_be_located_fails_the_bridge_installation(): void
+    public function test_a_standalone_binary_that_does_not_know_its_own_path_fails_the_bridge_installation(): void
     {
-        $runningBinaryLocator = self::createStub(RunningBinaryLocatorInterface::class);
-        $runningBinaryLocator->method('path')->willThrowException(SelfUpdateFailedException::forUndeterminedBinaryPath());
-
         $this->expectException(BridgeInstallationFailedException::class);
 
-        (new SelfInvocation($runningBinaryLocator, 'symfony-security-auditor', 'micro'))->command();
+        (new SelfInvocation('', 'micro', ''))->command();
     }
 }

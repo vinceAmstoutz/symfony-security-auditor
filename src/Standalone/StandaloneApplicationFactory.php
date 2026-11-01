@@ -156,7 +156,7 @@ final readonly class StandaloneApplicationFactory
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
-            $bridgeInstaller ?? self::bridgeInstaller($resolvedBinaryPath, $pathEnvironment, $bundledAiPlatformVersion),
+            $bridgeInstaller ?? self::bridgeInstaller($resolvedBinaryPath, $bundledAiPlatformVersion),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
@@ -173,11 +173,11 @@ final readonly class StandaloneApplicationFactory
         );
     }
 
-    private static function bridgeInstaller(string $runningBinaryPath, string $pathEnvironment, ?string $bundledAiPlatformVersion): ComposerBridgeInstaller
+    private static function bridgeInstaller(string $runningBinaryPath, ?string $bundledAiPlatformVersion): ComposerBridgeInstaller
     {
         return new ComposerBridgeInstaller(
             ComposerBridgeInstaller::embeddedProcessBuilder(
-                new SelfInvocation(new RunningBinaryLocator('/proc/self/exe', $runningBinaryPath, pathEnvironment: $pathEnvironment), $runningBinaryPath),
+                new SelfInvocation($runningBinaryPath),
                 new ComposerPhar(ComposerPhar::bundledPath()),
             ),
             aiPlatformPin: $bundledAiPlatformVersion,
