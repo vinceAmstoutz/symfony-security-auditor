@@ -153,7 +153,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         }
 
         if (!$process->isSuccessful()) {
-            throw BridgeInstallationFailedException::forFailedProcess($packageNames, $process->getErrorOutput());
+            throw BridgeInstallationFailedException::forFailedProcess($packageNames, '' !== $process->getErrorOutput() ? $process->getErrorOutput() : $process->getOutput());
         }
     }
 

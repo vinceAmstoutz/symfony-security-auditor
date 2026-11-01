@@ -374,6 +374,16 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
+    public function test_a_failure_that_printed_nothing_on_stderr_carries_what_composer_printed_on_stdout(): void
+    {
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => Process::fromShellCommandline('echo "The openssl extension is required"; exit 1'));
+
+        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessage('The openssl extension is required');
+
+        $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
+    }
+
     public function test_the_failure_message_carries_the_composer_error_output(): void
     {
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => Process::fromShellCommandline('echo "network unreachable" 1>&2; exit 1'));
