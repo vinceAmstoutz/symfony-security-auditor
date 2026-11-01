@@ -203,6 +203,52 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_auditor_runs_on_the_claude_code_cli_its_cli_agent_names(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_auditor_leaves_the_platform_of_the_application_to_the_application_when_it_runs_on_a_cli(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]]);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $platform = $this->getPrivateService($kernel, PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+
+        self::assertSame(['OK', 'stub-response'], [$llmClient->complete('sys', 'usr')->content(), $platform->invoke('model', 'usr')->asText()]);
+    }
+
+    public function test_the_auditor_asks_a_cli_for_json_answers_since_the_cli_cannot_carry_its_tools(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'opus', 'cli_agent' => ['platform' => 'codex']]);
+
+        self::assertSame(
+            [false, false, false, false],
+            [
+                $containerBuilder->getParameter('symfony_security_auditor.audit.tools_enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.structured_collection'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_tools_enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'),
+            ],
+        );
+    }
+
+    /**
      * @return iterable<string, array{string, string}>
      */
     public static function platformsWithoutAJsonObjectModeCases(): iterable
@@ -2399,6 +2445,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder->getParameterBag()->resolve();
 
         return $containerBuilder;
+    }
+
+    private function fakeClaudeCli(): string
+    {
+        $cli = $this->tmpDir.'/claude';
+        (new Filesystem())->dumpFile($cli, "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n");
+        (new Filesystem())->chmod($cli, 0o755);
+
+        return $cli;
     }
 
     /**

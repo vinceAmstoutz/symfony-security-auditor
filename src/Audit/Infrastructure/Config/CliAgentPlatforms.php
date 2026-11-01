@@ -110,9 +110,36 @@ final readonly class CliAgentPlatforms
             return $auditConfig;
         }
 
-        $audit = $auditConfig['audit'] ?? [];
+        return self::withToolFreeAudit($auditConfig);
+    }
 
-        return [...$auditConfig, 'audit' => [...(\is_array($audit) ? $audit : []), ...self::TOOL_FREE_AUDIT]];
+    /**
+     * @param array<array-key, mixed> $config
+     *
+     * @return array<array-key, mixed>
+     */
+    public static function withToolFreeAudit(array $config): array
+    {
+        $audit = $config['audit'] ?? [];
+
+        return [...$config, 'audit' => [...(\is_array($audit) ? $audit : []), ...self::TOOL_FREE_AUDIT]];
+    }
+
+    /**
+     * The CLI an application's `cli_agent.platform` names, if any.
+     *
+     * @param array<array-key, mixed> $config the processed bundle configuration
+     */
+    public static function agentIn(array $config): ?string
+    {
+        $platform = \is_array($config['cli_agent'] ?? null) ? ($config['cli_agent']['platform'] ?? null) : null;
+
+        return \is_string($platform) ? $platform : null;
+    }
+
+    public static function serviceIdOf(string $platform): string
+    {
+        return \sprintf('%s%s', self::PLATFORM_SERVICE_PREFIX, $platform);
     }
 
     /**
@@ -121,7 +148,7 @@ final readonly class CliAgentPlatforms
     public static function register(ContainerBuilder $containerBuilder, array $platform): void
     {
         foreach (array_intersect_key($platform, self::FACTORIES) as $name => $settings) {
-            $serviceId = \sprintf('%s%s', self::PLATFORM_SERVICE_PREFIX, $name);
+            $serviceId = self::serviceIdOf($name);
             $cliServiceId = \sprintf('%s.cli', $serviceId);
 
             $containerBuilder->register($cliServiceId, Platform::class)
