@@ -384,6 +384,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_the_failure_message_carries_the_composer_error_output(): void
     {
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => Process::fromShellCommandline('echo "network unreachable" 1>&2; exit 1'));
