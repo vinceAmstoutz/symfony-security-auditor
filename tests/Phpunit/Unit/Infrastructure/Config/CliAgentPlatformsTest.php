@@ -13,13 +13,15 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 
 final class CliAgentPlatformsTest extends TestCase
 {
-    public function test_a_run_on_a_cli_turns_the_auditor_tools_off_and_keeps_every_other_setting(): void
+    #[DataProvider('cliProviders')]
+    public function test_a_run_on_a_cli_turns_the_auditor_tools_off_and_keeps_every_other_setting(string $provider): void
     {
         self::assertSame(
             [
@@ -32,7 +34,7 @@ final class CliAgentPlatformsTest extends TestCase
                     'reviewer_structured_collection' => false,
                 ],
             ],
-            CliAgentPlatforms::auditConfigFor(['model' => 'sonnet', 'audit' => ['max_iterations' => 2, 'tools_enabled' => true]], new StandalonePlatformConfig(['claudecode' => []], 'claudecode')),
+            CliAgentPlatforms::auditConfigFor(['model' => 'sonnet', 'audit' => ['max_iterations' => 2, 'tools_enabled' => true]], new StandalonePlatformConfig([$provider => []], $provider)),
         );
     }
 
@@ -48,5 +50,14 @@ final class CliAgentPlatformsTest extends TestCase
         $auditConfig = ['audit' => ['tools_enabled' => true]];
 
         self::assertSame($auditConfig, CliAgentPlatforms::auditConfigFor($auditConfig, new StandalonePlatformConfig(['claudecode' => []])));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function cliProviders(): iterable
+    {
+        yield 'Claude Code' => ['claudecode'];
+        yield 'Codex' => ['codex'];
     }
 }

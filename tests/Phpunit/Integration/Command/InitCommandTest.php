@@ -115,6 +115,18 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_configures_the_codex_cli_with_no_api_key_and_its_newest_model(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'codex'], ['interactive' => false]);
+
+        self::assertSame(
+            ['provider' => 'codex', 'platform' => ['codex' => []], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
     public function test_it_offers_only_the_ten_newest_priced_models(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));

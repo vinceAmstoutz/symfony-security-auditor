@@ -567,6 +567,22 @@ model: opus
 - **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
 - **Limits.** The plan's usage limits apply, and its terms decide what automated use it allows. The run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced. A prompt longer than the 128 KiB one command-line argument can carry is split like one the provider refuses as too large. `privacy.offline_only` refuses this platform.
 
+### Running on a ChatGPT subscription
+
+_Since 1.23_ the standalone binary can also run on a ChatGPT subscription, through the [Codex](https://github.com/openai/codex) CLI installed on the machine. `init --provider=codex` downloads the bridge and writes:
+
+```yaml
+provider: codex
+platform:
+    codex: {}
+model: gpt-5.4
+```
+
+- **Requirements.** The `codex` CLI is installed and logged in to the subscription. When `codex` is not on the `PATH`, name it with `cli_binary:` under `codex:`.
+- **Models.** The ones the bundled bridge lists: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-5.3-codex-spark` and `gpt-5.2`.
+- **How each call runs.** The auditor runs `codex exec` read-only, with its shell and web search off, the user's Codex configuration and rules ignored, nothing kept of the session, and outside the audited project. As with Claude Code, the attacker and the reviewer answer in JSON.
+- **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together.
+
 ## Providing the API key
 
 The `platform:` block holds a `%env(...)%` placeholder, never the key itself. Where that value comes from is yours to choose:
