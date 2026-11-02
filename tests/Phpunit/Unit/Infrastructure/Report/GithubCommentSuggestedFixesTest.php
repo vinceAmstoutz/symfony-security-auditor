@@ -19,7 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubCommentReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubReviewSuggestions;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPathPrefix;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
 final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCase
@@ -110,5 +113,69 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
         $auditReport = $this->makeReport($this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -7 +7 @@\n-a\n+\$isAdmin = false; /*\u{202E} } \u{2066}if (true) {\u{2069} */"));
 
         self::assertStringContainsString("```suggestion\n\$isAdmin = false; /* } if (true) { */\n```", $this->renderer->render($auditReport));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_comment_carries_each_suggestion_for_a_pull_request_review(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -4,2 +4 @@\n-a\n-b\n+c");
+        $key = \sprintf('%s:4-5', $vulnerability->fingerprint());
+
+        self::assertSame(
+            [[
+                'key' => $key,
+                'path' => 'backend/src/Foo.php',
+                'start_line' => 4,
+                'line' => 5,
+                'expected' => ['a', 'b'],
+                'body' => \sprintf("**Test Vuln**\n\n```suggestion\nc\n```\n\n<!-- symfony-security-auditor:suggestion:%s -->", $key),
+            ]],
+            $this->reviewSuggestionsIn((new GithubCommentReportRenderer(new ReportPathPrefix('backend')))->render($this->makeReport($vulnerability))),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('fixesGithubCannotSuggest')]
+    public function test_a_fix_github_cannot_suggest_carries_no_review_comment(string $fix): void
+    {
+        $auditReport = $this->makeReport($this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix($fix));
+
+        self::assertStringNotContainsString(GithubReviewSuggestions::MARKER_PREFIX, $this->renderer->render($auditReport));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_review_comments_stop_before_the_comment_grows_past_what_github_accepts(): void
+    {
+        $vulnerabilities = array_map(
+            fn (int $index): Vulnerability => $this->makeValidatedVuln(filePath: \sprintf('src/Foo%d.php', $index))->withSuggestedFix(\sprintf("--- a/src/Foo%1\$d.php\n+++ b/src/Foo%1\$d.php\n@@ -1 +1 @@\n-a\n+%2\$s", $index, str_repeat('x', 2000))),
+            range(1, 40),
+        );
+
+        $comment = $this->renderer->render($this->makeReport(...$vulnerabilities));
+        $reviewComments = $this->reviewSuggestionsIn($comment);
+
+        self::assertSame([true, true], [\is_array($reviewComments) && \count($reviewComments) > 1 && \count($reviewComments) < 40, mb_strlen($comment) < 65_536]);
+    }
+
+    private function reviewSuggestionsIn(string $comment): mixed
+    {
+        self::assertSame(1, preg_match('/^<!-- symfony-security-auditor:review-suggestions:([A-Za-z0-9+\/=]+) -->$/m', $comment, $matches));
+
+        return json_decode((string) base64_decode($matches[1], true), true);
     }
 }

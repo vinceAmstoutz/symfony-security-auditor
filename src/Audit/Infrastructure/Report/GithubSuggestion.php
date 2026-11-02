@@ -28,29 +28,63 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\UnifiedDiff;
  */
 final readonly class GithubSuggestion
 {
+    public const string MARKER_PREFIX = '<!-- symfony-security-auditor:suggestion:';
+
     private const int MINIMUM_FENCE_LENGTH = 3;
 
-    public static function for(Vulnerability $vulnerability): ?string
+    private function __construct(
+        private Vulnerability $vulnerability,
+        private DiffHunk $diffHunk,
+    ) {}
+
+    public static function of(Vulnerability $vulnerability): ?self
     {
         $diffHunk = self::singleHunkOf($vulnerability);
-        if (!$diffHunk instanceof DiffHunk) {
-            return null;
-        }
 
+        return $diffHunk instanceof DiffHunk ? new self($vulnerability, $diffHunk) : null;
+    }
+
+    public function commentSection(): string
+    {
+        return \sprintf(
+            "%s, %s:\n\n%s",
+            MarkdownTextEscaper::inlineCode($this->vulnerability->filePath()),
+            $this->diffHunk->oldStart === $this->diffHunk->oldEnd() ? \sprintf('line %d', $this->diffHunk->oldStart) : \sprintf('lines %d to %d', $this->diffHunk->oldStart, $this->diffHunk->oldEnd()),
+            $this->block(),
+        );
+    }
+
+    /**
+     * The review comment GitHub turns into a one-click fix on the lines it
+     * replaces, with the lines it expects there so a workflow can check the
+     * commit it comments on still holds them, and a key naming the finding and
+     * those lines so a rerun does not post it twice.
+     *
+     * @return array{key: string, path: string, start_line: int, line: int, expected: list<string>, body: string}
+     */
+    public function reviewComment(ReportPathPrefix $reportPathPrefix): array
+    {
+        $key = \sprintf('%s:%d-%d', $this->vulnerability->fingerprint(), $this->diffHunk->oldStart, $this->diffHunk->oldEnd());
+
+        return [
+            'key' => $key,
+            'path' => $reportPathPrefix->apply($this->vulnerability->filePath()),
+            'start_line' => $this->diffHunk->oldStart,
+            'line' => $this->diffHunk->oldEnd(),
+            'expected' => $this->diffHunk->oldLines,
+            'body' => \sprintf("**%s**\n\n%s\n\n%s%s -->", MarkdownTextEscaper::tableCell($this->vulnerability->title()), $this->block(), self::MARKER_PREFIX, $key),
+        ];
+    }
+
+    private function block(): string
+    {
         $code = implode("\n", array_map(
             static fn (string $line): string => TerminalTextSanitizer::stripControlCharacters(mb_scrub($line, 'UTF-8')),
-            $diffHunk->newLines,
+            $this->diffHunk->newLines,
         ));
-        $fence = self::fenceAround($code);
+        $fence = $this->fenceAround($code);
 
-        return \sprintf(
-            "%s, %s:\n\n%ssuggestion\n%s\n%s",
-            MarkdownTextEscaper::inlineCode($vulnerability->filePath()),
-            $diffHunk->oldStart === $diffHunk->oldEnd() ? \sprintf('line %d', $diffHunk->oldStart) : \sprintf('lines %d to %d', $diffHunk->oldStart, $diffHunk->oldEnd()),
-            $fence,
-            $code,
-            $fence,
-        );
+        return \sprintf("%ssuggestion\n%s\n%s", $fence, $code, $fence);
     }
 
     private static function singleHunkOf(Vulnerability $vulnerability): ?DiffHunk
@@ -66,7 +100,7 @@ final readonly class GithubSuggestion
         return [] === $diffHunk->oldLines ? null : $diffHunk;
     }
 
-    private static function fenceAround(string $code): string
+    private function fenceAround(string $code): string
     {
         $fence = str_repeat('`', self::MINIMUM_FENCE_LENGTH);
         while (str_contains($code, $fence)) {

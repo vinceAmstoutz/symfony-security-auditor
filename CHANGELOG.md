@@ -14,6 +14,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The standalone binary bundles Composer 2.8.12 and `init` installs the provider bridge with it, on the binary's own PHP, so it no longer needs PHP or Composer on your machine; `init` no longer checks for Composer before asking anything, and `doctor`'s Composer check now only concerns the `lookup_advisory` tool ([#682](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/682))
 - `max_output_tokens`, `attacker_max_output_tokens` and `reviewer_max_output_tokens` cap the answers of Gemini, Vertex AI, Mistral, Bedrock Nova, OpenAI and the generic-bridge gateways, not only of Claude, and a `record_vulnerability` or `record_review` call the cap cuts off is asked again once with twice the cap, so the finding is kept
 - With `audit.fix_synthesis` enabled, the SARIF report carries each suggested fix as a `fixes` entry, and the `github-comment` format offers a fix that replaces one run of lines of its file as a `suggestion` block
+- The GitHub Action's `comment-pr` posts the suggested fixes as one pull-request review, each a one-click suggestion on lines of the diff the head commit still holds, never twice; `review-suggestions: false` turns it off
 - `audit:fix <report.json>` applies the suggested fixes of a JSON report: a dry run unless `--apply`, refusing a fix whose code changed since the audit or that would write outside the project, and exiting `1` when it refused one
 
 ### Core 🧱
