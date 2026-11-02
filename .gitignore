@@ -8,6 +8,7 @@ infection/
 /build/coverage/
 .playwright-mcp/
 /symfony-security-auditor.phar
+/resources/composer.phar
 
 .castor.stub.php
 

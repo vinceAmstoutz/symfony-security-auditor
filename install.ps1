@@ -21,7 +21,7 @@
       SSA_INIT         when "1", run "<binary> init" after installing so a single
                        command installs and configures the tool; prompts read from
                        the console when its input is not redirected, else fall back
-                       to "init --no-interaction" (needs composer, like init itself)
+                       to "init --no-interaction"
 #>
 
 Set-StrictMode -Version Latest

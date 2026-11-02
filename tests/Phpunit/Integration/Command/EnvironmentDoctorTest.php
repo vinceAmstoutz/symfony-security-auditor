@@ -420,7 +420,7 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), [], false)->diagnose();
 
         self::assertEquals(
-            new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not usable (php: not found) — needed only to run "init" or switch providers, not to audit. "init" lists how to install it.'),
+            new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not usable (php: not found) — the lookup_advisory tool then audits without advisory data; "init" does not need it.'),
             $results[2],
         );
     }
@@ -441,7 +441,7 @@ final class EnvironmentDoctorTest extends TestCase
             new ModelsDevPricingProvider(new NullLogger()),
         ))->diagnose();
 
-        self::assertSame('Not usable (\\<error\\>boom\\</error\\>) — needed only to run "init" or switch providers, not to audit. "init" lists how to install it.', $results[2]->detail);
+        self::assertSame('Not usable (\\<error\\>boom\\</error\\>) — the lookup_advisory tool then audits without advisory data; "init" does not need it.', $results[2]->detail);
     }
 
     /**
