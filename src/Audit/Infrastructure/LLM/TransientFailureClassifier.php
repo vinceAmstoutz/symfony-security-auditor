@@ -333,6 +333,15 @@ final readonly class TransientFailureClassifier
      * never a status code, and it is retried before any is looked for. A
      * stream that ends before its terminal event was cut the same way.
      */
+    /**
+     * A call cut before its answer ended: the provider may bill it beyond the
+     * usage it reported, so the cost booked for the run is a minimum.
+     */
+    public function isCutMidAnswer(Throwable $throwable): bool
+    {
+        return $this->isConnectionCut($throwable);
+    }
+
     private function isConnectionCut(Throwable $throwable): bool
     {
         return $this->hasInChain($throwable, IncompleteStreamException::class) || u($this->joinMessages($throwable))->containsAny(self::CONNECTION_CUT_HINTS);

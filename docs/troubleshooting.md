@@ -311,7 +311,7 @@ When every retry fails, the run still aborts with exit `1` and the report says i
 
 The request reached the provider, but nothing came back before the HTTP client's idle timeout, so the client hung up — which an AI gateway logs as `499` (client closed the request). A non-streamed answer arrives only once the model has finished it, so a slow local model, or a self-hosted gateway in front of one, can stay silent for minutes on a long prompt. The call is retried (`audit.retry.max_attempts`), and the same wait fails it again.
 
-- **On the `anthropic` platform**, set `provider_streaming: true`: the answer streams in as the model writes it, so the connection never sits idle. Other platforms keep buffered calls; raise the timeout below.
+- **Streamed platforms.** _Since 1.23_, the answers stream in as the model writes them on every platform but Vertex AI, Venice, Cohere, MiniMax and Bedrock, so the connection never sits idle. On those, with `cli_agent`, or behind a gateway that cannot stream, raise the timeout below.
 
 - **Standalone binary.** It waits 600 seconds by default. Raise `http_timeout` in `config.yaml`, in seconds:
 

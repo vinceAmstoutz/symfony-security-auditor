@@ -30,6 +30,6 @@ final readonly class PlatformRequestConfig
         public bool $providerJsonMode = SymfonyAiLLMClient::DEFAULT_PROVIDER_JSON_MODE,
         public TokenEstimatorInterface $tokenEstimator = new ResolvingTokenEstimator(),
         public ?string $servingPlatform = null,
-        public bool $providerStreaming = false,
+        public bool $streaming = false,
     ) {}
 }

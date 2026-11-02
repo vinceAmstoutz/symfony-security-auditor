@@ -30,6 +30,8 @@ use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\ResultConverterInterface;
 use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyStreamedAnswerException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnfinishedStreamException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnmeteredStreamException;
 
 /**
  * Reads a streamed answer to its end the first time it is asked for, and
@@ -43,7 +45,12 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
 {
     private const string TOKEN_USAGE = 'token_usage';
 
-    public function __construct(private DeferredResult $streamedResult) {}
+    private const string FINISH_REASON = 'finish_reason';
+
+    public function __construct(
+        private DeferredResult $streamedResult,
+        private StreamMetering $streamMetering = new StreamMetering(),
+    ) {}
 
     #[Override]
     public function supports(Model $model): bool
@@ -53,15 +60,13 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
 
     /**
      * @throws EmptyStreamedAnswerException when the stream carried no content
+     * @throws UnfinishedStreamException    when the stream never said why the model stopped
+     * @throws UnmeteredStreamException     when the stream never reported its usage
      */
     #[Override]
     public function convert(RawResultInterface $result, array $options = []): ResultInterface
     {
-        $streamResult = $this->streamedResult->getResult();
-        \assert($streamResult instanceof StreamResult);
-
-        $bufferedResult = $this->bufferedResult($streamResult->getAssistantMessage());
-        $bufferedResult->getMetadata()->merge($streamResult->getMetadata());
+        $bufferedResult = UnstreamedAnswer::in($this->streamedResult) ? $this->unstreamedResult($options) : $this->streamedAnswer();
         $bufferedResult->getMetadata()->remove(self::TOKEN_USAGE);
 
         return $bufferedResult;
@@ -74,13 +79,49 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
     }
 
     /**
-     * @throws EmptyStreamedAnswerException
+     * @param array<string, mixed> $options
      */
-    private function bufferedResult(AssistantMessage $assistantMessage): ResultInterface
+    private function unstreamedResult(array $options): ResultInterface
     {
-        $parts = $this->resultParts($assistantMessage);
+        $this->streamMetering->stopStreaming();
 
-        return [] === $parts ? throw EmptyStreamedAnswerException::create() : new MultiPartResult($parts);
+        return $this->streamedResult->getResultConverter()->convert($this->streamedResult->getRawResult(), $options);
+    }
+
+    /**
+     * @throws EmptyStreamedAnswerException
+     * @throws UnfinishedStreamException
+     * @throws UnmeteredStreamException
+     */
+    private function streamedAnswer(): ResultInterface
+    {
+        $answer = $this->streamedResult->getResult();
+
+        return $answer instanceof StreamResult ? $this->bufferedResult($answer) : $answer;
+    }
+
+    /**
+     * @throws EmptyStreamedAnswerException
+     * @throws UnfinishedStreamException
+     * @throws UnmeteredStreamException
+     */
+    private function bufferedResult(StreamResult $streamResult): ResultInterface
+    {
+        $parts = $this->resultParts($streamResult->getAssistantMessage());
+        if (!$streamResult->getMetadata()->has(self::FINISH_REASON)) {
+            throw UnfinishedStreamException::withoutFinishReason();
+        }
+
+        if (!$streamResult->getMetadata()->has(self::TOKEN_USAGE)) {
+            $this->streamMetering->stopStreaming();
+
+            throw UnmeteredStreamException::withoutUsage();
+        }
+
+        $bufferedResult = [] === $parts ? throw EmptyStreamedAnswerException::create() : new MultiPartResult($parts);
+        $bufferedResult->getMetadata()->merge($streamResult->getMetadata());
+
+        return $bufferedResult;
     }
 
     /**

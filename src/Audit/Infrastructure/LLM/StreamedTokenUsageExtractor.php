@@ -16,12 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use Override;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\RawResultInterface;
+use Symfony\AI\Platform\Result\StreamResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 
 /**
  * The usage a streamed answer reported, read once the stream was drained,
- * so even an answer that could not be used is booked at what it was billed.
+ * so even an answer that could not be used is booked at what it was billed;
+ * an answer given in one piece is booked at the usage its call settled on.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -32,7 +34,12 @@ final readonly class StreamedTokenUsageExtractor implements TokenUsageExtractorI
     #[Override]
     public function extract(RawResultInterface $rawResult, array $options = []): ?TokenUsageInterface
     {
-        $tokenUsage = $this->streamedResult->getResult()->getMetadata()->get('token_usage');
+        if (UnstreamedAnswer::in($this->streamedResult)) {
+            return $this->streamedResult->getResultConverter()->getTokenUsageExtractor()?->extract($rawResult, $options);
+        }
+
+        $answer = $this->streamedResult->getResult();
+        $tokenUsage = ($answer instanceof StreamResult ? $answer->getMetadata() : $this->streamedResult->getMetadata())->get('token_usage');
 
         return $tokenUsage instanceof TokenUsageInterface ? $tokenUsage : null;
     }

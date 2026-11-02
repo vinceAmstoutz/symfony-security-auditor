@@ -200,6 +200,17 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditCostException
      * @throws InvalidAuditContextException
      */
+    public function test_render_states_the_cost_is_a_minimum_when_calls_were_cut_before_their_answer_ended(): void
+    {
+        $output = $this->renderer->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2')->withInterruptedCalls(3)));
+
+        self::assertStringContainsString('$0.0000 (no published pricing, or a self-hosted model; at least: 3 calls were cut before their answer ended and may be billed more)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_caveats_zero_cost_when_tokens_were_spent_but_the_model_has_no_published_pricing(): void
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2')));

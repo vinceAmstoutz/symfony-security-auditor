@@ -38,6 +38,7 @@ final readonly class AuditCost
         private string $primaryModel,
         private array $byRole = [],
         private array $byModel = [],
+        private int $interruptedCalls = 0,
     ) {}
 
     /**
@@ -175,7 +176,22 @@ final readonly class AuditCost
      */
     public function withUsageByModel(array $byModel): self
     {
-        return new self($this->inputTokens, $this->outputTokens, $this->estimatedCostUsd, $this->primaryModel, $this->byRole, $byModel);
+        return new self($this->inputTokens, $this->outputTokens, $this->estimatedCostUsd, $this->primaryModel, $this->byRole, $byModel, $this->interruptedCalls);
+    }
+
+    /**
+     * The same cost, counting the calls cut before their answer ended: a
+     * provider may bill such a call beyond the usage it reported, so a cost
+     * with any is a minimum.
+     */
+    public function withInterruptedCalls(int $interruptedCalls): self
+    {
+        return new self($this->inputTokens, $this->outputTokens, $this->estimatedCostUsd, $this->primaryModel, $this->byRole, $this->byModel, $interruptedCalls);
+    }
+
+    public function interruptedCalls(): int
+    {
+        return $this->interruptedCalls;
     }
 
     /**
@@ -207,6 +223,7 @@ final readonly class AuditCost
                 ],
                 $this->byModel,
             ),
+            'interrupted_calls' => $this->interruptedCalls,
         ];
     }
 }
