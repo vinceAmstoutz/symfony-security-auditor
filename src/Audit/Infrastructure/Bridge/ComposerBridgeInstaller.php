@@ -63,6 +63,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         'claudecode' => 'claude-code',
     ];
 
+    private const string COMPOSER_VARIABLE = 'SYMFONY_SECURITY_AUDITOR_COMPOSER';
+
     private const string MANIFEST_FILENAME = 'composer.json';
 
     private const string PLATFORM_PACKAGE = 'symfony/ai-platform';
@@ -70,7 +72,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     private const string BRIDGE_PACKAGE_PATTERN = '#^symfony/ai-.+-platform$#';
 
     /**
-     * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::defaultProcessBuilder() in production); tests inject a stub
+     * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::embeddedProcessBuilder() in production); tests inject a stub
      * @param string                                               $platformPhpVersion the PHP version the bridge tree must resolve for — defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
      * @param ?string                                              $aiPlatformPin      the `symfony/ai-platform` release the bridge tree is held to — the one this binary bundles ({@see BundledAiPlatformVersion}), so a newer release the bridge would otherwise pull in cannot shadow the bundled classes; null writes no pin
      */
@@ -82,6 +84,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     ) {}
 
     /**
+     * Runs this binary itself as `composer.phar`, on its own PHP, so a host
+     * needs neither PHP nor Composer to install a bridge.
+     *
      * The pin is named on the command line as well as in the manifest:
      * composer then moves an already installed `symfony/ai-platform` of
      * another release to it, where the manifest pin alone would only report
@@ -91,16 +96,34 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
      *
      * @return Closure(string, ?string, string, string...): Process
      */
-    public static function defaultProcessBuilder(): Closure
+    public static function embeddedProcessBuilder(SelfInvocation $selfInvocation, ComposerPhar $composerPhar): Closure
     {
-        return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process {
-            $packages = [$package, ...$morePackages];
-            $required = null === $aiPlatformPin ? $packages : [...$packages, \sprintf('%s:%s', self::PLATFORM_PACKAGE, $aiPlatformPin)];
-            $process = new Process(['composer', 'require', ...$required, '--with-dependencies', \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction']);
+        return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use ($selfInvocation, $composerPhar): Process {
+            $composerDirectory = \sprintf('%s/.composer', $targetDirectory);
+
+            $process = new Process(
+                [...$selfInvocation->command(), ...self::requireArguments($package, $aiPlatformPin, $targetDirectory, ...$morePackages)],
+                env: [
+                    self::COMPOSER_VARIABLE => $composerPhar->in($composerDirectory),
+                    'COMPOSER_HOME' => \sprintf('%s/home', $composerDirectory),
+                    'COMPOSER_CACHE_DIR' => \sprintf('%s/cache', $composerDirectory),
+                ],
+            );
             $process->setTimeout(null);
 
             return $process;
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function requireArguments(string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): array
+    {
+        $packages = [$package, ...array_values($morePackages)];
+        $required = null === $aiPlatformPin ? $packages : [...$packages, \sprintf('%s:%s', self::PLATFORM_PACKAGE, $aiPlatformPin)];
+
+        return ['require', ...$required, '--with-dependencies', \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction'];
     }
 
     /**
@@ -130,7 +153,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         }
 
         if (!$process->isSuccessful()) {
-            throw BridgeInstallationFailedException::forFailedProcess($packageNames, $process->getErrorOutput());
+            throw BridgeInstallationFailedException::forFailedProcess($packageNames, '' !== $process->getErrorOutput() ? $process->getErrorOutput() : $process->getOutput());
         }
     }
 
