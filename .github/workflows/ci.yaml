@@ -219,6 +219,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: pcov
+          ini-values: zend.assertions=1
           # symfony/flex makes `composer update` honour SYMFONY_REQUIRE, which pins the leg's Symfony version.
           tools: flex
 
