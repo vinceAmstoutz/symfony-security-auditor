@@ -19,6 +19,7 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -29,7 +30,9 @@ use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
@@ -1053,6 +1056,18 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
             {
                 yield new FrameworkBundle();
                 yield new SymfonySecurityAuditorBundle();
+            }
+
+            #[Override]
+            protected function build(ContainerBuilder $container): void
+            {
+                $container->addCompilerPass(new class implements CompilerPassInterface {
+                    #[Override]
+                    public function process(ContainerBuilder $container): void
+                    {
+                        $container->setDefinition('logger', new Definition(NullLogger::class));
+                    }
+                });
             }
 
             #[Override]
