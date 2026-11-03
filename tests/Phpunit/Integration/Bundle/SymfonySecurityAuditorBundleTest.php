@@ -221,6 +221,34 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_the_calls_to_the_platform_of_the_application_are_streamed(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-sonnet-4-5'], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame(['[]', true], [$llmClient->complete('sys', 'usr')->content(), OptionsRecordingPlatform::$lastOptions['stream'] ?? false]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_calls_to_a_cli_agent_are_not_streamed(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_the_auditor_leaves_the_platform_of_the_application_to_the_application_when_it_runs_on_a_cli(): void
     {
         $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]]);

@@ -49,7 +49,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{tokens}}' => \sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens())),
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
             '{{cost}}' => number_format($cost->estimatedCostUsd(), 4, '.', ''),
-            '{{costRateLabel}}' => $cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model',
+            '{{costRateLabel}}' => CostRateLabel::of($cost),
             '{{riskLevel}}' => RiskHeadline::riskLevel($auditReport),
             '{{riskDetail}}' => RiskHeadline::scoreDetail($auditReport, 'Score:'),
             '{{body}}' => $this->body($auditReport),

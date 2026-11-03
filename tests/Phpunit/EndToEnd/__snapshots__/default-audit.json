@@ -69,7 +69,8 @@
                     "gpt-4o"
                 ]
             }
-        }
+        },
+        "interrupted_calls": 0
     },
     "scope": {
         "since": null,

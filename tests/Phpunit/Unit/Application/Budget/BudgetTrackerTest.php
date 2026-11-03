@@ -428,6 +428,19 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /** A tracker whose pricing provider knows `claude-opus-5` and prices everything else at zero, as an unlisted or self-hosted model does. */
+    public function test_it_counts_the_calls_cut_before_their_answer_ended_until_reset(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited());
+
+        $budgetTracker->recordInterruptedCall();
+        $budgetTracker->recordInterruptedCall();
+
+        $countedBeforeReset = $budgetTracker->interruptedCalls();
+        $budgetTracker->reset();
+
+        self::assertSame([2, 0], [$countedBeforeReset, $budgetTracker->interruptedCalls()]);
+    }
+
     private function splitModelBudgetTracker(): BudgetTracker
     {
         $pricingProvider = new class implements CacheAwarePricingProviderInterface {

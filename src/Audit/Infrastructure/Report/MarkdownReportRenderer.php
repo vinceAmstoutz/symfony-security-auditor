@@ -48,7 +48,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
                 number_format($cost->outputTokens()),
                 '' === $cost->primaryModel() ? 'unknown model' : MarkdownTextEscaper::fences($cost->primaryModel()),
                 number_format($cost->estimatedCostUsd(), 4, '.', ''),
-                $cost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model',
+                CostRateLabel::of($cost),
             ),
             '',
             \sprintf(

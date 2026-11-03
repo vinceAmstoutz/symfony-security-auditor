@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
+use Symfony\AI\Platform\Exception\IncompleteStreamException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\RetryableExceptionInterface;
@@ -28,6 +29,8 @@ use function Symfony\Component\String\u;
 final readonly class TransientFailureClassifier
 {
     private const string MALFORMED_TOOL_CALL_STOP_REASON = 'malformed_tool_call';
+
+    private const string INCOMPLETE_STREAM_STOP_REASON = 'incomplete_stream';
 
     /** @var list<string> */
     private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504', '529'];
@@ -251,7 +254,8 @@ final readonly class TransientFailureClassifier
      * Why a call that failed was still billed: the provider took the request
      * in and answered it, with nothing usable (the degraded stop reason) or
      * with a tool call whose arguments are not valid JSON
-     * (`malformed_tool_call`). Null for a failure it never answered, which
+     * (`malformed_tool_call`), or with a stream cut before its end
+     * (`incomplete_stream`). Null for a failure it never answered, which
      * spent nothing the budget or the rate window has to hold, and neither
      * does a request it refused with a client error: nothing was served.
      */
@@ -262,7 +266,8 @@ final readonly class TransientFailureClassifier
         }
 
         return $this->degradedStopReason($throwable)
-            ?? ($this->hasInChain($throwable, MalformedToolCallException::class) ? self::MALFORMED_TOOL_CALL_STOP_REASON : null);
+            ?? ($this->hasInChain($throwable, MalformedToolCallException::class) ? self::MALFORMED_TOOL_CALL_STOP_REASON : null)
+            ?? ($this->hasInChain($throwable, IncompleteStreamException::class) ? self::INCOMPLETE_STREAM_STOP_REASON : null);
     }
 
     /**
@@ -325,11 +330,21 @@ final readonly class TransientFailureClassifier
      * as symfony/http-client relays it, `Transfer closed with 512 bytes
      * remaining to read for "https://…".` and the like. No HTTP status came
      * back, so a byte count, an HTTP/2 stream id or the URL in that message is
-     * never a status code, and it is retried before any is looked for.
+     * never a status code, and it is retried before any is looked for. A
+     * stream that ends before its terminal event was cut the same way.
      */
+    /**
+     * A call cut before its answer ended: the provider may bill it beyond the
+     * usage it reported, so the cost booked for the run is a minimum.
+     */
+    public function isCutMidAnswer(Throwable $throwable): bool
+    {
+        return $this->isConnectionCut($throwable);
+    }
+
     private function isConnectionCut(Throwable $throwable): bool
     {
-        return u($this->joinMessages($throwable))->containsAny(self::CONNECTION_CUT_HINTS);
+        return $this->hasInChain($throwable, IncompleteStreamException::class) || u($this->joinMessages($throwable))->containsAny(self::CONNECTION_CUT_HINTS);
     }
 
     /**

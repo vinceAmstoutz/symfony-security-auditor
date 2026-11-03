@@ -38,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\RecordingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\OneModelPricingProvider;
 
 final class RunAuditUseCaseTest extends TestCase
 {
@@ -249,6 +250,39 @@ final class RunAuditUseCaseTest extends TestCase
         $auditReport = $runAuditUseCase->execute($this->tmpDir);
 
         self::assertSame(9.25, $auditReport->cost()->estimatedCostUsd());
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     */
+    public function test_the_reported_cost_counts_the_calls_cut_before_their_answer_ended(): void
+    {
+        $budgetTracker = new BudgetTracker(AuditBudget::unlimited(), new CostCalculator(new OneModelPricingProvider()));
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $cuttingStage = new class($budgetTracker) implements StageInterface {
+            public function __construct(private readonly BudgetTracker $budgetTracker) {}
+
+            #[Override]
+            public function name(): string
+            {
+                return 'cutting';
+            }
+
+            #[Override]
+            public function process(AuditContext $auditContext): void
+            {
+                $this->budgetTracker->recordInterruptedCall();
+            }
+        };
+
+        $auditReport = (new RunAuditUseCase($this->makePipeline($cuttingStage), new NullLogger(), $tokenUsageRecorder, null, 'attacker-model', $budgetTracker))->execute($this->tmpDir);
+
+        self::assertSame(1, $auditReport->cost()->interruptedCalls());
     }
 
     /**
