@@ -82,8 +82,6 @@ final readonly class PatchApplier
      */
     private function holdsAt(array $lines, array $expected, int $position): bool
     {
-        return $position >= 0
-            && $position + \count($expected) <= \count($lines)
-            && \array_slice($lines, $position, \count($expected)) === $expected;
+        return $position >= 0 && $position <= \count($lines) && \array_slice($lines, $position, \count($expected)) === $expected;
     }
 }

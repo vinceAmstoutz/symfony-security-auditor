@@ -35,7 +35,7 @@ final readonly class GithubReviewSuggestions
         $reviewComments = [];
         $encoded = '';
         foreach ($githubSuggestions as $githubSuggestion) {
-            $candidate = base64_encode(json_encode([...$reviewComments, $githubSuggestion->reviewComment($reportPathPrefix)], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_INVALID_UTF8_SUBSTITUTE));
+            $candidate = base64_encode(json_encode([...$reviewComments, $githubSuggestion->reviewComment($reportPathPrefix)], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES));
             if (\strlen($candidate) > self::MAXIMUM_ENCODED_LENGTH) {
                 break;
             }

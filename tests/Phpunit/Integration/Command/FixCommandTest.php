@@ -178,6 +178,30 @@ final class FixCommandTest extends TestCase
         self::assertSame([ExitCode::Failure->value, true], [$commandTester->getStatusCode(), str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), 'is not a directory')]);
     }
 
+    public function test_fixes_to_two_files_are_both_written(): void
+    {
+        $this->filesystem->dumpFile($this->tmpDir.'/src/Other.php', "x\n");
+        $other = "--- a/src/Other.php\n+++ b/src/Other.php\n@@ -1 +1 @@\n-x\n+y";
+        $commandTester = new CommandTester(new FixCommand());
+        $commandTester->execute(['report' => $this->writeReport([$this->finding('SQL injection in Repo', self::FIX), $this->finding('Other', $other, 'src/Other.php')]), 'project-path' => $this->tmpDir, '--apply' => true]);
+
+        self::assertSame(
+            ["<?php\n\$id = \$request->get('id');\n\$sql = 'SELECT * FROM user WHERE id = ?';\n", "y\n"],
+            [$this->filesystem->readFile($this->tmpDir.'/src/Repo.php'), $this->filesystem->readFile($this->tmpDir.'/src/Other.php')],
+        );
+    }
+
+    public function test_a_section_of_a_fix_applies_to_what_its_earlier_section_left(): void
+    {
+        $this->filesystem->dumpFile($this->tmpDir.'/src/Repo.php', "a\nb\n");
+        $first = "--- a/src/Repo.php\n+++ b/src/Repo.php\n@@ -1 +1 @@\n-a\n+A";
+        $second = "--- a/src/Repo.php\n+++ b/src/Repo.php\n@@ -2 +2 @@\n-b\n+B\n--- a/src/Repo.php\n+++ b/src/Repo.php\n@@ -2 +2 @@\n-B\n+C";
+        $commandTester = new CommandTester(new FixCommand());
+        $commandTester->execute(['report' => $this->writeReport([$this->finding('First', $first), $this->finding('Second', $second)]), 'project-path' => $this->tmpDir, '--apply' => true]);
+
+        self::assertSame([ExitCode::Success->value, "A\nC\n"], [$commandTester->getStatusCode(), $this->filesystem->readFile($this->tmpDir.'/src/Repo.php')]);
+    }
+
     /**
      * @return array<string, mixed>
      */

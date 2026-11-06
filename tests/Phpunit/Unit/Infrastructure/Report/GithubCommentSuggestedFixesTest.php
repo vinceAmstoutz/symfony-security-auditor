@@ -19,9 +19,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubCommentReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubReviewSuggestions;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubSuggestion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPathPrefix;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
@@ -170,6 +172,104 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
         $reviewComments = $this->reviewSuggestionsIn($comment);
 
         self::assertSame([true, true], [\is_array($reviewComments) && \count($reviewComments) > 1 && \count($reviewComments) < 40, mb_strlen($comment) < 65_536]);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_every_listed_finding_with_a_suggestion_gets_its_block(): void
+    {
+        $auditReport = $this->makeReport(
+            $this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -1 +1 @@\n-a\n+first"),
+            $this->makeValidatedVuln(filePath: 'src/Bar.php')->withSuggestedFix("--- a/src/Bar.php\n+++ b/src/Bar.php\n@@ -1 +1 @@\n-a\n+second"),
+        );
+
+        self::assertSame(2, substr_count($this->renderer->render($auditReport), '```suggestion'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_line_that_is_not_utf8_still_carries_its_review_comment(): void
+    {
+        $auditReport = $this->makeReport($this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -1 +1 @@\n-caf\xE9\n+cafe"));
+
+        self::assertSame(['caf?'], $this->firstReviewComment($auditReport)['expected'] ?? null);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_review_comment_list_of_exactly_the_largest_size_is_kept(): void
+    {
+        $githubSuggestion = $this->suggestionOfEncodedLength(40_000);
+
+        self::assertNotNull(GithubReviewSuggestions::block([$githubSuggestion], new ReportPathPrefix()));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_review_comments_stop_at_the_first_that_would_not_fit(): void
+    {
+        $small = $this->suggestionOfEncodedLength(1_000);
+        $block = GithubReviewSuggestions::block([$small, $this->suggestionOfEncodedLength(40_000), $small], new ReportPathPrefix());
+        self::assertNotNull($block);
+
+        self::assertCount(1, (array) $this->reviewSuggestionsIn($block));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function suggestionOfEncodedLength(int $encodedLength): GithubSuggestion
+    {
+        $jsonLength = intdiv($encodedLength, 4) * 3;
+        $githubSuggestion = $this->suggestionWithCode('');
+        $padding = $jsonLength - \strlen(json_encode([$githubSuggestion->reviewComment(new ReportPathPrefix())], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES));
+        $githubSuggestion = $this->suggestionWithCode(str_repeat('x', $padding));
+        self::assertSame($encodedLength, \strlen(base64_encode(json_encode([$githubSuggestion->reviewComment(new ReportPathPrefix())], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES))));
+
+        return $githubSuggestion;
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function suggestionWithCode(string $code): GithubSuggestion
+    {
+        $githubSuggestion = GithubSuggestion::of($this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix(\sprintf("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -1 +1 @@\n-a\n+%s", $code)));
+        self::assertInstanceOf(GithubSuggestion::class, $githubSuggestion);
+
+        return $githubSuggestion;
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     *
+     * @throws InvalidAuditContextException
+     */
+    private function firstReviewComment(AuditReport $auditReport): array
+    {
+        $reviewComments = $this->reviewSuggestionsIn($this->renderer->render($auditReport));
+        self::assertIsArray($reviewComments);
+        self::assertIsArray($reviewComments[0] ?? null);
+
+        return $reviewComments[0];
     }
 
     private function reviewSuggestionsIn(string $comment): mixed

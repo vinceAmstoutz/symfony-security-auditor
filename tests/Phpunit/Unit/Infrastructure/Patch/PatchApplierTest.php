@@ -44,6 +44,7 @@ final class PatchApplierTest extends TestCase
         yield 'no newline at the end' => ["a\nb", new FilePatch('x.php', [new DiffHunk(2, ['b'], ['B'])]), "a\nB"];
         yield 'lines added before line 2' => ["a\nb\n", new FilePatch('x.php', [new DiffHunk(2, [], ['new'])]), "a\nnew\nb\n"];
         yield 'lines added at the end' => ["a\n", new FilePatch('x.php', [new DiffHunk(2, [], ['new'])]), "a\nnew\n"];
+        yield 'a hunk shifted by every hunk before it' => ["a\nx\nb\nb\n", new FilePatch('x.php', [new DiffHunk(1, ['a'], ['a', 'a1']), new DiffHunk(2, ['x'], ['x', 'x1']), new DiffHunk(4, ['b'], ['B'])]), "a\na1\nx\nx1\nb\nB\n"];
         yield 'a later hunk shifted by an earlier one' => ["a\nb\nc\nb\n", new FilePatch('x.php', [new DiffHunk(1, ['a'], ['a', 'a2']), new DiffHunk(4, ['b'], ['B'])]), "a\na2\nb\nc\nB\n"];
     }
 

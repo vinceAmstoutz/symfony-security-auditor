@@ -66,6 +66,8 @@ final class UnifiedDiffTest extends TestCase
         yield 'an absolute path' => ["--- a//etc/x.php\n+++ b//etc/x.php\n@@ -1 +1 @@\n-a\n+b"];
         yield 'a windows drive path' => ["--- a/C:/x.php\n+++ b/C:/x.php\n@@ -1 +1 @@\n-a\n+b"];
         yield 'a backslash path that climbs out' => ["--- a/src\\..\\..\\x.php\n+++ b/src\\..\\..\\x.php\n@@ -1 +1 @@\n-a\n+b"];
+        yield 'a header without its a/ and b/ sides' => ["--- x.php\n+++ x.php\n@@ -1 +1 @@\n-a\n+b"];
+        yield 'a hunk longer than its header says' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1 @@\n-a\n+b\n+c\n d"];
         yield 'no patch at all' => ['NO_FIX: the code is fine'];
         yield 'prose inside a hunk' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\nThen change b:\n-b\n+c"];
     }
@@ -91,6 +93,8 @@ final class UnifiedDiffTest extends TestCase
                 new FilePatch('y.php', [new DiffHunk(4, ['f'], ['g'])]),
             ],
         ];
+        yield 'a dashed line of prose before the patch' => ["--- see below\n--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
+        yield 'a second file after a last line with no newline' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\\ No newline at end of file\n--- a/y.php\n+++ b/y.php\n@@ -1 +1 @@\n-c\n+d", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])]), new FilePatch('y.php', [new DiffHunk(1, ['c'], ['d'])])]];
         yield 'lines added after line 2' => ["--- a/x.php\n+++ b/x.php\n@@ -2,0 +3,2 @@\n+a\n+b", [new FilePatch('x.php', [new DiffHunk(3, [], ['a', 'b'])])]];
         yield 'an empty context line written without its space' => ["--- a/x.php\n+++ b/x.php\n@@ -1,3 +1,3 @@\n-a\n+b\n\n c", [new FilePatch('x.php', [new DiffHunk(1, ['a', '', 'c'], ['b', '', 'c'])])]];
         yield 'a last line with no newline' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+b\n\\ No newline at end of file", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];

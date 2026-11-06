@@ -18,7 +18,7 @@ use function Symfony\Component\String\u;
 /**
  * A unified-diff patch as a model writes it: the `--- a/` and `+++ b/` header
  * of each file, then its `@@` hunks, with any prose or code fence around them
- * left out. A patch that does not read as one — a hunk shorter or longer than
+ * left out, and any byte that is not UTF-8 replaced. A patch that does not read as one — a hunk shorter or longer than
  * its header says, a file it creates or deletes, a header with no hunk — is
  * none, as applying any part of it could leave the file half fixed.
  *
@@ -41,7 +41,7 @@ final readonly class UnifiedDiff
 
     public static function parse(string $patch): ?self
     {
-        $lines = explode("\n", u($patch)->replace("\r\n", "\n")->toString());
+        $lines = explode("\n", u(mb_scrub($patch, 'UTF-8'))->replace("\r\n", "\n")->toString());
 
         $filePatches = [];
         $index = 0;
@@ -134,7 +134,7 @@ final readonly class UnifiedDiff
         [$oldLines, $newLines, $index] = $hunkBody;
         $oldStart = (int) $counts[1] + (0 === $oldCount ? 1 : 0);
 
-        return [new DiffHunk($oldStart, $oldLines, $newLines), self::afterNoNewlineMarker($lines, $index)];
+        return [new DiffHunk($oldStart, $oldLines, $newLines), $index];
     }
 
     private static function lineCount(string $count): int
@@ -184,13 +184,5 @@ final readonly class UnifiedDiff
         $marker = null === $line ? null : ($line[0] ?? ' ');
 
         return \in_array($marker, ['-', '+', ' ', self::NO_NEWLINE_MARKER], true) ? $marker : null;
-    }
-
-    /**
-     * @param list<string> $lines
-     */
-    private static function afterNoNewlineMarker(array $lines, int $index): int
-    {
-        return str_starts_with($lines[$index] ?? '', self::NO_NEWLINE_MARKER) ? $index + 1 : $index;
     }
 }
