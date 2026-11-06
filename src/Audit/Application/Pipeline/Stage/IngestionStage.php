@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScanSkippedFiles;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScrubbedSecretFindings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
@@ -66,6 +67,7 @@ final readonly class IngestionStage implements StageInterface
         $auditContext->setFilesDiscovered(\count($scannedFiles));
         $auditContext->setMappingFiles($scopedScanResult->mappingFiles);
         $this->recordWithheldFiles($files, $auditContext);
+        $this->reportScrubbedSecrets($files, $auditContext);
         $this->recordSkippedFiles($projectFileScan->skippedFiles, $auditContext, $changed);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
@@ -76,6 +78,25 @@ final readonly class IngestionStage implements StageInterface
             'files' => \count($files),
             'lines' => $auditContext->getMeta('ingestion.total_lines'),
         ]);
+    }
+
+    /**
+     * Every credential the scrubber redacted is a real secret committed in the
+     * file, so it is reported as a finding without waiting for the model.
+     *
+     * @param list<ProjectFile> $files
+     */
+    private function reportScrubbedSecrets(array $files, AuditContext $auditContext): void
+    {
+        if ($auditContext->isCostEstimate()) {
+            return;
+        }
+
+        foreach ($files as $file) {
+            foreach (ScrubbedSecretFindings::in($file) as $finding) {
+                $auditContext->addVulnerability($finding);
+            }
+        }
     }
 
     /**
