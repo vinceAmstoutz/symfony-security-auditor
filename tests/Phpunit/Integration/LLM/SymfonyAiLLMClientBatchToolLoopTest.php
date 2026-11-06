@@ -66,6 +66,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResili
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\CallbackTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
@@ -80,6 +81,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
 
 final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
@@ -1102,7 +1105,7 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
         );
 
         $this->expectException(TransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
+        $this->expectExceptionMessageContaining('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
 
         $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's', 'user' => 'u', 'tools' => new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger())],

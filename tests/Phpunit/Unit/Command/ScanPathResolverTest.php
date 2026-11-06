@@ -19,9 +19,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ScanPathOutsideProjectException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ScanPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class ScanPathResolverTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $root;
 
     /**
@@ -98,7 +101,7 @@ final class ScanPathResolverTest extends TestCase
     public function test_an_absolute_scan_path_outside_the_project_is_refused_naming_both(array $scanPaths, string $projectPath): void
     {
         $this->expectException(ScanPathOutsideProjectException::class);
-        $this->expectExceptionMessage(\sprintf('The --path "%s" lies outside the project "%s"', $scanPaths[0], $projectPath));
+        $this->expectExceptionMessageContaining(\sprintf('The --path "%s" lies outside the project "%s"', $scanPaths[0], $projectPath));
 
         ScanPathResolver::resolve($scanPaths, $projectPath);
     }
@@ -120,7 +123,7 @@ final class ScanPathResolverTest extends TestCase
     public function test_the_refusal_says_to_give_the_path_relative_to_the_project_root(): void
     {
         $this->expectException(ScanPathOutsideProjectException::class);
-        $this->expectExceptionMessage('relative to the project root, for example --path src/Controller');
+        $this->expectExceptionMessageContaining('relative to the project root, for example --path src/Controller');
 
         ScanPathResolver::resolve(['/somewhere/else'], '/home/vince/demo');
     }
@@ -157,7 +160,7 @@ final class ScanPathResolverTest extends TestCase
     public function test_an_absolute_scan_path_whose_real_path_lies_outside_the_project_is_refused(string $scanPath): void
     {
         $this->expectException(ScanPathOutsideProjectException::class);
-        $this->expectExceptionMessage(\sprintf('The --path "%s" lies outside the project "%s"', $this->root.$scanPath, $this->root.'/real/project'));
+        $this->expectExceptionMessageContaining(\sprintf('The --path "%s" lies outside the project "%s"', $this->root.$scanPath, $this->root.'/real/project'));
 
         ScanPathResolver::resolve([$this->root.$scanPath], $this->root.'/real/project');
     }

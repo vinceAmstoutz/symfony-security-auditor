@@ -195,6 +195,7 @@ Apply when: same arrange/act/assert shape, only literal values vary. **Do not** 
 ## Quality Gates
 
 - PHPUnit config enforces `failOnDeprecation`, `failOnNotice`, `failOnWarning` — do not suppress these.
+- Expect an exception message with `expectExceptionMessageContaining()` from `Tests\Fixture\ExpectsExceptionMessageTrait`, never `expectExceptionMessage()`: PHPUnit 13 deprecates it, and its replacement does not exist in the PHPUnit 12 the PHP 8.3 leg runs.
 - **100% mutation score** required (Infection). Avoid trivially-killed mutants: assert on **return values**, not just _"no exception thrown"_.
 - Never silence Infection / PHPStan / CS Fixer / Rector via annotations or config opt-outs — see `CLAUDE.md` → _Never Silence Quality Gates_.
 - Symplify PHPUnit rules enforce test hygiene at PHPStan level: data providers must be `public static` (`PublicStaticDataProviderRule`), assertions go through `$this->`/`self::` (`NoAssertFuncCallInTestsRule`, no global `assert()`), and repeated consecutive identical mock expectations (`NoDoubleConsecutiveTestMockRule`) signal a missing `#[DataProvider]`.

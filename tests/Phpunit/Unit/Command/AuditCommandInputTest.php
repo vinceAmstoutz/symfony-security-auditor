@@ -21,9 +21,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class AuditCommandInputTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     public function test_is_machine_readable_to_stdout_true_when_no_output_file_and_json_format(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -196,7 +199,7 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput = new AuditCommandInput();
 
         $this->expectException(WorkingDirectoryUnavailableException::class);
-        $this->expectExceptionMessage('Failed to determine current working directory');
+        $this->expectExceptionMessageContaining('Failed to determine current working directory');
 
         $auditCommandInput->resolvedProjectPath(static fn (): false => false);
     }
@@ -490,7 +493,7 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->dryRun = true;
 
         $this->expectException(ConflictingCommandOptionsException::class);
-        $this->expectExceptionMessage('--generate-baseline requires a real audit run and cannot be combined with --dry-run, which exits before the LLM is ever invoked.');
+        $this->expectExceptionMessageContaining('--generate-baseline requires a real audit run and cannot be combined with --dry-run, which exits before the LLM is ever invoked.');
 
         $auditCommandInput->assertNoConflictingOptions();
     }
@@ -505,7 +508,7 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->showScanned = true;
 
         $this->expectException(ConflictingCommandOptionsException::class);
-        $this->expectExceptionMessage('--generate-baseline requires a real audit run and cannot be combined with --show-scanned, which exits before the LLM is ever invoked.');
+        $this->expectExceptionMessageContaining('--generate-baseline requires a real audit run and cannot be combined with --show-scanned, which exits before the LLM is ever invoked.');
 
         $auditCommandInput->assertNoConflictingOptions();
     }
@@ -648,7 +651,7 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->noOutput = true;
 
         $this->expectException(ConflictingCommandOptionsException::class);
-        $this->expectExceptionMessage('--output and --no-output cannot be combined: one writes the report to a file, the other prints it.');
+        $this->expectExceptionMessageContaining('--output and --no-output cannot be combined: one writes the report to a file, the other prints it.');
 
         $auditCommandInput->assertNoConflictingOptions();
     }

@@ -24,9 +24,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class ReportDifferTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -388,7 +391,7 @@ final class ReportDifferTest extends TestCase
         $current = $this->writeReport('current.json', []);
 
         $this->expectException(MalformedReportFileException::class);
-        $this->expectExceptionMessage('has a vulnerability entry at index 0 that is not a JSON object');
+        $this->expectExceptionMessageContaining('has a vulnerability entry at index 0 that is not a JSON object');
 
         (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }
@@ -407,7 +410,7 @@ final class ReportDifferTest extends TestCase
         $current = $this->writeReport('current.json', []);
 
         $this->expectException(MalformedReportFileException::class);
-        $this->expectExceptionMessage('has a vulnerability entry at index 1 that is not a JSON object');
+        $this->expectExceptionMessageContaining('has a vulnerability entry at index 1 that is not a JSON object');
 
         (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }

@@ -19,9 +19,12 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Tag\TaggedValue;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RepositoryYamlReader;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class RepositoryYamlReaderTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @param array<mixed> $expected
      *
@@ -54,7 +57,7 @@ final class RepositoryYamlReaderTest extends TestCase
     public function test_it_refuses_a_document_nested_deeper_than_thirty_two_levels(): void
     {
         $this->expectException(UnreadableYamlException::class);
-        $this->expectExceptionMessage('it is nested more than the 32 levels deep the audit reads');
+        $this->expectExceptionMessageContaining('it is nested more than the 32 levels deep the audit reads');
 
         (new RepositoryYamlReader())->read("# a header\n\n".self::nestedDocument(33, "z: 1\n"));
     }
@@ -74,7 +77,7 @@ final class RepositoryYamlReaderTest extends TestCase
         }
 
         $this->expectException(UnreadableYamlException::class);
-        $this->expectExceptionMessage('it is nested more than the 32 levels deep the audit reads');
+        $this->expectExceptionMessageContaining('it is nested more than the 32 levels deep the audit reads');
 
         (new RepositoryYamlReader())->read($document.str_repeat(' ', 32)."leaf: 1\n");
     }
@@ -95,7 +98,7 @@ final class RepositoryYamlReaderTest extends TestCase
     public function test_it_refuses_a_document_larger_than_256_kib(): void
     {
         $this->expectException(UnreadableYamlException::class);
-        $this->expectExceptionMessage('it holds 262145 bytes, more than the 262144 the audit reads');
+        $this->expectExceptionMessageContaining('it holds 262145 bytes, more than the 262144 the audit reads');
 
         (new RepositoryYamlReader())->read("a: 1\n#".str_repeat('x', 262_144 - 6)."\n");
     }

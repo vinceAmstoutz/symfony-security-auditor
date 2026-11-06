@@ -20,9 +20,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RepositoryYamlReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\YamlImportResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class YamlImportResolverTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string IMPORTING_FILE = 'config/packages/security.yaml';
 
     /**
@@ -92,7 +95,7 @@ final class YamlImportResolverTest extends TestCase
         [$imports, $candidates] = $this->importsOf(33);
 
         $this->expectException(UnreadableYamlException::class);
-        $this->expectExceptionMessage('it imports 33 resources, more than the 32 the audit follows');
+        $this->expectExceptionMessageContaining('it imports 33 resources, more than the 32 the audit follows');
 
         $this->importedPaths($imports, $candidates);
     }

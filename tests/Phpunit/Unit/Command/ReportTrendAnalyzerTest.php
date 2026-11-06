@@ -27,9 +27,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoaderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPoint;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class ReportTrendAnalyzerTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -184,7 +187,7 @@ final class ReportTrendAnalyzerTest extends TestCase
     public function test_fewer_than_two_reports_are_rejected(): void
     {
         $this->expectException(InsufficientTrendReportsException::class);
-        $this->expectExceptionMessage('at least two report files ordered oldest to newest, got 1');
+        $this->expectExceptionMessageContaining('at least two report files ordered oldest to newest, got 1');
 
         $this->reportTrendAnalyzer->analyze([$this->writeReport('only.json', [])]);
     }

@@ -17,9 +17,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class SymfonyProcessComposerAuditRunnerTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws AdvisorySourceUnavailableException
      */
@@ -45,7 +48,7 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         );
 
         $this->expectException(AdvisorySourceUnavailableException::class);
-        $this->expectExceptionMessage('Composer audit failed for project "/some/path"');
+        $this->expectExceptionMessageContaining('Composer audit failed for project "/some/path"');
 
         $symfonyProcessComposerAuditRunner->run('/some/path');
     }
@@ -88,7 +91,7 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         );
 
         $this->expectException(AdvisorySourceUnavailableException::class);
-        $this->expectExceptionMessage('composer binary not found on PATH; cannot run advisory audit');
+        $this->expectExceptionMessageContaining('composer binary not found on PATH; cannot run advisory audit');
 
         $symfonyProcessComposerAuditRunner->run('/some/path');
     }
@@ -145,7 +148,7 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         );
 
         $this->expectException(AdvisorySourceUnavailableException::class);
-        $this->expectExceptionMessage('The timeout value must be a valid positive integer or float number.');
+        $this->expectExceptionMessageContaining('The timeout value must be a valid positive integer or float number.');
 
         $symfonyProcessComposerAuditRunner->run('/app');
     }
@@ -161,7 +164,7 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         );
 
         $this->expectException(AdvisorySourceUnavailableException::class);
-        $this->expectExceptionMessage('composer audit timed out after 0.1 seconds');
+        $this->expectExceptionMessageContaining('composer audit timed out after 0.1 seconds');
 
         $symfonyProcessComposerAuditRunner->run('/app');
     }

@@ -45,10 +45,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputForm
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
 
 final class ReportWriterTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private ReportWriter $reportWriter;
 
     private Filesystem $filesystem;
@@ -333,7 +336,7 @@ final class ReportWriterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
 
         $this->expectException(UnsupportedOutputFormatException::class);
-        $this->expectExceptionMessage('No report renderer is registered for output format "sarif".');
+        $this->expectExceptionMessageContaining('No report renderer is registered for output format "sarif".');
 
         $reportWriter->write($this->makeReport(), OutputFormat::Sarif, null, $symfonyStyle);
     }
@@ -626,7 +629,7 @@ final class ReportWriterTest extends TestCase
         $this->filesystem->dumpFile($blockingFile, 'x');
 
         $this->expectException(ReportWriteFailedException::class);
-        $this->expectExceptionMessage('before the audit spends anything');
+        $this->expectExceptionMessageContaining('before the audit spends anything');
 
         $this->reportWriter->assertWritable($blockingFile.'/report.json', $this->tmpDir);
     }
@@ -639,7 +642,7 @@ final class ReportWriterTest extends TestCase
     public function test_assert_writable_refuses_a_path_that_names_a_directory(string $separator): void
     {
         $this->expectException(ReportWriteFailedException::class);
-        $this->expectExceptionMessage('names a directory');
+        $this->expectExceptionMessageContaining('names a directory');
 
         $this->reportWriter->assertWritable($this->tmpDir.'/reports'.$separator, $this->tmpDir);
     }
@@ -676,7 +679,7 @@ final class ReportWriterTest extends TestCase
         posix_mkfifo($pipe, 0o600);
 
         $this->expectException(ReportWriteFailedException::class);
-        $this->expectExceptionMessage('before the audit spends anything');
+        $this->expectExceptionMessageContaining('before the audit spends anything');
 
         $this->reportWriter->assertWritable($pipe, $this->tmpDir);
     }

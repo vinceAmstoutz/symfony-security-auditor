@@ -16,11 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Tooling\Eval;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\Exception\InvalidGroundTruthManifestException;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\GroundTruthManifest;
 
 final class GroundTruthManifestTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -70,7 +73,7 @@ final class GroundTruthManifestTest extends TestCase
     public function test_a_missing_file_is_rejected(): void
     {
         $this->expectException(InvalidGroundTruthManifestException::class);
-        $this->expectExceptionMessage('does not exist or is not readable');
+        $this->expectExceptionMessageContaining('does not exist or is not readable');
 
         GroundTruthManifest::fromFile($this->tmpDir.'/absent.json');
     }
@@ -81,7 +84,7 @@ final class GroundTruthManifestTest extends TestCase
     public function test_invalid_json_is_rejected(): void
     {
         $this->expectException(InvalidGroundTruthManifestException::class);
-        $this->expectExceptionMessage('is not valid JSON');
+        $this->expectExceptionMessageContaining('is not valid JSON');
 
         GroundTruthManifest::fromFile($this->write('{not json'));
     }
@@ -92,7 +95,7 @@ final class GroundTruthManifestTest extends TestCase
     public function test_a_document_without_a_findings_array_is_rejected(): void
     {
         $this->expectException(InvalidGroundTruthManifestException::class);
-        $this->expectExceptionMessage('must be a JSON object with a "findings" array');
+        $this->expectExceptionMessageContaining('must be a JSON object with a "findings" array');
 
         GroundTruthManifest::fromFile($this->write('{"version":1}'));
     }
@@ -103,7 +106,7 @@ final class GroundTruthManifestTest extends TestCase
     public function test_a_finding_missing_its_type_is_rejected(): void
     {
         $this->expectException(InvalidGroundTruthManifestException::class);
-        $this->expectExceptionMessage('index 0');
+        $this->expectExceptionMessageContaining('index 0');
 
         GroundTruthManifest::fromFile($this->write('{"findings":[{"file":"src/A.php"}]}'));
     }
@@ -124,7 +127,7 @@ final class GroundTruthManifestTest extends TestCase
     public function test_the_position_of_the_first_invalid_finding_is_reported(): void
     {
         $this->expectException(InvalidGroundTruthManifestException::class);
-        $this->expectExceptionMessage('index 1');
+        $this->expectExceptionMessageContaining('index 1');
 
         GroundTruthManifest::fromFile($this->write('{"findings":[{"file":"src/A.php","type":"sql_injection"},"not an object"]}'));
     }

@@ -31,9 +31,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExten
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class StandaloneAuditEndToEndTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $configHome;
@@ -190,7 +193,7 @@ final class StandaloneAuditEndToEndTest extends TestCase
     public function test_a_real_run_still_refuses_to_start_without_a_provider_credential(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('PROVIDER_API_KEY');
+        $this->expectExceptionMessageContaining('PROVIDER_API_KEY');
 
         $this->runWithCredentialFromEnvironment(\sprintf('%s %s', AuditCommand::NAME, $this->projectDir));
     }
@@ -212,7 +215,7 @@ final class StandaloneAuditEndToEndTest extends TestCase
         $missingCredentialFile = \sprintf('%s/absent-api-key', $this->configHome);
 
         $this->expectException(UnreadableCredentialFileException::class);
-        $this->expectExceptionMessage('through "PROVIDER_API_KEY_FILE"');
+        $this->expectExceptionMessageContaining('through "PROVIDER_API_KEY_FILE"');
 
         $this->runWithCredentialFromFile(\sprintf('%s %s', AuditCommand::NAME, $this->projectDir), $missingCredentialFile);
     }

@@ -70,6 +70,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimitBacko
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\CallbackTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
@@ -84,6 +85,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
 
 final class SymfonyAiLLMClientTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException
@@ -573,7 +576,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
 
         $this->expectException(MissingAiPlatformException::class);
-        $this->expectExceptionMessage('No AI platform is configured');
+        $this->expectExceptionMessageContaining('No AI platform is configured');
 
         $symfonyAiLLMClient->complete('sys', 'usr');
     }
@@ -595,7 +598,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
 
         $this->expectException(MissingAiPlatformException::class);
-        $this->expectExceptionMessage('config/packages/ai.yaml');
+        $this->expectExceptionMessageContaining('config/packages/ai.yaml');
 
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
     }
@@ -614,7 +617,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
 
         $this->expectException(MissingAiPlatformException::class);
-        $this->expectExceptionMessage('No AI platform is configured');
+        $this->expectExceptionMessageContaining('No AI platform is configured');
 
         $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
     }
@@ -2013,7 +2016,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(BudgetExceededException::class);
-        $this->expectExceptionMessage('token budget exceeded (200 / 100 tokens)');
+        $this->expectExceptionMessageContaining('token budget exceeded (200 / 100 tokens)');
 
         $symfonyAiLLMClient->completeWithTools(
             'sys',
@@ -2329,7 +2332,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(TransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed after 3 attempts');
+        $this->expectExceptionMessageContaining('LLM call failed after 3 attempts');
 
         try {
             $symfonyAiLLMClient->complete('sys', 'usr');
@@ -2356,7 +2359,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(TransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
+        $this->expectExceptionMessageContaining('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
 
         $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
     }
@@ -2465,7 +2468,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(NonTransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed with non-transient error');
+        $this->expectExceptionMessageContaining('LLM call failed with non-transient error');
 
         try {
             $symfonyAiLLMClient->complete('sys', 'usr');

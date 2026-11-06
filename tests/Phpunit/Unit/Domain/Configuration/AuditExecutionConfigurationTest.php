@@ -18,9 +18,12 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class AuditExecutionConfigurationTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws InvalidAuditExecutionConfigurationException
      */
@@ -60,7 +63,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_nan_min_confidence(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
-        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got NAN');
+        $this->expectExceptionMessageContaining('minConfidence must be finite and within 0.0-1.0, got NAN');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,
@@ -82,7 +85,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_positive_infinite_min_confidence(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
-        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got INF');
+        $this->expectExceptionMessageContaining('minConfidence must be finite and within 0.0-1.0, got INF');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,
@@ -99,7 +102,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_negative_infinite_min_confidence(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
-        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got -INF');
+        $this->expectExceptionMessageContaining('minConfidence must be finite and within 0.0-1.0, got -INF');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,
@@ -144,7 +147,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_min_confidence_above_one(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
-        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got 1.5');
+        $this->expectExceptionMessageContaining('minConfidence must be finite and within 0.0-1.0, got 1.5');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,
@@ -161,7 +164,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_negative_min_confidence(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
-        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got -0.1');
+        $this->expectExceptionMessageContaining('minConfidence must be finite and within 0.0-1.0, got -0.1');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,

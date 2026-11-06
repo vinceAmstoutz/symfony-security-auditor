@@ -24,10 +24,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
 
 final class BaselineTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -247,7 +250,7 @@ final class BaselineTest extends TestCase
         $this->filesystem->dumpFile($path, '['.str_repeat(' ', 33_554_431).']');
 
         $this->expectException(MalformedBaselineFileException::class);
-        $this->expectExceptionMessage(\sprintf('Baseline file "%1$s" could not be read or written: File "%1$s" holds more than 33554432 bytes, so it was not read.', $path));
+        $this->expectExceptionMessageContaining(\sprintf('Baseline file "%1$s" could not be read or written: File "%1$s" holds more than 33554432 bytes, so it was not read.', $path));
 
         (new Baseline($this->filesystem))->load($path);
     }
@@ -675,7 +678,7 @@ final class BaselineTest extends TestCase
     public function test_assert_writable_refuses_a_path_that_names_a_directory(string $separator): void
     {
         $this->expectException(BaselineWriteFailedException::class);
-        $this->expectExceptionMessage('names a directory');
+        $this->expectExceptionMessageContaining('names a directory');
 
         (new Baseline($this->filesystem))->assertWritable($this->tmpDir.'/baselines'.$separator, $this->tmpDir);
     }
@@ -711,7 +714,7 @@ final class BaselineTest extends TestCase
         $this->filesystem->dumpFile($this->tmpDir.'/blocking', 'x');
 
         $this->expectException(BaselineWriteFailedException::class);
-        $this->expectExceptionMessage('its directory could not be created');
+        $this->expectExceptionMessageContaining('its directory could not be created');
 
         (new Baseline($this->filesystem))->assertWritable($this->tmpDir.'/blocking/baseline.json', $this->tmpDir);
     }
@@ -726,7 +729,7 @@ final class BaselineTest extends TestCase
         posix_mkfifo($pipe, 0o600);
 
         $this->expectException(BaselineWriteFailedException::class);
-        $this->expectExceptionMessage('choose a --generate-baseline path that is a writable file');
+        $this->expectExceptionMessageContaining('choose a --generate-baseline path that is a writable file');
 
         (new Baseline($this->filesystem))->assertWritable($pipe, $this->tmpDir);
     }
@@ -764,7 +767,7 @@ final class BaselineTest extends TestCase
     public function test_assert_writable_refuses_a_directory_as_the_baseline_file(): void
     {
         $this->expectException(BaselineWriteFailedException::class);
-        $this->expectExceptionMessage('choose a --generate-baseline path that is a writable file');
+        $this->expectExceptionMessageContaining('choose a --generate-baseline path that is a writable file');
 
         (new Baseline($this->filesystem))->assertWritable($this->tmpDir, $this->tmpDir);
     }
