@@ -671,6 +671,6 @@ Run `bin/castor lint:fix` to apply the changes. Both tools enforce the project s
 
 ### Tests pass locally, fail in CI
 
-- Different PHP version — CI matrix runs 8.3, 8.4, 8.5; pin locally with Docker.
+- Different PHP version — CI matrix runs 8.3, 8.4, 8.5, 8.6; pin locally with Docker.
 - Filesystem case sensitivity — Linux CI is case-sensitive; macOS is not.
 - Random test order — Infection rewrites `phpunit.dist.xml` to force `executionOrder="defects,random"` for its own runs; reproduce locally with `--order-by=defects,random --random-order-seed=<seed>`.

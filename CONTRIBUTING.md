@@ -293,7 +293,7 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
      sh .github/scripts/check-pull-request.sh
    ```
 
-The CI pipeline runs eight jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife) → **zizmor** (GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.1, 8.1 on PHP 8.4+ only, then Infection 100% MSI) → **Compatibility** → **API compatibility** (see [Compatibility Checks](#compatibility-checks)). All eight must pass before merging.
+The CI pipeline runs eight jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife) → **zizmor** (GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5/8.6 × Symfony 7.4/8.1, 8.1 on PHP 8.4+ only, then Infection 100% MSI) → **Compatibility** → **API compatibility** (see [Compatibility Checks](#compatibility-checks)). All eight must pass before merging.
 
 Details: [`docs/ci.md`](docs/ci.md).
 

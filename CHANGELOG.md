@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
+### Core 🧱
+
+- The test suite also runs on PHP 8.6, where a failure does not block a merge until PHP 8.6 is stable
+
 ## [1.22.1] — 2026-10-29 — Waypoint
 
 ### Bugfixes 🐛

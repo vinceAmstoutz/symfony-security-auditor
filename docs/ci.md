@@ -234,7 +234,7 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3' # Or 8.4 or 8.5
+          php-version: '8.3' # Or 8.4, 8.5 or 8.6
           coverage: none
 
       - name: Install dependencies
@@ -278,7 +278,7 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3' # Or 8.4 or 8.5
+          php-version: '8.3' # Or 8.4, 8.5 or 8.6
           coverage: none
 
       - name: Install dependencies
@@ -320,7 +320,7 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3' # Or 8.4 or 8.5
+          php-version: '8.3' # Or 8.4, 8.5 or 8.6
           coverage: none
 
       - name: Install dependencies
@@ -438,7 +438,7 @@ GitLab ingests the report only when its job succeeds, and the audit exits non-ze
 # .gitlab-ci.yml (add to existing file or create standalone)
 
 symfony-security-audit:
-  image: php:8.3-cli # Or 8.4 or 8.5
+  image: php:8.3-cli # Or 8.4, 8.5 or 8.6
   stage: test
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -484,7 +484,7 @@ Each finding appears as a failed test case named `<title> (<file>:<line>)`, grou
 
 ```yaml
 symfony-security-audit:
-  image: php:8.3-cli # Or 8.4 or 8.5
+  image: php:8.3-cli # Or 8.4, 8.5 or 8.6
   stage: test
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
