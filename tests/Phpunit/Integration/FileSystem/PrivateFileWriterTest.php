@@ -33,7 +33,7 @@ final class PrivateFileWriterTest extends TestCase
         self::assertSame('{"a":1}', file_get_contents($this->root.'/entry.json'));
     }
 
-    #[MaximumDuration(4000)]
+    #[MaximumDuration(2500)]
     public function test_the_file_it_creates_is_owner_only(): void
     {
         PrivateFileWriter::write(new Filesystem(), $this->root.'/entry.json', 'x');
