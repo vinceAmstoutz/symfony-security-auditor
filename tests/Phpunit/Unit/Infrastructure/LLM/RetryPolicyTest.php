@@ -20,9 +20,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedul
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimitBackoff;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class RetryPolicyTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws InvalidRetryConfigurationException
      */
@@ -150,7 +153,7 @@ final class RetryPolicyTest extends TestCase
         $retryPolicy = new RetryPolicy();
 
         $this->expectException(InvalidRetryConfigurationException::class);
-        $this->expectExceptionMessage('attempt must be >= 1, got 0');
+        $this->expectExceptionMessageContaining('attempt must be >= 1, got 0');
 
         $retryPolicy->delayMs(0);
     }
@@ -163,7 +166,7 @@ final class RetryPolicyTest extends TestCase
         $retryPolicy = new RetryPolicy();
 
         $this->expectException(InvalidRetryConfigurationException::class);
-        $this->expectExceptionMessage('attempt must be >= 1, got 0');
+        $this->expectExceptionMessageContaining('attempt must be >= 1, got 0');
 
         $retryPolicy->rateLimitDelayMs(0);
     }
@@ -174,7 +177,7 @@ final class RetryPolicyTest extends TestCase
     public function test_invalid_max_attempts_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('maxAttempts must be >= 1, got 0');
+        $this->expectExceptionMessageContaining('maxAttempts must be >= 1, got 0');
 
         new BackoffSchedule(maxAttempts: 0);
     }
@@ -185,7 +188,7 @@ final class RetryPolicyTest extends TestCase
     public function test_negative_initial_delay_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('initialDelayMs must be >= 0, got -1');
+        $this->expectExceptionMessageContaining('initialDelayMs must be >= 0, got -1');
 
         new BackoffSchedule(initialDelayMs: -1);
     }
@@ -196,7 +199,7 @@ final class RetryPolicyTest extends TestCase
     public function test_backoff_multiplier_below_one_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('backoffMultiplier must be >= 1.0');
+        $this->expectExceptionMessageContaining('backoffMultiplier must be >= 1.0');
 
         new BackoffSchedule(backoffMultiplier: 0.5);
     }
@@ -207,7 +210,7 @@ final class RetryPolicyTest extends TestCase
     public function test_jitter_ratio_outside_zero_one_range_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('jitterRatio must be in [0.0, 1.0]');
+        $this->expectExceptionMessageContaining('jitterRatio must be in [0.0, 1.0]');
 
         new BackoffSchedule(jitterRatio: 1.5);
     }
@@ -218,7 +221,7 @@ final class RetryPolicyTest extends TestCase
     public function test_negative_jitter_ratio_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('jitterRatio must be in [0.0, 1.0]');
+        $this->expectExceptionMessageContaining('jitterRatio must be in [0.0, 1.0]');
 
         new BackoffSchedule(jitterRatio: -0.01);
     }
@@ -416,7 +419,7 @@ final class RetryPolicyTest extends TestCase
     public function test_negative_rate_limit_initial_delay_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('rateLimitInitialDelayMs must be >= 0, got -1');
+        $this->expectExceptionMessageContaining('rateLimitInitialDelayMs must be >= 0, got -1');
 
         new RateLimitBackoff(initialDelayMs: -1);
     }
@@ -508,7 +511,7 @@ final class RetryPolicyTest extends TestCase
     public function test_negative_rate_limit_max_delay_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('rateLimitMaxDelayMs must be >= 0, got -1');
+        $this->expectExceptionMessageContaining('rateLimitMaxDelayMs must be >= 0, got -1');
 
         new RateLimitBackoff(maxDelayMs: -1);
     }

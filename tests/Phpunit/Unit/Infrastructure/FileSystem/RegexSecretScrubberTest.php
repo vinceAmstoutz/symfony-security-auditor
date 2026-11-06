@@ -24,11 +24,14 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem\Fixture\RecordingPhpDataMaskFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem\Fixture\SodiumVaultKeyFile;
 
 final class RegexSecretScrubberTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     // Credential-shaped prefixes split as constants so GitHub's secret scanner does not flag the source.
     private const float LINEAR_TIME_CEILING_SECONDS = 3.0;
 
@@ -1156,7 +1159,7 @@ final class RegexSecretScrubberTest extends TestCase
     public function test_an_additional_pattern_that_is_no_text_throws_at_construction_naming_its_key(mixed $pattern, string $type): void
     {
         $this->expectException(SecretScrubberConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('The scan.secret_scrubbing.additional_patterns entry 1 is not a pattern: expected text, got %s.', $type));
+        $this->expectExceptionMessageContaining(\sprintf('The scan.secret_scrubbing.additional_patterns entry 1 is not a pattern: expected text, got %s.', $type));
 
         new RegexSecretScrubber(additionalPatterns: ['/INTERNAL-[A-Z0-9]{12}/', $pattern]);
     }
@@ -1867,7 +1870,7 @@ final class RegexSecretScrubberTest extends TestCase
     public function test_invalid_additional_pattern_throws_configuration_exception(): void
     {
         $this->expectException(SecretScrubberConfigurationException::class);
-        $this->expectExceptionMessage('Invalid secret-scrubbing pattern /[unterminated/');
+        $this->expectExceptionMessageContaining('Invalid secret-scrubbing pattern /[unterminated/');
 
         new RegexSecretScrubber(additionalPatterns: ['/[unterminated/']);
     }
@@ -1878,7 +1881,7 @@ final class RegexSecretScrubberTest extends TestCase
     public function test_empty_additional_pattern_throws_configuration_exception(): void
     {
         $this->expectException(SecretScrubberConfigurationException::class);
-        $this->expectExceptionMessage('empty pattern');
+        $this->expectExceptionMessageContaining('empty pattern');
 
         new RegexSecretScrubber(additionalPatterns: ['']);
     }

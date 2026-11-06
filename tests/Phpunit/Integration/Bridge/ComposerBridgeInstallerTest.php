@@ -24,9 +24,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPha
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class ComposerBridgeInstallerTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string AI_BUNDLE_CLASS = __DIR__.'/../../../../vendor/symfony/ai-bundle/src/AiBundle.php';
 
     private const string UNTOUCHED_SYMLINK_TARGET = '{"name":"not the manifest"}
@@ -174,7 +177,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $this->filesystem->mkdir($this->targetDirectory.'/composer.json');
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('File is a directory');
+        $this->expectExceptionMessageContaining('File is a directory');
 
         (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
     }
@@ -187,7 +190,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{not json');
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('composer.json');
+        $this->expectExceptionMessageContaining('composer.json');
 
         (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
     }
@@ -200,7 +203,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '"just a string"');
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('not a JSON object');
+        $this->expectExceptionMessageContaining('not a JSON object');
 
         (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
     }
@@ -305,7 +308,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process => new Process(['false']));
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('"symfony/ai-bedrock-platform", "symfony/ai-generic-platform"');
+        $this->expectExceptionMessageContaining('"symfony/ai-bedrock-platform", "symfony/ai-generic-platform"');
 
         $composerBridgeInstaller->install('bedrock', $this->targetDirectory, 'generic');
     }
@@ -366,7 +369,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => new Process(['false']));
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('symfony/ai-anthropic-platform');
+        $this->expectExceptionMessageContaining('symfony/ai-anthropic-platform');
 
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
@@ -379,7 +382,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => Process::fromShellCommandline('echo "The openssl extension is required"; exit 1'));
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('The openssl extension is required');
+        $this->expectExceptionMessageContaining('The openssl extension is required');
 
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
@@ -392,7 +395,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => Process::fromShellCommandline('echo "network unreachable" 1>&2; exit 1'));
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('network unreachable');
+        $this->expectExceptionMessageContaining('network unreachable');
 
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
@@ -406,7 +409,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, ?string $aiPlatformPin, string $targetDirectory): Process => new Process(['true'], $unlaunchableWorkingDirectory));
 
         $this->expectException(BridgeInstallationFailedException::class);
-        $this->expectExceptionMessage('composer');
+        $this->expectExceptionMessageContaining('composer');
 
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }

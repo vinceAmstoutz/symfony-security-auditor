@@ -51,11 +51,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\ReviewerAgentHarness;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class ReviewerAgentTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
 
     private string $tmpDir;
@@ -2197,7 +2200,7 @@ final class ReviewerAgentTest extends TestCase
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $this->expectException(LLMProviderException::class);
-        $this->expectExceptionMessage('platform unreachable');
+        $this->expectExceptionMessageContaining('platform unreachable');
 
         $reviewerAgent->review([$vulnerability], [], AuditContext::forProject($this->tmpDir));
     }
@@ -2253,7 +2256,7 @@ final class ReviewerAgentTest extends TestCase
         );
 
         $this->expectException(LLMProviderException::class);
-        $this->expectExceptionMessage('platform unreachable');
+        $this->expectExceptionMessageContaining('platform unreachable');
 
         $reviewerAgent->review($batch, [], AuditContext::forProject($this->tmpDir));
     }

@@ -42,6 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResili
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\MessageCollectingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedTokenUsagePlatform;
@@ -53,6 +54,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedT
  */
 final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string BUDGET_EXCEEDED_MESSAGE_FORMAT = 'Audit aborted: token budget exceeded (%d / 100 tokens)';
 
     private const string BATCH_WINDOW_DEBUG_MESSAGE = 'Budget exceeded while resolving a batch window; the remaining dispatched requests are still resolved so their spend is recorded';
@@ -173,7 +176,7 @@ final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
         );
 
         $this->expectException(BudgetExceededException::class);
-        $this->expectExceptionMessage(\sprintf(self::BUDGET_EXCEEDED_MESSAGE_FORMAT, 500));
+        $this->expectExceptionMessageContaining(\sprintf(self::BUDGET_EXCEEDED_MESSAGE_FORMAT, 500));
 
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 1);
     }

@@ -29,9 +29,12 @@ use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBa
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class EnvPlaceholderOnTypedSettingTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string PLACEHOLDER = '%env(SSA_VALUE)%';
 
     private const string ENTRY = 'entry';
@@ -49,7 +52,7 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
     public function test_a_placeholder_on_a_setting_read_while_the_container_is_built_is_refused_naming_the_key(array $config, string $path): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('"%s"', $path));
+        $this->expectExceptionMessageContaining(\sprintf('"%s"', $path));
 
         $this->mergeConfiguration($config);
     }

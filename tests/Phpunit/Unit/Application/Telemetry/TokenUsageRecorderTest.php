@@ -17,9 +17,12 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class TokenUsageRecorderTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws InvalidTokenUsageException
      */
@@ -162,7 +165,7 @@ final class TokenUsageRecorderTest extends TestCase
         $tokenUsageRecorder = new TokenUsageRecorder();
 
         $this->expectException(NegativeTokenCountException::class);
-        $this->expectExceptionMessage('Cache read tokens must be >= 0, got -2');
+        $this->expectExceptionMessageContaining('Cache read tokens must be >= 0, got -2');
 
         $tokenUsageRecorder->record(0, 0, -2, 0);
     }
@@ -175,7 +178,7 @@ final class TokenUsageRecorderTest extends TestCase
         $tokenUsageRecorder = new TokenUsageRecorder();
 
         $this->expectException(NegativeTokenCountException::class);
-        $this->expectExceptionMessage('Cache creation tokens must be >= 0, got -7');
+        $this->expectExceptionMessageContaining('Cache creation tokens must be >= 0, got -7');
 
         $tokenUsageRecorder->record(0, 0, 0, -7);
     }
@@ -188,7 +191,7 @@ final class TokenUsageRecorderTest extends TestCase
         $tokenUsageRecorder = new TokenUsageRecorder();
 
         $this->expectException(NegativeTokenCountException::class);
-        $this->expectExceptionMessage('Input tokens must be >= 0, got -1');
+        $this->expectExceptionMessageContaining('Input tokens must be >= 0, got -1');
 
         $tokenUsageRecorder->record(-1, 0);
     }
@@ -201,7 +204,7 @@ final class TokenUsageRecorderTest extends TestCase
         $tokenUsageRecorder = new TokenUsageRecorder();
 
         $this->expectException(NegativeTokenCountException::class);
-        $this->expectExceptionMessage('Output tokens must be >= 0, got -5');
+        $this->expectExceptionMessageContaining('Output tokens must be >= 0, got -5');
 
         $tokenUsageRecorder->record(0, -5);
     }
