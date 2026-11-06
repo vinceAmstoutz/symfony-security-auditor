@@ -47,6 +47,8 @@ final class SurfaceArchetypeTest extends TestCase
         yield 'a form binds request input' => [ProjectFileType::FORM, SurfaceArchetype::INPUT_BINDING];
         yield 'a Sonata admin binds request input too' => [ProjectFileType::SONATA_ADMIN, SurfaceArchetype::INPUT_BINDING];
 
+        yield 'a use case carries out one business operation for its caller' => [ProjectFileType::USE_CASE, SurfaceArchetype::APPLICATION_SERVICE];
+
         yield 'a messenger handler consumes a message' => [ProjectFileType::MESSENGER_HANDLER, SurfaceArchetype::ASYNC_HANDLER];
         yield 'a webhook consumer consumes a remote event' => [ProjectFileType::WEBHOOK_CONSUMER, SurfaceArchetype::ASYNC_HANDLER];
         yield 'a scheduler runs work out of band' => [ProjectFileType::SCHEDULER, SurfaceArchetype::ASYNC_HANDLER];

@@ -1247,6 +1247,21 @@ final class AttackerPromptBuilderTest extends TestCase
      * @throws InvalidProjectFileException
      */
     #[DataProvider('systemPromptModes')]
+    public function test_the_system_prompt_looks_for_checks_wherever_a_layered_architecture_puts_them(bool $useStructuredCollection, bool $emitAllSkills): void
+    {
+        $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
+            ->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]);
+
+        self::assertStringContainsString(
+            '- The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.',
+            $prompt,
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('systemPromptModes')]
     public function test_the_system_prompt_states_that_file_content_is_data_never_instructions(bool $useStructuredCollection, bool $emitAllSkills): void
     {
         $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
@@ -1355,7 +1370,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(25, substr_count($prompt, '<skills role="'));
+        self::assertSame(26, substr_count($prompt, '<skills role="'));
     }
 
     /**

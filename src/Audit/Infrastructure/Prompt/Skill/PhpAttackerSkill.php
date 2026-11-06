@@ -43,12 +43,14 @@ final readonly class PhpAttackerSkill implements AttackerSkillInterface
             - `Process` / `proc_open` / `shell_exec` constructed with user input concatenation; no `escapeshellarg`.
             - PSR-3 logger sinks receiving raw request payloads without redaction (log injection, log forging).
             - Cryptography: `md5`/`sha1` for security purposes, `random_int` vs `rand`/`mt_rand`, hardcoded IVs/keys.
+            - KeyManagement (Symfony ≥ 8.2): key material written in the code (an `InMemoryKeyLoader` fed a literal key outside tests), or `EnvelopeEncrypter::encrypt()` / a KMS `encrypt()` of a record with no `$aad` binding it to its owner or row id — a ciphertext moved to another row still decrypts there.
             - Raw header assembly via `Headers::addTextHeader()`/`addMailboxListHeader()`, or a custom `SerializerInterface`/transport bypassing `symfony/mime`, fed with unsanitized user input — header injection.
             - `CacheInterface::get($key, ...)` where `$key` is derived from request input without normalization — cache poisoning / cross-tenant leak.
             - `CacheItemPoolInterface` reads writing user-derived payloads then trusting them on subsequent reads (poisoned cache → privilege bypass).
             - `LockFactory::createLock()` missing on critical sections (refund, balance mutation, idempotent webhook) — race condition.
             - `HtmlSanitizerInterface::sanitize()` configured with `allowElement('script')` / `allowAttribute('on*')` — sanitizer disarmed.
             - `RateLimiterFactory::create($key)` with `$key` constant (`'global'`) instead of per-user/per-IP — limiter trivially exhausted.
+            - A Workflow transition named by request input and fired with `$workflow->apply()` while no guard (`guard:` expression, `#[AsGuardListener]`) restricts who may fire it — including workflows declared in a class with `#[AsWorkflow]` / `#[Transition]` (Symfony ≥ 8.2): a user approves or pays their own object.
             - PSR-16 / PSR-6 store handing back unserialized objects when the cache backend was filled with user input.
             Do NOT flag:
             - `md5`/`sha1` on non-security data (cache keys, ETags, file fingerprints) — those are integrity, not authentication.
