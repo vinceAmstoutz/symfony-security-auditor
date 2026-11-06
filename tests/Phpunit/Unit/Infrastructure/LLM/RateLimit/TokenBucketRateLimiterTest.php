@@ -25,9 +25,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RateLimitRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exception\InvalidRateLimiterConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class TokenBucketRateLimiterTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws RateLimitRequestTooLargeException
      * @throws InvalidRateLimiterConfigurationException
@@ -497,7 +500,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $sleeper = $this->createRecordingSleeper($mockClock);
 
         $this->expectException(InvalidRateLimiterConfigurationException::class);
-        $this->expectExceptionMessage('TokenBucketRateLimiter requires at least one rate-limit dimension; wire NullRateLimiter for fully-disabled config.');
+        $this->expectExceptionMessageContaining('TokenBucketRateLimiter requires at least one rate-limit dimension; wire NullRateLimiter for fully-disabled config.');
 
         new TokenBucketRateLimiter(
             rateLimitConfiguration: new RateLimitConfiguration(
@@ -531,7 +534,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         );
 
         $this->expectException(RateLimitRequestTooLargeException::class);
-        $this->expectExceptionMessage('estimated input tokens (200) exceed window capacity (100)');
+        $this->expectExceptionMessageContaining('estimated input tokens (200) exceed window capacity (100)');
 
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 200);
     }
@@ -557,7 +560,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         );
 
         $this->expectException(InvalidRateLimiterConfigurationException::class);
-        $this->expectExceptionMessage('estimatedInputTokens must be >= 0, got -1');
+        $this->expectExceptionMessageContaining('estimatedInputTokens must be >= 0, got -1');
 
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: -1);
     }

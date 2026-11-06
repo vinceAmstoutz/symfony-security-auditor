@@ -18,9 +18,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class XdgConfigPathResolverTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws UnresolvableConfigPathException
      */
@@ -226,7 +229,7 @@ final class XdgConfigPathResolverTest extends TestCase
     public function test_it_refuses_a_relative_application_home_override_rather_than_silently_ignoring_it(Closure $directory): void
     {
         $this->expectException(UnresolvableConfigPathException::class);
-        $this->expectExceptionMessage('SYMFONY_SECURITY_AUDITOR_HOME is set to "relative/dir", which is not an absolute path.');
+        $this->expectExceptionMessageContaining('SYMFONY_SECURITY_AUDITOR_HOME is set to "relative/dir", which is not an absolute path.');
 
         $directory(new XdgConfigPathResolver('/xdg/config', '/xdg/cache', '/home/dev', '/xdg/data', 'relative/dir'));
     }
@@ -307,7 +310,7 @@ final class XdgConfigPathResolverTest extends TestCase
     public function test_it_treats_a_relative_home_as_unset(): void
     {
         $this->expectException(UnresolvableConfigPathException::class);
-        $this->expectExceptionMessage('nor $HOME holds an absolute path');
+        $this->expectExceptionMessageContaining('nor $HOME holds an absolute path');
 
         (new XdgConfigPathResolver(null, null, 'home/dev'))->configFile();
     }

@@ -27,9 +27,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Mal
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\SarifFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class SarifImportingPreScannerTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -651,7 +654,7 @@ final class SarifImportingPreScannerTest extends TestCase
         $this->filesystem->symlink('/dev/zero', $sarifPath);
 
         $this->expectException(SarifFileNotReadableException::class);
-        $this->expectExceptionMessage(\sprintf('Configured SARIF import file "%1$s" could not be read: File "%1$s" holds more than 33554432 bytes, so it was not read.', $sarifPath));
+        $this->expectExceptionMessageContaining(\sprintf('Configured SARIF import file "%1$s" could not be read: File "%1$s" holds more than 33554432 bytes, so it was not read.', $sarifPath));
 
         $this->scanner(['psalm.sarif'], projectRoot: $this->tmpDir)->scan([$this->projectFile('src/A.php', $this->tmpDir)]);
     }
@@ -666,7 +669,7 @@ final class SarifImportingPreScannerTest extends TestCase
     public function test_a_missing_sarif_file_aborts_with_a_clear_error(): void
     {
         $this->expectException(SarifFileNotReadableException::class);
-        $this->expectExceptionMessage('does not exist or is not readable');
+        $this->expectExceptionMessageContaining('does not exist or is not readable');
 
         $this->scanner([$this->tmpDir.'/absent.sarif'])->scan([$this->projectFile('src/A.php')]);
     }
@@ -684,7 +687,7 @@ final class SarifImportingPreScannerTest extends TestCase
         $this->filesystem->dumpFile($path, '{not json');
 
         $this->expectException(MalformedSarifFileException::class);
-        $this->expectExceptionMessage('is not valid JSON');
+        $this->expectExceptionMessageContaining('is not valid JSON');
 
         $this->scanner([$path])->scan([$this->projectFile('src/A.php')]);
     }
@@ -703,7 +706,7 @@ final class SarifImportingPreScannerTest extends TestCase
         $this->filesystem->dumpFile($path, $json);
 
         $this->expectException(MalformedSarifFileException::class);
-        $this->expectExceptionMessage('must be a JSON object with a "runs" array');
+        $this->expectExceptionMessageContaining('must be a JSON object with a "runs" array');
 
         $this->scanner([$path])->scan([$this->projectFile('src/A.php')]);
     }
@@ -778,7 +781,7 @@ final class SarifImportingPreScannerTest extends TestCase
     public function test_an_unreadable_sarif_file_aborts_with_a_clear_error(): void
     {
         $this->expectException(SarifFileNotReadableException::class);
-        $this->expectExceptionMessage(\sprintf('Configured SARIF import file "%1$s" could not be read: File "%1$s" could not be read: file_get_contents(): Read of', $this->tmpDir));
+        $this->expectExceptionMessageContaining(\sprintf('Configured SARIF import file "%1$s" could not be read: File "%1$s" could not be read: file_get_contents(): Read of', $this->tmpDir));
 
         $this->scanner([$this->tmpDir])->scan([$this->projectFile('src/A.php')]);
     }

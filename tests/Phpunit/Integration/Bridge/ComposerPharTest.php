@@ -18,9 +18,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class ComposerPharTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string PAYLOAD = '<?php // composer';
 
     private const string FIXTURE_PHAR = __DIR__.'/../../../Fixture/Composer/composer.phar';
@@ -87,7 +90,7 @@ final class ComposerPharTest extends TestCase
      */
     public function test_it_reports_a_build_that_bundles_no_composer_as_a_failed_bridge_installation(): void
     {
-        $this->expectExceptionMessage('This build bundles no composer.phar 2.8.12');
+        $this->expectExceptionMessageContaining('This build bundles no composer.phar 2.8.12');
 
         (new ComposerPhar($this->directory.'/absent/composer.phar'))->in($this->directory.'/.composer');
     }
@@ -99,7 +102,7 @@ final class ComposerPharTest extends TestCase
     {
         $this->filesystem->dumpFile($this->directory.'/a-file', '');
 
-        $this->expectExceptionMessage(\sprintf('Could not copy composer.phar 2.8.12 to "%s/a-file/.composer"', $this->directory));
+        $this->expectExceptionMessageContaining(\sprintf('Could not copy composer.phar 2.8.12 to "%s/a-file/.composer"', $this->directory));
 
         (new ComposerPhar($this->bundledPhar, hash('sha256', self::PAYLOAD)))->in($this->directory.'/a-file/.composer');
     }

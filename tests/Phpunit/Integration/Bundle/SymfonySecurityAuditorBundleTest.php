@@ -124,12 +124,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportin
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\OptionsRecordingPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\PassThroughLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\UsageReportingLLMClient;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $tmpDir;
 
     private ?Kernel $bootedKernel = null;
@@ -609,7 +612,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public function test_bundle_refuses_a_model_key_set_to_a_number_with_a_configuration_error_naming_it(array $config, string $path): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "int".', $path));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "%s". Expected "string", but got "int".', $path));
 
         $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
     }
@@ -632,7 +635,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public function test_bundle_refuses_a_text_key_set_to_no_text_with_a_configuration_error_naming_it(array $config, string $path, string $type): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "%s".', $path, $type));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "%s". Expected "string", but got "%s".', $path, $type));
 
         $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
     }
