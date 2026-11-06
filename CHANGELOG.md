@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
+### New Features ✨
+
+- Every credential the secret scrubber redacts is reported as a validated `hardcoded_secret` finding on its line, without waiting for the model
+
 ## [1.22.1] — 2026-10-29 — Waypoint
 
 ### Bugfixes 🐛
