@@ -103,8 +103,8 @@ final readonly class GithubSuggestion
     private function fenceAround(string $code): string
     {
         preg_match_all('/`+/', $code, $backtickRuns);
-        $longestRun = max([0, ...array_map(\strlen(...), $backtickRuns[0])]);
+        $longestRun = max([self::MINIMUM_FENCE_LENGTH - 1, ...array_map(\strlen(...), $backtickRuns[0])]);
 
-        return str_repeat('`', max(self::MINIMUM_FENCE_LENGTH, $longestRun + 1));
+        return str_repeat('`', $longestRun + 1);
     }
 }
