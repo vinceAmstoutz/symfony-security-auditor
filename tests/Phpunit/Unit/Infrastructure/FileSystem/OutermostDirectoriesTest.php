@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSys
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\OutermostDirectories;
 
 final class OutermostDirectoriesTest extends TestCase
@@ -44,6 +45,6 @@ final class OutermostDirectoriesTest extends TestCase
         yield 'one directory spelled two ways' => [['/p/src/', '/p/./src', '/p/config/../src'], ['/p/src']];
         yield 'a directory spelled with dot segments inside another' => [['/p/src', '/p/config/../src/Controller'], ['/p/src']];
         yield 'the filesystem root holds every other' => [['/p/src', '/', '/q'], ['/']];
-        yield 'a folder ending with a colon spelled with two slashes' => [['/p/a:/Admin', '/p/a://'], ['/p/a://']];
+        yield 'a folder ending with a colon spelled with two slashes' => [['/p/a:/Admin', '/p/a://'], [Path::canonicalize('/p/a://')]];
     }
 }
