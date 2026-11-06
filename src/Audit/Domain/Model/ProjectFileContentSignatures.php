@@ -79,7 +79,8 @@ final readonly class ProjectFileContentSignatures
     public static function looksLikeForm(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
-            && str_contains($content, 'extends AbstractType');
+            && (str_contains($content, 'extends AbstractType')
+                || str_contains($content, '#[AsFormType'));
     }
 
     public static function looksLikeTwigExtension(string $path, string $content): bool
@@ -107,6 +108,15 @@ final readonly class ProjectFileContentSignatures
             && str_contains($content, '#[AsMessageHandler');
     }
 
+    public static function looksLikeUseCase(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'implements CommandHandler')
+                || str_contains($content, 'implements QueryHandler')
+                || str_contains($content, '#[CommandHandler')
+                || str_contains($content, '#[QueryHandler'));
+    }
+
     public static function looksLikeWebhookConsumer(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
@@ -118,7 +128,10 @@ final readonly class ProjectFileContentSignatures
     public static function looksLikeAuthenticator(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
-            && str_contains($content, 'implements AuthenticatorInterface');
+            && (str_contains($content, 'implements AuthenticatorInterface')
+                || str_contains($content, 'extends AbstractAuthenticator')
+                || str_contains($content, 'extends AbstractLoginFormAuthenticator')
+                || str_contains($content, 'implements AccessTokenHandlerInterface'));
     }
 
     public static function looksLikeEventSubscriber(string $path, string $content): bool

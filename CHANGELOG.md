@@ -12,10 +12,14 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The standalone binary runs on a ChatGPT subscription too: `init --provider=codex` sets it up, and each call goes through the installed Codex CLI, read-only and with its shell off ([#678](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/678))
 - A Symfony application runs the audit on a Claude or ChatGPT subscription too: `cli_agent.platform: claudecode` or `codex` sends the auditor's calls to the installed CLI and leaves the application's own `symfony/ai` platform as it is ([#679](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/679))
 - The standalone binary bundles Composer 2.8.12 and `init` installs the provider bridge with it, on the binary's own PHP, so it no longer needs PHP or Composer on your machine; `init` no longer checks for Composer before asking anything, and `doctor`'s Composer check now only concerns the `lookup_advisory` tool ([#682](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/682))
+- The attacker hunts the attack surfaces Symfony 8.2 adds: recoverable controller attributes whose failure an action ignores, `#[RateLimit]`/`#[Lock]` keys the client picks, multi-role `access_control` rules, `switch_user` without CSRF, foreign OIDC/OAuth2 tokens, `framework.test` outside tests, unsigned Messenger transports, `TrustStamp`, forged `AuthenticationMethodBadge`s, `|sign_url`, `|normalize` and `#[FormField]` on privileged properties
+- A `use_case` file type and attacker skill cover CQRS command and query handlers, use cases and interactors outside Messenger, and `audit.custom_skills` and `scan.custom_risk_patterns` accept it
+- Projects laid out in hexagonal, clean, CQRS or action-domain-responder style are mapped better: authenticators extending `AbstractAuthenticator`, access-token handlers, `#[AsFormType]` classes and `Action/` classes are recognized, an action is chunked with the command and handler it dispatches, and the attacker looks for checks in handlers, middleware and domain services before reporting one missing
 
 ### Core 🧱
 
 - A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
+- Cached attacker answers refresh once after upgrading
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 

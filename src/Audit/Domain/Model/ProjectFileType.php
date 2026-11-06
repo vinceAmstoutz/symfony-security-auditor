@@ -26,6 +26,7 @@ enum ProjectFileType: string
     case LDAP_SERVICE = 'ldap_service';
     case SONATA_ADMIN = 'sonata_admin';
     case EASYADMIN_CRUD = 'easyadmin_crud';
+    case USE_CASE = 'use_case';
     case MESSENGER_HANDLER = 'messenger_handler';
     case WEBHOOK_CONSUMER = 'webhook_consumer';
     case EVENT_SUBSCRIBER = 'event_subscriber';
@@ -55,6 +56,7 @@ enum ProjectFileType: string
             // per-action roles too; `INPUT_BINDING` is the closest fit short
             // of widening `HTTP_ENTRYPOINT`, which `isControllerLike()` locks.
             self::FORM, self::SONATA_ADMIN => SurfaceArchetype::INPUT_BINDING,
+            self::USE_CASE => SurfaceArchetype::APPLICATION_SERVICE,
             self::MESSENGER_HANDLER, self::WEBHOOK_CONSUMER, self::SCHEDULER => SurfaceArchetype::ASYNC_HANDLER,
             self::EVENT_SUBSCRIBER => SurfaceArchetype::EVENT_HOOK,
             self::NORMALIZER => SurfaceArchetype::SERIALIZATION,

@@ -29,6 +29,7 @@ final readonly class ProjectFileTypeClassifier
             self::isEntityPath($path), ProjectFileContentSignatures::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
             str_ends_with($path, 'Authenticator.php'), ProjectFileContentSignatures::looksLikeAuthenticator($path, $content) => ProjectFileType::AUTHENTICATOR,
             self::isMessengerHandlerPath($path), ProjectFileContentSignatures::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
+            self::isUseCasePath($path), ProjectFileContentSignatures::looksLikeUseCase($path, $content) => ProjectFileType::USE_CASE,
             self::isWebhookConsumerPath($path), ProjectFileContentSignatures::looksLikeWebhookConsumer($path, $content) => ProjectFileType::WEBHOOK_CONSUMER,
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php'), ProjectFileContentSignatures::looksLikeEventSubscriber($path, $content) => ProjectFileType::EVENT_SUBSCRIBER,
             str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php'), ProjectFileContentSignatures::looksLikeNormalizer($path, $content) => ProjectFileType::NORMALIZER,
@@ -38,6 +39,7 @@ final readonly class ProjectFileTypeClassifier
             ProjectFileContentSignatures::looksLikeTwigExtension($path, $content) => ProjectFileType::TWIG_EXTENSION,
             str_ends_with($path, '.twig') => ProjectFileType::TEMPLATE,
             str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') || str_ends_with($path, '.xml'), self::isDotenvPath($path) => ProjectFileType::CONFIG,
+            self::isActionPath($path) => ProjectFileType::CONTROLLER,
             str_ends_with($path, '.php') => ProjectFileType::PHP,
             default => ProjectFileType::OTHER,
         };
@@ -47,6 +49,12 @@ final readonly class ProjectFileTypeClassifier
     {
         return str_ends_with($path, 'Controller.php')
             || (str_contains($path, '/Controller/') && str_ends_with($path, '.php'));
+    }
+
+    private static function isActionPath(string $path): bool
+    {
+        return str_ends_with($path, 'Action.php')
+            && (str_contains($path, '/Action/') || str_contains($path, '/Actions/'));
     }
 
     private static function isEntityPath(string $path): bool
@@ -89,6 +97,14 @@ final readonly class ProjectFileTypeClassifier
     {
         return str_ends_with($path, 'MessageHandler.php')
             || (str_contains($path, '/MessageHandler/') && str_ends_with($path, '.php'));
+    }
+
+    private static function isUseCasePath(string $path): bool
+    {
+        return str_ends_with($path, 'CommandHandler.php')
+            || str_ends_with($path, 'QueryHandler.php')
+            || (str_ends_with($path, 'Handler.php') && (str_contains($path, '/Command/') || str_contains($path, '/Query/')))
+            || (str_contains($path, '/UseCase/') && str_ends_with($path, '.php'));
     }
 
     private static function isWebhookConsumerPath(string $path): bool

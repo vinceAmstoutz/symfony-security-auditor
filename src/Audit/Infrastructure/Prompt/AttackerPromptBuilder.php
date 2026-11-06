@@ -30,7 +30,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 19;
+    public const int PROMPT_VERSION = 20;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -365,6 +365,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
                 - Focus on issues traditional SAST tools miss: business logic, context-dependent access control
                 - Consider the FULL call chain, not just single function calls
                 - Cross-reference controllers, voters, services, and entities together
+                - The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.
                 - Record findings ONLY by calling the `record_vulnerability` tool — one call per finding. Do NOT emit prose, JSON, or any other listing of findings.
                 - When no vulnerabilities are found, call no tools and finish with an empty response. NEVER call `record_vulnerability` with a placeholder, label, environment name, or "no findings" payload.
 
@@ -382,6 +383,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Focus on issues traditional SAST tools miss: business logic, context-dependent access control
             - Consider the FULL call chain, not just single function calls
             - Cross-reference controllers, voters, services, and entities together
+            - The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.
             - Return ONLY the JSON array, no prose, no markdown fences
             - Every element of the JSON array MUST be a vulnerability object of the exact shape above. NEVER emit a bare string, number, boolean, or null as an array element. When no vulnerabilities are found, return `[]` — never `["no findings"]`, `["safe"]`, or any prose substitute.
             - The top-level value MUST be a JSON array (`[...]`). NEVER wrap findings in an object such as `{"vulnerabilities": [...]}`, `{"findings": [...]}`, `{"dev": [...], "test": [...]}`, or any environment-keyed map. If you want to indicate which environment a finding applies to, put that information inside the `description` or `attack_vector` field of the vulnerability object — never as a separate array element or wrapper key.

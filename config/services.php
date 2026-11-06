@@ -147,6 +147,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Sonat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\UseCaseAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
@@ -342,6 +343,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(TemplateAttackerSkill::class);
     $defaultsConfigurator->set(TrustBoundaryAttackerSkill::class);
     $defaultsConfigurator->set(TwigExtensionAttackerSkill::class);
+    $defaultsConfigurator->set(UseCaseAttackerSkill::class);
     $defaultsConfigurator->set(VoterAttackerSkill::class);
     $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
     $defaultsConfigurator->set(AttackerSkillRegistry::class)

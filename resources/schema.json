@@ -384,6 +384,7 @@
                       "ldap_service",
                       "sonata_admin",
                       "easyadmin_crud",
+                      "use_case",
                       "messenger_handler",
                       "webhook_consumer",
                       "event_subscriber",
