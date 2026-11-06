@@ -40,6 +40,7 @@ final readonly class ConfigAttackerSkill implements AttackerSkillInterface
             - Hardcoded secrets, API keys, DSNs (look for `_KEY`, `_SECRET`, `_TOKEN`, `password:`, full DSN strings).
             - `security.firewalls` with `security: false` on protected paths, or `access_control` rules with overly broad path patterns.
             - An `access_control` rule listing several `roles`, or combining `roles` with `allow_if`, written as if all were required: under the default `affirmative` strategy any one of them grants access (deprecated in Symfony 8.2 for that reason).
+            - An `access_control` rule or firewall limited by `methods:` with no rule for the other verbs of that path, while its controller answers them too — a `HEAD`, `PUT` or `PATCH` request (or a `_method` override when `framework.http_method_override` is on) runs it unchecked.
             - On Symfony ≥ 8.2, `switch_user` enabled without `path` and `enable_csrf: true` — impersonation starts from a `?_switch_user=` GET request any page can make an allowed user send (CSRF).
             - `access_token` token handlers: `oidc` without `enforce_at_jwt_type: true` (an ID token is accepted as an access token, RFC 9068); `oauth2` without `audience` and `issuer` (Symfony ≥ 8.2) — a token issued for another client or resource server is accepted.
             - `security.expose_security_errors: all` — login errors tell which accounts exist (user enumeration), and Symfony ≥ 8.2 then skips the password hash it otherwise spends on an unknown username.
@@ -59,6 +60,7 @@ final readonly class ConfigAttackerSkill implements AttackerSkillInterface
             - `framework.http_client.scoped_clients.*.verify_peer: false` / `verify_host: false` — MITM exposure.
             - `messenger.routing` directing privileged commands to a transport with `failure_transport: null` — silent loss of audit trail.
             - `security.password_hashers.*.algorithm` set to `plaintext`, `md5`, or `sha1` instead of `auto` (bcrypt/argon2id) — fast, unsalted or reversible hashing.
+            - `security.session_fixation_strategy: none`, `remember_me.signature_properties` without `password`, or a stricter firewall (admin) sharing one `context:` with a looser one — a session id planted before login survives it, remember-me cookies survive a password change, and a token from one area opens the other.
             - `remember_me` cookie configured with `secure: false` — a long-lived authentication cookie sent over plain HTTP.
             - NelmioCors `origin_regex: true` paired with an `allow_origin` pattern that is not anchored with `^...$` — an unanchored regex matches as a substring and can allow unintended origins.
             - A Content-Security-Policy directive allowing `'unsafe-inline'` or `'unsafe-eval'` — defeats CSP's main protection against injected/inline script execution.
