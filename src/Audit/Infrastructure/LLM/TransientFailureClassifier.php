@@ -248,6 +248,16 @@ final readonly class TransientFailureClassifier
     }
 
     /**
+     * A bridge throws `MaxOutputTokensException` for an answer the output cap
+     * cut off in the middle of a tool call: asking again with the same cap
+     * would cut it off again, while a higher one lets the call through.
+     */
+    public function isToolCallCutByTheOutputCap(Throwable $throwable): bool
+    {
+        return $this->hasInChain($throwable, MaxOutputTokensException::class);
+    }
+
+    /**
      * Why a call that failed was still billed: the provider took the request
      * in and answered it, with nothing usable (the degraded stop reason) or
      * with a tool call whose arguments are not valid JSON

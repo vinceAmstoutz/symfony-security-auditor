@@ -62,6 +62,7 @@ final readonly class RetryingPlatformInvoker
         private DegradedAnswerBooker $degradedAnswerBooker,
         private ?BudgetTracker $budgetTracker,
         private SuggestedWaitParser $suggestedWaitParser = new SuggestedWaitParser(),
+        private OutputCapRaise $outputCapRaise = new OutputCapRaise(),
     ) {}
 
     /**
@@ -85,6 +86,7 @@ final readonly class RetryingPlatformInvoker
 
         $maxAttempts = $this->retryPolicy->maxAttempts();
         $attempt = 1;
+        $capRaisable = true;
         while (true) {
             $this->rateLimiter->acquire($estimatedInputTokens);
             $deferredResult = null;
@@ -97,17 +99,65 @@ final readonly class RetryingPlatformInvoker
             } catch (Throwable $throwable) {
                 $failure = $this->explainedFailure($throwable, $deferredResult, $attempt >= $maxAttempts);
                 $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $estimatedInputTokens);
-                $this->rethrowWhenNonTransient($failure);
+                $raisedOptions = $this->optionsWithARaisedCap($failure, $options, $capRaisable);
+                if (null !== $raisedOptions) {
+                    $options = $raisedOptions;
+                    $capRaisable = false;
 
-                if ($attempt >= $maxAttempts) {
-                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $failure);
+                    continue;
                 }
 
-                $this->budgetTracker?->assertWithinBudget();
-                $this->backOffBeforeNextAttempt($failure, $deferredResult, $attempt, $maxAttempts);
+                $this->prepareRetry($failure, $deferredResult, $attempt, $maxAttempts);
                 ++$attempt;
             }
         }
+    }
+
+    /**
+     * @throws EmptyLLMResponseException
+     * @throws LLMRequestTooLargeException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     */
+    private function prepareRetry(Throwable $failure, ?DeferredResult $deferredResult, int $attempt, int $maxAttempts): void
+    {
+        $this->rethrowWhenNonTransient($failure);
+
+        if ($attempt >= $maxAttempts) {
+            throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $failure);
+        }
+
+        $this->budgetTracker?->assertWithinBudget();
+        $this->backOffBeforeNextAttempt($failure, $deferredResult, $attempt, $maxAttempts);
+    }
+
+    /**
+     * A tool call the output cap cut off is asked again, once, with a higher
+     * cap: the same cap would cut it off again.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws BudgetExceededException
+     */
+    private function optionsWithARaisedCap(Throwable $throwable, array $options, bool $capRaisable): ?array
+    {
+        if (!$capRaisable || !$this->transientFailureClassifier->isToolCallCutByTheOutputCap($throwable)) {
+            return null;
+        }
+
+        $raisedOptions = $this->outputCapRaise->raised($options);
+        if (null !== $raisedOptions) {
+            $this->budgetTracker?->assertWithinBudget();
+            $this->logger->warning('LLM tool call cut off by the output token cap, asking again with a higher cap', [
+                'error' => ProviderMessageRedactor::redact($throwable->getMessage()),
+            ]);
+        }
+
+        return $raisedOptions;
     }
 
     /**

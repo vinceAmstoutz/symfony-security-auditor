@@ -23,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\Bridge\Anthropic\ModelCatalog as AnthropicModelCatalog;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\PlatformOptions;
 use Symfony\AI\Platform\Test\MockPlatformFactory;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
@@ -202,7 +203,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $llmClient->complete('sys', 'usr');
 
         self::assertArrayNotHasKey('response_format', OptionsRecordingPlatform::$lastOptions);
-        self::assertSame(4096, OptionsRecordingPlatform::$lastOptions['max_tokens']);
+        self::assertSame(4096, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS]);
     }
 
     /**

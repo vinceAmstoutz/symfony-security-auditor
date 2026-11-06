@@ -11,4 +11,12 @@
 
 declare(strict_types=1);
 
-return [];
+return [
+    [
+        'scenarios' => ['standalone/list'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^\+\s+audit:fix\s/',
+        'reason' => 'The standalone binary lists the new audit:fix command.',
+        'changelog' => '#690',
+    ],
+];

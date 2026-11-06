@@ -39,6 +39,9 @@ final class ScriptedTokenUsagePlatform implements PlatformInterface
 
     public int $invocations = 0;
 
+    /** @var list<array<string, mixed>> */
+    public array $invokedOptions = [];
+
     /**
      * @param ResultInterface|list<ResultInterface> $results
      * @param TokenUsage|list<TokenUsage>           $tokenUsages
@@ -57,6 +60,7 @@ final class ScriptedTokenUsagePlatform implements PlatformInterface
     public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
     {
         ++$this->invocations;
+        $this->invokedOptions[] = $options;
         $result = array_shift($this->results);
         $tokenUsage = array_shift($this->tokenUsages);
         if ($result instanceof RuntimeException) {

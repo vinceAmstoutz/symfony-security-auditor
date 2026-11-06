@@ -79,10 +79,10 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 | `model` | string | `'claude-opus-5-5'` | Model name used for both Attacker and Reviewer roles |
 | `attacker_model` | string | `null` | Override: dedicated model for the Attacker role |
 | `reviewer_model` | string | `null` | Override: dedicated model for the Reviewer role |
-| `max_output_tokens` | `int` (≥ 1) | `4096` | Maximum output tokens per LLM call, set as `max_tokens` on every platform request **to a Claude/Anthropic-dialect model**. Default `4096` — `symfony/ai`'s Anthropic bridge would otherwise apply its own much smaller default (~1000) and silently truncate `record_vulnerability` tool-call arguments mid-finding. **Currently a no-op for non-Claude models**: `symfony/ai`'s Gemini and OpenAI Responses bridges reject the `max_tokens` option key outright, so `PlatformOptionsFactory` only forwards it when the configured model name contains `claude`. |
-| `attacker_max_output_tokens` | `int` (≥ 1) | `null` | Override: dedicated max output tokens for the Attacker. Falls back to `max_output_tokens` when `null`. Useful for headroom on detailed tool-call arguments. Same Claude-only caveat as `max_output_tokens` above. |
-| `reviewer_max_output_tokens` | `int` (≥ 1) | `null` | Override: dedicated max output tokens for the Reviewer. Falls back to `max_output_tokens` when `null`. Same Claude-only caveat as `max_output_tokens` above. |
-| `provider_json_mode` | bool | `false` | Send `response_format: {type: json_object}` on every LLM call **to a Claude/Anthropic-dialect model served through a gateway** (`openrouter`, `generic`, …) so the provider enforces JSON output natively. **Not sent on the `anthropic` and `bedrock` platforms**: Anthropic has no JSON-object mode, their bridges would turn it into an empty structured-output schema, and Bedrock's Mantle route refuses it. **Currently a no-op for non-Claude models**, for the same bridge-compatibility reason as `max_output_tokens` above. Default `false`. The prompt contract (_"Return ONLY the JSON array"_) remains authoritative. |
+| `max_output_tokens` | `int` (≥ 1) | `4096` | Maximum output tokens per LLM call. _Since 1.23_, sent as `symfony/ai`'s canonical `max_output_tokens` option, which the bridge translates, on the `anthropic`, `bedrock` (Claude and Nova), `gemini`, `vertexai`, `mistral`, `openai`, `openresponses` platforms and the gateways built on the generic bridge (`generic`, `openrouter`, `albert`, `amazeeai`, `edenai`, `lmstudio`, `ovh`); as `max_tokens` to a Claude model on any other platform; not sent elsewhere (`azure`, `deepseek`, `ollama`, …), where an unknown field may be refused. A tool call the cap cuts off is asked again once with twice the cap, so the finding is kept. Default `4096` — `symfony/ai`'s Anthropic bridge would otherwise apply its own much smaller default (~1000) and silently truncate `record_vulnerability` tool-call arguments mid-finding. |
+| `attacker_max_output_tokens` | `int` (≥ 1) | `null` | Override: dedicated max output tokens for the Attacker. Falls back to `max_output_tokens` when `null`. Useful for headroom on detailed tool-call arguments. Sent to the same platforms as `max_output_tokens` above. |
+| `reviewer_max_output_tokens` | `int` (≥ 1) | `null` | Override: dedicated max output tokens for the Reviewer. Falls back to `max_output_tokens` when `null`. Sent to the same platforms as `max_output_tokens` above. |
+| `provider_json_mode` | bool | `false` | Send `response_format: {type: json_object}` on every LLM call **to a Claude/Anthropic-dialect model served through a gateway** (`openrouter`, `generic`, …) so the provider enforces JSON output natively. **Not sent on the `anthropic` and `bedrock` platforms**: Anthropic has no JSON-object mode, their bridges would turn it into an empty structured-output schema, and Bedrock's Mantle route refuses it. **Currently a no-op for non-Claude models**: other bridges reject or ignore it. Default `false`. The prompt contract (_"Return ONLY the JSON array"_) remains authoritative. |
 | `cli_agent.platform` | `string` \| `null` | `null` | _Since 1.23._ Run the audit on a subscription instead of an API key, through a coding agent's CLI installed on the machine: `claudecode` (a Claude subscription, through `claude`) or `codex` (a ChatGPT subscription, through `codex`). The auditor's own calls go to that CLI instead of the `symfony/ai` platform the application configures, which stays the application's. Needs `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform`. See [Running on a Claude subscription](#running-on-a-claude-subscription) for how each call runs and its limits. |
 | `cli_agent.cli_binary` | `string` \| `null` | `null` | _Since 1.23._ Path to the CLI when it is not on the `PATH`. |
 
@@ -140,7 +140,7 @@ When raising `max_output_tokens`, consider raising `audit.rate_limit.output_toke
 | `audit.code_slicing.min_lines_before_slicing` | `int` (≥ 10) | `80` | Files shorter than this are sent unsliced (the saving is not worth the lost context). |
 | `audit.poc_synthesis.enabled` | `bool` | profile | After the audit, generate a concrete copy-pasteable PoC (curl, console, payload) for validated findings ≥ the severity floor, exposed as the `synthesized_poc` report field (thorough: `true`, balanced/fast: `false`). Spends extra reviewer-model tokens per finding. An answer the output token limit or a content filter cut short is never attached: the finding keeps its original `proof` and a warning is logged. |
 | `audit.poc_synthesis.severity_floor` | `critical` \| `high` \| `medium` \| `low` \| `info` | `high` | Minimum severity that triggers PoC synthesis. |
-| `audit.fix_synthesis.enabled` | `bool` | `false` | After the audit, generate a suggested fix — a minimal unified-diff patch against the vulnerable file — for validated findings ≥ the severity floor, exposed as the `suggested_fix` report field and rendered in console/markdown/html output. Off by default and, unlike PoC synthesis, not implied by any profile; opt in explicitly. Spends extra reviewer-model tokens per finding. A patch the output token limit or a content filter cut short is never attached: the finding keeps its original `remediation` and a warning is logged. |
+| `audit.fix_synthesis.enabled` | `bool` | `false` | After the audit, generate a suggested fix — a minimal unified-diff patch against the vulnerable file — for validated findings ≥ the severity floor, exposed as the `suggested_fix` report field, rendered in console/markdown/html output, carried (_since 1.23_) as a SARIF `fixes` entry and a `github-comment` suggestion, and applied by [`audit:fix`](#auditfix--applying-the-suggested-fixes). Off by default and, unlike PoC synthesis, not implied by any profile; opt in explicitly. Spends extra reviewer-model tokens per finding. A patch the output token limit or a content filter cut short is never attached: the finding keeps its original `remediation` and a warning is logged. |
 | `audit.fix_synthesis.severity_floor` | `critical` \| `high` \| `medium` \| `low` \| `info` | `high` | Minimum severity that triggers fix synthesis. |
 | `audit.escalation.enabled` | `bool` | `false` | Two-pass attacker: a cheap-model sweep runs first; the expensive model only re-analyses files the sweep flagged. Cuts attacker token spend ~3–5× on inert codebases. Uses `escalation.cheap_model` for the first pass, falling back to the reviewer model when unset. |
 | `audit.escalation.cheap_model` | `string` or `null` | `null` | Provider model id for the cheap first pass (e.g. `claude-haiku-5-5`). Falls back to the reviewer model when `null`. If the resolved cheap model equals the attacker model, escalation saves nothing and `audit:run` prints a pre-flight notice — set a genuinely cheaper model. |
@@ -848,6 +848,8 @@ _Since 1.19._ A pull-request comment body, sized for a comment rather than a ful
 Generated by [vinceamstoutz/symfony-security-auditor](https://github.com/vinceamstoutz/symfony-security-auditor).
 ```
 
+_Since 1.23._ With [`audit.fix_synthesis`](#audit--orchestrator-knobs) enabled, a `### Suggested fixes` section follows the table: each listed finding whose fix replaces one run of lines of its own file gets a GitHub ` ```suggestion ` block naming those lines. A fix spanning several hunks or files, or one that only adds lines, is left to [`audit:fix`](#auditfix--applying-the-suggested-fixes). The body also ends with a hidden, base64-encoded list of those suggestions, which the GitHub Action's `comment-pr` posts as a pull-request review (see [CI](ci.md#sticky-pr-comment-with-the-audit-summary)).
+
 #### `html`
 
 A single self-contained file — no external stylesheet, font, image or script — carrying the risk badge and run metadata, a Distribution section of two inline-SVG bar charts (by severity, by vulnerability type), and one card per finding with its location, description, vulnerable code, attack vector, proof of concept and remediation. Colors come from the report's own stylesheet, so it follows the reader's light/dark preference.
@@ -969,6 +971,28 @@ bin/console audit:baseline report.json .security-baseline.json --prune --annotat
 Each appended entry carries `fingerprint`, `type`, `file`, `title`, `added_at`, and — when `--annotate` supplied one — `reason`. Matching is count-aware, the same rule the audit itself applies: each entry accepts one occurrence, so a finding duplicated beyond its accepted count registers as new again. Entries whose `attacker_fingerprint` matches a report finding count as covering it. In a report written by 1.22 or later, so does an entry a baseline written before 1.22 holds a finding under: the path the model spelled for it then (`./src/A.php`, `src\A.php`, `/src/A.php`, or an absolute path inside the report's `project`), which the report now replaces with the project file, or a type the finding was reported as before its own existed (`twig_injection` or `sensitive_data_exposure` for an `xss` finding). Such an entry keeps its reason through a `--prune`, and its finding is not appended again.
 
 Exit codes: `0` on success, `1` if the report is missing or malformed, the baseline file is malformed, or the baseline path is a symlink (refused, exactly as every other writer in this tool refuses symlinked destinations).
+
+### `audit:fix` — applying the suggested fixes
+
+_Since 1.23._ Applies the suggested fixes of a JSON report written with [`audit.fix_synthesis`](#audit--orchestrator-knobs) enabled to the project, **without re-running the audit**. It is a dry run by default: it lists which fixes apply cleanly and changes no file until `--apply`.
+
+```bash
+bin/console audit:fix report.json
+bin/console audit:fix report.json --apply
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `report` | yes | Path to a JSON report produced by `audit:run --format=json`. |
+| `project-path` | no | The project the report audited (default: the working directory). |
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--apply` | off | Write the fixes that apply cleanly instead of only listing them. |
+
+Each fix applies to the files as the fixes before it left them, and applies whole or not at all. A fix is refused, never forced, when it is not a patch the auditor can read, when it changes something other than a regular file inside the project (a path through a symlink, or out of the project, included), or when the lines it was written for are no longer there exactly once — the code changed since the audit. A hunk whose lines merely moved still applies.
+
+Exit codes: `0` when every suggested fix applies (or the report holds none), `1` when one was refused or the report is missing or malformed.
 
 ### `mcp:serve` — Model Context Protocol server
 
