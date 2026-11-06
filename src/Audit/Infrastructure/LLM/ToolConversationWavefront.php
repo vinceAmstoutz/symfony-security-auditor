@@ -435,16 +435,16 @@ final readonly class ToolConversationWavefront
     private function runToolCalls(ConversationState $conversationState, ResultInterface $platformResult, ToolLLMRequest $toolLLMRequest): ConversationState
     {
         $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
-        $conversationState->bag->add($this->platformResultExtractor->extractAssistantMessage($platformResult));
+        $roundMessages = [$this->platformResultExtractor->extractAssistantMessage($platformResult)];
 
         $toolResults = [];
         foreach ($toolCalls as $position => $toolCall) {
             $result = FinalRound::resultOf($toolLLMRequest->tools, $toolCall, $conversationState->roundsLeft);
-            $conversationState->bag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $conversationState->roundsLeft, $position === array_key_last($toolCalls)))));
+            $roundMessages[] = new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $conversationState->roundsLeft, $position === array_key_last($toolCalls))));
             $toolResults[] = $result;
         }
 
-        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults), FinalRound::asksToRead($toolLLMRequest->tools, $toolCalls));
+        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults), FinalRound::asksToRead($toolLLMRequest->tools, $toolCalls), ...$roundMessages);
 
         return FinalRound::isConcludedBy($conversationState->roundsLeft, $toolLLMRequest->tools, $toolCalls, $toolResults)
             ? $conversationState->withResponse(FinalRound::answer($this->model, TokenUsageSnapshot::of($conversationState->input, $conversationState->output, $conversationState->cacheRead, $conversationState->cacheCreation), $conversationState->askedToRead))

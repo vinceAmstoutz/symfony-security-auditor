@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ## [Unreleased]
 
+### Core 🧱
+
+- The tool loops no longer change a message bag in place, ready for the immutable message bag of symfony/ai 1.0
+
 ## [1.22.1] — 2026-10-29 — Waypoint
 
 ### Bugfixes 🐛

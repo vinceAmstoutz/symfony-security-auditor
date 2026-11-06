@@ -95,6 +95,15 @@ final class ConversationStateTest extends TestCase
         self::assertFalse($this->state(null)->withExecutedTools(10, false)->withExecutedTools(10, false)->askedToRead);
     }
 
+    public function test_a_tool_round_appends_its_messages_to_a_new_bag_and_leaves_the_earlier_one_untouched(): void
+    {
+        $conversationState = $this->state(null);
+
+        $executed = $conversationState->withExecutedTools(10, false, Message::ofAssistant('a'), Message::ofUser('t'));
+
+        self::assertSame([1, 3], [\count($conversationState->bag), \count($executed->bag)]);
+    }
+
     /**
      * @throws InvalidTokenUsageException
      */

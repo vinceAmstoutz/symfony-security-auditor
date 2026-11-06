@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Symfony\AI\Platform\Message\MessageBag;
+use Symfony\AI\Platform\Message\MessageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -27,8 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
  * included, and whether the model ever called a tool that does not record (a
  * conversation that only recorded lost nothing to the round limit).
  *
- * Updates are copy-on-write — `$bag` is a mutable collaborator whose contents
- * are appended in place, but every scalar transition returns a new instance.
+ * Updates are copy-on-write: every transition, the bag included, returns a new
+ * instance.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -128,10 +129,10 @@ final readonly class ConversationState
         );
     }
 
-    public function withExecutedTools(int $estimatedToolResultTokens, bool $askedToRead): self
+    public function withExecutedTools(int $estimatedToolResultTokens, bool $askedToRead, MessageInterface ...$roundMessages): self
     {
         return new self(
-            $this->bag,
+            $this->bag->merge(new MessageBag(...$roundMessages)),
             $this->options,
             $this->input,
             $this->output,

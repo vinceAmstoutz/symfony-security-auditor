@@ -203,12 +203,12 @@ final readonly class SequentialToolLoop
     private function runToolCalls(ConversationState $conversationState, ResultInterface $platformResult, ToolRegistry $toolRegistry, int $iteration, int $roundsLeft): ConversationState|LLMResponse
     {
         $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
-        $conversationState->bag->add($this->platformResultExtractor->extractAssistantMessage($platformResult));
+        $roundMessages = [$this->platformResultExtractor->extractAssistantMessage($platformResult)];
 
         $toolResults = [];
         foreach ($toolCalls as $position => $toolCall) {
             $result = FinalRound::resultOf($toolRegistry, $toolCall, $roundsLeft);
-            $conversationState->bag->add(new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $roundsLeft, $position === array_key_last($toolCalls)))));
+            $roundMessages[] = new ToolCallMessage($toolCall, new Text(FinalRound::carried($result, $roundsLeft, $position === array_key_last($toolCalls))));
             $toolResults[] = $result;
             $this->logger->debug('Tool invoked', [
                 'tool' => $toolCall->getName(),
@@ -216,7 +216,7 @@ final readonly class SequentialToolLoop
             ]);
         }
 
-        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults), FinalRound::asksToRead($toolRegistry, $toolCalls));
+        $conversationState = $conversationState->withExecutedTools($this->promptTokenEstimator->estimate(...$toolResults), FinalRound::asksToRead($toolRegistry, $toolCalls), ...$roundMessages);
 
         return FinalRound::isConcludedBy($roundsLeft, $toolRegistry, $toolCalls, $toolResults)
             ? FinalRound::answer($this->model, $conversationState->tokenUsage(), $conversationState->askedToRead)
