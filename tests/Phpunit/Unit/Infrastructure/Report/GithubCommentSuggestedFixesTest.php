@@ -101,7 +101,7 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
     {
         $auditReport = $this->makeReport($this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -7 +7 @@\n-a\n+\$doc = '````';"));
 
-        self::assertStringContainsString("`````suggestion\n\$doc = '````';\n`````", $this->renderer->render($auditReport));
+        self::assertStringContainsString(":\n\n`````suggestion\n\$doc = '````';\n`````\n", $this->renderer->render($auditReport));
     }
 
     /**
