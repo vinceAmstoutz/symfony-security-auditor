@@ -51,6 +51,7 @@ final class FileChunkerTest extends TestCase
         yield 'authenticator' => ['src/Security/LoginFormAuthenticator.php', '<?php'];
         yield 'ldap service' => ['src/Ldap/DirectoryLookup.php', '<?php'];
         yield 'sonata admin' => ['src/Admin/StoreManager.php', '<?php'];
+        yield 'use case' => ['src/Ordering/Application/PlaceOrderCommandHandler.php', '<?php'];
         yield 'messenger handler' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php'];
         yield 'webhook consumer' => ['src/Webhook/StripeWebhookConsumer.php', '<?php'];
         yield 'event subscriber' => ['src/EventSubscriber/AuditSubscriber.php', '<?php'];
@@ -125,6 +126,29 @@ final class FileChunkerTest extends TestCase
         self::assertContains('src/Repository/ProductRepository.php', $productChunkPaths);
         self::assertNotContains('src/Entity/Order.php', $productChunkPaths);
         self::assertSame('src/Controller/Admin/ProductCrudController.php', $productChunk[0]->relativePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_groups_an_action_with_the_command_and_handler_it_dispatches(): void
+    {
+        $files = [
+            $this->makeFile('src/Billing/UI/Http/Action/CancelSubscriptionAction.php'),
+            $this->makeFile('src/Billing/Application/Command/CancelSubscriptionCommand.php'),
+            $this->makeFile('src/Billing/Application/Command/CancelSubscriptionHandler.php'),
+            $this->makeFile('src/Billing/Domain/Invoice.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $actionChunk = $this->findChunkContaining($chunks, 'src/Billing/UI/Http/Action/CancelSubscriptionAction.php');
+        self::assertNotNull($actionChunk);
+        self::assertSame([
+            'src/Billing/UI/Http/Action/CancelSubscriptionAction.php',
+            'src/Billing/Application/Command/CancelSubscriptionHandler.php',
+            'src/Billing/Application/Command/CancelSubscriptionCommand.php',
+        ], array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $actionChunk));
     }
 
     /**

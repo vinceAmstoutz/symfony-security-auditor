@@ -37,6 +37,9 @@ final readonly class RepositoryAttackerSkill implements AttackerSkillInterface
         return <<<'SKILL'
             <skills role="repository">
             Hunt:
+            - A MongoDB / Doctrine ODM query whose filter, update or pipeline comes from a request array (`find($request->toArray())`, `->equals($request->get('filter'))`) — operators such as `$ne`, `$gt`, `$regex` or `$where` rewrite the query: NoSQL operator injection.
+            - An API Platform `QueryCollectionExtensionInterface` / `QueryItemExtensionInterface` that scopes rows to the current user for collections but not items (or the reverse), for one resource class but not its siblings, or that returns early on a role broader than intended — other users' rows leak through the operation it skips.
+            - A user search term bound into `LIKE` (`'%'.$term.'%'`) without escaping `%` and `_` — a lone `%` or `_` matches every row, enumerating data the search should only reveal on an exact or prefix match (e.g. another user's email).
             - DQL/SQL injection via string concatenation in custom finder methods; absence of `setParameter()`.
             - Dynamic `ORDER BY` / `LIMIT` fed from request input — Doctrine does NOT parameterize these.
             - `NativeQuery` / `getConnection()->executeQuery()` with interpolated user input.

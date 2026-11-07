@@ -43,6 +43,8 @@ final readonly class TemplateAttackerSkill implements AttackerSkillInterface
             - `{% sandbox %}` / `{% apply %}` blocks lifting restrictions on user-supplied template fragments.
             - Inline JavaScript context (`<script>var x = {{ value }};`) without `|json_encode`. Report as `xss`.
             - URL attributes (`href`, `src`) built from user input without `|url_encode` and protocol whitelist (javascript:, data:). Report as `xss`.
+            - `|sign_url` (Symfony ≥ 8.2) applied to a URL the user controls — the page hands out valid signatures for attacker-chosen URLs, defeating every `#[IsSignatureValid]` route that shares the `UriSigner` secret.
+            - `|normalize` (Symfony ≥ 8.2) on an entity with no `groups`, printed into the page or a `<script>` block — every readable property (password hash, tokens, other users' data) ships to the browser.
             - Twig Components (`<twig:Component …/>`) passing user input through `data-*` attributes without escaping (`<twig:UserCard name="{{ name|raw }}"/>`).
             - Live Components emitting `data-live-action-param` / `data-live-prop` with untrusted values — bound back to the server unchecked.
             Do NOT flag:

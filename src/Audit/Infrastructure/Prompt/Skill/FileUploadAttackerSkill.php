@@ -37,6 +37,7 @@ final readonly class FileUploadAttackerSkill implements AttackerSkillInterface
         return <<<'SKILL'
             <skills role="file_upload">
             Hunt (`FileType` fields, `VichUploaderBundle` mappings, and manual `UploadedFile` handling):
+            - `image/svg+xml` accepted by the `File`/`Image` constraint `mimeTypes` (or `svg` in `extensions`) for files later served inline from the app's own origin — an SVG carries `<script>`, so the upload becomes stored XSS. Report as `xss`.
             - Extension/MIME validation missing or based on the client-supplied `Content-Type` header / `getClientMimeType()` instead of `guessExtension()` or a server-side allow-list.
             - No `maxSize` constraint (or a `MimeType`/`File` constraint with an empty `mimeTypes` allow-list), letting an attacker exhaust disk space.
             - Stored filename built from `getClientOriginalName()` without sanitization — user-controlled `../../etc/passwd`-style path traversal into `move()`'s target directory.
