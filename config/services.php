@@ -479,6 +479,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
             service(GitChangedFilesResolverInterface::class),
             service(StaticPreScannerInterface::class),
+            service(ProgressReporterInterface::class),
         ]);
 
     $defaultsConfigurator->set(NestingDepthGuard::class)

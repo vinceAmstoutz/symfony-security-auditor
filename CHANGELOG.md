@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
-- Every credential the secret scrubber redacts and every match of the static pre-scan becomes a finding on its line that the reviewer validates or rejects like the attacker's
+- Every credential the secret scrubber redacts and every match of the static pre-scan is announced in the progress output as soon as the scan ends, then becomes a finding on its line that the reviewer validates or rejects like the attacker's
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkFindingProgress;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
@@ -26,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 
@@ -39,6 +41,7 @@ final readonly class IngestionStage implements StageInterface
         private LoggerInterface $logger,
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
         private ?StaticPreScannerInterface $staticPreScanner = null,
+        private ?ProgressReporterInterface $progressReporter = null,
     ) {}
 
     #[Override]
@@ -103,6 +106,10 @@ final readonly class IngestionStage implements StageInterface
         }
 
         $this->reportStaticMarkers($files, $auditContext);
+
+        if ($this->progressReporter instanceof ProgressReporterInterface) {
+            ChunkFindingProgress::report($this->progressReporter, $auditContext->staticCandidates());
+        }
     }
 
     /**
