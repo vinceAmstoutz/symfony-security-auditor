@@ -117,6 +117,7 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'a class in an admin directory that is no sonata admin stays plain php' => ['src/Behat/Page/Admin/Product/IndexPage.php', "<?php\nfinal class IndexPage {}", ProjectFileType::PHP];
         yield 'an admin-suffixed class without sonata stays plain php' => ['src/Backoffice/StoreAdmin.php', "<?php\nfinal class StoreAdmin {}", ProjectFileType::PHP];
         yield 'a sonata service outside admin paths is not a sonata admin' => ['src/Block/StatsBlock.php', "<?php\nuse Sonata\\AdminBundle\\Admin\\Pool;\nfinal class StatsBlock {}", ProjectFileType::PHP];
+        yield 'use case by handler in a command directory outside an application layer' => ['src/Billing/Command/CancelSubscriptionHandler.php', "<?php\nfinal class CancelSubscriptionHandler {}", ProjectFileType::USE_CASE];
         yield 'template by extension' => ['templates/user/index.html.twig', '{{ user.name }}', ProjectFileType::TEMPLATE];
         yield 'config by yaml extension' => ['config/security.yaml', 'security:', ProjectFileType::CONFIG];
         yield 'config by xml extension' => ['config/services.xml', '', ProjectFileType::CONFIG];
