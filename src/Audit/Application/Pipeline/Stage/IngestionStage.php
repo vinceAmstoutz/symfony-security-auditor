@@ -21,15 +21,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScanSkippedFiles;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScrubbedSecretFindings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\StaticMarkerFindings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CandidateFindingSourceInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class IngestionStage implements StageInterface
@@ -40,7 +37,7 @@ final readonly class IngestionStage implements StageInterface
         private ProjectFileScannerInterface $projectFileScanner,
         private LoggerInterface $logger,
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
-        private ?StaticPreScannerInterface $staticPreScanner = null,
+        private ?CandidateFindingSourceInterface $candidateFindingSource = null,
         private ?ProgressReporterInterface $progressReporter = null,
     ) {}
 
@@ -74,7 +71,7 @@ final readonly class IngestionStage implements StageInterface
         $auditContext->setFilesDiscovered(\count($scannedFiles));
         $auditContext->setMappingFiles($scopedScanResult->mappingFiles);
         $this->recordWithheldFiles($files, $auditContext);
-        $this->reportScrubbedSecrets($files, $auditContext);
+        $this->queueCandidates($files, $auditContext);
         $this->recordSkippedFiles($projectFileScan->skippedFiles, $auditContext, $changed);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
@@ -88,52 +85,24 @@ final readonly class IngestionStage implements StageInterface
     }
 
     /**
-     * Every credential the scrubber redacted is a real secret committed in the
-     * file, so it is queued as a candidate finding for the reviewer.
+     * What the scrubber redacted and the static pre-scan matched is queued as
+     * candidate findings for the reviewer, and announced right away.
      *
      * @param list<ProjectFile> $files
      */
-    private function reportScrubbedSecrets(array $files, AuditContext $auditContext): void
+    private function queueCandidates(array $files, AuditContext $auditContext): void
     {
-        if ($auditContext->isCostEstimate()) {
+        if ($auditContext->isCostEstimate() || !$this->candidateFindingSource instanceof CandidateFindingSourceInterface) {
             return;
         }
 
-        foreach ($files as $file) {
-            foreach (ScrubbedSecretFindings::in($file) as $finding) {
-                $auditContext->addStaticCandidate($finding);
-            }
+        $candidates = $this->candidateFindingSource->candidatesIn($files);
+        foreach ($candidates as $candidate) {
+            $auditContext->addStaticCandidate($candidate);
         }
-
-        $this->reportStaticMarkers($files, $auditContext);
 
         if ($this->progressReporter instanceof ProgressReporterInterface) {
-            ChunkFindingProgress::report($this->progressReporter, $auditContext->staticCandidates());
-        }
-    }
-
-    /**
-     * Everything the static pre-scan matches is queued as a candidate finding
-     * for the reviewer, not only handed to the attacker as a hint.
-     *
-     * @param list<ProjectFile> $files
-     */
-    private function reportStaticMarkers(array $files, AuditContext $auditContext): void
-    {
-        if (!$this->staticPreScanner instanceof StaticPreScannerInterface) {
-            return;
-        }
-
-        $linesByPath = [];
-        foreach ($files as $file) {
-            $linesByPath[$file->relativePath()] = explode("\n", $file->content());
-        }
-
-        foreach ($this->staticPreScanner->scan($files) as $riskMarker) {
-            $finding = StaticMarkerFindings::from($riskMarker, $linesByPath[$riskMarker->filePath()][$riskMarker->line() - 1] ?? '');
-            if ($finding instanceof Vulnerability) {
-                $auditContext->addStaticCandidate($finding);
-            }
+            ChunkFindingProgress::report($this->progressReporter, $candidates);
         }
     }
 

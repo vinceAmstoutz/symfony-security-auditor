@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\CandidateFindingSource;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage;
@@ -478,9 +479,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ProjectFileScannerInterface::class),
             service('logger'),
             service(GitChangedFilesResolverInterface::class),
-            service(StaticPreScannerInterface::class),
+            service(CandidateFindingSource::class),
             service(ProgressReporterInterface::class),
         ]);
+
+    $defaultsConfigurator->set(CandidateFindingSource::class)
+        ->args([service(StaticPreScannerInterface::class)]);
 
     $defaultsConfigurator->set(NestingDepthGuard::class)
         ->args([service('logger')]);
