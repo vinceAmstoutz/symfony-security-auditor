@@ -57,6 +57,6 @@ final readonly class ScrubbedSecretFindings
                 'Revoke and rotate the credential, then load it from a secrets vault or an untracked environment file.',
             ),
             trim($line),
-        )->withReviewerValidation(true);
+        );
     }
 }

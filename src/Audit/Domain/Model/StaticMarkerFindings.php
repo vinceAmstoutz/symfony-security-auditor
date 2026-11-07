@@ -40,7 +40,7 @@ final readonly class StaticMarkerFindings
                 'Review the line, confirm whether untrusted input reaches it, and replace the construct with a safe equivalent when it does.',
             ),
             trim($vulnerableCode),
-        )->withReviewerValidation(true);
+        );
     }
 
     private static function title(RiskMarker $riskMarker): string
