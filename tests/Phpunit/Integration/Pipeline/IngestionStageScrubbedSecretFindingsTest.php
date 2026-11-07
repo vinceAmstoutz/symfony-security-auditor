@@ -76,8 +76,10 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
     public function test_candidates_are_announced_before_the_audit_loop_starts(): void
     {
         $file = ProjectFile::create('src/Billing.php', '/p/src/Billing.php', "<?php\n\n\$key = '***REDACTED:aws_access_key***';\n");
+        /** @var ArrayObject<int, array{string, array<string, mixed>}> $events */
         $events = new ArrayObject();
         $progressReporter = new readonly class($events) implements ProgressReporterInterface {
+            /** @param ArrayObject<int, array{string, array<string, mixed>}> $events */
             public function __construct(private ArrayObject $events) {}
 
             #[Override]
