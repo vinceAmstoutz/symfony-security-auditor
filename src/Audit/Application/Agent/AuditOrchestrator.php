@@ -107,7 +107,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $previousFindings = array_values($auditContext->validatedVulnerabilities());
         $rejectedFindings = $this->rejectedFindings($auditContext);
         $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
-        $filtered = $this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext);
+        $filtered = [...$auditContext->drainStaticCandidates(), ...$this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext)];
 
         if ([] === $filtered) {
             $this->logger->info('Attacker found no new findings, stopping');

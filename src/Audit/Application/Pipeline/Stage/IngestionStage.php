@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkFindingProgress;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
@@ -22,7 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScanSkippedFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CandidateFindingSourceInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -34,6 +37,8 @@ final readonly class IngestionStage implements StageInterface
         private ProjectFileScannerInterface $projectFileScanner,
         private LoggerInterface $logger,
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
+        private ?CandidateFindingSourceInterface $candidateFindingSource = null,
+        private ?ProgressReporterInterface $progressReporter = null,
     ) {}
 
     #[Override]
@@ -66,6 +71,7 @@ final readonly class IngestionStage implements StageInterface
         $auditContext->setFilesDiscovered(\count($scannedFiles));
         $auditContext->setMappingFiles($scopedScanResult->mappingFiles);
         $this->recordWithheldFiles($files, $auditContext);
+        $this->queueCandidates($files, $auditContext);
         $this->recordSkippedFiles($projectFileScan->skippedFiles, $auditContext, $changed);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
@@ -76,6 +82,28 @@ final readonly class IngestionStage implements StageInterface
             'files' => \count($files),
             'lines' => $auditContext->getMeta('ingestion.total_lines'),
         ]);
+    }
+
+    /**
+     * What the scrubber redacted and the static pre-scan matched is queued as
+     * candidate findings for the reviewer, and announced right away.
+     *
+     * @param list<ProjectFile> $files
+     */
+    private function queueCandidates(array $files, AuditContext $auditContext): void
+    {
+        if ($auditContext->isCostEstimate() || !$this->candidateFindingSource instanceof CandidateFindingSourceInterface) {
+            return;
+        }
+
+        $candidates = $this->candidateFindingSource->candidatesIn($files);
+        foreach ($candidates as $candidate) {
+            $auditContext->addStaticCandidate($candidate);
+        }
+
+        if ($this->progressReporter instanceof ProgressReporterInterface) {
+            ChunkFindingProgress::report($this->progressReporter, $candidates);
+        }
     }
 
     /**
