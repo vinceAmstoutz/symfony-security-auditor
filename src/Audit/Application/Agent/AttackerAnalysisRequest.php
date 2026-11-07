@@ -94,4 +94,14 @@ final readonly class AttackerAnalysisRequest
     {
         return new self($files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, $candidateFindings, $this->toolFiles, $this->coverageGap);
     }
+
+    /**
+     * This request narrowed to the files of a gap the coverage critic named:
+     * one chunk led by its hypothesis, whose investigation tools keep every
+     * file this request could reach.
+     */
+    public function forCoverageGap(CoverageGap $coverageGap): self
+    {
+        return new self($coverageGap->files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, [], $this->filesForTools(), $coverageGap);
+    }
 }
