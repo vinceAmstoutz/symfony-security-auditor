@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
-- Every credential the secret scrubber redacts is reported as a validated `hardcoded_secret` finding on its line, without waiting for the model
+- Every credential the secret scrubber redacts and every match of the static pre-scan is reported as a finding on its line, without waiting for the model
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 
