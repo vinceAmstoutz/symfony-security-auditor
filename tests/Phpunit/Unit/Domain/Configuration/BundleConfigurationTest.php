@@ -330,6 +330,31 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
+    public function test_from_array_maps_the_coverage_critic(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['coverage_critic'] = ['enabled' => true, 'max_gaps' => 3];
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame([true, 3], [$bundleConfiguration->audit->coverageCriticEnabled, $bundleConfiguration->audit->coverageCriticMaxGaps]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_leaves_the_coverage_critic_off_with_five_gaps_when_its_section_is_absent(): void
+    {
+        $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
+
+        self::assertSame([false, 5], [$bundleConfiguration->audit->coverageCriticEnabled, $bundleConfiguration->audit->coverageCriticMaxGaps]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_maps_excluded_and_included_types(): void
     {
         $config = $this->treeBuilderOutput();

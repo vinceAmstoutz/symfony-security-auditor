@@ -1738,6 +1738,19 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.fix_synthesis.enabled'));
     }
 
+    public function test_bundle_leaves_the_coverage_critic_off_with_five_gaps_by_default(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertSame(
+            [false, 5],
+            [
+                $containerBuilder->getParameter('symfony_security_auditor.audit.coverage_critic.enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.coverage_critic.max_gaps'),
+            ],
+        );
+    }
+
     public function test_bundle_defaults_since_closure_to_none(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
