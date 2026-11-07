@@ -505,7 +505,7 @@ symfony-security-audit:
 
 ## Feeding Psalm's Taint Analysis In
 
-Psalm 7 runs its taint analysis in the same run as type checking, and writes SARIF when `--report` names a `.sarif` file. Point `scan.import_sarif` at that file and each Psalm result, with its source-to-sink path, becomes a risk marker the attacker confirms or discards in context: Psalm finds the flows (including its `llm_prompt`, `nosql`, `url_path` and `url_component` taints), the auditor judges whether they are reachable and authorized.
+(_since 1.23_) Psalm 7 runs its taint analysis in the same run as type checking, and writes SARIF when `--report` names a `.sarif` file. Point `scan.import_sarif` at that file and each Psalm result, with its source-to-sink path, becomes a risk marker the attacker confirms or discards in context: Psalm finds the flows (including its `llm_prompt`, `nosql`, `url_path` and `url_component` taints), the auditor judges whether they are reachable and authorized.
 
 ```bash
 vendor/bin/psalm --report=build/psalm.sarif
