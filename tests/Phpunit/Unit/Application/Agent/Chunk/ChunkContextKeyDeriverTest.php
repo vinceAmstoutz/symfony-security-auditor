@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
 final class ChunkContextKeyDeriverTest extends TestCase
@@ -88,6 +89,17 @@ final class ChunkContextKeyDeriverTest extends TestCase
 
         self::assertSame($keys, array_values(array_unique($keys)));
         self::assertSame('', $this->keyForRules([], []));
+    }
+
+    public function test_the_project_profile_changes_the_key(): void
+    {
+        $chunkContextKeyDeriver = new ChunkContextKeyDeriver();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+
+        self::assertNotSame(
+            $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.0'], []))),
+            $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], []))),
+        );
     }
 
     public function test_the_candidate_preamble_alone_yields_a_key_of_its_own(): void

@@ -18,6 +18,7 @@ enum BuiltInStageName: string
 {
     case Ingestion = 'ingestion';
     case Mapping = 'mapping';
+    case ProjectProfile = 'project_profile';
     case DependencyExpansion = 'dependency_expansion';
     case Audit = 'audit';
     case PoCSynthesis = 'poc_synthesis';

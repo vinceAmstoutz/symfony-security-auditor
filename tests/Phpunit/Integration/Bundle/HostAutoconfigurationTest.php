@@ -34,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSyn
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\ProjectProfileStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\AnthropicTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\DeepSeekTokenEstimator;
@@ -72,6 +73,7 @@ final class HostAutoconfigurationTest extends TestCase
                 LeadingHostStage::class,
                 IngestionStage::class,
                 MappingStage::class,
+                ProjectProfileStage::class,
                 DependencyExpansionStage::class,
                 AuditStage::class,
                 PoCSynthesisStage::class,
@@ -109,6 +111,7 @@ final class HostAutoconfigurationTest extends TestCase
                     ExplicitlyTaggedHostStage::class => [['priority' => -200], []],
                     IngestionStage::class => [[]],
                     MappingStage::class => [[]],
+                    ProjectProfileStage::class => [[]],
                     DependencyExpansionStage::class => [[]],
                     AuditStage::class => [[]],
                     PoCSynthesisStage::class => [[]],

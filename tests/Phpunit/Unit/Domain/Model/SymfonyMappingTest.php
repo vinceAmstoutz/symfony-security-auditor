@@ -21,12 +21,29 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessCon
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 
 final class SymfonyMappingTest extends TestCase
 {
+    public function test_a_mapping_knows_no_project_profile_until_given_one(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromFiles([]), new AccessControlMap());
+
+        self::assertEquals(ProjectProfile::unknown(), $symfonyMapping->projectProfile());
+    }
+
+    public function test_a_mapping_given_a_project_profile_carries_it(): void
+    {
+        $projectProfile = ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], []);
+
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromFiles([]), new AccessControlMap())->withProjectProfile($projectProfile);
+
+        self::assertSame($projectProfile, $symfonyMapping->projectProfile());
+    }
+
     public function test_it_creates_empty_mapping(): void
     {
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
