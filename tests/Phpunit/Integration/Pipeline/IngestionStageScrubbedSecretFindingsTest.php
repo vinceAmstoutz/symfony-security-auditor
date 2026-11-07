@@ -93,6 +93,35 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_cost_estimate_queues_no_candidate(): void
+    {
+        $file = ProjectFile::create('src/Billing.php', '/p/src/Billing.php', "<?php\n\n\$key = '***REDACTED:aws_access_key***';\n");
+        $auditContext = AuditContext::forProject('/p');
+        $auditContext->markAsCostEstimate();
+
+        (new IngestionStage($this->scannerReturning([$file]), new NullLogger(), null, new CandidateFindingSource(new NullStaticPreScanner())))->process($auditContext);
+
+        self::assertSame([], $auditContext->drainStaticCandidates());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_without_a_candidate_source_nothing_is_queued(): void
+    {
+        $file = ProjectFile::create('src/Billing.php', '/p/src/Billing.php', "<?php\n\n\$key = '***REDACTED:aws_access_key***';\n");
+        $auditContext = AuditContext::forProject('/p');
+
+        (new IngestionStage($this->scannerReturning([$file]), new NullLogger()))->process($auditContext);
+
+        self::assertSame([], $auditContext->staticCandidates());
+    }
+
+    /**
      * @param list<ProjectFile> $files
      */
     private function scannerReturning(array $files): ProjectFileScannerInterface
