@@ -1136,7 +1136,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
                     public function delete(): Response
                     {
                         // SECURITY_AUDITOR_SINK
-                        $payload = 'sink';
+                        $payload = $_GET['payload'];
 
                         return new Response('deleted '.$payload);
                     }

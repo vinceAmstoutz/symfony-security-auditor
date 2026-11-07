@@ -174,11 +174,6 @@ final class StaticMarkerFindingsTest extends TestCase
         yield 'mercure_permissive_topic_claim' => ['mercure_permissive_topic_claim', VulnerabilityType::PERMISSIVE_MERCURE_TOPIC_SELECTOR, VulnerabilitySeverity::MEDIUM];
         yield 'api_pagination_disabled' => ['api_pagination_disabled', VulnerabilityType::MISSING_RATE_LIMITING, VulnerabilitySeverity::LOW];
         yield 'no_lock' => ['no_lock', VulnerabilityType::MISSING_RATE_LIMITING, VulnerabilitySeverity::LOW];
-        yield 'unserialize_session' => ['unserialize_session', VulnerabilityType::UNSAFE_PARAMETER_BINDING, VulnerabilitySeverity::INFO];
-        yield 'superglobal_input' => ['superglobal_input', VulnerabilityType::UNSAFE_PARAMETER_BINDING, VulnerabilitySeverity::INFO];
-        yield 'request_get' => ['request_get', VulnerabilityType::UNSAFE_PARAMETER_BINDING, VulnerabilitySeverity::INFO];
-        yield 'request_mapping_attribute' => ['request_mapping_attribute', VulnerabilityType::UNSAFE_PARAMETER_BINDING, VulnerabilitySeverity::INFO];
-        yield 'request_attributes_mutation' => ['request_attributes_mutation', VulnerabilityType::UNSAFE_PARAMETER_BINDING, VulnerabilitySeverity::INFO];
     }
 
     /**
@@ -188,6 +183,11 @@ final class StaticMarkerFindingsTest extends TestCase
     {
         yield 'scrubbed secret' => ['scrubbed_secret'];
         yield 'unmapped access control' => ['unmapped_access_control'];
+        yield 'superglobal input' => ['superglobal_input'];
+        yield 'request get' => ['request_get'];
+        yield 'request mapping attribute' => ['request_mapping_attribute'];
+        yield 'unserialize session' => ['unserialize_session'];
+        yield 'request attributes mutation' => ['request_attributes_mutation'];
     }
 
     /**
@@ -198,6 +198,6 @@ final class StaticMarkerFindingsTest extends TestCase
         yield 'high' => ['unserialize_call', 0.8];
         yield 'medium' => ['md5_or_sha1_security', 0.8];
         yield 'low' => ['role_check_only', 0.5];
-        yield 'info' => ['superglobal_input', 0.5];
+        yield 'info' => ['sarif:psalm:TaintedHtml', 0.5];
     }
 }
