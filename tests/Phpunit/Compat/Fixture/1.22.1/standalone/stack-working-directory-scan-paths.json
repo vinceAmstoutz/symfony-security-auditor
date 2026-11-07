@@ -1,0 +1,49 @@
+{
+    "scenario": "standalone/stack-working-directory-scan-paths",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --show-scanned=true",
+                "exit": 0,
+                "stdout": {
+                    "lines": [
+                        "API key: compat…6789",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Scanned files (2)",
+                        "-----------------",
+                        "",
+                        " config (1)",
+                        " * config/packages/security.yaml",
+                        "",
+                        " template (1)",
+                        " * templates/base.html.twig",
+                        "",
+                        "  2 file(s) in scope."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        " ! [NOTE] Project config <WORKSPACE>/cwd/.symfony-security-auditor.yaml is layered",
+                        " !        over your user config: the audited repository may tune the audit through it (paths, profile, models, a tighter",
+                        " !        budget), never the platform and its credentials, the cache, privacy, custom skills, the report path, the scope",
+                        " !        of the file tools, secret scrubbing, custom risk patterns or imported SARIF."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

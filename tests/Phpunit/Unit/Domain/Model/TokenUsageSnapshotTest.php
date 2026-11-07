@@ -16,9 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class TokenUsageSnapshotTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws InvalidTokenUsageException
      */
@@ -85,7 +88,7 @@ final class TokenUsageSnapshotTest extends TestCase
     public function test_negative_cache_read_tokens_rejected(): void
     {
         $this->expectException(InvalidTokenUsageException::class);
-        $this->expectExceptionMessage('Cache read tokens must be >= 0, got -2');
+        $this->expectExceptionMessageContaining('Cache read tokens must be >= 0, got -2');
 
         TokenUsageSnapshot::of(0, 0, -2, 0);
     }
@@ -96,7 +99,7 @@ final class TokenUsageSnapshotTest extends TestCase
     public function test_negative_cache_creation_tokens_rejected(): void
     {
         $this->expectException(InvalidTokenUsageException::class);
-        $this->expectExceptionMessage('Cache creation tokens must be >= 0, got -4');
+        $this->expectExceptionMessageContaining('Cache creation tokens must be >= 0, got -4');
 
         TokenUsageSnapshot::of(0, 0, 0, -4);
     }
@@ -107,7 +110,7 @@ final class TokenUsageSnapshotTest extends TestCase
     public function test_negative_input_tokens_rejected(): void
     {
         $this->expectException(InvalidTokenUsageException::class);
-        $this->expectExceptionMessage('Input tokens must be >= 0, got -1');
+        $this->expectExceptionMessageContaining('Input tokens must be >= 0, got -1');
 
         TokenUsageSnapshot::of(-1, 0);
     }
@@ -118,7 +121,7 @@ final class TokenUsageSnapshotTest extends TestCase
     public function test_negative_output_tokens_rejected(): void
     {
         $this->expectException(InvalidTokenUsageException::class);
-        $this->expectExceptionMessage('Output tokens must be >= 0, got -3');
+        $this->expectExceptionMessageContaining('Output tokens must be >= 0, got -3');
 
         TokenUsageSnapshot::of(0, -3);
     }

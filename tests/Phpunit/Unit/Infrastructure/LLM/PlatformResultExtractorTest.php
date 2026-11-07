@@ -36,12 +36,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResultExtractor;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\FailingResultConverter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\ReportedUsageExtractor;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Fixture\UnreadableResponse;
 
 final class PlatformResultExtractorTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const int ESTIMATED_INPUT_TOKENS = 999;
 
     /**
@@ -250,7 +253,7 @@ final class PlatformResultExtractorTest extends TestCase
         $platformResultExtractor = new PlatformResultExtractor(null);
 
         $this->expectException(NegativeTokenCountException::class);
-        $this->expectExceptionMessage($expectedMessage);
+        $this->expectExceptionMessageContaining($expectedMessage);
 
         $platformResultExtractor->extractTokens($this->deferredResultWithTokenUsage($tokenUsage), self::ESTIMATED_INPUT_TOKENS);
     }

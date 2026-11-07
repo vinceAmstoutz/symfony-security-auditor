@@ -1,0 +1,197 @@
+{
+    "scenario": "run/since",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json' --since='HEAD'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "audit_id": "AUDIT-<ID>",
+                        "project": "<WORKSPACE>/project",
+                        "started_at": "<TIMESTAMP>",
+                        "completed_at": "<TIMESTAMP>",
+                        "duration_seconds": 0,
+                        "files_scanned": 2,
+                        "files_discovered": 7,
+                        "complete": true,
+                        "risk_score": 17,
+                        "risk_level": "MEDIUM",
+                        "score": 83,
+                        "grade": "C",
+                        "total_vulnerabilities": 2,
+                        "by_severity": {
+                            "critical": 1,
+                            "high": 1,
+                            "medium": 0,
+                            "low": 0,
+                            "info": 0
+                        },
+                        "vulnerabilities": [
+                            {
+                                "id": "VULN-D9D6DA70",
+                                "fingerprint": "SSA-A075585EE3E2",
+                                "type": "broken_access_control",
+                                "category": "Broken Access Control",
+                                "owasp": "OWASP A01:2025 - Broken Access Control",
+                                "cwe": "CWE-284",
+                                "severity": "critical",
+                                "severity_score": 10,
+                                "title": "Unprotected admin",
+                                "description": "desc",
+                                "file": "src/Controller/AdminController.php",
+                                "line_start": 7,
+                                "line_end": 8,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.95,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N",
+                                    "base_score": 9.3
+                                }
+                            },
+                            {
+                                "id": "VULN-A43EDB69",
+                                "fingerprint": "SSA-D805EB9A79A7",
+                                "type": "ssrf",
+                                "category": "Data Exposure",
+                                "owasp": "OWASP A01:2025 - Broken Access Control (SSRF)",
+                                "cwe": "CWE-918",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "New file ssrf",
+                                "description": "desc",
+                                "file": "src/Controller/NewController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            }
+                        ],
+                        "cost": {
+                            "input_tokens": 1200,
+                            "output_tokens": 120,
+                            "total_tokens": 1320,
+                            "estimated_cost_usd": 0.0042,
+                            "primary_model": "gpt-4o",
+                            "by_role": [],
+                            "by_model": {
+                                "gpt-4o": {
+                                    "model": "gpt-4o",
+                                    "input_tokens": 1200,
+                                    "output_tokens": 120,
+                                    "cache_read_tokens": 0,
+                                    "cache_creation_tokens": 0,
+                                    "estimated_cost_usd": 0.0042,
+                                    "billed_models": [
+                                        "gpt-4o"
+                                    ]
+                                }
+                            }
+                        },
+                        "scope": {
+                            "since": "HEAD",
+                            "paths": []
+                        },
+                        "coverage": [
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/NewController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/NewController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/NewController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/NewController.php",
+                                "status": "validated"
+                            }
+                        ],
+                        "suppressed_fingerprints": [],
+                        "suppressed_baseline_fingerprints": []
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/NewController.php",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/NewController.php",
+                "tool-results model=gpt-4o count=1"
+            ]
+        }
+    }
+}

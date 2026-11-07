@@ -18,9 +18,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\BoundedFileReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\UnreadableInputFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class BoundedFileReaderTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -60,7 +63,7 @@ final class BoundedFileReaderTest extends TestCase
         $this->filesystem->dumpFile($path, '['.str_repeat(' ', 33_554_431).']');
 
         $this->expectException(UnreadableInputFileException::class);
-        $this->expectExceptionMessage(\sprintf('File "%s" holds more than 33554432 bytes, so it was not read.', $path));
+        $this->expectExceptionMessageContaining(\sprintf('File "%s" holds more than 33554432 bytes, so it was not read.', $path));
 
         BoundedFileReader::read($path);
     }
@@ -74,7 +77,7 @@ final class BoundedFileReaderTest extends TestCase
         $this->filesystem->symlink('/dev/zero', $path);
 
         $this->expectException(UnreadableInputFileException::class);
-        $this->expectExceptionMessage(\sprintf('File "%s" holds more than 33554432 bytes, so it was not read.', $path));
+        $this->expectExceptionMessageContaining(\sprintf('File "%s" holds more than 33554432 bytes, so it was not read.', $path));
 
         BoundedFileReader::read($path);
     }
@@ -85,7 +88,7 @@ final class BoundedFileReaderTest extends TestCase
     public function test_it_refuses_a_directory_it_reads_nothing_from(): void
     {
         $this->expectException(UnreadableInputFileException::class);
-        $this->expectExceptionMessage(\sprintf('File "%s" could not be read: file_get_contents(): Read of', $this->tmpDir));
+        $this->expectExceptionMessageContaining(\sprintf('File "%s" could not be read: file_get_contents(): Read of', $this->tmpDir));
 
         BoundedFileReader::read($this->tmpDir);
     }
@@ -98,7 +101,7 @@ final class BoundedFileReaderTest extends TestCase
         $path = $this->tmpDir.'/absent.json';
 
         $this->expectException(UnreadableInputFileException::class);
-        $this->expectExceptionMessage(\sprintf('File "%1$s" could not be read: file_get_contents(%1$s): Failed to open stream: No such file or directory', $path));
+        $this->expectExceptionMessageContaining(\sprintf('File "%1$s" could not be read: file_get_contents(%1$s): Failed to open stream: No such file or directory', $path));
 
         BoundedFileReader::read($path);
     }

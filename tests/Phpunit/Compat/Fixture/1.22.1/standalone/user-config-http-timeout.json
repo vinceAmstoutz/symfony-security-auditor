@@ -1,0 +1,311 @@
+{
+    "scenario": "standalone/user-config-http-timeout",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "audit_id": "AUDIT-<ID>",
+                        "project": "<WORKSPACE>/project",
+                        "started_at": "<TIMESTAMP>",
+                        "completed_at": "<TIMESTAMP>",
+                        "duration_seconds": 0,
+                        "files_scanned": 7,
+                        "files_discovered": 7,
+                        "complete": true,
+                        "risk_score": 19,
+                        "risk_level": "MEDIUM",
+                        "score": 81,
+                        "grade": "C",
+                        "total_vulnerabilities": 3,
+                        "by_severity": {
+                            "critical": 1,
+                            "high": 1,
+                            "medium": 0,
+                            "low": 1,
+                            "info": 0
+                        },
+                        "vulnerabilities": [
+                            {
+                                "id": "VULN-D9D6DA70",
+                                "fingerprint": "SSA-A075585EE3E2",
+                                "type": "broken_access_control",
+                                "category": "Broken Access Control",
+                                "owasp": "OWASP A01:2025 - Broken Access Control",
+                                "cwe": "CWE-284",
+                                "severity": "critical",
+                                "severity_score": 10,
+                                "title": "Unprotected admin",
+                                "description": "desc",
+                                "file": "src/Controller/AdminController.php",
+                                "line_start": 7,
+                                "line_end": 8,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.95,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N",
+                                    "base_score": 9.3
+                                }
+                            },
+                            {
+                                "id": "VULN-4CFEAC89",
+                                "fingerprint": "SSA-5107B0CC98DF",
+                                "type": "sql_injection",
+                                "category": "Injection",
+                                "owasp": "OWASP A05:2025 - Injection",
+                                "cwe": "CWE-89",
+                                "severity": "high",
+                                "severity_score": 7,
+                                "title": "SQLi in api",
+                                "description": "desc",
+                                "file": "src/Controller/ApiController.php",
+                                "line_start": 7,
+                                "line_end": 7,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.9,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 8.1
+                                }
+                            },
+                            {
+                                "id": "VULN-C308DBEA",
+                                "fingerprint": "SSA-456321EA35C6",
+                                "type": "insecure_direct_object_reference",
+                                "category": "Broken Access Control",
+                                "owasp": "OWASP A01:2025 - Broken Access Control",
+                                "cwe": "CWE-639",
+                                "severity": "low",
+                                "severity_score": 2,
+                                "title": "DOWNGRADE idor",
+                                "description": "desc",
+                                "file": "src/Controller/UserController.php",
+                                "line_start": 1,
+                                "line_end": 1,
+                                "vulnerable_code": "code",
+                                "attack_vector": "vector",
+                                "proof": "proof",
+                                "remediation": "fix",
+                                "confidence": 0.6,
+                                "reviewer_validated": true,
+                                "detected_at": "<TIMESTAMP>",
+                                "synthesized_poc": null,
+                                "suggested_fix": null,
+                                "cvss": {
+                                    "version": "4.0",
+                                    "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:L/VI:N/VA:N/SC:N/SI:N/SA:N",
+                                    "base_score": 3.1
+                                }
+                            }
+                        ],
+                        "cost": {
+                            "input_tokens": 2600,
+                            "output_tokens": 260,
+                            "total_tokens": 2860,
+                            "estimated_cost_usd": 0.0091,
+                            "primary_model": "gpt-4o",
+                            "by_role": [],
+                            "by_model": {
+                                "gpt-4o": {
+                                    "model": "gpt-4o",
+                                    "input_tokens": 2600,
+                                    "output_tokens": 260,
+                                    "cache_read_tokens": 0,
+                                    "cache_creation_tokens": 0,
+                                    "estimated_cost_usd": 0.0091,
+                                    "billed_models": [
+                                        "gpt-4o"
+                                    ]
+                                }
+                            }
+                        },
+                        "scope": {
+                            "since": null,
+                            "paths": []
+                        },
+                        "coverage": [
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/LowConfController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/UserController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "templates/base.html.twig",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "config/packages/security.yaml",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Service/Clean.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/UserController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/LowConfController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/UserController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "templates/base.html.twig",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "config/packages/security.yaml",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Service/Clean.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/UserController.php",
+                                "status": "validated"
+                            }
+                        ],
+                        "suppressed_fingerprints": [],
+                        "suppressed_baseline_fingerprints": []
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "API key: compat…6789",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php"
+            ]
+        }
+    }
+}

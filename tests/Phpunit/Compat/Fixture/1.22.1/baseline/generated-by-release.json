@@ -1,0 +1,199 @@
+{
+    "scenario": "baseline/generated-by-release",
+    "artifacts": {
+        "baseline.json": {
+            "mode": "644",
+            "base64": "WwogICAgewogICAgICAgICJmaW5nZXJwcmludCI6ICJTU0EtQTA3NTU4NUVFM0UyIiwKICAgICAgICAidHlwZSI6ICJicm9rZW5fYWNjZXNzX2NvbnRyb2wiLAogICAgICAgICJmaWxlIjogInNyYy9Db250cm9sbGVyL0FkbWluQ29udHJvbGxlci5waHAiLAogICAgICAgICJ0aXRsZSI6ICJVbnByb3RlY3RlZCBhZG1pbiIsCiAgICAgICAgImFkZGVkX2F0IjogIjIwMjYtMTAtMjkiCiAgICB9LAogICAgewogICAgICAgICJmaW5nZXJwcmludCI6ICJTU0EtNTEwN0IwQ0M5OERGIiwKICAgICAgICAidHlwZSI6ICJzcWxfaW5qZWN0aW9uIiwKICAgICAgICAiZmlsZSI6ICJzcmMvQ29udHJvbGxlci9BcGlDb250cm9sbGVyLnBocCIsCiAgICAgICAgInRpdGxlIjogIlNRTGkgaW4gYXBpIiwKICAgICAgICAiYWRkZWRfYXQiOiAiMjAyNi0xMC0yOSIKICAgIH0sCiAgICB7CiAgICAgICAgImZpbmdlcnByaW50IjogIlNTQS00NTYzMjFFQTM1QzYiLAogICAgICAgICJ0eXBlIjogImluc2VjdXJlX2RpcmVjdF9vYmplY3RfcmVmZXJlbmNlIiwKICAgICAgICAiZmlsZSI6ICJzcmMvQ29udHJvbGxlci9Vc2VyQ29udHJvbGxlci5waHAiLAogICAgICAgICJ0aXRsZSI6ICJET1dOR1JBREUgaWRvciIsCiAgICAgICAgImFkZGVkX2F0IjogIjIwMjYtMTAtMjkiCiAgICB9Cl0K"
+        }
+    },
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}' --format='json' --baseline='{workspace}/baseline.json'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "audit_id": "AUDIT-<ID>",
+                        "project": "<WORKSPACE>/project",
+                        "started_at": "<TIMESTAMP>",
+                        "completed_at": "<TIMESTAMP>",
+                        "duration_seconds": 0,
+                        "files_scanned": 7,
+                        "files_discovered": 7,
+                        "complete": true,
+                        "risk_score": 0,
+                        "risk_level": "SAFE",
+                        "score": 100,
+                        "grade": "A",
+                        "total_vulnerabilities": 0,
+                        "by_severity": {
+                            "critical": 0,
+                            "high": 0,
+                            "medium": 0,
+                            "low": 0,
+                            "info": 0
+                        },
+                        "vulnerabilities": [],
+                        "cost": {
+                            "input_tokens": 2000,
+                            "output_tokens": 200,
+                            "total_tokens": 2200,
+                            "estimated_cost_usd": 0.007,
+                            "primary_model": "gpt-4o",
+                            "by_role": [],
+                            "by_model": {
+                                "gpt-4o": {
+                                    "model": "gpt-4o",
+                                    "input_tokens": 2000,
+                                    "output_tokens": 200,
+                                    "cache_read_tokens": 0,
+                                    "cache_creation_tokens": 0,
+                                    "estimated_cost_usd": 0.007,
+                                    "billed_models": [
+                                        "gpt-4o"
+                                    ]
+                                }
+                            }
+                        },
+                        "scope": {
+                            "since": null,
+                            "paths": []
+                        },
+                        "coverage": [
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/LowConfController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/UserController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "templates/base.html.twig",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "config/packages/security.yaml",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Service/Clean.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "rejected"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/AdminController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/LowConfController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/UserController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "templates/base.html.twig",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "config/packages/security.yaml",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Service/Clean.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/ApiController.php",
+                                "status": "rejected"
+                            }
+                        ],
+                        "suppressed_fingerprints": [
+                            "SSA-A075585EE3E2",
+                            "SSA-5107B0CC98DF",
+                            "SSA-456321EA35C6"
+                        ],
+                        "suppressed_baseline_fingerprints": [
+                            "SSA-A075585EE3E2",
+                            "SSA-5107B0CC98DF",
+                            "SSA-456321EA35C6"
+                        ]
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------"
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/AdminController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/ApiController.php",
+                "tool-results model=gpt-4o count=2",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/LowConfController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/UserController.php",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=templates/base.html.twig,config/packages/security.yaml,src/Service/Clean.php"
+            ]
+        }
+    }
+}

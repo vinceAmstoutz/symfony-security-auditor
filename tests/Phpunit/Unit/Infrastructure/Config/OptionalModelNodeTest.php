@@ -19,9 +19,12 @@ use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class OptionalModelNodeTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @param array<string, mixed> $configuration
      */
@@ -29,7 +32,7 @@ final class OptionalModelNodeTest extends TestCase
     public function test_an_empty_model_override_is_refused_with_the_message_it_always_had(array $configuration, string $message): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage($message);
+        $this->expectExceptionMessageContaining($message);
 
         $this->process($configuration);
     }

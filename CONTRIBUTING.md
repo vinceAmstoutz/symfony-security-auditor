@@ -164,6 +164,8 @@ bin/castor compat:record X.Y.Z
 
 The task checks the tag out under `var/compat/X.Y.Z`, installs its dependencies, and runs the recorders against it, the behaviour one as your own user, so the scenarios writing to the discard device are recorded too. To record a scenario added since, run `docker compose exec --user "$(id -u):$(id -g)" php php tools/Compat/record.php var/compat/X.Y.Z X.Y.Z <scenario>`.
 
+A dependency bump that moves a recorded package (`symfony/ai-platform`, `symfony/ai-bundle`, `mcp/sdk`, Symfony) to another minor version cannot replay the last release's recordings, which only replay on the minor versions they were recorded with. Release the bump quickly and record the fixtures from that release once it is tagged: until then the bump's pull request records the last release again from its tag with only the bump applied, and that edited recording must not outlive the next release.
+
 ## Evaluating Detection Quality
 
 Unit and mutation tests prove the code behaves as written; they say nothing about whether the auditor actually _finds vulnerabilities_. The eval harness closes that gap: it audits a fixture whose vulnerabilities are known ahead of time and scores the run against that ground truth.

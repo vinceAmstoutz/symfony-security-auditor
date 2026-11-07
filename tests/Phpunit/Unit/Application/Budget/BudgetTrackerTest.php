@@ -24,9 +24,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class BudgetTrackerTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -68,7 +71,7 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(80, 30)));
 
         $this->expectException(BudgetExceededException::class);
-        $this->expectExceptionMessage('token budget exceeded (110 / 100 tokens)');
+        $this->expectExceptionMessageContaining('token budget exceeded (110 / 100 tokens)');
 
         $budgetTracker->assertWithinBudget();
     }
@@ -85,7 +88,7 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000, 0)));
 
         $this->expectException(BudgetExceededException::class);
-        $this->expectExceptionMessage('cost budget exceeded');
+        $this->expectExceptionMessageContaining('cost budget exceeded');
 
         $budgetTracker->assertWithinBudget();
     }
@@ -129,7 +132,7 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(100, 0)));
 
         $this->expectException(BudgetExceededException::class);
-        $this->expectExceptionMessage('cost budget exceeded');
+        $this->expectExceptionMessageContaining('cost budget exceeded');
 
         $budgetTracker->assertWithinBudget();
     }

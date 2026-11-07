@@ -31,7 +31,7 @@ final readonly class StandalonePlatformConfig
      */
     public function toAiConfig(): array
     {
-        return ['platform' => $this->platform];
+        return ['platform' => CliAgentPlatforms::withoutCliAgents($this->platform)];
     }
 
     /**

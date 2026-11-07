@@ -182,7 +182,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
 
         return $composerProbe->isAvailable
             ? new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.')
-            : new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, \sprintf('Not usable (%s) — needed only to run "init" or switch providers, not to audit. "init" lists how to install it.', OutputFormatter::escape($composerProbe->failure)));
+            : new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, \sprintf('Not usable (%s) — the lookup_advisory tool then audits without advisory data; "init" does not need it.', OutputFormatter::escape($composerProbe->failure)));
     }
 
     /**

@@ -1,0 +1,40 @@
+{
+    "scenario": "standalone/user-config-unknown-key",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit <project-path>='{project}' --format='json'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        ""
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        "",
+                        "In ArrayNode.php line <LINE>:",
+                        "",
+                        "  Unrecognized option \"bogus\" under \"symfony_security_auditor.audit\". Available options are \"attacker_max_concurrent\"",
+                        "  , \"baseline\", \"budget\", \"chunking\", \"code_slicing\", \"custom_skills\", \"escalation\", \"excluded_types\", \"fail_on\", \"fa",
+                        "  il_on_incomplete\", \"fix_synthesis\", \"format\", \"included_types\", \"max_iterations\", \"max_tool_iterations\", \"min_confi",
+                        "  dence\", \"min_score\", \"output\", \"poc_synthesis\", \"rate_limit\", \"report_path_prefix\", \"retry\", \"reviewer_batch_size\",",
+                        "   \"reviewer_max_concurrent\", \"reviewer_max_tool_iterations\", \"reviewer_structured_collection\", \"reviewer_tools_enabl",
+                        "  ed\", \"since_closure\", \"stable_system_prompt\", \"static_prescan\", \"structured_collection\", \"tools_enabled\", \"tools_sc",
+                        "  ope\", \"triage_memory\"."
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

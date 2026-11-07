@@ -123,12 +123,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportin
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\OptionsRecordingPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\PassThroughLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\UsageReportingLLMClient;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $tmpDir;
 
     private ?Kernel $bootedKernel = null;
@@ -200,6 +203,52 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertArrayNotHasKey('response_format', OptionsRecordingPlatform::$lastOptions);
         self::assertSame(4096, OptionsRecordingPlatform::$lastOptions['max_tokens']);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_auditor_runs_on_the_claude_code_cli_its_cli_agent_names(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_auditor_leaves_the_platform_of_the_application_to_the_application_when_it_runs_on_a_cli(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]]);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $platform = $this->getPrivateService($kernel, PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+
+        self::assertSame(['OK', 'stub-response'], [$llmClient->complete('sys', 'usr')->content(), $platform->invoke('model', 'usr')->asText()]);
+    }
+
+    public function test_the_auditor_asks_a_cli_for_json_answers_since_the_cli_cannot_carry_its_tools(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'opus', 'cli_agent' => ['platform' => 'codex']]);
+
+        self::assertSame(
+            [false, false, false, false],
+            [
+                $containerBuilder->getParameter('symfony_security_auditor.audit.tools_enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.structured_collection'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_tools_enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'),
+            ],
+        );
     }
 
     /**
@@ -562,7 +611,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public function test_bundle_refuses_a_model_key_set_to_a_number_with_a_configuration_error_naming_it(array $config, string $path): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "int".', $path));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "%s". Expected "string", but got "int".', $path));
 
         $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
     }
@@ -585,7 +634,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public function test_bundle_refuses_a_text_key_set_to_no_text_with_a_configuration_error_naming_it(array $config, string $path, string $type): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "%s".', $path, $type));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "%s". Expected "string", but got "%s".', $path, $type));
 
         $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
     }
@@ -2399,6 +2448,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder->getParameterBag()->resolve();
 
         return $containerBuilder;
+    }
+
+    private function fakeClaudeCli(): string
+    {
+        $cli = $this->tmpDir.'/claude';
+        (new Filesystem())->dumpFile($cli, "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n");
+        (new Filesystem())->chmod($cli, 0o755);
+
+        return $cli;
     }
 
     /**

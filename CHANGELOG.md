@@ -8,7 +8,15 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
+- The standalone binary runs on a Claude subscription instead of an API key: `init --provider=claudecode` sets it up, and each call goes through the installed Claude Code CLI with its own tools off ([#677](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/677))
+- The standalone binary runs on a ChatGPT subscription too: `init --provider=codex` sets it up, and each call goes through the installed Codex CLI, read-only and with its shell off ([#678](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/678))
+- A Symfony application runs the audit on a Claude or ChatGPT subscription too: `cli_agent.platform: claudecode` or `codex` sends the auditor's calls to the installed CLI and leaves the application's own `symfony/ai` platform as it is ([#679](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/679))
+- The standalone binary bundles Composer 2.8.12 and `init` installs the provider bridge with it, on the binary's own PHP, so it no longer needs PHP or Composer on your machine; `init` no longer checks for Composer before asking anything, and `doctor`'s Composer check now only concerns the `lookup_advisory` tool ([#682](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/682))
 - Every credential the secret scrubber redacts and every match of the static pre-scan is announced in the progress output as soon as the scan ends, then becomes a finding on its line that the reviewer validates or rejects like the attacker's
+
+### Core 🧱
+
+- A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 

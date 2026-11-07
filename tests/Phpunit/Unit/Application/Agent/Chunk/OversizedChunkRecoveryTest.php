@@ -29,10 +29,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
 final class OversizedChunkRecoveryTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const int FILE_BYTES = 100;
 
     /**
@@ -66,7 +69,7 @@ final class OversizedChunkRecoveryTest extends TestCase
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
         $this->expectException(LLMFixedPromptTooLargeException::class);
-        $this->expectExceptionMessage('even with only the 100-byte file "src/A.php" in it (prompt is too long)');
+        $this->expectExceptionMessageContaining('even with only the 100-byte file "src/A.php" in it (prompt is too long)');
 
         try {
             $this->recovery()->recover(
@@ -89,7 +92,7 @@ final class OversizedChunkRecoveryTest extends TestCase
     public function test_the_file_is_measured_as_the_prompt_carried_it_after_code_slicing(): void
     {
         $this->expectException(LLMFixedPromptTooLargeException::class);
-        $this->expectExceptionMessage('even with only the 100-byte file "src/A.php" in it');
+        $this->expectExceptionMessageContaining('even with only the 100-byte file "src/A.php" in it');
 
         $this->recovery()->recover(
             [ProjectFile::create('src/A.php', '/app/src/A.php', str_repeat('x', 5000))],

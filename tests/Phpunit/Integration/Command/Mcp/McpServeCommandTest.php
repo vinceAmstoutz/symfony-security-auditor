@@ -33,12 +33,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\FailingMcpTransportFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\PreloadedStdioTransportFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Mcp\Fixture\SingleFileAuditPipeline;
 
 final class McpServeCommandTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $projectPath;
 
     private PreloadedStdioTransportFactory $preloadedStdioTransportFactory;
@@ -99,7 +102,7 @@ final class McpServeCommandTest extends TestCase
         $commandTester = new CommandTester($this->command(new FailingMcpTransportFactory()));
 
         try {
-            $this->expectExceptionMessage(FailingMcpTransportFactory::FAILURE);
+            $this->expectExceptionMessageContaining(FailingMcpTransportFactory::FAILURE);
 
             $commandTester->execute([]);
         } finally {

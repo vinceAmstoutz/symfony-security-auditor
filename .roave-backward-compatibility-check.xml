@@ -8,7 +8,5 @@
 -->
 <roave-bc-check xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="var/bc-check/vendor/roave/backward-compatibility-check/Resources/schema.xsd">
     <baseline>
-        <!-- CHANGELOG: "#467" -->
-        <ignored-regex>#\[BC\] ADDED: Case VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\VulnerabilityType::XSS was added#</ignored-regex>
     </baseline>
 </roave-bc-check>
