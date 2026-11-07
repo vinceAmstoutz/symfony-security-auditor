@@ -101,6 +101,27 @@ final class AuditConfigurationDefinitionTest extends TestCase
         $this->process([['audit' => ['min_score' => 101]]]);
     }
 
+    public function test_the_coverage_critic_may_name_a_single_gap(): void
+    {
+        $processed = $this->process([['audit' => ['coverage_critic' => ['max_gaps' => 1]]]]);
+
+        self::assertSame(1, $this->valueAt($processed, ['audit', 'coverage_critic', 'max_gaps']));
+    }
+
+    public function test_the_coverage_critic_refuses_to_name_no_gap(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->process([['audit' => ['coverage_critic' => ['max_gaps' => 0]]]]);
+    }
+
+    public function test_the_coverage_critic_switch_refuses_a_value_that_is_no_boolean(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->process([['audit' => ['coverage_critic' => ['enabled' => 'yes']]]]);
+    }
+
     public function test_the_gitignore_is_respected_and_the_tracked_ignored_files_are_left_out_by_default(): void
     {
         $processed = $this->process([[]]);

@@ -1412,6 +1412,27 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_a_project_config_may_turn_the_coverage_critic_on_since_the_user_budget_still_caps_it(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  coverage_critic:\n    enabled: true\n    max_gaps: 3\n");
+
+        self::assertSame(['audit' => ['coverage_critic' => ['enabled' => true, 'max_gaps' => 3]]], $this->loader($projectConfigFile)->load()->auditConfig);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
+     * @throws ProjectConfigUserOnlyKeyException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_a_project_config_may_tighten_the_budget(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\naudit:\n  budget:\n    max_cost_usd: 10\n");

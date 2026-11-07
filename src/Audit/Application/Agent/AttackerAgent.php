@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkCove
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ConcurrentChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\SequentialChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -150,7 +151,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         $markers = $this->staticPreScanner->scan($files);
         $riskMarkerIndex = new RiskMarkerIndex($markers);
-        $effectiveFiles = $this->leanMode ? $riskMarkerIndex->filesWithMarkers($files) : $files;
+        $effectiveFiles = $this->effectiveFiles($files, $riskMarkerIndex, $attackerAnalysisRequest);
 
         if ([] === $effectiveFiles) {
             return $this->skipLeanFilteredAnalysis($files, $coverageRecorder);
@@ -162,7 +163,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($attackerAnalysisRequest->filesForTools()) : null;
 
-        $chunks = $this->fileChunker->chunk($effectiveFiles);
+        $chunks = $this->chunksOf($effectiveFiles, $attackerAnalysisRequest);
 
         $concurrentChunkAnalyzer = $this->concurrentChunkAnalyzerForConcurrentAnalysis();
 
@@ -177,6 +178,37 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         ]);
 
         return $allVulnerabilities;
+    }
+
+    /**
+     * Lean mode keeps the files a risk marker flags, except for a coverage
+     * gap: the critic named its files because no chunk showed them together.
+     *
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function effectiveFiles(array $files, RiskMarkerIndex $riskMarkerIndex, AttackerAnalysisRequest $attackerAnalysisRequest): array
+    {
+        if (!$this->leanMode || $attackerAnalysisRequest->coverageGap instanceof CoverageGap) {
+            return $files;
+        }
+
+        return $riskMarkerIndex->filesWithMarkers($files);
+    }
+
+    /**
+     * @param list<ProjectFile> $effectiveFiles
+     *
+     * @return list<list<ProjectFile>> one chunk of a coverage gap's files, else the chunker's groups
+     */
+    private function chunksOf(array $effectiveFiles, AttackerAnalysisRequest $attackerAnalysisRequest): array
+    {
+        if ($attackerAnalysisRequest->coverageGap instanceof CoverageGap) {
+            return [$effectiveFiles];
+        }
+
+        return $this->fileChunker->chunk($effectiveFiles);
     }
 
     /**

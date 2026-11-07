@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
@@ -199,6 +201,51 @@ final class AttackerAnalysisRequestTest extends TestCase
         $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         self::assertSame([], $attackerAnalysisRequest->candidateFindings);
+    }
+
+    public function test_the_deep_pass_of_a_coverage_gap_keeps_its_hypothesis(): void
+    {
+        $coverageGap = new CoverageGap([], 'The export skips the owner check.', 'broken_access_control');
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), coverageGap: $coverageGap);
+
+        self::assertSame($coverageGap, $attackerAnalysisRequest->withFilesAndCandidateFindings([], [])->coverageGap);
+    }
+
+    /**
+     * @param ?list<string> $toolPaths
+     * @param list<string>  $expectedToolPaths
+     *
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('coverageGapToolScopes')]
+    public function test_a_request_narrowed_to_a_coverage_gap_analyzes_its_files_and_keeps_every_audited_file_in_reach_of_the_tools(?array $toolPaths, array $expectedToolPaths): void
+    {
+        $file = static fn (string $path): ProjectFile => ProjectFile::create($path, '/app/'.$path, '<?php');
+        $gapFile = $file('src/B.php');
+        $previous = [$this->makeVulnerability()];
+        $rejected = [$this->makeVulnerability()];
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+        $coverageGap = new CoverageGap([$gapFile], 'The export skips the owner check.', 'broken_access_control');
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([$file('src/A.php'), $gapFile], $symfonyMapping, true, $previous, $rejected, toolFiles: null === $toolPaths ? null : array_map($file, $toolPaths));
+
+        $narrowed = $attackerAnalysisRequest->forCoverageGap($coverageGap);
+
+        self::assertSame(
+            [[$gapFile], $symfonyMapping, true, $previous, $rejected, $coverageGap, $expectedToolPaths],
+            [$narrowed->files, $narrowed->symfonyMapping, $narrowed->bypassCache, $narrowed->previousFindings, $narrowed->rejectedFindings, $narrowed->coverageGap, array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $narrowed->filesForTools())],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{?list<string>, list<string>}>
+     */
+    public static function coverageGapToolScopes(): iterable
+    {
+        yield 'the audited files when the tools were given none' => [null, ['src/A.php', 'src/B.php']];
+        yield 'the files the tools were given' => [['src/A.php', 'src/B.php', 'src/C.php'], ['src/A.php', 'src/B.php', 'src/C.php']];
     }
 
     /**

@@ -49,6 +49,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCritic;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCriticInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\NullCoverageCritic;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
@@ -1736,6 +1739,42 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['fix_synthesis' => ['enabled' => true]]]);
 
         self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.fix_synthesis.enabled'));
+    }
+
+    /**
+     * @param array<string, mixed>                  $audit
+     * @param class-string<CoverageCriticInterface> $expected
+     */
+    #[DataProvider('coverageCriticWirings')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_bundle_runs_the_coverage_critic_only_when_it_is_enabled(array $audit, string $expected): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => $audit]);
+
+        self::assertInstanceOf($expected, $this->getPrivateService($kernel, CoverageCriticInterface::class));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, class-string<CoverageCriticInterface>}>
+     */
+    public static function coverageCriticWirings(): iterable
+    {
+        yield 'off by default' => [[], NullCoverageCritic::class];
+        yield 'on when enabled' => [['coverage_critic' => ['enabled' => true]], CoverageCritic::class];
+    }
+
+    public function test_bundle_leaves_the_coverage_critic_off_with_five_gaps_by_default(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertSame(
+            [false, 5],
+            [
+                $containerBuilder->getParameter('symfony_security_auditor.audit.coverage_critic.enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.coverage_critic.max_gaps'),
+            ],
+        );
     }
 
     public function test_bundle_defaults_since_closure_to_none(): void

@@ -103,6 +103,8 @@ final readonly class ContainerParameterRegistrar
             'audit.fix_synthesis.severity_floor' => $audit->fixSynthesisSeverityFloor,
             'audit.code_slicing.enabled' => $audit->codeSlicingEnabled,
             'audit.code_slicing.min_lines_before_slicing' => $audit->codeSlicingMinLines,
+            'audit.coverage_critic.enabled' => $audit->coverageCriticEnabled,
+            'audit.coverage_critic.max_gaps' => $audit->coverageCriticMaxGaps,
             'audit.budget.max_tokens' => $budget->maxTokens,
             'audit.budget.max_cost_usd' => $budget->maxCostUsd,
             'audit.models_requiring_pricing' => $this->modelsRequiringPricing($bundleConfiguration),

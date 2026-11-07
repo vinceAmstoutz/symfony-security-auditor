@@ -23,6 +23,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCritic;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCriticInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCriticSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\NullCoverageCritic;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\RecordCoverageGapToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
@@ -57,6 +62,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CoverageCriticPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
@@ -115,6 +121,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\CoverageCriticPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRenderer;
@@ -168,6 +175,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVote
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordCoverageGapToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
@@ -529,6 +537,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                     ->args([param('symfony_security_auditor.audit.tools_scope')]),
             ]),
             service(ProgressReporterInterface::class),
+            service(CoverageCriticInterface::class),
         ]);
     $defaultsConfigurator->alias(AuditOrchestratorInterface::class, AuditOrchestrator::class);
 
@@ -665,6 +674,26 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(RecordReviewToolFactory::class);
     $defaultsConfigurator->alias(RecordReviewToolFactoryInterface::class, RecordReviewToolFactory::class);
+
+    $defaultsConfigurator->set(RecordCoverageGapToolFactory::class);
+    $defaultsConfigurator->alias(RecordCoverageGapToolFactoryInterface::class, RecordCoverageGapToolFactory::class);
+
+    $defaultsConfigurator->set(CoverageCriticPromptBuilder::class);
+    $defaultsConfigurator->alias(CoverageCriticPromptBuilderInterface::class, CoverageCriticPromptBuilder::class);
+
+    $defaultsConfigurator->set(NullCoverageCritic::class);
+    $defaultsConfigurator->set(CoverageCritic::class)
+        ->args([
+            service('security_auditor.attacker_client'),
+            service(CoverageCriticPromptBuilderInterface::class),
+            service(RecordCoverageGapToolFactoryInterface::class),
+            service(FileChunker::class),
+            service('logger'),
+            inline_service(CoverageCriticSettings::class)->args([
+                param('symfony_security_auditor.audit.coverage_critic.max_gaps'),
+                param('symfony_security_auditor.audit.structured_collection'),
+            ]),
+        ]);
 
     $defaultsConfigurator->set(AttackerAgent::class)
         ->args((new AttackerAgentDefinitionFactory())->args('security_auditor.attacker_client'));

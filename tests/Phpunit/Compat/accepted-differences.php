@@ -11,4 +11,12 @@
 
 declare(strict_types=1);
 
-return [];
+return [
+    [
+        'scenarios' => ['standalone/user-config-unknown-key'],
+        'path' => 'runs.*.stderr.lines',
+        'match' => '/^[-+]  /',
+        'reason' => 'The error naming an unknown `audit` key lists the new `coverage_critic` option among the available ones.',
+        'changelog' => '#695',
+    ],
+];

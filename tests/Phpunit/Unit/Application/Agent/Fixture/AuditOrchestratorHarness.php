@@ -23,6 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCol
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCriticInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\NullCoverageCritic;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
@@ -55,6 +57,7 @@ final class AuditOrchestratorHarness
      *     minConfidence?: float,
      *     recordingProgressReporter?: RecordingProgressReporter,
      *     fileChunker?: FileChunker,
+     *     coverageCritic?: CoverageCriticInterface,
      * } $overrides
      */
     public static function orchestrator(
@@ -94,6 +97,7 @@ final class AuditOrchestratorHarness
                 $overrides['minConfidence'] ?? AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
             ),
             progressReporter: $overrides['recordingProgressReporter'] ?? new NullProgressReporter(),
+            coverageCritic: $overrides['coverageCritic'] ?? new NullCoverageCritic(),
         );
     }
 

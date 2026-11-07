@@ -493,6 +493,21 @@
                 }
               }
             },
+            "coverage_critic": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "After the attacker/reviewer loop, ask the model from a summary of the audit (no source code) which entry points or sibling paths no chunk showed together, and analyze each gap as one targeted chunk. Default: false."
+                },
+                "max_gaps": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Most gaps the coverage critic may name, each analyzed as one targeted attacker chunk. Default: 5."
+                }
+              }
+            },
             "budget": {
               "type": "object",
               "additionalProperties": false,
