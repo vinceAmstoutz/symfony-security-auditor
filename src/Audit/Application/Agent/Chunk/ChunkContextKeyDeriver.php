@@ -93,7 +93,7 @@ final readonly class ChunkContextKeyDeriver
             return $contextKey;
         }
 
-        return hash('sha256', hash('sha256', $contextKey).hash('sha256', $chunkPreambles->hypothesis));
+        return hash('sha256', implode("\n", [$contextKey, $chunkPreambles->hypothesis]));
     }
 
     /**
