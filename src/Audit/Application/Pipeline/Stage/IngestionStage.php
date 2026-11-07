@@ -21,10 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScanSkippedFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScrubbedSecretFindings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\StaticMarkerFindings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class IngestionStage implements StageInterface
@@ -35,6 +38,7 @@ final readonly class IngestionStage implements StageInterface
         private ProjectFileScannerInterface $projectFileScanner,
         private LoggerInterface $logger,
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
+        private ?StaticPreScannerInterface $staticPreScanner = null,
     ) {}
 
     #[Override]
@@ -94,6 +98,33 @@ final readonly class IngestionStage implements StageInterface
 
         foreach ($files as $file) {
             foreach (ScrubbedSecretFindings::in($file) as $finding) {
+                $auditContext->addVulnerability($finding);
+            }
+        }
+
+        $this->reportStaticMarkers($files, $auditContext);
+    }
+
+    /**
+     * Everything the static pre-scan matches is reported, not only handed to
+     * the model as a hint.
+     *
+     * @param list<ProjectFile> $files
+     */
+    private function reportStaticMarkers(array $files, AuditContext $auditContext): void
+    {
+        if (!$this->staticPreScanner instanceof StaticPreScannerInterface) {
+            return;
+        }
+
+        $linesByPath = [];
+        foreach ($files as $file) {
+            $linesByPath[$file->relativePath()] = explode("\n", $file->content());
+        }
+
+        foreach ($this->staticPreScanner->scan($files) as $riskMarker) {
+            $finding = StaticMarkerFindings::from($riskMarker, $linesByPath[$riskMarker->filePath()][$riskMarker->line() - 1] ?? '');
+            if ($finding instanceof Vulnerability) {
                 $auditContext->addVulnerability($finding);
             }
         }
