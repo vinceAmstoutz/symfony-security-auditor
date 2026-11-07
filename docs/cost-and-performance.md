@@ -30,6 +30,14 @@ Each key a profile sets is documented in [Configuration → `audit.*`](configura
 - **Lean pre-scan & code slicing** — `audit.static_prescan.lean_mode` drops marker-free files and `audit.code_slicing.enabled` trims large files to security-relevant lines; both cut tokens and are on under the `fast` profile.
 - **Budget guards** — cap a run with `audit.budget.max_tokens` / `audit.budget.max_cost_usd`, and preview spend with `audit:run --dry-run` before committing to a full run. The preview's token counts are a heuristic projection, not the real per-call usage a completed run reports: the file contents plus, for each chunk, the system prompt and the project mapping (routes, firewalls, voters, forms) that every chunk's request carries, so a project with many routes is priced for them. The standalone binary runs it without a provider credential, so you can price a project before signing up for one.
 
+## Coverage critic
+
+`audit.coverage_critic.enabled: true` adds one pass after the attacker/reviewer loop. The attacker model reads a summary of the run — the routes and their guards, the voters, the file groups the attacker analyzed with each file's coverage status, and the confirmed findings, never a file's contents — and names up to `audit.coverage_critic.max_gaps` (default `5`) gaps: files no chunk showed together. Each gap is then analyzed as one targeted attacker chunk on those files, led by the critic's hypothesis, and what it finds goes through the reviewer like any other finding.
+
+- **Extra cost** — one critic call, whose input grows with the number of routes (the same route map every attacker chunk carries) and is otherwise capped (200 file groups, 100 findings), plus at most `max_gaps` chunks of a few files each, plus the review of what they find. Every call is booked on `audit.budget` like the others; `audit:run --dry-run` does not price the critic.
+- **When to enable** — when chunking cannot keep related paths together: a feature with a bulk, import or export action beside a guarded single-item one, a handler reached from a route, a console command and a Messenger message alike, or a large project audited with `audit.chunking.strategy: type`. Leave it off for quick PR runs and small projects, where each chunk already holds its feature.
+- **Caching** — a gap's chunk is cached under its hypothesis, so a rerun that names the same gap in the same words reads it from the cache; the critic's own call is made on every run.
+
 ## Avoiding rate limits (`429`)
 
 Two layers keep you inside provider quotas:
