@@ -68,6 +68,8 @@ src/
 │   │   └── Agent/       # AttackerAgent (+ Chunk/* collaborators),
 │   │                      ReviewerAgent (+ Review/* collaborators),
 │   │                      EscalatingAttackerAgent,
+│   │                      Critic/* (CoverageCritic, CoverageGap, CoverageGapFactory,
+│   │                      CoverageGapCollector + RecordCoverageGapToolFactoryInterface),
 │   │                      AuditOrchestrator, VulnerabilityFactory,
 │   │                      VulnerabilityCollector + RecordVulnerabilityToolFactoryInterface,
 │   │                      ReviewCollector + RecordReviewToolFactoryInterface,
@@ -169,6 +171,7 @@ flowchart TD
     REV["ReviewerAgent::review()\nLLM call per vulnerability\nwithReviewerValidation()"]
     DEDUP["deduplicate\nAuditContext::addVulnerability()"]
     LOOP{"no new findings\nOR 3 iterations?"}
+    CRIT["CoverageCritic (optional)\nname the files no chunk showed together\none targeted attacker chunk per gap\nreview · deduplicate"]
     POC["PoCSynthesisStage (optional)\nsynthesize PoC for\nhigh-severity validated findings"]
     RPT["AuditReport::fromContext()\nvalidated vulnerabilities only\ncapture completedAt"]
     RENDER["ReportRenderer\nrenderConsole() or renderJson()"]
@@ -177,9 +180,10 @@ flowchart TD
     UC --> ING --> MAP --> DEP --> AUD --> ATK
     ATK --> CONF
     CONF -- yes --> REV --> DEDUP --> LOOP
-    CONF -- none pass --> POC
+    CONF -- none pass --> CRIT
     LOOP -- continue --> ATK
-    LOOP -- done --> POC
+    LOOP -- done --> CRIT
+    CRIT --> POC
     POC --> RPT
     RPT --> RENDER
 ```
@@ -342,16 +346,20 @@ flowchart TD
     PERSIST["persist non-duplicate findings\ncount newFindings"]
     STOP{"newFindings == 0\nOR iteration == 3?"}
     INC["iteration++"]
+    CRIT["CoverageCritic::gaps() (when enabled)\neach gap: AttackerAgent::analyze(gap files, hypothesis)\nthen filter · review · persist"]
     META["write metadata\niterations · total_findings · validated · risk_score"]
     END(["done"])
 
     START --> ATK --> FILT --> EMPTY
-    EMPTY -- yes --> META
+    EMPTY -- yes --> CRIT
     EMPTY -- no --> REV --> PERSIST --> STOP
     STOP -- no --> INC --> ATK
-    STOP -- yes --> META
+    STOP -- yes --> CRIT
+    CRIT --> META
     META --> END
 ```
+
+**Coverage critic** (`audit.coverage_critic.enabled`, off by default). The attacker sees the project chunk by chunk, so its blind spots are what no chunk showed it together: an entry point never grouped with its handler, a bulk, import or export path that lacks the check the single-item path has, a console command or Messenger message reaching the same handler as a guarded route. Once the loop is over, `CoverageCritic` asks the attacker's client, from a summary built by `CoverageCriticPromptBuilder` (Infrastructure, `SymfonyProfile`) — the route access-control map and voter coverage the attacker sees, the file groups `FileChunker` makes of the audited files with each file's last attacker status in the coverage ledger, and the confirmed findings, each list capped, never a file's contents — which files were never examined together. The model records each gap through the schema-enforced `record_coverage_gap` tool (`files`, `hypothesis`, `attack_class`), or answers with a JSON array when `audit.structured_collection` is off or the client never offered the tool. `CoverageGapFactory` drops a gap that names a file the run did not audit or misses a field, and keeps at most `audit.coverage_critic.max_gaps`. Each gap then runs through the same path as an iteration: `AttackerAnalysisRequest::forCoverageGap()` hands the attacker the gap's files as one chunk — lean mode does not filter them, the investigation tools keep every audited file in reach — led by the hypothesis as a quoted preamble that also joins the chunk's cache key, and its findings are filtered, reviewed, deduplicated and persisted with the rest. The critic's call is booked on the budget like any other; a budget or non-transient provider failure stops the run, while an unreadable answer or a summary the model cannot fit only costs the gaps.
 
 Duplicate detection: two vulnerabilities are duplicates when their IDs match, or when `filePath`, `type`, and line ranges all overlap. Duplicates collapse to the better one: a reviewer-validated finding beats any other, then the higher severity wins, then the higher confidence, and a tie keeps the finding seen first; the confidence floor applies before the copies of one id collapse, so a copy below it never hides a confident one. A later verdict never lowers the severity already reported, except that a same-severity `corrected_type` reclassifies the finding.
 
