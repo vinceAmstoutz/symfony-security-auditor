@@ -25,6 +25,9 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCritic;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCriticInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\NullCoverageCritic;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
@@ -366,6 +369,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(CodeSlicerInterface::class, $bundleConfiguration->audit->codeSlicingEnabled
             ? RegexCodeSlicer::class
             : NullCodeSlicer::class);
+
+        $servicesConfigurator->alias(CoverageCriticInterface::class, $bundleConfiguration->audit->coverageCriticEnabled
+            ? CoverageCritic::class
+            : NullCoverageCritic::class);
     }
 
     /**

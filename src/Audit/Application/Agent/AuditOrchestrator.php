@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCriticInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\NullCoverageCritic;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -46,6 +48,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         private LoggerInterface $logger,
         private AuditLoopSettings $auditLoopSettings,
         private ProgressReporterInterface $progressReporter,
+        private CoverageCriticInterface $coverageCritic = new NullCoverageCritic(),
     ) {}
 
     /**
@@ -83,6 +86,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $newFindings = $this->runIteration($mapping, $files, $auditContext, $iteration);
         } while (0 !== $newFindings && $iteration < $this->auditLoopSettings->maxIterations);
 
+        $this->analyzeCoverageGaps($mapping, $files, $auditContext);
+
         $auditContext->setMeta('audit.baseline_skipped', \count($this->skippedFingerprints($auditContext)));
         $auditContext->setMeta('audit.iterations', $iteration);
         $auditContext->setMeta('audit.total_findings', \count($auditContext->vulnerabilities()));
@@ -105,15 +110,83 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         ]);
 
         $previousFindings = array_values($auditContext->validatedVulnerabilities());
-        $rejectedFindings = $this->rejectedFindings($auditContext);
-        $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
-        $filtered = $this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext);
+        $filtered = $this->analyzeWithRecovery($this->analysisRequest($symfonyMapping, $files, $auditContext), $files, $auditContext);
+        $reviewOutcome = $this->reviewAndPersist($filtered, $files, $auditContext);
 
+        if (null === $reviewOutcome) {
+            return 0;
+        }
+
+        [$newFindings, $acceptedCount] = $reviewOutcome;
+
+        $this->logger->info('Iteration complete', [
+            'iteration' => $iteration,
+            'attacker_found' => \count($filtered),
+            'reviewer_accepted' => $acceptedCount,
+            'new_unique' => $newFindings,
+            'total' => \count($auditContext->vulnerabilities()),
+            'previous_validated_passed_back' => \count($previousFindings),
+        ]);
+
+        return $newFindings;
+    }
+
+    /**
+     * Once the loop is over, analyzes each gap the coverage critic names —
+     * files no chunk showed together — as one attacker chunk led by its
+     * hypothesis, and reviews, deduplicates and persists what it finds like
+     * any iteration's findings.
+     *
+     * @param list<ProjectFile> $files
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function analyzeCoverageGaps(SymfonyMapping $symfonyMapping, array $files, AuditContext $auditContext): void
+    {
+        foreach ($this->coverageCritic->gaps($symfonyMapping, $auditContext) as $coverageGap) {
+            $this->reviewAndPersist(
+                $this->analyzeWithRecovery($this->analysisRequest($symfonyMapping, $files, $auditContext)->forCoverageGap($coverageGap), $files, $auditContext),
+                $files,
+                $auditContext,
+            );
+        }
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     */
+    private function analysisRequest(SymfonyMapping $symfonyMapping, array $files, AuditContext $auditContext): AttackerAnalysisRequest
+    {
+        return new AttackerAnalysisRequest(
+            files: $files,
+            symfonyMapping: $symfonyMapping,
+            bypassCache: $auditContext->isCacheBypassed(),
+            previousFindings: [...array_values($auditContext->validatedVulnerabilities()), ...$auditContext->baselineSkippedFindings()],
+            rejectedFindings: $this->rejectedFindings($auditContext),
+            toolFiles: $this->auditLoopSettings->toolFiles($auditContext),
+        );
+    }
+
+    /**
+     * Filters the attacker's findings against the baseline, reviews what is
+     * left and persists the verdicts.
+     *
+     * @param list<Vulnerability> $filtered
+     * @param list<ProjectFile>   $files
+     *
+     * @return ?array{int, int} how many new findings were persisted and how many the reviewer accepted; null when nothing was left to review
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function reviewAndPersist(array $filtered, array $files, AuditContext $auditContext): ?array
+    {
         if ([] === $filtered) {
             $this->logger->info('Attacker found no new findings, stopping');
             $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'no_new_findings']);
 
-            return 0;
+            return null;
         }
 
         $reviewCandidates = $this->withoutBaselineAccepted($filtered, $auditContext);
@@ -122,7 +195,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $this->logger->info('Every remaining finding is baseline-accepted, stopping');
             $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'all_baseline_accepted']);
 
-            return 0;
+            return null;
         }
 
         $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
@@ -138,16 +211,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         ));
         $this->reportReviewCompleted($reviewed, $acceptedCount, $auditContext);
 
-        $this->logger->info('Iteration complete', [
-            'iteration' => $iteration,
-            'attacker_found' => \count($filtered),
-            'reviewer_accepted' => $acceptedCount,
-            'new_unique' => $newFindings,
-            'total' => \count($auditContext->vulnerabilities()),
-            'previous_validated_passed_back' => \count($previousFindings),
-        ]);
-
-        return $newFindings;
+        return [$newFindings, $acceptedCount];
     }
 
     /**
@@ -187,29 +251,17 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * @param list<Vulnerability> $previousFindings
-     * @param list<Vulnerability> $rejectedFindings
-     * @param list<ProjectFile>   $files
+     * @param list<ProjectFile> $files the audited files, which the review of a finding recovered from an abort reads
      *
      * @return list<Vulnerability> the findings at or above the confidence floor, one per id: a copy below the floor is dropped before the copies collapse, so it cannot hide a confident one
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function analyzeWithRecovery(SymfonyMapping $symfonyMapping, array $files, array $previousFindings, array $rejectedFindings, AuditContext $auditContext): array
+    private function analyzeWithRecovery(AttackerAnalysisRequest $attackerAnalysisRequest, array $files, AuditContext $auditContext): array
     {
         try {
-            $rawFindings = $this->attackerAgent->analyze(
-                new AttackerAnalysisRequest(
-                    files: $files,
-                    symfonyMapping: $symfonyMapping,
-                    bypassCache: $auditContext->isCacheBypassed(),
-                    previousFindings: $previousFindings,
-                    rejectedFindings: $rejectedFindings,
-                    toolFiles: $this->auditLoopSettings->toolFiles($auditContext),
-                ),
-                $auditContext,
-            );
+            $rawFindings = $this->attackerAgent->analyze($attackerAnalysisRequest, $auditContext);
         } catch (BudgetExceededException|LLMProviderException $attackerException) {
             $this->reviewRecoveredFindings($auditContext->drainFoundVulnerabilities(), $files, $auditContext);
 
