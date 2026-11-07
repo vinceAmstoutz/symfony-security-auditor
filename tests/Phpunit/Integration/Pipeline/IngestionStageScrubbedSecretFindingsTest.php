@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
@@ -61,6 +62,30 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
         $findings = $auditContext->drainStaticCandidates();
         self::assertSame(VulnerabilityType::INSECURE_DESERIALIZATION, $findings[0]->type());
         self::assertSame(3, $findings[0]->lineStart());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_candidates_are_announced_before_the_audit_loop_starts(): void
+    {
+        $file = ProjectFile::create('src/Billing.php', '/p/src/Billing.php', "<?php\n\n\$key = '***REDACTED:aws_access_key***';\n");
+        $events = [];
+        $progressReporter = new class($events) implements ProgressReporterInterface {
+            /** @param list<array{string, array<string, mixed>}> $events */
+            public function __construct(private array &$events) {}
+
+            #[Override]
+            public function report(string $event, array $context = []): void
+            {
+                $this->events[] = [$event, $context];
+            }
+        };
+
+        (new IngestionStage($this->scannerReturning([$file]), new NullLogger(), null, null, $progressReporter))->process(AuditContext::forProject('/p'));
+
+        self::assertSame([['attacker.finding.recorded', ['severity' => 'high', 'type' => 'hardcoded_secret', 'file' => 'src/Billing.php', 'line' => 3]]], $events);
     }
 
     /**

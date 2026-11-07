@@ -470,6 +470,14 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
         return $drained;
     }
 
+    /**
+     * @return list<Vulnerability>
+     */
+    public function staticCandidates(): array
+    {
+        return $this->staticCandidates;
+    }
+
     public function addStaticCandidate(Vulnerability $vulnerability): void
     {
         $this->staticCandidates[] = $vulnerability;
