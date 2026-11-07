@@ -142,6 +142,7 @@ final class StaticMarkerFindingsTest extends TestCase
         yield 'twig_string_template' => ['twig_string_template', VulnerabilityType::TWIG_INJECTION, VulnerabilitySeverity::MEDIUM];
         yield 'dynamic_include' => ['dynamic_include', VulnerabilityType::TWIG_INJECTION, VulnerabilitySeverity::MEDIUM];
         yield 'expression_language_evaluate' => ['expression_language_evaluate', VulnerabilityType::TWIG_INJECTION, VulnerabilitySeverity::MEDIUM];
+        yield 'raw_filter' => ['raw_filter', VulnerabilityType::XSS, VulnerabilitySeverity::MEDIUM];
         yield 'extension_is_safe_html' => ['extension_is_safe_html', VulnerabilityType::XSS, VulnerabilitySeverity::MEDIUM];
         yield 'autoescape_false' => ['autoescape_false', VulnerabilityType::XSS, VulnerabilitySeverity::MEDIUM];
         yield 'csrf_disabled' => ['csrf_disabled', VulnerabilityType::MISSING_CSRF_PROTECTION, VulnerabilitySeverity::MEDIUM];
