@@ -13,6 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class StaticMarkerFindings
 {
@@ -22,6 +26,11 @@ final readonly class StaticMarkerFindings
 
     private const float LEAD_CONFIDENCE = 0.5;
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public static function from(RiskMarker $riskMarker, string $vulnerableCode): ?Vulnerability
     {
         if (\in_array($riskMarker->pattern(), self::NOT_A_FINDING, true)) {

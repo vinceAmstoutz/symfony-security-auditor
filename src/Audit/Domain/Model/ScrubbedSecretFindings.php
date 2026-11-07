@@ -13,6 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ScrubbedSecretFindings
 {
@@ -22,6 +26,10 @@ final readonly class ScrubbedSecretFindings
 
     /**
      * @return list<Vulnerability>
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public static function in(ProjectFile $projectFile): array
     {
@@ -45,6 +53,11 @@ final readonly class ScrubbedSecretFindings
         return SecretPatternLabel::Unscannable->value === $matches[1] ? null : $matches[1];
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     private static function finding(ProjectFile $projectFile, int $lineNumber, string $line, string $label): Vulnerability
     {
         return Vulnerability::of(
