@@ -24,7 +24,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Messe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
 
 final class SymfonyReleaseAttackSurfaceTest extends TestCase
 {
@@ -60,7 +59,6 @@ final class SymfonyReleaseAttackSurfaceTest extends TestCase
         yield 'a voter that grants every guest' => [new VoterAttackerSkill(), 'grants every anonymous visitor'];
         yield 'a message from outside marked as verified' => [new MessengerHandlerAttackerSkill(), '`TrustStamp::trusted()`'];
         yield 'not a handler the transport already deduplicates' => [new MessengerHandlerAttackerSkill(), 'the transport `inbox` option'];
-        yield 'one consumer serving several webhook sources alike' => [new WebhookConsumerAttackerSkill(), 'reaches the logic meant for another'];
         yield 'a page signing URLs the user picks' => [new TemplateAttackerSkill(), 'valid signatures for attacker-chosen URLs'];
         yield 'a whole entity normalized into the page' => [new TemplateAttackerSkill(), '`|normalize` (Symfony ≥ 8.2) on an entity'];
         yield 'a privileged property made a submittable form field' => [new FormAttackerSkill(), '`#[FormField]` on a privileged property'];

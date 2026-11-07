@@ -38,8 +38,11 @@ final readonly class PhpAttackerSkill implements AttackerSkillInterface
             <skills role="php">
             Hunt:
             - Symfony ExpressionLanguage / Security Expression evaluating strings derived from user input.
+            - User or stored content placed into `Message::forSystem()`, an `ai.agent.*.prompt`, or fed back from a tool result as instructions, while the agent holds `#[AsTool]` tools, data or credentials the requester lacks — the injected text acts with that authority; prompt injection alone is not a finding.
+            - An `#[AsTool]` tool acting with the app's own identity on a record, path or URL the model picked, without re-checking the end user's permission, or passing its arguments to SQL, file, HTTP or shell sinks unchecked; and model output rendered with `|raw` or used as a redirect, path or query — tool arguments and model output are untrusted input (confused deputy).
             - `HttpClientInterface` calls with user-controlled URL or host — SSRF; check for protocol & host allowlist; `max_redirects` not bounded + redirect host not re-validated.
             - A scoped HTTP client carrying `auth_bearer`, `auth_basic` or auth headers given a URL or path whose start the user controls (`//evil.example/x`) — the credentials go to another host; an SSRF guard built on `#[Assert\Ip]` / `FILTER_FLAG_NO_PRIV_RANGE` instead of `NoPrivateNetworkHttpClient` — IPv6 forms such as `::ffff:10.0.0.1`, 6to4 or NAT64 pass it.
+            - A user value placed in the path or query of an outbound request without `rawurlencode()` (`"https://billing.internal/users/{$id}"`) — `../`, `?`, `&` or `#` re-targets the call to another endpoint of a trusted API.
             - `unserialize()` / `igbinary_unserialize()` on untrusted payloads (cache values, queue messages, request body).
             - `Process` / `proc_open` / `shell_exec` constructed with user input concatenation; no `escapeshellarg`.
             - An allow-list regex (`preg_match()`, `#[Assert\Regex]`) ending in `$` without `\z` or the `D` modifier, or with an alternation outside a group (`/^admin|editor$/`) — a trailing `\n` or the unanchored branch passes the check.
