@@ -61,4 +61,11 @@ return [
         'reason' => 'The attacker skill blocks carry the Symfony 8.2, advisory, layered-architecture and taint-kind hunts, so a dry run estimates more attacker input tokens, and with them more output tokens and cost.',
         'changelog' => '#693',
     ],
+    [
+        'scenarios' => ['standalone/user-config-unknown-key'],
+        'path' => 'runs.*.stderr.lines',
+        'match' => '/^[-+]  /',
+        'reason' => 'The error naming an unknown `audit` key lists the new `coverage_critic` option among the available ones.',
+        'changelog' => '#695',
+    ],
 ];
