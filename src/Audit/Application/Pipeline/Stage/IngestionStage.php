@@ -86,7 +86,7 @@ final readonly class IngestionStage implements StageInterface
 
     /**
      * Every credential the scrubber redacted is a real secret committed in the
-     * file, so it is reported as a finding without waiting for the model.
+     * file, so it is queued as a candidate finding for the reviewer.
      *
      * @param list<ProjectFile> $files
      */
@@ -98,7 +98,7 @@ final readonly class IngestionStage implements StageInterface
 
         foreach ($files as $file) {
             foreach (ScrubbedSecretFindings::in($file) as $finding) {
-                $auditContext->addVulnerability($finding);
+                $auditContext->addStaticCandidate($finding);
             }
         }
 
@@ -106,8 +106,8 @@ final readonly class IngestionStage implements StageInterface
     }
 
     /**
-     * Everything the static pre-scan matches is reported, not only handed to
-     * the model as a hint.
+     * Everything the static pre-scan matches is queued as a candidate finding
+     * for the reviewer, not only handed to the attacker as a hint.
      *
      * @param list<ProjectFile> $files
      */
@@ -125,7 +125,7 @@ final readonly class IngestionStage implements StageInterface
         foreach ($this->staticPreScanner->scan($files) as $riskMarker) {
             $finding = StaticMarkerFindings::from($riskMarker, $linesByPath[$riskMarker->filePath()][$riskMarker->line() - 1] ?? '');
             if ($finding instanceof Vulnerability) {
-                $auditContext->addVulnerability($finding);
+                $auditContext->addStaticCandidate($finding);
             }
         }
     }
