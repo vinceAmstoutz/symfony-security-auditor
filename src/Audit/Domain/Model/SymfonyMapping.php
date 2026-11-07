@@ -19,6 +19,7 @@ final readonly class SymfonyMapping
         private ProjectFileInventory $projectFileInventory,
         private AccessControlMap $accessControlMap,
         private ApplicationSecurityMap $applicationSecurityMap,
+        private ProjectProfile $projectProfile,
     ) {}
 
     public static function of(ProjectFileInventory $projectFileInventory, AccessControlMap $accessControlMap): self
@@ -27,7 +28,24 @@ final readonly class SymfonyMapping
             $projectFileInventory,
             $accessControlMap,
             ApplicationSecurityMap::of($projectFileInventory, $accessControlMap),
+            ProjectProfile::unknown(),
         );
+    }
+
+    /**
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function projectProfile(): ProjectProfile
+    {
+        return $this->projectProfile;
+    }
+
+    /**
+     * @internal not part of the BC promise — see docs/versioning.md
+     */
+    public function withProjectProfile(ProjectProfile $projectProfile): self
+    {
+        return new self($this->projectFileInventory, $this->accessControlMap, $this->applicationSecurityMap, $projectProfile);
     }
 
     /**
