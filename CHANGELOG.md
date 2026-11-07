@@ -26,7 +26,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 ### Core 🧱
 
 - A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
-- Cached attacker answers refresh once after upgrading ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
+- Cached attacker answers refresh once after upgrading, and the longer hunting instructions raise the attacker's input tokens, by about a third on a small project where they outweigh the code ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 
