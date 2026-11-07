@@ -126,6 +126,7 @@ All interfaces under `src/Audit/Domain/Port/` plus the documented Domain pipelin
 ### Domain models and exceptions
 
 - Value objects and enums under `src/Audit/Domain/Model/` — `Vulnerability`, `AuditReport`, `AuditContext`, `VulnerabilitySeverity`, `VulnerabilityType`, etc. Their public accessors are stable.
+- Enums under `src/Audit/Domain/Model/` may gain cases in a MINOR release, as classes may gain constants; removing or renaming a case is a MAJOR. Code that `match`es on one keeps a `default` arm.
 - Domain exception classes — callers may rely on the exception types thrown by public methods.
 
 ### Programmatic entry point
