@@ -41,6 +41,7 @@ final readonly class VoterAttackerSkill implements AttackerSkillInterface
             - `voteOnAttribute()` default branch returning `true` or implicit fallthrough — critical bypass.
             - Over-broad role shortcuts (`ROLE_SUPER_ADMIN` always allowed) without auditable trail.
             - Ownership checks with nullable / weak-typed comparisons (`==` on UUID strings, missing user object check).
+            - A voter that denies only when a user object is present (`if ($user instanceof User && …) return false;` then `return true`) — a `NullToken`, or a guest check through `isGrantedForUser(null, …)` / `is_granted_for_user(null, …)` since Symfony 8.2, grants every anonymous visitor.
             - Voters consulting only `getRoles()` while the request requires per-resource attribute checks.
             Do NOT flag:
             - Voters that explicitly `return false` as the default — that is the secure-by-default pattern.

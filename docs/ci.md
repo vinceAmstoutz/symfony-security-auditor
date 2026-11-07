@@ -12,6 +12,7 @@ Run the AI security audit on a nightly schedule and ship the SARIF report to Git
   - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
   - [Live security badge in your README](#live-security-badge-in-your-readme)
 - [GitLab CI](#gitlab-ci)
+- [Feeding Psalm's Taint Analysis In](#feeding-psalms-taint-analysis-in)
 - [Output Formats in CI](#output-formats-in-ci)
 - [How This Project Guards Compatibility](#how-this-project-guards-compatibility)
 
@@ -501,6 +502,23 @@ symfony-security-audit:
       - report.json
     expire_in: 30 days
 ```
+
+## Feeding Psalm's Taint Analysis In
+
+(_since 1.23_) Psalm 7 runs its taint analysis in the same run as type checking, and writes SARIF when `--report` names a `.sarif` file. Point `scan.import_sarif` at that file and each Psalm result, with its source-to-sink path, becomes a risk marker the attacker confirms or discards in context: Psalm finds the flows (including its `llm_prompt`, `nosql`, `url_path` and `url_component` taints), the auditor judges whether they are reachable and authorized.
+
+```bash
+vendor/bin/psalm --report=build/psalm.sarif
+```
+
+```yaml
+# config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    scan:
+        import_sarif: ['build/psalm.sarif']
+```
+
+Run Psalm in the same job, before `audit:run`: the auditor stops on a SARIF file it cannot read or parse. With the standalone binary, set `scan.import_sarif` in your own `config.yaml`; a project's `.symfony-security-auditor.yaml` may not set it.
 
 ## Output Formats in CI
 

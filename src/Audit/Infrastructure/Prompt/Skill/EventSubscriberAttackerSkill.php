@@ -37,6 +37,7 @@ final readonly class EventSubscriberAttackerSkill implements AttackerSkillInterf
         return <<<'SKILL'
             <skills role="event_subscriber">
             Hunt:
+            - A `kernel.request` listener that authorizes by the URL text (`str_starts_with($request->getPathInfo(), '/admin')`, `getRequestUri()`, a regex on the path) instead of the matched route — `//admin`, `%2F`, `/index.php/admin` or a trailing-slash variant still reaches the route unchecked.
             - `KernelEvents::CONTROLLER` / `KernelEvents::REQUEST` subscribers mutating `$event->getRequest()->attributes` to inject privileged values (role, user id) before the controller runs.
             - `AuthenticationEvents::AUTHENTICATION_SUCCESS` listeners auto-elevating roles based on payload fields without re-checking the source.
             - `kernel.exception` listeners leaking stack traces, env vars, or internal hostnames in the response body.

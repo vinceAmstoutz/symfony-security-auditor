@@ -289,7 +289,7 @@ final class ConfigurationNoticesTest extends TestCase
 
     private function unknownBucketNotice(string $bucket): string
     {
-        return \sprintf('scan.custom_risk_patterns.%s names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.', $bucket);
+        return \sprintf('scan.custom_risk_patterns.%s names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, use_case, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.', $bucket);
     }
 
     /**

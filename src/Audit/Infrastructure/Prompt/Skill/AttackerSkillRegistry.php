@@ -77,6 +77,7 @@ final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendere
             new SonataAdminAttackerSkill(),
             new VoterAttackerSkill(),
             new WebhookConsumerAttackerSkill(),
+            new UseCaseAttackerSkill(),
             new MessengerHandlerAttackerSkill(),
             new EventSubscriberAttackerSkill(),
             new NormalizerAttackerSkill(),

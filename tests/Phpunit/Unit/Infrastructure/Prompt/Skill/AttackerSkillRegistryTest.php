@@ -42,6 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Sonat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\UseCaseAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
 
@@ -78,6 +79,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'sonata_admin' => [new SonataAdminAttackerSkill(), ProjectFileType::SONATA_ADMIN, 45, 'sonata_admin'];
         yield 'voter' => [new VoterAttackerSkill(), ProjectFileType::VOTER, 50, 'voter'];
         yield 'webhook_consumer' => [new WebhookConsumerAttackerSkill(), ProjectFileType::WEBHOOK_CONSUMER, 60, 'webhook_consumer'];
+        yield 'use_case' => [new UseCaseAttackerSkill(), ProjectFileType::USE_CASE, 65, 'use_case'];
         yield 'messenger_handler' => [new MessengerHandlerAttackerSkill(), ProjectFileType::MESSENGER_HANDLER, 70, 'messenger_handler'];
         yield 'event_subscriber' => [new EventSubscriberAttackerSkill(), ProjectFileType::EVENT_SUBSCRIBER, 80, 'event_subscriber'];
         yield 'normalizer' => [new NormalizerAttackerSkill(), ProjectFileType::NORMALIZER, 90, 'normalizer'];
@@ -111,7 +113,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
-        self::assertSame(25, substr_count($output, '<skills role="'));
+        self::assertSame(26, substr_count($output, '<skills role="'));
     }
 
     public function test_it_emits_blocks_in_attack_surface_priority_order(): void
@@ -134,6 +136,7 @@ final class AttackerSkillRegistryTest extends TestCase
             'sonata_admin',
             'voter',
             'webhook_consumer',
+            'use_case',
             'messenger_handler',
             'event_subscriber',
             'normalizer',
@@ -181,6 +184,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'easyadmin_crud' => [ProjectFileType::EASYADMIN_CRUD, ['controller_easyadmin']];
         yield 'voter' => [ProjectFileType::VOTER, ['voter']];
         yield 'webhook_consumer' => [ProjectFileType::WEBHOOK_CONSUMER, ['webhook_consumer']];
+        yield 'use_case' => [ProjectFileType::USE_CASE, ['use_case']];
         yield 'messenger_handler' => [ProjectFileType::MESSENGER_HANDLER, ['messenger_handler']];
         yield 'event_subscriber' => [ProjectFileType::EVENT_SUBSCRIBER, ['event_subscriber']];
         yield 'normalizer' => [ProjectFileType::NORMALIZER, ['normalizer']];
