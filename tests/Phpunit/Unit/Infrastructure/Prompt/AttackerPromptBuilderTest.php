@@ -18,9 +18,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ArchitectureStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
@@ -1304,6 +1306,71 @@ final class AttackerPromptBuilderTest extends TestCase
             ->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]);
 
         self::assertStringContainsString("- Do not inflate: a crash is not code execution, an action within the actor's own rights is not privilege gain, and a missing best practice with no affected principal or resource is hardening, not a finding.", $prompt);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_system_prompt_names_the_layout_the_project_follows(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())
+            ->withProjectProfile(ProjectProfile::of(null, [ArchitectureStyle::CQRS]));
+
+        $prompt = (new AttackerPromptBuilder())->buildSystemPromptFor([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')], $symfonyMapping);
+
+        self::assertStringContainsString('- This project is laid out in CQRS (command and query handlers): before deciding a check is missing, look for it where this layout puts it — the command and query handlers and the bus middleware in front of them.', $prompt);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_system_prompt_names_every_layout_style_the_project_combines(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())
+            ->withProjectProfile(ProjectProfile::of(null, [ArchitectureStyle::CQRS, ArchitectureStyle::LAYERED]));
+
+        $prompt = (new AttackerPromptBuilder())->buildSystemPromptFor([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')], $symfonyMapping);
+
+        self::assertStringContainsString('- This project is laid out in CQRS (command and query handlers), Domain, Application and Infrastructure layers (hexagonal or clean architecture): before deciding a check is missing, look for it where this layout puts it — the command and query handlers and the bus middleware in front of them; the application services and the domain policies behind the ports.', $prompt);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_system_prompt_names_the_bounded_contexts_of_the_project(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())
+            ->withProjectProfile(ProjectProfile::of(null, [ArchitectureStyle::BOUNDED_CONTEXTS], ['Billing', 'Identity']));
+
+        $prompt = (new AttackerPromptBuilder())->buildSystemPromptFor([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')], $symfonyMapping);
+
+        self::assertStringContainsString('- This project is laid out in bounded contexts (Billing, Identity):', $prompt);
+    }
+
+    /**
+     * @param list<ArchitectureStyle> $styles
+     * @param list<string>            $boundedContexts
+     *
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('layoutsNamingTheirContextsOnlyWhenBoundedOnes')]
+    public function test_the_system_prompt_names_contexts_only_for_a_bounded_context_layout_that_has_some(array $styles, array $boundedContexts, string $expectedLayout): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())
+            ->withProjectProfile(ProjectProfile::of(null, $styles, $boundedContexts));
+
+        $prompt = (new AttackerPromptBuilder())->buildSystemPromptFor([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')], $symfonyMapping);
+
+        self::assertStringContainsString(\sprintf('- This project is laid out in %s:', $expectedLayout), $prompt);
+    }
+
+    /**
+     * @return iterable<string, array{list<ArchitectureStyle>, list<string>, string}>
+     */
+    public static function layoutsNamingTheirContextsOnlyWhenBoundedOnes(): iterable
+    {
+        yield 'contexts beside another style' => [[ArchitectureStyle::CQRS, ArchitectureStyle::BOUNDED_CONTEXTS], ['Billing'], 'CQRS (command and query handlers), bounded contexts (Billing)'];
+        yield 'bounded contexts with no name' => [[ArchitectureStyle::BOUNDED_CONTEXTS], [], 'bounded contexts'];
     }
 
     /**

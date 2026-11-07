@@ -14,15 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ArchitectureStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProfileAwareAttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use WeakMap;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInterface
+final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPromptBuilderInterface
 {
     /**
      * Wire-format version of the prompt this builder emits. Folded into the
@@ -33,6 +35,22 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     public const int PROMPT_VERSION = 20;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
+
+    private const string GENERIC_LAYOUT_RULE = '- The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.';
+
+    private const array STYLE_NAMES = [
+        'cqrs' => 'CQRS (command and query handlers)',
+        'action_domain_responder' => 'action-domain-responder (single-action classes)',
+        'layered' => 'Domain, Application and Infrastructure layers (hexagonal or clean architecture)',
+        'bounded_contexts' => 'bounded contexts',
+    ];
+
+    private const array STYLE_PLACES = [
+        'cqrs' => 'the command and query handlers and the bus middleware in front of them',
+        'action_domain_responder' => 'the single-action classes and the services they call',
+        'layered' => 'the application services and the domain policies behind the ports',
+        'bounded_contexts' => "each bounded context, whose rules may differ from the others'",
+    ];
 
     public const bool DEFAULT_EMIT_ALL_SKILLS = false;
 
@@ -60,9 +78,26 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     #[Override]
     public function buildSystemPrompt(array $files = []): string
     {
-        $base = $this->basePrompt();
+        return $this->systemPromptFor($files, ProjectProfile::unknown());
+    }
 
-        $skills = $this->skillsForFiles($files);
+    /**
+     * @param list<ProjectFile> $files
+     */
+    #[Override]
+    public function buildSystemPromptFor(array $files, SymfonyMapping $symfonyMapping): string
+    {
+        return $this->systemPromptFor($files, $symfonyMapping->projectProfile());
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     */
+    private function systemPromptFor(array $files, ProjectProfile $projectProfile): string
+    {
+        $base = $this->basePrompt($projectProfile);
+
+        $skills = $this->skillsForFiles($files, $projectProfile);
 
         if ('' === $skills) {
             return $base;
@@ -138,7 +173,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         return str_replace(["\r", "\n"], ' ', $path);
     }
 
-    private function basePrompt(): string
+    private function basePrompt(ProjectProfile $projectProfile): string
     {
         return $this->basePromptIntro()
             .$this->outputFormatSection()
@@ -147,7 +182,33 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             .$this->untrustedContentRule()
             .$this->analysisMethodology()
             .$this->exampleFinding()
-            .$this->rulesAndToolDiscipline();
+            .str_replace(self::GENERIC_LAYOUT_RULE, $this->layoutRule($projectProfile), $this->rulesAndToolDiscipline());
+    }
+
+    /**
+     * @param list<string> $boundedContexts
+     */
+    private static function styleName(ArchitectureStyle $architectureStyle, array $boundedContexts): string
+    {
+        $name = self::STYLE_NAMES[$architectureStyle->value];
+
+        return ArchitectureStyle::BOUNDED_CONTEXTS === $architectureStyle && [] !== $boundedContexts
+            ? \sprintf('%s (%s)', $name, implode(', ', $boundedContexts))
+            : $name;
+    }
+
+    private function layoutRule(ProjectProfile $projectProfile): string
+    {
+        $styles = $projectProfile->architectureStyles();
+        if ([] === $styles) {
+            return self::GENERIC_LAYOUT_RULE;
+        }
+
+        return \sprintf(
+            '- This project is laid out in %s: before deciding a check is missing, look for it where this layout puts it — %s.',
+            implode(', ', array_map(static fn (ArchitectureStyle $architectureStyle): string => self::styleName($architectureStyle, $projectProfile->boundedContexts()), $styles)),
+            implode('; ', array_map(static fn (ArchitectureStyle $architectureStyle): string => self::STYLE_PLACES[$architectureStyle->value], $styles)),
+        );
     }
 
     private function basePromptIntro(): string
@@ -404,13 +465,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     /**
      * @param list<ProjectFile> $files
      */
-    private function skillsForFiles(array $files): string
+    private function skillsForFiles(array $files, ProjectProfile $projectProfile): string
     {
         $presentTypes = array_map(
             static fn (ProjectFile $projectFile): ProjectFileType => $projectFile->fileType(),
             $files,
         );
 
-        return $this->attackerSkillRegistry->render($presentTypes, $this->emitAllSkills);
+        return $this->attackerSkillRegistry->renderFor($presentTypes, $this->emitAllSkills, $projectProfile);
     }
 }
