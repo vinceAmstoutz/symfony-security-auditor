@@ -212,6 +212,8 @@ final class CoverageCriticPromptBuilderTest extends TestCase
     {
         yield 'a hundred and twenty characters are kept' => [str_repeat('t', 120), str_repeat('t', 120)];
         yield 'a longer title is cut with an ellipsis' => [str_repeat('t', 121), \sprintf('%s…', str_repeat('t', 120))];
+        yield 'a title is measured in characters, not bytes' => [str_repeat('é', 100), str_repeat('é', 100)];
+        yield 'a longer title is cut after its hundred and twentieth character' => [\sprintf('A%s', str_repeat('é', 129)), \sprintf('A%s…', str_repeat('é', 119))];
     }
 
     /**

@@ -505,6 +505,26 @@ final class ChunkContextFactoryTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_a_coverage_critic_hypothesis_keeps_the_context_of_its_gap_in_the_key(): void
+    {
+        $chunkContextFactory = new ChunkContextFactory(new AttackerPromptBuilder(), new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver());
+        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+        $coverageGap = new CoverageGap($chunk, 'The export skips the owner check.', 'broken_access_control');
+        $keyOf = static fn (AttackerAnalysisRequest $attackerAnalysisRequest): string => $chunkContextFactory->cacheCoordinates($chunk, $attackerAnalysisRequest, new RiskMarkerIndex([]), true)->contextKey;
+
+        self::assertNotSame(
+            $keyOf(new AttackerAnalysisRequest($chunk, $symfonyMapping, coverageGap: $coverageGap)),
+            $keyOf(new AttackerAnalysisRequest($chunk, $symfonyMapping, previousFindings: [$this->makeVulnerability()], coverageGap: $coverageGap)),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_a_factory_reused_across_requests_renders_each_requests_own_findings(): void
     {
         $chunkContextFactory = new ChunkContextFactory(new AttackerPromptBuilder(), new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver());
