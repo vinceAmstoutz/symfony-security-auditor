@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageCriticInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\FindingsOnlyCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\NullCoverageCritic;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
@@ -25,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
@@ -110,7 +112,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         ]);
 
         $previousFindings = array_values($auditContext->validatedVulnerabilities());
-        $filtered = $this->analyzeWithRecovery($this->analysisRequest($symfonyMapping, $files, $auditContext), $files, $auditContext);
+        $filtered = $this->analyzeWithRecovery($this->analysisRequest($symfonyMapping, $files, $auditContext), $files, $auditContext, $auditContext);
         $reviewOutcome = $this->reviewAndPersist($filtered, $files, $auditContext);
 
         if (null === $reviewOutcome) {
@@ -146,7 +148,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     {
         foreach ($this->coverageCritic->gaps($symfonyMapping, $auditContext) as $coverageGap) {
             $this->reviewAndPersist(
-                $this->analyzeWithRecovery($this->analysisRequest($symfonyMapping, $files, $auditContext)->forCoverageGap($coverageGap), $files, $auditContext),
+                $this->analyzeWithRecovery($this->analysisRequest($symfonyMapping, $files, $auditContext)->forCoverageGap($coverageGap), $files, $auditContext, new FindingsOnlyCoverageRecorder($auditContext)),
                 $files,
                 $auditContext,
             );
@@ -258,10 +260,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function analyzeWithRecovery(AttackerAnalysisRequest $attackerAnalysisRequest, array $files, AuditContext $auditContext): array
+    private function analyzeWithRecovery(AttackerAnalysisRequest $attackerAnalysisRequest, array $files, AuditContext $auditContext, CoverageRecorderInterface $coverageRecorder): array
     {
         try {
-            $rawFindings = $this->attackerAgent->analyze($attackerAnalysisRequest, $auditContext);
+            $rawFindings = $this->attackerAgent->analyze($attackerAnalysisRequest, $coverageRecorder);
         } catch (BudgetExceededException|LLMProviderException $attackerException) {
             $this->reviewRecoveredFindings($auditContext->drainFoundVulnerabilities(), $files, $auditContext);
 

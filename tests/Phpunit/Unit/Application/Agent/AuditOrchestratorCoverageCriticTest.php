@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsag
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -100,6 +101,29 @@ final class AuditOrchestratorCoverageCriticTest extends TestCase
             [2, [$handler], $auditContext->projectFiles()],
             [$recordingAttackerAgent->callCount, $recordingAttackerAgent->lastFiles, $recordingAttackerAgent->lastToolFiles],
         );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_a_gap_whose_analysis_is_cut_short_leaves_the_audit_complete(): void
+    {
+        $auditContext = AuditOrchestratorHarness::contextWithMapping(sys_get_temp_dir());
+        $coverageCritic = new FixedCoverageCritic([new CoverageGap($auditContext->projectFiles(), 'The bulk export skips the owner check.', 'broken_access_control')]);
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnCallback(
+            static fn (string $systemPrompt, string $userMessage): LLMResponse => str_contains($userMessage, 'Coverage critic hypothesis')
+                ? LLMResponse::of('', 'test', 'length', TokenUsageSnapshot::of(0, 0))
+                : AuditOrchestratorHarness::attackerResponse([]),
+        );
+
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $this->acceptingReviewer(), ['coverageCritic' => $coverageCritic])->orchestrate($auditContext);
+
+        self::assertNotContains('errored', array_column($auditContext->coverage(), 'status'));
     }
 
     /**
