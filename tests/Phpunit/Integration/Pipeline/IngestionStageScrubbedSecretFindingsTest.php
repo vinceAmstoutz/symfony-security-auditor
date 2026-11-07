@@ -120,7 +120,7 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
 
         (new IngestionStage($this->scannerReturning([$file]), new NullLogger()))->process($auditContext);
 
-        self::assertSame([], $auditContext->staticCandidates());
+        self::assertSame([], $auditContext->drainStaticCandidates());
     }
 
     /**
