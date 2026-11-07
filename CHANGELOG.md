@@ -16,6 +16,12 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The attacker hunts the app-level analogues of Symfony's published security advisories: hand-set login tokens, sub-requests past `access_control`, verb-limited rules, payload DTOs typed as files, shared caching of personal pages, weak session fixation and remember-me settings, `$`-anchored regexes, option injection into `Process`, string-based path checks, leaking scoped HTTP clients, URL-text authorization, unescaped `LIKE`, SVG uploads, raw `Response` echoes and CSV formulas
 - A `use_case` file type and attacker skill cover CQRS command and query handlers, use cases and interactors outside Messenger, and `audit.custom_skills` and `scan.custom_risk_patterns` accept it
 - Projects laid out in hexagonal, clean, CQRS or action-domain-responder style are mapped better: authenticators extending `AbstractAuthenticator`, access-token handlers, `#[AsFormType]` classes and `Action/` classes are recognized, an action is chunked with the command and handler it dispatches, and the attacker looks for checks in handlers, middleware and domain services before reporting one missing
+- API Platform state providers and processors, `#[AsCommandHandler]`/`#[AsQueryHandler]` handlers and handlers in `CommandHandler/`, `QueryHandler/` or `Application/` folders are audited as use cases; authentication handlers, entry points, user checkers and user providers as authenticators; API Platform query extensions and `Sql/` query objects as repositories
+- The attacker states the invariant a finding breaks, compares sibling paths for an equal control, sweeps business logic, stops inflating crashes or hardening into findings, and hunts prompt injection backed by agent tools, `#[AsTool]` confused deputies, outbound URL path injection and NoSQL operator injection
+
+### Bugfixes 🐛
+
+- A class in an `Admin/` folder or named `*Admin.php` gets the Sonata admin skill only when it uses Sonata, so form providers, page objects and API state providers kept there are audited as what they are
 
 ### Core 🧱
 

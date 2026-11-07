@@ -16,7 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt\
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\MessengerHandlerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\UseCaseAttackerSkill;
 
 final class ArchitectureAttackSurfaceTest extends TestCase
@@ -42,5 +44,8 @@ final class ArchitectureAttackSurfaceTest extends TestCase
         yield 'not an actor id the server set from the authenticated user' => [new UseCaseAttackerSkill(), 'set by server code from the authenticated user'];
         yield 'not a query handler serving public data' => [new UseCaseAttackerSkill(), 'Query handlers returning public data'];
         yield 'a bus command handler trusting the actor in its message' => [new MessengerHandlerAttackerSkill(), 'the worker runs it with no token'];
+        yield 'an api platform processor saving what the client rewrote' => [new UseCaseAttackerSkill(), '`securityPostDenormalize`'];
+        yield 'a query extension scoping rows for some operations only' => [new RepositoryAttackerSkill(), 'leak through the operation it skips'];
+        yield 'a blocked account that keeps its session' => [new AuthenticatorAttackerSkill(), 'a blocked or downgraded account keeps working'];
     }
 }

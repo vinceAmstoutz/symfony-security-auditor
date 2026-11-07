@@ -41,7 +41,6 @@ final readonly class WebhookConsumerAttackerSkill implements AttackerSkillInterf
             - Signature compared with `===` / `==` (timing-attack vulnerable) instead of `hash_equals()`.
             - Missing replay-attack defense: no nonce check, no timestamp check, no idempotency key — same payload can be replayed indefinitely.
             - `#[AsRemoteEventConsumer]` handler trusting `$payload['user_id']` / `$payload['amount']` without re-validating against the authenticated source.
-            - One consumer class bound to several webhook names by repeated `#[AsRemoteEventConsumer]` (Symfony ≥ 8.2) that never branches on which source delivered the event — a source with a weaker or no signature reaches the logic meant for another.
             - JSON / XML parsers without bounded depth/size (DoS via large or deeply-nested payloads).
             - Webhook routes mounted under a firewall that allows anonymous access AND lacks IP allowlist or mutual-TLS gating.
             Do NOT flag:

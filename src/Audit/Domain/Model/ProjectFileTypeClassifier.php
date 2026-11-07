@@ -29,13 +29,13 @@ final readonly class ProjectFileTypeClassifier
             self::isEntityPath($path), ProjectFileContentSignatures::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
             str_ends_with($path, 'Authenticator.php'), ProjectFileContentSignatures::looksLikeAuthenticator($path, $content) => ProjectFileType::AUTHENTICATOR,
             self::isMessengerHandlerPath($path), ProjectFileContentSignatures::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
-            self::isUseCasePath($path), ProjectFileContentSignatures::looksLikeUseCase($path, $content) => ProjectFileType::USE_CASE,
+            self::isUseCasePath($path), ProjectFileContentSignatures::looksLikeUseCase($path, $content), ProjectFileContentSignatures::looksLikeApiPlatformState($path, $content) => ProjectFileType::USE_CASE,
             self::isWebhookConsumerPath($path), ProjectFileContentSignatures::looksLikeWebhookConsumer($path, $content) => ProjectFileType::WEBHOOK_CONSUMER,
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php'), ProjectFileContentSignatures::looksLikeEventSubscriber($path, $content) => ProjectFileType::EVENT_SUBSCRIBER,
             str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php'), ProjectFileContentSignatures::looksLikeNormalizer($path, $content) => ProjectFileType::NORMALIZER,
             str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php'), ProjectFileContentSignatures::looksLikeScheduler($path, $content) => ProjectFileType::SCHEDULER,
             self::isLdapServicePath($path), ProjectFileContentSignatures::looksLikeLdapService($path, $content) => ProjectFileType::LDAP_SERVICE,
-            self::isSonataAdminPath($path), ProjectFileContentSignatures::looksLikeSonataAdmin($path, $content) => ProjectFileType::SONATA_ADMIN,
+            self::isSonataAdminPath($path) && str_contains($content, 'Sonata\\AdminBundle'), ProjectFileContentSignatures::looksLikeSonataAdmin($path, $content) => ProjectFileType::SONATA_ADMIN,
             ProjectFileContentSignatures::looksLikeTwigExtension($path, $content) => ProjectFileType::TWIG_EXTENSION,
             str_ends_with($path, '.twig') => ProjectFileType::TEMPLATE,
             str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') || str_ends_with($path, '.xml'), self::isDotenvPath($path) => ProjectFileType::CONFIG,
@@ -72,7 +72,7 @@ final readonly class ProjectFileTypeClassifier
     private static function isRepositoryPath(string $path): bool
     {
         return str_ends_with($path, 'Repository.php')
-            || (str_contains($path, '/Repository/') && str_ends_with($path, '.php'));
+            || ((str_contains($path, '/Repository/') || str_contains($path, '/Sql/')) && str_ends_with($path, '.php'));
     }
 
     private static function isFormPath(string $path): bool
@@ -103,8 +103,19 @@ final readonly class ProjectFileTypeClassifier
     {
         return str_ends_with($path, 'CommandHandler.php')
             || str_ends_with($path, 'QueryHandler.php')
-            || (str_ends_with($path, 'Handler.php') && (str_contains($path, '/Command/') || str_contains($path, '/Query/')))
+            || (str_ends_with($path, 'Handler.php') && self::isInAHandlerDirectory($path))
             || (str_contains($path, '/UseCase/') && str_ends_with($path, '.php'));
+    }
+
+    private static function isInAHandlerDirectory(string $path): bool
+    {
+        foreach (['/Command/', '/Query/', '/CommandHandler/', '/QueryHandler/', '/Application/'] as $directory) {
+            if (str_contains($path, $directory)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function isWebhookConsumerPath(string $path): bool

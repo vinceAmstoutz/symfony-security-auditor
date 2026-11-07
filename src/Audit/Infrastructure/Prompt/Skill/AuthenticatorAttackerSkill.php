@@ -42,6 +42,7 @@ final readonly class AuthenticatorAttackerSkill implements AttackerSkillInterfac
             - `onAuthenticationSuccess()` calling `RedirectResponse` with a user-controlled `_target_path` / `referer` without protocol+host allowlist.
             - `AccessTokenHandler::getUserBadgeFrom($accessToken)` not verifying signature/audience/issuer of JWT/opaque tokens, or not checking that a JWT's `typ` header is `at+jwt` — an OIDC ID token is then replayed as an access token (RFC 9068).
             - An authenticator that checks the password itself and answers an unknown identifier differently from a wrong password (its own message, or an early `UserNotFoundException` that skips the hash Symfony ≥ 8.2 spends on `PasswordCredentials`) — user enumeration by message or timing.
+            - A `UserCheckerInterface` that checks only some account states (disabled, locked, unverified, expired) in `checkPreAuth()`, or a `UserProviderInterface::refreshUser()` returning the session's copy instead of reloading it — a blocked or downgraded account keeps working.
             - Custom `LoginFormAuthenticator` storing the password in the session, log, or exception trace.
             - Missing `CsrfTokenBadge` on form-based login authenticators where CSRF was previously enforced.
             - OAuth/OIDC handlers omitting `state` parameter verification (CSRF on auth callback) or PKCE for public clients.

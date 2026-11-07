@@ -993,7 +993,7 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'src/Admin/StoreManager.php',
             '/app/src/Admin/StoreManager.php',
-            '<?php',
+            "<?php\nuse Sonata\\AdminBundle\\Admin\\AbstractAdmin;",
         );
 
         self::assertSame('sonata_admin', $projectFile->type());
@@ -1276,7 +1276,7 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'src/Admin/FooAdmin.php',
             '/app/src/Admin/FooAdmin.php',
-            '<?php',
+            "<?php\nuse Sonata\\AdminBundle\\Admin\\AbstractAdmin;",
         );
 
         self::assertFalse($projectFile->isService());
