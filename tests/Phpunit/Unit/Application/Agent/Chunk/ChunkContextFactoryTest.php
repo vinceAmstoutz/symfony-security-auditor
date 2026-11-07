@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
@@ -454,6 +455,48 @@ final class ChunkContextFactoryTest extends TestCase
         sort($sorted);
         self::assertSame($sorted, $positions);
         self::assertSame(0, $positions[0]);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_coverage_critic_hypothesis_leads_the_chunk_of_its_gap(): void
+    {
+        $chunkContextFactory = new ChunkContextFactory(new AttackerPromptBuilder(), new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver());
+        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
+        $attackerAnalysisRequest = new AttackerAnalysisRequest(
+            $chunk,
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            previousFindings: [$this->makeVulnerability()],
+            coverageGap: new CoverageGap($chunk, 'The export skips the owner check.', 'broken_access_control'),
+        );
+
+        $chunkContext = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, new RiskMarkerIndex([]), true);
+
+        self::assertStringStartsWith("## Coverage Critic Hypothesis (Unverified)\nCoverage critic hypothesis (broken_access_control): \"The export skips the owner check.\";", $chunkContext->userMessage);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_each_coverage_critic_hypothesis_keys_the_chunk_of_its_gap_apart(): void
+    {
+        $chunkContextFactory = new ChunkContextFactory(new AttackerPromptBuilder(), new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver());
+        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+        $keyOf = static fn (?CoverageGap $coverageGap): string => $chunkContextFactory->cacheCoordinates($chunk, new AttackerAnalysisRequest($chunk, $symfonyMapping, coverageGap: $coverageGap), new RiskMarkerIndex([]), true)->contextKey;
+
+        $keys = [
+            $keyOf(null),
+            $keyOf(new CoverageGap($chunk, 'The export skips the owner check.', 'broken_access_control')),
+            $keyOf(new CoverageGap($chunk, 'The import trusts the submitted owner id.', 'broken_access_control')),
+            $keyOf(new CoverageGap($chunk, 'The export skips the owner check.', 'insecure_direct_object_reference')),
+        ];
+
+        self::assertSame(['', ...\array_slice($keys, 1)], array_values(array_unique($keys)));
     }
 
     /**

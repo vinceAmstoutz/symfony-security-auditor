@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmColl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
@@ -3945,5 +3946,48 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true, 'toolRegistryFactory' => $factory, 'toolsEnabled' => true]);
 
         $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_files_of_a_coverage_gap_are_analyzed_as_one_chunk_the_chunker_would_have_split(): void
+    {
+        $recordingLLMClient = new RecordingLLMClient();
+        $files = [$this->makeFile('src/Controller/ExportController.php'), $this->makeFile('src/Service/ExportHandler.php')];
+        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+
+        $attackerAgent->analyze(
+            new AttackerAnalysisRequest($files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), coverageGap: new CoverageGap($files, 'The export skips the owner check.', 'broken_access_control')),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertSame([[true, true]], array_map(
+            static fn (string $userMessage): array => [str_contains($userMessage, 'src/Controller/ExportController.php'), str_contains($userMessage, 'src/Service/ExportHandler.php')],
+            $recordingLLMClient->capturedUserMessages,
+        ));
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidProjectFileException
+     */
+    public function test_lean_mode_leaves_the_files_of_a_coverage_gap_to_the_attacker_though_no_risk_marker_flags_them(): void
+    {
+        $recordingLLMClient = new RecordingLLMClient();
+        $files = [$this->makeFile('src/Controller/ExportController.php')];
+        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient, ['leanMode' => true]);
+
+        $attackerAgent->analyze(
+            new AttackerAnalysisRequest($files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), coverageGap: new CoverageGap($files, 'The export skips the owner check.', 'broken_access_control')),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertCount(1, $recordingLLMClient->capturedUserMessages);
     }
 }

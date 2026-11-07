@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -91,12 +92,13 @@ final readonly class ChunkContextFactory
             $rejectedPreamble,
             $previousPreamble,
             $this->renderCandidatePreamble($chunk, $attackerAnalysisRequest),
+            $this->renderHypothesisPreamble($attackerAnalysisRequest),
         );
     }
 
     private function coordinates(ChunkPreambles $chunkPreambles, AttackerAnalysisRequest $attackerAnalysisRequest, bool $cacheIsContextAware): ChunkCacheCoordinates
     {
-        $contextKey = $this->chunkContextKeyDeriver->derive($chunkPreambles->markers, $chunkPreambles->rejected, $chunkPreambles->previous, $chunkPreambles->candidates, $attackerAnalysisRequest->symfonyMapping);
+        $contextKey = $this->chunkContextKeyDeriver->deriveFor($chunkPreambles, $attackerAnalysisRequest->symfonyMapping);
 
         return new ChunkCacheCoordinates($contextKey, $this->isCacheable($attackerAnalysisRequest, $contextKey, $cacheIsContextAware));
     }
@@ -169,6 +171,15 @@ final readonly class ChunkContextFactory
         return $this->attackerContextPromptRenderer->renderCandidateFindings($candidates);
     }
 
+    private function renderHypothesisPreamble(AttackerAnalysisRequest $attackerAnalysisRequest): string
+    {
+        if (!$attackerAnalysisRequest->coverageGap instanceof CoverageGap) {
+            return '';
+        }
+
+        return $this->attackerContextPromptRenderer->renderCoverageHypothesis($attackerAnalysisRequest->coverageGap);
+    }
+
     private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool
     {
         return !$attackerAnalysisRequest->bypassCache && ('' === $contextKey || $cacheIsContextAware);
@@ -189,7 +200,11 @@ final readonly class ChunkContextFactory
         }
 
         if ('' !== $chunkPreambles->previous) {
-            return \sprintf("%s\n\n%s", $chunkPreambles->previous, $userMessage);
+            $userMessage = \sprintf("%s\n\n%s", $chunkPreambles->previous, $userMessage);
+        }
+
+        if ('' !== $chunkPreambles->hypothesis) {
+            return \sprintf("%s\n\n%s", $chunkPreambles->hypothesis, $userMessage);
         }
 
         return $userMessage;
