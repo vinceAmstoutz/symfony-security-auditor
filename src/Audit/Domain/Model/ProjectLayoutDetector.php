@@ -60,11 +60,12 @@ final readonly class ProjectLayoutDetector
             $domainAt = strpos($file->relativePath(), self::DOMAIN_LAYER);
             $module = false === $domainAt ? '' : substr($file->relativePath(), 0, $domainAt);
             if (str_contains($module, '/')) {
-                $contexts[basename($module)] = true;
+                $context = basename($module);
+                $contexts[$context] = $context;
             }
         }
 
-        return array_keys($contexts);
+        return array_values($contexts);
     }
 
     /**

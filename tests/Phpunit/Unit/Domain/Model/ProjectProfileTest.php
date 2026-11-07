@@ -55,6 +55,21 @@ final class ProjectProfileTest extends TestCase
         self::assertTrue(ProjectProfile::of(['symfony/http-kernel' => '8.2.x-dev'], [])->satisfies('symfony>=8.2'));
     }
 
+    #[DataProvider('branchesNamingNoRelease')]
+    public function test_a_kernel_locked_at_a_branch_naming_no_release_keeps_the_symfony_hunts(string $lockedVersion): void
+    {
+        self::assertTrue(ProjectProfile::of(['symfony/http-kernel' => $lockedVersion], [])->satisfies('symfony>=8.2'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function branchesNamingNoRelease(): iterable
+    {
+        yield 'the main branch' => ['dev-main'];
+        yield 'a feature branch mentioning an older release' => ['dev-fix-8.1-session'];
+    }
+
     /**
      * @param array<string, string> $installedPackages
      */
@@ -70,7 +85,6 @@ final class ProjectProfileTest extends TestCase
     public static function lockfilesBelowTheMinimum(): iterable
     {
         yield 'an older release' => [['symfony/http-kernel' => 'v8.1.4']];
-        yield 'a branch with no release number' => [['symfony/http-kernel' => 'dev-main']];
         yield 'no kernel at all' => [['monolog/monolog' => '3.9.0']];
     }
 
@@ -84,6 +98,14 @@ final class ProjectProfileTest extends TestCase
         self::assertNotSame(
             ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], [])->signature(),
             ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0', 'symfony/ai-agent' => 'v0.15.0'], [])->signature(),
+        );
+    }
+
+    public function test_the_order_the_lockfile_lists_packages_in_keeps_the_signature(): void
+    {
+        self::assertSame(
+            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0', 'doctrine/orm' => '3.5.0'], [])->signature(),
+            ProjectProfile::of(['doctrine/orm' => '3.5.0', 'symfony/http-kernel' => 'v8.2.0'], [])->signature(),
         );
     }
 
