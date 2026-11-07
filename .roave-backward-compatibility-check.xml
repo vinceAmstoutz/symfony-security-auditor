@@ -8,5 +8,9 @@
 -->
 <roave-bc-check xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="var/bc-check/vendor/roave/backward-compatibility-check/Resources/schema.xsd">
     <baseline>
+        <!-- CHANGELOG: "#693" -->
+        <ignored-regex>#\[BC\] ADDED: Case VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\ProjectFileType::USE_CASE was added#</ignored-regex>
+        <!-- CHANGELOG: "#693" -->
+        <ignored-regex>#\[BC\] ADDED: Case VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\SurfaceArchetype::APPLICATION_SERVICE was added#</ignored-regex>
     </baseline>
 </roave-bc-check>
