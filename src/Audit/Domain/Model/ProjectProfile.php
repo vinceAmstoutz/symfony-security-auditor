@@ -27,6 +27,8 @@ final readonly class ProjectProfile
 
     private const string NO_LOCKFILE = 'no lockfile';
 
+    private const string UNNAMED_RELEASE = '';
+
     /**
      * @param array<string, string>|null $installedPackages  package name => locked version, `null` when no lockfile was read
      * @param list<ArchitectureStyle>    $architectureStyles
@@ -122,7 +124,9 @@ final readonly class ProjectProfile
     private function isMet(string $alternative, array $installedPackages): bool
     {
         if (str_starts_with($alternative, self::SYMFONY_MINIMUM)) {
-            return version_compare($this->releaseOf($installedPackages[self::SYMFONY_KERNEL] ?? '0'), substr($alternative, \strlen(self::SYMFONY_MINIMUM)), '>=');
+            $lockedRelease = $this->releaseOf($installedPackages[self::SYMFONY_KERNEL] ?? '0');
+
+            return self::UNNAMED_RELEASE === $lockedRelease || version_compare($lockedRelease, substr($alternative, \strlen(self::SYMFONY_MINIMUM)), '>=');
         }
 
         return \array_key_exists($alternative, $installedPackages);
@@ -132,6 +136,6 @@ final readonly class ProjectProfile
     {
         preg_match('/^v?(\d+(?:\.\d+)*)/', $lockedVersion, $matches);
 
-        return $matches[1] ?? '0';
+        return $matches[1] ?? self::UNNAMED_RELEASE;
     }
 }

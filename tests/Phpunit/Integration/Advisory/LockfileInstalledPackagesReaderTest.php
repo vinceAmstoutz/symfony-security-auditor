@@ -55,7 +55,7 @@ final class LockfileInstalledPackagesReaderTest extends TestCase
 
         $this->reader($warningRecordingLogger)->read($this->projectDir);
 
-        self::assertCount(1, $warningRecordingLogger->warnings);
+        self::assertSame([['path', 'error']], $this->contextKeysOf($warningRecordingLogger));
     }
 
     public function test_json_that_lists_no_packages_is_no_lockfile(): void
@@ -108,7 +108,7 @@ final class LockfileInstalledPackagesReaderTest extends TestCase
 
         try {
             $this->reader($warningRecordingLogger)->read($this->projectDir);
-            self::assertCount(1, $warningRecordingLogger->warnings);
+            self::assertSame([['path']], $this->contextKeysOf($warningRecordingLogger));
         } finally {
             unlink($outside);
         }
@@ -137,7 +137,7 @@ final class LockfileInstalledPackagesReaderTest extends TestCase
 
         $this->reader($warningRecordingLogger)->read($this->projectDir);
 
-        self::assertCount(1, $warningRecordingLogger->warnings);
+        self::assertSame([['path', 'limit_bytes']], $this->contextKeysOf($warningRecordingLogger));
     }
 
     public function test_a_lockfile_that_cannot_be_read_has_no_known_packages(): void
@@ -154,7 +154,7 @@ final class LockfileInstalledPackagesReaderTest extends TestCase
 
         $this->reader($warningRecordingLogger)->read($this->projectDir);
 
-        self::assertCount(1, $warningRecordingLogger->warnings);
+        self::assertSame([['path', 'error']], $this->contextKeysOf($warningRecordingLogger));
     }
 
     #[Override]
@@ -168,6 +168,14 @@ final class LockfileInstalledPackagesReaderTest extends TestCase
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->projectDir);
+    }
+
+    /**
+     * @return list<list<array-key>>
+     */
+    private function contextKeysOf(WarningRecordingLogger $warningRecordingLogger): array
+    {
+        return array_map(static fn (array $warning): array => array_keys($warning[1]), $warningRecordingLogger->warnings);
     }
 
     private function reader(?LoggerInterface $logger = null): LockfileInstalledPackagesReader
