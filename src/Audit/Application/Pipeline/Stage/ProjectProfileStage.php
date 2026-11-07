@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectLayoutDetector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
@@ -37,7 +38,7 @@ final readonly class ProjectProfileStage implements StageInterface
     #[Override]
     public function name(): string
     {
-        return 'project_profile';
+        return BuiltInStageName::ProjectProfile->value;
     }
 
     #[Override]
@@ -51,6 +52,7 @@ final readonly class ProjectProfileStage implements StageInterface
         $auditContext->setMapping($symfonyMapping->withProjectProfile(ProjectProfile::of(
             $this->installedPackagesReader->read($auditContext->projectPath()),
             ProjectLayoutDetector::stylesOf($auditContext->mappingFiles()),
+            ProjectLayoutDetector::boundedContextsOf($auditContext->mappingFiles()),
         )));
     }
 }

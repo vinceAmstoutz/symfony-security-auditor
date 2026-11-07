@@ -69,4 +69,22 @@ final class ProjectProfileStageTest extends TestCase
 
         self::assertNull($auditContext->mapping());
     }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_bounded_contexts_of_the_mapped_files_reach_the_mapping(): void
+    {
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+        $auditContext->setMappingFiles([
+            ProjectFile::create('src/Billing/Domain/Invoice.php', '/app/a', '<?php final class Invoice {}'),
+            ProjectFile::create('src/Identity/Domain/User.php', '/app/b', '<?php final class User {}'),
+        ]);
+        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromFiles([]), new AccessControlMap()));
+
+        (new ProjectProfileStage(self::createStub(InstalledPackagesReaderInterface::class)))->process($auditContext);
+
+        self::assertSame(['Billing', 'Identity'], $auditContext->mapping()?->projectProfile()->boundedContexts());
+    }
 }

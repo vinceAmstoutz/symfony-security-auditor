@@ -59,6 +59,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipelin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\ProjectProfileStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
@@ -164,6 +165,22 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertNotFalse($auditIndex);
         self::assertGreaterThan($mappingIndex, $dependencyExpansionIndex);
         self::assertLessThan($auditIndex, $dependencyExpansionIndex);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_bundle_profiles_the_project_right_after_mapping_it(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        $auditPipeline = $this->getPrivateService($kernel, AuditPipeline::class);
+        self::assertInstanceOf(AuditPipeline::class, $auditPipeline);
+
+        $stageClasses = array_map(static fn (object $stage): string => $stage::class, $auditPipeline->stages());
+
+        $mappingPosition = array_search(MappingStage::class, $stageClasses, true);
+        self::assertIsInt($mappingPosition);
+        self::assertSame([MappingStage::class, ProjectProfileStage::class], \array_slice($stageClasses, $mappingPosition, 2));
     }
 
     #[RunInSeparateProcess]
