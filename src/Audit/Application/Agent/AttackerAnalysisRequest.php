@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -49,6 +50,8 @@ final readonly class AttackerAnalysisRequest
      *                                               run narrowed by `--since`, `--path` or the escalation
      *                                               deep pass, with `audit.tools_scope: scanned`; null
      *                                               means `files`, those of the deep pass included
+     * @param ?CoverageGap        $coverageGap       the gap the coverage critic named, when this pass analyzes it:
+     *                                               its files form one chunk led by its hypothesis
      */
     public function __construct(
         public array $files,
@@ -58,6 +61,7 @@ final readonly class AttackerAnalysisRequest
         public array $rejectedFindings = [],
         public array $candidateFindings = [],
         public ?array $toolFiles = null,
+        public ?CoverageGap $coverageGap = null,
     ) {
         $this->knownFiles = new KnownFiles($this->filesForTools());
     }
@@ -88,6 +92,6 @@ final readonly class AttackerAnalysisRequest
      */
     public function withFilesAndCandidateFindings(array $files, array $candidateFindings): self
     {
-        return new self($files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, $candidateFindings, $this->toolFiles);
+        return new self($files, $this->symfonyMapping, $this->bypassCache, $this->previousFindings, $this->rejectedFindings, $candidateFindings, $this->toolFiles, $this->coverageGap);
     }
 }

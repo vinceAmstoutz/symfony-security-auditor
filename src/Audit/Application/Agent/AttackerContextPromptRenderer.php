@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
@@ -27,6 +28,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 final readonly class AttackerContextPromptRenderer
 {
     private const int MAX_TITLE_LENGTH = 120;
+
+    private const int MAX_HYPOTHESIS_LENGTH = 2000;
+
+    private const int MAX_ATTACK_CLASS_LENGTH = 100;
 
     private const int MAX_LISTED_MARKERS_PER_PATTERN = 20;
 
@@ -101,7 +106,7 @@ final readonly class AttackerContextPromptRenderer
                 $candidateFinding->lineEnd(),
                 $candidateFinding->severity()->value,
                 $candidateFinding->confidence(),
-                $this->delimitTitle($candidateFinding->title()),
+                $this->delimit($candidateFinding->title(), self::MAX_TITLE_LENGTH),
             );
         }
 
@@ -110,6 +115,17 @@ final readonly class AttackerContextPromptRenderer
             A cheaper model swept these files first and reported the candidates below. They are NOT validated: treat each one as a lead. Confirm it against the code, refine its type, severity, line range or description, or discard it when the surrounding context proves it safe. Re-report every candidate you confirm at the lines you verified — a confirmed candidate you leave out is lost — then look past them for what the first pass missed.
 
             {$this->indent(implode("\n", $lines))}
+            PROMPT;
+    }
+
+    public function renderCoverageHypothesis(CoverageGap $coverageGap): string
+    {
+        $attackClass = $this->singleLineCappedAt($coverageGap->attackClass, self::MAX_ATTACK_CLASS_LENGTH);
+        $hypothesis = $this->delimit($coverageGap->hypothesis, self::MAX_HYPOTHESIS_LENGTH);
+
+        return <<<PROMPT
+            ## Coverage Critic Hypothesis (Unverified)
+            Coverage critic hypothesis ({$attackClass}): {$hypothesis}; confirm it or rule it out — never record it without evidence in the code below.
             PROMPT;
     }
 
@@ -197,20 +213,26 @@ final readonly class AttackerContextPromptRenderer
     }
 
     /**
-     * A candidate title is a first-pass model's free text about untrusted code:
-     * quoted so the deep pass reads it as data rather than as an instruction of
-     * its own, with embedded double quotes folded so none can close the quote
-     * early, and capped so a runaway title cannot crowd the prompt.
+     * A candidate title or a coverage critic hypothesis is a model's free text
+     * about untrusted code: quoted so the attacker reads it as data rather than
+     * as an instruction of its own, with embedded double quotes folded so none
+     * can close the quote early, and capped so a runaway text cannot crowd the
+     * prompt.
      */
-    private function delimitTitle(string $title): string
+    private function delimit(string $text, int $maxLength): string
     {
-        $singleLine = str_replace('"', "'", $this->sanitizeLine($title));
+        return \sprintf('"%s"', str_replace('"', "'", $this->singleLineCappedAt($text, $maxLength)));
+    }
 
-        if (mb_strlen($singleLine, 'UTF-8') > self::MAX_TITLE_LENGTH) {
-            $singleLine = \sprintf('%s…', mb_substr($singleLine, 0, self::MAX_TITLE_LENGTH, 'UTF-8'));
+    private function singleLineCappedAt(string $text, int $maxLength): string
+    {
+        $singleLine = $this->sanitizeLine($text);
+
+        if (mb_strlen($singleLine, 'UTF-8') > $maxLength) {
+            return \sprintf('%s…', mb_substr($singleLine, 0, $maxLength, 'UTF-8'));
         }
 
-        return \sprintf('"%s"', $singleLine);
+        return $singleLine;
     }
 
     /**

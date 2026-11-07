@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Critic\CoverageGap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
@@ -199,6 +200,14 @@ final class AttackerAnalysisRequestTest extends TestCase
         $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         self::assertSame([], $attackerAnalysisRequest->candidateFindings);
+    }
+
+    public function test_the_deep_pass_of_a_coverage_gap_keeps_its_hypothesis(): void
+    {
+        $coverageGap = new CoverageGap([], 'The export skips the owner check.', 'broken_access_control');
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), coverageGap: $coverageGap);
+
+        self::assertSame($coverageGap, $attackerAnalysisRequest->withFilesAndCandidateFindings([], [])->coverageGap);
     }
 
     /**

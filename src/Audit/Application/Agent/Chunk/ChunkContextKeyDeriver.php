@@ -79,6 +79,24 @@ final readonly class ChunkContextKeyDeriver
     }
 
     /**
+     * The key {@see self::derive()} gives a chunk's preambles, with the
+     * coverage critic's hypothesis folded in when the chunk analyzes a gap it
+     * named: a gap's chunk never shares an entry with the plain chunk of the
+     * same files or with another hypothesis, and every other chunk keeps the
+     * key earlier releases derived.
+     */
+    public function deriveFor(ChunkPreambles $chunkPreambles, SymfonyMapping $symfonyMapping): string
+    {
+        $contextKey = $this->derive($chunkPreambles->markers, $chunkPreambles->rejected, $chunkPreambles->previous, $chunkPreambles->candidates, $symfonyMapping);
+
+        if ('' === $chunkPreambles->hypothesis) {
+            return $contextKey;
+        }
+
+        return hash('sha256', hash('sha256', $contextKey).hash('sha256', $chunkPreambles->hypothesis));
+    }
+
+    /**
      * `AttackerPromptBuilder::buildUserMessage()` renders the firewall,
      * route-access-control, voter-coverage and form-binding sections straight
      * from the mapping, but the chunk cache is keyed only by file content and
