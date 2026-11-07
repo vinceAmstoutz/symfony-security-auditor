@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProfileAwareAttackerPromptBuilderInterface;
 use WeakMap;
 
 /**
@@ -61,7 +62,9 @@ final readonly class ChunkContextFactory
         $chunkCacheCoordinates = $this->coordinates($chunkPreambles, $attackerAnalysisRequest, $cacheIsContextAware);
 
         $slicedChunk = $this->sliceChunk($chunk, $riskMarkerIndex);
-        $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
+        $systemPrompt = $this->attackerPromptBuilder instanceof ProfileAwareAttackerPromptBuilderInterface
+            ? $this->attackerPromptBuilder->buildSystemPromptFor($slicedChunk, $attackerAnalysisRequest->symfonyMapping)
+            : $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
         $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
         $userMessage = $this->prependContext($userMessage, $chunkPreambles);
 

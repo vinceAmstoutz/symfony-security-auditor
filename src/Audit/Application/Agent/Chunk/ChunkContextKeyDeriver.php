@@ -119,6 +119,7 @@ final readonly class ChunkContextKeyDeriver
             ...$this->voterCapabilitySignatures($applicationSecurityMap->authorizationRules()),
             ...$this->formBindingSignatures($symfonyMapping->formBindings()),
             ...$this->entrypointsWithoutAuthorizationRulePaths($applicationSecurityMap->entrypointsWithoutAuthorizationRule()),
+            ...$this->projectProfileSignatures($symfonyMapping->projectProfile()->signature()),
         ];
 
         if ([] === $signatures) {
@@ -220,5 +221,13 @@ final readonly class ChunkContextKeyDeriver
     private function entrypointsWithoutAuthorizationRulePaths(array $entrypointsWithoutAuthorizationRule): array
     {
         return array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $entrypointsWithoutAuthorizationRule);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function projectProfileSignatures(string $projectProfileSignature): array
+    {
+        return '' === $projectProfileSignature ? [] : [\sprintf('project profile %s', $projectProfileSignature)];
     }
 }
