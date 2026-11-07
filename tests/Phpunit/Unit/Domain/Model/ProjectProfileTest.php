@@ -123,4 +123,12 @@ final class ProjectProfileTest extends TestCase
             ProjectProfile::of([], [ArchitectureStyle::CQRS])->signature(),
         );
     }
+
+    public function test_other_bounded_contexts_change_the_signature(): void
+    {
+        self::assertNotSame(
+            ProjectProfile::of(null, [ArchitectureStyle::BOUNDED_CONTEXTS], ['Billing', 'Identity'])->signature(),
+            ProjectProfile::of(null, [ArchitectureStyle::BOUNDED_CONTEXTS], ['Billing', 'Shipping'])->signature(),
+        );
+    }
 }

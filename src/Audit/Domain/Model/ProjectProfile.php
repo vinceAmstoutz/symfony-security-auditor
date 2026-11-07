@@ -30,24 +30,27 @@ final readonly class ProjectProfile
     /**
      * @param array<string, string>|null $installedPackages  package name => locked version, `null` when no lockfile was read
      * @param list<ArchitectureStyle>    $architectureStyles
+     * @param list<string>               $boundedContexts
      */
     private function __construct(
         private ?array $installedPackages,
         private array $architectureStyles,
+        private array $boundedContexts,
     ) {}
 
     public static function unknown(): self
     {
-        return new self(null, []);
+        return new self(null, [], []);
     }
 
     /**
      * @param array<string, string>|null $installedPackages  package name => locked version, `null` when no lockfile was read
      * @param list<ArchitectureStyle>    $architectureStyles
+     * @param list<string>               $boundedContexts    the modules the project splits its domain into
      */
-    public static function of(?array $installedPackages, array $architectureStyles): self
+    public static function of(?array $installedPackages, array $architectureStyles, array $boundedContexts = []): self
     {
-        return new self($installedPackages, $architectureStyles);
+        return new self($installedPackages, $architectureStyles, $boundedContexts);
     }
 
     /**
@@ -56,6 +59,14 @@ final readonly class ProjectProfile
     public function architectureStyles(): array
     {
         return $this->architectureStyles;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function boundedContexts(): array
+    {
+        return $this->boundedContexts;
     }
 
     public function signature(): string
@@ -73,7 +84,7 @@ final readonly class ProjectProfile
 
         $styles = array_map(static fn (ArchitectureStyle $architectureStyle): string => $architectureStyle->value, $this->architectureStyles);
 
-        return hash('sha256', implode("\n", [$symfonyRelease, ...$styles, '', ...$packageNames]));
+        return hash('sha256', implode("\n", [$symfonyRelease, ...$styles, '', ...$this->boundedContexts, '', ...$packageNames]));
     }
 
     public function satisfies(string $requirement): bool
