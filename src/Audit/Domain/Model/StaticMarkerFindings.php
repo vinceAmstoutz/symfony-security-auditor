@@ -20,7 +20,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class StaticMarkerFindings
 {
-    private const array NOT_A_FINDING = ['scrubbed_secret', 'unmapped_access_control'];
+    private const array NOT_A_FINDING = [
+        'scrubbed_secret',
+        'unmapped_access_control',
+        'superglobal_input',
+        'request_get',
+        'request_mapping_attribute',
+        'unserialize_session',
+        'request_attributes_mutation',
+    ];
 
     private const float DEFINITE_CONFIDENCE = 0.8;
 
@@ -102,7 +110,6 @@ final readonly class StaticMarkerFindings
             'trusted_proxies_wildcard', 'forwarded_host_usage' => [VulnerabilityType::TRUSTED_PROXY_MISCONFIGURATION, VulnerabilitySeverity::MEDIUM],
             'mercure_permissive_topic_claim' => [VulnerabilityType::PERMISSIVE_MERCURE_TOPIC_SELECTOR, VulnerabilitySeverity::MEDIUM],
             'api_pagination_disabled', 'no_lock' => [VulnerabilityType::MISSING_RATE_LIMITING, VulnerabilitySeverity::LOW],
-            'unserialize_session', 'superglobal_input', 'request_get', 'request_mapping_attribute', 'request_attributes_mutation' => [VulnerabilityType::UNSAFE_PARAMETER_BINDING, VulnerabilitySeverity::INFO],
             default => [VulnerabilityType::BUSINESS_LOGIC_FLAW, VulnerabilitySeverity::INFO],
         };
     }

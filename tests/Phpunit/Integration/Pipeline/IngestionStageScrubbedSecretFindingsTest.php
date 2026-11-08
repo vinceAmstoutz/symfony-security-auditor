@@ -39,7 +39,7 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
     public function test_a_redacted_credential_is_queued_for_review_as_a_hardcoded_secret_on_its_line(): void
     {
         $file = ProjectFile::create('src/Billing.php', '/p/src/Billing.php', "<?php\n\n\$key = '***REDACTED:aws_access_key***';\n");
-        $auditContext = AuditContext::forProject('/p');
+        $auditContext = AuditContext::forProject(__DIR__);
 
         (new IngestionStage($this->scannerReturning([$file]), new NullLogger(), null, new CandidateFindingSource(new NullStaticPreScanner())))->process($auditContext);
 
@@ -60,7 +60,7 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
     public function test_a_static_pre_scan_match_is_queued_for_review_as_a_finding_of_its_mapped_type(): void
     {
         $file = ProjectFile::create('src/Legacy.php', '/p/src/Legacy.php', "<?php\n\nunserialize(\$payload);\n");
-        $auditContext = AuditContext::forProject('/p');
+        $auditContext = AuditContext::forProject(__DIR__);
 
         (new IngestionStage($this->scannerReturning([$file]), new NullLogger(), null, new CandidateFindingSource(new RegexStaticPreScanner([], new NullLogger()))))->process($auditContext);
 
@@ -89,7 +89,7 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
             }
         };
 
-        (new IngestionStage($this->scannerReturning([$file]), new NullLogger(), null, new CandidateFindingSource(new NullStaticPreScanner()), $progressReporter))->process(AuditContext::forProject('/p'));
+        (new IngestionStage($this->scannerReturning([$file]), new NullLogger(), null, new CandidateFindingSource(new NullStaticPreScanner()), $progressReporter))->process(AuditContext::forProject(__DIR__));
 
         self::assertSame([['attacker.finding.recorded', ['severity' => 'high', 'type' => 'hardcoded_secret', 'file' => 'src/Billing.php', 'line' => 3]]], $events->getArrayCopy());
     }
@@ -101,7 +101,7 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
     public function test_a_cost_estimate_queues_no_candidate(): void
     {
         $file = ProjectFile::create('src/Billing.php', '/p/src/Billing.php', "<?php\n\n\$key = '***REDACTED:aws_access_key***';\n");
-        $auditContext = AuditContext::forProject('/p');
+        $auditContext = AuditContext::forProject(__DIR__);
         $auditContext->markAsCostEstimate();
 
         (new IngestionStage($this->scannerReturning([$file]), new NullLogger(), null, new CandidateFindingSource(new NullStaticPreScanner())))->process($auditContext);
@@ -116,7 +116,7 @@ final class IngestionStageScrubbedSecretFindingsTest extends TestCase
     public function test_without_a_candidate_source_nothing_is_queued(): void
     {
         $file = ProjectFile::create('src/Billing.php', '/p/src/Billing.php', "<?php\n\n\$key = '***REDACTED:aws_access_key***';\n");
-        $auditContext = AuditContext::forProject('/p');
+        $auditContext = AuditContext::forProject(__DIR__);
 
         (new IngestionStage($this->scannerReturning([$file]), new NullLogger()))->process($auditContext);
 
