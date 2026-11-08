@@ -94,7 +94,7 @@ final readonly class StaticMarkerFindings
             'file_sink', 'dynamic_file_inclusion', 'upload_handling' => [VulnerabilityType::PATH_TRAVERSAL, VulnerabilitySeverity::MEDIUM],
             'xml_external_entity' => [VulnerabilityType::XXE, VulnerabilitySeverity::MEDIUM],
             'twig_string_template', 'dynamic_include', 'expression_language_evaluate' => [VulnerabilityType::TWIG_INJECTION, VulnerabilitySeverity::MEDIUM],
-            'extension_is_safe_html', 'autoescape_false' => [VulnerabilityType::XSS, VulnerabilitySeverity::MEDIUM],
+            'raw_filter', 'extension_is_safe_html', 'autoescape_false' => [VulnerabilityType::XSS, VulnerabilitySeverity::MEDIUM],
             'csrf_disabled' => [VulnerabilityType::MISSING_CSRF_PROTECTION, VulnerabilitySeverity::MEDIUM],
             'submit_request_all', 'allow_extra_fields', 'allow_extra_attributes', 'sensitive_setter', 'live_prop_writable' => [VulnerabilityType::MASS_ASSIGNMENT, VulnerabilitySeverity::MEDIUM],
             'serializer_groups_attribute', 'api_filter_declared', 'sonata_admin_sensitive_field_exposed', 'easyadmin_sensitive_field' => [VulnerabilityType::OVER_PERMISSIVE_SERIALIZER_GROUP, VulnerabilitySeverity::LOW],
