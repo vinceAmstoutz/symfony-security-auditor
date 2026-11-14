@@ -49,6 +49,9 @@ enum SurfaceArchetype: string
     /** Declares which request fields may be written to what. */
     case INPUT_BINDING = 'input_binding';
 
+    /** Carries out one business operation for its caller — a use case, interactor or command/query handler. */
+    case APPLICATION_SERVICE = 'application_service';
+
     /** Consumes work that arrived out of band — a message, event or schedule. */
     case ASYNC_HANDLER = 'async_handler';
 
