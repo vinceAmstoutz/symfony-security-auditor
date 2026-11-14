@@ -480,6 +480,15 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
+     * A coding agent's CLI answers in one piece, whatever the platform the
+     * application configures, so only that platform's calls are streamed.
+     */
+    private function streamsCalls(string $platformServiceId): bool
+    {
+        return PlatformInterface::class === $platformServiceId;
+    }
+
+    /**
      * @return list<mixed>
      */
     private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens, string $platformServiceId): array
@@ -497,6 +506,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->providerJsonMode,
                 service(TokenEstimatorInterface::class),
                 param(PricingPlatformPass::PARAMETER),
+                $this->streamsCalls($platformServiceId),
             ]),
             inline_service(PlatformResilienceConfig::class)->args([
                 service(RetryPolicy::class),

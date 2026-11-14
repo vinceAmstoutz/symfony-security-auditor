@@ -22,7 +22,7 @@ declare(strict_types=1);
 namespace Symfony\AI\Platform\Bridge\Generic;
 
 use Symfony\AI\Platform\PlatformInterface;
-use Symfony\AI\Platform\Test\MockPlatformFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\Bridge\StubAnswerPlatform;
 
 final class Factory
 {
@@ -32,6 +32,6 @@ final class Factory
     {
         self::$lastBaseUrl = $baseUrl;
 
-        return MockPlatformFactory::createPlatform('stub-response');
+        return StubAnswerPlatform::answering('stub-response');
     }
 }
