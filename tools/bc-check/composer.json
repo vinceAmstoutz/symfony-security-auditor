@@ -7,11 +7,20 @@
         "php": "~8.3.0",
         "roave/backward-compatibility-check": "^8.18"
     },
+    "autoload": {
+        "psr-4": {
+            "VinceAmstoutz\\SymfonySecurityAuditor\\Tooling\\BcCheck\\": "../BcCheck/"
+        }
+    },
     "config": {
         "platform": {
             "php": "8.3.6"
         },
         "sort-packages": true,
         "vendor-dir": "../../var/bc-check/vendor"
+    },
+    "scripts": {
+        "post-install-cmd": "VinceAmstoutz\\SymfonySecurityAuditor\\Tooling\\BcCheck\\RoaveEnumCaseAdditions::acceptInInstalledRoave",
+        "post-update-cmd": "VinceAmstoutz\\SymfonySecurityAuditor\\Tooling\\BcCheck\\RoaveEnumCaseAdditions::acceptInInstalledRoave"
     }
 }
