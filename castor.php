@@ -93,7 +93,7 @@ function compatRecord(string $tagOrCheckout): void
     run(['docker', 'compose', 'exec', 'php', 'php', 'tools/Compat/record-configuration.php', $checkout, $release]);
     run(['docker', 'compose', 'exec', '--user', sprintf('%d:%d', posix_getuid(), posix_getgid()), 'php', 'php', 'tools/Compat/record.php', $checkout, $release]);
 
-    io()->success(sprintf('Recorded the compatibility fixtures from %s. Empty the accepted-differences.php files and the roave baseline but for its POLICY entry: they list differences from the previous release.', $release));
+    io()->success(sprintf('Recorded the compatibility fixtures from %s. Empty the accepted-differences.php files and the roave baseline: they list differences from the previous release.', $release));
 }
 
 #[AsTask(name: 'compat:lock', description: 'Refresh the dependencies the compatibility job installs (tests/Phpunit/Compat/composer.lock) after composer.json changed')]

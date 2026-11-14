@@ -134,7 +134,7 @@ docker compose exec php composer install --working-dir=tools/bc-check
 docker compose exec php var/bc-check/vendor/bin/roave-backward-compatibility-check --from=1.21.0
 ```
 
-A break the maintainer accepted goes into `.roave-backward-compatibility-check.xml` as an `ignored-regex` that is the reported line itself, with every metacharacter escaped, right after a `<!-- CHANGELOG: "#123" -->` comment naming the pull request that a bullet under `## [Unreleased]` links. `RoaveBaselineTest` refuses a pattern with a wildcard and an entry no such bullet announces. One entry is the exception: the `<!-- POLICY: … -->` pattern that accepts every case added to an enum under `src/Audit/Domain/Model/`, which [the versioning policy](docs/versioning.md#domain-models-and-exceptions) allows in a MINOR release. It is kept across releases, and `RoaveBaselineTest` fails if it goes missing or accepts anything more.
+A break the maintainer accepted goes into `.roave-backward-compatibility-check.xml` as an `ignored-regex` that is the reported line itself, with every metacharacter escaped, right after a `<!-- CHANGELOG: "#123" -->` comment naming the pull request that a bullet under `## [Unreleased]` links. `RoaveBaselineTest` refuses a pattern with a wildcard and an entry no such bullet announces.
 
 ### Behaviour Replay
 
@@ -156,7 +156,7 @@ Review the drafts one by one: give each a reason and its bullet, widen a path on
 
 ### Recording From a New Release
 
-Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch, and empty the `accepted-differences.php` files and the `<baseline>` of `.roave-backward-compatibility-check.xml` but for its `POLICY` entry, whose other entries described differences from the previous release:
+Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch, and empty the `accepted-differences.php` files and the `<baseline>` of `.roave-backward-compatibility-check.xml`, whose entries described differences from the previous release:
 
 ```bash
 bin/castor compat:record X.Y.Z
