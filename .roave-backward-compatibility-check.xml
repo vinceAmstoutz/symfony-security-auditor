@@ -4,13 +4,13 @@
     ignored-regex per reported line, written as that line, under a
     CHANGELOG comment naming the bullet of CHANGELOG.md's [Unreleased]
     section that announces it (checked by RoaveBaselineTest). Emptied once
-    the next release is tagged (see CONTRIBUTING.md, "Compatibility Checks").
+    the next release is tagged (see CONTRIBUTING.md, "Compatibility Checks"),
+    but for the POLICY entry, which accepts what docs/versioning.md always
+    allows.
 -->
 <roave-bc-check xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="var/bc-check/vendor/roave/backward-compatibility-check/Resources/schema.xsd">
     <baseline>
-        <!-- CHANGELOG: "#693" -->
-        <ignored-regex>#\[BC\] ADDED: Case VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\ProjectFileType::USE_CASE was added#</ignored-regex>
-        <!-- CHANGELOG: "#693" -->
-        <ignored-regex>#\[BC\] ADDED: Case VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\SurfaceArchetype::APPLICATION_SERVICE was added#</ignored-regex>
+        <!-- POLICY: docs/versioning.md lets an enum under src/Audit/Domain/Model/ gain cases in a MINOR release; kept across releases -->
+        <ignored-regex>#\[BC\] ADDED: Case VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\\w+::\w+ was added#</ignored-regex>
     </baseline>
 </roave-bc-check>
