@@ -15,6 +15,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - A Symfony application runs the audit on a Claude or ChatGPT subscription too: `cli_agent.platform: claudecode` or `codex` sends the auditor's calls to the installed CLI and leaves the application's own `symfony/ai` platform as it is ([#679](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/679))
 - The standalone binary bundles Composer 2.8.12 and `init` installs the provider bridge with it, on the binary's own PHP, so it no longer needs PHP or Composer on your machine; `init` no longer checks for Composer before asking anything, and `doctor`'s Composer check now only concerns the `lookup_advisory` tool ([#682](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/682))
 
+### Bugfixes 🐛
+
+- OpenAI cached input is billed at the cache rate again and its cache writes are no longer billed on top of the full prompt, so `estimated_cost_usd` and `audit.budget.max_cost_usd` stop running up to 3x high and `audit.rate_limit.input_tokens_per_minute` counts each prompt once (thanks @JerritEic)
+
 ### Core 🧱
 
 - A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
