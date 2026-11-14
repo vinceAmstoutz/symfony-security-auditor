@@ -23,21 +23,34 @@ final class RoaveEnumCaseAdditionsTest extends TestCase
     use ExpectsExceptionMessageTrait;
 
     private const string REPORTED_AS_A_BREAK = <<<'PHP'
-        static function (string $caseName) use ($fromEnumName): Change {
-            return Change::added('Case ' . $fromEnumName . '::' . $caseName . ' was added');
-        },
+        $caseAddedChanges = array_map(
+            static fn (ReflectionEnumCase $case): Change => Change::added('Case ' . $case->getName() . ' was added'),
+            $addedCases,
+        );
+
+        return Changes::fromList(
+            ...$caseRemovedChanges,
+            ...$caseAddedChanges,
+            ...$caseBecameInternalChanges,
+        );
         PHP;
 
     private const string REPORTED_WITHOUT_A_BREAK = <<<'PHP'
-        static function (string $caseName) use ($fromEnumName): Change {
-            return Change::added('Case ' . $fromEnumName . '::' . $caseName . ' was added', false);
-        },
+        $caseAddedChanges = array_map(
+            static fn (ReflectionEnumCase $case): Change => Change::added('Case ' . $case->getName() . ' was added'),
+            $addedCases,
+        );
+
+        return Changes::fromList(
+            ...$caseRemovedChanges,
+            ...$caseBecameInternalChanges,
+        );
         PHP;
 
     /**
      * @throws UnpatchableEnumCasesCheckException
      */
-    public function test_an_added_enum_case_is_still_reported_but_no_longer_as_a_break(): void
+    public function test_an_added_enum_case_is_no_longer_reported(): void
     {
         self::assertSame(self::REPORTED_WITHOUT_A_BREAK, RoaveEnumCaseAdditions::acceptedIn(self::REPORTED_AS_A_BREAK));
     }
@@ -84,8 +97,8 @@ final class RoaveEnumCaseAdditionsTest extends TestCase
     public function test_a_check_that_no_longer_reports_added_cases_that_way_fails_the_install(): void
     {
         $this->expectException(UnpatchableEnumCasesCheckException::class);
-        $this->expectExceptionMessageContaining('does not report an added enum case the way');
+        $this->expectExceptionMessageContaining('does not return its added enum cases the way');
 
-        RoaveEnumCaseAdditions::acceptedIn("return Change::added('Case ' . \$name . ' appeared');");
+        RoaveEnumCaseAdditions::acceptedIn('return Changes::fromList(...$caseRemovedChanges);');
     }
 }

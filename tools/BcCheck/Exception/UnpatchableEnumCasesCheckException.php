@@ -24,6 +24,6 @@ final class UnpatchableEnumCasesCheckException extends RuntimeException
 
     public static function forUnknownReport(string $expected): self
     {
-        return new self(\sprintf('The enum cases check of roave/backward-compatibility-check does not report an added enum case the way this install expects (one "%s"): update tools/BcCheck/RoaveEnumCaseAdditions.php for this Roave release.', $expected));
+        return new self(\sprintf('The enum cases check of roave/backward-compatibility-check does not return its added enum cases the way this install expects (one "%s" line): update tools/BcCheck/RoaveEnumCaseAdditions.php for this Roave release.', $expected));
     }
 }

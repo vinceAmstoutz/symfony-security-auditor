@@ -17,15 +17,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tooling\BcCheck\Exception\UnpatchableEn
 
 /**
  * docs/versioning.md lets an enum gain cases in a MINOR release, so the API
- * compatibility job reports a case added to an enum without counting it as a
- * break: its install rewrites the one line of roave/backward-compatibility-check
- * that counts it as one, and a removed case still fails the job.
+ * compatibility job no longer fails on a case added to an enum: its install
+ * removes, from the changes the enum cases check of
+ * roave/backward-compatibility-check returns, the one line that adds the
+ * added cases, and a removed case still fails the job.
  */
 final readonly class RoaveEnumCaseAdditions
 {
-    private const string REPORTED_AS_A_BREAK = "' was added');";
+    private const string ADDED_CASES_RETURNED = '/^[ \t]*\.\.\.\$caseAddedChanges,\R/m';
 
-    private const string REPORTED_WITHOUT_A_BREAK = "' was added', false);";
+    private const string ADDED_CASES_COMPUTED = '$caseAddedChanges = ';
 
     private const string INSTALLED_ENUM_CASES_CHECK = '/var/bc-check/vendor/roave/backward-compatibility-check/src/DetectChanges/BCBreak/ClassBased/EnumCasesChanged.php';
 
@@ -59,15 +60,15 @@ final readonly class RoaveEnumCaseAdditions
             return $enumCasesCheck;
         }
 
-        if (1 !== substr_count($enumCasesCheck, self::REPORTED_AS_A_BREAK)) {
-            throw UnpatchableEnumCasesCheckException::forUnknownReport(self::REPORTED_AS_A_BREAK);
+        if (1 !== preg_match_all(self::ADDED_CASES_RETURNED, $enumCasesCheck)) {
+            throw UnpatchableEnumCasesCheckException::forUnknownReport('...$caseAddedChanges,');
         }
 
-        return str_replace(self::REPORTED_AS_A_BREAK, self::REPORTED_WITHOUT_A_BREAK, $enumCasesCheck);
+        return preg_replace(self::ADDED_CASES_RETURNED, '', $enumCasesCheck) ?? throw UnpatchableEnumCasesCheckException::forUnknownReport('...$caseAddedChanges,');
     }
 
     private static function isAlreadyAccepting(string $enumCasesCheck): bool
     {
-        return 1 === substr_count($enumCasesCheck, self::REPORTED_WITHOUT_A_BREAK) && !str_contains($enumCasesCheck, self::REPORTED_AS_A_BREAK);
+        return 0 === preg_match_all(self::ADDED_CASES_RETURNED, $enumCasesCheck) && str_contains($enumCasesCheck, self::ADDED_CASES_COMPUTED);
     }
 }
