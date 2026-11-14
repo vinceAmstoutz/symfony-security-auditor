@@ -39,8 +39,11 @@ final readonly class OpenAiStreamedProvider implements StreamedProviderInterface
         return Factory::createPlatform('sk-test', new MockHttpClient($answers));
     }
 
+    /**
+     * @param array<string, int> $inputTokensDetails
+     */
     #[Override]
-    public function textAnswer(string $text, int $inputTokens, int $outputTokens): MockResponse
+    public function textAnswer(string $text, int $inputTokens, int $outputTokens, array $inputTokensDetails = []): MockResponse
     {
         return ServerSentEvents::of(
             ['type' => 'response.created', 'response' => ['id' => 'resp_1', 'status' => 'in_progress', 'output' => [], 'usage' => null]],
@@ -50,7 +53,7 @@ final readonly class OpenAiStreamedProvider implements StreamedProviderInterface
                 'status' => 'completed',
                 'model' => $this->model(),
                 'output' => [['type' => 'message', 'id' => 'msg_1', 'role' => 'assistant', 'content' => [['type' => 'output_text', 'text' => $text]]]],
-                'usage' => ['input_tokens' => $inputTokens, 'output_tokens' => $outputTokens, 'total_tokens' => $inputTokens + $outputTokens],
+                'usage' => ['input_tokens' => $inputTokens, 'input_tokens_details' => $inputTokensDetails, 'output_tokens' => $outputTokens, 'total_tokens' => $inputTokens + $outputTokens],
             ]],
         );
     }
