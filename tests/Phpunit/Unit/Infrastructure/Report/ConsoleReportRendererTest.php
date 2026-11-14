@@ -647,6 +647,18 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditCostException
      * @throws InvalidAuditContextException
      */
+    public function test_render_states_the_cost_is_a_minimum_when_calls_were_cut_before_their_answer_ended(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(1_000, 500, 0.0123, 'claude-sonnet-4-5')->withInterruptedCalls(2));
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString('$0.0123 (published rates; at least: 2 calls were cut before their answer ended and may be billed more)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_caveats_zero_cost_when_tokens_were_spent_but_the_model_has_no_published_pricing(): void
     {
         $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2'));

@@ -24,7 +24,7 @@ declare(strict_types=1);
 namespace Symfony\AI\Platform\Bridge\Ollama;
 
 use Symfony\AI\Platform\PlatformInterface;
-use Symfony\AI\Platform\Test\MockPlatformFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\Bridge\StubAnswerPlatform;
 
 final class Factory
 {
@@ -32,6 +32,6 @@ final class Factory
 
     public static function createPlatform(): PlatformInterface
     {
-        return MockPlatformFactory::createPlatform(self::STUB_RESPONSE);
+        return StubAnswerPlatform::answering(self::STUB_RESPONSE);
     }
 }

@@ -229,7 +229,20 @@ final class AuditCostTest extends TestCase
             'primary_model' => 'claude-sonnet-4-5',
             'by_role' => (object) [],
             'by_model' => (object) [],
+            'interrupted_calls' => 0,
         ], $auditCost->toArray());
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_cost_carries_the_calls_cut_before_their_answer_ended_through_every_copy(): void
+    {
+        $auditCost = AuditCost::of(120, 30, 0.04, 'claude-sonnet-4-5')
+            ->withInterruptedCalls(2)
+            ->withUsageByModel(['claude-sonnet-4-5' => ['model' => 'claude-sonnet-4-5', 'input_tokens' => 120, 'output_tokens' => 30, 'estimated_cost_usd' => 0.04]]);
+
+        self::assertSame([2, 2, 0.04, 120], [$auditCost->interruptedCalls(), $auditCost->toArray()['interrupted_calls'], $auditCost->estimatedCostUsd(), $auditCost->inputTokens()]);
     }
 
     /**

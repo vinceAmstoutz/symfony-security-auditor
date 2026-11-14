@@ -17,11 +17,9 @@ use Override;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
-use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
-use Symfony\AI\Platform\Result\InMemoryRawResult;
-use Symfony\AI\Platform\Result\TextResult;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\Bridge\StubAnswerPlatform;
 
 /**
  * Test fake: a platform the container builds on its own, which keeps the
@@ -42,7 +40,7 @@ final class OptionsRecordingPlatform implements PlatformInterface
     {
         self::$lastOptions = $options;
 
-        return new DeferredResult(new PlainConverter(new TextResult('[]')), new InMemoryRawResult(), $options);
+        return StubAnswerPlatform::answering('[]')->invoke($model, $input, $options);
     }
 
     #[Override]
