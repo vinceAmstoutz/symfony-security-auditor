@@ -48,6 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -3781,6 +3782,28 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_project_profile_that_drops_a_hunt_gives_chunks_their_own_context_key(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())
+            ->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v7.4.0'], []));
+
+        $cache = $this->createMock(ContextAwareAttackerCacheInterface::class);
+        $cache->expects(self::once())->method('getForContext')->with(self::isArray(), self::logicalNot(self::identicalTo('')))->willReturn(null);
+        $cache->method('storeForContext');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+
+        $this->callAnalyze($attackerAgent, $files, $symfonyMapping, new NullCoverageRecorder());
     }
 
     /**
