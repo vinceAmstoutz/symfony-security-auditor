@@ -193,6 +193,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FixCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
@@ -783,6 +784,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReportDifferInterface::class),
             service(DiffPresenterInterface::class),
         ])
+        ->tag('console.command');
+
+    $defaultsConfigurator->set(FixCommand::class)
         ->tag('console.command');
 
     $defaultsConfigurator->set(BaselineCommand::class)

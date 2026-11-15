@@ -281,6 +281,9 @@ function runCodeQualityTools(bool $fixMode = false): void
     io()->section('Pull request check tests');
     run('sh tests/Shell/pull_request_check_test.sh');
 
+    io()->section('Review suggestion tests');
+    run('sh tests/Shell/review_suggestions_test.sh');
+
     io()->section('Changelog check');
     run('sh tests/Shell/changelog_check_test.sh');
     run('sh .github/scripts/check-changelog.sh CHANGELOG.md');

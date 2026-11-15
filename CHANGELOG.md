@@ -20,13 +20,14 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - Projects laid out in hexagonal, clean, CQRS or action-domain-responder style are mapped better: authenticators extending `AbstractAuthenticator`, access-token handlers, `#[AsFormType]` classes and `Action/` classes are recognized, an action is chunked with the command and handler it dispatches, and the attacker looks for checks in handlers, middleware and domain services before reporting one missing ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
 - API Platform state providers and processors, `#[AsCommandHandler]`/`#[AsQueryHandler]` handlers and handlers in `CommandHandler/`, `QueryHandler/` or `Application/` folders are audited as use cases; authentication handlers, entry points, user checkers and user providers as authenticators; API Platform query extensions and `Sql/` query objects as repositories ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
 - The attacker states the invariant a finding breaks, compares sibling paths for an equal control, sweeps business logic, stops inflating crashes or hardening into findings, and hunts prompt injection backed by agent tools, `#[AsTool]` confused deputies, outbound URL path injection and NoSQL operator injection ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
+- `max_output_tokens`, `attacker_max_output_tokens` and `reviewer_max_output_tokens` cap the answers of Gemini, Vertex AI, Mistral, Bedrock Nova, OpenAI and the generic-bridge gateways, not only of Claude, and a `record_vulnerability` or `record_review` call the cap cuts off is asked again once with twice the cap, so the finding is kept ([#690](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/690))
+- With `audit.fix_synthesis` enabled, the SARIF report carries each suggested fix as a `fixes` entry, and the `github-comment` format offers a fix that replaces one run of lines of its file as a `suggestion` block ([#690](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/690))
+- The GitHub Action's `comment-pr` posts the suggested fixes as one pull-request review, each a one-click suggestion on lines of the diff the head commit still holds, never twice; `review-suggestions: false` turns it off ([#690](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/690))
+- `audit:fix <report.json>` applies the suggested fixes of a JSON report: a dry run unless `--apply`, refusing a fix whose code changed since the audit or that would write outside the project, and exiting `1` when it refused one ([#690](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/690))
 
 ### Bugfixes 🐛
 
 - A class in an `Admin/` folder or named `*Admin.php` gets the Sonata admin skill only when it uses Sonata, so form providers, page objects and API state providers kept there are audited as what they are ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
-
-### Bugfixes 🐛
-
 - OpenAI cached input is billed at the cache rate again and its cache writes are no longer billed on top of the full prompt, so `estimated_cost_usd` and `audit.budget.max_cost_usd` stop running up to 3x high and `audit.rate_limit.input_tokens_per_minute` counts each prompt once (thanks @JerritEic) ([#701](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/701))
 
 ### Core 🧱

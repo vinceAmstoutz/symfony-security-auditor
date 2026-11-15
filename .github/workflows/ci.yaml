@@ -171,6 +171,9 @@ jobs:
       - name: Pull request check tests
         run: sh tests/Shell/pull_request_check_test.sh
 
+      - name: Review suggestion tests
+        run: sh tests/Shell/review_suggestions_test.sh
+
       - name: Changelog check tests
         run: sh tests/Shell/changelog_check_test.sh
 
