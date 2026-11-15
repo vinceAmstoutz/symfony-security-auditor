@@ -107,6 +107,7 @@ final readonly class RetryingPlatformInvoker
                     continue;
                 }
 
+                $this->rethrowWhenNonTransient($failure);
                 $this->prepareRetry($failure, $deferredResult, $attempt, $maxAttempts);
                 ++$attempt;
             }
@@ -114,17 +115,12 @@ final readonly class RetryingPlatformInvoker
     }
 
     /**
-     * @throws EmptyLLMResponseException
-     * @throws LLMRequestTooLargeException
-     * @throws NonTransientLLMFailureException
      * @throws TransientLLMFailureException
      * @throws BudgetExceededException
      * @throws InvalidRetryConfigurationException
      */
     private function prepareRetry(Throwable $failure, ?DeferredResult $deferredResult, int $attempt, int $maxAttempts): void
     {
-        $this->rethrowWhenNonTransient($failure);
-
         if ($attempt >= $maxAttempts) {
             throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $failure);
         }
