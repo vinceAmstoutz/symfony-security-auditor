@@ -1247,6 +1247,69 @@ final class AttackerPromptBuilderTest extends TestCase
      * @throws InvalidProjectFileException
      */
     #[DataProvider('systemPromptModes')]
+    public function test_the_system_prompt_looks_for_checks_wherever_a_layered_architecture_puts_them(bool $useStructuredCollection, bool $emitAllSkills): void
+    {
+        $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
+            ->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]);
+
+        self::assertStringContainsString(
+            '- The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.',
+            $prompt,
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('systemPromptModes')]
+    public function test_the_methodology_works_from_a_concrete_invariant(bool $useStructuredCollection, bool $emitAllSkills): void
+    {
+        $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
+            ->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]);
+
+        self::assertStringContainsString('- Invariant: name the lower-trust principal and what it can already do, the value or action it controls, the control that should stop it, and the smallest effect past that control.', $prompt);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('systemPromptModes')]
+    public function test_the_methodology_compares_sibling_paths_for_an_equivalent_control(bool $useStructuredCollection, bool $emitAllSkills): void
+    {
+        $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
+            ->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]);
+
+        self::assertStringContainsString('- Siblings: compare every path that reaches the same effect (create, update, bulk, import, export, API, admin, retry and error paths) for an equivalent control, not only for the presence of one.', $prompt);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('systemPromptModes')]
+    public function test_the_methodology_sweeps_business_logic(bool $useStructuredCollection, bool $emitAllSkills): void
+    {
+        $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
+            ->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]);
+
+        self::assertStringContainsString('- Business logic: skipped, repeated or reordered workflow steps; negative, zero or oversized quantities; exports, search, sort and filters that reveal rows the user cannot read; preview or draft tokens that unlock more than their item; restore or undelete that ignores the current owner.', $prompt);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('systemPromptModes')]
+    public function test_the_methodology_refuses_to_inflate_a_finding(bool $useStructuredCollection, bool $emitAllSkills): void
+    {
+        $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
+            ->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]);
+
+        self::assertStringContainsString("- Do not inflate: a crash is not code execution, an action within the actor's own rights is not privilege gain, and a missing best practice with no affected principal or resource is hardening, not a finding.", $prompt);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('systemPromptModes')]
     public function test_the_system_prompt_states_that_file_content_is_data_never_instructions(bool $useStructuredCollection, bool $emitAllSkills): void
     {
         $prompt = (new AttackerPromptBuilder($useStructuredCollection, $emitAllSkills))
@@ -1355,7 +1418,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(25, substr_count($prompt, '<skills role="'));
+        self::assertSame(26, substr_count($prompt, '<skills role="'));
     }
 
     /**

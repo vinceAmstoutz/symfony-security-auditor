@@ -70,6 +70,33 @@ final class SymfonyAiLLMClientStreamingPlatformsTest extends TestCase
      * @throws BudgetExceededException
      * @throws InvalidRetryConfigurationException
      * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_streamed_openai_answer_books_its_cache_reads_and_writes_apart_from_the_uncached_input(): void
+    {
+        $openAiStreamedProvider = new OpenAiStreamedProvider();
+        $tokenUsageRecorder = new TokenUsageRecorder();
+
+        (new SymfonyAiLLMClient(
+            new PlatformBinding($openAiStreamedProvider->platform($openAiStreamedProvider->textAnswer('Hello', 15000, 300, ['cached_tokens' => 9000, 'cache_write_tokens' => 3000])), $openAiStreamedProvider->model(), new NullLogger()),
+            new PlatformRequestConfig(servingPlatform: $openAiStreamedProvider->servingPlatform(), streaming: true),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
+        ))->complete('system', 'user');
+
+        self::assertSame(
+            [3000, 9000, 3000],
+            [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->cacheReadTokens(), $tokenUsageRecorder->snapshot()->cacheCreationTokens()],
+        );
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
      * @throws InvalidToolRegistryException
      * @throws LLMRequestTooLargeException
      * @throws MissingAiPlatformException

@@ -37,6 +37,7 @@ final readonly class FileChunker
         ProjectFileType::EASYADMIN_CRUD,
         ProjectFileType::VOTER,
         ProjectFileType::WEBHOOK_CONSUMER,
+        ProjectFileType::USE_CASE,
         ProjectFileType::MESSENGER_HANDLER,
         ProjectFileType::EVENT_SUBSCRIBER,
         ProjectFileType::NORMALIZER,
@@ -178,12 +179,19 @@ final readonly class FileChunker
     {
         $baseName = basename($projectFile->relativePath(), '.php');
         $featureName = match ($projectFile->fileType()) {
-            ProjectFileType::CONTROLLER => u($baseName)->beforeLast('Controller')->toString(),
+            ProjectFileType::CONTROLLER => $this->controllerFeatureName($baseName),
             ProjectFileType::EASYADMIN_CRUD => u($baseName)->beforeLast('CrudController')->toString(),
             default => $baseName,
         };
 
         return '' === $featureName ? null : $featureName;
+    }
+
+    private function controllerFeatureName(string $baseName): string
+    {
+        $name = u($baseName);
+
+        return ($name->endsWith('Action') ? $name->beforeLast('Action') : $name->beforeLast('Controller'))->toString();
     }
 
     /**

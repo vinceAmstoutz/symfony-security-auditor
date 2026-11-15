@@ -12,6 +12,7 @@ Run the AI security audit on a nightly schedule and ship the SARIF report to Git
   - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
   - [Live security badge in your README](#live-security-badge-in-your-readme)
 - [GitLab CI](#gitlab-ci)
+- [Feeding Psalm's Taint Analysis In](#feeding-psalms-taint-analysis-in)
 - [Output Formats in CI](#output-formats-in-ci)
 - [How This Project Guards Compatibility](#how-this-project-guards-compatibility)
 
@@ -504,6 +505,23 @@ symfony-security-audit:
     expire_in: 30 days
 ```
 
+## Feeding Psalm's Taint Analysis In
+
+(_since 1.23_) Psalm 7 runs its taint analysis in the same run as type checking, and writes SARIF when `--report` names a `.sarif` file. Point `scan.import_sarif` at that file and each Psalm result, with its source-to-sink path, becomes a risk marker the attacker confirms or discards in context: Psalm finds the flows (including its `llm_prompt`, `nosql`, `url_path` and `url_component` taints), the auditor judges whether they are reachable and authorized.
+
+```bash
+vendor/bin/psalm --report=build/psalm.sarif
+```
+
+```yaml
+# config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    scan:
+        import_sarif: ['build/psalm.sarif']
+```
+
+Run Psalm in the same job, before `audit:run`: the auditor stops on a SARIF file it cannot read or parse. With the standalone binary, set `scan.import_sarif` in your own `config.yaml`; a project's `.symfony-security-auditor.yaml` may not set it.
+
 ## Output Formats in CI
 
 ```bash
@@ -531,6 +549,6 @@ Upgrading within `1.x` must not change what your pipeline relies on. Besides its
 
 - **Configuration** — the bundle configuration, path by path: kind, default, choices, bounds, the values each setting takes and what it reads them as, `%env()%` placeholders, what a project's `.symfony-security-auditor.yaml` may set, and the published container parameters for each `profile`. A key added since the release must be listed in [Versioning](versioning.md).
 - **Behaviour** — a few hundred scenarios replayed from the last release: every `audit:run` option, the nine formats and their exit codes, an incomplete run, baselines, `audit:diff` and `audit:trend` on that release's reports, the configurations its docs showed, the standalone binary's configuration stack and `init`, its cache directory, `mcp:serve`'s tools, and the Domain models' accessors. A key a JSON report gains is not a difference.
-- **Public PHP API** — every class, interface, enum and member not tagged `@internal` (see [Versioning](versioning.md#public-api--what-is-covered-by-the-bc-promise)), compared by [roave/backward-compatibility-check](https://github.com/Roave/BackwardCompatibilityCheck) with the last release of the line the change is headed for.
+- **Public PHP API** — every class, interface, enum and member not tagged `@internal` (see [Versioning](versioning.md#public-api--what-is-covered-by-the-bc-promise)), compared by [roave/backward-compatibility-check](https://github.com/Roave/BackwardCompatibilityCheck) with the last release of the line the change is headed for. A case added to an enum does not fail the job, as [Versioning](versioning.md#domain-models-and-exceptions) allows; a removed one does.
 
 [CONTRIBUTING.md → Compatibility Checks](../CONTRIBUTING.md#compatibility-checks) explains how to run them, accept a difference, and record them again from a new release.

@@ -30,7 +30,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 19;
+    public const int PROMPT_VERSION = 20;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -284,10 +284,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     {
         return <<<'PROMPT'
             Analysis methodology — apply to every candidate before recording it:
+            - Invariant: name the lower-trust principal and what it can already do, the value or action it controls, the control that should stop it, and the smallest effect past that control.
+            - Siblings: compare every path that reaches the same effect (create, update, bulk, import, export, API, admin, retry and error paths) for an equivalent control, not only for the presence of one.
             - Source (trust boundary): identify the attacker-controlled entry point the value crosses from — route/path parameter, query string, request body, header, cookie, uploaded file, or webhook/queue payload (and anything derived from them).
             - Flow: trace that value through each assignment, transformation, and cross-file call to the sink, noting any sanitizer, validator, parameterized query, escaping, or access-control check on the path.
             - Sink: confirm it reaches a dangerous operation (SQL/DQL, shell/process, file path, Twig, redirect, deserialization, reflected/stored output, or a privileged state change) with no mitigating control in between.
             - Verify before recording: record ONLY when the value is genuinely attacker-controlled, reaches the sink on a reachable path, and nothing on the path (guard clause, validator, parameterization, escaping, `access_control`, voter) neutralizes it. Otherwise do not record — or lower `confidence` and state the missing link in `attack_vector`. Always name the concrete source, sink, and path.
+            - Do not inflate: a crash is not code execution, an action within the actor's own rights is not privilege gain, and a missing best practice with no affected principal or resource is hardening, not a finding.
 
             For each entry point, sweep the STRIDE categories so no class is skipped:
             - Spoofing: authentication or identity-check bypass (authenticator flaws, forgeable or replayable tokens).
@@ -296,6 +299,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Information disclosure: IDOR, over-permissive serializer groups, verbose errors, sensitive data in logs.
             - Denial of service: unbounded loops/uploads/recursion, missing rate limiting on costly or auth endpoints.
             - Elevation of privilege: missing `#[IsGranted]` / `denyAccessUnlessGranted()`, broken voter, role escalation.
+            - Business logic: skipped, repeated or reordered workflow steps; negative, zero or oversized quantities; exports, search, sort and filters that reveal rows the user cannot read; preview or draft tokens that unlock more than their item; restore or undelete that ignores the current owner.
 
 
             PROMPT;
@@ -365,6 +369,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
                 - Focus on issues traditional SAST tools miss: business logic, context-dependent access control
                 - Consider the FULL call chain, not just single function calls
                 - Cross-reference controllers, voters, services, and entities together
+                - The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.
                 - Record findings ONLY by calling the `record_vulnerability` tool — one call per finding. Do NOT emit prose, JSON, or any other listing of findings.
                 - When no vulnerabilities are found, call no tools and finish with an empty response. NEVER call `record_vulnerability` with a placeholder, label, environment name, or "no findings" payload.
 
@@ -382,6 +387,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Focus on issues traditional SAST tools miss: business logic, context-dependent access control
             - Consider the FULL call chain, not just single function calls
             - Cross-reference controllers, voters, services, and entities together
+            - The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.
             - Return ONLY the JSON array, no prose, no markdown fences
             - Every element of the JSON array MUST be a vulnerability object of the exact shape above. NEVER emit a bare string, number, boolean, or null as an array element. When no vulnerabilities are found, return `[]` — never `["no findings"]`, `["safe"]`, or any prose substitute.
             - The top-level value MUST be a JSON array (`[...]`). NEVER wrap findings in an object such as `{"vulnerabilities": [...]}`, `{"findings": [...]}`, `{"dev": [...], "test": [...]}`, or any environment-keyed map. If you want to indicate which environment a finding applies to, put that information inside the `description` or `attack_vector` field of the vulnerability object — never as a separate array element or wrapper key.
