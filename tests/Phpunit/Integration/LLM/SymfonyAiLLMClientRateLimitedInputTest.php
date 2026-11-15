@@ -137,6 +137,7 @@ final class SymfonyAiLLMClientRateLimitedInputTest extends TestCase
     public static function usageConventions(): iterable
     {
         yield 'OpenAI-style usage, the cached tokens counted inside the prompt' => [new TokenUsage(promptTokens: 15000, completionTokens: 50, cachedTokens: 12000, totalTokens: 15050), 15000];
+        yield 'OpenAI usage, the cache reads and writes counted inside the prompt' => [new TokenUsage(promptTokens: 15000, completionTokens: 50, cachedTokens: 9000, cacheCreationTokens: 3000, totalTokens: 15050), 15000];
         yield 'Anthropic usage, the cache reads and writes reported apart' => [new TokenUsage(promptTokens: 20, completionTokens: 50, cacheCreationTokens: 2980, cacheReadTokens: 12000), 3000];
     }
 
