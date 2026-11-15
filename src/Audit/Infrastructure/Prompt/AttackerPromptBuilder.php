@@ -38,6 +38,8 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
 
     private const string GENERIC_LAYOUT_RULE = '- The project may not follow the default Symfony layout (hexagonal or clean architecture, CQRS, action-domain-responder, bounded-context folders): before deciding a check is missing, look for it wherever such a layout puts it — command and query handlers, use cases, bus middleware, decorators, domain services, policies.';
 
+    private const int NAMED_BOUNDED_CONTEXTS = 10;
+
     private const array STYLE_NAMES = [
         'cqrs' => 'CQRS (command and query handlers)',
         'action_domain_responder' => 'action-domain-responder (single-action classes)',
@@ -206,8 +208,19 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
         $name = self::STYLE_NAMES[$architectureStyle->value];
 
         return ArchitectureStyle::BOUNDED_CONTEXTS === $architectureStyle && [] !== $boundedContexts
-            ? \sprintf('%s (%s)', $name, implode(', ', $boundedContexts))
+            ? \sprintf('%s (%s)', $name, self::boundedContextList($boundedContexts))
             : $name;
+    }
+
+    /**
+     * @param non-empty-list<string> $boundedContexts
+     */
+    private static function boundedContextList(array $boundedContexts): string
+    {
+        $named = implode(', ', array_map(self::sanitizePathLine(...), \array_slice($boundedContexts, 0, self::NAMED_BOUNDED_CONTEXTS)));
+        $others = \count($boundedContexts) - self::NAMED_BOUNDED_CONTEXTS;
+
+        return $others > 0 ? \sprintf('%s and %d more', $named, $others) : $named;
     }
 
     private function layoutRule(ProjectProfile $projectProfile): string
