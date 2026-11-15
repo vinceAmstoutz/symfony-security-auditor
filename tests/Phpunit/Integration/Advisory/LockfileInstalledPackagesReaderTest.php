@@ -39,10 +39,10 @@ final class LockfileInstalledPackagesReaderTest extends TestCase
     public function test_a_package_another_replaces_at_its_own_version_is_installed_at_that_version(): void
     {
         file_put_contents($this->projectDir.'/composer.lock', (string) json_encode([
-            'packages' => [['name' => 'symfony/symfony', 'version' => 'v8.2.0', 'replace' => ['symfony/http-kernel' => 'self.version']]],
+            'packages' => [['name' => 'symfony/symfony', 'version' => 'v8.2.0', 'replace' => ['symfony/http-kernel' => 'self.version', 'symfony/security-http' => 'self.version']]],
         ]));
 
-        self::assertSame(['symfony/symfony' => 'v8.2.0', 'symfony/http-kernel' => 'v8.2.0'], $this->reader()->read($this->projectDir));
+        self::assertSame(['symfony/symfony' => 'v8.2.0', 'symfony/http-kernel' => 'v8.2.0', 'symfony/security-http' => 'v8.2.0'], $this->reader()->read($this->projectDir));
     }
 
     public function test_a_package_another_replaces_at_a_constraint_is_installed_at_that_constraint(): void
