@@ -2510,4 +2510,44 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertLessThan($examplePosition, $scopePosition);
         self::assertLessThan($rulesPosition, $examplePosition);
     }
+
+    public function test_a_package_no_hunt_requires_leaves_the_profile_fingerprint_alone(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        self::assertSame(
+            $attackerPromptBuilder->profileFingerprint(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.4'], [])),
+            $attackerPromptBuilder->profileFingerprint(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.4', 'monolog/monolog' => '3.9.0'], [])),
+        );
+    }
+
+    public function test_a_package_a_hunt_requires_changes_the_profile_fingerprint(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        self::assertNotSame(
+            $attackerPromptBuilder->profileFingerprint(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.4'], [])),
+            $attackerPromptBuilder->profileFingerprint(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.4', 'symfony/workflow' => 'v8.1.4'], [])),
+        );
+    }
+
+    public function test_a_profile_that_leaves_the_prompt_as_an_unprofiled_run_gets_it_has_no_fingerprint(): void
+    {
+        self::assertSame('', (new AttackerPromptBuilder())->profileFingerprint(ProjectProfile::unknown()));
+    }
+
+    public function test_a_layout_gives_the_profile_a_fingerprint_even_when_every_hunt_is_kept(): void
+    {
+        self::assertNotSame('', (new AttackerPromptBuilder())->profileFingerprint(ProjectProfile::of(null, [ArchitectureStyle::CQRS])));
+    }
+
+    public function test_another_layout_changes_the_profile_fingerprint(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        self::assertNotSame(
+            $attackerPromptBuilder->profileFingerprint(ProjectProfile::of(null, [ArchitectureStyle::CQRS])),
+            $attackerPromptBuilder->profileFingerprint(ProjectProfile::of(null, [ArchitectureStyle::LAYERED])),
+        );
+    }
 }

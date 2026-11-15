@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessCon
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 
 final class ChunkContextKeyDeriverTest extends TestCase
 {
@@ -93,12 +94,23 @@ final class ChunkContextKeyDeriverTest extends TestCase
 
     public function test_the_project_profile_changes_the_key(): void
     {
-        $chunkContextKeyDeriver = new ChunkContextKeyDeriver();
+        $chunkContextKeyDeriver = new ChunkContextKeyDeriver(new AttackerPromptBuilder());
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
         self::assertNotSame(
             $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.0'], []))),
             $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], []))),
+        );
+    }
+
+    public function test_a_package_no_hunt_requires_keeps_the_key(): void
+    {
+        $chunkContextKeyDeriver = new ChunkContextKeyDeriver(new AttackerPromptBuilder());
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+
+        self::assertSame(
+            $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.0'], []))),
+            $chunkContextKeyDeriver->derive('', '', '', '', $symfonyMapping->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.0', 'monolog/monolog' => '3.9.0'], []))),
         );
     }
 

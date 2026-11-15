@@ -74,6 +74,27 @@ final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendere
         return implode("\n\n", $blocks);
     }
 
+    /**
+     * The `{requires …}` tag of every hunt the audited project's prompts
+     * leave out, in skill order.
+     *
+     * @return list<string>
+     */
+    public function droppedRequirements(ProjectProfile $projectProfile): array
+    {
+        $dropped = [];
+        foreach ($this->orderedSkills as $orderedSkill) {
+            preg_match_all(self::GATED_HUNT, $orderedSkill->block(), $matches);
+            foreach ($matches[2] as $requirement) {
+                if (!$projectProfile->satisfies($requirement)) {
+                    $dropped[] = $requirement;
+                }
+            }
+        }
+
+        return $dropped;
+    }
+
     private function gated(string $block, ProjectProfile $projectProfile): string
     {
         return (string) preg_replace_callback(

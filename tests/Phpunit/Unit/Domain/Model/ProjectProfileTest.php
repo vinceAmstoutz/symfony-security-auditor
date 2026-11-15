@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ArchitectureStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 
 final class ProjectProfileTest extends TestCase
@@ -86,71 +85,5 @@ final class ProjectProfileTest extends TestCase
     {
         yield 'an older release' => [['symfony/http-kernel' => 'v8.1.4']];
         yield 'no kernel at all' => [['monolog/monolog' => '3.9.0']];
-    }
-
-    public function test_a_profile_read_from_no_lockfile_leaves_cache_keys_alone(): void
-    {
-        self::assertSame('', ProjectProfile::unknown()->signature());
-    }
-
-    public function test_installing_another_package_changes_the_signature(): void
-    {
-        self::assertNotSame(
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], [])->signature(),
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0', 'symfony/ai-agent' => 'v0.15.0'], [])->signature(),
-        );
-    }
-
-    public function test_the_order_the_lockfile_lists_packages_in_keeps_the_signature(): void
-    {
-        self::assertSame(
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0', 'doctrine/orm' => '3.5.0'], [])->signature(),
-            ProjectProfile::of(['doctrine/orm' => '3.5.0', 'symfony/http-kernel' => 'v8.2.0'], [])->signature(),
-        );
-    }
-
-    public function test_moving_to_another_symfony_minor_release_changes_the_signature(): void
-    {
-        self::assertNotSame(
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.1.9'], [])->signature(),
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], [])->signature(),
-        );
-    }
-
-    public function test_patch_releases_keep_the_signature(): void
-    {
-        self::assertSame(
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0', 'monolog/monolog' => '3.8.0'], [])->signature(),
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.3', 'monolog/monolog' => '3.9.1'], [])->signature(),
-        );
-    }
-
-    public function test_another_architecture_changes_the_signature(): void
-    {
-        self::assertNotSame(
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], [])->signature(),
-            ProjectProfile::of(['symfony/http-kernel' => 'v8.2.0'], [ArchitectureStyle::CQRS])->signature(),
-        );
-    }
-
-    public function test_a_layout_read_without_a_lockfile_still_changes_the_signature(): void
-    {
-        self::assertNotSame('', ProjectProfile::of(null, [ArchitectureStyle::CQRS])->signature());
-    }
-
-    public function test_no_lockfile_and_a_lockfile_listing_nothing_sign_differently(): void
-    {
-        self::assertNotSame(
-            ProjectProfile::of(null, [ArchitectureStyle::CQRS])->signature(),
-            ProjectProfile::of([], [ArchitectureStyle::CQRS])->signature(),
-        );
-    }
-
-    public function test_other_bounded_contexts_change_the_signature(): void
-    {
-        self::assertNotSame(
-            ProjectProfile::of(null, [ArchitectureStyle::BOUNDED_CONTEXTS], ['Billing', 'Identity'])->signature(),
-            ProjectProfile::of(null, [ArchitectureStyle::BOUNDED_CONTEXTS], ['Billing', 'Shipping'])->signature(),
-        );
     }
 }

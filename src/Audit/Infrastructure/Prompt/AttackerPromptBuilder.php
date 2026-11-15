@@ -90,6 +90,19 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
         return $this->systemPromptFor($files, $symfonyMapping->projectProfile());
     }
 
+    #[Override]
+    public function profileFingerprint(ProjectProfile $projectProfile): string
+    {
+        $layoutRule = $this->layoutRule($projectProfile);
+        $droppedRequirements = $this->attackerSkillRegistry->droppedRequirements($projectProfile);
+
+        if (self::GENERIC_LAYOUT_RULE === $layoutRule && [] === $droppedRequirements) {
+            return '';
+        }
+
+        return hash('sha256', implode("\n", [$layoutRule, ...$droppedRequirements]));
+    }
+
     /**
      * @param list<ProjectFile> $files
      */

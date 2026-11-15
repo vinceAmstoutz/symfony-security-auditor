@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
 /**
@@ -28,4 +29,10 @@ interface ProfileAwareAttackerPromptBuilderInterface extends AttackerPromptBuild
      * @param list<ProjectFile> $files
      */
     public function buildSystemPromptFor(array $files, SymfonyMapping $symfonyMapping): string;
+
+    /**
+     * What of the profile the system prompt depends on, for the chunk cache
+     * key: empty when the prompt is the one an unprofiled run gets.
+     */
+    public function profileFingerprint(ProjectProfile $projectProfile): string;
 }

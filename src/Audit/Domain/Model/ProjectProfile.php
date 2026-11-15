@@ -25,8 +25,6 @@ final readonly class ProjectProfile
 
     private const string SYMFONY_KERNEL = 'symfony/http-kernel';
 
-    private const string NO_LOCKFILE = 'no lockfile';
-
     private const string UNNAMED_RELEASE = '';
 
     /**
@@ -69,24 +67,6 @@ final readonly class ProjectProfile
     public function boundedContexts(): array
     {
         return $this->boundedContexts;
-    }
-
-    public function signature(): string
-    {
-        if (null === $this->installedPackages && [] === $this->architectureStyles) {
-            return '';
-        }
-
-        $packageNames = array_keys($this->installedPackages ?? []);
-        sort($packageNames);
-
-        $symfonyRelease = null === $this->installedPackages
-            ? self::NO_LOCKFILE
-            : implode('.', \array_slice(explode('.', $this->releaseOf($this->installedPackages[self::SYMFONY_KERNEL] ?? '0')), 0, 2));
-
-        $styles = array_map(static fn (ArchitectureStyle $architectureStyle): string => $architectureStyle->value, $this->architectureStyles);
-
-        return hash('sha256', implode("\n", [$symfonyRelease, ...$styles, '', ...$this->boundedContexts, '', ...$packageNames]));
     }
 
     public function satisfies(string $requirement): bool
