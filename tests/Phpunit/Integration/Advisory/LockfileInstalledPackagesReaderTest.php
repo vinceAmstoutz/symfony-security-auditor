@@ -36,6 +36,39 @@ final class LockfileInstalledPackagesReaderTest extends TestCase
         self::assertSame(['symfony/http-kernel' => 'v8.2.0', 'phpunit/phpunit' => '13.4.1'], $this->reader()->read($this->projectDir));
     }
 
+    public function test_a_package_another_replaces_at_its_own_version_is_installed_at_that_version(): void
+    {
+        file_put_contents($this->projectDir.'/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'symfony/symfony', 'version' => 'v8.2.0', 'replace' => ['symfony/http-kernel' => 'self.version']]],
+        ]));
+
+        self::assertSame(['symfony/symfony' => 'v8.2.0', 'symfony/http-kernel' => 'v8.2.0'], $this->reader()->read($this->projectDir));
+    }
+
+    public function test_a_package_another_replaces_at_a_constraint_is_installed_at_that_constraint(): void
+    {
+        file_put_contents($this->projectDir.'/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'acme/fork', 'version' => '1.0.0', 'replace' => ['acme/original' => '^2.0']]],
+        ]));
+
+        self::assertSame(['acme/fork' => '1.0.0', 'acme/original' => '^2.0'], $this->reader()->read($this->projectDir));
+    }
+
+    public function test_it_skips_a_replaced_entry_without_a_name_and_a_constraint(): void
+    {
+        file_put_contents($this->projectDir.'/composer.lock', '{"packages": [{"name": "acme/a", "version": "1.0.0", "replace": "acme/flat"}, {"name": "acme/b", "version": "1.0.0", "replace": ["acme/listed"]}, {"name": "acme/c", "version": "1.0.0", "replace": {"acme/numbered": 2, "acme/kept": "*"}}]}');
+
+        self::assertSame(['acme/a' => '1.0.0', 'acme/b' => '1.0.0', 'acme/c' => '1.0.0', 'acme/kept' => '*'], $this->reader()->read($this->projectDir));
+    }
+
+    public function test_it_reads_a_lockfile_of_fifty_thousand_packages_within_the_slow_test_bar(): void
+    {
+        $packages = array_map(static fn (int $index): array => ['name' => \sprintf('acme/package-%05d', $index), 'version' => '1.0.0'], range(1, 50_000));
+        file_put_contents($this->projectDir.'/composer.lock', (string) json_encode(['packages' => $packages]));
+
+        self::assertCount(50_000, $this->reader()->read($this->projectDir) ?? []);
+    }
+
     public function test_a_project_without_a_lockfile_has_no_known_packages(): void
     {
         self::assertNull($this->reader()->read($this->projectDir));

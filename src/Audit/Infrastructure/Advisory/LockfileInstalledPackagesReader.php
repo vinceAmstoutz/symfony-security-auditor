@@ -25,6 +25,8 @@ use function Symfony\Component\String\b;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class LockfileInstalledPackagesReader implements InstalledPackagesReaderInterface
 {
+    private const string SELF_VERSION = 'self.version';
+
     public function __construct(
         private Filesystem $filesystem,
         private LoggerInterface $logger,
@@ -94,14 +96,14 @@ final readonly class LockfileInstalledPackagesReader implements InstalledPackage
             return null;
         }
 
-        $packages = [];
+        $entries = [];
         foreach ($packageLists as $packageList) {
             foreach ($packageList as $package) {
-                $packages = [...$packages, ...$this->nameAndVersionOf($package)];
+                $entries[] = $this->nameAndVersionOf($package);
             }
         }
 
-        return $packages;
+        return array_merge(...$entries);
     }
 
     /**
@@ -113,6 +115,33 @@ final readonly class LockfileInstalledPackagesReader implements InstalledPackage
             return [];
         }
 
-        return [$package['name'] => $package['version']];
+        return [$package['name'] => $package['version'], ...$this->replacedPackagesOf($package, $package['version'])];
+    }
+
+    /**
+     * @param array<mixed> $package
+     *
+     * @return array<string, string>
+     */
+    private function replacedPackagesOf(array $package, string $version): array
+    {
+        $replace = $package['replace'] ?? null;
+        if (!\is_array($replace)) {
+            return [];
+        }
+
+        $replaced = [];
+        foreach ($replace as $name => $constraint) {
+            if (\is_string($name) && \is_string($constraint)) {
+                $replaced[$name] = $this->replacedVersion($constraint, $version);
+            }
+        }
+
+        return $replaced;
+    }
+
+    private function replacedVersion(string $constraint, string $replacingVersion): string
+    {
+        return self::SELF_VERSION === $constraint ? $replacingVersion : $constraint;
     }
 }
