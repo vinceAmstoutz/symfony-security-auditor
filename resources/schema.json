@@ -29,7 +29,7 @@
         "max_output_tokens": {
           "type": "integer",
           "minimum": 1,
-          "description": "Maximum output tokens per LLM call (max_tokens). Default: 4096."
+          "description": "Maximum output tokens per LLM call, on every platform whose bridge takes symfony/ai's max_output_tokens. Default: 4096."
         },
         "attacker_max_output_tokens": {
           "type": ["integer", "null"],

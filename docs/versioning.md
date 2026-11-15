@@ -52,6 +52,7 @@ Default values for these keys are also part of the contract. Changing a default 
   - `3` (since 1.21) — `--fail-on-incomplete` is set, no gate tripped, and some file could not be fully analyzed.
 - The command name `audit:diff` (see [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)), its `previous-report` and `current-report` arguments, its `--format` option (`console` or `json`), and its exit codes (`0` on a successful comparison, `1` when a report file is missing or is not valid JSON).
 - The command name `audit:trend` (see [CLI Reference → `audit:trend`](configuration.md#audittrend--tracking-findings-across-reports)), its `reports` argument, its `--format` option (`console`, `json` or `html`), its JSON output shape (the `points` array), and its exit codes (`0` on a successful trend, `1` when fewer than two reports are given or a report file is missing or is not valid JSON).
+- The command name `audit:fix` (see [CLI Reference → `audit:fix`](configuration.md#auditfix--applying-the-suggested-fixes)), its `report` and `project-path` arguments, its `--apply` option, and its exit codes (`0` when every suggested fix applies, `1` when one is refused or a report file is missing or is not valid JSON).
 - The command name `audit:baseline` (see [CLI Reference → `audit:baseline`](configuration.md#auditbaseline--maintaining-the-accepted-finding-baseline)), its arguments, options, and exit codes.
 
 ### Standalone executable & XDG configuration

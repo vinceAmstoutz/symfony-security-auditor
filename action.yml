@@ -51,6 +51,10 @@ inputs:
     description: Whether to post the report as a single pull-request comment, editing the previous one in place on every rerun instead of appending. Requires format github-comment plus a non-empty output, a pull_request event, and pull-requests write permission on the calling job's GITHUB_TOKEN (passed as the GITHUB_TOKEN env var).
     required: false
     default: "false"
+  review-suggestions:
+    description: Whether comment-pr also posts the suggested fixes of the report (audit.fix_synthesis) as one pull-request review, so each becomes a one-click GitHub suggestion. Only a fix whose lines are all lines of the pull request's diff, and which the head commit still holds exactly, is posted, and a rerun never posts the same one twice; the summary comment lists every fix either way. A review GitHub refuses is a warning, never a failed job.
+    required: false
+    default: "true"
   update-badge:
     description: Whether to write a shields.io endpoint-schema JSON file carrying the report's grade, for a live security badge in your README — or a grey "incomplete" badge when the audit could not fully analyze every file, since its grade covers only the files analyzed, and a grey "no verdict" badge when its scan found no file to audit. Requires format json and a non-empty output. Only runs on push events. The file is written but never committed — that stays your workflow's decision.
     required: false
@@ -367,3 +371,23 @@ runs:
 
         echo "comment-url=$url" >> "$GITHUB_OUTPUT"
         echo "Posted the audit summary to $url."
+
+    # A separate step so a review GitHub refuses can never take the summary
+    # comment with it; the script itself only ever warns.
+    - name: Post the suggested fixes as a pull-request review
+      if: ${{ always() && inputs.comment-pr == 'true' && inputs.review-suggestions == 'true' && github.event_name == 'pull_request' && inputs.format == 'github-comment' && steps.audit.outputs.report-written == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SSA_ACTION_PATH: ${{ github.action_path }}
+        SSA_COMMENT_FILE: ${{ inputs.output }}
+        SSA_REPOSITORY: ${{ github.repository }}
+        SSA_PULL_NUMBER: ${{ github.event.pull_request.number }}
+        SSA_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -euo pipefail
+        if [ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+          echo "::warning::review-suggestions needs GITHUB_TOKEN in the calling job's env, and pull-requests write permission on it. No review was posted."
+          exit 0
+        fi
+        sh "$SSA_ACTION_PATH/resources/action/post-review-suggestions.sh"

@@ -176,6 +176,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'diff' => ['audit:diff'];
         yield 'trend' => ['audit:trend'];
         yield 'baseline' => ['audit:baseline'];
+        yield 'fix' => ['audit:fix'];
     }
 
     public function test_the_report_commands_run_without_any_configuration(): void

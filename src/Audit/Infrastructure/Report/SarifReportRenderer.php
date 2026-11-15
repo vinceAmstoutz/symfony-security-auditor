@@ -18,6 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\DiffHunk;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\FilePatch;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\UnifiedDiff;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class SarifReportRenderer implements ReportRendererInterface, BaselineSuppressingReportRendererInterface
@@ -144,11 +147,56 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             ],
         ];
 
+        $fixes = $this->fixesFor($vulnerability);
+        if ([] !== $fixes) {
+            $result['fixes'] = $fixes;
+        }
+
         if ($baselined) {
             $result['suppressions'] = [['kind' => 'external', 'justification' => 'Accepted via audit baseline']];
         }
 
         return $result;
+    }
+
+    /**
+     * A suggested fix that reads as a unified diff becomes one SARIF `fix`:
+     * each hunk deletes the whole lines it expects and inserts the lines that
+     * replace them, so a viewer that applies fixes needs no diff of its own. A
+     * fix that does not read as a diff is left to the formats that show it.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function fixesFor(Vulnerability $vulnerability): array
+    {
+        $unifiedDiff = UnifiedDiff::parse($vulnerability->suggestedFix() ?? '');
+        if (!$unifiedDiff instanceof UnifiedDiff) {
+            return [];
+        }
+
+        return [[
+            'description' => ['text' => 'Suggested fix'],
+            'artifactChanges' => array_map($this->artifactChange(...), $unifiedDiff->filePatches),
+        ]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function artifactChange(FilePatch $filePatch): array
+    {
+        return [
+            'artifactLocation' => ['uri' => $this->encodeArtifactUri($this->reportPathPrefix->apply($filePatch->path))],
+            'replacements' => array_map(static fn (DiffHunk $diffHunk): array => [
+                'deletedRegion' => [
+                    'startLine' => $diffHunk->oldStart,
+                    'startColumn' => 1,
+                    'endLine' => $diffHunk->oldStart + \count($diffHunk->oldLines),
+                    'endColumn' => 1,
+                ],
+                'insertedContent' => ['text' => implode('', array_map(static fn (string $line): string => \sprintf("%s\n", $line), $diffHunk->newLines))],
+            ], $filePatch->hunks),
+        ];
     }
 
     /**

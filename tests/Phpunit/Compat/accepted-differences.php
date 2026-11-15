@@ -61,4 +61,11 @@ return [
         'reason' => 'The attacker skill blocks carry the Symfony 8.2, advisory, layered-architecture and taint-kind hunts, so a dry run estimates more attacker input tokens, and with them more output tokens and cost.',
         'changelog' => '#693',
     ],
+    [
+        'scenarios' => ['standalone/list'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^\+\s+audit:fix\s/',
+        'reason' => 'The standalone binary lists the new audit:fix command.',
+        'changelog' => '#690',
+    ],
 ];

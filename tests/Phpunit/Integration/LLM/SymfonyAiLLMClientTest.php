@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 use Closure;
 use DateTimeImmutable;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -32,6 +33,7 @@ use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\PlatformOptions;
 use Symfony\AI\Platform\Result\BaseResult;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
@@ -479,6 +481,80 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertNotNull($invocationOptionsCapture->options);
         self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('platformsTranslatingTheCanonicalOutputCap')]
+    public function test_complete_passes_the_canonical_output_cap_to_a_platform_that_translates_it(string $servingPlatform, string $model): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, $model, new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(servingPlatform: $servingPlatform),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame(4096, $invocationOptionsCapture->options[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function platformsTranslatingTheCanonicalOutputCap(): iterable
+    {
+        yield 'gemini' => ['gemini', 'gemini-3.1-pro-preview'];
+        yield 'vertex ai' => ['vertexai', 'gemini-3.6-flash'];
+        yield 'mistral' => ['mistral', 'mistral-large-latest'];
+        yield 'bedrock nova' => ['bedrock', 'amazon.nova-pro-v1:0'];
+        yield 'generic gateway' => ['generic', 'qwen3-coder'];
+        yield 'openai responses' => ['openai', 'gpt-5.6'];
+        yield 'anthropic' => ['anthropic', 'claude-opus-5-5'];
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('platformsNotTranslatingTheCanonicalOutputCap')]
+    public function test_complete_sends_no_output_cap_to_a_platform_that_would_not_translate_it(string $servingPlatform): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'deepseek-v4-pro', new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(temperature: 0.2, servingPlatform: $servingPlatform),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame(['temperature' => 0.2], $invocationOptionsCapture->options);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function platformsNotTranslatingTheCanonicalOutputCap(): iterable
+    {
+        yield 'deepseek' => ['deepseek'];
+        yield 'ollama' => ['ollama'];
+        yield 'azure chat completions' => ['azure'];
     }
 
     /**
