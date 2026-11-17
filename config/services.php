@@ -490,7 +490,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
 
     $defaultsConfigurator->set(CandidateFindingSource::class)
-        ->args([service(StaticPreScannerInterface::class)]);
+        ->args([
+            service(StaticPreScannerInterface::class),
+            param('symfony_security_auditor.audit.report_static_findings'),
+        ]);
 
     $defaultsConfigurator->set(NestingDepthGuard::class)
         ->args([service('logger')]);

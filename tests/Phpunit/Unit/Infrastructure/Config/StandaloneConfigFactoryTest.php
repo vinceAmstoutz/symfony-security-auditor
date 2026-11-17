@@ -67,6 +67,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'openai',
                 'platform' => ['openai' => ['api_key' => '%env(API_TOKEN)%']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -79,6 +80,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'openresponses.my_gateway',
                 'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -91,6 +93,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'openresponses.my_gateway',
                 'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy', 'api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -103,6 +106,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'ollama',
                 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434/a%%2Fb%%3Fc']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -115,6 +119,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => '%env(GATEWAY_URL)%', 'api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -127,6 +132,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -139,6 +145,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'ollama',
                 'platform' => ['ollama' => ['endpoint' => 'https://ollama.com', 'api_key' => '%env(OLLAMA_API_KEY)%']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -151,6 +158,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'ollama',
                 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -163,6 +171,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
     }

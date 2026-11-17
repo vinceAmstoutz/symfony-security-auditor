@@ -85,6 +85,24 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
+    public function test_a_static_match_is_reported_once_static_findings_are_turned_on(): void
+    {
+        $report = $this->runAudit(['model' => 'gpt-4o', 'audit' => ['report_static_findings' => true]], 'json');
+
+        self::assertStringContainsString('Static analysis: unserialize call', $report);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_a_static_match_is_not_reported_by_default(): void
+    {
+        $report = $this->runAudit(['model' => 'gpt-4o'], 'json');
+
+        self::assertStringNotContainsString('Static analysis:', $report);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
     public function test_default_config_run_matches_the_committed_json_report_snapshot(): void
     {
         $report = $this->runAudit(['model' => 'gpt-4o'], 'json');
@@ -1136,7 +1154,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
                     public function delete(): Response
                     {
                         // SECURITY_AUDITOR_SINK
-                        $payload = $_GET['payload'];
+                        $payload = unserialize($_GET['payload']);
 
                         return new Response('deleted '.$payload);
                     }

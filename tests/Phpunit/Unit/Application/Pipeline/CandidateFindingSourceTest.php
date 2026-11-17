@@ -68,6 +68,21 @@ final class CandidateFindingSourceTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_disabled_source_lists_nothing(): void
+    {
+        $file = ProjectFile::create('src/A.php', '/p/src/A.php', "<?php\n\$k = '***REDACTED:jwt***';\nunserialize(\$x);\n");
+        $source = new CandidateFindingSource($this->scannerReturning([RiskMarker::create('src/A.php', 3, 'unserialize_call', 'Unsafe.')]), false);
+
+        self::assertSame([], $source->candidatesIn([$file]));
+    }
+
+    /**
      * @param list<RiskMarker> $markers
      */
     private function scannerReturning(array $markers): StaticPreScannerInterface

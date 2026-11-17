@@ -74,6 +74,7 @@ final readonly class ContainerParameterRegistrar
             'audit.min_confidence' => $audit->minConfidence,
             'audit.reviewer_batch_size' => $audit->reviewerBatchSize,
             'audit.tools_enabled' => $audit->toolsEnabled,
+            'audit.report_static_findings' => $audit->reportStaticFindings,
             'audit.tools_scope' => $audit->toolsScope->value,
             'audit.structured_collection' => $audit->structuredCollection,
             'audit.reviewer_structured_collection' => $audit->reviewerStructuredCollection,

@@ -35,6 +35,7 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
             'provider' => $provider,
             'platform' => $this->platformBlock($providerKey, $connection),
             'model' => $model,
+            'audit' => ['report_static_findings' => true],
         ];
     }
 

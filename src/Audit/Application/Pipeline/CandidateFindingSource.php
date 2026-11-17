@@ -27,7 +27,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInter
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class CandidateFindingSource implements CandidateFindingSourceInterface
 {
-    public function __construct(private StaticPreScannerInterface $staticPreScanner) {}
+    public function __construct(
+        private StaticPreScannerInterface $staticPreScanner,
+        private bool $enabled = true,
+    ) {}
 
     /**
      * @param list<ProjectFile> $files
@@ -41,6 +44,10 @@ final readonly class CandidateFindingSource implements CandidateFindingSourceInt
     #[Override]
     public function candidatesIn(array $files): array
     {
+        if (!$this->enabled) {
+            return [];
+        }
+
         return [...$this->scrubbedSecrets($files), ...$this->staticMatches($files)];
     }
 
