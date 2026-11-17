@@ -50,6 +50,9 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     /** @var list<Vulnerability> */
     private array $pendingFoundVulnerabilities = [];
 
+    /** @var list<Vulnerability> */
+    private array $staticCandidates = [];
+
     /** @var array<string, true> keyed by vulnerability id */
     private array $rejectedFindingIds = [];
 
@@ -463,6 +466,22 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     {
         $drained = $this->pendingFoundVulnerabilities;
         $this->pendingFoundVulnerabilities = [];
+
+        return $drained;
+    }
+
+    public function addStaticCandidate(Vulnerability $vulnerability): void
+    {
+        $this->staticCandidates[] = $vulnerability;
+    }
+
+    /**
+     * @return list<Vulnerability>
+     */
+    public function drainStaticCandidates(): array
+    {
+        $drained = $this->staticCandidates;
+        $this->staticCandidates = [];
 
         return $drained;
     }

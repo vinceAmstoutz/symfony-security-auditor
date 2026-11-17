@@ -153,6 +153,10 @@
               "minimum": 1,
               "description": "Findings reviewed per LLM call. Default: 1."
             },
+            "report_static_findings": {
+              "type": "boolean",
+              "description": "Report every redacted credential and every static pre-scan match as a finding, validated by the reviewer. Default: false; the configuration init writes turns it on. Since 1.23."
+            },
             "tools_enabled": {
               "type": "boolean",
               "description": "Give the attacker cross-file investigation tools. Default: true."

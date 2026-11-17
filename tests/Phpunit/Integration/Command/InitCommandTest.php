@@ -68,7 +68,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -81,7 +81,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -94,7 +94,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-new'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-new', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -106,7 +106,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--provider' => 'claudecode'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'opus'],
+            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'opus', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -118,7 +118,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--provider' => 'codex'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'codex', 'platform' => ['codex' => []], 'model' => 'gpt-5.4'],
+            ['provider' => 'codex', 'platform' => ['codex' => []], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -142,7 +142,7 @@ final class InitCommandTest extends TestCase
 
         self::assertStringContainsString('Which model should the auditor use? [claude-opus-5-5]:', $this->unwrappedDisplay($commandTester));
         self::assertSame(
-            ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-5-5'],
+            ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-5-5', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -165,7 +165,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame(
-            ['provider' => 'gemini', 'platform' => ['gemini' => ['api_key' => '%env(GEMINI_API_KEY)%']], 'model' => 'gemini-2.5-pro'],
+            ['provider' => 'gemini', 'platform' => ['gemini' => ['api_key' => '%env(GEMINI_API_KEY)%']], 'model' => 'gemini-2.5-pro', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -180,7 +180,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -207,7 +207,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(MY_CUSTOM_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(MY_CUSTOM_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -222,7 +222,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -275,7 +275,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -291,7 +291,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => $provider, 'platform' => [$provider => ['api_key' => \sprintf('%%env(%s)%%', $envVar)]], 'model' => $model],
+            ['provider' => $provider, 'platform' => [$provider => ['api_key' => \sprintf('%%env(%s)%%', $envVar)]], 'model' => $model, 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -307,7 +307,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame(
-            ['provider' => $provider, 'platform' => [$provider => ['api_key' => \sprintf('%%env(%s)%%', $envVar)]], 'model' => $model],
+            ['provider' => $provider, 'platform' => [$provider => ['api_key' => \sprintf('%%env(%s)%%', $envVar)]], 'model' => $model, 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -345,7 +345,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--force' => true]);
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -410,7 +410,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -512,7 +512,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(MY_KEY)%']], 'model' => 'gpt-5.4'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(MY_KEY)%']], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -693,6 +693,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => $expectedApiKey]]],
                 'model' => 'our-model',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -748,6 +749,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'albert',
                 'platform' => ['albert' => ['base_url' => 'https://albert.example', 'api_key' => '%env(ALBERT_API_KEY)%']],
                 'model' => 'our-model',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -803,6 +805,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'bedrock.prod',
                 'platform' => ['bedrock' => ['prod' => ['api' => 'messages', 'api_key' => '%env(BEDROCK_API_KEY)%']]],
                 'model' => 'anthropic.claude-opus-4-8',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -958,7 +961,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--provider' => 'openai', '--model' => '.nan'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => '.nan'],
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => '.nan', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -1120,6 +1123,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'generic.42',
                 'platform' => ['generic' => [42 => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
                 'model' => 'our-model',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -1183,7 +1187,7 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('generic.équipe', $this->unwrappedDisplay($commandTester));
         self::assertStringContainsString("modèle\tété", $commandTester->getDisplay());
         self::assertSame(
-            ['provider' => 'generic.équipe', 'platform' => ['generic' => ['équipe' => ['base_url' => 'https://gw.example', 'api_key' => '%env(TOKEN)%']]], 'model' => "modèle\tété"],
+            ['provider' => 'generic.équipe', 'platform' => ['generic' => ['équipe' => ['base_url' => 'https://gw.example', 'api_key' => '%env(TOKEN)%']]], 'model' => "modèle\tété", 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -1222,7 +1226,7 @@ final class InitCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertSame(
-            ['provider' => 'generic.'.$instance, 'platform' => ['generic' => [$instance => ['base_url' => 'https://gw.example', 'api_key' => '%env(TOKEN)%']]], 'model' => 'our-model'],
+            ['provider' => 'generic.'.$instance, 'platform' => ['generic' => [$instance => ['base_url' => 'https://gw.example', 'api_key' => '%env(TOKEN)%']]], 'model' => 'our-model', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -1429,7 +1433,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'generic.my_gateway', 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy', 'api_key' => '%env(TOKEN)%']]], 'model' => 'our-model'],
+            ['provider' => 'generic.my_gateway', 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy', 'api_key' => '%env(TOKEN)%']]], 'model' => 'our-model', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -1460,6 +1464,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => '%env(GATEWAY_URL)%', 'api_key' => '%env(TOKEN)%']]],
                 'model' => 'our-model',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -1522,6 +1527,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
                 'model' => 'our-model',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -1568,6 +1574,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'generic.myGateway',
                 'platform' => ['generic' => ['myGateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
                 'model' => 'our-model',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -1600,6 +1607,7 @@ final class InitCommandTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(GATEWAY_TOKEN)%']]],
                 'model' => 'our-model',
+                'audit' => ['report_static_findings' => true],
             ],
             Yaml::parseFile($this->configFile()),
         );
@@ -1650,7 +1658,7 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame(
-            ['provider' => 'ollama', 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']], 'model' => 'llama3.2'],
+            ['provider' => 'ollama', 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']], 'model' => 'llama3.2', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -1675,7 +1683,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'ollama', 'platform' => ['ollama' => ['endpoint' => 'https://ollama.com', 'api_key' => '%env(OLLAMA_API_KEY)%']], 'model' => 'llama3.2'],
+            ['provider' => 'ollama', 'platform' => ['ollama' => ['endpoint' => 'https://ollama.com', 'api_key' => '%env(OLLAMA_API_KEY)%']], 'model' => 'llama3.2', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
@@ -1708,7 +1716,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['provider' => 'generic.my_gateway', 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example']]], 'model' => 'our-model'],
+            ['provider' => 'generic.my_gateway', 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example']]], 'model' => 'our-model', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }

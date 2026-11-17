@@ -182,12 +182,14 @@ ai:
 
 ### 4. Adjust the auditor config
 
-The Flex recipe already created this file — pick your model:
+The Flex recipe already created this file — pick your model, and report what the deterministic scans find (redacted secrets, pre-scan matches) as reviewed findings:
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     model: 'claude-opus-5-5'
+    audit:
+        report_static_findings: true
 ```
 
 Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough`:

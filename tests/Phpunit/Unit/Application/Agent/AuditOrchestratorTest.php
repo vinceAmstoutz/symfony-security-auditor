@@ -137,6 +137,32 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_static_candidate_is_reviewed_even_when_the_attacker_finds_nothing(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditContext = $this->makeContextWithMapping();
+        $auditContext->addStaticCandidate($this->findingTitled('Static analysis: unserialize call', 'src/Controller/FooController.php'));
+
+        $this->makeOrchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertCount(1, $auditContext->validatedVulnerabilities());
+        self::assertSame([], $auditContext->drainStaticCandidates());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_deduplicates_vulnerabilities_across_iterations(): void
     {
