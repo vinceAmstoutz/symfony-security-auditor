@@ -199,10 +199,11 @@ jobs:
   tests:
     name: Tests + Mutation (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony }})
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.php == '8.6' }}
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.3', '8.4', '8.5']
+        php: ['8.3', '8.4', '8.5', '8.6']
         # Symfony 8.0 is end of life and Composer refuses its releases for their open security advisories.
         symfony: ['7.4', '8.1']
         exclude:
@@ -234,7 +235,10 @@ jobs:
           restore-keys: composer-php${{ matrix.php }}-sf${{ matrix.symfony }}-
 
       - name: Install dependencies
-        run: composer update --no-interaction --prefer-dist --no-progress
+        env:
+          # ergebnis/composer-normalize caps its PHP range below 8.6 through localheinz/diff.
+          IGNORE_PHP_UPPER_BOUND: ${{ matrix.php == '8.6' && '--ignore-platform-req=php+' || '' }}
+        run: composer update --no-interaction --prefer-dist --no-progress $IGNORE_PHP_UPPER_BOUND
 
       - name: Cache PHPUnit result cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
