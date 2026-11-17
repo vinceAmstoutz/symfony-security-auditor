@@ -155,6 +155,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'set' => ['auth:set'];
         yield 'status' => ['auth:status'];
         yield 'remove' => ['auth:remove'];
+        yield 'test' => ['auth:test'];
     }
 
     #[DataProvider('reportCommandNames')]

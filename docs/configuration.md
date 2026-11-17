@@ -635,6 +635,7 @@ The prompt never echoes, so the key reaches neither the terminal nor the shell h
 | `auth:set` | Store or replace the key; `--env-var` targets a variable other than the configured one |
 | `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path |
 | `auth:remove` | Forget the stored key (the key stays valid with your provider — revoke it there too) |
+| `auth:test` | _Since 1.23._ Send one short request to the configured provider and say whether it accepted the key — exits `1` with the provider's reason when it did not. A paid API bills that request, usually well under a cent, so it only runs when you ask; `auth:status` suggests it once a key resolves. It runs the same check as `doctor --check-connection` |
 
 **File permissions.** The file is created `0600` and its directory `0700`, and those are re-applied on every write. On a read, a file that group or others can open is **refused**, not used:
 

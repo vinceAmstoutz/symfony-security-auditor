@@ -142,6 +142,8 @@ final readonly class AuthStatusCommand
             ['Credential file' => $this->credentialStore->location() ?? 'nowhere — no per-user configuration directory could be resolved'],
         );
 
+        $symfonyStyle->text(\sprintf('Run "%s" to check that the provider accepts this key. It sends one short request, which a paid API bills, usually well under a cent.', AuthTestCommand::NAME));
+
         if ($shadowsStoredCredential) {
             $symfonyStyle->note(\sprintf('A key is also stored on this machine, but the exported %s wins. Unset it to go back to the stored one.', $variableName));
         }

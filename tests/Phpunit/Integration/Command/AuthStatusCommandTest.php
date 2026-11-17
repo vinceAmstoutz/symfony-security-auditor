@@ -56,6 +56,16 @@ final class AuthStatusCommandTest extends TestCase
         self::assertStringContainsString('Source the environment', $this->flattened($commandTester));
     }
 
+    public function test_it_suggests_testing_a_key_that_resolves(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->commandTester(['ANTHROPIC_API_KEY' => self::KEY]);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Run "auth:test" to check that the provider accepts this key. It sends one short request, which a paid API bills, usually well under a cent.', $this->flattened($commandTester));
+    }
+
     /**
      * @throws CredentialStoreWriteException
      * @throws UnreadableCredentialStoreException

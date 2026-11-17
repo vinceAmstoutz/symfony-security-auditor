@@ -29,6 +29,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `init` first asks how you reach a model (API key, cloud account, AI gateway, local model or chat subscription) and lists only the providers that fit ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `init` lists the newest model of each family with its price per million tokens, most expensive first, and defaults to `claude-opus-5-5` where listed, else to the one in the middle of the price range ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `doctor --check-connection` sends one short test request to the configured provider and reports whether it answered, and an interactive `init` offers to run it at the end, saying first that a paid API may bill it ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
+- `auth:test` checks that the provider accepts the API key with one short request, and `auth:status` suggests it once a key resolves ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 
 ### Bugfixes 🐛
 

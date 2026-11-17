@@ -151,4 +151,18 @@ return [
         'reason' => 'The list of valid audit keys quoted for an unknown key now names report_static_findings, which rewraps it',
         'changelog' => '#696',
     ],
+    [
+        'scenarios' => ['standalone/list'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^\\+\\s+auth:test\\s/',
+        'reason' => 'The standalone binary lists the new auth:test command.',
+        'changelog' => '#702',
+    ],
+    [
+        'scenarios' => ['standalone/auth-status-environment', 'standalone/auth-status-stored'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^\\+(?: Run "auth:test" to check that the provider accepts this key\\. .*)?$/',
+        'reason' => 'auth:status suggests auth:test, and what its request costs, once a key resolves.',
+        'changelog' => '#702',
+    ],
 ];

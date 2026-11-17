@@ -72,6 +72,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditTarget;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthRemoveCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthTestCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
@@ -258,6 +259,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand(new AuthSetCommand($this->credentialStore, $this->configuredCredentialVariable()));
         $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
         $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
+        $standaloneApplication->addCommand(new AuthTestCommand(new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory)));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
         $standaloneApplication->addCommand(new DiffCommand(new ReportDiffer(), new DiffPresenter()));
         $standaloneApplication->addCommand(new TrendCommand(new ReportTrendAnalyzer(new ReportDiffer()), new TrendPresenter()));
