@@ -27,16 +27,20 @@ enum ModelAccess: string
     case Local = 'local';
     case Subscription = 'subscription';
 
+    private const array CLOUD_PLATFORMS = ['bedrock.default', 'vertexai', 'azure.default'];
+
+    private const array GATEWAYS = ['openrouter', 'edenai', 'generic.gateway'];
+
     /**
      * @return list<string>
      */
     public function providers(): array
     {
         return match ($this) {
-            self::Cloud => ['bedrock.default', 'vertexai', 'azure.default'],
-            self::Gateway => ['openrouter', 'edenai', 'generic.gateway'],
+            self::Cloud => self::CLOUD_PLATFORMS,
+            self::Gateway => self::GATEWAYS,
             self::Local => ['ollama'],
-            default => array_values(array_diff(InitProviderChoices::names(), self::Cloud->providers(), self::Gateway->providers())),
+            default => array_values(array_diff(InitProviderChoices::names(), self::CLOUD_PLATFORMS, self::GATEWAYS)),
         };
     }
 

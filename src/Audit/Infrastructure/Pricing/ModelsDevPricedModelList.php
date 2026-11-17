@@ -50,7 +50,7 @@ final readonly class ModelsDevPricedModelList implements PricedModelListInterfac
             $newestOfEachFamily[$families[$model]] ??= $pricedModels[$model];
         }
 
-        $offered = \array_slice(array_values($newestOfEachFamily), 0, self::OFFERED_MODELS);
+        $offered = \array_slice($newestOfEachFamily, 0, self::OFFERED_MODELS);
         usort($offered, static fn (PricedModel $left, PricedModel $right): int => self::cost($right) <=> self::cost($left));
 
         return $offered;
@@ -79,7 +79,7 @@ final readonly class ModelsDevPricedModelList implements PricedModelListInterfac
 
     private function price(mixed $rate): ?float
     {
-        return \is_int($rate) || \is_float($rate) ? (float) $rate : null;
+        return \is_int($rate) || \is_float($rate) ? $rate : null;
     }
 
     /** @param array<array-key, mixed> $listing */

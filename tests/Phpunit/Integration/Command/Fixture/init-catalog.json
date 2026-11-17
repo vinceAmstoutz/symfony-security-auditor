@@ -27,7 +27,7 @@
                 "last_updated": "2099-01-01",
                 "tool_call": true,
                 "cost": {
-                    "input": 0.5
+                    "input": 2.5
                 }
             },
             "gpt-no-tools": {
@@ -217,6 +217,65 @@
                 "cost": {
                     "input": 0.1,
                     "output": 0.5
+                }
+            }
+        }
+    },
+    "google": {
+        "models": {
+            "gemini-a": {
+                "id": "gemini-a",
+                "family": "gemini-a",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 5,
+                    "output": 5
+                }
+            },
+            "gemini-b": {
+                "id": "gemini-b",
+                "family": "gemini-b",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 4,
+                    "output": 4
+                }
+            },
+            "gemini-c": {
+                "id": "gemini-c",
+                "family": "gemini-c",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 3,
+                    "output": 3
+                }
+            },
+            "gemini-d": {
+                "id": "gemini-d",
+                "family": "gemini-d",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2,
+                    "output": 2
+                }
+            },
+            "gemini-e": {
+                "id": "gemini-e",
+                "family": "gemini-e",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 1
                 }
             }
         }

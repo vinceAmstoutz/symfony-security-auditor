@@ -210,7 +210,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('gpt-input-only ($0.5 in per million tokens)', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('gpt-input-only ($2.5 in per million tokens)', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_offers_only_the_newest_model_of_each_family(): void
@@ -223,6 +223,16 @@ final class InitCommandTest extends TestCase
         self::assertStringNotContainsString('claude-opus-older', $this->unwrappedDisplay($commandTester));
     }
 
+    public function test_it_ranks_a_model_priced_for_input_alone_by_its_input_price(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openai', '0', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertMatchesRegularExpression('/\] gpt-old .*\] gpt-input-only /', $this->unwrappedDisplay($commandTester));
+    }
+
     public function test_it_lists_the_most_expensive_model_first(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
@@ -233,14 +243,24 @@ final class InitCommandTest extends TestCase
         self::assertSame('claude-fable-new', $this->configuredValue('model'));
     }
 
-    public function test_it_defaults_to_the_model_in_the_middle_of_the_price_range(): void
+    #[DataProvider('middleOfThePriceRangeCases')]
+    public function test_it_defaults_to_the_model_in_the_middle_of_the_price_range(string $provider, string $expectedModel): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['anthropic', '', '', '']);
+        $commandTester->setInputs([$provider, '', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertSame('claude-opus-new', $this->configuredValue('model'));
+        self::assertSame($expectedModel, $this->configuredValue('model'));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function middleOfThePriceRangeCases(): iterable
+    {
+        yield 'the more expensive of the two middle models of four' => ['anthropic', 'claude-opus-new'];
+        yield 'the middle model of five' => ['gemini', 'gemini-c'];
     }
 
     public function test_it_keeps_claude_opus_5_5_as_the_default_model_when_the_provider_lists_it(): void
