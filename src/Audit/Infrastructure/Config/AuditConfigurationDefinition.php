@@ -183,7 +183,7 @@ final readonly class AuditConfigurationDefinition
                         ->end()
                         ->booleanNode('report_static_findings')
                             ->defaultFalse()
-                            ->info('Report every credential the secret scrubber redacted and every static pre-scan match as a finding on its line, announced as soon as the scan ends and validated or rejected by the reviewer like the attacker\'s findings. Default false, so an existing configuration audits as before; the configuration `init` writes turns it on.')
+                            ->info("Report every credential the secret scrubber redacted and every static pre-scan match as a finding on its line, announced as soon as the scan ends and validated or rejected by the reviewer like the attacker's findings. Default false, so an existing configuration audits as before; the configuration `init` writes turns it on.")
                         ->end()
                         ->booleanNode('tools_enabled')
                             ->defaultTrue()
