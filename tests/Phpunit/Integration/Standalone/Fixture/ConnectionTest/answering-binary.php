@@ -11,4 +11,6 @@
 
 declare(strict_types=1);
 
-echo 'ran: '.implode(' ', array_slice($argv, 1)).\PHP_EOL;
+$arguments = is_array($_SERVER['argv'] ?? null) ? $_SERVER['argv'] : [];
+
+echo 'ran: '.implode(' ', array_filter(array_slice($arguments, 1), is_string(...))).\PHP_EOL;
