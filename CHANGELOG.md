@@ -26,7 +26,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The GitHub Action's `comment-pr` posts the suggested fixes as one pull-request review, each a one-click suggestion on lines of the diff the head commit still holds, never twice; `review-suggestions: false` turns it off ([#690](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/690))
 - `audit:fix <report.json>` applies the suggested fixes of a JSON report: a dry run unless `--apply`, refusing a fix whose code changed since the audit or that would write outside the project, and exiting `1` when it refused one ([#690](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/690))
 - `audit.report_static_findings` reports every credential the secret scrubber redacts and every static pre-scan match as a finding on its line, announced as soon as the scan ends and validated or rejected by the reviewer like the attacker's; off by default, turned on in the configuration `init` writes ([#696](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/696))
-- `init` first asks how you reach a model (API key, cloud account, AI gateway, local model or chat subscription) and lists only the providers that fit, explaining that a chat subscription cannot be used and where to create an API key instead
+- `init` first asks how you reach a model (API key, cloud account, AI gateway, local model or chat subscription) and lists only the providers that fit
 - `init` lists the newest model of each family with its price per million tokens, most expensive first, and defaults to `claude-opus-5-5` where listed, else to the one in the middle of the price range
 
 ### Bugfixes 🐛

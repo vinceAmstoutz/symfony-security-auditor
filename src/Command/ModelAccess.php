@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
+
 /**
  * How someone running `init` reaches an AI model, which narrows the
  * providers it then lists.
@@ -39,8 +41,9 @@ enum ModelAccess: string
         return match ($this) {
             self::Cloud => self::CLOUD_PLATFORMS,
             self::Gateway => self::GATEWAYS,
+            self::Subscription => array_keys(CliAgentPlatforms::FACTORIES),
             self::Local => ['ollama'],
-            default => array_values(array_diff(InitProviderChoices::names(), self::CLOUD_PLATFORMS, self::GATEWAYS)),
+            self::ApiKey => array_values(array_diff(InitProviderChoices::names(), self::CLOUD_PLATFORMS, self::GATEWAYS, array_keys(CliAgentPlatforms::FACTORIES))),
         };
     }
 
@@ -51,7 +54,7 @@ enum ModelAccess: string
             self::Cloud => 'A cloud account (AWS Bedrock, Google Vertex AI, Azure)',
             self::Gateway => 'An AI gateway or router (OpenRouter, Eden AI, any OpenAI-compatible endpoint)',
             self::Local => 'A model running on this machine (Ollama)',
-            self::Subscription => 'A chat subscription (Claude Pro/Max, ChatGPT Plus/Pro, Gemini, Copilot)',
+            self::Subscription => 'A Claude or ChatGPT subscription (through the Claude Code or Codex CLI)',
         };
     }
 }

@@ -23,8 +23,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 final readonly class InitProviderQuestion
 {
-    private const string SUBSCRIPTION_NOTE = 'A chat subscription is not an API key: Anthropic does not let other tools use Claude plans, and ChatGPT, Gemini and Copilot plans do not include API access either. Create an API key instead — Anthropic: https://console.anthropic.com/settings/keys, OpenAI: https://platform.openai.com/api-keys, Google: https://aistudio.google.com/apikey, Mistral: https://console.mistral.ai/api-keys — then pick its provider below.';
-
     public static function ask(SymfonyStyle $symfonyStyle): string
     {
         $answer = NumberedChoice::ask(
@@ -42,10 +40,6 @@ final readonly class InitProviderQuestion
 
     private static function askProviderReachedThrough(SymfonyStyle $symfonyStyle, ModelAccess $modelAccess): string
     {
-        if (ModelAccess::Subscription === $modelAccess) {
-            $symfonyStyle->note(self::SUBSCRIPTION_NOTE);
-        }
-
         $providers = $modelAccess->providers();
 
         return 1 === \count($providers)

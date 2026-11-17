@@ -120,17 +120,17 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertDoesNotMatchRegularExpression('/\] (vertexai|openrouter|edenai) /', $this->unwrappedDisplay($commandTester));
+        self::assertDoesNotMatchRegularExpression('/\] (vertexai|openrouter|edenai|claudecode|codex) /', $this->unwrappedDisplay($commandTester));
     }
 
-    public function test_it_explains_that_a_chat_subscription_is_not_an_api_key(): void
+    public function test_it_lists_the_cli_agents_for_a_chat_subscription(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) array_search(ModelAccess::Subscription, ModelAccess::cases(), true), 'anthropic', '', '', '']);
+        $commandTester->setInputs([(string) array_search(ModelAccess::Subscription, ModelAccess::cases(), true), 'claudecode', '']);
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('A chat subscription is not an API key', $this->unwrappedDisplay($commandTester));
+        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[0\] claudecode \[1\] codex >/', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
