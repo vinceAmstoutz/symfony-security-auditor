@@ -1183,6 +1183,8 @@ A missing `composer` or pricing catalog is reported as a **warning** (auditing s
 symfony-security-auditor doctor && symfony-security-auditor audit path/to/app
 ```
 
+_Since 1.23._ `doctor --check-connection` also sends one short request to the configured provider and adds a `Connection` line: `The provider answered.`, or a **failure** naming why it did not (a refused key, an unknown model, an unreachable endpoint, an answer cut short). A paid API bills that request, usually well under a cent, a subscription counts it against its usage, and a local model costs nothing, so it never runs unless asked. At the end of an interactive `init`, the binary offers to run it, saying so before it sends anything; `init --no-interaction` never does.
+
 ### Update notifications
 
 When you run the [standalone binary](#standalone-configuration) interactively, it prints a one-line notice to **stderr** once a command finishes if a newer release is available:

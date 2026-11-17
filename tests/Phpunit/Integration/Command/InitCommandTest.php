@@ -35,6 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ModelAccess;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingConnectionTestRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
 
 final class InitCommandTest extends TestCase
@@ -131,6 +132,58 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[0\] claudecode \[1\] codex >/', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_tests_the_connection_when_the_user_accepts(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+        $commandTester->setInputs(['anthropic', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(1, $recordingConnectionTestRunner->runs);
+    }
+
+    public function test_it_never_tests_the_connection_without_interaction(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+
+        $commandTester->execute(['--provider' => 'anthropic'], ['interactive' => false]);
+
+        self::assertSame(0, $recordingConnectionTestRunner->runs);
+    }
+
+    public function test_it_points_at_doctor_when_the_user_declines_the_connection_test(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+        $commandTester->setInputs(['anthropic', '', '', '', 'n']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([0, true], [$recordingConnectionTestRunner->runs, str_contains($this->unwrappedDisplay($commandTester), 'Run "doctor --check-connection" to test it later.')]);
+    }
+
+    public function test_it_says_how_to_retry_a_connection_test_that_failed(): void
+    {
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner(succeeds: false));
+        $commandTester->setInputs(['anthropic', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('The configuration is saved. Fix the cause above, then run "doctor --check-connection" again.', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_says_the_test_request_may_be_billed_before_sending_it(): void
+    {
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
+        $commandTester->setInputs(['anthropic', '', '', '', 'n']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('A paid API bills it, usually well under a cent; a subscription counts it against its usage; a local model costs nothing', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
@@ -2043,7 +2096,7 @@ final class InitCommandTest extends TestCase
         self::assertSame([], $this->recordingBridgeInstaller->installations);
     }
 
-    private function commandTester(?PricedModelListInterface $pricedModelList = null): CommandTester
+    private function commandTester(?PricedModelListInterface $pricedModelList = null, ?RecordingConnectionTestRunner $recordingConnectionTestRunner = null): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
         $initCommand = new InitCommand(
@@ -2053,6 +2106,7 @@ final class InitCommandTest extends TestCase
             $this->recordingBridgeInstaller,
             new FilesystemCredentialStore($xdgConfigPathResolver),
             pricedModelList: $pricedModelList,
+            connectionTestRunner: $recordingConnectionTestRunner,
         );
 
         return new CommandTester($initCommand);

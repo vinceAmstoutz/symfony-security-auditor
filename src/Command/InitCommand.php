@@ -18,6 +18,7 @@ use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
@@ -68,6 +69,7 @@ final readonly class InitCommand
         private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
         private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
         private ?PricedModelListInterface $pricedModelList = null,
+        private ?ConnectionTestRunnerInterface $connectionTestRunner = null,
     ) {}
 
     /**
@@ -76,16 +78,17 @@ final readonly class InitCommand
      */
     public function __invoke(
         SymfonyStyle $symfonyStyle,
+        InputInterface $input,
         #[MapInput] InitCommandInput $initCommandInput,
     ): int {
-        return $this->configure($symfonyStyle, $initCommandInput);
+        return $this->configure($symfonyStyle, $initCommandInput, $input->isInteractive());
     }
 
     /**
      * @throws UnresolvableConfigPathException
      * @throws BridgeInstallationFailedException
      */
-    private function configure(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput): int
+    private function configure(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, bool $interactive): int
     {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
@@ -136,6 +139,7 @@ final readonly class InitCommand
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
 
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
+        ConnectionTestOffer::make($this->connectionTestRunner, $symfonyStyle, $interactive);
 
         return Command::SUCCESS;
     }

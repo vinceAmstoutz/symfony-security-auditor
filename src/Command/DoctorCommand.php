@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -25,19 +26,36 @@ final readonly class DoctorCommand
 
     public const string DESCRIPTION = 'Check that the environment is ready to run an audit';
 
+    private const string CONNECTION_CHECK = 'Connection';
+
     public function __construct(
         private EnvironmentDoctorInterface $environmentDoctor,
+        private ConnectionCheckInterface $connectionCheck,
     ) {}
 
-    public function __invoke(SymfonyStyle $symfonyStyle): int
-    {
+    public function __invoke(
+        SymfonyStyle $symfonyStyle,
+        #[Option(description: 'Also send one short request to the configured provider, which it may bill')] bool $checkConnection = false,
+    ): int {
         $results = $this->environmentDoctor->diagnose();
+        if ($checkConnection) {
+            $results[] = $this->connectionResult();
+        }
 
         foreach ($results as $result) {
             $this->render($symfonyStyle, $result);
         }
 
         return $this->containsFailure($results) ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    private function connectionResult(): DoctorCheckResult
+    {
+        $failureReason = $this->connectionCheck->failureReason();
+
+        return null === $failureReason
+            ? new DoctorCheckResult(self::CONNECTION_CHECK, DoctorCheckStatus::Ok, 'The provider answered.')
+            : new DoctorCheckResult(self::CONNECTION_CHECK, DoctorCheckStatus::Failure, \sprintf('The provider did not answer: %s', $failureReason));
     }
 
     private function render(SymfonyStyle $symfonyStyle, DoctorCheckResult $doctorCheckResult): void

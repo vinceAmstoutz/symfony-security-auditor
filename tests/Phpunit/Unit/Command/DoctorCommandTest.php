@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ConnectionCheckInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
@@ -80,11 +81,56 @@ final class DoctorCommandTest extends TestCase
         self::assertStringContainsString('Provider bridge: Not installed.', $display);
     }
 
+    public function test_it_reports_a_provider_that_answers_the_connection_check(): void
+    {
+        $commandTester = $this->commandTesterCheckingConnection(null);
+
+        $commandTester->execute(['--check-connection' => true]);
+
+        self::assertStringContainsString('[OK] Connection: The provider answered.', $commandTester->getDisplay());
+    }
+
+    public function test_it_reports_why_the_connection_check_failed(): void
+    {
+        $commandTester = $this->commandTesterCheckingConnection('The API key was refused.');
+
+        $commandTester->execute(['--check-connection' => true]);
+
+        self::assertStringContainsString('Connection: The provider did not answer: The API key was refused.', $commandTester->getDisplay());
+    }
+
+    public function test_it_fails_when_the_connection_check_fails(): void
+    {
+        $commandTester = $this->commandTesterCheckingConnection('The API key was refused.');
+
+        self::assertSame(Command::FAILURE, $commandTester->execute(['--check-connection' => true]));
+    }
+
+    public function test_it_sends_no_request_without_the_check_connection_option(): void
+    {
+        $environmentDoctor = self::createStub(EnvironmentDoctorInterface::class);
+        $environmentDoctor->method('diagnose')->willReturn([]);
+        $connectionCheck = $this->createMock(ConnectionCheckInterface::class);
+        $connectionCheck->expects(self::never())->method('failureReason');
+
+        (new CommandTester(new DoctorCommand($environmentDoctor, $connectionCheck)))->execute([]);
+    }
+
     private function commandTester(DoctorCheckResult ...$results): CommandTester
     {
         $environmentDoctor = self::createStub(EnvironmentDoctorInterface::class);
         $environmentDoctor->method('diagnose')->willReturn($results);
 
-        return new CommandTester(new DoctorCommand($environmentDoctor));
+        return new CommandTester(new DoctorCommand($environmentDoctor, self::createStub(ConnectionCheckInterface::class)));
+    }
+
+    private function commandTesterCheckingConnection(?string $failureReason): CommandTester
+    {
+        $environmentDoctor = self::createStub(EnvironmentDoctorInterface::class);
+        $environmentDoctor->method('diagnose')->willReturn([new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves.')]);
+        $connectionCheck = self::createStub(ConnectionCheckInterface::class);
+        $connectionCheck->method('failureReason')->willReturn($failureReason);
+
+        return new CommandTester(new DoctorCommand($environmentDoctor, $connectionCheck));
     }
 }

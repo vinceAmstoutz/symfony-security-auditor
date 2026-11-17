@@ -22,6 +22,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBa
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
@@ -97,6 +98,7 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
         $containerBuilder->getDefinition(McpServeCommand::class)->setPublic(true);
+        $containerBuilder->getAlias(LLMClientInterface::class)->setPublic(true);
         $containerBuilder->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
         $containerBuilder->compile(true);
 

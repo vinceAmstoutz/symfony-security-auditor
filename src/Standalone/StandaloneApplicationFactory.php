@@ -293,6 +293,7 @@ final readonly class StandaloneApplicationFactory
             $this->bridgeInstaller,
             $this->credentialStore,
             pricedModelList: new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
+            connectionTestRunner: new ProcessConnectionTestRunner(new SelfInvocation($this->runningBinaryPath)),
         );
     }
 
@@ -423,6 +424,7 @@ final readonly class StandaloneApplicationFactory
                 new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
                 bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
             ),
+            new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),
         );
     }
 
