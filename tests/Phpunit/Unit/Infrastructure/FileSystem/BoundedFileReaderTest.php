@@ -101,7 +101,7 @@ final class BoundedFileReaderTest extends TestCase
         $path = $this->tmpDir.'/absent.json';
 
         $this->expectException(UnreadableInputFileException::class);
-        $this->expectExceptionMessageContaining(\sprintf('File "%1$s" could not be read: file_get_contents(%1$s): Failed to open stream: No such file or directory', $path));
+        $this->expectExceptionMessageMatches(\sprintf('/^File "%s" could not be read: file_get_contents\(.*\): Failed to open stream: No such file or directory$/', preg_quote($path, '/')));
 
         BoundedFileReader::read($path);
     }

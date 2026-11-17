@@ -48,6 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\JsonSyntaxError;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
 final class ToolIgnoringReviewClientTest extends TestCase
@@ -174,7 +175,7 @@ final class ToolIgnoringReviewClientTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('error')->with('Failed to parse reviewer batch response', [
             'batch_size' => 2,
-            'error' => 'Syntax error',
+            'error' => JsonSyntaxError::messageFor('Both findings look real.'),
             'content_preview' => 'Both findings look real.',
         ]);
         $recordingCoverageRecorder = new RecordingCoverageRecorder();

@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\JsonSyntaxError;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\ReviewerAgentHarness;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
@@ -518,7 +519,7 @@ final class ReviewerAgentTest extends TestCase
             ->method('error')
             ->with('Failed to parse reviewer response', [
                 'vulnerability_id' => $vulnerability->id(),
-                'error' => 'Syntax error',
+                'error' => JsonSyntaxError::messageFor('invalid json {{{'),
                 'content_preview' => 'invalid json {{{',
             ]);
 

@@ -81,6 +81,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Inv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\JsonSyntaxError;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
@@ -699,7 +700,7 @@ final class AttackerAgentTest extends TestCase
         $logger->expects(self::once())
             ->method('error')
             ->with('Failed to parse attacker agent JSON response', [
-                'error' => 'Syntax error',
+                'error' => JsonSyntaxError::messageFor('invalid json {{{'),
                 'content_preview' => 'invalid json {{{',
             ]);
 
