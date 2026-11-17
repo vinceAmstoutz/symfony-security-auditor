@@ -39,7 +39,7 @@ final readonly class FormAttackerSkill implements AttackerSkillInterface
             Hunt:
             - `'csrf_protection' => false` on forms processing state changes (acceptable only for stateless APIs with their own auth).
             - `'allow_extra_fields' => true` enabling mass assignment of unmapped properties via setters.
-            - An `#[AsFormType]` data class (Symfony ≥ 8.2) with `#[FormField]` on a privileged property (`roles`, `isAdmin`, `isVerified`, `owner`, `price`, `status`) — the property becomes a field any submitter can set (mass assignment).
+            - {requires symfony>=8.2} An `#[AsFormType]` data class (Symfony ≥ 8.2) with `#[FormField]` on a privileged property (`roles`, `isAdmin`, `isVerified`, `owner`, `price`, `status`) — the property becomes a field any submitter can set (mass assignment).
             - `EntityType` choice queries unscoped by ownership — attacker can select any other tenant's row.
             - Data transformers that `unserialize` / `json_decode` raw input without strict mode.
             - Missing `'constraints'` on free-form fields that flow into the database or shell.

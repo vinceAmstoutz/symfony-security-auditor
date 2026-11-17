@@ -96,7 +96,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             $attackerLlmCollaborators->attackerPromptBuilder,
             $attackerLlmCollaborators->codeSlicer,
             new AttackerContextPromptRenderer(),
-            new ChunkContextKeyDeriver(),
+            new ChunkContextKeyDeriver($attackerLlmCollaborators->attackerPromptBuilder),
         );
         $attackerChunkCache = new AttackerChunkCache($attackerScanCollaborators->attackerCache, $attackerLlmCollaborators->vulnerabilityFactory, $logger);
 

@@ -17,9 +17,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProfileAwareAttackerPromptBuilderInterface;
 use WeakMap;
 
 /**
@@ -41,8 +44,9 @@ final readonly class ChunkContextKeyDeriver
      */
     private WeakMap $weakMap;
 
-    public function __construct()
-    {
+    public function __construct(
+        private ?AttackerPromptBuilderInterface $attackerPromptBuilder = null,
+    ) {
         $this->weakMap = new WeakMap();
     }
 
@@ -119,6 +123,7 @@ final readonly class ChunkContextKeyDeriver
             ...$this->voterCapabilitySignatures($applicationSecurityMap->authorizationRules()),
             ...$this->formBindingSignatures($symfonyMapping->formBindings()),
             ...$this->entrypointsWithoutAuthorizationRulePaths($applicationSecurityMap->entrypointsWithoutAuthorizationRule()),
+            ...$this->projectProfileSignatures($symfonyMapping->projectProfile()),
         ];
 
         if ([] === $signatures) {
@@ -220,5 +225,17 @@ final readonly class ChunkContextKeyDeriver
     private function entrypointsWithoutAuthorizationRulePaths(array $entrypointsWithoutAuthorizationRule): array
     {
         return array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $entrypointsWithoutAuthorizationRule);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function projectProfileSignatures(ProjectProfile $projectProfile): array
+    {
+        $projectProfileFingerprint = $this->attackerPromptBuilder instanceof ProfileAwareAttackerPromptBuilderInterface
+            ? $this->attackerPromptBuilder->profileFingerprint($projectProfile)
+            : '';
+
+        return '' === $projectProfileFingerprint ? [] : [\sprintf('project profile %s', $projectProfileFingerprint)];
     }
 }

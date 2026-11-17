@@ -47,7 +47,7 @@ final readonly class AuthenticatorAttackerSkill implements AttackerSkillInterfac
             - Missing `CsrfTokenBadge` on form-based login authenticators where CSRF was previously enforced.
             - OAuth/OIDC handlers omitting `state` parameter verification (CSRF on auth callback) or PKCE for public clients.
             - `UserBadge::setUserLoader()` query running with a user-controlled `identifier` without normalization (`User WHERE email = :id` accepting wildcards/case-insensitive variants).
-            - An `AuthenticationMethodBadge` (Symfony ≥ 8.2) naming a method the authenticator did not verify (`AuthenticationMethod::ONE_TIME_PASSWORD` or `MULTIPLE_FACTORS` on a token, link or single-password login) — it forges the proof step-up checks rely on (`IS_AUTHENTICATED_RECENTLY`, MFA-gated voters).
+            - {requires symfony>=8.2} An `AuthenticationMethodBadge` (Symfony ≥ 8.2) naming a method the authenticator did not verify (`AuthenticationMethod::ONE_TIME_PASSWORD` or `MULTIPLE_FACTORS` on a token, link or single-password login) — it forges the proof step-up checks rely on (`IS_AUTHENTICATED_RECENTLY`, MFA-gated voters).
             - `RememberMeBadge` attached unconditionally — not gated on a user-submitted "remember me" request parameter — issuing a long-lived authentication cookie for every login regardless of consent.
             Do NOT flag:
             - Authenticators that explicitly throw `AuthenticationException` on missing credentials.

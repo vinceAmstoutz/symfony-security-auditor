@@ -42,6 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProfileAwareAttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
@@ -158,6 +159,22 @@ final class ChunkContextFactoryTest extends TestCase
             SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]), new AccessControlMap()),
             SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$protectedController]]), new AccessControlMap()),
         ];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_builder_that_fits_the_prompt_to_the_project_is_given_its_mapping(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+        $profileAwareAttackerPromptBuilder = self::createStub(ProfileAwareAttackerPromptBuilderInterface::class);
+        $profileAwareAttackerPromptBuilder->method('buildSystemPromptFor')->willReturnCallback(static fn (array $files, SymfonyMapping $given): string => $given === $symfonyMapping ? 'fitted to the project' : 'another mapping');
+        $chunkContextFactory = new ChunkContextFactory($profileAwareAttackerPromptBuilder, new NullCodeSlicer(), new AttackerContextPromptRenderer(), new ChunkContextKeyDeriver());
+        $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
+
+        $chunkContext = $chunkContextFactory->create($chunk, new AttackerAnalysisRequest($chunk, $symfonyMapping), new RiskMarkerIndex([]), true);
+
+        self::assertSame('fitted to the project', $chunkContext->systemPrompt);
     }
 
     /**

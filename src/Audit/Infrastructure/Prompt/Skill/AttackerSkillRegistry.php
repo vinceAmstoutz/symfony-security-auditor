@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill
 use Override;
 use Traversable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 
 /**
@@ -26,6 +27,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRe
  */
 final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendererInterface
 {
+    private const string GATED_HUNT = '/^(\s*- )\{requires ([^}]+)\} ([^\n]*\n?)/m';
+
     /** @var array<AttackerSkillInterface> */
     private array $orderedSkills;
 
@@ -50,14 +53,55 @@ final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendere
     #[Override]
     public function render(array $presentTypes, bool $emitAll): string
     {
+        return $this->renderFor($presentTypes, $emitAll, ProjectProfile::unknown());
+    }
+
+    /**
+     * The blocks for a chunk, keeping only the hunts whose `{requires …}`
+     * tag the audited project satisfies.
+     *
+     * @param list<ProjectFileType> $presentTypes
+     */
+    public function renderFor(array $presentTypes, bool $emitAll, ProjectProfile $projectProfile): string
+    {
         $blocks = [];
         foreach ($this->orderedSkills as $orderedSkill) {
             if ($emitAll || \in_array($orderedSkill->fileType(), $presentTypes, true)) {
-                $blocks[] = $orderedSkill->block();
+                $blocks[] = $this->gated($orderedSkill->block(), $projectProfile);
             }
         }
 
         return implode("\n\n", $blocks);
+    }
+
+    /**
+     * The `{requires …}` tag of every hunt the audited project's prompts
+     * leave out, in skill order.
+     *
+     * @return list<string>
+     */
+    public function droppedRequirements(ProjectProfile $projectProfile): array
+    {
+        $dropped = [];
+        foreach ($this->orderedSkills as $orderedSkill) {
+            preg_match_all(self::GATED_HUNT, $orderedSkill->block(), $matches);
+            foreach ($matches[2] as $requirement) {
+                if (!$projectProfile->satisfies($requirement)) {
+                    $dropped[] = $requirement;
+                }
+            }
+        }
+
+        return $dropped;
+    }
+
+    private function gated(string $block, ProjectProfile $projectProfile): string
+    {
+        return (string) preg_replace_callback(
+            self::GATED_HUNT,
+            static fn (array $matches): string => $projectProfile->satisfies($matches[2]) ? $matches[1].$matches[3] : '',
+            $block,
+        );
     }
 
     /**
