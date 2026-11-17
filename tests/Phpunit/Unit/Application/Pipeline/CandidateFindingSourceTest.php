@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 
@@ -80,6 +81,27 @@ final class CandidateFindingSourceTest extends TestCase
         $source = new CandidateFindingSource($this->scannerReturning([RiskMarker::create('src/A.php', 3, 'unserialize_call', 'Unsafe.')]), false);
 
         self::assertSame([], $source->candidatesIn([$file]));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_lists_every_redacted_secret_and_every_static_match(): void
+    {
+        $file = ProjectFile::create('src/A.php', '/p/src/A.php', "<?php\n\$a = '***REDACTED:jwt***';\n\$b = '***REDACTED:aws_access_key***';\nunserialize(\$x);\neval(\$y);\n");
+        $source = new CandidateFindingSource($this->scannerReturning([
+            RiskMarker::create('src/A.php', 4, 'unserialize_call', 'Unsafe.'),
+            RiskMarker::create('src/A.php', 5, 'eval_call', 'Unsafe.'),
+        ]));
+
+        self::assertSame(
+            [[2, VulnerabilityType::HARDCODED_SECRET], [3, VulnerabilityType::HARDCODED_SECRET], [4, VulnerabilityType::INSECURE_DESERIALIZATION], [5, VulnerabilityType::COMMAND_INJECTION]],
+            array_map(static fn (Vulnerability $vulnerability): array => [$vulnerability->lineStart(), $vulnerability->type()], $source->candidatesIn([$file])),
+        );
     }
 
     /**
