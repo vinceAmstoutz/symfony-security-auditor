@@ -18,7 +18,6 @@ use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
-use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
@@ -40,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\RoundTripYa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 
@@ -89,7 +89,7 @@ final readonly class InitCommand
     {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        $provider = b($initCommandInput->provider ?? $this->pick($symfonyStyle, 'Which AI provider do you want to use? Pick a number, or type any symfony/ai platform — e.g. ollama, or generic.my_gateway for an AI gateway', InitProviderChoices::names(), 'anthropic'))->trim()->toString();
+        $provider = b($initCommandInput->provider ?? InitProviderQuestion::ask($symfonyStyle))->trim()->toString();
 
         if ($this->refused($symfonyStyle, InitRefusal::forProviderText($provider))) {
             return Command::INVALID;
@@ -270,33 +270,32 @@ final readonly class InitCommand
     private function askModel(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): string
     {
         $pricedModels = $this->pricedModelList?->pricedModels($providerKey->platform) ?? [];
-        $defaultModel = CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? self::DEFAULT_MODEL;
+        $modelIds = array_map(static fn (PricedModel $pricedModel): string => $pricedModel->id, $pricedModels);
 
-        return [] === $pricedModels
-            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', $defaultModel)
-            : $this->pick($symfonyStyle, 'Which model should the auditor use? Pick a number, or type any model id', $pricedModels, $defaultModel);
+        return [] === $modelIds
+            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? self::DEFAULT_MODEL)
+            : NumberedChoice::ask(
+                $symfonyStyle,
+                'Which model should the auditor use? Pick a number, or type any model id',
+                array_map($this->modelChoice(...), $pricedModels),
+                $this->defaultModel($modelIds),
+                $modelIds,
+            );
     }
 
     /**
-     * @param list<string> $choices
+     * @param non-empty-list<string> $modelIds the most expensive first
      */
-    private function pick(SymfonyStyle $symfonyStyle, string $question, array $choices, string $default): string
+    private function defaultModel(array $modelIds): string
     {
-        $choiceQuestion = new ChoiceQuestion($question, $choices, $default);
-        $choiceQuestion->setValidator(static fn (mixed $answer): string => self::chosen($choices, \is_string($answer) ? $answer : ''));
-
-        $answer = $symfonyStyle->askQuestion($choiceQuestion);
-        \assert(\is_string($answer));
-
-        return $answer;
+        return \in_array(self::DEFAULT_MODEL, $modelIds, true) ? self::DEFAULT_MODEL : $modelIds[intdiv(\count($modelIds) - 1, 2)];
     }
 
-    /**
-     * @param list<string> $choices
-     */
-    private static function chosen(array $choices, string $answer): string
+    private function modelChoice(PricedModel $pricedModel): string
     {
-        return ctype_digit($answer) ? $choices[(int) $answer] ?? $answer : $answer;
+        return null === $pricedModel->outputPrice
+            ? \sprintf('%s ($%s in per million tokens)', $pricedModel->id, $pricedModel->inputPrice)
+            : \sprintf('%s ($%s in, $%s out per million tokens)', $pricedModel->id, $pricedModel->inputPrice, $pricedModel->outputPrice);
     }
 
     private function ask(SymfonyStyle $symfonyStyle, string $question, string $default): string

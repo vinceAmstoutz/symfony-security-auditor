@@ -32,7 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\InitProviderChoices;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ModelAccess;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
@@ -73,10 +73,70 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_first_asks_how_you_reach_a_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringStartsWith(' How do you reach an AI model?', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_configures_ollama_for_a_model_running_on_this_machine(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) array_search(ModelAccess::Local, ModelAccess::cases(), true), 'llama3.2', '', 'http://localhost:11434']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('ollama', $this->configuredValue('provider'));
+    }
+
+    public function test_it_lists_only_cloud_platforms_for_a_cloud_account(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) array_search(ModelAccess::Cloud, ModelAccess::cases(), true), 'vertexai', 'gemini-3-pro', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[0\] bedrock\.default \[1\] vertexai \[2\] azure\.default >/', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_lists_gateways_for_an_ai_gateway(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) array_search(ModelAccess::Gateway, ModelAccess::cases(), true), 'openrouter', 'anthropic/claude-opus-5-5', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[0\] openrouter \[1\] edenai \[2\] generic\.gateway >/', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_lists_neither_cloud_platforms_nor_gateways_for_an_api_key(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['0', 'openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertDoesNotMatchRegularExpression('/\] (vertexai|openrouter|edenai) /', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_explains_that_a_chat_subscription_is_not_an_api_key(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) array_search(ModelAccess::Subscription, ModelAccess::cases(), true), 'anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('A chat subscription is not an API key', $this->unwrappedDisplay($commandTester));
+    }
+
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) array_search('openai', InitProviderChoices::names(), true), 'gpt-5.4', '', '']);
+        $commandTester->setInputs(['0', (string) array_search('openai', ModelAccess::ApiKey->providers(), true), 'gpt-5.4', '', '']);
 
         $commandTester->execute([]);
 
@@ -131,6 +191,65 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringNotContainsString('old-model', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_shows_the_price_of_each_model_it_offers(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openai', '0', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('gpt-new ($1 in, $2 out per million tokens)', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_shows_only_the_input_price_of_a_model_priced_for_input_alone(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openai', '0', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('gpt-input-only ($0.5 in per million tokens)', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_offers_only_the_newest_model_of_each_family(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '0', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('claude-opus-older', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_lists_the_most_expensive_model_first(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '0', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-fable-new', $this->configuredValue('model'));
+    }
+
+    public function test_it_defaults_to_the_model_in_the_middle_of_the_price_range(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-opus-new', $this->configuredValue('model'));
+    }
+
+    public function test_it_keeps_claude_opus_5_5_as_the_default_model_when_the_provider_lists_it(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog-listing-the-default-model.json')));
+
+        $commandTester->execute(['--provider' => 'anthropic'], ['interactive' => false]);
+
+        self::assertSame('claude-opus-5-5', $this->configuredValue('model'));
     }
 
     public function test_it_offers_claude_opus_5_5_as_the_default_model(): void
@@ -1927,6 +2046,14 @@ final class InitCommandTest extends TestCase
     private function unwrappedDisplay(CommandTester $commandTester): string
     {
         return (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
+    }
+
+    private function configuredValue(string $key): mixed
+    {
+        $configuration = Yaml::parseFile($this->configFile());
+        self::assertIsArray($configuration);
+
+        return $configuration[$key] ?? null;
     }
 
     private function configFile(): string

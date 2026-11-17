@@ -1,0 +1,53 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
+
+/**
+ * How someone running `init` reaches an AI model, which narrows the
+ * providers it then lists.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
+enum ModelAccess: string
+{
+    case ApiKey = 'api-key';
+    case Cloud = 'cloud';
+    case Gateway = 'gateway';
+    case Local = 'local';
+    case Subscription = 'subscription';
+
+    /**
+     * @return list<string>
+     */
+    public function providers(): array
+    {
+        return match ($this) {
+            self::Cloud => ['bedrock.default', 'vertexai', 'azure.default'],
+            self::Gateway => ['openrouter', 'edenai', 'generic.gateway'],
+            self::Local => ['ollama'],
+            default => array_values(array_diff(InitProviderChoices::names(), self::Cloud->providers(), self::Gateway->providers())),
+        };
+    }
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::ApiKey => 'An API key from an AI provider (Anthropic, OpenAI, Mistral, Gemini, …)',
+            self::Cloud => 'A cloud account (AWS Bedrock, Google Vertex AI, Azure)',
+            self::Gateway => 'An AI gateway or router (OpenRouter, Eden AI, any OpenAI-compatible endpoint)',
+            self::Local => 'A model running on this machine (Ollama)',
+            self::Subscription => 'A chat subscription (Claude Pro/Max, ChatGPT Plus/Pro, Gemini, Copilot)',
+        };
+    }
+}
