@@ -949,7 +949,7 @@ final class InitCommandTest extends TestCase
 
         preg_match('/^"?provider"?: .*/ms', $commandTester->getDisplay(), $block);
         self::assertSame(
-            ['provider' => 'lmstudio', 'platform' => ['lmstudio' => ['host_url' => 'http://127.0.0.1:1234']], 'model' => '.inf', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'lmstudio', 'platform' => ['lmstudio' => ['host_url' => 'http://127.0.0.1:1234']], 'model' => '.inf'],
             Yaml::parse($block[0] ?? ''),
         );
     }
