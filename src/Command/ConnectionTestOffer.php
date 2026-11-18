@@ -31,7 +31,7 @@ final readonly class ConnectionTestOffer
             return;
         }
 
-        if (!$symfonyStyle->confirm(self::QUESTION)) {
+        if (!$symfonyStyle->confirm(self::QUESTION, false)) {
             $symfonyStyle->note('Run "doctor --check-connection" to test it later.');
 
             return;

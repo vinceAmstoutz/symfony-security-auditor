@@ -22,6 +22,7 @@ use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpClient\HttpClient;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
@@ -53,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\OllamaPulledModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
@@ -296,6 +298,7 @@ final readonly class StandaloneApplicationFactory
             $this->credentialStore,
             pricedModelList: new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
             connectionTestRunner: new ProcessConnectionTestRunner(new SelfInvocation($this->runningBinaryPath)),
+            pulledModelList: new OllamaPulledModelList(HttpClient::create(['timeout' => 3])),
         );
     }
 

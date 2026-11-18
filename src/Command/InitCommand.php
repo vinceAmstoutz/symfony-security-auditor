@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\RoundTripYa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 
@@ -68,6 +69,7 @@ final readonly class InitCommand
         private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
         private ?PricedModelListInterface $pricedModelList = null,
         private ?ConnectionTestRunnerInterface $connectionTestRunner = null,
+        private ?PulledModelListInterface $pulledModelList = null,
     ) {}
 
     /**
@@ -103,18 +105,6 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $model = b($initCommandInput->model ?? (new InitModelQuestion($this->pricedModelList))->ask($symfonyStyle, $providerKey))->trim()->toString();
-
-        if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
-            return Command::INVALID;
-        }
-
-        $envVar = $this->resolveApiKeyVariable($symfonyStyle, $initCommandInput, $providerKey);
-
-        if ($this->refused($symfonyStyle, InitRefusal::forEnvironmentVariable($envVar))) {
-            return Command::INVALID;
-        }
-
         $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
 
         if ($this->refused($symfonyStyle, InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl))) {
@@ -124,6 +114,18 @@ final readonly class InitCommand
         $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey, $interactive);
 
         if ($this->refused($symfonyStyle, InitRefusal::forResolvedEndpoint($providerKey, $provider, $endpoint))) {
+            return Command::INVALID;
+        }
+
+        $model = b($initCommandInput->model ?? (new InitModelQuestion($this->pricedModelList, $this->pulledModelList))->ask($symfonyStyle, $providerKey, $endpoint))->trim()->toString();
+
+        if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
+            return Command::INVALID;
+        }
+
+        $envVar = $this->resolveApiKeyVariable($initCommandInput, $providerKey);
+
+        if ($this->refused($symfonyStyle, InitRefusal::forEnvironmentVariable($envVar))) {
             return Command::INVALID;
         }
 
@@ -229,11 +231,7 @@ final readonly class InitCommand
      */
     private function installBridge(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey, string ...$companionPlatforms): void
     {
-        $symfonyStyle->text(\sprintf(
-            'Downloading the %s provider bridge%s with composer — this can take a minute…',
-            OutputFormatter::escape(implode(' and ', [$providerKey->platform, ...$companionPlatforms])),
-            [] === $companionPlatforms ? '' : 's',
-        ));
+        $symfonyStyle->text(\sprintf('Installing support for %s — this can take a minute…', OutputFormatter::escape(ProviderNames::ofPlatform($providerKey->platform))));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir(), ...$companionPlatforms);
     }
 
@@ -281,13 +279,13 @@ final readonly class InitCommand
      * that makes you supply its endpoint is one you host yourself, so no
      * credential is asked for unless `--env-var` names one.
      */
-    private function resolveApiKeyVariable(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    private function resolveApiKeyVariable(InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
         if ($initCommandInput->noApiKey || CliAgentPlatforms::declares($providerKey) || (null === $initCommandInput->envVar && EndpointPlatforms::requires($providerKey))) {
             return null;
         }
 
-        $answer = $initCommandInput->envVar ?? InitPrompt::withDefault($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey));
+        $answer = $initCommandInput->envVar ?? $this->defaultApiKeyVariable($providerKey);
 
         $envVar = b($answer)->trim()->toString();
 

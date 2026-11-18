@@ -165,4 +165,32 @@ return [
         'reason' => 'auth:status suggests auth:test, and what its request costs, once a key resolves.',
         'changelog' => '#702',
     ],
+    [
+        'scenarios' => ['standalone/init-anthropic-defaults', 'standalone/init-existing-confirmed', 'standalone/init-force', 'standalone/init-force-same-provider', 'standalone/init-generic', 'standalone/init-generic-no-api-key', 'standalone/init-ollama', 'standalone/init-openai', 'standalone/init-then-audit'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^[-+] (?:Installing support for .+|Downloading the [a-z]+ provider bridge with composer) — this can take a minute…$/',
+        'reason' => 'init names the provider it installs support for as people know it, instead of its bridge package.',
+        'changelog' => '#702',
+    ],
+    [
+        'scenarios' => ['standalone/init-existing-confirmed'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/.*/',
+        'reason' => 'init no longer asks which environment variable holds the API key, so the scripted "yes" now answers the overwrite question and the configuration is rewritten instead of the run aborting.',
+        'changelog' => '#702',
+    ],
+    [
+        'scenarios' => ['standalone/init-existing-confirmed'],
+        'path' => 'files.home/config/symfony-security-auditor/config.yaml.lines',
+        'match' => '/.*/',
+        'reason' => 'init no longer asks which environment variable holds the API key, so the scripted "yes" now answers the overwrite question and the configuration is rewritten instead of the run aborting.',
+        'changelog' => '#702',
+    ],
+    [
+        'scenarios' => ['standalone/init-existing-confirmed'],
+        'path' => 'files.home/data/symfony-security-auditor/composer.json',
+        'match' => '/^null -> /',
+        'reason' => 'init no longer asks which environment variable holds the API key, so the scripted "yes" now answers the overwrite question and the configuration is rewritten instead of the run aborting.',
+        'changelog' => '#702',
+    ],
 ];

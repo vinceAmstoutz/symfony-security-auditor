@@ -59,7 +59,7 @@ final class StandaloneInitEndToEndTest extends TestCase
     public function test_the_standalone_init_command_writes_the_config_and_installs_the_chosen_bridge(): void
     {
         $commandTester = $this->initCommandTester();
-        $commandTester->setInputs(['openai', 'gpt-5', 'OPENAI_API_KEY', '', 'n']);
+        $commandTester->setInputs(['openai', 'gpt-5', '', 'n']);
 
         $exitCode = $commandTester->execute([]);
 
@@ -81,7 +81,7 @@ final class StandaloneInitEndToEndTest extends TestCase
     public function test_the_standalone_init_command_offers_the_models_the_pricing_catalog_lists(): void
     {
         $commandTester = $this->initCommandTester();
-        $commandTester->setInputs(['anthropic', '', '', '', 'n']);
+        $commandTester->setInputs(['anthropic', '', '', 'n']);
 
         $commandTester->execute([]);
 

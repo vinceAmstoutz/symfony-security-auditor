@@ -25,6 +25,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final readonly class NumberedChoice
 {
     /**
+     * The prompt names the default by its choice.
+     *
      * @param list<string>      $choices
      * @param list<string>|null $values  what each choice stands for, when it reads otherwise
      * @param string            $default the value an empty answer picks
@@ -33,11 +35,27 @@ final readonly class NumberedChoice
     {
         $values ??= $choices;
         $defaultPosition = array_search($default, $values, true);
-        $choiceQuestion = new ChoiceQuestion(
-            $question,
-            self::numberedFromOne($choices),
-            false === $defaultPosition ? $default : (string) ($defaultPosition + 1),
-        );
+
+        return self::askQuestion($symfonyStyle, new ChoiceQuestion($question, self::numberedFromOne($choices), false === $defaultPosition ? $default : (string) ($defaultPosition + 1)), $values);
+    }
+
+    /**
+     * The prompt names the default by the value it stands for.
+     *
+     * @param list<string> $choices
+     * @param list<string> $values  what each choice stands for
+     * @param string       $default the value an empty answer picks
+     */
+    public static function askNamingTheDefaultValue(SymfonyStyle $symfonyStyle, string $question, array $choices, string $default, array $values): string
+    {
+        return self::askQuestion($symfonyStyle, new ChoiceQuestion($question, self::numberedFromOne($choices), $default), $values);
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private static function askQuestion(SymfonyStyle $symfonyStyle, ChoiceQuestion $choiceQuestion, array $values): string
+    {
         $choiceQuestion->setValidator(static fn (mixed $answer): string => self::chosen($values, \is_string($answer) ? $answer : ''));
 
         $answer = $symfonyStyle->askQuestion($choiceQuestion);

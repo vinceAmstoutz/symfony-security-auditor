@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
@@ -64,7 +65,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_the_configuration_for_the_chosen_provider(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -77,7 +78,7 @@ final class InitCommandTest extends TestCase
     public function test_it_configures_ollama_for_a_model_running_on_this_machine(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Local, ModelAccess::cases(), true)), 'llama3.2', 'http://localhost:11434']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Local, ModelAccess::cases(), true)), 'http://localhost:11434', 'llama3.2']);
 
         $commandTester->execute([]);
 
@@ -128,11 +129,22 @@ final class InitCommandTest extends TestCase
     {
         $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
         $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
-        $commandTester->setInputs(['anthropic', '', '', '', '']);
+        $commandTester->setInputs(['anthropic', '', '', 'yes']);
 
         $commandTester->execute([]);
 
         self::assertSame(1, $recordingConnectionTestRunner->runs);
+    }
+
+    public function test_it_sends_no_test_request_when_the_user_just_presses_enter(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+        $commandTester->setInputs(['anthropic', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(0, $recordingConnectionTestRunner->runs);
     }
 
     public function test_it_never_tests_the_connection_without_interaction(): void
@@ -149,7 +161,7 @@ final class InitCommandTest extends TestCase
     {
         $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
         $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
-        $commandTester->setInputs(['anthropic', '', '', '', 'n']);
+        $commandTester->setInputs(['anthropic', '', '', 'n']);
 
         $commandTester->execute([]);
 
@@ -159,7 +171,7 @@ final class InitCommandTest extends TestCase
     public function test_it_says_how_to_retry_a_connection_test_that_failed(): void
     {
         $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner(succeeds: false));
-        $commandTester->setInputs(['anthropic', '', '', '', '']);
+        $commandTester->setInputs(['anthropic', '', '', 'yes']);
 
         $commandTester->execute([]);
 
@@ -169,7 +181,7 @@ final class InitCommandTest extends TestCase
     public function test_it_says_the_test_request_may_be_billed_before_sending_it(): void
     {
         $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
-        $commandTester->setInputs(['anthropic', '', '', '', 'n']);
+        $commandTester->setInputs(['anthropic', '', '', 'n']);
 
         $commandTester->execute([]);
 
@@ -232,7 +244,7 @@ final class InitCommandTest extends TestCase
     public function test_it_says_it_sends_the_test_request_once_the_user_agreed(): void
     {
         $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
-        $commandTester->setInputs(['anthropic', '', '', '', 'yes']);
+        $commandTester->setInputs(['anthropic', '', '', 'yes']);
 
         $commandTester->execute([]);
 
@@ -252,7 +264,7 @@ final class InitCommandTest extends TestCase
     public function test_it_asks_for_a_model_pulled_in_ollama_for_a_local_model(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([ModelAccess::Local->value, 'qwen3', '', '']);
+        $commandTester->setInputs([ModelAccess::Local->value, '', 'qwen3', '']);
 
         $commandTester->execute([]);
 
@@ -262,7 +274,7 @@ final class InitCommandTest extends TestCase
     public function test_it_asks_no_api_key_for_a_local_model(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([ModelAccess::Local->value, 'qwen3', 'http://localhost:11434', '']);
+        $commandTester->setInputs([ModelAccess::Local->value, 'http://localhost:11434', 'qwen3', '']);
 
         $commandTester->execute([]);
 
@@ -272,7 +284,7 @@ final class InitCommandTest extends TestCase
     public function test_it_reaches_ollama_on_this_machine_by_default(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([ModelAccess::Local->value, 'qwen3', '', '']);
+        $commandTester->setInputs([ModelAccess::Local->value, '', 'qwen3', '']);
 
         $commandTester->execute([]);
 
@@ -282,7 +294,7 @@ final class InitCommandTest extends TestCase
     public function test_it_asks_the_model_a_gateway_serves_without_suggesting_one(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'my-model', '', 'https://gateway.example']);
+        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'https://gateway.example', 'my-model', '']);
 
         $commandTester->execute([]);
 
@@ -297,6 +309,56 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertSame('anthropic/claude-opus-5-5', $this->configuredValue('model'));
+    }
+
+    public function test_it_names_the_default_model_by_its_id_alone(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should the auditor use? Pick a number, or type any model id [claude-opus-new]:', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_points_at_a_dry_run_for_what_an_audit_would_cost(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Prices are per million tokens; "audit --dry-run <path>" estimates what an audit of your project would cost. Which model should the auditor use?', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_where_a_gateway_runs_before_its_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'https://gateway.example', 'my-model', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([['generic' => ['gateway' => ['base_url' => 'https://gateway.example', 'api_key' => '%env(GENERIC_API_KEY)%']]], 'my-model'], [$this->configuredValue('platform'), $this->configuredValue('model')]);
+    }
+
+    public function test_it_names_the_api_key_variable_without_asking(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']]], [str_contains($commandTester->getDisplay(), 'Which environment variable'), $this->configuredValue('platform')]);
+    }
+
+    public function test_it_lists_the_models_pulled_in_ollama(): void
+    {
+        $commandTester = $this->commandTester(pulledModels: ['qwen3:8b', 'llama3.3:latest']);
+        $commandTester->setInputs([ModelAccess::Local->value, '', '2', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([true, 'llama3.3:latest'], [str_contains($this->unwrappedDisplay($commandTester), 'Which Ollama model should the auditor use? Pick a number, or type a model name [qwen3:8b]: [1] qwen3:8b [2] llama3.3:latest'), $this->configuredValue('model')]);
     }
 
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
@@ -455,7 +517,7 @@ final class InitCommandTest extends TestCase
     public function test_it_installs_the_bridge_for_the_chosen_provider_in_the_data_directory(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -549,7 +611,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -561,7 +623,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -607,7 +669,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithEverythingInitDoesNotWrite());
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([$provider, $model, $envVar, 'yes', '']);
+        $commandTester->setInputs([$provider, $model, 'yes', '']);
 
         $commandTester->execute([]);
 
@@ -645,7 +707,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute(['--force' => true]);
 
@@ -660,7 +722,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -710,7 +772,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'yes', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'yes', '']);
 
         $commandTester->execute([]);
 
@@ -723,7 +785,7 @@ final class InitCommandTest extends TestCase
     public function test_its_success_message_points_at_the_docs_instead_of_a_paste_ready_export_line(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
         $commandTester->execute([]);
 
         $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
@@ -735,7 +797,7 @@ final class InitCommandTest extends TestCase
     public function test_it_reports_success(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
     }
@@ -846,7 +908,7 @@ final class InitCommandTest extends TestCase
     public function test_it_confirms_where_the_configuration_was_written(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -856,9 +918,9 @@ final class InitCommandTest extends TestCase
     public function test_it_names_the_api_key_variable_the_user_chose(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'MY_CUSTOM_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
-        $commandTester->execute([]);
+        $commandTester->execute(['--env-var' => 'MY_CUSTOM_KEY']);
 
         $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
 
@@ -871,7 +933,7 @@ final class InitCommandTest extends TestCase
     public function test_it_stores_the_api_key_the_user_pastes(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
 
         $commandTester->execute([]);
 
@@ -881,7 +943,7 @@ final class InitCommandTest extends TestCase
     public function test_it_names_the_stored_key_without_printing_it(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
 
         $commandTester->execute([]);
 
@@ -897,7 +959,7 @@ final class InitCommandTest extends TestCase
     public function test_it_stores_nothing_when_the_user_skips_the_key(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -907,7 +969,7 @@ final class InitCommandTest extends TestCase
     public function test_it_does_not_try_to_store_a_key_the_user_skipped(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
         $commandTester->execute([]);
 
         $display = $this->unwrappedDisplay($commandTester);
@@ -920,7 +982,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
     }
@@ -930,7 +992,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
         $display = $this->unwrappedDisplay($commandTester);
@@ -943,7 +1005,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
         $display = $this->unwrappedDisplay($commandTester);
@@ -964,7 +1026,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -976,7 +1038,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -1023,7 +1085,7 @@ final class InitCommandTest extends TestCase
     public function test_it_does_not_ask_for_a_base_url_when_the_platform_has_no_such_key(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4']);
 
         $commandTester->execute([]);
 
@@ -1141,13 +1203,13 @@ final class InitCommandTest extends TestCase
         self::assertCount(1, $this->recordingBridgeInstaller->installations);
     }
 
-    public function test_it_names_every_bridge_it_downloads(): void
+    public function test_it_names_the_provider_it_installs_support_for(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'bedrock.prod', '--model' => 'openai.gpt-oss-120b'], ['interactive' => false]);
 
-        self::assertStringContainsString('Downloading the bedrock and generic provider bridges with composer', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Installing support for AWS Bedrock — this can take a minute…', $this->unwrappedDisplay($commandTester));
     }
 
     /**
@@ -1646,7 +1708,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'Downloading the generic provider bridge with composer',
+            'Installing support for your OpenAI-compatible gateway — this can take a minute…',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -1903,9 +1965,9 @@ final class InitCommandTest extends TestCase
     public function test_it_asks_for_a_base_url_when_the_provider_selects_a_platform_instance(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example']);
+        $commandTester->setInputs(['generic.my_gateway', 'https://gw.example', 'our-model']);
 
-        $commandTester->execute([]);
+        $commandTester->execute(['--env-var' => 'GATEWAY_TOKEN']);
 
         self::assertSame(
             [
@@ -1921,7 +1983,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_nothing_when_a_required_base_url_is_answered_empty(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', '']);
+        $commandTester->setInputs(['generic.my_gateway', '']);
 
         $commandTester->execute([]);
 
@@ -1958,7 +2020,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_a_local_platform_with_its_endpoint_and_no_credential(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'http://localhost:11434', 'llama3.2']);
 
         $commandTester->execute([]);
 
@@ -1971,7 +2033,7 @@ final class InitCommandTest extends TestCase
     public function test_it_never_asks_for_a_key_to_store_when_it_wrote_no_credential(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'http://localhost:11434', 'llama3.2']);
 
         $commandTester->execute([]);
 
@@ -2073,7 +2135,7 @@ final class InitCommandTest extends TestCase
     public function test_it_offers_no_such_default_for_the_platform_that_declares_none(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'http://localhost:11434', 'llama3.2']);
 
         $commandTester->execute([]);
 
@@ -2209,8 +2271,13 @@ final class InitCommandTest extends TestCase
         self::assertSame([], $this->recordingBridgeInstaller->installations);
     }
 
-    private function commandTester(?PricedModelListInterface $pricedModelList = null, ?RecordingConnectionTestRunner $recordingConnectionTestRunner = null): CommandTester
+    /**
+     * @param list<string> $pulledModels
+     */
+    private function commandTester(?PricedModelListInterface $pricedModelList = null, ?RecordingConnectionTestRunner $recordingConnectionTestRunner = null, array $pulledModels = []): CommandTester
     {
+        $pulledModelList = self::createStub(PulledModelListInterface::class);
+        $pulledModelList->method('pulledModels')->willReturn($pulledModels);
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
         $initCommand = new InitCommand(
             $xdgConfigPathResolver,
@@ -2220,6 +2287,7 @@ final class InitCommandTest extends TestCase
             new FilesystemCredentialStore($xdgConfigPathResolver),
             pricedModelList: $pricedModelList,
             connectionTestRunner: $recordingConnectionTestRunner,
+            pulledModelList: $pulledModelList,
         );
 
         return new CommandTester($initCommand);
@@ -2256,7 +2324,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
         self::assertSame('openai-test-key-pasted-at-init', $this->storedCredential('OPENAI_API_KEY'));
@@ -2265,7 +2333,7 @@ final class InitCommandTest extends TestCase
     public function test_it_explains_when_the_terminal_cannot_hide_the_key(): void
     {
         $commandTester = $this->commandTesterThatCannotHideInput();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
         $display = $this->unwrappedDisplay($commandTester);
@@ -2280,7 +2348,7 @@ final class InitCommandTest extends TestCase
     public function test_it_stores_nothing_when_the_terminal_cannot_hide_the_key(): void
     {
         $commandTester = $this->commandTesterThatCannotHideInput();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4']);
 
         $commandTester->execute([]);
 

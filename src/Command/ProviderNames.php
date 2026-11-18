@@ -47,8 +47,20 @@ final readonly class ProviderNames
         'codex' => 'ChatGPT (through the Codex CLI)',
     ];
 
+    private const array PLATFORM_NAMES = [
+        'bedrock' => 'AWS Bedrock',
+        'azure' => 'Azure OpenAI',
+        'generic' => 'your OpenAI-compatible gateway',
+        'ollama' => 'Ollama',
+    ];
+
     public static function of(string $provider): string
     {
         return self::NAMES[$provider] ?? $provider;
+    }
+
+    public static function ofPlatform(string $platform): string
+    {
+        return self::PLATFORM_NAMES[$platform] ?? self::of($platform);
     }
 }
