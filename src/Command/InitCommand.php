@@ -324,7 +324,7 @@ final readonly class InitCommand
             return $initCommandInput->deployment;
         }
 
-        return b($initCommandInput->deployment ?? InitPrompt::required($symfonyStyle, 'What is the name of your Azure OpenAI deployment?'))->trim()->toString();
+        return b($initCommandInput->deployment ?? InitPrompt::required($symfonyStyle, 'Azure OpenAI deployment name'))->trim()->toString();
     }
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string

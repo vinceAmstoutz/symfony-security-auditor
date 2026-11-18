@@ -422,7 +422,7 @@ final class InitCommandTest extends TestCase
 
         self::assertSame(
             [true, ['azure' => ['default' => ['base_url' => 'https://acme.openai.azure.com', 'deployment' => 'gpt-4o-prod', 'api_key' => '%env(AZURE_API_KEY)%']]]],
-            [str_contains($this->unwrappedDisplay($commandTester), 'What is the URL of Azure OpenAI? e.g. https://<resource>.openai.azure.com: > What is the name of your Azure OpenAI deployment?'), $this->configuredValue('platform')],
+            [str_contains($this->unwrappedDisplay($commandTester), 'What is the URL of Azure OpenAI? e.g. https://<resource>.openai.azure.com: > Azure OpenAI deployment name'), $this->configuredValue('platform')],
         );
     }
 
