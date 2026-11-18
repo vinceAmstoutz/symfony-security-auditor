@@ -23,13 +23,18 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 final readonly class InitProviderQuestion
 {
+    private const array SUBSCRIPTIONS = [
+        'claudecode' => 'Claude (through the Claude Code CLI)',
+        'codex' => 'ChatGPT (through the Codex CLI)',
+    ];
+
     public static function ask(SymfonyStyle $symfonyStyle): string
     {
         $answer = NumberedChoice::ask(
             $symfonyStyle,
-            'How do you reach an AI model? Pick a number, or type a provider name if you know it',
+            'How do you access AI models? Pick a number, or type a provider name',
             array_map(static fn (ModelAccess $modelAccess): string => $modelAccess->label(), ModelAccess::cases()),
-            '0',
+            ModelAccess::ApiKey->value,
             array_map(static fn (ModelAccess $modelAccess): string => $modelAccess->value, ModelAccess::cases()),
         );
 
@@ -42,8 +47,12 @@ final readonly class InitProviderQuestion
     {
         $providers = $modelAccess->providers();
 
-        return 1 === \count($providers)
-            ? $providers[0]
-            : NumberedChoice::ask($symfonyStyle, 'Which AI provider do you want to use? Pick a number, or type any symfony/ai platform — e.g. ollama, or generic.my_gateway for an AI gateway', $providers, '0');
+        if (1 === \count($providers)) {
+            return $providers[0];
+        }
+
+        return ModelAccess::Subscription === $modelAccess
+            ? NumberedChoice::ask($symfonyStyle, 'Which subscription do you have?', array_map(static fn (string $provider): string => self::SUBSCRIPTIONS[$provider] ?? $provider, $providers), $providers[0], $providers)
+            : NumberedChoice::ask($symfonyStyle, 'Which AI provider do you want to use? Pick a number, or type any symfony/ai platform — e.g. ollama, or generic.my_gateway for an AI gateway', $providers, $providers[0]);
     }
 }

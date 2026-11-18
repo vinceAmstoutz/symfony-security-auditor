@@ -74,20 +74,10 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_first_asks_how_you_reach_a_model(): void
-    {
-        $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
-
-        $commandTester->execute([]);
-
-        self::assertStringStartsWith(' How do you reach an AI model?', $this->unwrappedDisplay($commandTester));
-    }
-
     public function test_it_configures_ollama_for_a_model_running_on_this_machine(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) array_search(ModelAccess::Local, ModelAccess::cases(), true), 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Local, ModelAccess::cases(), true)), 'llama3.2', '', 'http://localhost:11434']);
 
         $commandTester->execute([]);
 
@@ -97,41 +87,41 @@ final class InitCommandTest extends TestCase
     public function test_it_lists_only_cloud_platforms_for_a_cloud_account(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) array_search(ModelAccess::Cloud, ModelAccess::cases(), true), 'vertexai', 'gemini-3-pro', '', '']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Cloud, ModelAccess::cases(), true)), 'vertexai', 'gemini-3-pro', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[0\] bedrock\.default \[1\] vertexai \[2\] azure\.default >/', $this->unwrappedDisplay($commandTester));
+        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[1\] bedrock\.default \[2\] vertexai \[3\] azure\.default >/', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_gateways_for_an_ai_gateway(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) array_search(ModelAccess::Gateway, ModelAccess::cases(), true), 'openrouter', 'anthropic/claude-opus-5-5', '', '']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Gateway, ModelAccess::cases(), true)), 'openrouter', 'anthropic/claude-opus-5-5', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[0\] openrouter \[1\] edenai \[2\] generic\.gateway >/', $this->unwrappedDisplay($commandTester));
+        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[1\] openrouter \[2\] edenai \[3\] generic\.gateway >/', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_neither_cloud_platforms_nor_gateways_for_an_api_key(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['0', 'openai', 'gpt-5.4', '', '']);
+        $commandTester->setInputs([ModelAccess::ApiKey->value, 'openai', 'gpt-5.4', '', '']);
 
         $commandTester->execute([]);
 
         self::assertDoesNotMatchRegularExpression('/\] (vertexai|openrouter|edenai|claudecode|codex) /', $this->unwrappedDisplay($commandTester));
     }
 
-    public function test_it_lists_the_cli_agents_for_a_chat_subscription(): void
+    public function test_it_names_the_subscriptions_it_can_run_on(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) array_search(ModelAccess::Subscription, ModelAccess::cases(), true), 'claudecode', '']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '']);
 
         $commandTester->execute([]);
 
-        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[0\] claudecode \[1\] codex >/', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which subscription do you have? [Claude (through the Claude Code CLI)]: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_tests_the_connection_when_the_user_accepts(): void
@@ -186,10 +176,73 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('A paid API bills it, usually well under a cent; a subscription counts it against its usage; a local model costs nothing', $this->unwrappedDisplay($commandTester));
     }
 
+    public function test_it_numbers_the_choices_from_one(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, true], [str_contains($commandTester->getDisplay(), '[0]'), str_contains($commandTester->getDisplay(), '[1]')]);
+    }
+
+    public function test_it_lists_the_ways_to_access_a_model_most_common_first(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString(
+            '[1] A Claude or ChatGPT subscription [2] An API key (Anthropic, OpenAI, Mistral, …) [3] A local model (Ollama) [4] An AI gateway (OpenRouter, Eden AI, …) [5] A cloud account (AWS, Google Cloud, Azure)',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_configures_an_anthropic_api_key_when_every_answer_is_the_default(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('anthropic', $this->configuredValue('provider'));
+    }
+
+    public function test_it_asks_how_you_access_ai_models_in_a_few_words(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_no_model_for_a_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), '1', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, 'opus'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
+    }
+
+    public function test_it_says_it_sends_the_test_request_once_the_user_agreed(): void
+    {
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
+        $commandTester->setInputs(['anthropic', '', '', '', 'yes']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('You answered yes: sending one test request to the provider…', $this->unwrappedDisplay($commandTester));
+    }
+
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['0', (string) array_search('openai', ModelAccess::ApiKey->providers(), true), 'gpt-5.4', '', '']);
+        $commandTester->setInputs([ModelAccess::ApiKey->value, (string) (1 + (int) array_search('openai', ModelAccess::ApiKey->providers(), true)), 'gpt-5.4', '', '']);
 
         $commandTester->execute([]);
 
@@ -202,7 +255,7 @@ final class InitCommandTest extends TestCase
     public function test_it_lets_you_pick_the_newest_priced_model_that_calls_tools_by_its_number(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['openai', '0', '', '']);
+        $commandTester->setInputs(['openai', '1', '', '']);
 
         $commandTester->execute([]);
 
@@ -239,7 +292,7 @@ final class InitCommandTest extends TestCase
     public function test_it_offers_only_the_ten_newest_priced_models(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['mistral', '0', '', '']);
+        $commandTester->setInputs(['mistral', '1', '', '']);
 
         $commandTester->execute([]);
 
@@ -249,7 +302,7 @@ final class InitCommandTest extends TestCase
     public function test_it_shows_the_price_of_each_model_it_offers(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['openai', '0', '', '']);
+        $commandTester->setInputs(['openai', '1', '', '']);
 
         $commandTester->execute([]);
 
@@ -259,7 +312,7 @@ final class InitCommandTest extends TestCase
     public function test_it_shows_only_the_input_price_of_a_model_priced_for_input_alone(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['openai', '0', '', '']);
+        $commandTester->setInputs(['openai', '1', '', '']);
 
         $commandTester->execute([]);
 
@@ -269,7 +322,7 @@ final class InitCommandTest extends TestCase
     public function test_it_offers_only_the_newest_model_of_each_family(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['anthropic', '0', '', '']);
+        $commandTester->setInputs(['anthropic', '1', '', '']);
 
         $commandTester->execute([]);
 
@@ -279,7 +332,7 @@ final class InitCommandTest extends TestCase
     public function test_it_ranks_a_model_priced_for_input_alone_by_its_input_price(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['openai', '0', '', '']);
+        $commandTester->setInputs(['openai', '1', '', '']);
 
         $commandTester->execute([]);
 
@@ -289,7 +342,7 @@ final class InitCommandTest extends TestCase
     public function test_it_lists_the_most_expensive_model_first(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['anthropic', '0', '', '']);
+        $commandTester->setInputs(['anthropic', '1', '', '']);
 
         $commandTester->execute([]);
 

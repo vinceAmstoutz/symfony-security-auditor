@@ -37,6 +37,8 @@ final readonly class ConnectionTestOffer
             return;
         }
 
+        $symfonyStyle->text('You answered yes: sending one test request to the provider…');
+
         if (!$connectionTestRunner->run($symfonyStyle)) {
             $symfonyStyle->warning('The configuration is saved. Fix the cause above, then run "doctor --check-connection" again.');
         }

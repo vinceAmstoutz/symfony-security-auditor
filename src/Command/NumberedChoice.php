@@ -27,11 +27,18 @@ final readonly class NumberedChoice
     /**
      * @param list<string>      $choices
      * @param list<string>|null $values  what each choice stands for, when it reads otherwise
+     * @param string            $default the value an empty answer picks
      */
     public static function ask(SymfonyStyle $symfonyStyle, string $question, array $choices, string $default, ?array $values = null): string
     {
-        $choiceQuestion = new ChoiceQuestion($question, $choices, $default);
-        $choiceQuestion->setValidator(static fn (mixed $answer): string => self::chosen($values ?? $choices, \is_string($answer) ? $answer : ''));
+        $values ??= $choices;
+        $defaultPosition = array_search($default, $values, true);
+        $choiceQuestion = new ChoiceQuestion(
+            $question,
+            self::numberedFromOne($choices),
+            false === $defaultPosition ? $default : (string) ($defaultPosition + 1),
+        );
+        $choiceQuestion->setValidator(static fn (mixed $answer): string => self::chosen($values, \is_string($answer) ? $answer : ''));
 
         $answer = $symfonyStyle->askQuestion($choiceQuestion);
         \assert(\is_string($answer));
@@ -41,9 +48,24 @@ final readonly class NumberedChoice
 
     /**
      * @param list<string> $choices
+     *
+     * @return array<int, string>
+     */
+    private static function numberedFromOne(array $choices): array
+    {
+        $numbered = [];
+        foreach ($choices as $position => $choice) {
+            $numbered[$position + 1] = $choice;
+        }
+
+        return $numbered;
+    }
+
+    /**
+     * @param list<string> $choices
      */
     private static function chosen(array $choices, string $answer): string
     {
-        return ctype_digit($answer) ? $choices[(int) $answer] ?? $answer : $answer;
+        return ctype_digit($answer) ? $choices[(int) $answer - 1] ?? $answer : $answer;
     }
 }

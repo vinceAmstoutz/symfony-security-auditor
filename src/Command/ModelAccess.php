@@ -23,11 +23,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPla
  */
 enum ModelAccess: string
 {
-    case ApiKey = 'api-key';
-    case Cloud = 'cloud';
-    case Gateway = 'gateway';
-    case Local = 'local';
     case Subscription = 'subscription';
+    case ApiKey = 'api-key';
+    case Local = 'local';
+    case Gateway = 'gateway';
+    case Cloud = 'cloud';
 
     private const array CLOUD_PLATFORMS = ['bedrock.default', 'vertexai', 'azure.default'];
 
@@ -50,11 +50,11 @@ enum ModelAccess: string
     public function label(): string
     {
         return match ($this) {
-            self::ApiKey => 'An API key from an AI provider (Anthropic, OpenAI, Mistral, Gemini, …)',
-            self::Cloud => 'A cloud account (AWS Bedrock, Google Vertex AI, Azure)',
-            self::Gateway => 'An AI gateway or router (OpenRouter, Eden AI, any OpenAI-compatible endpoint)',
-            self::Local => 'A model running on this machine (Ollama)',
-            self::Subscription => 'A Claude or ChatGPT subscription (through the Claude Code or Codex CLI)',
+            self::Subscription => 'A Claude or ChatGPT subscription',
+            self::ApiKey => 'An API key (Anthropic, OpenAI, Mistral, …)',
+            self::Local => 'A local model (Ollama)',
+            self::Gateway => 'An AI gateway (OpenRouter, Eden AI, …)',
+            self::Cloud => 'A cloud account (AWS, Google Cloud, Azure)',
         };
     }
 }

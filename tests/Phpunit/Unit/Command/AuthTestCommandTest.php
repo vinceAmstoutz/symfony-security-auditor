@@ -27,7 +27,7 @@ final class AuthTestCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('[OK] The provider accepted the key and answered.', $commandTester->getDisplay());
+        self::assertStringContainsString('[OK] Your API key works: the provider answered a test request.', $commandTester->getDisplay());
     }
 
     public function test_it_fails_with_the_reason_the_provider_gave(): void

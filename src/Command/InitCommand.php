@@ -273,11 +273,16 @@ final readonly class InitCommand
 
     private function askModel(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): string
     {
+        $subscriptionModel = CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? null;
+        if (null !== $subscriptionModel) {
+            return $subscriptionModel;
+        }
+
         $pricedModels = $this->pricedModelList?->pricedModels($providerKey->platform) ?? [];
         $modelIds = array_map(static fn (PricedModel $pricedModel): string => $pricedModel->id, $pricedModels);
 
         return [] === $modelIds
-            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? self::DEFAULT_MODEL)
+            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
             : NumberedChoice::ask(
                 $symfonyStyle,
                 'Which model should the auditor use? Pick a number, or type any model id',
