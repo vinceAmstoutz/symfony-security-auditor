@@ -8,7 +8,7 @@
         "symfony/yaml": "v7.4.21",
         "symfony/ai-platform": "v0.15.0",
         "symfony/ai-bundle": "v0.15.0",
-        "mcp/sdk": "v0.10.0"
+        "mcp/sdk": "v0.9.0"
     },
     "recordings": [
         {
