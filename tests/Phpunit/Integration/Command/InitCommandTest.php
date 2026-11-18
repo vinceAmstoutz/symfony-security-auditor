@@ -77,7 +77,7 @@ final class InitCommandTest extends TestCase
     public function test_it_configures_ollama_for_a_model_running_on_this_machine(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Local, ModelAccess::cases(), true)), 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Local, ModelAccess::cases(), true)), 'llama3.2', 'http://localhost:11434']);
 
         $commandTester->execute([]);
 
@@ -91,7 +91,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[1\] bedrock\.default \[2\] vertexai \[3\] azure\.default >/', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which cloud do you use? [AWS Bedrock]: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI (prints a configuration to complete by hand) >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_gateways_for_an_ai_gateway(): void
@@ -101,7 +101,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertMatchesRegularExpression('/Which AI provider do you want to use\?[^>]*\[1\] openrouter \[2\] edenai \[3\] generic\.gateway >/', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which gateway do you use? [OpenRouter]: [1] OpenRouter [2] Eden AI [3] Another OpenAI-compatible gateway (you give its URL) >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_neither_cloud_platforms_nor_gateways_for_an_api_key(): void
@@ -111,7 +111,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertDoesNotMatchRegularExpression('/\] (vertexai|openrouter|edenai|claudecode|codex) /', $this->unwrappedDisplay($commandTester));
+        self::assertDoesNotMatchRegularExpression('/\] (Google Vertex AI|OpenRouter|Eden AI|Claude \(through|ChatGPT) /', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_names_the_subscriptions_it_can_run_on(): void
@@ -237,6 +237,56 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringContainsString('You answered yes: sending one test request to the provider…', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_names_the_companies_an_api_key_comes_from_most_common_first(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::ApiKey->value, '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which company is your API key from? Pick a number, or type a provider name [Anthropic (Claude)]: [1 ] Anthropic (Claude) [2 ] OpenAI (GPT) [3 ] Google AI Studio (Gemini) [4 ] Mistral AI [5 ] DeepSeek [6 ] Cerebras', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_for_a_model_pulled_in_ollama_for_a_local_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Local->value, 'qwen3', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which Ollama model should the auditor use? Type the name of a model you pulled, e.g. qwen3 or llama3.3:', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_no_api_key_for_a_local_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Local->value, 'qwen3', 'http://localhost:11434', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, ['ollama' => ['endpoint' => 'http://localhost:11434']]], [str_contains($commandTester->getDisplay(), 'Which environment variable holds the API key'), $this->configuredValue('platform')]);
+    }
+
+    public function test_it_reaches_ollama_on_this_machine_by_default(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Local->value, 'qwen3', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(['ollama' => ['endpoint' => 'http://localhost:11434']], $this->configuredValue('platform'));
+    }
+
+    public function test_it_asks_the_model_a_gateway_serves_without_suggesting_one(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'my-model', '', 'https://gateway.example']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should the auditor use? Type its id as your provider names it: >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
@@ -1898,7 +1948,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_a_local_platform_with_its_endpoint_and_no_credential(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'llama3.2', 'http://localhost:11434']);
 
         $commandTester->execute([]);
 
@@ -1911,7 +1961,7 @@ final class InitCommandTest extends TestCase
     public function test_it_never_asks_for_a_key_to_store_when_it_wrote_no_credential(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'llama3.2', 'http://localhost:11434']);
 
         $commandTester->execute([]);
 
@@ -2013,7 +2063,7 @@ final class InitCommandTest extends TestCase
     public function test_it_offers_no_such_default_for_the_platform_that_declares_none(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'llama3.2', 'http://localhost:11434']);
 
         $commandTester->execute([]);
 

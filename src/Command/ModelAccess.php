@@ -33,6 +33,8 @@ enum ModelAccess: string
 
     private const array GATEWAYS = ['openrouter', 'edenai', 'generic.gateway'];
 
+    private const array MOST_COMMON_API_KEYS = ['anthropic', 'openai', 'gemini', 'mistral', 'deepseek'];
+
     /**
      * @return list<string>
      */
@@ -43,8 +45,28 @@ enum ModelAccess: string
             self::Gateway => self::GATEWAYS,
             self::Subscription => array_keys(CliAgentPlatforms::FACTORIES),
             self::Local => ['ollama'],
-            self::ApiKey => array_values(array_diff(InitProviderChoices::names(), self::CLOUD_PLATFORMS, self::GATEWAYS, array_keys(CliAgentPlatforms::FACTORIES))),
+            self::ApiKey => self::mostCommonFirst(array_diff(InitProviderChoices::names(), self::CLOUD_PLATFORMS, self::GATEWAYS, array_keys(CliAgentPlatforms::FACTORIES))),
         };
+    }
+
+    public function providerQuestion(): string
+    {
+        return match ($this) {
+            self::Subscription => 'Which subscription do you have?',
+            self::ApiKey => 'Which company is your API key from? Pick a number, or type a provider name',
+            self::Cloud => 'Which cloud do you use?',
+            default => 'Which gateway do you use?',
+        };
+    }
+
+    /**
+     * @param array<int, string> $providers
+     *
+     * @return list<string>
+     */
+    private static function mostCommonFirst(array $providers): array
+    {
+        return [...self::MOST_COMMON_API_KEYS, ...array_diff($providers, self::MOST_COMMON_API_KEYS)];
     }
 
     public function label(): string

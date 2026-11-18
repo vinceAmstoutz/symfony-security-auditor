@@ -23,11 +23,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 final readonly class InitProviderQuestion
 {
-    private const array SUBSCRIPTIONS = [
-        'claudecode' => 'Claude (through the Claude Code CLI)',
-        'codex' => 'ChatGPT (through the Codex CLI)',
-    ];
-
     public static function ask(SymfonyStyle $symfonyStyle): string
     {
         $answer = NumberedChoice::ask(
@@ -51,8 +46,6 @@ final readonly class InitProviderQuestion
             return $providers[0];
         }
 
-        return ModelAccess::Subscription === $modelAccess
-            ? NumberedChoice::ask($symfonyStyle, 'Which subscription do you have?', array_map(static fn (string $provider): string => self::SUBSCRIPTIONS[$provider] ?? $provider, $providers), $providers[0], $providers)
-            : NumberedChoice::ask($symfonyStyle, 'Which AI provider do you want to use? Pick a number, or type any symfony/ai platform — e.g. ollama, or generic.my_gateway for an AI gateway', $providers, $providers[0]);
+        return NumberedChoice::ask($symfonyStyle, $modelAccess->providerQuestion(), array_map(ProviderNames::of(...), $providers), $providers[0], $providers);
     }
 }

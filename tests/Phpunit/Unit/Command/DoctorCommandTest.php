@@ -87,7 +87,7 @@ final class DoctorCommandTest extends TestCase
 
         $commandTester->execute(['--check-connection' => true]);
 
-        self::assertStringContainsString('[OK] Connection: The provider answered.', $commandTester->getDisplay());
+        self::assertStringContainsString('[OK] Connection: It works. You can run an audit now.', $commandTester->getDisplay());
     }
 
     public function test_it_reports_why_the_connection_check_failed(): void
@@ -96,7 +96,7 @@ final class DoctorCommandTest extends TestCase
 
         $commandTester->execute(['--check-connection' => true]);
 
-        self::assertStringContainsString('Connection: The provider did not answer: The API key was refused.', $commandTester->getDisplay());
+        self::assertStringContainsString('Connection: The test failed, so an audit would fail too. The provider said: The API key was refused.', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
     }
 
     public function test_it_fails_when_the_connection_check_fails(): void

@@ -27,7 +27,7 @@ final class AuthTestCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('[OK] Your API key works: the provider answered a test request.', $commandTester->getDisplay());
+        self::assertStringContainsString('[OK] Your API key works. You can run an audit now.', $commandTester->getDisplay());
     }
 
     public function test_it_fails_with_the_reason_the_provider_gave(): void
@@ -36,7 +36,7 @@ final class AuthTestCommandTest extends TestCase
 
         $exitCode = $commandTester->execute([]);
 
-        self::assertSame([Command::FAILURE, true], [$exitCode, str_contains($commandTester->getDisplay(), 'The provider did not answer: HTTP 401: invalid x-api-key')]);
+        self::assertSame([Command::FAILURE, true], [$exitCode, str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), 'The test failed, so an audit would fail too. The provider said: HTTP 401: invalid x-api-key')]);
     }
 
     private function commandTester(?string $failureReason): CommandTester

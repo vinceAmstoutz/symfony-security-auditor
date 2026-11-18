@@ -33,12 +33,12 @@ final readonly class AuthTestCommand
     {
         $failureReason = $this->connectionCheck->failureReason();
         if (null !== $failureReason) {
-            $symfonyStyle->error(\sprintf('The provider did not answer: %s', $failureReason));
+            $symfonyStyle->error(\sprintf(ConnectionProbe::FAILURE, $failureReason));
 
             return Command::FAILURE;
         }
 
-        $symfonyStyle->success('Your API key works: the provider answered a test request.');
+        $symfonyStyle->success('Your API key works. You can run an audit now.');
 
         return Command::SUCCESS;
     }

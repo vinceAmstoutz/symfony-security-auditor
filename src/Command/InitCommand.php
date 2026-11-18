@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -40,7 +39,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\RoundTripYa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 
@@ -57,7 +55,7 @@ final readonly class InitCommand
 
     private const string MODEL_PLACEHOLDER = '<model id>';
 
-    private const string DEFAULT_MODEL = 'claude-opus-5-5';
+    private const string LOCAL_OLLAMA = 'http://localhost:11434';
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -105,7 +103,7 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $model = b($initCommandInput->model ?? $this->askModel($symfonyStyle, $providerKey))->trim()->toString();
+        $model = b($initCommandInput->model ?? (new InitModelQuestion($this->pricedModelList))->ask($symfonyStyle, $providerKey))->trim()->toString();
 
         if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
             return Command::INVALID;
@@ -123,7 +121,7 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey);
+        $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey, $interactive);
 
         if ($this->refused($symfonyStyle, InitRefusal::forResolvedEndpoint($providerKey, $provider, $endpoint))) {
             return Command::INVALID;
@@ -271,108 +269,44 @@ final readonly class InitCommand
             && !$symfonyStyle->confirm(\sprintf('A configuration already exists at %s. Overwrite it?', $configFile), false);
     }
 
-    private function askModel(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): string
+    private function defaultApiKeyVariable(ProviderKey $providerKey): string
     {
-        $subscriptionModel = CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? null;
-        if (null !== $subscriptionModel) {
-            return $subscriptionModel;
-        }
-
-        $pricedModels = $this->pricedModelList?->pricedModels($providerKey->platform) ?? [];
-        $modelIds = array_map(static fn (PricedModel $pricedModel): string => $pricedModel->id, $pricedModels);
-
-        return [] === $modelIds
-            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
-            : NumberedChoice::ask(
-                $symfonyStyle,
-                'Which model should the auditor use? Pick a number, or type any model id',
-                array_map($this->modelChoice(...), $pricedModels),
-                $this->defaultModel($modelIds),
-                $modelIds,
-            );
-    }
-
-    /**
-     * @param non-empty-list<string> $modelIds the most expensive first
-     */
-    private function defaultModel(array $modelIds): string
-    {
-        return \in_array(self::DEFAULT_MODEL, $modelIds, true) ? self::DEFAULT_MODEL : $modelIds[intdiv(\count($modelIds) - 1, 2)];
-    }
-
-    private function modelChoice(PricedModel $pricedModel): string
-    {
-        return null === $pricedModel->outputPrice
-            ? \sprintf('%s ($%s in per million tokens)', $pricedModel->id, $pricedModel->inputPrice)
-            : \sprintf('%s ($%s in, $%s out per million tokens)', $pricedModel->id, $pricedModel->inputPrice, $pricedModel->outputPrice);
-    }
-
-    private function ask(SymfonyStyle $symfonyStyle, string $question, string $default): string
-    {
-        $answer = $symfonyStyle->ask($question, $default);
-        \assert(\is_string($answer));
-
-        return $answer;
-    }
-
-    /**
-     * A platform that makes you supply its endpoint is one you host yourself,
-     * so no credential is invented for it: naming a variable nobody set is what
-     * made `init --provider=ollama` end in "No API key available".
-     */
-    private function defaultApiKeyVariable(ProviderKey $providerKey): ?string
-    {
-        return EndpointPlatforms::requires($providerKey)
-            ? null
-            : \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+        return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
     }
 
     /**
      * Null means the connection is written without an `api_key`. Only the
      * platforms whose key the bundle leaves optional may reach that, so an
-     * empty answer elsewhere still falls through to the refusal.
+     * empty answer elsewhere still falls through to the refusal. A platform
+     * that makes you supply its endpoint is one you host yourself, so no
+     * credential is asked for unless `--env-var` names one.
      */
     private function resolveApiKeyVariable(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
-        if ($initCommandInput->noApiKey || CliAgentPlatforms::declares($providerKey)) {
+        if ($initCommandInput->noApiKey || CliAgentPlatforms::declares($providerKey) || (null === $initCommandInput->envVar && EndpointPlatforms::requires($providerKey))) {
             return null;
         }
 
-        $default = $this->defaultApiKeyVariable($providerKey);
-        $answer = $initCommandInput->envVar ?? (null === $default
-            ? $this->askRequired($symfonyStyle, \sprintf('Which environment variable holds the API key for %s? Leave it empty to write none, which is what a local install needs', $providerKey->platform))
-            : $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $default));
+        $answer = $initCommandInput->envVar ?? InitPrompt::withDefault($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($providerKey));
 
         $envVar = b($answer)->trim()->toString();
 
         return '' === $envVar && OptionalApiKeyPlatforms::accept($providerKey) ? null : $envVar;
     }
 
-    private function resolveEndpoint(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    private function resolveEndpoint(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey, bool $interactive): ?string
     {
         if (!EndpointPlatforms::accept($providerKey)) {
             return null;
         }
 
-        $endpoint = b($initCommandInput->endpoint ?? $this->askRequired($symfonyStyle, \sprintf('Endpoint %s should reach (e.g. http://localhost:11434)%s', $providerKey->platform, EndpointPlatforms::requires($providerKey) ? '' : ', or leave it empty to keep the default')))->trim()->toString();
-
-        return '' !== $endpoint ? $endpoint : null;
-    }
-
-    /**
-     * Asked without a default, so no misleading `[]` is offered for a value that
-     * is required. `QuestionHelper` rethrows at end of input when the default is
-     * null, which would abort with exit 1 instead of the refusal this returns to.
-     */
-    private function askRequired(SymfonyStyle $symfonyStyle, string $question): string
-    {
-        try {
-            $answer = $symfonyStyle->ask($question);
-        } catch (MissingInputException) {
-            return '';
+        if (null === $initCommandInput->endpoint && $interactive && 'ollama' === $providerKey->platform) {
+            return b(InitPrompt::withDefault($symfonyStyle, 'Where does Ollama run?', self::LOCAL_OLLAMA))->trim()->toString();
         }
 
-        return \is_string($answer) ? $answer : '';
+        $endpoint = b($initCommandInput->endpoint ?? InitPrompt::required($symfonyStyle, \sprintf('Endpoint %s should reach (e.g. http://localhost:11434)%s', $providerKey->platform, EndpointPlatforms::requires($providerKey) ? '' : ', or leave it empty to keep the default')))->trim()->toString();
+
+        return '' !== $endpoint ? $endpoint : null;
     }
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
@@ -381,7 +315,7 @@ final readonly class InitCommand
             return null;
         }
 
-        $baseUrl = b($initCommandInput->baseUrl ?? $this->askRequired($symfonyStyle, \sprintf('Base URL of the endpoint you want %s to reach (required, e.g. https://your-gateway.example)', $providerKey->platform)))->trim()->toString();
+        $baseUrl = b($initCommandInput->baseUrl ?? InitPrompt::required($symfonyStyle, \sprintf('Base URL of the endpoint you want %s to reach (required, e.g. https://your-gateway.example)', $providerKey->platform)))->trim()->toString();
 
         return '' !== $baseUrl ? $baseUrl : null;
     }

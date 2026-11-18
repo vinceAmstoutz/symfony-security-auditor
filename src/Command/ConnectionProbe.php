@@ -23,6 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
  */
 final readonly class ConnectionProbe
 {
+    public const string FAILURE = 'The test failed, so an audit would fail too. The provider said: %s';
+
     private const string SYSTEM_PROMPT = 'You check that a connection works. Answer with the single word OK.';
 
     private const string USER_MESSAGE = 'Connection check';

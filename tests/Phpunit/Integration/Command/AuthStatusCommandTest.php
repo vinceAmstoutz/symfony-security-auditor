@@ -63,7 +63,7 @@ final class AuthStatusCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Run "auth:test" to check that the provider accepts this key. It sends one short request, which a paid API bills, usually well under a cent.', $this->flattened($commandTester));
+        self::assertStringContainsString('Run "auth:test" to check that this key works. It sends one short test request, which a paid API bills, usually well under a cent.', $this->flattened($commandTester));
     }
 
     /**

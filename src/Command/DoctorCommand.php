@@ -54,8 +54,8 @@ final readonly class DoctorCommand
         $failureReason = $this->connectionCheck->failureReason();
 
         return null === $failureReason
-            ? new DoctorCheckResult(self::CONNECTION_CHECK, DoctorCheckStatus::Ok, 'The provider answered.')
-            : new DoctorCheckResult(self::CONNECTION_CHECK, DoctorCheckStatus::Failure, \sprintf('The provider did not answer: %s', $failureReason));
+            ? new DoctorCheckResult(self::CONNECTION_CHECK, DoctorCheckStatus::Ok, 'It works. You can run an audit now.')
+            : new DoctorCheckResult(self::CONNECTION_CHECK, DoctorCheckStatus::Failure, \sprintf(ConnectionProbe::FAILURE, $failureReason));
     }
 
     private function render(SymfonyStyle $symfonyStyle, DoctorCheckResult $doctorCheckResult): void
