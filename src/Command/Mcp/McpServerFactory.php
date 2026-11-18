@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp;
 
-use Mcp\Server;
+use Mcp\Server\Server;
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 

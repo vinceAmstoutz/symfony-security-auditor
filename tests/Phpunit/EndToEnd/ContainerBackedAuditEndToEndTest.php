@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
