@@ -289,6 +289,16 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Which model should the auditor use? Type its id as your provider names it: >', $this->unwrappedDisplay($commandTester));
     }
 
+    public function test_it_defaults_to_claude_opus_5_5_listed_under_a_vendor_prefix(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openrouter', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('anthropic/claude-opus-5-5', $this->configuredValue('model'));
+    }
+
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
     {
         $commandTester = $this->commandTester();

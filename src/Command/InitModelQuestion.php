@@ -30,6 +30,8 @@ final readonly class InitModelQuestion
 {
     private const string DEFAULT_MODEL = 'claude-opus-5-5';
 
+    private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5$#';
+
     public function __construct(
         private ?PricedModelListInterface $pricedModelList,
     ) {}
@@ -68,7 +70,13 @@ final readonly class InitModelQuestion
      */
     private function defaultModel(array $modelIds): string
     {
-        return \in_array(self::DEFAULT_MODEL, $modelIds, true) ? self::DEFAULT_MODEL : $modelIds[intdiv(\count($modelIds) - 1, 2)];
+        foreach ($modelIds as $modelId) {
+            if (1 === preg_match(self::DEFAULT_MODEL_ID, $modelId)) {
+                return $modelId;
+            }
+        }
+
+        return $modelIds[intdiv(\count($modelIds) - 1, 2)];
     }
 
     private function modelChoice(PricedModel $pricedModel): string
