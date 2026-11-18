@@ -361,6 +361,36 @@ final class InitCommandTest extends TestCase
         self::assertSame([true, 'llama3.3:latest'], [str_contains($this->unwrappedDisplay($commandTester), 'Which Ollama model should the auditor use? Pick a number, or type a model name [qwen3:8b]: [1] qwen3:8b [2] llama3.3:latest'), $this->configuredValue('model')]);
     }
 
+    public function test_it_defaults_to_claude_opus_5_5_listed_with_a_version_suffix(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['vertexai', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-opus-5-5@default', $this->configuredValue('model'));
+    }
+
+    public function test_it_asks_the_url_of_a_gateway_in_plain_words(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'https://gateway.example', 'my-model', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('What is the URL of your OpenAI-compatible gateway? e.g. https://your-gateway.example:', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_names_the_cli_it_installs_support_for_a_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Subscription->value, '1', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Installing support for the Claude Code CLI — this can take a minute…', $this->unwrappedDisplay($commandTester));
+    }
+
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
     {
         $commandTester = $this->commandTester();
@@ -1089,7 +1119,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringNotContainsString('Base URL of the endpoint', $commandTester->getDisplay());
+        self::assertStringNotContainsString('What is the URL of', $commandTester->getDisplay());
     }
 
     public function test_it_asks_for_a_base_url_when_a_flat_platform_requires_one(): void
@@ -1099,7 +1129,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Base URL of the endpoint', $commandTester->getDisplay());
+        self::assertStringContainsString('What is the URL of', $commandTester->getDisplay());
     }
 
     public function test_it_writes_the_base_url_of_a_flat_platform_beside_its_api_key(): void

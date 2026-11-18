@@ -52,6 +52,8 @@ final readonly class ProviderNames
         'azure' => 'Azure OpenAI',
         'generic' => 'your OpenAI-compatible gateway',
         'ollama' => 'Ollama',
+        'claudecode' => 'the Claude Code CLI',
+        'codex' => 'the Codex CLI',
     ];
 
     public static function of(string $provider): string

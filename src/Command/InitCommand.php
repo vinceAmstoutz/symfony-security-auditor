@@ -313,7 +313,7 @@ final readonly class InitCommand
             return null;
         }
 
-        $baseUrl = b($initCommandInput->baseUrl ?? InitPrompt::required($symfonyStyle, \sprintf('Base URL of the endpoint you want %s to reach (required, e.g. https://your-gateway.example)', $providerKey->platform)))->trim()->toString();
+        $baseUrl = b($initCommandInput->baseUrl ?? InitPrompt::required($symfonyStyle, \sprintf('What is the URL of %s? e.g. https://your-gateway.example', ProviderNames::ofPlatform($providerKey->platform))))->trim()->toString();
 
         return '' !== $baseUrl ? $baseUrl : null;
     }

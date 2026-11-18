@@ -31,7 +31,7 @@ final readonly class InitModelQuestion
 {
     private const string DEFAULT_MODEL = 'claude-opus-5-5';
 
-    private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5$#';
+    private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5(?:@[a-z0-9-]+)?$#';
 
     public function __construct(
         private ?PricedModelListInterface $pricedModelList,

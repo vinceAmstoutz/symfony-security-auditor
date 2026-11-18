@@ -338,5 +338,64 @@
                 }
             }
         }
+    },
+    "google-vertex": {
+        "models": {
+            "claude-fable-new@default": {
+                "id": "claude-fable-new@default",
+                "family": "claude-fable",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 10,
+                    "output": 50
+                }
+            },
+            "claude-opus-5-5@default": {
+                "id": "claude-opus-5-5@default",
+                "family": "claude-opus",
+                "release_date": "2026-09-22",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 4,
+                    "output": 20
+                }
+            },
+            "vendor/mid-a": {
+                "id": "vendor/mid-a",
+                "family": "mid-a",
+                "release_date": "2026-09-02",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 3,
+                    "output": 9
+                }
+            },
+            "vendor/mid-b": {
+                "id": "vendor/mid-b",
+                "family": "mid-b",
+                "release_date": "2026-09-03",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2,
+                    "output": 8
+                }
+            },
+            "vendor/cheap": {
+                "id": "vendor/cheap",
+                "family": "cheap",
+                "release_date": "2026-09-04",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0.1,
+                    "output": 0.2
+                }
+            }
+        }
     }
 }
