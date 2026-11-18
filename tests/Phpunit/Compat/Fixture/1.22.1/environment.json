@@ -8,7 +8,7 @@
         "symfony/yaml": "v7.4.21",
         "symfony/ai-platform": "v0.15.0",
         "symfony/ai-bundle": "v0.15.0",
-        "mcp/sdk": "v0.9.0"
+        "mcp/sdk": "v0.10.0"
     },
     "recordings": [
         {
@@ -37,31 +37,31 @@
         },
         {
             "scenario": "baseline/generated-by-release",
-            "sha256": "605d1249519b4d47fb92e53d972891485defab0a95edcd7f7ba4f3a8e7f03c7f"
+            "sha256": "009bba0cd8b3a6993ff17ed0d43c7c5cfbd2470ee5a8e634dc2e5bdf6f2703ab"
         },
         {
             "scenario": "baseline/generated-by-release-config-key",
-            "sha256": "570c516fb6ba89024ff71d39ab0cdc7a265a8e9ec6f52ef88a95e39a6b99baca"
+            "sha256": "209dbcb0a881a30fdbb11c7e978d1e9891108f43f8e096e4b85326de97351bff"
         },
         {
             "scenario": "baseline/generated-by-release-console",
-            "sha256": "51a9e7d9e87e8be098fc39e91a7b7b01406782666eaa620b5c820e5c984334ad"
+            "sha256": "939e42103592c3928659d3062786da377399248e79bfa0d286adc0e75e15728e"
         },
         {
             "scenario": "baseline/generated-by-release-on-changed-project",
-            "sha256": "1e18b339457113d7a8ee1bc69ba9c4a56658be1544cb352cf32d299df8c6ba5b"
+            "sha256": "653d015e7dac7af7624479f046d223f1432c26282f9a9cda8d5761b9c5f8ab97"
         },
         {
             "scenario": "baseline/generated-by-release-regenerated",
-            "sha256": "0a1a9fb394c83182515f21048398b35b327ceaceb9df09c970d6e129ea60dc4d"
+            "sha256": "25cfd3da365f9c8cbd08b9d94eb42150a3b36332d6ac753bd975d50c92e79e91"
         },
         {
             "scenario": "baseline/generated-by-release-sarif",
-            "sha256": "b1cc4bd63884888ffe3f0ba9b86d804141fa48e386921bfd65aa51e1639fd7e6"
+            "sha256": "b19bd40985f324237435e9e317fab56b8225f98427c430c34fc3b3108fa1071a"
         },
         {
             "scenario": "cache/written-by-release",
-            "sha256": "828fd9e193c745200b735c3f3547c977c1250aefb330aaba12f6d62bcce6b830"
+            "sha256": "e6e8df6c3ffa397a1ef22ff3643f5d06ca8c1c56817f2bca5fbc56d0a936e6aa"
         },
         {
             "scenario": "cache/written-by-release-batch",
@@ -69,11 +69,11 @@
         },
         {
             "scenario": "cache/written-by-release-changed-project",
-            "sha256": "5e821e72ae9c12e407e6861a38cc57041ae0b142137d358fb155d68782f02330"
+            "sha256": "7824f841c4e4e7bf733c04446d23b7d35e7cca7183cc60923f207856f2a8f99a"
         },
         {
             "scenario": "cache/written-by-release-no-cache",
-            "sha256": "ca6c6e96563bf1ea9be0dd4a0909b9690790c51c7f9a6959a8f71462a43e93e0"
+            "sha256": "c32721d0a1fabf76e86fcfe9d53db75464cd03f1c9a31caf67ba29e5e72f833b"
         },
         {
             "scenario": "config-file/architecture-01",
@@ -505,55 +505,55 @@
         },
         {
             "scenario": "report-commands/baseline-create",
-            "sha256": "80eb5d32f4720ecb5d955a3addee4dbefb73316a69ef17a182741e9f94e3a156"
+            "sha256": "6462d07dbeec6b0844c8eaec4c50bf44274ceb442880763524c1dcf13e867213"
         },
         {
             "scenario": "report-commands/baseline-default-file",
-            "sha256": "8b3d8d50ef8c29bf560335572ae065d2e2131cbe735878a20d8c17bb85649bfc"
+            "sha256": "e58c7d7211776e27bc0af04a5e8832b9df341c8655687cc83be6861bac01a070"
         },
         {
             "scenario": "report-commands/baseline-merge",
-            "sha256": "ca0bf6f4cefe4e74bd078f58887c775fb3fc44f7acb789eb2d7b80305d8e5250"
+            "sha256": "b42a85773b3078ceac3fb30bfb992f5896a376fdbcfe8009d9f800c14739a10d"
         },
         {
             "scenario": "report-commands/baseline-prune",
-            "sha256": "3979678800132e4af965efa49697c6eb4c49e5cefd02e7c0494a7588bfaec221"
+            "sha256": "676fe653ddf347e762c8621d0e41389196da86bc8e801f8c6ef9b039f87396c8"
         },
         {
             "scenario": "report-commands/baseline-prune-scoped",
-            "sha256": "7b67cb3a02cc682fe5fe76c65c41a48f170903bb2330f2c624bfa4118ef5bc64"
+            "sha256": "f3843de4c324ba22566693c5eb6cabe64b6637e2796f358b2af95045a76051e2"
         },
         {
             "scenario": "report-commands/diff",
-            "sha256": "330cdcd61585ef5d9d78db1a3c4defc42247533025f3f5fdf41e37bd8e68fa51"
+            "sha256": "bd60ebd9b2c36d349f7a9f14bf55c74d8040cd702a7d316c4c43813c126e32cc"
         },
         {
             "scenario": "report-commands/diff-json",
-            "sha256": "5ab72fb92c20f2c1f2242c5151033826a00e156a591ed6dab46d2489c7f33f46"
+            "sha256": "ee49539bd6ad1e8960ca7b6949ef9603d1e106f13a15e999c22a8b26e4f3f9c5"
         },
         {
             "scenario": "report-commands/diff-missing-report",
-            "sha256": "8abc6567ea63c066bc4f383dbea0004725c9ab283b1923aac20b4d0aa548d215"
+            "sha256": "c012c8ddd23d0a2f30f8955a44390c4dc304ca5b81cbda54ea889da66ba18ec7"
         },
         {
             "scenario": "report-commands/diff-scoped-json",
-            "sha256": "da182cede959bb1423f628c40c50ac266d4236e2b0d1060a8dd5ed76afd367c6"
+            "sha256": "61862a642ae503ea2ae6d2c36ba79a154dcf8e3439f30a7fd443705d69644068"
         },
         {
             "scenario": "report-commands/trend",
-            "sha256": "86f517a19f17eecbfdf59a831fd5d0c1b908eb2cb0082b0a818b578af2833084"
+            "sha256": "a59384be11dba82a122f39aa3bf251473e5afff65001be404166366d5ed15afc"
         },
         {
             "scenario": "report-commands/trend-html",
-            "sha256": "f773ac53b0a5abf409b6e85b6c2bae9bc82ae5bf996f05d46ba5553be9179c2e"
+            "sha256": "19d759c809df95bdfcbf0ee7a53d3b8aa967d2a6019c27f035001c39d4fa1425"
         },
         {
             "scenario": "report-commands/trend-json",
-            "sha256": "3513107f4005463f872ce4352535e9056820cb1e872459e6abcbb0de34b108a3"
+            "sha256": "af2cda4902ceeb5980884afb179f2f17018cefe615e51fc8e67e93a70a7eb3e2"
         },
         {
             "scenario": "report-commands/trend-single-report",
-            "sha256": "3925334b0131be1c0fe54bc323d36fad527bf78fe8c4db1b739d24b01f84ae19"
+            "sha256": "05b0381da40f7e09b5896fcc4297d8607b0ad79361c6a616b499e4dfef44a184"
         },
         {
             "scenario": "run/advisory-lookup",
@@ -1073,7 +1073,7 @@
         },
         {
             "scenario": "standalone/report-commands",
-            "sha256": "accbdf5b19d1f38736fc5b702e5b87cf8cad49fba01ef54a286222643f91bd6a"
+            "sha256": "7d0bf251a921ce9bf1fa8d87670cccac2d2e7883273bd0f6ff949be93cb4b817"
         },
         {
             "scenario": "standalone/run-alias-audit-run",
@@ -1173,5 +1173,5 @@
         }
     ],
     "unrecorded": [],
-    "seal": "0c92f466e2f766e74e4fec199a4d283b78e39ba20d5dc02607734824b49648c8"
+    "seal": "db21c854d916a4e1680bfbfdb6021181d9eb164469b7e47c6ff3b2341ecc4ed8"
 }
