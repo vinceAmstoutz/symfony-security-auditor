@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformConnection;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 
 final class StandaloneConfigFactoryTest extends TestCase
@@ -27,7 +28,7 @@ final class StandaloneConfigFactoryTest extends TestCase
     {
         self::assertSame(
             $expected,
-            (new StandaloneConfigFactory())->create($provider, 'gpt-5.4', $apiKeyVariable, $baseUrl, $endpoint),
+            (new StandaloneConfigFactory())->create($provider, 'gpt-5.4', $apiKeyVariable, new PlatformConnection($baseUrl, $endpoint)),
         );
     }
 
@@ -174,5 +175,13 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'audit' => ['report_static_findings' => true],
             ],
         ];
+    }
+
+    public function test_it_writes_the_deployment_of_an_azure_openai_resource(): void
+    {
+        self::assertSame(
+            ['azure' => ['default' => ['base_url' => 'https://acme.openai.azure.com', 'deployment' => 'gpt-4o-prod', 'api_key' => '%env(AZURE_API_KEY)%']]],
+            (new StandaloneConfigFactory())->create('azure.default', 'gpt-4o', 'AZURE_API_KEY', new PlatformConnection('https://acme.openai.azure.com', deployment: 'gpt-4o-prod'))['platform'],
+        );
     }
 }

@@ -42,7 +42,7 @@ final readonly class ProviderNames
         'generic.gateway' => 'Another OpenAI-compatible gateway (you give its URL)',
         'bedrock.default' => 'AWS Bedrock',
         'vertexai' => 'Google Vertex AI',
-        'azure.default' => 'Azure OpenAI (prints a configuration to complete by hand)',
+        'azure.default' => 'Azure OpenAI',
         'claudecode' => 'Claude (through the Claude Code CLI)',
         'codex' => 'ChatGPT (through the Codex CLI)',
     ];

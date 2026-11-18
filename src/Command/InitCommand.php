@@ -35,6 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatformBlock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformConnection;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\RoundTripYaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
@@ -105,19 +106,13 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
+        $platformConnection = $this->resolveConnection($symfonyStyle, $initCommandInput, $providerKey, $provider, $interactive);
 
-        if ($this->refused($symfonyStyle, InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl))) {
+        if (!$platformConnection instanceof PlatformConnection) {
             return Command::INVALID;
         }
 
-        $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey, $interactive);
-
-        if ($this->refused($symfonyStyle, InitRefusal::forResolvedEndpoint($providerKey, $provider, $endpoint))) {
-            return Command::INVALID;
-        }
-
-        $model = b($initCommandInput->model ?? (new InitModelQuestion($this->pricedModelList, $this->pulledModelList))->ask($symfonyStyle, $providerKey, $endpoint))->trim()->toString();
+        $model = b($initCommandInput->model ?? (new InitModelQuestion($this->pricedModelList, $this->pulledModelList))->ask($symfonyStyle, $providerKey, $platformConnection->endpoint))->trim()->toString();
 
         if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
             return Command::INVALID;
@@ -136,7 +131,7 @@ final readonly class InitCommand
         }
 
         $this->installBridges($symfonyStyle, $provider, $providerKey, $model);
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $platformConnection));
 
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
         ConnectionTestOffer::make($this->connectionTestRunner, $symfonyStyle, $interactive);
@@ -249,15 +244,14 @@ final readonly class InitCommand
     private function reportWritten(SymfonyStyle $symfonyStyle, string $configFile, string $provider, string $model, ?string $envVar): void
     {
         $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
-        $symfonyStyle->definitionList(
-            ['Provider' => OutputFormatter::escape($provider)],
-            ['Model' => OutputFormatter::escape($model)],
-            ['API key variable' => $envVar ?? 'none — this platform is configured without a credential'],
-        );
+        if (null === $envVar) {
+            $symfonyStyle->definitionList(['Provider' => OutputFormatter::escape($provider)], ['Model' => OutputFormatter::escape($model)]);
 
-        if (null !== $envVar) {
-            $this->offerToStoreCredential($symfonyStyle, $envVar);
+            return;
         }
+
+        $symfonyStyle->definitionList(['Provider' => OutputFormatter::escape($provider)], ['Model' => OutputFormatter::escape($model)], ['API key variable' => $envVar]);
+        $this->offerToStoreCredential($symfonyStyle, $envVar);
     }
 
     private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile, bool $force): bool
@@ -307,13 +301,39 @@ final readonly class InitCommand
         return '' !== $endpoint ? $endpoint : null;
     }
 
+    private function resolveConnection(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey, string $provider, bool $interactive): ?PlatformConnection
+    {
+        $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
+        if ($this->refused($symfonyStyle, InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl))) {
+            return null;
+        }
+
+        $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey, $interactive);
+        if ($this->refused($symfonyStyle, InitRefusal::forResolvedEndpoint($providerKey, $provider, $endpoint))) {
+            return null;
+        }
+
+        $deployment = $this->resolveDeployment($symfonyStyle, $initCommandInput, $providerKey);
+
+        return $this->refused($symfonyStyle, DeploymentRefusal::of($providerKey, $provider, $deployment)) ? null : new PlatformConnection($baseUrl, $endpoint, $deployment);
+    }
+
+    private function resolveDeployment(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    {
+        if ('azure' !== $providerKey->platform) {
+            return $initCommandInput->deployment;
+        }
+
+        return b($initCommandInput->deployment ?? InitPrompt::required($symfonyStyle, 'What is the name of your Azure OpenAI deployment?'))->trim()->toString();
+    }
+
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
         if (!BaseUrlPlatforms::accept($providerKey)) {
             return null;
         }
 
-        $baseUrl = b($initCommandInput->baseUrl ?? InitPrompt::required($symfonyStyle, \sprintf('What is the URL of %s? e.g. https://your-gateway.example', ProviderNames::ofPlatform($providerKey->platform))))->trim()->toString();
+        $baseUrl = b($initCommandInput->baseUrl ?? InitPrompt::required($symfonyStyle, \sprintf('What is the URL of %s? e.g. %s', ProviderNames::ofPlatform($providerKey->platform), 'azure' === $providerKey->platform ? 'https://<resource>.openai.azure.com' : 'https://your-gateway.example')))->trim()->toString();
 
         return '' !== $baseUrl ? $baseUrl : null;
     }

@@ -193,4 +193,25 @@ return [
         'reason' => 'init no longer asks which environment variable holds the API key, so the scripted "yes" now answers the overwrite question and the configuration is rewritten instead of the run aborting.',
         'changelog' => '#702',
     ],
+    [
+        'scenarios' => ['standalone/help-init'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/.*/',
+        'reason' => 'init takes the new --deployment option for Azure OpenAI, which realigns every option row of its help.',
+        'changelog' => '#702',
+    ],
+    [
+        'scenarios' => ['standalone/init-base-url-refused'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^[-+] (?:\\[ERROR\\] --base-url applies to the platforms that expose one|\\s+(?:generic|openresponses)\\.<instance>)/',
+        'reason' => 'init writes Azure OpenAI now, so the --base-url refusal names azure.<instance> among the platforms that take one.',
+        'changelog' => '#702',
+    ],
+    [
+        'scenarios' => ['standalone/init-generic-no-api-key', 'standalone/init-ollama'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^[-+] (?:-+ -+|\\s+(?:Provider|Model|API key variable)\\s.*)$/',
+        'reason' => 'init leaves the API key row out of its summary when the configuration carries no credential.',
+        'changelog' => '#702',
+    ],
 ];

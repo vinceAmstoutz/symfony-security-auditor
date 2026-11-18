@@ -92,8 +92,8 @@ final class InitRefusalTest extends TestCase
      */
     public static function handWrittenCases(): iterable
     {
-        yield 'the field the platform wants' => ['azure', '"azure" needs a "deployment" name beside the api_key, which "init" does not ask for'];
-        yield 'the file the block goes into' => ['azure.prod', \sprintf('so %s was not written', self::CONFIG_FILE)];
+        yield 'the field the platform wants' => ['higgsfield', '"higgsfield" needs an "api_secret" beside the api_key, which "init" does not ask for'];
+        yield 'the file the block goes into' => ['higgsfield', \sprintf('so %s was not written', self::CONFIG_FILE)];
         yield 'a platform wrapping others, which no block can make boot' => ['failover.prod', null];
         yield 'a platform init can write' => ['anthropic', null];
     }

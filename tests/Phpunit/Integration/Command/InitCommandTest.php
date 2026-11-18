@@ -92,7 +92,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which cloud do you use? [AWS Bedrock]: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI (prints a configuration to complete by hand) >', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which cloud do you use? [AWS Bedrock]: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_gateways_for_an_ai_gateway(): void
@@ -389,6 +389,63 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringContainsString('Installing support for the Claude Code CLI — this can take a minute…', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_offers_no_free_model(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openrouter', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('vendor/zero-cost:free', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_writes_an_azure_openai_resource_with_its_deployment(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'azure.default', '--model' => 'gpt-4o', '--base-url' => 'https://acme.openai.azure.com', '--deployment' => 'gpt-4o-prod'], ['interactive' => false]);
+
+        self::assertSame(
+            ['azure' => ['default' => ['base_url' => 'https://acme.openai.azure.com', 'deployment' => 'gpt-4o-prod', 'api_key' => '%env(AZURE_API_KEY)%']]],
+            $this->configuredValue('platform'),
+        );
+    }
+
+    public function test_it_asks_the_deployment_of_an_azure_openai_resource(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Cloud->value, '3', 'https://acme.openai.azure.com', 'gpt-4o-prod', 'gpt-4o', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(
+            [true, ['azure' => ['default' => ['base_url' => 'https://acme.openai.azure.com', 'deployment' => 'gpt-4o-prod', 'api_key' => '%env(AZURE_API_KEY)%']]]],
+            [str_contains($this->unwrappedDisplay($commandTester), 'What is the URL of Azure OpenAI? e.g. https://<resource>.openai.azure.com: > What is the name of your Azure OpenAI deployment?'), $this->configuredValue('platform')],
+        );
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('refusedDeploymentCases')]
+    public function test_it_refuses_a_deployment_it_cannot_write(array $options, string $refusal): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--model' => 'gpt-4o', ...$options], ['interactive' => false]);
+
+        self::assertSame([Command::INVALID, true, false], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), $refusal), file_exists($this->configFile())]);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function refusedDeploymentCases(): iterable
+    {
+        yield 'a blank deployment for azure' => [['--provider' => 'azure.default', '--base-url' => 'https://acme.openai.azure.com', '--deployment' => ' '], '"azure.default" needs the name of its deployment, so nothing was written. Re-run with --deployment=<name>.'];
+        yield 'a deployment for another platform' => [['--provider' => 'openai', '--deployment' => 'gpt-4o-prod'], '--deployment applies to Azure OpenAI (azure.<instance>) only; "openai" has no deployment.'];
     }
 
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
@@ -1174,7 +1231,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'albert, amazeeai, generic.<instance>, openresponses.<instance>',
+            'albert, amazeeai, azure.<instance>, generic.<instance>, openresponses.<instance>',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -1267,12 +1324,12 @@ final class InitCommandTest extends TestCase
         $commandTester = $this->commandTester();
 
         $commandTester->execute(
-            ['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
+            ['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => 'HIGGSFIELD_API_KEY'],
             ['interactive' => false],
         );
 
         self::assertStringContainsString(
-            'needs a "deployment" name beside the api_key, which "init" does not ask for',
+            'needs an "api_secret" beside the api_key, which "init" does not ask for',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -1302,16 +1359,16 @@ final class InitCommandTest extends TestCase
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model'], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model'], ['interactive' => false]);
 
-        self::assertStringContainsString("deployment: '<deployment>'", $commandTester->getDisplay());
+        self::assertStringContainsString("api_secret: '%env(HIGGSFIELD_API_SECRET)%'", $commandTester->getDisplay());
     }
 
     public function test_it_prints_the_block_with_the_model_it_was_given_trimmed(): void
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure.prod', '--model' => ' our-model '], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield', '--model' => ' our-model '], ['interactive' => false]);
 
         self::assertStringContainsString("model: our-model\n", $commandTester->getDisplay());
     }
@@ -1320,18 +1377,15 @@ final class InitCommandTest extends TestCase
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure'], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield'], ['interactive' => false]);
 
         self::assertStringContainsString(
             <<<'YAML'
-                provider: azure.default
+                provider: higgsfield
                 platform:
-                    azure:
-                        default:
-                            base_url: 'https://<resource>.openai.azure.com'
-                            deployment: '<deployment>'
-                            api_version: '<api version>'
-                            api_key: '%env(AZURE_API_KEY)%'
+                    higgsfield:
+                        api_key: '%env(HIGGSFIELD_API_KEY)%'
+                        api_secret: '%env(HIGGSFIELD_API_SECRET)%'
                 model: '<model id>'
                 YAML,
             $commandTester->getDisplay(),
@@ -1425,15 +1479,6 @@ final class InitCommandTest extends TestCase
         yield 'cache' => ['cache.prod'];
     }
 
-    public function test_it_names_the_instance_the_block_is_written_for(): void
-    {
-        $commandTester = $this->commandTester();
-
-        $commandTester->execute(['--provider' => 'azure', '--model' => 'our-model'], ['interactive' => false]);
-
-        self::assertStringContainsString('provider: azure.default', $commandTester->getDisplay());
-    }
-
     public function test_it_puts_the_model_it_was_given_into_the_block(): void
     {
         $commandTester = $this->commandTester();
@@ -1491,21 +1536,6 @@ final class InitCommandTest extends TestCase
         self::assertFileDoesNotExist($this->configFile());
     }
 
-    public function test_it_says_a_platform_is_unwritable_before_asking_for_an_instance(): void
-    {
-        $commandTester = $this->commandTester();
-
-        $commandTester->execute(
-            ['--provider' => 'azure', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
-            ['interactive' => false],
-        );
-
-        self::assertStringContainsString(
-            'needs a "deployment" name beside the api_key',
-            $this->unwrappedDisplay($commandTester),
-        );
-    }
-
     public function test_it_writes_a_numbered_instance_other_than_zero(): void
     {
         $commandTester = $this->commandTester();
@@ -1551,8 +1581,8 @@ final class InitCommandTest extends TestCase
         yield 'a hand-written platform carrying a terminal escape sequence' => [['--provider' => "azure.x\e]0;pwned\x07y", '--model' => 'our-model', '--env-var' => 'TOKEN'], 'The provider must not hold a control character, a line break or a bidirectional override.', "\e]0;pwned"];
         yield 'a model carrying a workflow command line' => [['--provider' => 'bedrock.x', '--model' => "gpt\n::stop-commands::pwned", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\n::stop-commands::"];
         yield 'a model reversing its direction' => [['--provider' => 'openai', '--model' => "gpt\u{202E}denwp", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{202E}"];
-        yield 'a model for a hand-written platform carrying an eight-bit control' => [['--provider' => 'azure.prod', '--model' => "gpt\u{9B}2J\u{202E}rev", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{9B}"];
-        yield 'a model for a hand-written platform that is not UTF-8' => [['--provider' => 'azure.prod', '--model' => "caf\xE9", '--env-var' => 'TOKEN'], 'The model must be valid UTF-8 text.', "\xE9"];
+        yield 'a model for a hand-written platform carrying an eight-bit control' => [['--provider' => 'higgsfield', '--model' => "gpt\u{9B}2J\u{202E}rev", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{9B}"];
+        yield 'a model for a hand-written platform that is not UTF-8' => [['--provider' => 'higgsfield', '--model' => "caf\xE9", '--env-var' => 'TOKEN'], 'The model must be valid UTF-8 text.', "\xE9"];
     }
 
     /**
@@ -2118,7 +2148,7 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_says_the_configuration_carries_no_credential(): void
+    public function test_it_leaves_the_api_key_row_out_when_the_configuration_carries_no_credential(): void
     {
         $commandTester = $this->commandTester();
 
@@ -2127,7 +2157,7 @@ final class InitCommandTest extends TestCase
             ['interactive' => false],
         );
 
-        self::assertStringContainsString('none — this platform is configured without a credential', $this->unwrappedDisplay($commandTester));
+        self::assertSame([false, true], [str_contains($this->unwrappedDisplay($commandTester), 'API key variable'), str_contains($this->unwrappedDisplay($commandTester), 'Provider ollama Model llama3.2')]);
     }
 
     #[DataProvider('inapplicableOptionCases')]
@@ -2257,8 +2287,8 @@ final class InitCommandTest extends TestCase
      */
     public static function handWrittenPlatformsGivenTwoThingsToRefuse(): iterable
     {
-        yield 'the instance before the model' => [['--provider' => 'azure.0', '--model' => "caf\xE9"], 'cannot be read back with', 'The model must be valid UTF-8 text.'];
-        yield 'the model before the variable name' => [['--provider' => 'azure.prod', '--model' => "caf\xE9", '--env-var' => 'NOT-A-NAME'], 'The model must be valid UTF-8 text.', 'is not a valid environment variable name'];
+        yield 'the instance before the model' => [['--provider' => 'higgsfield.x', '--model' => "caf\xE9"], 'takes a single connection block and names no instance', 'The model must be valid UTF-8 text.'];
+        yield 'the model before the variable name' => [['--provider' => 'higgsfield', '--model' => "caf\xE9", '--env-var' => 'NOT-A-NAME'], 'The model must be valid UTF-8 text.', 'is not a valid environment variable name'];
     }
 
     public function test_a_hand_written_platform_refuses_a_key_pasted_as_the_variable_name_without_echoing_it(): void
@@ -2266,7 +2296,7 @@ final class InitCommandTest extends TestCase
         $pastedKey = 'sk-ant-api03-PASTEDKEYPASTEDKEYPASTEDKEY1234';
         $commandTester = $this->commandTester();
 
-        $exitCode = $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => $pastedKey], ['interactive' => false]);
+        $exitCode = $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => $pastedKey], ['interactive' => false]);
 
         self::assertSame(
             [Command::INVALID, [], false, true],
@@ -2283,9 +2313,9 @@ final class InitCommandTest extends TestCase
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => ' AZURE_API_KEY '], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => ' HIGGSFIELD_API_KEY '], ['interactive' => false]);
 
-        self::assertSame([['azure.prod', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
+        self::assertSame([['higgsfield', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
     }
 
     public function test_a_run_that_cannot_ask_leaves_an_existing_configuration_untouched(): void

@@ -36,9 +36,10 @@ final readonly class ModelsDevPricedModelList implements PricedModelListInterfac
         $pricedModels = [];
         $families = [];
         foreach ($this->modelsDevPricingProvider->platformListing($platform) as $model => $listing) {
-            if (\is_array($listing) && $this->isOffered($listing)) {
+            $pricedModel = \is_array($listing) ? $this->paidModelOffered((string) $model, $listing) : null;
+            if ($pricedModel instanceof PricedModel) {
                 $releaseDates[$model] = $this->releaseDate($listing);
-                $pricedModels[$model] = $this->pricedModel((string) $model, $listing);
+                $pricedModels[$model] = $pricedModel;
                 $families[$model] = $this->family((string) $model, $listing);
             }
         }
@@ -80,6 +81,18 @@ final readonly class ModelsDevPricedModelList implements PricedModelListInterfac
     private function price(mixed $rate): ?float
     {
         return \is_int($rate) || \is_float($rate) ? $rate : null;
+    }
+
+    /** @param array<array-key, mixed> $listing */
+    private function paidModelOffered(string $model, array $listing): ?PricedModel
+    {
+        if (!$this->isOffered($listing)) {
+            return null;
+        }
+
+        $pricedModel = $this->pricedModel($model, $listing);
+
+        return 0.0 < self::cost($pricedModel) ? $pricedModel : null;
     }
 
     /** @param array<array-key, mixed> $listing */

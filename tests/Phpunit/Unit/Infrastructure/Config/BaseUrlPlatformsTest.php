@@ -31,7 +31,7 @@ final class BaseUrlPlatformsTest extends TestCase
 
     public function test_it_leaves_out_the_platforms_init_cannot_write(): void
     {
-        self::assertSame(['albert', 'amazeeai', 'generic', 'openresponses'], BaseUrlPlatforms::writableNames());
+        self::assertSame(['albert', 'amazeeai', 'azure', 'generic', 'openresponses'], BaseUrlPlatforms::writableNames());
     }
 
     public function test_the_base_url_option_help_names_every_platform_it_accepts(): void

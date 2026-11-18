@@ -34,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformConnection;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -99,7 +100,7 @@ final class WrittenConfigurationBootsEndToEndTest extends TestCase
 
         (new YamlStandaloneConfigWriter())->write(
             $xdgConfigPathResolver->configFile(),
-            (new StandaloneConfigFactory())->create($provider, 'our-model', $apiKeyVariable, $baseUrl, $endpoint),
+            (new StandaloneConfigFactory())->create($provider, 'our-model', $apiKeyVariable, new PlatformConnection($baseUrl, $endpoint)),
         );
 
         $standaloneConfig = (new StandaloneConfigLoader(
@@ -139,7 +140,7 @@ final class WrittenConfigurationBootsEndToEndTest extends TestCase
 
         (new YamlStandaloneConfigWriter())->write(
             $xdgConfigPathResolver->configFile(),
-            (new StandaloneConfigFactory())->create('generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example/v1%2Fx%3Fy'),
+            (new StandaloneConfigFactory())->create('generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', new PlatformConnection('https://gw.example/v1%2Fx%3Fy')),
         );
 
         $standaloneConfig = (new StandaloneConfigLoader(

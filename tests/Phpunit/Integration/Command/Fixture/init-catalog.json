@@ -336,6 +336,17 @@
                     "input": 0.1,
                     "output": 0.2
                 }
+            },
+            "vendor/zero-cost:free": {
+                "id": "vendor/zero-cost:free",
+                "family": "zero-cost",
+                "release_date": "2026-10-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0,
+                    "output": 0
+                }
             }
         }
     },
