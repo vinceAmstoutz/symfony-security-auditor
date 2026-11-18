@@ -66,10 +66,10 @@ final class PlatformShapeKnowledgeTest extends TestCase
         self::assertSame(BaseUrlPlatforms::NAMES, $this->platformsDeclaring('base_url'));
     }
 
-    public function test_azure_and_higgsfield_are_the_only_platforms_both_declaring_a_base_url_and_hand_written(): void
+    public function test_higgsfield_is_the_only_platform_both_declaring_a_base_url_and_hand_written(): void
     {
         self::assertSame(
-            ['azure', 'higgsfield'],
+            ['higgsfield'],
             array_values(array_intersect(BaseUrlPlatforms::NAMES, array_keys(HandWrittenPlatforms::REQUIREMENTS))),
         );
     }
@@ -301,7 +301,7 @@ final class PlatformShapeKnowledgeTest extends TestCase
             preg_match_all('/(?:string|scalar|integer|float|boolean|enum|variable|array)Node\(\x27([a-z_]+)\x27\)(.*?)->end\(\)/s', $finder->getContents(), $matches, \PREG_SET_ORDER);
 
             foreach ($matches as $match) {
-                if (str_contains($match[2], '->isRequired()') && !\in_array($match[1], ['api_key', 'base_url'], true)) {
+                if (str_contains($match[2], '->isRequired()') && !\in_array($match[1], ['api_key', 'base_url', 'deployment'], true)) {
                     $names[] = $finder->getBasename('.php');
                     break;
                 }

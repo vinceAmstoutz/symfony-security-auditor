@@ -28,13 +28,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\InitProviderChoices;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ModelAccess;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingConnectionTestRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
 
 final class InitCommandTest extends TestCase
@@ -63,7 +65,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_the_configuration_for_the_chosen_provider(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -73,10 +75,383 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_configures_ollama_for_a_model_running_on_this_machine(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Local, ModelAccess::cases(), true)), 'http://localhost:11434', 'llama3.2']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('ollama', $this->configuredValue('provider'));
+    }
+
+    public function test_it_lists_only_cloud_platforms_for_a_cloud_account(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Cloud, ModelAccess::cases(), true)), 'vertexai', 'gemini-3-pro', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which cloud do you use? [AWS Bedrock]: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI >', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_lists_gateways_for_an_ai_gateway(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Gateway, ModelAccess::cases(), true)), 'openrouter', 'anthropic/claude-opus-5-5', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which gateway do you use? [OpenRouter]: [1] OpenRouter [2] Eden AI [3] Another OpenAI-compatible gateway (you give its URL) >', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_lists_neither_cloud_platforms_nor_gateways_for_an_api_key(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::ApiKey->value, 'openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertDoesNotMatchRegularExpression('/\] (Google Vertex AI|OpenRouter|Eden AI|Claude \(through|ChatGPT) /', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_names_the_subscriptions_it_can_run_on(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which subscription do you have? [Claude (through the Claude Code CLI)]: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_tests_the_connection_when_the_user_accepts(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+        $commandTester->setInputs(['anthropic', '', '', 'yes']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(1, $recordingConnectionTestRunner->runs);
+    }
+
+    public function test_it_sends_no_test_request_when_the_user_just_presses_enter(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+        $commandTester->setInputs(['anthropic', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(0, $recordingConnectionTestRunner->runs);
+    }
+
+    public function test_it_never_tests_the_connection_without_interaction(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+
+        $commandTester->execute(['--provider' => 'anthropic'], ['interactive' => false]);
+
+        self::assertSame(0, $recordingConnectionTestRunner->runs);
+    }
+
+    public function test_it_points_at_doctor_when_the_user_declines_the_connection_test(): void
+    {
+        $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: $recordingConnectionTestRunner);
+        $commandTester->setInputs(['anthropic', '', '', 'n']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([0, true], [$recordingConnectionTestRunner->runs, str_contains($this->unwrappedDisplay($commandTester), 'Run "doctor --check-connection" to test it later.')]);
+    }
+
+    public function test_it_says_how_to_retry_a_connection_test_that_failed(): void
+    {
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner(succeeds: false));
+        $commandTester->setInputs(['anthropic', '', '', 'yes']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('The configuration is saved. Fix the cause above, then run "doctor --check-connection" again.', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_says_the_test_request_may_be_billed_before_sending_it(): void
+    {
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
+        $commandTester->setInputs(['anthropic', '', '', 'n']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('A paid API bills it, usually well under a cent; a subscription counts it against its usage; a local model costs nothing', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_numbers_the_choices_from_one(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, true], [str_contains($commandTester->getDisplay(), '[0]'), str_contains($commandTester->getDisplay(), '[1]')]);
+    }
+
+    public function test_it_lists_the_ways_to_access_a_model_most_common_first(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString(
+            '[1] A Claude or ChatGPT subscription [2] An API key (Anthropic, OpenAI, Mistral, …) [3] A local model (Ollama) [4] An AI gateway (OpenRouter, Eden AI, …) [5] A cloud account (AWS, Google Cloud, Azure)',
+            $this->unwrappedDisplay($commandTester),
+        );
+    }
+
+    public function test_it_configures_an_anthropic_api_key_when_every_answer_is_the_default(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('anthropic', $this->configuredValue('provider'));
+    }
+
+    public function test_it_asks_how_you_access_ai_models_in_a_few_words(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_no_model_for_a_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), '1', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, 'opus'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
+    }
+
+    public function test_it_says_it_sends_the_test_request_once_the_user_agreed(): void
+    {
+        $commandTester = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
+        $commandTester->setInputs(['anthropic', '', '', 'yes']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('You answered yes: sending one test request to the provider…', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_names_the_companies_an_api_key_comes_from_most_common_first(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::ApiKey->value, '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which company is your API key from? Pick a number, or type a provider name [Anthropic (Claude)]: [1 ] Anthropic (Claude) [2 ] OpenAI (GPT) [3 ] Google AI Studio (Gemini) [4 ] Mistral AI [5 ] DeepSeek [6 ] Cerebras', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_for_a_model_pulled_in_ollama_for_a_local_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Local->value, '', 'qwen3', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which Ollama model should the auditor use? Type the name of a model you pulled, e.g. qwen3 or llama3.3:', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_no_api_key_for_a_local_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Local->value, 'http://localhost:11434', 'qwen3', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, ['ollama' => ['endpoint' => 'http://localhost:11434']]], [str_contains($commandTester->getDisplay(), 'Which environment variable holds the API key'), $this->configuredValue('platform')]);
+    }
+
+    public function test_it_reaches_ollama_on_this_machine_by_default(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Local->value, '', 'qwen3', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(['ollama' => ['endpoint' => 'http://localhost:11434']], $this->configuredValue('platform'));
+    }
+
+    public function test_it_asks_the_model_a_gateway_serves_without_suggesting_one(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'https://gateway.example', 'my-model', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should the auditor use? Type its id as your provider names it: >', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_defaults_to_claude_opus_5_5_listed_under_a_vendor_prefix(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openrouter', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('anthropic/claude-opus-5-5', $this->configuredValue('model'));
+    }
+
+    public function test_it_names_the_default_model_by_its_id_alone(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should the auditor use? Pick a number, or type any model id [claude-opus-new]:', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_points_at_a_dry_run_for_what_an_audit_would_cost(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Prices are per million tokens; "audit --dry-run <path>" estimates what an audit of your project would cost. Which model should the auditor use?', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_asks_where_a_gateway_runs_before_its_model(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'https://gateway.example', 'my-model', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([['generic' => ['gateway' => ['base_url' => 'https://gateway.example', 'api_key' => '%env(GENERIC_API_KEY)%']]], 'my-model'], [$this->configuredValue('platform'), $this->configuredValue('model')]);
+    }
+
+    public function test_it_names_the_api_key_variable_without_asking(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([false, ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']]], [str_contains($commandTester->getDisplay(), 'Which environment variable'), $this->configuredValue('platform')]);
+    }
+
+    public function test_it_lists_the_models_pulled_in_ollama(): void
+    {
+        $commandTester = $this->commandTester(pulledModels: ['qwen3:8b', 'llama3.3:latest']);
+        $commandTester->setInputs([ModelAccess::Local->value, '', '2', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame([true, 'llama3.3:latest'], [str_contains($this->unwrappedDisplay($commandTester), 'Which Ollama model should the auditor use? Pick a number, or type a model name [qwen3:8b]: [1] qwen3:8b [2] llama3.3:latest'), $this->configuredValue('model')]);
+    }
+
+    public function test_it_defaults_to_claude_opus_5_5_listed_with_a_version_suffix(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['vertexai', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-opus-5-5@default', $this->configuredValue('model'));
+    }
+
+    public function test_it_asks_the_url_of_a_gateway_in_plain_words(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Gateway->value, '3', 'https://gateway.example', 'my-model', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('What is the URL of your OpenAI-compatible gateway? e.g. https://your-gateway.example:', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_names_the_cli_it_installs_support_for_a_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Subscription->value, '1', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Installing support for the Claude Code CLI — this can take a minute…', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_offers_no_free_model(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openrouter', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('vendor/zero-cost:free', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_writes_an_azure_openai_resource_with_its_deployment(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'azure.default', '--model' => 'gpt-4o', '--base-url' => 'https://acme.openai.azure.com', '--deployment' => 'gpt-4o-prod'], ['interactive' => false]);
+
+        self::assertSame(
+            ['azure' => ['default' => ['base_url' => 'https://acme.openai.azure.com', 'deployment' => 'gpt-4o-prod', 'api_key' => '%env(AZURE_API_KEY)%']]],
+            $this->configuredValue('platform'),
+        );
+    }
+
+    public function test_it_asks_the_deployment_of_an_azure_openai_resource(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Cloud->value, '3', 'https://acme.openai.azure.com', 'gpt-4o-prod', 'gpt-4o', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(
+            [true, ['azure' => ['default' => ['base_url' => 'https://acme.openai.azure.com', 'deployment' => 'gpt-4o-prod', 'api_key' => '%env(AZURE_API_KEY)%']]]],
+            [str_contains($this->unwrappedDisplay($commandTester), 'What is the URL of Azure OpenAI? e.g. https://<resource>.openai.azure.com: > Azure OpenAI deployment name'), $this->configuredValue('platform')],
+        );
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('refusedDeploymentCases')]
+    public function test_it_refuses_a_deployment_it_cannot_write(array $options, string $refusal): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--model' => 'gpt-4o', ...$options], ['interactive' => false]);
+
+        self::assertSame([Command::INVALID, true, false], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), $refusal), file_exists($this->configFile())]);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function refusedDeploymentCases(): iterable
+    {
+        yield 'a blank deployment for azure' => [['--provider' => 'azure.default', '--base-url' => 'https://acme.openai.azure.com', '--deployment' => ' '], '"azure.default" needs the name of its deployment, so nothing was written. Re-run with --deployment=<name>.'];
+        yield 'a deployment for another platform' => [['--provider' => 'openai', '--deployment' => 'gpt-4o-prod'], '--deployment applies to Azure OpenAI (azure.<instance>) only; "openai" has no deployment.'];
+    }
+
     public function test_it_lets_you_pick_a_priced_provider_by_its_number(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) array_search('openai', InitProviderChoices::names(), true), 'gpt-5.4', '', '']);
+        $commandTester->setInputs([ModelAccess::ApiKey->value, (string) (1 + (int) array_search('openai', ModelAccess::ApiKey->providers(), true)), 'gpt-5.4', '', '']);
 
         $commandTester->execute([]);
 
@@ -89,7 +464,7 @@ final class InitCommandTest extends TestCase
     public function test_it_lets_you_pick_the_newest_priced_model_that_calls_tools_by_its_number(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['openai', '0', '', '']);
+        $commandTester->setInputs(['openai', '1', '', '']);
 
         $commandTester->execute([]);
 
@@ -126,11 +501,90 @@ final class InitCommandTest extends TestCase
     public function test_it_offers_only_the_ten_newest_priced_models(): void
     {
         $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
-        $commandTester->setInputs(['mistral', '0', '', '']);
+        $commandTester->setInputs(['mistral', '1', '', '']);
 
         $commandTester->execute([]);
 
         self::assertStringNotContainsString('old-model', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_shows_the_price_of_each_model_it_offers(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openai', '1', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('gpt-new ($1 in, $2 out per million tokens)', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_shows_only_the_input_price_of_a_model_priced_for_input_alone(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openai', '1', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('gpt-input-only ($2.5 in per million tokens)', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_offers_only_the_newest_model_of_each_family(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '1', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringNotContainsString('claude-opus-older', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_ranks_a_model_priced_for_input_alone_by_its_input_price(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['openai', '1', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertMatchesRegularExpression('/\] gpt-old .*\] gpt-input-only /', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_lists_the_most_expensive_model_first(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs(['anthropic', '1', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-fable-new', $this->configuredValue('model'));
+    }
+
+    #[DataProvider('middleOfThePriceRangeCases')]
+    public function test_it_defaults_to_the_model_in_the_middle_of_the_price_range(string $provider, string $expectedModel): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog.json')));
+        $commandTester->setInputs([$provider, '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame($expectedModel, $this->configuredValue('model'));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function middleOfThePriceRangeCases(): iterable
+    {
+        yield 'the more expensive of the two middle models of four' => ['anthropic', 'claude-opus-new'];
+        yield 'the middle model of five' => ['gemini', 'gemini-c'];
+    }
+
+    public function test_it_keeps_claude_opus_5_5_as_the_default_model_when_the_provider_lists_it(): void
+    {
+        $commandTester = $this->commandTester(new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/init-catalog-listing-the-default-model.json')));
+
+        $commandTester->execute(['--provider' => 'anthropic'], ['interactive' => false]);
+
+        self::assertSame('claude-opus-5-5', $this->configuredValue('model'));
     }
 
     public function test_it_offers_claude_opus_5_5_as_the_default_model(): void
@@ -150,7 +604,7 @@ final class InitCommandTest extends TestCase
     public function test_it_installs_the_bridge_for_the_chosen_provider_in_the_data_directory(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -244,7 +698,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -256,7 +710,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -302,7 +756,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), $this->anthropicConfigurationWithEverythingInitDoesNotWrite());
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([$provider, $model, $envVar, 'yes', '']);
+        $commandTester->setInputs([$provider, $model, 'yes', '']);
 
         $commandTester->execute([]);
 
@@ -340,7 +794,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute(['--force' => true]);
 
@@ -355,7 +809,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -405,7 +859,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'yes', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'yes', '']);
 
         $commandTester->execute([]);
 
@@ -418,7 +872,7 @@ final class InitCommandTest extends TestCase
     public function test_its_success_message_points_at_the_docs_instead_of_a_paste_ready_export_line(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
         $commandTester->execute([]);
 
         $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
@@ -430,7 +884,7 @@ final class InitCommandTest extends TestCase
     public function test_it_reports_success(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
     }
@@ -541,7 +995,7 @@ final class InitCommandTest extends TestCase
     public function test_it_confirms_where_the_configuration_was_written(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -551,9 +1005,9 @@ final class InitCommandTest extends TestCase
     public function test_it_names_the_api_key_variable_the_user_chose(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'MY_CUSTOM_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
-        $commandTester->execute([]);
+        $commandTester->execute(['--env-var' => 'MY_CUSTOM_KEY']);
 
         $display = preg_replace('/\s+/', ' ', $commandTester->getDisplay());
 
@@ -566,7 +1020,7 @@ final class InitCommandTest extends TestCase
     public function test_it_stores_the_api_key_the_user_pastes(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
 
         $commandTester->execute([]);
 
@@ -576,7 +1030,7 @@ final class InitCommandTest extends TestCase
     public function test_it_names_the_stored_key_without_printing_it(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
 
         $commandTester->execute([]);
 
@@ -592,7 +1046,7 @@ final class InitCommandTest extends TestCase
     public function test_it_stores_nothing_when_the_user_skips_the_key(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -602,7 +1056,7 @@ final class InitCommandTest extends TestCase
     public function test_it_does_not_try_to_store_a_key_the_user_skipped(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
         $commandTester->execute([]);
 
         $display = $this->unwrappedDisplay($commandTester);
@@ -615,7 +1069,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
     }
@@ -625,7 +1079,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
         $display = $this->unwrappedDisplay($commandTester);
@@ -638,7 +1092,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->mkdir($this->configHome.'/symfony-security-auditor/credentials.json');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
         $display = $this->unwrappedDisplay($commandTester);
@@ -659,7 +1113,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', '']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', '']);
 
         $commandTester->execute([]);
 
@@ -671,7 +1125,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'no']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'no']);
 
         $commandTester->execute([]);
 
@@ -718,11 +1172,11 @@ final class InitCommandTest extends TestCase
     public function test_it_does_not_ask_for_a_base_url_when_the_platform_has_no_such_key(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4']);
 
         $commandTester->execute([]);
 
-        self::assertStringNotContainsString('Base URL of the endpoint', $commandTester->getDisplay());
+        self::assertStringNotContainsString('What is the URL of', $commandTester->getDisplay());
     }
 
     public function test_it_asks_for_a_base_url_when_a_flat_platform_requires_one(): void
@@ -732,7 +1186,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Base URL of the endpoint', $commandTester->getDisplay());
+        self::assertStringContainsString('What is the URL of', $commandTester->getDisplay());
     }
 
     public function test_it_writes_the_base_url_of_a_flat_platform_beside_its_api_key(): void
@@ -777,7 +1231,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'albert, amazeeai, generic.<instance>, openresponses.<instance>',
+            'albert, amazeeai, azure.<instance>, generic.<instance>, openresponses.<instance>',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -836,13 +1290,13 @@ final class InitCommandTest extends TestCase
         self::assertCount(1, $this->recordingBridgeInstaller->installations);
     }
 
-    public function test_it_names_every_bridge_it_downloads(): void
+    public function test_it_names_the_provider_it_installs_support_for(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'bedrock.prod', '--model' => 'openai.gpt-oss-120b'], ['interactive' => false]);
 
-        self::assertStringContainsString('Downloading the bedrock and generic provider bridges with composer', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Installing support for AWS Bedrock — this can take a minute…', $this->unwrappedDisplay($commandTester));
     }
 
     /**
@@ -870,12 +1324,12 @@ final class InitCommandTest extends TestCase
         $commandTester = $this->commandTester();
 
         $commandTester->execute(
-            ['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
+            ['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => 'HIGGSFIELD_API_KEY'],
             ['interactive' => false],
         );
 
         self::assertStringContainsString(
-            'needs a "deployment" name beside the api_key, which "init" does not ask for',
+            'needs an "api_secret" beside the api_key, which "init" does not ask for',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -905,16 +1359,16 @@ final class InitCommandTest extends TestCase
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model'], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model'], ['interactive' => false]);
 
-        self::assertStringContainsString("deployment: '<deployment>'", $commandTester->getDisplay());
+        self::assertStringContainsString("api_secret: '%env(HIGGSFIELD_API_SECRET)%'", $commandTester->getDisplay());
     }
 
     public function test_it_prints_the_block_with_the_model_it_was_given_trimmed(): void
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure.prod', '--model' => ' our-model '], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield', '--model' => ' our-model '], ['interactive' => false]);
 
         self::assertStringContainsString("model: our-model\n", $commandTester->getDisplay());
     }
@@ -923,18 +1377,15 @@ final class InitCommandTest extends TestCase
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure'], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield'], ['interactive' => false]);
 
         self::assertStringContainsString(
             <<<'YAML'
-                provider: azure.default
+                provider: higgsfield
                 platform:
-                    azure:
-                        default:
-                            base_url: 'https://<resource>.openai.azure.com'
-                            deployment: '<deployment>'
-                            api_version: '<api version>'
-                            api_key: '%env(AZURE_API_KEY)%'
+                    higgsfield:
+                        api_key: '%env(HIGGSFIELD_API_KEY)%'
+                        api_secret: '%env(HIGGSFIELD_API_SECRET)%'
                 model: '<model id>'
                 YAML,
             $commandTester->getDisplay(),
@@ -1028,15 +1479,6 @@ final class InitCommandTest extends TestCase
         yield 'cache' => ['cache.prod'];
     }
 
-    public function test_it_names_the_instance_the_block_is_written_for(): void
-    {
-        $commandTester = $this->commandTester();
-
-        $commandTester->execute(['--provider' => 'azure', '--model' => 'our-model'], ['interactive' => false]);
-
-        self::assertStringContainsString('provider: azure.default', $commandTester->getDisplay());
-    }
-
     public function test_it_puts_the_model_it_was_given_into_the_block(): void
     {
         $commandTester = $this->commandTester();
@@ -1094,21 +1536,6 @@ final class InitCommandTest extends TestCase
         self::assertFileDoesNotExist($this->configFile());
     }
 
-    public function test_it_says_a_platform_is_unwritable_before_asking_for_an_instance(): void
-    {
-        $commandTester = $this->commandTester();
-
-        $commandTester->execute(
-            ['--provider' => 'azure', '--model' => 'our-model', '--env-var' => 'AZURE_API_KEY'],
-            ['interactive' => false],
-        );
-
-        self::assertStringContainsString(
-            'needs a "deployment" name beside the api_key',
-            $this->unwrappedDisplay($commandTester),
-        );
-    }
-
     public function test_it_writes_a_numbered_instance_other_than_zero(): void
     {
         $commandTester = $this->commandTester();
@@ -1154,8 +1581,8 @@ final class InitCommandTest extends TestCase
         yield 'a hand-written platform carrying a terminal escape sequence' => [['--provider' => "azure.x\e]0;pwned\x07y", '--model' => 'our-model', '--env-var' => 'TOKEN'], 'The provider must not hold a control character, a line break or a bidirectional override.', "\e]0;pwned"];
         yield 'a model carrying a workflow command line' => [['--provider' => 'bedrock.x', '--model' => "gpt\n::stop-commands::pwned", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\n::stop-commands::"];
         yield 'a model reversing its direction' => [['--provider' => 'openai', '--model' => "gpt\u{202E}denwp", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{202E}"];
-        yield 'a model for a hand-written platform carrying an eight-bit control' => [['--provider' => 'azure.prod', '--model' => "gpt\u{9B}2J\u{202E}rev", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{9B}"];
-        yield 'a model for a hand-written platform that is not UTF-8' => [['--provider' => 'azure.prod', '--model' => "caf\xE9", '--env-var' => 'TOKEN'], 'The model must be valid UTF-8 text.', "\xE9"];
+        yield 'a model for a hand-written platform carrying an eight-bit control' => [['--provider' => 'higgsfield', '--model' => "gpt\u{9B}2J\u{202E}rev", '--env-var' => 'TOKEN'], 'The model must not hold a control character, a line break or a bidirectional override.', "\u{9B}"];
+        yield 'a model for a hand-written platform that is not UTF-8' => [['--provider' => 'higgsfield', '--model' => "caf\xE9", '--env-var' => 'TOKEN'], 'The model must be valid UTF-8 text.', "\xE9"];
     }
 
     /**
@@ -1341,7 +1768,7 @@ final class InitCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'Downloading the generic provider bridge with composer',
+            'Installing support for your OpenAI-compatible gateway — this can take a minute…',
             $this->unwrappedDisplay($commandTester),
         );
     }
@@ -1598,9 +2025,9 @@ final class InitCommandTest extends TestCase
     public function test_it_asks_for_a_base_url_when_the_provider_selects_a_platform_instance(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', 'https://gw.example']);
+        $commandTester->setInputs(['generic.my_gateway', 'https://gw.example', 'our-model']);
 
-        $commandTester->execute([]);
+        $commandTester->execute(['--env-var' => 'GATEWAY_TOKEN']);
 
         self::assertSame(
             [
@@ -1616,7 +2043,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_nothing_when_a_required_base_url_is_answered_empty(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['generic.my_gateway', 'our-model', 'GATEWAY_TOKEN', '']);
+        $commandTester->setInputs(['generic.my_gateway', '']);
 
         $commandTester->execute([]);
 
@@ -1653,7 +2080,7 @@ final class InitCommandTest extends TestCase
     public function test_it_writes_a_local_platform_with_its_endpoint_and_no_credential(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'http://localhost:11434', 'llama3.2']);
 
         $commandTester->execute([]);
 
@@ -1666,7 +2093,7 @@ final class InitCommandTest extends TestCase
     public function test_it_never_asks_for_a_key_to_store_when_it_wrote_no_credential(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'http://localhost:11434', 'llama3.2']);
 
         $commandTester->execute([]);
 
@@ -1721,7 +2148,7 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_says_the_configuration_carries_no_credential(): void
+    public function test_it_leaves_the_api_key_row_out_when_the_configuration_carries_no_credential(): void
     {
         $commandTester = $this->commandTester();
 
@@ -1730,7 +2157,7 @@ final class InitCommandTest extends TestCase
             ['interactive' => false],
         );
 
-        self::assertStringContainsString('none — this platform is configured without a credential', $this->unwrappedDisplay($commandTester));
+        self::assertSame([false, true], [str_contains($this->unwrappedDisplay($commandTester), 'API key variable'), str_contains($this->unwrappedDisplay($commandTester), 'Provider ollama Model llama3.2')]);
     }
 
     #[DataProvider('inapplicableOptionCases')]
@@ -1768,7 +2195,7 @@ final class InitCommandTest extends TestCase
     public function test_it_offers_no_such_default_for_the_platform_that_declares_none(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['ollama', 'llama3.2', '', 'http://localhost:11434']);
+        $commandTester->setInputs(['ollama', 'http://localhost:11434', 'llama3.2']);
 
         $commandTester->execute([]);
 
@@ -1860,8 +2287,8 @@ final class InitCommandTest extends TestCase
      */
     public static function handWrittenPlatformsGivenTwoThingsToRefuse(): iterable
     {
-        yield 'the instance before the model' => [['--provider' => 'azure.0', '--model' => "caf\xE9"], 'cannot be read back with', 'The model must be valid UTF-8 text.'];
-        yield 'the model before the variable name' => [['--provider' => 'azure.prod', '--model' => "caf\xE9", '--env-var' => 'NOT-A-NAME'], 'The model must be valid UTF-8 text.', 'is not a valid environment variable name'];
+        yield 'the instance before the model' => [['--provider' => 'higgsfield.x', '--model' => "caf\xE9"], 'takes a single connection block and names no instance', 'The model must be valid UTF-8 text.'];
+        yield 'the model before the variable name' => [['--provider' => 'higgsfield', '--model' => "caf\xE9", '--env-var' => 'NOT-A-NAME'], 'The model must be valid UTF-8 text.', 'is not a valid environment variable name'];
     }
 
     public function test_a_hand_written_platform_refuses_a_key_pasted_as_the_variable_name_without_echoing_it(): void
@@ -1869,7 +2296,7 @@ final class InitCommandTest extends TestCase
         $pastedKey = 'sk-ant-api03-PASTEDKEYPASTEDKEYPASTEDKEY1234';
         $commandTester = $this->commandTester();
 
-        $exitCode = $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => $pastedKey], ['interactive' => false]);
+        $exitCode = $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => $pastedKey], ['interactive' => false]);
 
         self::assertSame(
             [Command::INVALID, [], false, true],
@@ -1886,9 +2313,9 @@ final class InitCommandTest extends TestCase
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'azure.prod', '--model' => 'our-model', '--env-var' => ' AZURE_API_KEY '], ['interactive' => false]);
+        $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => ' HIGGSFIELD_API_KEY '], ['interactive' => false]);
 
-        self::assertSame([['azure.prod', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
+        self::assertSame([['higgsfield', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
     }
 
     public function test_a_run_that_cannot_ask_leaves_an_existing_configuration_untouched(): void
@@ -1904,8 +2331,13 @@ final class InitCommandTest extends TestCase
         self::assertSame([], $this->recordingBridgeInstaller->installations);
     }
 
-    private function commandTester(?PricedModelListInterface $pricedModelList = null): CommandTester
+    /**
+     * @param list<string> $pulledModels
+     */
+    private function commandTester(?PricedModelListInterface $pricedModelList = null, ?RecordingConnectionTestRunner $recordingConnectionTestRunner = null, array $pulledModels = []): CommandTester
     {
+        $pulledModelList = self::createStub(PulledModelListInterface::class);
+        $pulledModelList->method('pulledModels')->willReturn($pulledModels);
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome);
         $initCommand = new InitCommand(
             $xdgConfigPathResolver,
@@ -1914,6 +2346,8 @@ final class InitCommandTest extends TestCase
             $this->recordingBridgeInstaller,
             new FilesystemCredentialStore($xdgConfigPathResolver),
             pricedModelList: $pricedModelList,
+            connectionTestRunner: $recordingConnectionTestRunner,
+            pulledModelList: $pulledModelList,
         );
 
         return new CommandTester($initCommand);
@@ -1929,6 +2363,14 @@ final class InitCommandTest extends TestCase
         return (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
     }
 
+    private function configuredValue(string $key): mixed
+    {
+        $configuration = Yaml::parseFile($this->configFile());
+        self::assertIsArray($configuration);
+
+        return $configuration[$key] ?? null;
+    }
+
     private function configFile(): string
     {
         return $this->configHome.'/symfony-security-auditor/config.yaml';
@@ -1942,7 +2384,7 @@ final class InitCommandTest extends TestCase
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/credentials.json', 'not json{');
 
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY', 'openai-test-key-pasted-at-init']);
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'openai-test-key-pasted-at-init']);
         $commandTester->execute([]);
 
         self::assertSame('openai-test-key-pasted-at-init', $this->storedCredential('OPENAI_API_KEY'));
@@ -1951,7 +2393,7 @@ final class InitCommandTest extends TestCase
     public function test_it_explains_when_the_terminal_cannot_hide_the_key(): void
     {
         $commandTester = $this->commandTesterThatCannotHideInput();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
         $display = $this->unwrappedDisplay($commandTester);
@@ -1966,7 +2408,7 @@ final class InitCommandTest extends TestCase
     public function test_it_stores_nothing_when_the_terminal_cannot_hide_the_key(): void
     {
         $commandTester = $this->commandTesterThatCannotHideInput();
-        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+        $commandTester->setInputs(['openai', 'gpt-5.4']);
 
         $commandTester->execute([]);
 

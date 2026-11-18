@@ -22,6 +22,7 @@ use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpClient\HttpClient;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
@@ -53,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\OllamaPulledModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
@@ -72,6 +74,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditTarget;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthRemoveCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthTestCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
@@ -258,6 +261,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand(new AuthSetCommand($this->credentialStore, $this->configuredCredentialVariable()));
         $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
         $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
+        $standaloneApplication->addCommand(new AuthTestCommand(new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory)));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
         $standaloneApplication->addCommand(new DiffCommand(new ReportDiffer(), new DiffPresenter()));
         $standaloneApplication->addCommand(new TrendCommand(new ReportTrendAnalyzer(new ReportDiffer()), new TrendPresenter()));
@@ -293,6 +297,8 @@ final readonly class StandaloneApplicationFactory
             $this->bridgeInstaller,
             $this->credentialStore,
             pricedModelList: new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
+            connectionTestRunner: new ProcessConnectionTestRunner(new SelfInvocation($this->runningBinaryPath)),
+            pulledModelList: new OllamaPulledModelList(HttpClient::create(['timeout' => 3])),
         );
     }
 
@@ -423,6 +429,7 @@ final readonly class StandaloneApplicationFactory
                 new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
                 bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
             ),
+            new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),
         );
     }
 

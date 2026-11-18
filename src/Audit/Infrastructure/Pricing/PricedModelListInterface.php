@@ -22,7 +22,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 interface PricedModelListInterface
 {
     /**
-     * @return list<string> the newest first
+     * @return list<PricedModel> the most expensive first
      */
     public function pricedModels(string $platform): array;
 }

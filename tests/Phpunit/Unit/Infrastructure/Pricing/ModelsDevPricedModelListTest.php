@@ -24,6 +24,6 @@ final class ModelsDevPricedModelListTest extends TestCase
     {
         $modelsDevPricedModelList = new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/numeric-model-id.json'));
 
-        self::assertSame(['42'], $modelsDevPricedModelList->pricedModels('openai'));
+        self::assertSame('42', $modelsDevPricedModelList->pricedModels('openai')[0]->id);
     }
 }

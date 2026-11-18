@@ -21,6 +21,15 @@
                     "output": 2
                 }
             },
+            "gpt-input-only": {
+                "id": "gpt-input-only",
+                "release_date": "2025-06-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2.5
+                }
+            },
             "gpt-no-tools": {
                 "id": "gpt-no-tools",
                 "release_date": "2026-06-01",
@@ -149,6 +158,253 @@
                 "cost": {
                     "input": 1,
                     "output": 2
+                }
+            }
+        }
+    },
+    "anthropic": {
+        "models": {
+            "claude-fable-new": {
+                "id": "claude-fable-new",
+                "family": "claude-fable",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 10,
+                    "output": 50
+                }
+            },
+            "claude-opus-older": {
+                "id": "claude-opus-older",
+                "family": "claude-opus",
+                "release_date": "2025-01-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 5,
+                    "output": 25
+                }
+            },
+            "claude-opus-new": {
+                "id": "claude-opus-new",
+                "family": "claude-opus",
+                "release_date": "2026-09-22",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 4,
+                    "output": 20
+                }
+            },
+            "claude-sonnet-new": {
+                "id": "claude-sonnet-new",
+                "family": "claude-sonnet",
+                "release_date": "2026-09-28",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2,
+                    "output": 10
+                }
+            },
+            "claude-haiku-new": {
+                "id": "claude-haiku-new",
+                "family": "claude-haiku",
+                "release_date": "2026-10-07",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0.1,
+                    "output": 0.5
+                }
+            }
+        }
+    },
+    "google": {
+        "models": {
+            "gemini-a": {
+                "id": "gemini-a",
+                "family": "gemini-a",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 5,
+                    "output": 5
+                }
+            },
+            "gemini-b": {
+                "id": "gemini-b",
+                "family": "gemini-b",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 4,
+                    "output": 4
+                }
+            },
+            "gemini-c": {
+                "id": "gemini-c",
+                "family": "gemini-c",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 3,
+                    "output": 3
+                }
+            },
+            "gemini-d": {
+                "id": "gemini-d",
+                "family": "gemini-d",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2,
+                    "output": 2
+                }
+            },
+            "gemini-e": {
+                "id": "gemini-e",
+                "family": "gemini-e",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 1,
+                    "output": 1
+                }
+            }
+        }
+    },
+    "openrouter": {
+        "models": {
+            "openai/gpt-top": {
+                "id": "openai/gpt-top",
+                "family": "gpt-top",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 10,
+                    "output": 50
+                }
+            },
+            "anthropic/claude-opus-5-5": {
+                "id": "anthropic/claude-opus-5-5",
+                "family": "claude-opus",
+                "release_date": "2026-09-22",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 4,
+                    "output": 20
+                }
+            },
+            "vendor/mid-a": {
+                "id": "vendor/mid-a",
+                "family": "mid-a",
+                "release_date": "2026-09-02",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 3,
+                    "output": 9
+                }
+            },
+            "vendor/mid-b": {
+                "id": "vendor/mid-b",
+                "family": "mid-b",
+                "release_date": "2026-09-03",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2,
+                    "output": 8
+                }
+            },
+            "vendor/cheap": {
+                "id": "vendor/cheap",
+                "family": "cheap",
+                "release_date": "2026-09-04",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0.1,
+                    "output": 0.2
+                }
+            },
+            "vendor/zero-cost:free": {
+                "id": "vendor/zero-cost:free",
+                "family": "zero-cost",
+                "release_date": "2026-10-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0,
+                    "output": 0
+                }
+            }
+        }
+    },
+    "google-vertex": {
+        "models": {
+            "claude-fable-new@default": {
+                "id": "claude-fable-new@default",
+                "family": "claude-fable",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 10,
+                    "output": 50
+                }
+            },
+            "claude-opus-5-5@default": {
+                "id": "claude-opus-5-5@default",
+                "family": "claude-opus",
+                "release_date": "2026-09-22",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 4,
+                    "output": 20
+                }
+            },
+            "vendor/mid-a": {
+                "id": "vendor/mid-a",
+                "family": "mid-a",
+                "release_date": "2026-09-02",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 3,
+                    "output": 9
+                }
+            },
+            "vendor/mid-b": {
+                "id": "vendor/mid-b",
+                "family": "mid-b",
+                "release_date": "2026-09-03",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2,
+                    "output": 8
+                }
+            },
+            "vendor/cheap": {
+                "id": "vendor/cheap",
+                "family": "cheap",
+                "release_date": "2026-09-04",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0.1,
+                    "output": 0.2
                 }
             }
         }

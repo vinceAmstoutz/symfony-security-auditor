@@ -31,7 +31,6 @@ final readonly class HandWrittenPlatforms
      * @var array<string, string>
      */
     public const array REQUIREMENTS = [
-        'azure' => 'a "deployment" name beside the api_key',
         'cartesia' => 'a "version" beside the api_key',
         'dockermodelrunner' => 'a "host_url" rather than an api_key',
         'higgsfield' => 'an "api_secret" beside the api_key',

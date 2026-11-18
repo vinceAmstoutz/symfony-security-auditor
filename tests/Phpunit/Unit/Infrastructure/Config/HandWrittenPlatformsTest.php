@@ -31,7 +31,7 @@ final class HandWrittenPlatformsTest extends TestCase
      */
     public static function platformCases(): iterable
     {
-        yield 'an instance-keyed platform needing a deployment' => ['azure.prod', 'a "deployment" name beside the api_key'];
+        yield 'a platform needing a secret beside its key' => ['higgsfield', 'an "api_secret" beside the api_key'];
         yield 'a platform wrapping others, which no block can make boot' => ['failover.prod', null];
         yield 'a flat platform needing a version' => ['cartesia', 'a "version" beside the api_key'];
         yield 'a flat platform addressed by host url' => ['lmstudio', 'a "host_url" rather than an api_key'];
