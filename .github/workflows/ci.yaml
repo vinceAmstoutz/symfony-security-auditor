@@ -199,7 +199,6 @@ jobs:
   tests:
     name: Tests + Mutation (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony }})
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.php == '8.6' }}
     strategy:
       fail-fast: false
       matrix:
@@ -235,10 +234,7 @@ jobs:
           restore-keys: composer-php${{ matrix.php }}-sf${{ matrix.symfony }}-
 
       - name: Install dependencies
-        env:
-          # ergebnis/composer-normalize caps its PHP range below 8.6 through localheinz/diff.
-          IGNORE_PHP_UPPER_BOUND: ${{ matrix.php == '8.6' && '--ignore-platform-req=php+' || '' }}
-        run: composer update --no-interaction --prefer-dist --no-progress $IGNORE_PHP_UPPER_BOUND
+        run: composer update --no-interaction --prefer-dist --no-progress
 
       - name: Cache PHPUnit result cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
