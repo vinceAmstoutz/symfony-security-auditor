@@ -42,7 +42,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `mcp:serve` runs on `mcp/sdk` `^0.10`, for the bundle and the standalone binary; in bundle mode an application holding `mcp/sdk` at 0.9 must let it move to 0.10 ([#703](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/703))
 - A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
 - Cached attacker answers refresh once after upgrading, and the longer hunting instructions raise the attacker's input tokens, by about a third on a small project where they outweigh the code ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
-- The test suite also runs on PHP 8.6, where a failure does not block a merge until PHP 8.6 is stable
+- The test suite also runs on PHP 8.6
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 
