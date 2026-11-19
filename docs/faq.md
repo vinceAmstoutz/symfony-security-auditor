@@ -150,6 +150,10 @@ Roughly, for a medium Symfony app (~150 files), running once with Anthropic prom
 
 Tips: set `profile: fast` (one attacker iteration, lean pre-scan, code slicing, concurrent reviews), enable Anthropic prompt caching (`cache_retention` in `ai.yaml`; default `short` already on), use `cache.enabled` for repeated CI runs, use split-model in CI, run nightly not per-PR. See [CI → Managing LLM Costs](ci.md#managing-llm-costs).
 
+### Can I use my Claude or ChatGPT subscription instead of an API key?
+
+Yes, since 1.23: `init --provider=claudecode` or `init --provider=codex` runs the audit through the installed Claude Code or Codex CLI, and a Symfony application sets `cli_agent.platform`. The plan's usage limits apply and the run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced — see [Running on a Claude subscription](configuration.md#running-on-a-claude-subscription).
+
 ### How long does an audit take?
 
 30 seconds to several minutes depending on project size, model latency, and `audit.max_iterations`. The Reviewer is run **per-finding** by default (`reviewer_batch_size: 1`) — increase that to batch reviews and cut latency at the risk of cross-talk between findings in the prompt.
