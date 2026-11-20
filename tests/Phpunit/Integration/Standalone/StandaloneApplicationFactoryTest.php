@@ -177,7 +177,16 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'diff' => ['audit:diff'];
         yield 'trend' => ['audit:trend'];
         yield 'baseline' => ['audit:baseline'];
-        yield 'fix' => ['audit:fix'];
+    }
+
+    public function test_it_offers_no_audit_fix_command(): void
+    {
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertFalse($standaloneApplication->has('audit:fix'));
     }
 
     public function test_the_report_commands_run_without_any_configuration(): void

@@ -22,9 +22,4 @@ final class InvalidProjectPathException extends InvalidArgumentException
     {
         return new self(\sprintf('Project path must be absolute, got "%s".', $path));
     }
-
-    public static function forMissingDirectory(string $path): self
-    {
-        return new self(\sprintf('Project path "%s" is not a directory.', $path));
-    }
 }
