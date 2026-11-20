@@ -259,7 +259,7 @@ Do not point documentation or examples at a `raw.githubusercontent.com/.../main/
 2. Extend `category()` and `owaspReference()` with the new case.
 3. Update `AttackerPromptBuilder` to mention the new type so the LLM emits it.
 4. Add a fixture in `tests/Phpunit/Fixtures/` that exercises the new case.
-5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-references).
+5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-and-cwe-references).
 
 ### Add a new pipeline stage
 
