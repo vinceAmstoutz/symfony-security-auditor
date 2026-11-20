@@ -107,6 +107,22 @@ final class ClaudeCodePlatformTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_starts_in_a_directory_whose_name_no_other_user_can_guess(): void
+    {
+        $this->invoke([]);
+
+        self::assertMatchesRegularExpression('#/symfony-security-auditor-cli-[0-9a-f]{32}$#', trim((string) file_get_contents($this->workingDirectory.'/cwd')));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_the_claude_code_cli_starts_outside_the_audited_project_so_its_files_cannot_configure_it(): void
     {
         $this->invoke([]);
