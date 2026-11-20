@@ -38,17 +38,21 @@ symfony-security-auditor doctor
 
 ![Dry run — token and cost estimate with no LLM calls](assets/dry-run.gif?raw=true)
 
-Scans files and estimates token usage and cost without calling the LLM.
+Scans files and estimates token usage and cost without calling the LLM. Use this to gauge cost before committing to a full audit.
 
 ```bash
 bin/console audit:run --dry-run
 ```
 
+No LLM calls are made; the exit code is `0` unless the command is refused before the estimate — an invalid option or project path, or a `--path` outside the project — which exits `1`.
+
 ### Console mode
 
 ![Live audit — the Attacker vs Reviewer feed streaming to the validated report](assets/demo.gif?raw=true)
 
-The audit narrates itself live — attack-surface overview, each finding as the Attacker flags it, per-chunk timing, reviewer tally — and falls back to plain append-only lines in CI. See the [CLI reference](docs/configuration.md#cli-reference) and [output formats](docs/configuration.md#output-formats-reference).
+While the pipeline runs, the audit narrates itself live — an attack-surface overview, each finding streamed (color-coded by severity in a terminal) the moment the Attacker flags it, per-chunk timing, and a reviewer tally. In CI or any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI codes). Progress is suppressed for any non-`console` `--format` to stdout and for `--dry-run`.
+
+The full report renders the same way in console, JSON, SARIF, HTML, and Markdown — see [CLI reference](docs/configuration.md#cli-reference) and [output formats](docs/configuration.md#output-formats-reference).
 
 ## Getting Started
 
@@ -248,13 +252,16 @@ With the binary, the server reads its configuration once, when it starts — you
 - **Diff mode** — `audit:run --since=main` audits only changed files for fast pull-request CI; with `audit.tools_scope: scanned` the Attacker can still follow a changed controller into the unchanged files it calls.
 - **Cross-file investigation tools** — Attacker (and optionally Reviewer) can `read_file`, `grep`, `list_files`, and `lookup_advisory` (zero-config live CVE lookups via `composer audit`, backed by Packagist + GitHub Security Advisories).
 - **One-knob profiles** — `fast`, `balanced`, and `thorough` preset the cost/speed/depth levers in a single line; any explicit key still wins.
-- **Tunable for speed & cost** — split-model, concurrent Attacker and Reviewer calls, prompt caching, content-hash caching, cheap→expensive escalation and code slicing; see [Cost & Performance](docs/cost-and-performance.md).
+- **Tunable for speed & cost** — split-model (powerful Attacker + cheap Reviewer, ~20× cheaper), concurrent Attacker **and** Reviewer calls (`attacker_max_concurrent` / `reviewer_max_concurrent`), Anthropic prompt caching on by default (~90% input-token discount), content-hash caching that skips identical chunks, cheap→expensive escalation, and code slicing.
 - **Secret-safe by default** — credential-shaped strings are scrubbed from file content **before** it reaches the LLM, and `privacy.offline_only` refuses every network call the auditor owns (see [Security by design](#security-by-design)).
-- **Actionable findings** — optionally attach a reproduction and a suggested patch to every high-severity finding, applied with `audit:fix`; each one also carries a heuristic CVSS v4.0 estimate.
-- **Nine output formats** — `console`, `executive`, `json`, `sarif`, `html`, `markdown`, `junit`, `github` (inline PR annotations) and `github-comment` (self-updating PR comment with one-click fix suggestions). `--baseline` drops accepted findings so only new ones fail CI; `--min-score` gates on the normalized score.
-- **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them, and and `audit:baseline` merges, prunes and annotates a baseline.
+- **Rate-limit aware** — reactive retry with `Retry-After`-aware exponential backoff plus an optional proactive token-bucket limiter keep you inside provider quotas (see [Cost & Performance](docs/cost-and-performance.md#avoiding-rate-limits-429)).
+- **Actionable findings** — optionally attach a copy-pasteable reproduction (curl/console/payload) and a suggested patch to every high-severity finding; each one also carries a heuristic CVSS v4.0 estimate.
+- **Nine output formats** — `console`, `executive` (stakeholder summary: risk level, business impact, severity/type/hotspot distributions, no per-finding detail), `json`, `sarif` (GitHub Code Scanning / GitLab Security Dashboard), `html` (self-contained, shareable), `markdown` (PR-friendly), `junit` (CI test-report panels), `github` (inline PR annotations, no SARIF upload step), and `github-comment` (PR comment headlined by the grade and score, self-updating on rerun). Baseline suppression: `--generate-baseline` accepts known findings, `--baseline` drops them from the report and exit code so only new findings fail CI; `--min-score` gates on the normalized score independently of `--fail-on`.
+- **Callable from your AI assistant (experimental)** — `mcp:serve` exposes the audit as an MCP tool to Claude Code, Claude Desktop, Cursor, VS Code and any other MCP client, from the binary or the bundle (see [Use it from your AI assistant](#use-it-from-your-ai-assistant-mcp)).
+- **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them, and `audit:baseline` merges, prunes and annotates a baseline, and `audit:fix` applies the suggested fixes of a report — in the bundle and the standalone binary alike.
 - **CI-ready** — a reusable [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.22.1`) plus GitLab CI templates, with SARIF upload to Code Scanning and an optional shields.io badge tracking the report's letter grade. See [CI Integration](docs/ci.md).
 - **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let you plug in custom providers, agents, stages, advisory feeds, or report formats; project-specific attacker skills need only configuration, no PHP.
+- **Bundle or standalone** — install as a Symfony bundle, or run it from a single self-contained binary configured once at the user level to audit any project with zero footprint, kept current with `self-update` and preflighted with `doctor` (see [Standalone tool](#standalone-tool-binary)).
 
 ## Security by design
 

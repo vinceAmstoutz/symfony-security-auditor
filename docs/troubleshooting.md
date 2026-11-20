@@ -227,8 +227,6 @@ In a Symfony application, re-run with `-v` or `-vv` to see more of the applicati
 
 ### `API key not set` / `401 Unauthorized`
 
-With the standalone binary, `auth:test` (or `doctor --check-connection`) sends one short request and names why the provider refused the key.
-
 Confirm the env var is exported in the same shell:
 
 ```bash
