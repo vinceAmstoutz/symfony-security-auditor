@@ -91,11 +91,27 @@ final class ClaudeCodePlatformTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_starts_in_a_directory_no_other_user_can_open(): void
+    {
+        $this->invoke([]);
+
+        self::assertSame('drwx------', trim((string) file_get_contents($this->workingDirectory.'/cwd-mode')));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_the_claude_code_cli_starts_outside_the_audited_project_so_its_files_cannot_configure_it(): void
     {
         $this->invoke([]);
 
-        self::assertSame(realpath(sys_get_temp_dir()), trim((string) file_get_contents($this->workingDirectory.'/cwd')));
+        self::assertStringStartsWith(realpath(sys_get_temp_dir()).'/', trim((string) file_get_contents($this->workingDirectory.'/cwd')));
     }
 
     /**
@@ -157,7 +173,7 @@ final class ClaudeCodePlatformTest extends TestCase
     private function fakeCli(): string
     {
         $cli = $this->workingDirectory.'/claude';
-        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\npwd -P > %s\nprintf '%%s\\0' \"\$@\" > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->argumentsFile()), self::ANSWER));
+        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\npwd -P > %s\nls -ld . | cut -c1-10 > %s\nprintf '%%s\\0' \"\$@\" > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->workingDirectory.'/cwd-mode'), escapeshellarg($this->argumentsFile()), self::ANSWER));
         (new Filesystem())->chmod($cli, 0o755);
 
         return $cli;

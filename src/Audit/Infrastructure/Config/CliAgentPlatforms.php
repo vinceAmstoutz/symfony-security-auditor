@@ -20,6 +20,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 /**
  * The platforms that run a coding agent's own CLI on the user's subscription
@@ -152,8 +153,8 @@ final readonly class CliAgentPlatforms
             $cliServiceId = \sprintf('%s.cli', $serviceId);
 
             $containerBuilder->register($cliServiceId, Platform::class)
-                ->setFactory([self::FACTORIES[$name], 'createPlatform'])
-                ->setArguments([\is_array($settings) ? ($settings['cli_binary'] ?? null) : null, ContainerParameterSyntax::escape(sys_get_temp_dir())]);
+                ->setFactory([CliAgentPlatformFactory::class, 'create'])
+                ->setArguments([self::FACTORIES[$name], \is_array($settings) ? ($settings['cli_binary'] ?? null) : null]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
                 ->setArguments([new Reference($cliServiceId), self::ISOLATING_OPTIONS[$name], \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
                 ->addTag(self::PLATFORM_TAG);
