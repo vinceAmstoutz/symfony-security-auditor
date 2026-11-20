@@ -167,8 +167,8 @@ final class SymfonyAiLLMClientOutputCapRaiseTest extends TestCase
     {
         $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new TextResult('done')], [new TokenUsage(), new TokenUsage()]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new PlatformBinding($scriptedTokenUsagePlatform, 'gemini-3.1-pro-preview', new NullLogger(), maxOutputTokens: 4096),
-            new PlatformRequestConfig(servingPlatform: 'gemini'),
+            new PlatformBinding($scriptedTokenUsagePlatform, 'claude-opus-5-5', new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(servingPlatform: 'anthropic'),
             new PlatformResilienceConfig(sleeper: new FakeSleeper()),
             new PlatformAccountingConfig(budgetTracker: new BudgetTracker(AuditBudget::forTokens(1), new CostCalculator(new FixedPricingProvider(0.0, 0.0)))),
         );
@@ -184,8 +184,8 @@ final class SymfonyAiLLMClientOutputCapRaiseTest extends TestCase
     private function client(ScriptedTokenUsagePlatform $scriptedTokenUsagePlatform, LoggerInterface $logger = new NullLogger()): SymfonyAiLLMClient
     {
         return new SymfonyAiLLMClient(
-            new PlatformBinding($scriptedTokenUsagePlatform, 'gemini-3.1-pro-preview', $logger, maxOutputTokens: 4096),
-            new PlatformRequestConfig(servingPlatform: 'gemini'),
+            new PlatformBinding($scriptedTokenUsagePlatform, 'claude-opus-5-5', $logger, maxOutputTokens: 4096),
+            new PlatformRequestConfig(servingPlatform: 'anthropic'),
             new PlatformResilienceConfig(sleeper: new FakeSleeper()),
         );
     }
