@@ -48,8 +48,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\AuditOrchestratorHarness;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\FailingLLMClient;
-use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class AuditOrchestratorAbortRecoveryTest extends TestCase
@@ -111,7 +111,7 @@ final class AuditOrchestratorAbortRecoveryTest extends TestCase
             new RecordingLLMClient((string) json_encode(['accepted' => true])),
         );
         $auditContext = $this->makeContextWithMapping();
-        foreach (ScrubbedSecretFindings::in(ProjectFile::create('config/secrets.php', '/app/config/secrets.php', "<?php\n$key = '***REDACTED:aws_access_key***';\n")) as $staticFinding) {
+        foreach (ScrubbedSecretFindings::in(ProjectFile::create('config/secrets.php', '/app/config/secrets.php', "<?php\n\$key = '***REDACTED:aws_access_key***';\n")) as $staticFinding) {
             $auditContext->addStaticCandidate($staticFinding);
         }
 

@@ -10,6 +10,7 @@
  */
 
 declare(strict_types=1);
+
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Symfony\AI\Platform\Bridge\ClaudeCode\Factory as ClaudeCodeFactory;

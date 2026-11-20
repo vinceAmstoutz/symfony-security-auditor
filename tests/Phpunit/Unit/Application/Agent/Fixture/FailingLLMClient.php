@@ -10,6 +10,7 @@
  */
 
 declare(strict_types=1);
+
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture;
 
 use Override;
