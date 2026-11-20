@@ -107,7 +107,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $previousFindings = array_values($auditContext->validatedVulnerabilities());
         $rejectedFindings = $this->rejectedFindings($auditContext);
         $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
-        $filtered = [...$auditContext->drainStaticCandidates(), ...$this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext)];
+        $attackerFindings = $this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext);
+        $filtered = [...$auditContext->drainStaticCandidates(), ...$attackerFindings];
 
         if ([] === $filtered) {
             $this->logger->info('Attacker found no new findings, stopping');
@@ -211,7 +212,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 $auditContext,
             );
         } catch (BudgetExceededException|LLMProviderException $attackerException) {
-            $this->reviewRecoveredFindings($auditContext->drainFoundVulnerabilities(), $files, $auditContext);
+            $this->reviewRecoveredFindings([...$auditContext->drainStaticCandidates(), ...$auditContext->drainFoundVulnerabilities()], $files, $auditContext);
 
             throw $attackerException;
         }

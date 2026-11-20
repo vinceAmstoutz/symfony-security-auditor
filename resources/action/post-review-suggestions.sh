@@ -33,7 +33,12 @@ if ! printf '%s' "$encoded" | base64 -d > "$work/suggestions.json" 2> /dev/null 
   exit 0
 fi
 
-gh api --paginate "$pull/files" | jq -s '
+if ! gh api --paginate "$pull/files" > "$work/files.json" 2> "$work/error"; then
+  echo "::warning::GitHub refused to list the files of the pull request: $(head -n 1 "$work/error"). No review was posted."
+  exit 0
+fi
+
+jq -s '
   def right_lines:
     reduce (split("\n")[]) as $line ({next: 0, lines: []};
       if ($line | startswith("@@")) then .next = ($line | capture("\\+(?<start>[0-9]+)") | .start | tonumber)
@@ -42,11 +47,16 @@ gh api --paginate "$pull/files" | jq -s '
       end)
     | .lines;
   add // [] | map({key: .filename, value: ((.patch // "") | right_lines)}) | from_entries
-' > "$work/diff-lines.json"
+' "$work/files.json" > "$work/diff-lines.json"
 
-gh api --paginate "$pull/comments" | jq -s --arg bot "$bot_login" '
+if ! gh api --paginate "$pull/comments" > "$work/comments-listed.json" 2> "$work/error"; then
+  echo "::warning::GitHub failed to list the review comments of the pull request: $(head -n 1 "$work/error"). No review was posted."
+  exit 0
+fi
+
+jq -s --arg bot "$bot_login" '
   add // [] | map(select(.user.login == $bot) | .body | capture("<!-- symfony-security-auditor:suggestion:(?<key>[^ ]+) -->") | .key)
-' > "$work/posted-keys.json"
+' "$work/comments-listed.json" > "$work/posted-keys.json"
 
 jq --slurpfile diff "$work/diff-lines.json" --slurpfile posted "$work/posted-keys.json" '
   map(select(

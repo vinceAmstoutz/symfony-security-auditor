@@ -16,13 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use Symfony\AI\Platform\PlatformOptions;
 
 /**
- * Builds the per-invocation platform options: temperature, the output token
- * cap and the Anthropic-dialect provider JSON mode that other providers
- * reject. The cap goes out as symfony/ai's canonical `max_output_tokens` to a
- * platform whose bridge translates it, or whose API takes it as is (the
- * Responses API), and as `max_tokens` to a Claude model on any other
- * platform; a platform that knows neither gets none, as an unknown field may
- * be refused. The JSON mode goes only to a platform that can honour it: the
+ * Builds the per-invocation platform options: temperature, and the
+ * Anthropic-dialect output token cap and provider JSON mode that other
+ * providers reject. The cap goes to a Claude model only, as symfony/ai's
+ * canonical `max_output_tokens` on a platform whose bridge translates it and
+ * as `max_tokens` elsewhere: on another model it would also count the
+ * reasoning tokens and cut a thinking model's answer short. The JSON mode goes only to a platform that can honour it: the
  * Anthropic and Bedrock bridges turn any `response_format` into a JSON schema
  * for Anthropic's structured outputs, empty for a JSON-object mode, which
  * Anthropic has no equivalent of, and Bedrock's Mantle route refuses it
@@ -74,11 +73,11 @@ final readonly class PlatformOptionsFactory
 
     private function outputCapOption(): ?string
     {
-        if (\in_array($this->servingPlatform, self::PLATFORMS_TAKING_THE_CANONICAL_OUTPUT_CAP, true)) {
-            return PlatformOptions::MAX_OUTPUT_TOKENS;
+        if (!$this->usesAnthropicOptionDialect()) {
+            return null;
         }
 
-        return $this->usesAnthropicOptionDialect() ? 'max_tokens' : null;
+        return \in_array($this->servingPlatform, self::PLATFORMS_TAKING_THE_CANONICAL_OUTPUT_CAP, true) ? PlatformOptions::MAX_OUTPUT_TOKENS : 'max_tokens';
     }
 
     private function usesAnthropicOptionDialect(): bool

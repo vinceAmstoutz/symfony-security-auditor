@@ -33,8 +33,12 @@ case "$method $endpoint" in
     [ -f "$FAKE_GH/post-fails" ] && { echo 'HTTP 422: Unprocessable Entity' >&2; exit 1; }
     cp "$input" "$FAKE_GH/posted.json"
     echo 'https://github.com/acme/shop/pull/7#pullrequestreview-1' ;;
-  'GET repos/acme/shop/pulls/7/files') cat "$FAKE_GH/files.json" ;;
-  'GET repos/acme/shop/pulls/7/comments') cat "$FAKE_GH/comments.json" ;;
+  'GET repos/acme/shop/pulls/7/files')
+    [ -f "$FAKE_GH/files-fail" ] && { echo '{"message":"Resource not accessible by integration","status":"403"}'; echo 'gh: Resource not accessible by integration (HTTP 403)' >&2; exit 1; }
+    cat "$FAKE_GH/files.json" ;;
+  'GET repos/acme/shop/pulls/7/comments')
+    [ -f "$FAKE_GH/comments-fail" ] && { echo '{"message":"Server Error","status":"502"}'; echo 'gh: Server Error (HTTP 502)' >&2; exit 1; }
+    cat "$FAKE_GH/comments.json" ;;
   'GET repos/acme/shop/contents/'*) cat "$FAKE_GH/head/$(printf '%s' "${endpoint#repos/acme/shop/contents/}" | sed 's/?ref=.*//')" ;;
   *) echo "unexpected gh call: $method $endpoint" >&2; exit 1 ;;
 esac
@@ -136,6 +140,18 @@ touch "$work/gh/post-fails"
 write_comment "$(suggestion 'fp1:3-3' src/Repo.php 3 3 '["$sql = \"SELECT $id\";"]' 'Fix it')"
 run_post
 expect 'a review GitHub refuses warns without failing the job' "$status $(printf '%s' "$output" | grep -c '::warning::GitHub refused the review')" '0 1'
+
+reset_pull_request
+touch "$work/gh/files-fail"
+write_comment "$(suggestion 'fp1:3-3' src/Repo.php 3 3 '["$sql = \"SELECT $id\";"]' 'Fix it')"
+run_post
+expect 'a pull request GitHub refuses to list warns without failing the job' "$status $(posted '.') $(printf '%s' "$output" | grep -c '::warning::')" '0 nothing posted 1'
+
+reset_pull_request
+touch "$work/gh/comments-fail"
+write_comment "$(suggestion 'fp1:3-3' src/Repo.php 3 3 '["$sql = \"SELECT $id\";"]' 'Fix it')"
+run_post
+expect 'review comments GitHub fails to list warn without failing the job' "$status $(posted '.') $(printf '%s' "$output" | grep -c '::warning::')" '0 nothing posted 1'
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures test(s) failed"

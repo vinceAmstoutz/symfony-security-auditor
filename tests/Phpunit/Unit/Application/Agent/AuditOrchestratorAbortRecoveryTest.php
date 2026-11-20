@@ -35,6 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScrubbedSecretFindings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -46,7 +47,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\AuditOrchestratorHarness;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\FailingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class AuditOrchestratorAbortRecoveryTest extends TestCase
@@ -91,6 +94,36 @@ final class AuditOrchestratorAbortRecoveryTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
         self::assertCount(1, $auditContext->validatedVulnerabilities());
         self::assertSame('v1', current($auditContext->validatedVulnerabilities())->title());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws LLMProviderException
+     */
+    public function test_it_reviews_and_persists_a_static_finding_when_the_attacker_aborts_the_first_iteration(): void
+    {
+        $auditOrchestrator = AuditOrchestratorHarness::orchestrator(
+            new FailingLLMClient(BudgetExceededException::forTokens(500, 100)),
+            new RecordingLLMClient((string) json_encode(['accepted' => true])),
+        );
+        $auditContext = $this->makeContextWithMapping();
+        foreach (ScrubbedSecretFindings::in(ProjectFile::create('config/secrets.php', '/app/config/secrets.php', "<?php\n\$key = '***REDACTED:aws_access_key***';\n")) as $staticFinding) {
+            $auditContext->addStaticCandidate($staticFinding);
+        }
+
+        $budgetExceeded = false;
+        try {
+            $auditOrchestrator->orchestrate($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
+        self::assertSame(['config/secrets.php'], array_values(array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $auditContext->validatedVulnerabilities())));
     }
 
     /**
