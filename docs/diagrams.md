@@ -73,7 +73,7 @@ flowchart LR
     FIX --> RPT
 ```
 
-## Attacker vs Reviewer — Dual-Agent Loop
+## Attacker vs Reviewer: Dual-Agent Loop
 
 ```mermaid
 %%{init: {'theme': 'default', 'themeVariables': {'background': 'transparent'}}}%%
