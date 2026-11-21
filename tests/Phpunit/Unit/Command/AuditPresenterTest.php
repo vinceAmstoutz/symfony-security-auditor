@@ -133,6 +133,26 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
     }
 
+    public function test_the_scope_line_neutralizes_console_markup_in_the_paths(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->enclosingProject($symfonyStyle, '/workspace', ['src/<fg=grey>oops</>']);
+
+        self::assertStringContainsString('Scope: src/<fg=grey>oops</> (no composer.json in the folder named', $bufferedOutput->fetch());
+    }
+
+    public function test_the_scope_line_neutralizes_console_markup_in_the_folder(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->enclosingProject($symfonyStyle, '/var/www/<fg=grey>oops</>', []);
+
+        self::assertStringContainsString('Scope: whole project (no composer.json in "/var/www/<fg=grey>oops</>"', $bufferedOutput->fetch());
+    }
+
     public function test_header_opens_with_the_identity_banner(): void
     {
         $bufferedOutput = new BufferedOutput();

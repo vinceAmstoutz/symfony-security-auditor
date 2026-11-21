@@ -54,10 +54,10 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function enclosingProject(SymfonyStyle $symfonyStyle, string $folder, array $scanPaths): void
     {
-        $scope = [] === $scanPaths ? 'whole project' : implode(', ', array_map($this->sanitizePathForListing(...), $scanPaths));
-        $folderNamed = [] === $scanPaths ? \sprintf('"%s"', OutputFormatter::escape($this->sanitizeForWarning($folder))) : 'the folder named';
-
-        $symfonyStyle->text(\sprintf('Scope: <info>%s</info> <fg=gray>(no composer.json in %s: auditing its enclosing project)</>', $scope, $folderNamed));
+        $symfonyStyle->text(EnclosingProjectScope::line(
+            OutputFormatter::escape($this->sanitizeForWarning($folder)),
+            array_map($this->sanitizePathForListing(...), $scanPaths),
+        ));
     }
 
     #[Override]
