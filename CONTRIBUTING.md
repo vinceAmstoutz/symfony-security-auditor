@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution. This guide walks through the dev setup, expected workflow, and PR checklist. New to the codebase? Start with the [Architecture overview](docs/architecture.md) — it explains the DDD layering and the dual-agent loop before you touch code.
+Thanks for considering a contribution. This guide walks through the dev setup, expected workflow and PR checklist. New to the codebase? Start with the [Architecture overview](docs/architecture.md): it explains the DDD layering and the dual-agent loop before you touch code.
 
 ## Table of Contents
 
@@ -55,13 +55,13 @@ tests/Phpunit/
   EndToEnd/          # Full pipeline with stubbed LLM responses.
 ```
 
-Strict dependency direction: `Command → Application → Domain ← Infrastructure`. Infrastructure never leaks into Domain or Application. The sole LLM seam is `LLMClientInterface` — Application agents never import `symfony/ai` types directly.
+Strict dependency direction: `Command → Application → Domain ← Infrastructure`. Infrastructure never leaks into Domain or Application. The sole LLM seam is `LLMClientInterface`: Application agents never import `symfony/ai` types directly.
 
 Read more:
 
-- [Architecture](docs/architecture.md) — layers, data flow, domain model, design decisions.
-- [Extending](docs/extending.md) — extension points (custom LLM client, agent, stage, report format).
-- [`.claude/rules/`](.claude/rules/) — path-scoped rules (DDD boundaries, immutability, LLM seam, testing).
+- [Architecture](docs/architecture.md): layers, data flow, domain model, design decisions.
+- [Extending](docs/extending.md): extension points (custom LLM client, agent, stage, report format).
+- [`.claude/rules/`](.claude/rules/): path-scoped rules (DDD boundaries, immutability, LLM seam, testing).
 
 ## Daily Dev Loop
 
@@ -107,11 +107,11 @@ docker compose exec php vendor/bin/phpunit --testsuite EndToEnd
 docker compose exec php bin/infection
 ```
 
-**100% MSI (Mutation Score Indicator) is required.** Every mutation must be killed. Suppression directives (`@infection-ignore-all`, `ignoreSourceCodeByRegex`, …) are not allowed — fix the underlying test gap instead. See [CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
+**100% MSI (Mutation Score Indicator) is required.** Every mutation must be killed. Suppression directives (`@infection-ignore-all`, `ignoreSourceCodeByRegex`, …) are not allowed: fix the underlying test gap instead. See [CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
 
 ## Compatibility Checks
 
-A `1.x` upgrade must not break what a user wrote or built against the last release. Unit and end-to-end tests move with the code, so a separate suite compares this tree with fixtures recorded from the last release tag, and fails on any difference the maintainer has not accepted:
+A `1.x` upgrade must not break what a user wrote or built against the last release. Unit and end-to-end tests move with the code, so a separate suite compares this tree with fixtures recorded from the last release tag and fails on any difference the maintainer has not accepted:
 
 ```bash
 docker compose exec php vendor/bin/phpunit -c phpunit.compat.xml
@@ -121,13 +121,13 @@ It runs as the **Compatibility** CI job, on PHP 8.3 and Symfony 7.4. A differenc
 
 ### Configuration Snapshot
 
-`tests/Phpunit/Compat/Configuration/` compares the bundle configuration with the snapshot recorded from the last release, path by path: kind, default, choices, bounds and whether the key is required; which of a fixed set of values the bundle loads with and what each becomes (a value the tree let through but the release then failed on, with a `TypeError` for instance, does not count as taken); whether it takes an `%env()%` placeholder; whether the standalone binary lets a project's `.symfony-security-auditor.yaml` set it; and the container parameters the bundle publishes, for the default configuration and for each `profile`. A narrowing of a path is a `MAJOR` change (see [Versioning](docs/versioning.md)): restore the released contract. A parameter whose value changes on purpose, such as a cache key salt when a prompt changes, goes into `tests/Phpunit/Compat/Configuration/accepted-differences.php` with the parameters it names (`*` matches any run of characters), a one-line reason, and its `CHANGELOG.md` bullet. A default the maintainer decides is no break, such as the default `model` moving to a newer model priced no higher, goes into the same file with the `paths` it changes, the exact `narrowings` the test reports for them, a reason and its bullet. A key added since the release must be listed in `docs/versioning.md` and described in `resources/schema.json`.
+`tests/Phpunit/Compat/Configuration/` compares the bundle configuration with the snapshot recorded from the last release, path by path: kind, default, choices, bounds and whether the key is required; which of a fixed set of values the bundle loads with and what each becomes (a value the tree let through but the release then failed on, with a `TypeError` for instance, does not count as taken); whether it takes an `%env()%` placeholder; whether the standalone binary lets a project's `.symfony-security-auditor.yaml` set it; and the container parameters the bundle publishes, for the default configuration and for each `profile`. A narrowing of a path is a `MAJOR` change (see [Versioning](docs/versioning.md)): restore the released contract. A parameter whose value changes on purpose, such as a cache key salt when a prompt changes, goes into `tests/Phpunit/Compat/Configuration/accepted-differences.php` with the parameters it names (`*` matches any run of characters), a one-line reason and its `CHANGELOG.md` bullet. A default the maintainer decides is no break, such as the default `model` moving to a newer model priced no higher, goes into the same file with the `paths` it changes, the exact `narrowings` the test reports for them, a reason and its bullet. A key added since the release must be listed in `docs/versioning.md` and described in `resources/schema.json`.
 
 ### Public API
 
-The **API compatibility** CI job compares the public PHP API with the last release of the line the change is headed for, with [roave/backward-compatibility-check](https://github.com/Roave/BackwardCompatibilityCheck), and fails on a removed or changed class, method, property, constant or enum case, a narrowed type or an added required parameter. A case added to an enum does not fail it, as [the versioning policy](docs/versioning.md#domain-models-and-exceptions) allows: installing `tools/bc-check` removes the added cases from the changes Roave's enum check returns (`tools/BcCheck/RoaveEnumCaseAdditions.php`), and fails when a Roave release no longer returns them the way it expects. Classes and members tagged `@internal` are not checked. The release is the newest `X.Y.Z` tag of the base branch's line (`1.*.*` for a pull request on `1.x`); a stacked pull request, based on another one's branch, takes the line of the release branch ticked in its description, else of the release branch its commits are closest to.
+The **API compatibility** CI job compares the public PHP API with the last release of the line the change is headed for, with [roave/backward-compatibility-check](https://github.com/Roave/BackwardCompatibilityCheck) and fails on a removed or changed class, method, property, constant or enum case, a narrowed type or an added required parameter. A case added to an enum does not fail it, as [the versioning policy](docs/versioning.md#domain-models-and-exceptions) allows: installing `tools/bc-check` removes the added cases from the changes Roave's enum check returns (`tools/BcCheck/RoaveEnumCaseAdditions.php`) and fails when a Roave release no longer returns them the way it expects. Classes and members tagged `@internal` are not checked. The release is the newest `X.Y.Z` tag of the base branch's line (`1.*.*` for a pull request on `1.x`); a stacked pull request, based on another one's branch, takes the line of the release branch ticked in its description, else of the release branch its commits are closest to.
 
-The tool lives in its own Composer project under `tools/bc-check/`, apart from the project's dependencies, and needs the `bcmath` and `intl` extensions. It reads the release from git and refuses to run in a `git worktree` checkout, so run it in a full clone that holds the tag:
+The tool lives in its own Composer project under `tools/bc-check/`, apart from the project's dependencies. It needs the `bcmath` and `intl` extensions. It reads the release from git and refuses to run in a `git worktree` checkout, so run it in a full clone that holds the tag:
 
 ```bash
 docker compose exec php composer install --working-dir=tools/bc-check
@@ -138,33 +138,33 @@ A break the maintainer accepted goes into `.roave-backward-compatibility-check.x
 
 ### Behaviour Replay
 
-`tests/Phpunit/Compat/` replays, in-process and against a scripted provider, a few hundred scenarios recorded from the last release: every `audit:run` option alone, the nine formats, the exit codes `0` to `3`, `--path`, `--since`, `--dry-run` and `--show-scanned`, an incomplete run, baselines, `audit:diff`, `audit:trend` and `audit:baseline` on reports the release wrote, the configurations its docs showed, the standalone binary's configuration stack, guards, `init` and credential commands, reading the release's cache directory, `mcp:serve`'s tools, and the public PHP API (`RunAuditUseCase` and the Domain models' accessors). Each scenario runs in a workspace of its own under the system's temporary directory, with an isolated home, no network and no API key, and touches nothing outside it: a path a scenario names outside its workspace is refused, and a report written to the discard device goes to a device node of the workspace's own wherever the process could replace the system's `/dev/null`.
+`tests/Phpunit/Compat/` replays, in-process and against a scripted provider, a few hundred scenarios recorded from the last release: every `audit:run` option alone, the nine formats, the exit codes `0` to `3`, `--path`, `--since`, `--dry-run` and `--show-scanned`, an incomplete run, baselines, `audit:diff`, `audit:trend` and `audit:baseline` on reports the release wrote, the configurations its docs showed, the standalone binary's configuration stack, guards, `init` and credential commands, reading the release's cache directory, `mcp:serve`'s tools and the public PHP API (`RunAuditUseCase` and the Domain models' accessors). Each scenario runs in a workspace of its own under the system's temporary directory, with an isolated home, no network and no API key. It touches nothing outside that workspace: a path a scenario names outside its workspace is refused; a report written to the discard device goes to a device node of the workspace's own wherever the process could replace the system's `/dev/null`.
 
-The recordings live in `tests/Phpunit/Compat/Fixture/<release>/`, one JSON file per scenario: the exit code and both output streams of each command, the files it wrote, and a summary of each request the model received (the tools offered, the files sent), with paths, timestamps, dates, durations, run ids and the PHP and package versions normalized; every command runs under the `C` locale and a 120-column terminal. Each workspace path has the same length, so the console wraps it as it did when recording: the suite refuses a `TMPDIR` longer than 22 characters. `environment.json` notes the PHP and package versions they were recorded with, and the suite refuses to replay on another minor version of either, so the CI job installs `tests/Phpunit/Compat/composer.lock`: refresh it with `bin/castor compat:lock` when `composer.json` changes. A scenario that writes to the discard device is recorded only by a user that cannot write `/dev`, or from a release that writes a device in place; `environment.json` lists the ones the recorder left out.
+The recordings live in `tests/Phpunit/Compat/Fixture/<release>/`, one JSON file per scenario: the exit code and both output streams of each command, the files it wrote and a summary of each request the model received (the tools offered, the files sent), with paths, timestamps, dates, durations, run ids and the PHP and package versions normalized; every command runs under the `C` locale and a 120-column terminal. Each workspace path has the same length, so the console wraps it as it did when recording: the suite refuses a `TMPDIR` longer than 22 characters. `environment.json` notes the PHP and package versions they were recorded with. The suite refuses to replay on another minor version of either, so the CI job installs `tests/Phpunit/Compat/composer.lock`: refresh it with `bin/castor compat:lock` when `composer.json` changes. A scenario that writes to the discard device is recorded only by a user that cannot write `/dev`, or from a release that writes a device in place; `environment.json` lists the ones the recorder left out.
 
-**When a scenario fails**, the message lists each difference by its path in the recording (for instance `runs.0.stdout.json.vulnerabilities.1.severity`) or, for text output, by the line lost (`-`) or gained (`+`). A key a JSON report gained is not a difference: [Versioning](docs/versioning.md) lets a `MINOR` add keys to the reports. Restore the released behaviour, or, for a change the maintainer accepted, add an entry to `tests/Phpunit/Compat/accepted-differences.php`: the scenarios it shows in (a name, or a pattern where `*` matches any run of characters, which must show the difference in every scenario it names), its path (`*` matches one segment, `**` any number), a `match` pattern for what changed (the `-line` or `+line` of a text, or `recorded -> replayed` of a value, as JSON), a one-line reason, and the bold summary of its bullet under `## [Unreleased]`. Keep the path and the pattern as narrow as the change: an entry covering a whole scenario stops that scenario from guarding anything else, so pin a broad new behaviour in an ordinary test instead. A difference only in what the scripted provider received (`llm.*`, such as a tool added to a request or files grouped differently) is marked `'internal' => true` instead of citing a bullet. A difference with no bullet to cite is a break to fix, not one to accept.
+**When a scenario fails**, the message lists each difference by its path in the recording (for instance `runs.0.stdout.json.vulnerabilities.1.severity`) or, for text output, by the line lost (`-`) or gained (`+`). A key a JSON report gained is not a difference: [Versioning](docs/versioning.md) lets a `MINOR` add keys to the reports. Restore the released behaviour, or, for a change the maintainer accepted, add an entry to `tests/Phpunit/Compat/accepted-differences.php`: the scenarios it shows in (a name, or a pattern where `*` matches any run of characters, which must show the difference in every scenario it names), its path (`*` matches one segment, `**` any number), a `match` pattern for what changed (the `-line` or `+line` of a text, or `recorded -> replayed` of a value, as JSON), a one-line reason and the bold summary of its bullet under `## [Unreleased]`. Keep the path and the pattern as narrow as the change: an entry covering a whole scenario stops that scenario from guarding anything else, so pin a broad new behaviour in an ordinary test instead. A difference only in what the scripted provider received (`llm.*`, such as a tool added to a request or files grouped differently) is marked `'internal' => true` instead of citing a bullet. A difference with no bullet to cite is a break to fix, not one to accept.
 
 ### Keeping Up With 1.x
 
-The recordings stay those of the last release until the next one is tagged; only the accepted differences follow the branch. When `1.x` moves and the suite reports differences, replay every scenario and print a draft entry for each difference not yet accepted, grouped by path and change, and the entries that no longer show:
+The recordings stay those of the last release until the next one is tagged; only the accepted differences follow the branch. When `1.x` moves and the suite reports differences, replay every scenario and print a draft entry for each difference not yet accepted, grouped by path and change, along with the entries that no longer show:
 
 ```bash
 bin/castor compat:draft
 ```
 
-Review the drafts one by one: give each a reason and its bullet, widen a path only where every difference under it is the same change, and fix what is a break.
+Review the drafts one by one: give each a reason and its bullet, widen a path only where every difference under it is the same change and fix what is a break.
 
 ### Recording From a New Release
 
-Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch, and empty the `accepted-differences.php` files and the `<baseline>` of `.roave-backward-compatibility-check.xml`, whose entries described differences from the previous release:
+Once a release is tagged, record the fixtures from it in a pull request on its `<N>.x` branch and empty the `accepted-differences.php` files and the `<baseline>` of `.roave-backward-compatibility-check.xml`, whose entries described differences from the previous release:
 
 ```bash
 bin/castor compat:record X.Y.Z
 ```
 
-The task checks the tag out under `var/compat/X.Y.Z`, installs its dependencies, and runs the recorders against it, the behaviour one as your own user, so the scenarios writing to the discard device are recorded too. To record a scenario added since, run `docker compose exec --user "$(id -u):$(id -g)" php php tools/Compat/record.php var/compat/X.Y.Z X.Y.Z <scenario>`.
+The task checks the tag out under `var/compat/X.Y.Z`, installs its dependencies and runs the recorders against it, the behaviour one as your own user, so the scenarios writing to the discard device are recorded too. To record a scenario added since, run `docker compose exec --user "$(id -u):$(id -g)" php php tools/Compat/record.php var/compat/X.Y.Z X.Y.Z <scenario>`.
 
-A dependency bump that moves a recorded package (`symfony/ai-platform`, `symfony/ai-bundle`, `mcp/sdk`, Symfony) to another minor version cannot replay the last release's recordings, which only replay on the minor versions they were recorded with. Release the bump quickly and record the fixtures from that release once it is tagged: until then the bump's pull request records the last release again from its tag with only the bump applied, and that edited recording must not outlive the next release.
+A dependency bump that moves a recorded package (`symfony/ai-platform`, `symfony/ai-bundle`, `mcp/sdk`, Symfony) to another minor version cannot replay the last release's recordings, which only replay on the minor versions they were recorded with. Release the bump quickly and record the fixtures from that release once it is tagged: until then the bump's pull request records the last release again from its tag with only the bump applied. That edited recording must not outlive the next release.
 
 ## Evaluating Detection Quality
 
@@ -174,9 +174,9 @@ Unit and mutation tests prove the code behaves as written; they say nothing abou
 bin/castor eval
 ```
 
-This audits `examples/vulnerable-app` with the demo app's own console (real LLM calls, so it costs tokens), then scores the JSON report against [`examples/vulnerable-app/ground-truth.json`](examples/vulnerable-app/ground-truth.json) — a manifest of `{"file", "type"}` seeds. Scoring is at `(file, type)` granularity: a seed the run reproduced is a true positive, a seed it missed a false negative, and a reported finding with no matching seed a false positive (so a safe decoy file the auditor flags lowers precision). Precision, recall, and F1 are printed overall and per vulnerability class.
+This audits `examples/vulnerable-app` with the demo app's own console (real LLM calls, so it costs tokens), then scores the JSON report against [`examples/vulnerable-app/ground-truth.json`](examples/vulnerable-app/ground-truth.json), a manifest of `{"file", "type"}` seeds. Scoring is at `(file, type)` granularity: a seed the run reproduced is a true positive, a seed it missed a false negative and a reported finding with no matching seed a false positive (so a safe decoy file the auditor flags lowers precision). Precision, recall and F1 are printed overall and per vulnerability class.
 
-It runs `examples/vulnerable-app/bin/console` in the `php` container, so install the demo's dependencies once (`docker compose exec php composer install -d examples/vulnerable-app`) and export the key of the platform its [`ai.yaml`](examples/vulnerable-app/config/packages/ai.yaml) configures — `ANTHROPIC_API_KEY` by default — before running it: the task passes that variable into the container. For another platform, edit that `ai.yaml`, `composer require` its bridge in the demo, and name its variable with `--api-key-env` (for example `--api-key-env=OPENAI_API_KEY`). The JSON report is kept as `var/ssa-eval-<id>.json`.
+It runs `examples/vulnerable-app/bin/console` in the `php` container, so install the demo's dependencies once (`docker compose exec php composer install -d examples/vulnerable-app`) and export the key of the platform its [`ai.yaml`](examples/vulnerable-app/config/packages/ai.yaml) configures (`ANTHROPIC_API_KEY` by default) before running it: the task passes that variable into the container. For another platform, edit that `ai.yaml`, `composer require` its bridge in the demo and name its variable with `--api-key-env` (for example `--api-key-env=OPENAI_API_KEY`). The JSON report is kept as `var/ssa-eval-<id>.json`.
 
 Point it at another fixture and gate a run on minimum quality:
 
@@ -185,7 +185,7 @@ bin/castor eval --target=path/to/app --ground-truth=path/to/manifest.json \
     --min-precision=0.8 --min-recall=0.9
 ```
 
-The harness lives in [`tools/Eval/`](tools/Eval/) (namespace `Tooling\Eval`) — `GroundTruthManifest` loads and validates the manifest, `EvalScorer` computes the `EvalReport`. It is a maintainer tool, not part of the shipped bundle, so it is excluded from coverage and mutation scope like the rest of `tools/`.
+The harness lives in [`tools/Eval/`](tools/Eval/) (namespace `Tooling\Eval`): `GroundTruthManifest` loads and validates the manifest, `EvalScorer` computes the `EvalReport`. It is a maintainer tool, not part of the shipped bundle, so it is excluded from coverage and mutation scope like the rest of `tools/`.
 
 ## Code Quality
 
@@ -210,7 +210,7 @@ Prettier and Markdown lint both run via Docker (`tmknom/prettier`, `davidanson/m
 npx --yes @commitlint/cli --from=origin/main --to=HEAD --config commitlint.config.mjs
 ```
 
-**No silent suppressions allowed.** PHPStan `@phpstan-ignore*`, baseline files, Rector skips, `@codeCoverageIgnore`, `markTestSkipped` used to dodge failures — all forbidden. If a tool flags something, fix the code. Genuine false positives require a PR-description justification and a linked tracking issue.
+**No silent suppressions allowed.** PHPStan `@phpstan-ignore*`, baseline files, Rector skips, `@codeCoverageIgnore`, `markTestSkipped` used to dodge failures are all forbidden. If a tool flags something, fix the code. Genuine false positives require a PR-description justification and a linked tracking issue.
 
 ## Writing Tests
 
@@ -235,11 +235,11 @@ npx --yes @commitlint/cli --from=origin/main --to=HEAD --config commitlint.confi
 
 A pull request opens against `main` by default, so **retarget the base**. Tick the same branch under `## Target branch` in the description; the `Pull request target` check fails the build when the two disagree. Full rationale in [Branches & maintenance](docs/versioning.md#branches--maintenance).
 
-Base a pull request on another open one's branch — stack it — only when it needs code that one adds, never because both edit `CHANGELOG.md` or the docs. Tick `stacked` as well, and end the Summary with `Stacked on #123` and what this one needs from it.
+Base a pull request on another open one's branch (stack it) only when it needs code that one adds, never because both edit `CHANGELOG.md` or the docs. Tick `stacked` as well and end the Summary with `Stacked on #123` and what this one needs from it.
 
 ## Documenting Additions
 
-Because `main` tracks the latest release, its documentation matches what users can install — but a reader still needs to know which release introduced a key, and the config tree rejects an unknown key outright (`InvalidConfigurationException` from both the bundle and the standalone binary) if they are on an older version.
+Because `main` tracks the latest release, its documentation matches what users can install, but a reader still needs to know which release introduced a key: the config tree rejects an unknown key outright (`InvalidConfigurationException` from both the bundle and the standalone binary) if they are on an older version.
 
 So when you document a new config key, CLI option or output format, mark it with the release that will carry it:
 
@@ -247,7 +247,7 @@ So when you document a new config key, CLI option or output format, mark it with
 | `audit.new_key` | `bool` | `false` | _Since 1.19._ What it does. |
 ```
 
-Use the next unreleased version — the one your `CHANGELOG.md` entry sits under. Removals already follow this convention (see `cache.prompt_caching`, marked _Deprecated since 1.7_); additions need it for the same reason.
+Use the next unreleased version: the one your `CHANGELOG.md` entry sits under. Removals already follow this convention (see `cache.prompt_caching`, marked _Deprecated since 1.7_); additions need it for the same reason.
 
 Do not point documentation or examples at a `raw.githubusercontent.com/.../main/` URL. User-facing files are published as release assets, so reference them through `releases/latest/download/`, which always resolves to the newest published release. See [Branches & maintenance](docs/versioning.md#branches--maintenance).
 
@@ -259,7 +259,7 @@ Do not point documentation or examples at a `raw.githubusercontent.com/.../main/
 2. Extend `category()` and `owaspReference()` with the new case.
 3. Update `AttackerPromptBuilder` to mention the new type so the LLM emits it.
 4. Add a fixture in `tests/Phpunit/Fixtures/` that exercises the new case.
-5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-references).
+5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype-backed-enum-with-owasp-and-cwe-references).
 
 ### Add a new pipeline stage
 
@@ -277,7 +277,7 @@ Implement `Audit/Domain/Port/AdvisoryDatabaseInterface` and alias `AdvisoryDatab
 
 ### Swap the LLM provider
 
-`config/packages/ai.yaml` change only — no PHP edits. See [Configuration → Platform Configuration](docs/configuration.md#platform-configuration).
+`config/packages/ai.yaml` change only, no PHP edits. See [Configuration → Platform Configuration](docs/configuration.md#platform-configuration).
 
 For a custom client implementation (direct HTTP, retry logic, …) see [Extending → Custom LLM Client](docs/extending.md#1-custom-llm-client).
 
@@ -286,9 +286,9 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feat/my-feature`.
 3. Write tests for your change (unit + integration where applicable).
-4. Mind backward compatibility — the project follows [Semantic Versioning 2.0.0](https://semver.org); any change that affects the public API surface listed in [`docs/versioning.md`](docs/versioning.md) needs a deprecation cycle and a `feat!:` commit.
+4. Mind backward compatibility: the project follows [Semantic Versioning 2.0.0](https://semver.org); any change that affects the public API surface listed in [`docs/versioning.md`](docs/versioning.md) needs a deprecation cycle and a `feat!:` commit.
 5. Ensure all checks pass: `bin/castor lint`. A behavior change also adds one line to `CHANGELOG.md` under `## [Unreleased]`, in the sections and voice of [`.claude/rules/changelog.md`](.claude/rules/changelog.md); `sh .github/scripts/check-changelog.sh` checks it.
-6. Open a pull request and fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md): a title of 50 characters or fewer, a `## Summary` of 500 or fewer, only the boxes you tick — the license box included — and no section beyond the template's four. The `Pull request target` check fails the pull request otherwise — run it first:
+6. Open a pull request and fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md): a title of 50 characters or fewer, a `## Summary` of 500 or fewer, only the boxes you tick (the license box included) and no section beyond the template's four. The `Pull request target` check fails the pull request otherwise. Run it first:
 
    ```bash
    PR_TITLE='fix(scan): …' PR_BODY="$(cat body.md)" BASE_REF=1.x \
@@ -331,6 +331,6 @@ Be respectful and constructive. Personal attacks, harassment, or dismissive beha
 
 ## Security
 
-Report vulnerabilities **in the auditor itself** privately via [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new) — not in a public issue. See [SECURITY.md](SECURITY.md) for the full policy.
+Report vulnerabilities **in the auditor itself** privately via [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new), not in a public issue. See [SECURITY.md](SECURITY.md) for the full policy.
 
-Issues with audit output (false positives, missed vulnerabilities, weird LLM behavior) are not security issues — open them as normal GitHub issues with a reproducer, or check [Troubleshooting](docs/troubleshooting.md) first.
+Issues with audit output (false positives, missed vulnerabilities, weird LLM behavior) are not security issues: open them as normal GitHub issues with a reproducer, or check [Troubleshooting](docs/troubleshooting.md) first.

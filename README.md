@@ -10,44 +10,31 @@ AI-powered, multi-agent security auditor for Symfony applications. An adversaria
 >
 > `main` holds **exactly the latest release**, so everything documented here is in the version you install. Development happens on [version branches](docs/versioning.md#branches--maintenance).
 
-## What's new in 1.22
-
-- **Claude Opus 5.5 by default** — `init` lists the providers and the newest models the pricing catalog prices, to pick by number, and suggests `claude-opus-5-5`.
-- **Gates in YAML, config per project** — `audit.min_score`, `audit.fail_on_incomplete`, `audit.format` and `audit.output` live in the configuration, and the standalone binary layers the audited project's own `.symfony-security-auditor.yaml` over your user config. A flag always wins.
-- **Sharper pull-request audits** — `audit.tools_scope: scanned` lets a `--since` or `--path` run follow a changed controller into unchanged files, and `audit.report_path_prefix` puts SARIF and GitHub annotations on the right file in a monorepo.
-- **Honest reports** — `xss` is a finding type of its own, files the scan left out are listed, and a run that found no file reads `UNKNOWN` instead of a clean grade.
-- **Standalone binary, all the commands** — `audit:diff`, `audit:trend` and `audit:baseline` run with no configuration; `self-update` shows its download progress, and `self-update --snapshot` installs the build of every push to `1.x` to try a fix before it ships.
-- **More secrets scrubbed** — Symfony secrets-vault keys, `Authorization` headers, and the credentials passed to PDO, LDAP, Redis, HttpClient and many more are redacted before any code leaves your machine.
-
-Everything else is in the [changelog](CHANGELOG.md).
-
 ## Why this auditor?
 
 Traditional PHP static analysis tools (PHPStan, Psalm) catch type errors. Static SAST tools (Psalm Security, Progpilot) follow taint flows but cannot reason about business logic, missing authorization, or multi-file attack chains. Dependency scanners (Dependabot, Renovate, Snyk) only flag known CVEs in third-party packages. This auditor runs alongside them, **targeting the application-level logic flaws they cannot see**.
 
-Side-by-side comparison with PHPStan, Psalm, Progpilot, Dependabot, and Snyk: [FAQ](docs/faq.md#comparisons).
+Side-by-side comparison with PHPStan, Psalm, Progpilot, Dependabot and Snyk: [FAQ](docs/faq.md#comparisons).
 
 ## What it does
 
-An adversarial **Attacker** agent hunts for vulnerabilities; a skeptical **Reviewer** agent culls false positives over up to three iterations — then emits a validated report in console, JSON, SARIF, HTML, or Markdown.
+An adversarial **Attacker** agent hunts for vulnerabilities; a skeptical **Reviewer** agent culls false positives over up to three iterations, then emits a validated report in console, JSON, SARIF, HTML, or Markdown.
 
 🔀 **Pipeline**: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer) → Report.
 
 ## See it in action
 
-### `doctor` — preflight check
+### Live audit
 
-![Doctor — the standalone binary checks its configuration, provider bridge, Composer and pricing catalog](assets/doctor.gif?raw=true)
+![Live audit: the Attacker vs Reviewer feed streaming to the validated report](assets/demo.gif?raw=true)
 
-The standalone binary checks that it is ready to audit before you spend a token: configuration and API key, provider bridge, Composer, and pricing catalog. It exits `1` when a check fails, so it drops into a CI preflight step — see [`doctor`](docs/configuration.md#doctor--preflight-environment-check).
+While the pipeline runs, the audit narrates itself live: an attack-surface overview, each finding streamed (color-coded by severity in a terminal) the moment the Attacker flags it, per-chunk timing and a reviewer tally. In CI or any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI codes). Progress is suppressed for any non-`console` `--format` to stdout and for `--dry-run`.
 
-```bash
-symfony-security-auditor doctor
-```
+The full report renders the same way in console, JSON, SARIF, HTML and Markdown: see [CLI reference](docs/configuration.md#cli-reference) and [output formats](docs/configuration.md#output-formats-reference).
 
-### `--dry-run` mode
+### Cost estimate with `--dry-run`
 
-![Dry run — token and cost estimate with no LLM calls](assets/dry-run.gif?raw=true)
+![Dry run: token and cost estimate with no LLM calls](assets/dry-run.gif?raw=true)
 
 Scans files and estimates token usage and cost without calling the LLM. Use this to gauge cost before committing to a full audit.
 
@@ -55,38 +42,26 @@ Scans files and estimates token usage and cost without calling the LLM. Use this
 bin/console audit:run --dry-run
 ```
 
-No LLM calls are made; the exit code is `0` unless the command is refused before the estimate — an invalid option or project path, or a `--path` outside the project — which exits `1`.
-
-### Console mode
-
-![Live audit — the Attacker vs Reviewer feed streaming to the validated report](assets/demo.gif?raw=true)
-
-While the pipeline runs, the audit narrates itself live — an attack-surface overview, each finding streamed (color-coded by severity in a terminal) the moment the Attacker flags it, per-chunk timing, and a reviewer tally. In CI or any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI codes). Progress is suppressed for any non-`console` `--format` to stdout and for `--dry-run`.
-
-The full report renders the same way in console, JSON, SARIF, HTML, and Markdown — see [CLI reference](docs/configuration.md#cli-reference) and [output formats](docs/configuration.md#output-formats-reference).
+No LLM calls are made; the exit code is `0` unless the command is refused before the estimate (an invalid option or project path, or a `--path` outside the project), which exits `1`.
 
 ## Getting Started
 
-The auditor ships two maintained ways to run it — pick the one that fits:
+The auditor ships two maintained ways to run it. Pick the one that fits:
 
-- **[Standalone CLI](#standalone-tool-binary) (recommended)** — one download, configured once, audits any project with zero footprint in it. Best for most users, and for auditing a project you don't want to add a dependency to.
-- **[Symfony bundle](#use-it-as-a-symfony-bundle)** — wired into a Symfony app via Flex. Pick this to extend the auditor (custom services, decorated ports) or to pin it in the app's `dev` dependencies.
+- **[Standalone CLI](#standalone-tool-binary) (recommended)**: one download, configured once, audits any project with zero footprint in it. Best for most users and for auditing a project you don't want to add a dependency to.
+- **[Symfony bundle](#use-it-as-a-symfony-bundle)**: wired into a Symfony app via Flex. Pick this to extend the auditor (custom services, decorated ports) or to pin it in the app's `dev` dependencies.
 
 > [!TIP]
 >
-> Both expose the same `audit` command, options, and output formats — see the [CLI reference](docs/configuration.md#cli-reference) — and both can serve the auditor to your AI assistant over [MCP](#use-it-from-your-ai-assistant-mcp) (experimental).
+> Both expose the same `audit` command, options and output formats (see the [CLI reference](docs/configuration.md#cli-reference)) and both can serve the auditor to your AI assistant over [MCP](#use-it-from-your-ai-assistant-mcp) (experimental).
 
 ## Standalone tool (binary)
 
-One install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** with its own PHP runtime for Linux, macOS, and Windows.
+One install, many projects, zero footprint in the audited app. Each release ships a **self-contained native binary** with its own PHP runtime for Linux, macOS and Windows.
 
 ### Requirements
 
-Running audits needs nothing but the binary and an API key for your provider (not even that for a local model such as [Ollama](#supported-platforms)).
-
-The one-time [`init`](#2-configure--the-guided-init) downloads the package that talks to your AI provider with the Composer bundled in the binary, run on its own PHP, so it needs no PHP or Composer on your machine, only network access to Packagist.
-
-`--since` needs `git`, and live CVE lookups use `composer audit` when `composer` is present.
+Nothing but the binary and access to a model: an API key, a Claude or ChatGPT subscription through its CLI, or a [local model](#supported-platforms) such as Ollama. No PHP or Composer: the one-time [`init`](#2-configure-the-guided-init) fetches the provider bridge with the Composer the binary bundles. `--since` needs `git`. Live CVE lookups use `composer audit` when `composer` is present.
 
 ### 1. Install
 
@@ -104,21 +79,23 @@ Both detect your OS and CPU, download the matching binary and **abort** rather t
 
 > [!TIP]
 >
-> Set `SSA_INIT=1` on either command and the installer runs the guided [`init`](#2-configure--the-guided-init) right after downloading (`$env:SSA_INIT = '1'` in PowerShell). With a terminal it prompts for your provider and API key; in a pipe or CI it takes the Anthropic defaults and stores no key.
+> Set `SSA_INIT=1` on either command and the installer runs the guided [`init`](#2-configure-the-guided-init) right after downloading (`$env:SSA_INIT = '1'` in PowerShell). With a terminal it prompts for your provider and API key; in a pipe or CI it takes the Anthropic defaults and stores no key.
 
-### 2. Configure — the guided `init`
+### 2. Configure: the guided `init`
 
 ```bash
 symfony-security-auditor init
 ```
 
-`init` walks you through three things:
+`init` asks how you access AI models (subscription, API key, local model, gateway or cloud account), lists the matching providers and models with their price, installs the provider bridge and takes your API key invisibly. Press Enter to skip it and run `auth:set` later, or keep using an environment variable. It writes `~/.config/symfony-security-auditor/config.yaml` (`%APPDATA%\symfony-security-auditor\config.yaml` on Windows), which takes the bundle's keys without the `symfony_security_auditor:` wrapper plus a `platform:` block. See [configuration](docs/configuration.md#standalone-configuration). It can end by sending one test request (`doctor --check-connection`).
 
-- **The config file:** `~/.config/symfony-security-auditor/config.yaml` on Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows.
-- **The provider bridge:** the package that talks to your AI provider, downloaded with `composer`.
-- **Your API key:** pasted invisibly, never echoed, never in your shell history. Press Enter to skip it and run `auth:set` later, or keep using an environment variable.
+Check the setup at any time with `doctor`, before you spend a token: configuration and API key, provider bridge, Composer and pricing catalog. It exits `1` when a check fails, so it drops into a CI preflight step. See [`doctor`](docs/configuration.md#doctor-preflight-environment-check).
 
-The config takes the bundle's keys without the `symfony_security_auditor:` wrapper, plus a `platform:` block handed to `symfony/ai` — see [configuration](docs/configuration.md#standalone-configuration).
+```bash
+symfony-security-auditor doctor
+```
+
+![Doctor: the standalone binary checks its configuration, provider bridge, Composer and pricing catalog](assets/doctor.gif?raw=true)
 
 ### 3. Run
 
@@ -132,11 +109,12 @@ symfony-security-auditor audit /path/to/your/symfony/project
 
 | Command | What it does |
 | --- | --- |
-| `auth:set` | Store or replace the key — prompts invisibly, writes an owner-only file |
-| `auth:status` | Show which key an audit would use, where it came from, and its SHA-256 fingerprint — never the key |
+| `auth:set` | Store or replace the key: prompts invisibly, writes an owner-only file |
+| `auth:status` | Show which key an audit would use, where it came from and its SHA-256 fingerprint (never the key) |
+| `auth:test` | Send one short test request to check the key works |
 | `auth:remove` | Forget the stored key on this machine |
 
-The key lives in an owner-only `credentials.json` next to your config, which an audit refuses to read if other users can. **An exported variable always wins**, so Docker, Kubernetes and CI are unchanged: `ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .`. Storing nothing is fine too — [Providing the API key](docs/configuration.md#providing-the-api-key) covers environment variables, mounted secret files, password managers and CI secrets.
+The key lives in an owner-only `credentials.json` next to your config, which an audit refuses to read if other users can. **An exported variable always wins**, so Docker, Kubernetes and CI are unchanged: `ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .`. Storing nothing is fine too: [Providing the API key](docs/configuration.md#providing-the-api-key) covers environment variables, mounted secret files, password managers and CI secrets.
 
 ### 4. Keep it up to date
 
@@ -145,13 +123,13 @@ symfony-security-auditor self-update          # download + verify + replace, if 
 symfony-security-auditor self-update --check  # only report whether a newer version exists
 ```
 
-`self-update` verifies the checksum before replacing the binary — see the [CLI reference](docs/configuration.md#self-update--updating-the-standalone-binary). `self-update --snapshot` (or `SSA_VERSION=snapshot` with the installers) installs the pre-release built from every push to the development branch; a plain `self-update` returns to the latest release.
+`self-update` verifies the checksum before replacing the binary. See the [CLI reference](docs/configuration.md#self-update-updating-the-standalone-binary). `self-update --snapshot` (or `SSA_VERSION=snapshot` with the installers) installs the pre-release built from every push to the development branch; a plain `self-update` returns to the latest release.
 
 ## Use it as a Symfony bundle
 
-### 1. Install — Symfony Flex wires everything
+### 1. Install: Symfony Flex wires everything
 
-Installing the bundle requires **PHP 8.3+ and Symfony 7.4+** in the host application (see [`composer.json`](composer.json)) — the standalone binary needs no PHP to audit, since it bundles its own runtime (only its one-time `init` needs PHP and Composer, see its [requirements](#requirements)).
+Installing the bundle requires **PHP 8.3+ and Symfony 7.4+** in the host application (see [`composer.json`](composer.json)).
 
 ```bash
 composer require --dev vinceamstoutz/symfony-security-auditor
@@ -182,7 +160,7 @@ ai:
 
 ### 4. Adjust the auditor config
 
-The Flex recipe already created this file — pick your model, and report what the deterministic scans find (redacted secrets, pre-scan matches) as reviewed findings:
+The Flex recipe already created this file. Pick your model and report what the deterministic scans find (redacted secrets, pre-scan matches) as reviewed findings:
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
@@ -192,7 +170,7 @@ symfony_security_auditor:
         report_static_findings: true
 ```
 
-Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough`:
+Optionally pick a one-knob preset, `fast`, `balanced` (default), or `thorough`:
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
@@ -200,7 +178,7 @@ symfony_security_auditor:
     profile: 'fast'
 ```
 
-A profile only fills the keys you leave unset — any explicitly configured key always wins. See [Cost & Performance](docs/cost-and-performance.md) for exactly what each profile sets.
+A profile only fills the keys you leave unset: any explicitly configured key always wins. See [Cost & Performance](docs/cost-and-performance.md) for exactly what each profile sets.
 
 ### 5. Run
 
@@ -222,21 +200,21 @@ bin/console audit:run --dry-run
 
 > [!WARNING]
 >
-> **Audit reports list your application's vulnerabilities.** On a **public repository**, CI artifacts are publicly downloadable — storing the report exposes your attack surface. Prefer GitHub Code Scanning (SARIF, restricted to collaborators), private storage (S3/GCS with IAM), or notification-only. See [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories).
+> **Audit reports list your application's vulnerabilities.** On a **public repository**, CI artifacts are publicly downloadable, so storing the report exposes your attack surface. Prefer GitHub Code Scanning (SARIF, restricted to collaborators), private storage (S3/GCS with IAM), or notification-only. See [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories).
 
 <!-- -->
 
 > [!TIP]
 >
-> Schedule the audit as a nightly CI job — the multi-agent LLM loop can take minutes, so blocking PRs on it hurts productivity. [CI Integration](docs/ci.md) has ready-to-copy GitHub Actions and GitLab CI schedules and a split-model config to [control API costs](docs/ci.md#managing-llm-costs). For **dependency CVEs**, pair it with [Dependabot](https://docs.github.com/en/code-security/dependabot) or [Renovate](https://docs.renovatebot.com/) — this auditor targets the application-level logic flaws those scanners cannot see.
+> Schedule the audit as a nightly CI job: the multi-agent LLM loop can take minutes, so blocking PRs on it hurts productivity. [CI Integration](docs/ci.md) has ready-to-copy GitHub Actions and GitLab CI schedules and a split-model config to [control API costs](docs/ci.md#managing-llm-costs). For **dependency CVEs**, pair it with [Dependabot](https://docs.github.com/en/code-security/dependabot) or [Renovate](https://docs.renovatebot.com/). This auditor targets the application-level logic flaws those scanners cannot see.
 
 ## Use it from your AI assistant (MCP)
 
 > [!WARNING]
 >
-> **`mcp:serve` is experimental.** The command, the `audit` tool and its input schema may change in any release, including a `MINOR` or `PATCH` one, and are not covered by the [backward compatibility promise](docs/versioning.md#experimental-features).
+> **`mcp:serve` is experimental.** The command, the `audit` tool and its input schema may change in any release (including a `MINOR` or `PATCH` one) and are not covered by the [backward compatibility promise](docs/versioning.md#experimental-features).
 
-`mcp:serve` starts a [Model Context Protocol](https://modelcontextprotocol.io) server, so any MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, … — can audit a project on request and read back the JSON report. It works from the standalone binary and from the bundle alike:
+`mcp:serve` starts a [Model Context Protocol](https://modelcontextprotocol.io) server, so any MCP client (Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, …) can audit a project on request and read back the JSON report. It works from the standalone binary and from the bundle alike:
 
 ```bash
 # Claude Code, with the standalone binary
@@ -256,103 +234,51 @@ claude mcp add --transport stdio symfony-security-auditor -- symfony-security-au
 
 The second snippet is the shape Claude Desktop, Cursor, Windsurf and Gemini CLI read; with the bundle, use `"command": "php"` and `"args": ["/absolute/path/to/bin/console", "mcp:serve"]`.
 
-With the binary, the server reads its configuration once, when it starts — your user config and the `.symfony-security-auditor.yaml` of the folder it starts in — and applies it to every project it audits, never the audited project's own file: start it from the project it will audit (see [Per-project overrides](docs/configuration.md#per-project-overrides)).
+With the binary, the server reads its configuration once, when it starts (your user config and the `.symfony-security-auditor.yaml` of the folder it starts in) and applies it to every project it audits, never the audited project's own file: start it from the project it will audit (see [Per-project overrides](docs/configuration.md#per-project-overrides)).
 
 > [!NOTE]
 >
-> The audit still runs on **your configured provider and model**, not on the assistant's, so it needs the same API key as a CLI run — with the binary, store it once with `auth:set` so a desktop client finds it. Point the auditor at a local Ollama and it needs no key at all. Setup for every client, including VS Code and Codex CLI: [`mcp:serve`](docs/configuration.md#mcpserve--model-context-protocol-server).
+> The audit still runs on **your configured provider and model**, not on the assistant's, so it needs the same API key as a CLI run. With the binary, store it once with `auth:set` so a desktop client finds it. Point the auditor at a local Ollama and it needs no key at all. Setup for every client, including VS Code and Codex CLI: [`mcp:serve`](docs/configuration.md#mcpserve-model-context-protocol-server).
 
 ## Features
 
-- **Multi-agent loop** — adversarial Attacker + skeptical Reviewer cut false positives across up to 3 iterations, with confirmed findings fed back so later iterations generalize patterns instead of re-finding the same bugs, and the Reviewer remembering its own rejections across runs.
-- **50 vulnerability types** covering OWASP-aligned categories: Injection, Broken Access Control, Logic Flaws, Symfony-specific, Data Exposure, Cryptographic — including the modern Symfony 7.x/8.x surface (Authenticators, Messenger handlers, Webhooks, Serializer denormalizers, Schedules, RateLimiter, Mailer, cache poisoning).
-- **Symfony-aware** — understands Controllers, Voters, Forms, Firewalls, Routes, `#[IsGranted]`, `denyAccessUnlessGranted`, `#[MapRequestPayload]`, Twig/Live Components, and surfaces controllers without proper access checks.
-- **Feature-based chunking** — groups a controller with its entity, repository, form, voter, and templates so the Attacker can follow data flow across files.
-- **Deterministic pre-scan** — a zero-token risk-marker pass flags concrete locations (unserialize, `|raw`, hardcoded secrets, unsafe Doctrine, …) to focus the LLM; optional **lean mode** drops marker-free files to cut tokens. Results from other SAST tools can be imported as markers via SARIF.
-- **Diff mode** — `audit:run --since=main` audits only changed files for fast pull-request CI; with `audit.tools_scope: scanned` the Attacker can still follow a changed controller into the unchanged files it calls.
-- **Cross-file investigation tools** — Attacker (and optionally Reviewer) can `read_file`, `grep`, `list_files`, and `lookup_advisory` (zero-config live CVE lookups via `composer audit`, backed by Packagist + GitHub Security Advisories).
-- **One-knob profiles** — `fast`, `balanced`, and `thorough` preset the cost/speed/depth levers in a single line; any explicit key still wins.
-- **Tunable for speed & cost** — split-model (powerful Attacker + cheap Reviewer, ~20× cheaper), concurrent Attacker **and** Reviewer calls (`attacker_max_concurrent` / `reviewer_max_concurrent`), Anthropic prompt caching on by default (~90% input-token discount), content-hash caching that skips identical chunks, cheap→expensive escalation, and code slicing.
-- **Secret-safe by default** — credential-shaped strings are scrubbed from file content **before** it reaches the LLM, and `privacy.offline_only` refuses every network call the auditor owns (see [Security by design](#security-by-design)).
-- **Rate-limit aware** — reactive retry with `Retry-After`-aware exponential backoff plus an optional proactive token-bucket limiter keep you inside provider quotas (see [Cost & Performance](docs/cost-and-performance.md#avoiding-rate-limits-429)).
-- **Actionable findings** — optionally attach a copy-pasteable reproduction (curl/console/payload) and a suggested patch to every high-severity finding; each one also carries a heuristic CVSS v4.0 estimate.
-- **Nine output formats** — `console`, `executive` (stakeholder summary: risk level, business impact, severity/type/hotspot distributions, no per-finding detail), `json`, `sarif` (GitHub Code Scanning / GitLab Security Dashboard), `html` (self-contained, shareable), `markdown` (PR-friendly), `junit` (CI test-report panels), `github` (inline PR annotations, no SARIF upload step), and `github-comment` (PR comment headlined by the grade and score, self-updating on rerun). Baseline suppression: `--generate-baseline` accepts known findings, `--baseline` drops them from the report and exit code so only new findings fail CI; `--min-score` gates on the normalized score independently of `--fail-on`.
-- **Callable from your AI assistant (experimental)** — `mcp:serve` exposes the audit as an MCP tool to Claude Code, Claude Desktop, Cursor, VS Code and any other MCP client, from the binary or the bundle (see [Use it from your AI assistant](#use-it-from-your-ai-assistant-mcp)).
-- **Findings over time** — `audit:diff` compares two JSON reports by finding fingerprint, `audit:trend` tracks counts across a series of them, and `audit:baseline` merges, prunes and annotates a baseline — in the bundle and the standalone binary alike.
-- **CI-ready** — a reusable [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.22.1`) plus GitLab CI templates, with SARIF upload to Code Scanning and an optional shields.io badge tracking the report's letter grade. See [CI Integration](docs/ci.md).
-- **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let you plug in custom providers, agents, stages, advisory feeds, or report formats; project-specific attacker skills need only configuration, no PHP.
-- **Bundle or standalone** — install as a Symfony bundle, or run it from a single self-contained binary configured once at the user level to audit any project with zero footprint, kept current with `self-update` and preflighted with `doctor` (see [Standalone tool](#standalone-tool-binary)).
+- **Finds what SAST tools miss**: an Attacker agent hunts, a Reviewer agent rejects false positives, over up to three rounds: broken access control, IDOR, business-logic flaws, injections and 50 vulnerability types mapped to OWASP and CWE.
+- **Knows Symfony**: controllers, voters, firewalls, `access_control`, forms, `#[IsGranted]`, `#[MapRequestPayload]`, Twig and Live Components, Messenger, Webhooks, API Platform. It flags routes without an access check and reads a controller together with its entity, repository, form, voter and templates.
+- **Pull-request ready**: `--since=main` audits only the changed files. The [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor) (`uses: vinceamstoutz/symfony-security-auditor@1.22.1`) posts annotations, a PR comment and one-click fix suggestions; SARIF feeds GitHub Code Scanning and GitLab. See [CI Integration](docs/ci.md).
+- **Actionable findings**: each one has its file and line, a CVSS v4.0 estimate and a remediation, plus, on request, a reproduction and a suggested patch.
+- **Any model**: Claude, GPT, Gemini, Mistral, DeepSeek, Bedrock, Azure OpenAI, any OpenAI-compatible gateway, a local Ollama, or your Claude or ChatGPT subscription.
+- **Private by default**: secrets are scrubbed before any code leaves your machine; `privacy.offline_only` enforces a fully local run (see [Security by design](#security-by-design)).
+- **Cost under control**: `--dry-run` estimates the bill, budgets stop a run at a cap. Profiles, split models, caching and concurrency cut cost and time (see [Cost & Performance](docs/cost-and-performance.md)).
+- **Works with your other tools**: imports PHPStan, Psalm or Semgrep results as leads through SARIF and checks dependency CVEs with `composer audit`.
+- **Nine report formats**: console, executive summary, JSON, SARIF, HTML, Markdown, JUnit, GitHub annotations and PR comment. A baseline and `--min-score` let CI fail on new findings only.
+- **Findings over time**: `audit:diff` compares two reports, `audit:trend` tracks a series, `audit:baseline` maintains accepted findings.
+- **From your AI assistant**: `mcp:serve` (experimental) lets Claude Code, Cursor, VS Code or any MCP client run an audit.
+- **Extensible**: strict DDD layers behind one `LLMClientInterface` seam for custom providers, stages, advisory feeds or report formats; project-specific attacker rules need only configuration.
+- **Bundle or standalone**: add it to a Symfony app, or audit any project with one self-contained binary, kept current by `self-update` and checked by `doctor`.
 
 ## Security by design
 
 The auditor is conservative about what leaves your machine:
 
-- **Secrets are scrubbed before they leave your machine.** With `scan.secret_scrubbing.enabled: true` (the default), credential-shaped strings are redacted from file content _before_ it reaches the LLM: AWS / GitHub / Stripe / Slack / Google API keys, JWTs, PEM private keys, Symfony secrets-vault decryption keys, env-style credential assignments, `Authorization` headers, the credentials passed in code to PDO, LDAP, Redis or HttpClient, and connection-string URIs with embedded credentials (`postgres://user:pass@host`). Add project-specific shapes with `scan.secret_scrubbing.additional_patterns`.
-- **The cache never stores your files.** The filesystem cache keys LLM _responses_ by content hash. An entry holds the findings the model reported, with the short source excerpts it quoted, and the reviewer's reasoning — never a project file — so treat `cache.dir` like a report: keep it out of shared CI caches and public artifacts.
-- **You choose where the code goes.** Source is sent only to the provider you wire in `ai.yaml`. For zero third-party exposure, run fully offline with [Ollama](docs/configuration.md#supported-platforms) — nothing leaves your network. Set [`privacy.offline_only: true`](docs/configuration.md#privacy--data-egress) to have that enforced rather than assumed: the advisory feed is dropped (no `composer audit`) and the standalone CLI refuses to boot against a platform endpoint that is not loopback or private-range. `docs/faq.md` carries a `tcpdump` recipe for verifying it yourself.
-- **Reports are sensitive — they list your weak spots.** On public repos, prefer SARIF → GitHub Code Scanning (collaborator-only) over downloadable CI artifacts. See [Report Visibility](docs/ci.md#report-visibility-on-public-repositories).
-
-## Tuning & cost
-
-Profiles (`fast` / `balanced` / `thorough`), split-model, concurrency, caching, budget caps, and `429` rate-limit handling are covered in **[Cost & Performance](docs/cost-and-performance.md)** — start with a profile, then override individual keys as needed.
+- **Secrets are scrubbed before they leave your machine.** With `scan.secret_scrubbing.enabled: true` (the default), credential-shaped strings are redacted from file content _before_ it reaches the LLM: AWS / GitHub / Stripe / Slack / Google API keys, JWTs, PEM private keys, Symfony secrets-vault decryption keys, env-style credential assignments, `Authorization` headers, connection-string URIs with embedded credentials (`postgres://user:pass@host`) and the credentials passed in code to PDO, LDAP, Redis or HttpClient. Add project-specific shapes with `scan.secret_scrubbing.additional_patterns`.
+- **The cache never stores your files.** The filesystem cache keys LLM _responses_ by content hash. An entry holds the findings the model reported (with the short source excerpts it quoted) and the reviewer's reasoning (never a project file), so treat `cache.dir` like a report: keep it out of shared CI caches and public artifacts.
+- **You choose where the code goes.** Source is sent only to the provider you wire in `ai.yaml`. For zero third-party exposure, run fully offline with [Ollama](docs/configuration.md#supported-platforms): nothing leaves your network. Set [`privacy.offline_only: true`](docs/configuration.md#privacy-data-egress) to have that enforced rather than assumed: the advisory feed is dropped (no `composer audit`) and the standalone CLI refuses to boot against a platform endpoint that is not loopback or private-range. `docs/faq.md` carries a `tcpdump` recipe for verifying it yourself.
+- **Reports are sensitive: they list your weak spots.** On public repos, prefer SARIF → GitHub Code Scanning (collaborator-only) over downloadable CI artifacts. See [Report Visibility](docs/ci.md#report-visibility-on-public-repositories).
 
 ## Supported Platforms
 
-| Platform | Bridge package | Key env var(s) |
-| --- | --- | --- |
-| Anthropic (Claude) | `symfony/ai-anthropic-platform` | `ANTHROPIC_API_KEY` |
-| OpenAI | `symfony/ai-open-ai-platform` | `OPENAI_API_KEY` |
-| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY` plus a `base_url` |
-| Azure OpenAI | `symfony/ai-azure-platform` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL` |
-| Google Gemini | `symfony/ai-gemini-platform` | `GEMINI_API_KEY` |
-| Google Vertex AI | `symfony/ai-vertex-ai-platform` | GCP credentials |
-| AWS Bedrock | `symfony/ai-bedrock-platform` | `BEDROCK_API_KEY`, or AWS credentials |
-| DeepSeek | `symfony/ai-deep-seek-platform` | `DEEPSEEK_API_KEY` |
-| Mistral | `symfony/ai-mistral-platform` | `MISTRAL_API_KEY` |
-| MiniMax | `symfony/ai-mini-max-platform` | `MINIMAX_API_KEY` |
-| Ollama (local) | `symfony/ai-ollama-platform` | _(none)_ |
-| Albert (French gov) | `symfony/ai-albert-platform` | `ALBERT_API_KEY` plus a `base_url` |
-| amazee.ai | `symfony/ai-amazee-ai-platform` | `AMAZEEAI_API_KEY` plus a `base_url` |
-| Fireworks AI | `symfony/ai-fireworks-platform` | `FIREWORKS_API_KEY` |
-| Together AI | `symfony/ai-together-platform` | `TOGETHER_API_KEY` |
-| Venice AI | `symfony/ai-venice-platform` | `VENICE_API_KEY` |
-| Eden AI | `symfony/ai-eden-ai-platform` | `EDENAI_API_KEY` |
-| Generic (AI gateway) | `symfony/ai-generic-platform` | depends on the gateway |
-
-Swapping providers requires only a `config/packages/ai.yaml` change — no PHP edits.
-
-Any OpenAI-compatible endpoint behind a custom URL and token (an in-house AI gateway, LiteLLM, vLLM, LocalAI) goes through the **generic** platform. It is configured per instance, so the instance name is part of the platform block and, in standalone mode, part of `provider:` as well:
-
-```yaml
-# config/packages/ai.yaml
-ai:
-    platform:
-        generic:
-            my_gateway:
-                base_url: '%env(GATEWAY_URL)%'
-                api_key: '%env(GATEWAY_TOKEN)%'
-```
-
-See [Configuration → Instance-keyed platforms](docs/configuration.md#instance-keyed-platforms).
+Any platform `symfony/ai` supports (Anthropic, OpenAI, Azure OpenAI, Gemini, Vertex AI, Bedrock, Mistral, DeepSeek, Ollama, OpenRouter, any OpenAI-compatible gateway through the generic platform and more), plus a Claude or ChatGPT subscription through the Claude Code or Codex CLI. Swapping providers is a configuration change, no PHP edits. Bridges, keys and examples: [Configuration → Supported platforms](docs/configuration.md#supported-platforms).
 
 ## Documentation
 
-- [Configuration](docs/configuration.md) — every config key, all platforms, split-model, model options, CLI reference
-- [Cost & Performance](docs/cost-and-performance.md) — profiles, split-model, concurrency, caching, budgets, and rate-limit handling
-- [Architecture](docs/architecture.md) — DDD layers, pipeline, agent loop, domain model, design decisions
-- [CI Integration](docs/ci.md) — scheduled GitHub Actions & GitLab CI, SARIF upload, cost management
-- [Extending](docs/extending.md) — custom LLM clients, agents, pipeline stages, report formats
-- [FAQ](docs/faq.md) — accuracy, cost, privacy, model picks, comparisons
-- [Troubleshooting](docs/troubleshooting.md) — empty reports, LLM errors, composer audit failures, cache issues
-- [Contributing](CONTRIBUTING.md) — dev setup, Docker workflow, QA, PR checklist
-
-## FAQ
-
-**How much does an audit cost?** Depends on project size and model. A medium Symfony app (~150 files) on Claude Opus + Haiku split-model with prompt caching enabled costs roughly $0.50 per nightly run. See [CI → Managing LLM Costs](docs/ci.md#managing-llm-costs).
-
-**Does it send my code to the cloud?** Only to the LLM provider you configure, and credential-shaped strings are scrubbed first (see [Security by design](#security-by-design)). For zero-cloud operation, use the [Ollama local platform](docs/configuration.md#supported-platforms).
-
-Full FAQ — privacy, false positives, model picks, comparisons: [docs/faq.md](docs/faq.md).
+- [Configuration](docs/configuration.md): every config key, all platforms, split-model, model options, CLI reference
+- [Cost & Performance](docs/cost-and-performance.md): profiles, split-model, concurrency, caching, budgets and rate-limit handling
+- [Architecture](docs/architecture.md): DDD layers, pipeline, agent loop, domain model, design decisions
+- [CI Integration](docs/ci.md): scheduled GitHub Actions & GitLab CI, SARIF upload, cost management
+- [Extending](docs/extending.md): custom LLM clients, agents, pipeline stages, report formats
+- [FAQ](docs/faq.md): accuracy, cost, privacy, model picks, comparisons
+- [Troubleshooting](docs/troubleshooting.md): empty reports, LLM errors, composer audit failures, cache issues
+- [Contributing](CONTRIBUTING.md): dev setup, Docker workflow, QA, PR checklist
 
 ## Contributing
 
@@ -366,4 +292,4 @@ See [SECURITY.md](SECURITY.md).
 
 ## License
 
-[MIT](LICENSE) — Copyright © Vincent Amstoutz
+[MIT](LICENSE). Copyright © Vincent Amstoutz
