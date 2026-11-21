@@ -67,7 +67,7 @@ final readonly class ModelsDevCatalog
             return 'catalog root is not an object';
         }
 
-        return self::containsPricedModel($decoded) ? $decoded : 'catalog carries no model pricing';
+        return self::containsPricedModel($decoded) ? ModelsDevCatalogExcerpt::of($decoded) : 'catalog carries no model pricing';
     }
 
     /**

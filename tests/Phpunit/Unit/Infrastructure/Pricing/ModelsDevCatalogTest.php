@@ -126,6 +126,59 @@ final class ModelsDevCatalogTest extends TestCase
         );
     }
 
+    public function test_it_reads_from_a_catalog_file_only_the_model_fields_the_auditor_uses(): void
+    {
+        $catalogPath = \sprintf('%s/ssa-catalog-%s.json', sys_get_temp_dir(), bin2hex(random_bytes(6)));
+        file_put_contents($catalogPath, json_encode(['anthropic' => [
+            'id' => 'anthropic',
+            'npm' => '@ai-sdk/anthropic',
+            'models' => ['claude-opus-5-5' => [
+                'id' => 'claude-opus-5-5',
+                'name' => 'Claude Opus 5.5',
+                'family' => 'claude-opus',
+                'tool_call' => true,
+                'limit' => ['context' => 200000, 'output' => 64000],
+                'release_date' => '2026-05-01',
+                'last_updated' => '2026-06-01',
+                'modalities' => ['input' => ['text'], 'output' => ['text']],
+                'cost' => ['input' => 5, 'output' => 25],
+            ]],
+        ]], \JSON_THROW_ON_ERROR));
+
+        try {
+            self::assertSame(
+                ['anthropic' => ['models' => ['claude-opus-5-5' => [
+                    'family' => 'claude-opus',
+                    'tool_call' => true,
+                    'release_date' => '2026-05-01',
+                    'last_updated' => '2026-06-01',
+                    'cost' => ['input' => 5, 'output' => 25],
+                ]]]],
+                ModelsDevCatalog::fromFile($catalogPath),
+            );
+        } finally {
+            unlink($catalogPath);
+        }
+    }
+
+    public function test_it_reads_the_entries_of_a_catalog_file_that_are_not_providers_or_models_as_they_are(): void
+    {
+        $catalog = [
+            'anthropic' => ['models' => ['paid' => ['cost' => ['input' => 5]], 'not-a-model' => 'text']],
+            'aggregator' => ['api' => 'https://example.test', 'models' => 'not a map'],
+            'gateway' => ['api' => 'https://example.test'],
+            'notes' => 'not a provider',
+        ];
+        $catalogPath = \sprintf('%s/ssa-catalog-%s.json', sys_get_temp_dir(), bin2hex(random_bytes(6)));
+        file_put_contents($catalogPath, json_encode($catalog, \JSON_THROW_ON_ERROR));
+
+        try {
+            self::assertSame($catalog, ModelsDevCatalog::fromFile($catalogPath));
+        } finally {
+            unlink($catalogPath);
+        }
+    }
+
     /** @param array<array-key, mixed> $catalog */
     #[DataProvider('catalogsPricingAModel')]
     public function test_it_tells_a_catalog_that_prices_a_model(array $catalog): void
