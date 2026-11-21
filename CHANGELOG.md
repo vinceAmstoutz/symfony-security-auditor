@@ -8,8 +8,8 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
-- `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths
-- `audit:run` writes its long-run notice with a colon in place of a dash
+- `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
+- `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 
