@@ -60,6 +60,22 @@ final class CodexPlatformTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_the_codex_cli_starts_in_a_directory_no_other_user_can_open(): void
+    {
+        $this->invoke([]);
+
+        self::assertSame('drwx------', trim((string) file_get_contents($this->workingDirectory.'/cwd-mode')));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_the_codex_cli_runs_with_its_shell_off(): void
     {
         $this->invoke([]);
@@ -140,7 +156,7 @@ final class CodexPlatformTest extends TestCase
     private function fakeCli(): string
     {
         $cli = $this->workingDirectory.'/codex';
-        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\npwd -P > %s\nprintf '%%s\\0' \"\$@\" > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->argumentsFile()), self::ANSWER));
+        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\npwd -P > %s\nls -ld . | cut -c1-10 > %s\nprintf '%%s\\0' \"\$@\" > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->workingDirectory.'/cwd-mode'), escapeshellarg($this->argumentsFile()), self::ANSWER));
         (new Filesystem())->chmod($cli, 0o755);
 
         return $cli;

@@ -180,6 +180,12 @@ jobs:
       - name: Changelog check
         run: sh .github/scripts/check-changelog.sh CHANGELOG.md
 
+      - name: Prose check tests
+        run: sh tests/Shell/prose_check_test.sh
+
+      - name: Prose check
+        run: git ls-files -z '*.md' | xargs -0 sh .github/scripts/check-prose.sh
+
   zizmor:
     name: zizmor (GitHub Actions security scan)
     runs-on: ubuntu-latest

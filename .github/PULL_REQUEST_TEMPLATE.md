@@ -1,7 +1,7 @@
 ## Summary
 
 <!--
-The user-visible outcome, in 500 characters or fewer, under a title of 50 or fewer. Then a "Closes #123" or "Refs #123" line when an issue is involved, and for a stacked pull request a "Stacked on #123" line with the code this one needs from it. The CHANGELOG entry carries the details. CI checks this description: run .github/scripts/check-pull-request.sh before opening the pull request (see CONTRIBUTING.md).
+The user-visible outcome, in 500 characters or fewer, under a title of 50 or fewer. Then a "Closes #123" or "Refs #123" line when an issue is involved. For a stacked pull request, add a "Stacked on #123" line with the code this one needs from it. The CHANGELOG entry carries the details. CI checks this description: run .github/scripts/check-pull-request.sh before opening the pull request (see CONTRIBUTING.md).
 -->
 
 ## Type of change
@@ -17,15 +17,15 @@ The user-visible outcome, in 500 characters or fewer, under a title of 50 or few
 ## Target branch
 
 <!--
-Tick the release branch this is ultimately headed for, and open the pull request against it — CI fails if they disagree. The default base `main` is almost never right (docs/versioning.md#branches--maintenance).
+Tick the release branch this is ultimately headed for and open the pull request against it: CI fails if they disagree. The default base `main` is almost never right (docs/versioning.md#branches--maintenance).
 
 Tick `stacked` too only when this pull request needs code from another open one and is based on its branch. Keep only the boxes you tick.
 -->
 
-- [ ] `1.x` — anything for the next minor release: bug fixes and new features
-- [ ] `2.x` — breaking changes, for the next major release
-- [ ] `main` — release merges only, nothing else
-- [ ] `stacked` — based on another open PR; retarget to the release branch ticked above once that PR merges
+- [ ] `1.x`: anything for the next minor release (bug fixes and new features)
+- [ ] `2.x`: breaking changes, for the next major release
+- [ ] `main`: release merges only, nothing else
+- [ ] `stacked`: based on another open PR; retarget to the release branch ticked above once that PR merges
 
 ## Checklist
 

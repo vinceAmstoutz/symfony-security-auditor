@@ -214,7 +214,7 @@ function fix(): void
     runCodeQualityTools(fixMode: true);
 }
 
-#[AsTask(name: 'lint:docs', description: 'Check Markdown formatting only (fast pre-push check)')]
+#[AsTask(name: 'lint:docs', description: 'Check Markdown formatting and prose only (fast pre-push check)')]
 function lintDocs(): void
 {
     $userFlag = sprintf('--user %d:%d', posix_getuid(), posix_getgid());
@@ -233,7 +233,16 @@ function lintDocs(): void
         getcwd(),
     ));
 
+    checkProse();
+
     io()->success('Markdown looks good.');
+}
+
+function checkProse(): void
+{
+    io()->section('Prose check');
+    run('sh tests/Shell/prose_check_test.sh');
+    run("git ls-files -z '*.md' | xargs -0 sh .github/scripts/check-prose.sh");
 }
 
 function runCodeQualityTools(bool $fixMode = false): void
@@ -287,6 +296,8 @@ function runCodeQualityTools(bool $fixMode = false): void
     io()->section('Changelog check');
     run('sh tests/Shell/changelog_check_test.sh');
     run('sh .github/scripts/check-changelog.sh CHANGELOG.md');
+
+    checkProse();
 
     io()->section('PHPUnit');
     run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml --coverage-xml=build/coverage/coverage-xml --log-junit=build/coverage/junit.xml');

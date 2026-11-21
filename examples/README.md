@@ -38,7 +38,7 @@ export ANTHROPIC_API_KEY=…           # or set up Ollama: uncomment the ollama:
 bin/console audit:run
 ```
 
-Expect: exit code `1` (the demo's configuration sets `audit.fail_on: high`) and a report listing roughly five findings — one broken-access-control on `UserController::deleteAction()`, one IDOR on `UserController::showAction()`, one JSON hijacking on `UserController::listAction()`, one SQL-injection on `SearchController::queryAction()`, and one mass-assignment on the `User` entity. Their risk level is typically `HIGH` (four critical findings and one medium score 45; `CRITICAL` takes 50). Exact wording and severity vary by model.
+Expect: exit code `1` (the demo's configuration sets `audit.fail_on: high`) and a report listing roughly five findings: one broken-access-control on `UserController::deleteAction()`, one IDOR on `UserController::showAction()`, one JSON hijacking on `UserController::listAction()`, one SQL-injection on `SearchController::queryAction()` and one mass-assignment on the `User` entity. Their risk level is typically `HIGH` (four critical findings and one medium score 45; `CRITICAL` takes 50). Exact wording and severity vary by model.
 
 ## Files in this directory are not shipped to Packagist
 

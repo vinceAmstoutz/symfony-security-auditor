@@ -513,13 +513,49 @@ final class SymfonyAiLLMClientTest extends TestCase
      */
     public static function platformsTranslatingTheCanonicalOutputCap(): iterable
     {
-        yield 'gemini' => ['gemini', 'gemini-3.1-pro-preview'];
-        yield 'vertex ai' => ['vertexai', 'gemini-3.6-flash'];
+        yield 'vertex ai' => ['vertexai', 'claude-opus-5-5'];
+        yield 'bedrock' => ['bedrock', 'anthropic.claude-opus-5-5'];
+        yield 'generic gateway' => ['generic', 'claude-opus-5-5'];
+        yield 'openrouter' => ['openrouter', 'anthropic/claude-opus-5-5'];
+        yield 'anthropic' => ['anthropic', 'claude-opus-5-5'];
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('modelsOtherThanClaude')]
+    public function test_complete_sends_no_output_cap_to_a_model_other_than_claude(string $servingPlatform, string $model): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, $model, new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(servingPlatform: $servingPlatform),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame([], array_intersect_key($invocationOptionsCapture->options ?? [], array_flip([PlatformOptions::MAX_OUTPUT_TOKENS, 'max_tokens'])));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function modelsOtherThanClaude(): iterable
+    {
+        yield 'openai reasoning model' => ['openai', 'gpt-5.6'];
+        yield 'gemini thinking model' => ['gemini', 'gemini-3.1-pro-preview'];
+        yield 'vertex ai gemini' => ['vertexai', 'gemini-3.6-flash'];
         yield 'mistral' => ['mistral', 'mistral-large-latest'];
         yield 'bedrock nova' => ['bedrock', 'amazon.nova-pro-v1:0'];
         yield 'generic gateway' => ['generic', 'qwen3-coder'];
-        yield 'openai responses' => ['openai', 'gpt-5.6'];
-        yield 'anthropic' => ['anthropic', 'claude-opus-5-5'];
     }
 
     /**
