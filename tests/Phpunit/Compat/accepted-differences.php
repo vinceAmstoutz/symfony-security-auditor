@@ -207,4 +207,11 @@ return [
         'reason' => 'init leaves the API key row out of its summary when the configuration carries no credential.',
         'changelog' => '#702',
     ],
+    [
+        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '/^(?:- The audit makes many LLM calls \\xE2\\x80\\x94 typically several minutes, 20\\+ minutes on large projects\\.$|\\+ The audit makes many LLM calls: typically several minutes, 20\\+ minutes on large projects\\.$)/',
+        'reason' => 'The long-run notice is written with a colon in place of a dash.',
+        'changelog' => '#711',
+    ],
 ];

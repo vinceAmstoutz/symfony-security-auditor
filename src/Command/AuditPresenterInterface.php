@@ -29,7 +29,7 @@ interface AuditPresenterInterface
      *
      * @param list<string> $scanPaths project-relative, none when the project itself was named
      */
-    public function enclosingProject(SymfonyStyle $symfonyStyle, string $folder, string $projectPath, array $scanPaths): void;
+    public function enclosingProject(SymfonyStyle $symfonyStyle, string $folder, array $scanPaths): void;
 
     /**
      * @param list<string> $configNotices

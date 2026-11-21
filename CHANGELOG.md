@@ -30,6 +30,8 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `init` configures Azure OpenAI: it asks the resource URL and the deployment name, which the new `--deployment` option sets, instead of printing a block to complete by hand ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `doctor --check-connection` sends one short test request to the configured provider and reports whether it answered. An interactive `init` offers to run it at the end, saying first that a paid API may bill it and sending it only on `yes` ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `auth:test` checks that the API key works with one short test request; `auth:status` suggests it once a key resolves ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
+- `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
+- `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 
 ### Bugfixes 🐛
 

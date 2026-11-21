@@ -108,7 +108,7 @@ final readonly class AuditCommand
         }
 
         if (null !== $auditTarget->folder) {
-            $this->auditPresenter->enclosingProject($displayStyle, $auditTarget->folder, $projectPath, $scanPaths);
+            $this->auditPresenter->enclosingProject($displayStyle, $auditTarget->folder, $scanPaths);
         }
 
         $this->auditPresenter->preflightWarnings($displayStyle, $this->secretScrubbingEnabled, $this->configNotices);

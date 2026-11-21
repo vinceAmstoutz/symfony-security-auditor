@@ -150,7 +150,7 @@ No `.php`, `.twig`, `.yaml`, `.yml` or `.xml` file was found in `scan.included_p
 - `scan.included_paths` against a non-standard layout (`app/`, a monorepo). A `No included paths exist in project` warning means no entry exists.
 - `scan.respect_gitignore`, which may filter everything out.
 
-Naming a folder of the project as the project (`audit /path/to/project/src`) is fine: it audits the project narrowed to `src` and prints a `[NOTE] … is not a project root, it holds no composer.json.` note.
+Naming a folder of the project as the project (`audit /path/to/project/src`) is fine: it audits the project narrowed to `src` and says so in a `Scope:` line.
 
 ### Audit exits with code `1` even though risk is LOW
 

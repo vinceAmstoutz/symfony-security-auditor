@@ -52,11 +52,12 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     #[Override]
-    public function enclosingProject(SymfonyStyle $symfonyStyle, string $folder, string $projectPath, array $scanPaths): void
+    public function enclosingProject(SymfonyStyle $symfonyStyle, string $folder, array $scanPaths): void
     {
-        $paths = implode('', array_map(fn (string $scanPath): string => \sprintf(' --path %s', $this->sanitizeForWarning($scanPath)), $scanPaths));
-
-        $symfonyStyle->note(\sprintf('Auditing "%s"%s: "%s" is not a project root, it holds no composer.json.', $this->sanitizeForWarning($projectPath), $paths, $this->sanitizeForWarning($folder)));
+        $symfonyStyle->text(EnclosingProjectScope::line(
+            OutputFormatter::escape($this->sanitizeForWarning($folder)),
+            array_map($this->sanitizePathForListing(...), $scanPaths),
+        ));
     }
 
     #[Override]
@@ -142,7 +143,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     public function longRunNotice(SymfonyStyle $symfonyStyle): void
     {
         $symfonyStyle->writeln([
-            ' <fg=gray>The audit makes many LLM calls — typically several minutes, 20+ minutes on large projects.</>',
+            ' <fg=gray>The audit makes many LLM calls: typically several minutes, 20+ minutes on large projects.</>',
             ' <fg=gray>Live progress and findings stream below as they happen.</>',
             '',
         ]);
