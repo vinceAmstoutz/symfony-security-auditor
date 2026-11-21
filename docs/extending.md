@@ -2,6 +2,8 @@
 
 All extension points are PHP interfaces. Wire your implementations via `config/services.yaml`; no bundle internals need to be modified.
 
+Extension points need the Symfony bundle: the standalone binary takes configuration only. To move from the binary, follow [Switching Between the Standalone Binary and the Bundle](switching-standalone-bundle.md).
+
 ## Table of Contents
 
 - [1. Custom LLM Client](#1-custom-llm-client)

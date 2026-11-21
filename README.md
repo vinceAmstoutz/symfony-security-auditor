@@ -53,7 +53,7 @@ The auditor ships two maintained ways to run it. Pick the one that fits:
 
 > [!TIP]
 >
-> Both expose the same `audit` command, options and output formats (see the [CLI reference](docs/configuration.md#cli-reference)) and both can serve the auditor to your AI assistant over [MCP](#use-it-from-your-ai-assistant-mcp) (experimental).
+> Both expose the same `audit` command, options and output formats (see the [CLI reference](docs/configuration.md#cli-reference)) and both can serve the auditor to your AI assistant over [MCP](#use-it-from-your-ai-assistant-mcp) (experimental). To move an existing setup from one to the other, follow [Switching Between the Standalone Binary and the Bundle](docs/switching-standalone-bundle.md).
 
 ## Standalone tool (binary)
 
@@ -272,6 +272,7 @@ Any platform `symfony/ai` supports (Anthropic, OpenAI, Azure OpenAI, Gemini, Ver
 ## Documentation
 
 - [Configuration](docs/configuration.md): every config key, all platforms, split-model, model options, CLI reference
+- [Switching Binary and Bundle](docs/switching-standalone-bundle.md): move a setup from the standalone binary to the bundle and back
 - [Cost & Performance](docs/cost-and-performance.md): profiles, split-model, concurrency, caching, budgets and rate-limit handling
 - [Architecture](docs/architecture.md): DDD layers, pipeline, agent loop, domain model, design decisions
 - [CI Integration](docs/ci.md): scheduled GitHub Actions & GitLab CI, SARIF upload, cost management
