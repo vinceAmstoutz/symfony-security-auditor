@@ -25,6 +25,7 @@ use Symfony\AI\Platform\Bridge\Anthropic\ModelCatalog as AnthropicModelCatalog;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\PlatformOptions;
 use Symfony\AI\Platform\Test\MockPlatformFactory;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -145,6 +146,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_application_console_offers_no_audit_fix_command(): void
+    {
+        $application = new Application($this->boot(['model' => 'gpt-4o']));
+
+        self::assertFalse($application->has('audit:fix'));
     }
 
     #[RunInSeparateProcess]

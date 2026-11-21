@@ -75,13 +75,6 @@ return [
         'changelog' => '#693',
     ],
     [
-        'scenarios' => ['standalone/list'],
-        'path' => 'runs.0.stdout.lines',
-        'match' => '/^\+\s+audit:fix\s/',
-        'reason' => 'The standalone binary lists the new audit:fix command.',
-        'changelog' => '#690',
-    ],
-    [
         'scenarios' => $writtenByInit,
         'path' => 'files.home/config/symfony-security-auditor/config.yaml.lines',
         'match' => '/^\+(audit:|    report_static_findings: true)$/',
