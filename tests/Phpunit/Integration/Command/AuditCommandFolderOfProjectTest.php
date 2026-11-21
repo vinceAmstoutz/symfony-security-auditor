@@ -113,7 +113,7 @@ final class AuditCommandFolderOfProjectTest extends TestCase
 
         $commandTester->execute(['project-path' => $this->project, '--path' => ['src'], '--show-scanned' => true]);
 
-        self::assertStringNotContainsString('is not a project root', $this->display($commandTester));
+        self::assertStringNotContainsString('Scope:', $this->display($commandTester));
     }
 
     public function test_a_path_given_with_a_folder_of_a_project_is_read_relative_to_that_folder(): void
@@ -154,7 +154,7 @@ final class AuditCommandFolderOfProjectTest extends TestCase
         $display = $this->display($commandTester);
         self::assertStringContainsString(\sprintf('Project: %s/packages/legacy ', $this->project), $display);
         self::assertStringContainsString('* lib/Legacy.php', $display);
-        self::assertStringNotContainsString('is not a project root', $display);
+        self::assertStringNotContainsString('Scope:', $display);
     }
 
     public function test_telling_a_folder_the_configured_scan_finds_files_in_for_the_project_reads_none_of_them(): void
@@ -186,7 +186,7 @@ final class AuditCommandFolderOfProjectTest extends TestCase
         $display = $this->display($commandTester);
         self::assertStringContainsString(\sprintf('Project: %s/packages/tool ', $this->project), $display);
         self::assertStringContainsString('No files matched under', $display);
-        self::assertStringNotContainsString('is not a project root', $display);
+        self::assertStringNotContainsString('Scope:', $display);
     }
 
     public function test_a_folder_no_composer_project_encloses_stays_the_project(): void

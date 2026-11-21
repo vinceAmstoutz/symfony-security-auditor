@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Common problems running **symfony-security-auditor** and how to fix them. Found a new gotcha? [Open an issue](https://github.com/vinceamstoutz/symfony-security-auditor/issues) so we can document it.
+Find the error message or symptom below and apply the fix. Found a new one? [Open an issue](https://github.com/vinceamstoutz/symfony-security-auditor/issues).
 
 ## Table of Contents
 
@@ -20,175 +20,111 @@ Common problems running **symfony-security-auditor** and how to fix them. Found 
 
 ## Standalone Binary Issues
 
-Entries in this section apply only to the standalone binary (`init`, `self-update`, `doctor`), not to the Symfony bundle, which has no equivalent commands.
+These apply to the standalone binary only (`init`, `doctor`, `self-update`).
 
 ### `doctor` reports a Configuration or API key failure
 
-`doctor`'s "Configuration" and "API key" lines surface `StandaloneConfigLoader::load()` failures directly:
+`audit` and `init` fail on the same causes. Fix the one `doctor` names:
 
-- **`No provider is configured — run "init".`**: no `platform:` block in `config.yaml`; run `init`.
-- **`No API key available. Your config reads it from "<VAR>", which is not set in the environment and has nothing stored for it. …`** (reported under the `API key` label): store the key with `auth:set --env-var=<VAR>`, export `<VAR>`, or pass it for one run from a password manager; `auth:status --env-var=<VAR>` shows what resolves. With several platforms configured, only the one `provider:` selects needs its key; without `provider:`, every platform's key is needed and a bare `auth:set` would store under the first `api_key` in the file, which is why the message names `<VAR>`.
-- **`The environment variable "<VAR>", referenced by your config, is not set.`** (reported under the `Configuration` label): a setting other than the key, such as a `base_url` or `endpoint` written as `%env(VAR)%`, has no value. Export the variable.
-- **`Config file "<path>" is not valid YAML: <detail>`**: fix the malformed `config.yaml` or `.symfony-security-auditor.yaml` at `<path>`. The same message after `Audited project config <path> was skipped and the run goes on without it:` is a note, not a failure: the audited project's own file was left out.
-- **Cannot resolve the user configuration directory:** set `$HOME`, or set `SYMFONY_SECURITY_AUDITOR_HOME` to the absolute path of a writable directory:
-
-  ```text
-  Cannot resolve the user configuration directory: neither the relevant XDG
-  base-directory variable nor $HOME holds an absolute path.
-  ```
-
-  When it names `SYMFONY_SECURITY_AUDITOR_HOME` instead, the override holds a relative path: give it an absolute one, or unset it.
-
-Running `audit`/`init` directly without `doctor` first hits the same underlying failures.
+- **`No provider is configured — run "init".`**: run `init`.
+- **`No API key available. Your config reads it from "<VAR>", …`**: store the key with `auth:set --env-var=<VAR>`, export `<VAR>` or pass it for one run. Check with `auth:status --env-var=<VAR>`. Without `provider:`, every configured platform needs its key. See [Providing the API key](configuration.md#providing-the-api-key).
+- **`The environment variable "<VAR>", referenced by your config, is not set.`**: a setting other than the key (a `base_url` or `endpoint` written as `%env(VAR)%`) has no value. Export `<VAR>`.
+- **`Config file "<path>" is not valid YAML: <detail>`**: fix the YAML at `<path>`. After `Audited project config <path> was skipped and the run goes on without it:` it is only a note: the audited project's own file was left out.
+- **`Cannot resolve the user configuration directory: …`**: set `$HOME`, or set `SYMFONY_SECURITY_AUDITOR_HOME` to the absolute path of a writable directory. When the message names `SYMFONY_SECURITY_AUDITOR_HOME`, it holds a relative path: make it absolute or unset it.
 
 ### `doctor` reports the provider bridge as not installed or unbootable
 
-Two distinct "Provider bridge" failures:
-
-- **`Not installed — run "init --provider=<platform>" to download it.`**: `<data-dir>/vendor/autoload.php` does not exist yet.
-- **`Installed, but the audit cannot start with it: <reason>`**: the autoloader exists, but `doctor` also builds the container to confirm it actually boots, not just that the file is present. A bridge left over from a previously configured provider passes the file check but fails here, since the container needs the _currently_ configured provider's classes, not whichever bridge happens to be installed. Re-run `init` for the current provider (`--force` skips the overwrite prompt) to install the matching bridge. A bridge an older version of the binary installed fails here too, whatever the configuration says. See the entry below.
-
-On `1.20.1` and earlier, one reason string came from the binary rather than from the bridge:
-
-```text
-Installed, but the audit cannot start with it: The service
-"Symfony\AI\Platform\PlatformInterface" has a dependency on a non-existent
-service "http_client".
-```
-
-The container the binary builds registers the services `symfony/ai-bundle` expects an application to provide and `http_client` was missing from that list. Three bridges require it outright (`ollama`, `elevenlabs` and `deepgram`) and `ollama` is the only one an audit runs against, so this surfaced as an Ollama-only failure. Upgrade the binary (`symfony-security-auditor self-update`); re-running `init` does not help, since the bridge was never the problem.
+- **`Not installed — run "init --provider=<platform>" to download it.`**: run that command.
+- **`Installed, but the audit cannot start with it: <reason>`**: the bridge was installed for another provider or by another binary version. Run `init --provider=<current provider> --force` (see [the next entry](#the-provider-bridge-under--was-installed-for-symfonyai-platform--but-this-binary-bundles-) for the options to pass).
+- **`Installed, but the audit cannot start with it: The service "Symfony\AI\Platform\PlatformInterface" has a dependency on a non-existent service "http_client".`** (Ollama, 1.20.1 and earlier): run `self-update`. Re-running `init` does not help.
 
 ### `The provider bridge under "…" was installed for symfony/ai-platform …, but this binary bundles …`
 
-`audit`, `mcp:serve` and `doctor` stop with:
+`audit`, `mcp:serve` and `doctor` stop: another version of the binary installed the bridge, which would fail every LLM call. Run the `init` command the message names. It rewrites `config.yaml`, so pass your `--model` and connection options again (`--endpoint`, `--base-url`, `--env-var`, `--no-api-key`):
 
-```text
-The provider bridge under "/home/you/.local/share/symfony-security-auditor" was
-installed for symfony/ai-platform v0.12.0, but this binary bundles v0.15.0:
-loaded, its classes would replace the bundled ones and fail every LLM call, so
-the binary leaves it unloaded. Rebuild it with "symfony-security-auditor init
---provider=ollama --force" — init rewrites config.yaml, so give it your model
-and connection options again.
+```bash
+symfony-security-auditor init --provider=ollama --force --model=<your model> --endpoint=<your endpoint>
 ```
 
-The bridges under the data directory were installed by another version of the binary (1.20.x resolved `symfony/ai-platform` 0.12 or 0.13) and the binary loads them ahead of its own classes. Loaded, they failed every LLM call (`Call to undefined method Symfony\AI\Platform\TokenUsage\TokenUsage::getModel()`), which an audit only reported as incomplete, so the binary checks the release in `<data-dir>/vendor/composer/installed.php` before loading anything and leaves a mismatched tree alone. Run the `init` command it names, with the `--model` and connection options you use (`--endpoint`, `--base-url`, `--env-var`, `--no-api-key`): it requires every bridge the tree holds again, pinned to the bundled release. `--force` is what lets it run on a machine that already has a configuration: without it, `init` asks before overwriting `config.yaml` and `--no-interaction` answers no before any bridge is touched.
+Without `--force`, `init` asks before overwriting `config.yaml` and `--no-interaction` answers no.
 
-### `.symfony-security-auditor.yaml` cannot override `platform`, `provider`, or `scan.import_sarif`
+### `The project config "…" declares …` or `sets …`
 
-Fixed as a security issue in `1.19.0`. A per-project `.symfony-security-auditor.yaml` ships with the audited repository, so letting it contribute these keys allowed a malicious or compromised repository to redirect your resolved API key (and every prompt, i.e. the source code) to an endpoint of its choosing via `platform:`/`provider:`, or to point the SARIF importer at an arbitrary file via `scan.import_sarif`. Both are now rejected outright before the audit starts, when they come from the `.symfony-security-auditor.yaml` of the folder you run from (the file of another project named by `project-path` is skipped as a whole instead, with an `Audited project config <path> was skipped and the run goes on without it: …` note in the audit header):
+The `.symfony-security-auditor.yaml` of the audited repository sets a key only your user `config.yaml` may set. Move the key to your user `config.yaml`:
 
-- Declaring `platform` and/or `provider` aborts with `ProjectConfigPlatformOverrideException`:
+- `platform`, `provider` or `scan.import_sarif`, which could send your API key, your code or your files elsewhere.
+- `cache`, `privacy`, `audit.custom_skills`, `audit.output`, `audit.tools_scope`, `scan.custom_risk_patterns` or `scan.secret_scrubbing`.
 
-  ```text
-  The project config "<path>" declares "platform", but LLM connection
-  settings are read from your user config only — a repository you audit
-  must not be able to point your API credentials at another endpoint.
-  Configure the platform in your user config instead.
-  ```
-
-- Declaring `scan.import_sarif` aborts with `ProjectConfigScanOverrideException` carrying the equivalent message for that key.
-
-`doctor` reports the same message under a failed `Configuration` check. Per-project overrides of audit settings (chunking strategy, `fail_on`, scan scope, …) are unaffected. Move only `platform`/`provider`/`scan.import_sarif` to your user `config.yaml`.
+A project file that loosens your `audit.budget`, shortens your `http_timeout` or replaces a whole section fails with `The project config "…" sets "…" …`: it may only lower the budget, raise the timeout and override single keys. The file of the folder you run from stops the run (and fails `doctor`'s `Configuration` check). The file of another project named by `project-path` is skipped instead, with an `Audited project config <path> was skipped and the run goes on without it: …` note. See [Per-project overrides](configuration.md#per-project-overrides).
 
 ### `self-update` fails
 
-`self-update` exists only in the standalone binary. Failures:
-
-- **Any platform other than Linux or macOS:** `UnsupportedSelfUpdatePlatformException`. There is no Windows `self-update`; reinstall with `install.ps1` or download the new release asset directly:
-
-  ```text
-  Self-update does not support the "Windows" / "<machine>" platform;
-  download the binary for your platform from the releases page instead.
-  ```
-
-- **Cannot reach GitHub:** `SelfUpdateFailedException`: `Failed to download "<url>": <reason>` (curl itself failed: offline, DNS, TLS, a redirect off HTTPS, an HTTP error such as GitHub's `403` rate limit, or a response over the size limit of 1 MiB for release metadata or 256 MiB for a download; `<reason>` is curl's own error, for example `curl: (22) The requested URL returned error: 403`, which tells these apart) or `Could not determine the latest released version from "<url>".` (GitHub answered but without a usable `tag_name`, as in an API outage or rate limit, or with one that is not a release version: only `X.Y.Z`, an optional pre-release suffix and an optional leading `v` are accepted, so a tag carrying a path, a URL or a control character stops the update before any download URL is built from it).
-- **Checksum mismatch:** the downloaded file is deleted and nothing is replaced; retry, or download the asset manually and verify its `.sha256` yourself:
-
-  ```text
-  Checksum verification failed for "<asset>"; the download was not trusted
-  and has been discarded.
-  ```
-
-- **Directory not writable:** the binary is replaced by renaming a new file over it, so the directory holding it must be writable, whatever the binary's own permissions; nothing is downloaded:
-
-  ```text
-  The directory "<dir>" holding the binary is not writable (<reason>), so the
-  binary cannot be replaced; re-run the update with the necessary permissions
-  (e.g. sudo) or reinstall with the install script.
-  ```
-
-- **Replacement failed mid-swap:** `Failed to replace the binary at "<path>": <reason>`, followed by `The update was not applied: the previous version is still installed.`, on stderr. The command exits `1`. The new binary is moved into place as the command exits, not while it runs (the running process still loads classes from the archive being replaced), so this one surfaces after `Downloaded and verified <new>; it replaces <old> as this command exits.` has printed. The previous binary is left in place, so re-running `self-update` is safe.
+- **`Self-update does not support the "Windows" / "<machine>" platform; …`**: only Linux and macOS update themselves. Reinstall with `install.ps1` or download the release asset.
+- **`Failed to download "<url>": <reason>`**: curl failed (offline, DNS, TLS, GitHub's `403` rate limit, release metadata over 1 MiB or a download over 256 MiB). `<reason>` is curl's error. Retry later or download the asset by hand.
+- **`Could not determine the latest released version from "<url>".`**: GitHub answered without a usable release tag (outage, rate limit). Retry later.
+- **`Checksum verification failed for "<asset>"; …`**: nothing was replaced. Retry, or download the asset and check its `.sha256` yourself.
+- **`The directory "<dir>" holding the binary is not writable …`**: the directory must be writable, not only the binary. Rerun with the needed permissions (`sudo`) or reinstall with the install script.
+- **`Failed to replace the binary at "<path>": <reason>`** (exit `1`, after `Downloaded and verified …`): the previous version is still installed. Rerun `self-update`.
 
 ### Every command warns `The provider bridge under "…" cannot be loaded by this binary`
 
-The bridge tree under the data directory was resolved for another PHP than the one the binary bundles (typically a `composer.json` written by a release before 1.15, which pinned no PHP version), so Composer's `platform_check.php` refuses it. The binary prints that warning, naming the data directory, on stderr and runs the command without the bridge: `init`, `self-update` and `--version` work, while `audit` stops at the missing bridge with `ProviderBridgeException`. That holds whichever Composer generated the tree: 2.8.10 and later throw the refusal, while earlier versions (the one Ubuntu's `apt` installs included) raise it as a fatal `E_USER_ERROR`, which the binary turns into the same warning. Run `init --provider=<platform> --force` again: it rewrites the manifest with the PHP and `symfony/ai-platform` pins and reinstalls the bridge.
+The bridge tree was built for another PHP than the binary's (typically by a release before 1.15). `init`, `self-update` and `--version` still work; `audit` stops at the missing bridge. Rebuild it with `init --provider=<platform> --force`.
 
 ### `init` fails to install the provider bridge
 
-`init` always runs `composer require symfony/ai-<slug>-platform` under the data directory before it writes the config file, with the Composer the binary bundles: `composer.phar` 2.8.12, copied to the data directory's `.composer/`, checked against its SHA-256, unpacked there and run on the binary's own PHP, so no PHP or Composer is needed on the machine. `BridgeInstallationFailedException` covers what fails:
+`init` installs the bridge under the data directory with the `composer.phar` 2.8.12 it bundles, before it writes the config. `doctor` does not report these failures. Fix by message:
 
-- **`The composer.phar 2.8.12 this binary bundles does not match its pinned SHA-256 checksum; it was discarded. Reinstall the binary.`**: the binary was altered or damaged after its checksum was verified; download it again.
-- **`Could not copy composer.phar 2.8.12 to "<dir>": <reason>`**: the data directory cannot be written (permissions, a full disk).
-- **`This build bundles no composer.phar 2.8.12 …`**: `init` runs from a source checkout rather than a released binary; put that release of `composer.phar` at `resources/composer.phar`.
-- **`composer require` ran but exited non-zero** (no network, or the package does not exist for a misspelled `--provider`):
-
-  ```text
-  Installing the "<package>" provider bridge failed: <composer's error output>
-  ```
-
-- **`Could not initialize a composer project in "<dir>": <reason>`**: the data directory has no `composer.json` yet and one could not be written there (permissions).
-- **The data directory or its `composer.json` is a symlink:** `init` refuses to write through it:
-
-  ```text
-  Refusing to initialize a composer project in "<dir>": the target or its
-  manifest path is a symlink.
-  ```
-
-These surface directly from `init` itself: `doctor`'s "Provider bridge" check only inspects the _result_ of a previous `init` run, so a failed installation never shows up there.
+- **`The composer.phar 2.8.12 this binary bundles does not match its pinned SHA-256 checksum; …`**: the binary is damaged. Download it again.
+- **`Could not copy composer.phar 2.8.12 to "<dir>": <reason>`** or **`Could not initialize a composer project in "<dir>": <reason>`**: make the data directory writable (permissions, disk space).
+- **`This build bundles no composer.phar 2.8.12 …`**: you run a source checkout. Put that `composer.phar` release at `resources/composer.phar`.
+- **`Installing the "<package>" provider bridge failed: <composer's error output>`**: check the network and the spelling of `--provider`.
+- **`Refusing to initialize a composer project in "<dir>": the target or its manifest path is a symlink.`**: replace the symlinked data directory or `composer.json` with a real one.
 
 ## Installation & Setup
 
 ### `Class "Symfony\AI\AiBundle\AiBundle" not found`
 
-`symfony/ai-bundle` isn't installed, or Composer's autoloader hasn't picked it up yet. This is a Composer/autoload issue, not a `config/bundles.php` ordering problem: `AiBundle` and `SymfonySecurityAuditorBundle` can be registered in either order.
+`symfony/ai-bundle` is not installed or not autoloaded yet. Install a platform bridge, then register both bundles, in either order:
 
 ```bash
 composer require symfony/ai-anthropic-platform  # or any other bridge
 ```
 
 ```php
-// config/bundles.php — either order works
+// config/bundles.php
 Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
 VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
 ```
 
 ### `No AI platform is configured`
 
-`audit:run` aborts with this message when no `Symfony\AI\Platform\PlatformInterface` service exists in the container. The `symfony/ai-bundle` recipe ships `config/packages/ai.yaml` with **every platform commented out**: uncomment one (e.g. `anthropic`) and set its API key. See [Configuration → Platform Configuration](configuration.md#platform-configuration).
+The `symfony/ai-bundle` recipe ships `config/packages/ai.yaml` with every platform commented out. Uncomment one (e.g. `anthropic`) and set its API key. See [Platform Configuration](configuration.md#platform-configuration).
+
+On 1.7.0 and earlier, the same cause shows as `The service "security_auditor.attacker_client" has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"` (at `cache:clear`) or `Argument #1 ... must be of type Symfony\AI\Platform\PlatformInterface, NULL given`. Upgrade to 1.7.1 or later, then configure a platform and install its `symfony/ai-*-platform` package.
 
 ### `Several AI platforms are configured (…) and none is selected`
 
-`config/packages/ai.yaml` configures more than one platform and `symfony/ai-bundle` wires `Symfony\AI\Platform\PlatformInterface` only for a single one, so the audit has none to call. Alias the interface to the service of the platform to audit with, one of those the message names, under `services:` in `config/services.yaml` (`Symfony\AI\Platform\PlatformInterface: '@ai.platform.anthropic'`). See [Configuration → Several platforms in a Symfony application](configuration.md#several-platforms-in-a-symfony-application).
+Alias the interface to the platform to audit with, one the message names:
 
-### `The service "security_auditor.attacker_client" has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"`
+```yaml
+# config/services.yaml
+services:
+    Symfony\AI\Platform\PlatformInterface: '@ai.platform.anthropic'
+```
 
-Same root cause as above, surfaced at container compile time (`cache:clear`, `cache:warmup`) by versions **≤ 1.7.0**. Upgrade to `1.7.1` or later: the container then compiles without a platform and the actionable error above is raised only when an audit actually runs.
-
-### `Argument #1 ... must be of type Symfony\AI\Platform\PlatformInterface, NULL given`
-
-Same root cause as above, another **≤ 1.7.0** symptom. Since `1.7.1`, `PlatformBinding`'s platform property is typed `?PlatformInterface` and every collaborator built from it asks the binding for the platform when it calls one, so a missing platform can no longer reach a constructor as a hard type error. Upgrade to `1.7.1` or later, or verify `ai.yaml` has a `platform:` block and the corresponding `symfony/ai-*-platform` package is installed.
+See [Several platforms in a Symfony application](configuration.md#several-platforms-in-a-symfony-application).
 
 ## Running the Audit
 
 ### `audit:run` not registered / unknown command
 
-`SymfonySecurityAuditorBundle` is registered for `dev` and `test` only by default. Run from those environments:
+The bundle is registered for `dev` and `test` only. Run in one of them:
 
 ```bash
 APP_ENV=dev bin/console audit:run /path/to/project
 ```
 
-To enable in `prod`, change `config/bundles.php`:
+Or enable it everywhere in `config/bundles.php`:
 
 ```php
 VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['all' => true],
@@ -196,129 +132,91 @@ VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['al
 
 ### `[ERROR] Project path "/x" is not a valid directory`
 
-The `project-path` argument must point to a directory that exists. Use an absolute path, or omit the argument to default to the current working directory. A relative one is resolved against the folder you run the command from, so `audit src/Command` run from your home folder looks for `~/src/Command`. _Since 1.22_ the check runs right after the header (before anything is scanned) and fails with exit code `1`.
+The `project-path` argument is not an existing directory. A relative path is resolved against the folder you run from: `audit src/Command` run from your home folder looks for `~/src/Command`. Pass an absolute path, or omit it to audit the current folder. The run exits `1` before scanning.
 
-To audit part of a project, name the project and give the part with `--path`, relative to the project:
+To audit part of a project, give the part as `--path`, relative to the project:
 
 ```bash
 symfony-security-auditor audit /path/to/project --path src/Command
 ```
 
-An absolute `--path` inside the project is accepted, also when a symbolic link spells it or the project differently (a shell's `$PWD` under macOS `/tmp`, which is `/private/tmp`). One outside it is refused. _Since 1.22_ `--path` replaces `scan.included_paths` for the run, so it reaches a folder the configured scope leaves out (`--path apps/api` on a monorepo) and audits every file of a folder the configuration narrows (`--path src` with `included_paths: [src/Controller]`); an earlier release narrowed it to the configured scope. It has to exist in the project and hold PHP, Twig, YAML or XML files. If a scan still lists nothing, the warning names the project and the `--path` values it applied: `No files matched under "/home/me" for --path src/Command.`
+An absolute `--path` inside the project works, even through a symlink (macOS `/tmp` is `/private/tmp`); one outside is refused. `--path` replaces `scan.included_paths` for the run (_since 1.22_), so it reaches folders the configuration leaves out. It must exist and hold PHP, Twig, YAML or XML files. When nothing matches, the warning names the project and the paths: `No files matched under "/home/me" for --path src/Command.`
 
 ### `[ERROR] The scan found no file to audit, so the run has no verdict`
 
-The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files inside `scan.included_paths` (default: `src/`, `config/`, `templates/`, `public/index.php` and the root dotenv files, the Symfony Flex skeleton). If nothing is found, the path is wrong, the layout is non-standard, or `scan.respect_gitignore` is filtering everything out. _Since 1.22_ naming a folder of the project as the project is not one of them: `audit /path/to/project/src` audits `/path/to/project` narrowed to `src` and says so in a `Scope: src (no composer.json in the folder named: auditing its enclosing project)` line, where an earlier release scanned `src` for a `src/` of its own and found nothing. A log line `No included paths exist in project` at `warning` level confirms the allow-list resolved to nothing.
+No `.php`, `.twig`, `.yaml`, `.yml` or `.xml` file was found in `scan.included_paths` (default: `src/`, `config/`, `templates/`, `public/index.php` and the root dotenv files). Check:
+
+- The project path and any `--path`.
+- `scan.included_paths` against a non-standard layout (`app/`, a monorepo). A `No included paths exist in project` warning means no entry exists.
+- `scan.respect_gitignore`, which may filter everything out.
+
+Naming a folder of the project as the project (`audit /path/to/project/src`) is fine: it audits the project narrowed to `src` and says so in a `Scope:` line.
 
 ### Audit exits with code `1` even though risk is LOW
 
-Exit code `1` is also used for:
+Exit `1` also means:
 
-- Invalid `project-path` argument.
-- The scan discovered no file to audit at all (a mistyped path, a `scan.included_paths` entry matching nothing, or an over-narrow `--path`). The run fails rather than reporting a hollow SAFE result: the command says `The scan found no file to audit, so the run has no verdict` and the reports state no risk level. A `--since` run that finds no _changed_ files still exits `0`.
-- No file in scope could be analyzed (a scan or LLM call failed for each of them, or the run stopped before reaching them) and nothing was found, so the run has no verdict (_since 1.21_). The command says `Audit incomplete: none of the N file(s) in scope could be analyzed`; see [`Audit incomplete`](#audit-incomplete-n-files-could-not-be-fully-analyzed) for the cause.
-- The normalized score fell below `--min-score`, if set.
-- Unhandled exception during pipeline execution (check stderr).
-- Validator errors on the input (e.g. `--format` set to a value it does not support; see [Configuration → Options](configuration.md#options)).
+- `audit.fail_on` (or `--fail-on`) is `low` or `safe`.
+- The score fell below `--min-score` (or `audit.min_score`).
+- The run has no verdict: the scan found no file (see above), or no file could be analyzed and nothing was found (`Audit incomplete: none of the N file(s) in scope could be analyzed`, see [`Audit incomplete`](#audit-incomplete-n-files-could-not-be-fully-analyzed)). A `--since` run with no changed file exits `0`.
+- The project path or an option is invalid (e.g. `--format`, see [Options](configuration.md#options)), or the pipeline threw (read stderr).
 
-In a Symfony application, re-run with `-v` or `-vv` to see more of the application log (`warning` entries and above show by default). The standalone binary writes no log, so `-v` adds nothing there: it names why a chunk failed on its `✗ chunk N/M failed` progress line (see [`✗ chunk N/M failed`](#-chunk-nm-failed-on-the-progress-line)) and prints the error that stopped a run.
+See [Exit codes](configuration.md#exit-codes). In a Symfony application, rerun with `-v` or `-vv` to see more of the log. The standalone binary writes no log: read its `✗ chunk N/M failed` lines and the error it prints.
 
 ## LLM & Provider Errors
 
 ### `API key not set` / `401 Unauthorized`
 
-Confirm the env var is exported in the same shell:
+The process running the audit has no valid key.
 
-```bash
-echo $ANTHROPIC_API_KEY    # should not be empty
-```
-
-In Docker, pass it through:
-
-```bash
-docker compose exec -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" php bin/console audit:run
-```
+- Check it is exported in the same shell: `echo $ANTHROPIC_API_KEY` must not be empty.
+- In Docker, pass it through: `docker compose exec -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" php bin/console audit:run`.
+- In the standalone binary, `auth:status` shows which key resolves and `auth:set` stores one. See [Providing the API key](configuration.md#providing-the-api-key).
 
 ### `Rate limit exceeded` / `429`
 
-A `429` that says the quota is used up (OpenAI's `You exceeded your current quota, please check your plan and billing details.`, `insufficient_quota`) is not a rate limit: the audit stops on it at once instead of retrying, since waiting cannot help. Add credit or raise the plan's limit, then run again. A `429` that suggests a wait (`Please retry in 41.8s.`) is a rate limit and is retried. The retry waits for the longest wait the provider names: its `Retry-After`, the wait its message asks for (OpenAI's `Please try again in 8.064s.`) and, on OpenAI, the `x-ratelimit-reset-tokens` reset of its token window. It never waits less than the rate-limit back-off would wait without them, nor more than its ceiling (300 s).
-
-Configure `audit.rate_limit.requests_per_minute` / `input_tokens_per_minute` / `output_tokens_per_minute` to your provider tier's limits so the auditor throttles proactively instead of hitting a `429`. Otherwise, reduce concurrent load:
-
-- Lower `audit.max_iterations` (default `3`) to `1`.
-- Raise `reviewer_batch_size` from `1` to `5` (fewer reviewer calls).
-- Use a split-model with a cheaper Reviewer (Haiku, DeepSeek, Mistral): they have higher rate limits.
-- Run nightly, not on every PR.
+- **Quota used up** (OpenAI's `You exceeded your current quota, please check your plan and billing details.`, `insufficient_quota`): the run stops at once. Add credit or raise the plan's limit, then rerun.
+- **Rate limit** (`Please retry in 41.8s.`): retried automatically after the wait the provider names, up to 300 s. To stay under it, set `audit.rate_limit.requests_per_minute`, `audit.rate_limit.input_tokens_per_minute` and `audit.rate_limit.output_tokens_per_minute` to your tier. Otherwise lower `audit.max_iterations`, raise `audit.reviewer_batch_size` to `5`, use a reviewer model with higher limits or run nightly. See [Avoiding rate limits](cost-and-performance.md#avoiding-rate-limits-429).
 
 ### `prompt is too long` / `context_length_exceeded` / HTTP `413`
 
-The files of one chunk add up to more than the model's input window (the default `feature` chunking sends up to ten related files per call). The audit does not stop there: the chunk is split in two and each half is analyzed on its own, again until every part fits. A half already in the cache costs no call and, once every part is analyzed, the whole chunk is cached too, so the next run does not refuse and split it again. Every split is logged at `warning` level:
+A chunk exceeds the model's input window, `audit.rate_limit.input_tokens_per_minute` or a gateway's body limit (nginx's `client_max_body_size` is 1 MB by default; its `413` may read as `Syntax error` or `Response does not contain choices.`). The run splits the chunk in two until each part fits and logs `Attacker chunk exceeds the model input limit; it is split in two and each half analyzed on its own` (for a reviewer batch: `Reviewer batch exceeds the model input limit; …`). Raise the gateway's limit to avoid the split.
 
-```text
-Attacker chunk exceeds the model input limit; it is split in two and each half analyzed on its own
-```
+A single file that still does not fit is recorded as errored (`Attacker chunk exceeds the model input limit as a single file; …`), as is a lone finding the reviewer cannot fit. To get it analyzed:
 
-A gateway in front of the model can refuse the request body before the model sees it: nginx's `client_max_body_size` (1 MB by default), an AI gateway's payload limit. It answers HTTP `413`, often with an HTML page the provider bridge cannot decode (`Syntax error`) or a JSON body it reads as an empty answer (`Response does not contain choices.` for Kong's `{"message":"Request size limit exceeded"}`); the auditor reads the status, splits the chunk the same way and books no spend for the refused request. Raising that limit above the largest prompt avoids the split.
-
-A single file that does not fit on its own is recorded as errored and listed under `Audit incomplete: N file(s) could not be fully analyzed`:
-
-```text
-Attacker chunk exceeds the model input limit as a single file; it is recorded as errored and left out of the cache
-```
-
-To get it analyzed:
-
-- Turn on `audit.code_slicing.enabled` (the `fast` profile already does): a large file is trimmed to its security-relevant lines before it is sent.
-- Give the attacker a model with a larger context window (`attacker_model`).
+- Turn on `audit.code_slicing.enabled` (the `fast` profile does).
+- Use an attacker model with a larger context window (`attacker_model`).
 - Leave generated or vendored trees out of `scan.included_paths`.
 
-When a file refused on its own (measured as the prompt carried it, after code slicing) is under a tenth of that prompt, no split can help: the system prompt and the project mapping around it take up the rest of the model's input window (or of `audit.rate_limit.input_tokens_per_minute`), so the run stops at once instead of recording every file as errored:
+When even a small file is refused, the run stops: the system prompt and project mapping fill the window.
 
 ```text
 The audit prompt was refused even with only the 512-byte file "src/Kernel.php" in it (…): the system prompt and the project mapping around it take up the rest, so no file can fit. Use a model with a larger context window for the attacker, raise audit.rate_limit.input_tokens_per_minute when that limit refused it, or narrow scan.included_paths.
 ```
 
-A request larger than `audit.rate_limit.input_tokens_per_minute` is handled the same way. A tool-using conversation that only outgrows the model after tool results were appended ends with what it recorded so far and the chunk is recorded as errored:
-
-```text
-Tool-using conversation outgrew the model input limit after tool results were appended; it ends as an empty response and keeps the tool results already recorded
-```
-
-The reviewer handles a prompt it cannot fit the same way: a batch of findings (`reviewer_batch_size` above `1`) is split in two until every part fits. A finding the model cannot review with its whole file in the prompt is recorded as errored while the review goes on with the next one:
-
-```text
-Reviewer batch exceeds the model input limit; it is split in two and each half reviewed on its own
-```
+A tool conversation that outgrows the window after tool results (`Tool-using conversation outgrew the model input limit after tool results were appended; …`) keeps what it recorded and its chunk is errored. Lower `audit.max_tool_iterations`.
 
 ### `OpenSSL SSL_read: … unexpected eof while reading` / `Transfer closed with … bytes remaining to read` / `cURL error 56`
 
-The peer closed the connection while the response was still being read. `error:0A000126` is `SSL_R_UNEXPECTED_EOF_WHILE_READING` and `errno 0` means no OS-level error: the endpoint hung up without a TLS `close_notify`. This is a transport truncation, so it is classified as transient and the LLM call is retried on a fresh connection (`audit.retry.max_attempts`, default `3`).
+The endpoint closed the connection mid-answer. The call is retried on a fresh connection (`audit.retry.max_attempts`, default `3`), as are curl's other wordings: `Transfer closed with outstanding read data remaining`, `Failure when receiving data from the peer`, `OpenSSL SSL_read: SSL_ERROR_SYSCALL, errno 0`, `HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)`, `Error in the HTTP2 framing layer`. When it keeps happening (most often on a self-hosted endpoint or behind a proxy):
 
-Depending on the TLS library and the protocol, curl words the same cut differently and every wording is retried the same way: `Transfer closed with 512 bytes remaining to read`, `Transfer closed with outstanding read data remaining`, `Failure when receiving data from the peer`, `OpenSSL SSL_read: SSL_ERROR_SYSCALL, errno 0` (OpenSSL 1.1, LibreSSL), `HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)` and `Error in the HTTP2 framing layer`.
+- Raise the endpoint's or proxy's `keepalive_timeout` above the longest gap between calls. Raise `proxy_read_timeout` / `proxy_send_timeout` above the longest generation.
+- Set `audit.attacker_max_concurrent` and `audit.reviewer_max_concurrent` to `1` for a server with few workers (the `fast` profile opens four of each).
 
-Self-hosted endpoints and proxied APIs produce it most often, in two ways:
-
-- **Stale keep-alive reuse.** Auditor calls are slow and far apart, so the idle gap exceeds the endpoint's or your reverse proxy's `keepalive_timeout`. The server drops the socket; the HTTP client takes the dead one from its pool for the next call. Raise `keepalive_timeout` above the longest gap between calls and `proxy_read_timeout` / `proxy_send_timeout` above the longest generation time.
-- **More concurrent connections than the endpoint serves.** The `fast` profile opens up to four attacker and four reviewer calls (`audit.attacker_max_concurrent` / `audit.reviewer_max_concurrent`). A local model server with a small worker pool drops the excess. Set both to `1`; `balanced` and `thorough` already default to `1`.
-
-When every retry fails, the run still aborts with exit `1` and the report says it is incomplete (#378). That holds with any `audit.attacker_max_concurrent` or `audit.reviewer_max_concurrent`; in the concurrent path the `LLM call failed after N attempts` message counts the first, concurrent dispatch as an attempt too. Running again resumes from the cache (`cache.enabled`, on by default), so only the failed chunks are retried. Streaming, which should remove the problem at its source, is tracked in #379.
+When every retry fails, the run exits `1` with an incomplete report. Rerun: the cache serves the chunks already analyzed.
 
 ### `Idle timeout reached for "…"` / HTTP `499` in the gateway log
 
-The request reached the provider, but nothing came back before the HTTP client's idle timeout, so the client hung up, which an AI gateway logs as `499` (client closed the request). A non-streamed answer arrives only once the model has finished it, so a slow local model, or a self-hosted gateway in front of one, can stay silent for minutes on a long prompt. The call is retried (`audit.retry.max_attempts`) and the same wait fails it again.
+Nothing came back before the HTTP client's idle timeout: a slow local model, or a gateway that answers only once done. Answers stream on every platform but Vertex AI, Venice, Cohere, MiniMax, Bedrock and `cli_agent` (_since 1.23_), so this hits those or a gateway that cannot stream. Raise the timeout:
 
-- **Streamed platforms.** _Since 1.23_, the answers stream in as the model writes them on every platform but Vertex AI, Venice, Cohere, MiniMax and Bedrock, so the connection never sits idle. On those, with `cli_agent`, or behind a gateway that cannot stream, raise the timeout below.
-
-- **Standalone binary.** It waits 600 seconds by default. Raise `http_timeout` in `config.yaml`, in seconds:
+- **Standalone binary** (default 600 s): set `http_timeout`, in seconds.
 
   ```yaml
   # ~/.config/symfony-security-auditor/config.yaml
   http_timeout: 1800
   ```
 
-  Before 1.21 the binary left the timeout to PHP's `default_socket_timeout` (60 seconds) and nothing could change it.
-
-- **Symfony bundle.** The platform uses your application's `http_client` service, whose idle timeout is PHP's `default_socket_timeout` unless you set one. Raise it for every request your application makes:
+- **Symfony bundle**: the platform uses your `http_client` service. Raise its timeout for every request:
 
   ```yaml
   # config/packages/framework.yaml
@@ -328,7 +226,7 @@ The request reached the provider, but nothing came back before the HTTP client's
               timeout: 1800
   ```
 
-  or only for the LLM platform, with a scoped client named in the platform's `http_client` option:
+  Or only for the LLM platform, with a scoped client named in the platform's `http_client` option:
 
   ```yaml
   # config/packages/framework.yaml
@@ -347,23 +245,21 @@ The request reached the provider, but nothing came back before the HTTP client's
               http_client: 'llm.http_client'
   ```
 
-### `LLM response was empty` / `Failed to parse … JSON response`
+### `Failed to parse attacker agent JSON response` / `Failed to parse reviewer response`
 
-The model returned blank or non-JSON output. The chunk is skipped automatically and logged at `error` level via `LoggerInterface`. The log entry includes a `content_preview` field with the first 512 bytes of the response: inspect it to see what the model actually emitted. Causes:
+The answer held no JSON the parser could recover. The chunk is skipped and the `error` log entry's `content_preview` shows the first 512 bytes. This happens only on the JSON path (`audit.structured_collection: false`, or for the reviewer `audit.reviewer_structured_collection: false` or `audit.reviewer_tools_enabled: true`). Fix:
 
-- Model context limit reached: see [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413) above; lower `audit.max_tool_iterations` when tool results are what overflow it.
-- Model refused the prompt: try a different model (some smaller open-weight models refuse "hacking" prompts).
-- Network timeout: retry; check the provider's status page.
-
-The parser tolerates prose wrapped around a balanced JSON block (the model sometimes ignores the "Return ONLY the JSON array" instruction when tools are enabled); when the prose carries several, it takes the last one at the top level that decodes to an object or to a list holding one. That is the answer that follows the model's reasoning, never JSON it quoted along the way nor a bracket in the prose after it (`[1]` citing a source, `[ ]` in a checklist). A JSON array cut off before its closing bracket still gives its first complete object. A JSON object the model writes after its answer, such as a `{"total": 1}` summary, still replaces it: when a JSON-path run loses findings that way, switch back to the default structured collection (`audit.structured_collection: true`, `audit.reviewer_structured_collection: true`). A residual `JsonException: Syntax error` therefore means the response contains no recoverable JSON at all, not just chatty prose.
-
-This error only arises with `audit.structured_collection: false`. In the default (`true`) mode, findings come in via `record_vulnerability` tool calls that the provider validates against the schema, so there is no JSON parsing on the agent side and no `JsonException` can be raised. Switching to the default is the simplest fix when the model repeatedly produces unparseable prose.
-
-If it happens for **every** chunk, the model is unsuitable. Switch model.
+- Return to the defaults (`audit.structured_collection: true`, `audit.reviewer_structured_collection: true`, `audit.reviewer_tools_enabled: false`): findings then arrive through schema-checked tool calls, with no JSON to parse. This also fixes findings lost to a JSON summary (`{"total": 1}`) the model writes after its answer.
+- If the prompt overflowed, see [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413).
+- If the model refuses "hacking" prompts (some small open-weight models do) or fails on every chunk, switch model.
 
 ### `Tool-using loop ended with empty content response` warnings
 
-Logged at `warning` level when the empty response is the very first LLM call in the loop (no tool round happened yet); once at least one tool round has run, a later empty response logs the same message at `debug` instead: grep by message text rather than filtering on `warning` alone if the loop used tools first. Look at the `output_tokens` field: if it sits near a multiple of ~1000 (e.g. `1971`, `2000`), the model is being truncated by `symfony/ai`'s default `max_tokens = 1000` that ships with the Anthropic bridge. Set `max_output_tokens` in the bundle config (default `4096` since this fix), or `attacker_max_output_tokens` / `reviewer_max_output_tokens` for per-agent tuning:
+The model answered with nothing usable. Once a tool round has run, this logs at `debug`, so search by message text. A log entry names the cause:
+
+- **`LLM response was truncated by the output token limit`**: raise `max_output_tokens` (default `4096`) or its per-agent variants. Raise `audit.rate_limit.output_tokens_per_minute` with them. A thinking model that spends the limit on reasoning needs the same, or a lower reasoning effort. `max_output_tokens` applies to Claude models; for another model see [Model Options](configuration.md#model-options).
+- **`LLM response was suppressed by the provider content filter`** (or Azure's HTTP 400 `content_filter`, `Unsupported finish reason "content_filter".`): try another model or deployment.
+- **`LLM response ended abnormally with no content`** (Gemini, Vertex AI: `MALFORMED_FUNCTION_CALL`, `RECITATION`, `OTHER`, … in `finish_reason`): the file is retried on the next run.
 
 ```yaml
 symfony_security_auditor:
@@ -372,175 +268,139 @@ symfony_security_auditor:
     reviewer_max_output_tokens: 2048 # optional, reviewer needs less headroom
 ```
 
-When raising the cap, raise `audit.rate_limit.output_tokens_per_minute` proportionally. Otherwise the output-tokens bucket becomes the binding throttle.
-
-When the provider reports why generation stopped (`symfony/ai` ≥ 0.11 exposes a normalized finish reason), the auditor logs an explicit `LLM response was truncated by the output token limit` warning: no output-token forensics needed. A `LLM response was suppressed by the provider content filter` warning likewise flags responses the provider filtered out. A Gemini or Vertex AI answer that ends with `MALFORMED_FUNCTION_CALL`, `UNEXPECTED_TOOL_CALL`, `TOO_MANY_TOOL_CALLS`, `MISSING_THOUGHT_SIGNATURE`, `RECITATION`, `LANGUAGE`, `OTHER`, `FINISH_REASON_UNSPECIFIED`, `IMAGE_PROHIBITED_CONTENT`, `IMAGE_RECITATION`, `IMAGE_OTHER`, `NO_IMAGE` or `MODEL_ARMOR` and holds no text logs `LLM response ended abnormally with no content — it is no verdict on the prompt and is answered as empty_content` with the provider's `finish_reason`; its file or finding is recorded as errored (`the model returned no content`) and retried on the next run. A thinking model that spends the whole output limit on its reasoning and never reaches its answer is a `length` answer too: its usage is booked and it is not sent again, so raise `max_output_tokens` (or lower the reasoning effort) when it keeps happening.
-
-Some provider bridges report the same two outcomes as an error rather than a finish reason: a typed `symfony/ai` exception, a plain one naming the provider's reason (`Unsupported finish reason "content_filter".`, `Responses API response is incomplete (content_filter) and contains no content.`, Cohere's `Unsupported finish reason "MAX_TOKENS".`), or (for a prompt Azure's content filter caught) an HTTP 400 whose `error.code` is `content_filter`. They are handled identically: the call is not retried and the file or finding it covered is recorded as errored. The request is booked against `audit.budget`, the report's token totals and the rate-limit window at the usage the provider reported in its answer, its input at the estimated input tokens when that usage reports no prompt tokens, or at its estimated input tokens when the answer reports none, since the provider bills it. A tool call the output token limit cut off mid-way through its arguments, which the bridges report as malformed tool-call arguments, is one of these `length` answers and is not retried either; arguments the model finished but garbled are retried and each attempt is booked the same way under `stop_reason: malformed_tool_call`. The entries that report it carry its `stop_reason` (`length` or `content-filter`): a `debug` entry for the booking and the warning of the path that ran the call where it logs one:
-
-```text
-An answer the provider delivered as an error is booked at the usage it reported, since the provider bills the request it accepted
-An answer the provider delivered as an error is booked at its estimated input tokens, since the provider bills the request it accepted
-LLM returned a response with no content blocks
-Tool-using loop ended with empty content response
-Concurrent tool-using conversation ended without usable content; it is answered as a degraded response and keeps the tool results already recorded
-```
+The file or finding is then recorded as errored. The call still counts against `audit.budget`.
 
 ### `Ollama: model not found`
 
-Pull the model first:
+Pull the model, then check it with `ollama list`. The `model` setting must match its name exactly.
 
 ```bash
 ollama pull llama3.3
 ```
 
-Then verify with `ollama list`. The model name in `symfony_security_auditor.yaml` must match exactly.
-
 ## Empty / Surprising Reports
 
 ### `✗ chunk N/M failed` on the progress line
 
-The attacker's answer for that chunk could not be used, so its files are recorded as errored, left out of the cache and counted in `Audit incomplete: N file(s) could not be fully analyzed`. _Since 1.22_ the line names why; before, it only said `failed` and the standalone binary (which writes no log) gave no other hint.
+The chunk's files are recorded as errored, left out of the cache and counted under `Audit incomplete`. Fix by the reason on the line:
 
-| Reason on the line | What happened | What to do |
-| --- | --- | --- |
-| `tool-call limit reached (audit.max_tool_iterations)` | The model kept calling `read_file`, `grep` or `list_files` and never ended its turn within `audit.max_tool_iterations` rounds, nor on the closing request it gets after its last round (_since 1.22_). | Raise `audit.max_tool_iterations` (try `16`), or set `audit.tools_enabled: false` to scan each chunk in a single call. See the cost note below. |
-| `output token limit reached (max_output_tokens)` | The answer, or a tool call inside it, was cut off by the output limit. | Raise `max_output_tokens` or `attacker_max_output_tokens` (Claude models only). |
-| `answer withheld by the provider content filter` | The provider's filter blocked the answer. | Try another model or deployment; see [`Tool-using loop ended with empty content response`](#tool-using-loop-ended-with-empty-content-response-warnings). |
-| `the model returned no content` | The call ended with nothing usable. | Retry; if it repeats for every chunk, switch model. |
-| `the answer was not valid JSON` | Only with `audit.structured_collection: false`. | See [`LLM response was empty`](#llm-response-was-empty--failed-to-parse--json-response). |
-| `a finding the record tool refused was never recorded again` | The model called `record_vulnerability` with a call the tool refused (a required key missing or of the wrong type, or the stricter contract of a custom `RecordVulnerabilityToolFactoryInterface`) and never made that call again in full (the same file and either the same title or the same type and line, both calls stating them), so that finding is lost; the findings it did record are kept. | Retry; if it repeats for every chunk the model cannot follow the tool schema, so switch model. In a Symfony application the warning `Attacker finding was refused by the recording tool and never recorded again` names the files. |
-| `the file is too large for the model input limit` | A single file does not fit the model's input window. | See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
-| an error message | An unexpected failure on that chunk's call; the run went on with the next one. | Read it; in a Symfony application the same text is in the log. |
-
-**Raising `audit.max_tool_iterations` costs more.** A chunk that explores until the cap uses up to twice the rounds at `16`, plus the closing request. Each round re-reads the prompt, so call time and cost grow with it; a chunk the model never stops exploring can still hit the new cap. The value is also part of the attacker cache key, so changing it re-analyzes every chunk once: a run after the change bills the whole project again, not only the chunks that failed.
+| Reason | Fix |
+| --- | --- |
+| `tool-call limit reached (audit.max_tool_iterations)` | Raise `audit.max_tool_iterations` (try `16`) or set `audit.tools_enabled: false`. See [the cost](#attacker-loops-indefinitely-on-tool-calls). |
+| `output token limit reached (max_output_tokens)` | Raise `max_output_tokens` or `attacker_max_output_tokens` (Claude models only). |
+| `answer withheld by the provider content filter` | Try another model or deployment. |
+| `the model returned no content` | Retry; switch model if every chunk fails. |
+| `the answer was not valid JSON` | See [`Failed to parse …`](#failed-to-parse-attacker-agent-json-response--failed-to-parse-reviewer-response). |
+| `a finding the record tool refused was never recorded again` | The model never repeated a refused `record_vulnerability` call, so that finding is lost. Retry; switch model if every chunk fails. |
+| `the file is too large for the model input limit` | See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
+| any other message | An unexpected failure; the run went on. Read the message (also in the Symfony log). |
 
 ### `Audit incomplete: N file(s) could not be fully analyzed`
 
-Some file was never fully analyzed: its LLM call failed even after the retries in `audit.retry.*`, an abort (a provider error, a budget cap) stopped the run before reaching it, the model's answer held an entry that could not be read as a finding (the `Attacker answer held entries that could not be read as findings` warning names the files and the drop reasons; the findings that did read are kept), or secret scrubbing could not scan it and withheld its content (`secret_scrubbing` in the `coverage` array). Every report format says so instead of printing "No validated vulnerabilities found", because a file nobody analyzed can still hold a vulnerability. The JSON report sets `complete: false`, SARIF sets `invocations[0].executionSuccessful: false` and the `coverage` array in the JSON report lists each file with its `errored` or `aborted` status.
+Some file was not fully analyzed, so the report does not call it safe (JSON `complete: false`, SARIF `executionSuccessful: false`). The JSON report's `coverage` array names each file, its stage and its status. Fix by cause, then rerun (the cache serves the files already analyzed):
 
-A file the scan left out because it is larger than `scan.max_file_size_kb` or could not be read is listed there too, as `skipped` under the `scan` stage (_since 1.22_): it is not analyzed, but nothing gates on it, so the report stays complete and `--fail-on-incomplete` does not fire. A file left out because its name or its content could read as something else once the bytes that are not UTF-8 are repaired (see [below](#file-content-is-not-valid-utf-8--file-name-is-not-valid-utf-8-warnings)) is listed as `errored` under the `scan` stage instead and leaves the report incomplete. The `The scan left a file out, so it is not analyzed` warning names each of them.
+- **LLM call failed** after the `audit.retry.*` retries: read the `LLM call failed` log entries and fix the cause (see [LLM & Provider Errors](#llm--provider-errors)).
+- **`aborted`**: a provider error or a budget cap stopped the run first.
+- **`Attacker answer held entries that could not be read as findings`**: the warning names the files; the findings that did read are kept.
+- **`secret_scrubbing`**: a `scan.secret_scrubbing.additional_patterns` regex could not be evaluated (catastrophic backtracking, `/u` on invalid UTF-8, or a quoted value of several hundred KB without PCRE JIT). Fix the pattern, or review the file yourself.
+- **`reviewer` `errored`**: the reviewer reached no verdict (`Reviewer reached no verdict for the finding; …`). The next run, or a later iteration, reviews it again.
+- **`scan` `errored`**: a name or content that is ambiguous once repaired to UTF-8, see [below](#file-content-is-not-valid-utf-8--file-name-is-not-valid-utf-8-warnings).
 
-The `coverage` array names, for each file, the stage that failed. For an LLM failure, read the `LLM call failed` warnings in the log for the cause, fix it (see [LLM & Provider Errors](#llm--provider-errors)) and run again. A withheld file is one a `scan.secret_scrubbing.additional_patterns` entry could not evaluate (a catastrophic-backtracking regex, a `/u` pattern meeting invalid UTF-8), or, with the PCRE JIT disabled, a single quoted value of several hundred kilobytes: fix the pattern, or read the file yourself. A file the scan left out for its size is audited once you raise `scan.max_file_size_kb` above it; to keep it out of the audit on purpose, leave it out of `scan.included_paths`. With `cache.enabled`, the files that were analyzed are served from the cache. A `reviewer` entry with the `errored` status can also mean the reviewer returned no verdict for a finding in the file: an empty answer, a batch answer that left the finding out, or a verdict with no `accepted` flag (the `Reviewer reached no verdict for the finding; it is recorded as errored and left out of the cache` warning names it). The finding is not reported to the attacker as rejected and nothing is cached, so the next run reviews it again. When a later iteration of the same run reviews that finding again and reaches a verdict, the `errored` entry is dropped from the `coverage` array and no longer counts.
+Files the scan skipped (over `scan.max_file_size_kb`, unreadable, symlinked) are listed as `skipped` under `scan`, with a `The scan left a file out, so it is not analyzed` warning, but keep the report complete: `--fail-on-incomplete` does not fire. Raise `scan.max_file_size_kb` to audit a large one.
 
-When **no** file could be analyzed and nothing was found, the run has no verdict: it exits `1` whatever the gates say and the reports read `RISK LEVEL: UNKNOWN  (no file was analyzed)` on the console (`UNKNOWN (no file was analyzed)` in Markdown and HTML) instead of a SAFE result. When only some files failed, or the run still holds a finding, the risk level and grade cover only the files analyzed and the reports say so.
+When no file was analyzed and nothing was found, the run exits `1` and reads `RISK LEVEL: UNKNOWN  (no file was analyzed)`. Otherwise the risk level covers only the analyzed files. Set `--fail-on-incomplete` (exit `3`) to fail CI on a partial run.
 
 ### `File content is not valid UTF-8` / `File name is not valid UTF-8` warnings
 
-The scanner met a file whose bytes, or whose name, are not UTF-8: typically a legacy Latin-1 file with an accented comment, or a name git accepted as it is on Linux. It writes each invalid byte as the Latin-1 character of that byte and audits the file like any other: the report is complete, a renamed file appears under its repaired name (`src/Controller/Fo\xFFo.php` as `src/Controller/Foÿo.php`) and the warning (in the log of a Symfony application; the standalone binary writes none) names it. Two names that differ only in their invalid bytes (a Latin-1 `caf\xE9.php` beside a `caf\xE8.php`) stay different, as `café.php` and `cafè.php`. Nothing needs fixing for the audit to run; to see the file under its real name, re-encode the content to UTF-8 or rename the file. Two cases do need a fix, because the repaired text could read as something else. The first is a name that is the same as another file's once repaired (a Latin-1 `caf\xE9.php` beside a UTF-8 `café.php`), where only the first in byte order of its path is audited under it. The second is a file whose content mixes invalid bytes with the characters they are repaired into (a Latin-1 `$id\xE9` beside a UTF-8 `$idé`), which could read two different names as one. Each such file is left out with a `The scan left a file out, so it is not analyzed` warning and listed as `errored` under the `scan` stage in the `coverage` array, so the report is incomplete and `--fail-on-incomplete` fires: rename the file, or re-encode it to UTF-8, to audit it.
+Nothing to fix: each invalid byte is read as its Latin-1 character and the file is audited, under its repaired name (`Fo\xFFo.php` as `Foÿo.php`). Re-encode the content or rename the file to see its real name.
+
+Two cases leave the file out as `errored` under `scan`, so the report is incomplete: a repaired name equal to another file's (`caf\xE9.php` beside a UTF-8 `café.php`), or content mixing invalid bytes with the characters they repair into. Rename the file or re-encode it to UTF-8.
 
 ### A finding or a file quotes `***REDACTED:secrets_vault_key***`
 
-The file is the decryption key of a Symfony secrets vault, `config/secrets/<env>/<env>.decrypt.private.php` by default, or a file holding such a key under another name. With `scan.secret_scrubbing.enabled` (the default) the key itself never reaches the provider: every string literal of a `*.decrypt.private.php` file is replaced with that placeholder before the file is analyzed. A 64-byte `return "\x…";` key, or a literal returned right under a `SYMFONY_DECRYPTION_SECRET=` comment, is replaced the same way in a file of any other name. The file is still audited, so a finding that the key is committed is genuine: a committed prod key decrypts every secret of the vault. Keep `config/secrets/prod/prod.decrypt.private.php` out of the repository (the Symfony Flex `.gitignore` already does), deploy the key through the `SYMFONY_DECRYPTION_SECRET` environment variable and rotate it with `secrets:generate-keys --rotate` if it was ever pushed.
+The file holds a Symfony secrets vault decryption key (`config/secrets/<env>/<env>.decrypt.private.php`, or a key-shaped literal in another file). `scan.secret_scrubbing.enabled` (the default) replaced it before sending. The file is still audited, so a "key committed" finding is genuine:
+
+1. Remove `config/secrets/prod/prod.decrypt.private.php` from the repository (the Symfony Flex `.gitignore` ignores it).
+2. Deploy the key through the `SYMFONY_DECRYPTION_SECRET` environment variable.
+3. If it was ever pushed, rotate it with `secrets:generate-keys --rotate`.
 
 ### Report has zero vulnerabilities but I know there are some
 
-Diagnostic order:
-
-1. **Lower `audit.min_confidence`** from `0.6` to `0.3`: borderline findings now pass to the Reviewer.
-2. **Inspect attacker output before review:** temporarily decorate `ReviewerAgent` to log all incoming candidates, including non-validated ones.
-3. **Raise `audit.max_iterations`** to `5`: the loop stops early when no new findings emerge; a stronger pass can surface more.
-4. **Switch to a stronger model:** Claude Opus and GPT-5.6 consistently outperform small models.
-5. **Check the file actually got scanned:** run with `--show-scanned` to list the files in scope (the progress line `Auditing N file(s)` gives the count and `chunk i/M` the chunks); in a Symfony application, `-vv` also logs the ingested file and chunk counts.
-6. **`scan.respect_gitignore: true`** silently skips every file the `.gitignore` matches, including a file git tracks (committed with `git add -f`). Set to `false` to include them, or set `scan.include_tracked_ignored: true` to audit the tracked ones only.
-7. **A dot file or dot directory** under an included path (`src/Controller/.helpers.php`, `templates/admin/.row.html.twig`, `src/.legacy/`) is skipped and so is a directory named like version-control metadata (`CVS`, `_darcs`, `.svn`), without a record in the report. Set `scan.include_dotfiles: true` to audit the dot ones, or list the file in `scan.included_paths`.
-8. **`scan.max_file_size_kb`** drops large files. Default `512` KB; raise if your project has bigger files. Each file it drops is listed in the report's `coverage` as `skipped` under the `scan` stage (_since 1.22_), but nothing gates on it: the report stays complete and `--fail-on-incomplete` does not fire.
+1. Check the file was scanned: `--show-scanned` lists the files in scope. If it is missing, see [A file is not scanned](#a-file-is-not-scanned-or-read_file--grep-returns-nothing-for-it).
+2. Lower `audit.min_confidence` from `0.6` to `0.3`.
+3. Raise `audit.max_iterations` to `5`.
+4. Use a stronger attacker model; see [Which LLM model should I use?](faq.md#which-llm-model-should-i-use).
 
 ### Report has too many false positives
 
 - Raise `audit.min_confidence` from `0.6` to `0.8`.
-- Switch Reviewer to a **stronger** model (counterintuitive: Reviewer needs accuracy, not speed).
-- Inspect the LLM's `reviewer_notes` (logged at `debug` level in the `Vulnerability reviewed` entry): the Reviewer often explains why it accepted weak findings.
+- Give the reviewer a stronger model: it needs accuracy, not speed.
+- Read `reviewer_notes` in the `Vulnerability reviewed` log entry (`debug` level): it says why a weak finding was accepted.
 
 ### Same code, different findings on each run
 
-LLM output is **nondeterministic** by design. Set `temperature: 0.0` (or `0.1`) on the model:
+LLM output is nondeterministic. Keep `cache.enabled: true` so unchanged code reuses earlier answers. On a model that accepts it, also set `temperature` to `0.0`:
 
 ```yaml
 symfony_security_auditor:
     model: 'claude-haiku-5-5?temperature=0.0'
 ```
 
-With `temperature: 0.0` + `cache.enabled: true`, repeated runs on identical code become deterministic.
-
-The current Claude generation (Opus 4.7/4.8, Opus 5, Sonnet 5, Fable 5) no longer accepts `temperature` and rejects a request that sets it. On those models rely on `cache.enabled: true` alone for run-to-run stability.
+The current Claude generation (Opus 4.7/4.8, Opus 5, Sonnet 5, Fable 5) rejects `temperature`: rely on the cache alone.
 
 ## Performance & Cost
 
 ### Audit takes 10+ minutes
 
-Expected behavior on large projects. Mitigations:
+Time and cost grow with the files in scope: at least one call per chunk per iteration, plus reviewer calls. Measure first with `--dry-run`, which prints the file count and the estimated tokens and cost without calling the model. Then:
 
-- Use **split-model**: Opus Attacker + Haiku Reviewer cuts ~50% wall time.
-- Raise `reviewer_batch_size` from `1` to `5` (fewer Reviewer round-trips).
+- Audit a slice: `--path src/Controller --path src/Form` (repeatable) or a narrower `scan.included_paths`. On a monorepo, run one audit per bounded context.
+- Audit only what changed: `--since main` on a pull request.
+- Use `profile: fast` (one iteration, lean pre-scan, code slicing, four concurrent calls per agent), or raise `audit.attacker_max_concurrent` and `audit.reviewer_max_concurrent` within your rate limits.
+- Give the reviewer a faster model (`reviewer_model`).
+- Raise `audit.reviewer_batch_size` from `1` to `5`.
 - Lower `audit.max_iterations` from `3` to `1` or `2`.
-- Tighten `scan.included_paths` to specific sub-directories, e.g. point it at `src/Controller`, `src/Form`, `src/Voter`, `config`, `templates` so high-value surfaces are audited and infrastructure code is dropped.
-- Enable both caches: `cache.enabled: true` (default) and Anthropic prompt caching via `cache_retention` in `ai.yaml` (default `short` already on).
+- Keep both caches on: `cache.enabled: true` and Anthropic `cache_retention` in `ai.yaml` (default `short`).
 
-### What happens on a very large project (10 000+ files)?
-
-Nothing special happens. That is the problem. The pipeline is linear in the number of files it keeps, so a 10 000-file repository is not "slow", it is proportionally expensive: the scanner walks the tree once, drops everything outside `scan.included_paths` and every file over `scan.max_file_size_kb` (default `512`), groups what remains into chunks and spends at least one LLM call per chunk per iteration. Triple that for the default `audit.max_iterations: 3`, then add one reviewer call per surviving finding.
-
-Measure before you spend: `audit:run --dry-run` reports the retained file count and the estimated token/cost total for **your** repository and model without making a single audit call. Treat that number as the decision input; wall-clock and dollar figures quoted for other projects will not transfer.
-
-To bring a repository of that size into a sane envelope, in the order that helps most:
-
-- **Audit a slice, not the monolith.** `--path src/Controller --path src/Form` (repeatable) or a tightened `scan.included_paths` targets the code that actually faces user input. On a monorepo, run one audit per bounded context.
-- **Audit only what changed.** `--since main` (or any git ref) restricts the run to files touched since that ref, which is what you want on a PR: cost then tracks the diff, not the repository.
-- **Use `profile: fast`.** One iteration, lean pre-scan (marker-free files are dropped), code slicing (large files are trimmed to security-relevant lines) and 4× attacker/reviewer concurrency.
-- **Cap the run.** `audit.budget.max_tokens` / `audit.budget.max_cost_usd` abort mid-run and still emit the partial report with exit code `2`, so a misestimated scan cannot run away with your budget.
-- **Keep the cache on.** `cache.enabled: true` (default) means the second and later runs pay only for chunks whose content changed.
+See [Cost & Performance](cost-and-performance.md).
 
 ### Cost blew past my budget
 
-- Confirm `scan.included_paths` matches the deployable code surface. The default (the Flex skeleton plus root dotenv files) already skips every file outside the Symfony skeleton (`vendor/`, `node_modules/`, `var/`, `tests/`, `migrations/`, `translations/`, `bin/`, root scripts, IDE folders, build artefacts) without you having to enumerate them.
-- Trim further by tightening `scan.included_paths`: drop `templates/` or `config/` if you only want to audit PHP, or replace `src` with a list of specific sub-directories (e.g. `src/Controller`, `src/Form`, `src/Voter`) to focus the audit on high-value security surfaces.
-- Confirm Anthropic prompt caching is on: `cache_retention` in `ai.yaml` (default `short`) gives a ~90% input-token discount on cached prompts.
-- Confirm `cache.enabled: true` (default): repeated chunks skip the LLM entirely.
-- Lower `audit.max_tool_iterations` from `8` to `4` or `5`: it caps chatty tool-use loops on each chunk at the cost of less cross-file investigation.
+- Cap the run: `audit.budget.max_tokens` or `audit.budget.max_cost_usd` stops it with exit `2` and still writes the partial report.
+- Narrow `scan.included_paths` (the default already skips `vendor/`, `tests/`, `migrations/` and other non-skeleton folders): drop `templates/` or `config/`, or list `src/Controller`, `src/Form` and `src/Voter` instead of `src`.
+- Keep `cache.enabled: true` and Anthropic prompt caching (`cache_retention`, about 90% off cached input).
+- Lower `audit.max_tool_iterations` from `8` to `4` or `5`.
 - Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-5-5` or `deepseek-flash`).
-- Set a provider-side hard cap. See [CI → Set a spend cap](ci.md#set-a-spend-cap).
-- Run weekly instead of nightly for large monorepos.
+- Set a provider-side cap: see [Set a spend cap](ci.md#set-a-spend-cap).
+- Run weekly instead of nightly on a large monorepo.
 
 ### `--dry-run` estimate shows `$0.00`
 
-The cost estimate multiplies token counts by per-model prices from the configured `PricingProviderInterface` (the bundled `ModelsDevPricingProvider` reads prices from the `symfony/models-dev` catalog shipped in `vendor/`, the listing of the platform the audit runs against first). When a configured model (`model`, `attacker_model`, or `reviewer_model`) is absent from that catalog (a typo, or a model `symfony/ai` supports but the catalog does not list), its price resolves to `0.0` and the dry run now prints a stderr warning:
+The model has no price in the `symfony/models-dev` catalog. The run warns `No published pricing for the configured model(s): <model>. …`. For a local model (Ollama, LM Studio) `$0.00` is correct. Otherwise:
 
-```text
-No published pricing for the configured model(s): <model>. The dry-run cost
-estimate shows $0.00 for these. If you are running a local or self-hosted model
-(e.g. Ollama, LM Studio), $0.00 is correct — you can ignore this notice.
-Otherwise the name is likely a typo or an unlisted model: check it in your
-symfony_security_auditor configuration against the models supported by your
-symfony/ai platform.
-```
+- Fix a typo in `model`, `attacker_model` or `reviewer_model`. The catalog no longer lists DeepSeek's `deepseek-chat` and `deepseek-reasoner`: use `deepseek-flash` or `deepseek-v4-pro`.
+- Refresh the catalog. In a Symfony application, run `composer update symfony/models-dev`. In the standalone binary, run `self-update`: it downloads the current catalog even when the binary is up to date (`doctor`'s `Pricing catalog` line names the copy in use; `self-update --check` and `privacy.offline_only: true` leave it alone).
+- Or supply prices with your own `PricingProviderInterface` (see [Extending](extending.md)).
 
-Fix the model identifier if it is a typo. A model id the catalog has dropped prices at zero as well: it no longer lists DeepSeek's legacy `deepseek-chat` and `deepseek-reasoner` ids, so configure `deepseek-flash` or `deepseek-v4-pro` instead. If the name is correct but missing from the catalog, the token counts in the report are still accurate: only the USD figure is unavailable. Run `composer update symfony/models-dev` to pull a fresher catalog, or alias your own `PricingProviderInterface` implementation to supply prices (see [Extending](extending.md)).
-
-**Standalone binary:** `composer update` does not apply. There is no user-facing `vendor/` or `composer.json`; the binary carries the `symfony/models-dev` catalog its release was built with. Run `self-update` to refresh it: even when the binary is already the latest release, it downloads the current catalog into the cache directory and later runs price from that copy (`doctor`'s `Pricing catalog` check names it). A copy the run cannot use (unreadable, not JSON, or pricing no model) is ignored in favor of the catalog the binary was built with. So is one the binary's own catalog has overtaken (the newest `last_updated` of its models is older), as after replacing the binary with a newer release without running `self-update`. `self-update --check` and a configuration with `privacy.offline_only: true` leave the catalog as it is.
+Token counts stay accurate; only the USD figure is missing.
 
 ## Cache Issues
 
 ### Cache seems stale: old findings persist after fixing code
 
-The cache is keyed by **chunk content hash**. If your fix changes the file's bytes, the cache key changes and the LLM is re-invoked. If you see stale findings, the file content didn't actually change: diff to confirm.
-
-To force a full re-audit:
+The cache is keyed by chunk content, so a changed file is re-analyzed. Stale findings mean its bytes did not change: diff to confirm. To force a fresh analysis, run with `--no-cache`, or delete the cache (adjust the path to `cache.dir` if you set it):
 
 ```bash
-docker compose exec php bin/console cache:clear
 rm -rf var/cache/dev/symfony_security_auditor/attacker
 ```
 
-Adjust the path to match `cache.dir` if you overrode it.
-
 ### `Permission denied` writing to `cache.dir`
+
+Give the user running the audit write access, or point `cache.dir` elsewhere:
 
 ```bash
 chown -R www-data:www-data var/cache
 ```
-
-Or pick a writable directory:
 
 ```yaml
 symfony_security_auditor:
@@ -550,9 +410,11 @@ symfony_security_auditor:
 
 ### Every run misses the cache and logs `cache entry path was a symlink`
 
-A symlink below `cache.dir` (a sub-directory or an entry file) is refused, on a read (`Attacker cache entry path was a symlink, ignoring`) as on a write (`Failed to write attacker cache entry`), so a link planted there cannot feed a forged entry to the audit or redirect a write. `cache.dir` itself and the directories above it are taken as you configured them: a symlinked `var/`, `~/.cache` or `$XDG_CACHE_HOME` is fine. Remove the link below the cache directory, or point `cache.dir` at the directory it targets.
+A symlink below `cache.dir` is refused on read (`Attacker cache entry path was a symlink, ignoring`) and on write (`Failed to write attacker cache entry`). Remove the link, or point `cache.dir` at its target. A symlinked `cache.dir` or parent (`var/`, `~/.cache`) is fine.
 
 ### Disable cache for one-off debugging
+
+Run with `--no-cache`: it skips cache reads and writes for that run. To turn the cache off in the configuration:
 
 ```yaml
 symfony_security_auditor:
@@ -560,71 +422,56 @@ symfony_security_auditor:
         enabled: false
 ```
 
-`AttackerCacheInterface` is aliased to `NullAttackerCache` (and `ReviewerCacheInterface` to `NullReviewerCache`): every chunk (and every reviewer verdict) hits the LLM.
-
 ## Advisory (`composer audit`) Issues
 
 ### `lookup_advisory` always returns empty results
 
-Causes (each logs a `warning` via `LoggerInterface`, except the deliberate `offline_only` case below):
+The audit goes on without CVE data and logs a `warning`. Fix the cause:
 
-- **`composer` not in `PATH`:** install Composer 2.4+ on the audit host.
-- **`composer.lock` missing, over 8 MiB, or a symlink out of the project:** run `composer install` first; advisory data comes from the lockfile, which is copied into a private directory for the audit and refused when it is not a regular file of at most 8 MiB. A `composer.lock` that is a symlink is followed when it leads to a regular file inside the project (a shared lockfile in a sub-directory, for instance) and refused when it points outside the project or at anything but a regular file.
-- **Malformed JSON output:** corrupted `composer.lock`. Regenerate it.
-- **Advisories of a private repository missing:** `composer audit` no longer reads the audited project's `composer.json`, so its `repositories` and `auth.json` do not apply; configure them in Composer's global configuration (`COMPOSER_HOME`) of the user running the audit.
-- **Process error:** network failure to Packagist. Retry: a lookup five minutes after a failed `composer audit` runs it again and so does one after `composer.lock` changes; lookups in between answer with no advisory at once instead of waiting on a `composer audit` that timed out again.
-- **`privacy.offline_only: true`**: the advisory feed is intentionally replaced by an empty in-memory database, so `composer audit` never runs; no warning is logged since this is configured behavior, not a failure.
-
-When `lookup_advisory` returns empty, the audit continues without CVE data: no audit failure.
+- **`composer` not in `PATH`**: install Composer 2.4+ on the audit host. `doctor` checks it in the standalone binary.
+- **`composer.lock` missing, over 8 MiB or a symlink leaving the project**: run `composer install` and keep the lockfile a regular file (a symlink to one inside the project works).
+- **Malformed output**: regenerate the corrupted `composer.lock`.
+- **Advisories of a private repository missing**: the audited project's `composer.json` and `auth.json` are not read. Configure the repository in the global Composer configuration (`COMPOSER_HOME`) of the user running the audit.
+- **Process error** (Packagist unreachable): retry. A lookup reruns `composer audit` five minutes after a failure or once `composer.lock` changes.
+- **`privacy.offline_only: true`**: intended. The advisory feed is off and nothing is logged.
 
 ### `composer audit` is slow
 
-Within a run it executes **once** and the result is cached for the lifetime of the request (a long-lived `mcp:serve` runs it again after 24h, so it sees the advisories disclosed since). Across runs, with `cache.enabled: true` (default), `LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h, keyed by a SHA-256 hash of `composer.lock`: an unchanged lockfile skips `composer audit` entirely on the next run. A `composer.lock` that is larger than 8 MiB, or a symlink out of the project or to anything but a regular file, is never read for that hash, so its run is not cached (a symlink to a regular file inside the project is hashed by its content). An output that is not a JSON document with an `advisories` map is never stored. If it's still the bottleneck, you can pre-warm it before the audit or override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing a baked snapshot.
-
-### Override the advisory source
-
-Implement `Audit/Domain/Port/AdvisoryDatabaseInterface`:
-
-```yaml
-# config/services.yaml
-services:
-    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
-        alias: App\Security\MyCustomAdvisoryDatabase
-```
-
-See [Configuration → Advisory Source](configuration.md#advisory-source-lookup_advisory-tool).
+It runs once per audit (a long-running `mcp:serve` reruns it every 24 h). With `cache.enabled: true`, its result is cached for 24 h per `composer.lock` hash, so an unchanged lockfile skips it. A lockfile over 8 MiB, or a symlink leaving the project, is never cached. Still too slow? Replace the source with your own `AdvisoryDatabaseInterface`, such as an `InMemoryAdvisoryDatabase` snapshot: see [Advisory Source](configuration.md#advisory-source-lookup_advisory-tool).
 
 ## Tools (`read_file`, `grep`, `list_files`, `lookup_advisory`)
 
 ### Attacker never calls tools
 
-Verify `audit.tools_enabled: true` (the default). With tools disabled, the Attacker uses `LLMClientInterface::complete()` (single-shot) instead of `completeWithTools()`.
-
-Some models do not support tool/function calling: verify your provider's docs. Most major providers (Anthropic, OpenAI, Gemini, Mistral) do; some smaller Ollama models don't.
+- Check `audit.tools_enabled: true` (the default).
+- Check the model supports tool calling: Anthropic, OpenAI, Gemini and Mistral do; some small Ollama models do not.
 
 ### Attacker loops indefinitely on tool calls
 
-Lower `audit.max_tool_iterations` from the default `8` to bound the spend. The last round is announced to the model, which is told to record what it holds and stop (_since 1.22_). A model that asks to read one more file instead gets those reads answered unrun and one closing request to record what it holds or answer in text. A chunk that ends at the cap either way is analyzed; it is cached when it found something and left out of the cache when it found nothing, so the next run looks at it again. A model that still asks to read on the closing request ends the conversation: the findings the Attacker already recorded are kept, but the chunk is recorded as errored and not cached, so the run reports `Audit incomplete` and the next run pays for it again. Raise the cap when chunks keep failing that way, or keep coming back without a finding at the cap: it gives the model more rounds to read, at the price of more rounds (each re-reads the prompt) and of a one-time re-analysis, since the value is part of the attacker cache key.
+Lower `audit.max_tool_iterations` (default `8`) to bound the spend. On its last round the model is told to record what it holds. A chunk that still asks to read on the closing request keeps its findings but is recorded as errored and not cached, so the next run pays for it again.
 
-### `lookup_advisory` always returns `[]`
+If chunks keep failing that way, or keep reaching the cap without a finding, raise the cap instead (try `16`). Each extra round re-reads the prompt and costs more. The value is part of the attacker cache key, so the next run re-analyzes every chunk once.
 
-See [Advisory (`composer audit`) Issues](#advisory-composer-audit-issues) above.
+### A file is not scanned, or `read_file` / `grep` returns nothing for it
 
-### `read_file` / `grep` returns nothing for files I know exist
+The tools see only the files the scan loaded; `--show-scanned` lists them. A file is left out when:
 
-Both tools only search the files `ProjectFileScanner` already loaded into memory during ingestion: neither touches the filesystem live. Causes:
+- It is outside `scan.included_paths` (or `--path`).
+- `scan.respect_gitignore: true` matches it, even if git tracks it. Set `scan.include_tracked_ignored: true` to audit tracked files, or `scan.respect_gitignore: false`.
+- It is a dot file or sits in a dot directory (`.helpers.php`, `src/.legacy/`). Set `scan.include_dotfiles: true` or list it in `scan.included_paths`. Version-control directories (`CVS`, `_darcs`, `.svn`) always stay out.
+- It is larger than `scan.max_file_size_kb` (default `512`). Raise it.
+- It, or a directory above it, is a symlink, wherever it points (`Skipped symlinked file`, `Skipped symlinked included path`, `Skipped symlinked directory`).
+- Its directory cannot be listed (`Skipped unreadable directory`), or it is a pipe, socket or device (`Skipped a file that is not a regular file`).
 
-- The file falls outside `scan.included_paths`, is excluded by `scan.respect_gitignore`, or exceeds `scan.max_file_size_kb`.
-- The file, or one of its `scan.included_paths` ancestors, is a symlink. `ProjectFileScanner` skips symlinks unconditionally regardless of where they point (logged as `Skipped symlinked file` / `Skipped symlinked included path`). A symlink pointing back inside the project is skipped too, not just one pointing outside it. _Since 1.22_ a symlinked file or directory inside the scanned paths is also listed in the report's `coverage` as `skipped` under the `scan` stage (a directory logged as `Skipped symlinked directory`); the report stays complete.
-- The file sits under a directory the process cannot list: a root-owned or `chmod 700` directory, such as a docker data directory under a `--path .` scan. `ProjectFileScanner` skips that directory with a `Skipped unreadable directory` warning naming it and the operating system's reason. It scans everything else.
-- The file is a named pipe, a socket or a device node rather than a regular file. _Since 1.22_ `ProjectFileScanner` reports it as an unreadable skipped file with a `Skipped a file that is not a regular file` warning, without opening it: a named pipe waits for a writer forever, so in earlier releases a pipe named like a source file stopped the scan for good.
-- `read_file`'s `relative_path` argument must match `ProjectFile::relativePath()` exactly (e.g. `src/Controller/UserController.php`). It has no absolute-path fallback: an absolute path never matches and returns `Error: file "..." is not part of the audited project.`
+Over-size, unreadable and symlinked files are listed as `skipped` in the report's `coverage`; the report stays complete.
+
+`read_file` takes the project-relative path (`src/Controller/UserController.php`). An absolute path returns `Error: file "..." is not part of the audited project.`
 
 ## CI Failures
 
 ### GitHub Actions: `SARIF upload failed: not authorized`
 
-The workflow needs `security-events: write` permission:
+Grant the workflow `security-events: write`:
 
 ```yaml
 permissions:
@@ -634,7 +481,7 @@ permissions:
 
 ### GitLab CI: SARIF report not visible in Security Dashboard
 
-Upload it as a `sarif` report, not a `sast` one: `artifacts:reports:sast` takes GitLab's own SAST report format, so a SARIF file there shows nothing.
+Upload it as a `sarif` report, not `sast`:
 
 ```yaml
 artifacts:
@@ -642,33 +489,30 @@ artifacts:
     sarif: security-audit.sarif
 ```
 
-The `sarif` report type needs GitLab Ultimate, on GitLab 19.2 or later (from 18.11 with the `sarif_ingestion` feature flag enabled). GitLab also ingests the report only when the job succeeded, so a job that ends with the audit's non-zero exit code shows no finding: keep the exit code in the script, as the [CI → GitLab CI](ci.md#gitlab-ci) recipe does. On another tier or an older GitLab, use the JUnit report shown there.
+It needs GitLab Ultimate 19.2 or later (18.11 with the `sarif_ingestion` feature flag). GitLab ingests it only from a successful job: catch the audit's exit code in the script (`|| audit_exit=$?`), as the [GitLab CI](ci.md#gitlab-ci) recipe does. On another tier or version, use the JUnit report shown there.
 
 ### Audit succeeds locally but fails in CI
 
-Common causes:
-
-- API key secret not exposed to the job (check the workflow `env` block).
-- CI runner lacks Composer 2.4+ → `lookup_advisory` reports empty.
-- `composer.lock` not committed → `lookup_advisory` reports empty.
-- Different model name between local config and CI config.
+- The API key secret is not exposed to the job (check its `env` block).
+- `lookup_advisory` finds nothing: the runner lacks Composer 2.4+ or `composer.lock` is not committed.
+- The model name differs between the local and CI configuration.
 
 ## Dev / Quality Gate Failures
 
 ### PHPStan max fails on a finding I think is wrong
 
-Do **not** silence it. PHPStan suppressions (`@phpstan-ignore-*`, baseline) are forbidden. See [CLAUDE.md → Never Silence Quality Gates](../CLAUDE.md#5-never-silence-quality-gates). Fix the underlying type issue. Genuine PHPStan false positives require a tracking issue and a justification in the PR description.
+Fix the underlying type issue. Suppressions (`@phpstan-ignore-*`, a baseline) are forbidden: see [Never Silence Quality Gates](../CLAUDE.md#5-never-silence-quality-gates). A genuine false positive needs a tracking issue and a justification in the PR description.
 
 ### Infection MSI is below 100%
 
-A mutation survived your tests. Read the Infection log (`infection/infection.log`) to see which mutator and which line. Add a test that distinguishes the mutated behavior. Suppression annotations are forbidden.
+Read `infection/infection.log` for the mutator and line, then add a test that tells the mutated behavior apart. Suppression annotations are forbidden.
 
 ### PHP CS Fixer / Rector wants to change code I deliberately wrote that way
 
-Run `bin/castor lint:fix` to apply the changes. Both tools enforce the project style: diverging styles get rejected in CI. If you genuinely need a deviation, document the reason in the PR.
+Run `bin/castor lint:fix` to apply the project style: CI rejects any other. Justify a genuine deviation in the PR.
 
 ### Tests pass locally, fail in CI
 
-- Different PHP version: CI matrix runs 8.3, 8.4, 8.5, 8.6; pin locally with Docker.
-- Filesystem case sensitivity: Linux CI is case-sensitive; macOS is not.
-- Random test order: Infection rewrites `phpunit.dist.xml` to force `executionOrder="defects,random"` for its own runs; reproduce locally with `--order-by=defects,random --random-order-seed=<seed>`.
+- PHP version: CI runs 8.3, 8.4, 8.5 and 8.6. Reproduce with Docker.
+- File name case: Linux CI is case-sensitive, macOS is not.
+- Test order: Infection forces `executionOrder="defects,random"`. Reproduce with `--order-by=defects,random --random-order-seed=<seed>`.

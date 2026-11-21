@@ -415,6 +415,8 @@ symfony_security_auditor:
 
 ## Standalone Configuration
 
+To move an existing bundle setup to the binary, or back, follow [Switching Between the Standalone Binary and the Bundle](switching-standalone-bundle.md).
+
 When you run the [standalone binary](../README.md#standalone-tool-binary) instead of the bundle, configuration is read from a single user-level file. On Linux and macOS it follows the XDG Base Directory specification; on Windows it uses the native app-data directories:
 
 | Purpose | Linux / macOS | Windows |
