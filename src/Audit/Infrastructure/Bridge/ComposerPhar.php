@@ -57,6 +57,7 @@ final readonly class ComposerPhar
         }
 
         try {
+            $this->filesystem->remove($path);
             $this->filesystem->copy($this->bundledPhar, $path, true);
             $this->assertPinnedRelease($path);
             $this->filesystem->remove($unpacked);
