@@ -90,7 +90,9 @@ final class AuditCommandFolderOfProjectTest extends TestCase
 
         $commandTester->execute(['project-path' => $this->project.'/src', '--show-scanned' => true]);
 
-        self::assertStringContainsString(\sprintf('[NOTE] Auditing "%1$s" --path src: "%1$s/src" is not a project root, it holds no composer.json.', $this->project), $this->display($commandTester));
+        $display = $this->display($commandTester);
+        self::assertStringContainsString('Scope: src (no composer.json in the folder named: auditing its enclosing project)', $display);
+        self::assertStringNotContainsString('[NOTE]', $display);
     }
 
     public function test_it_names_no_path_when_the_path_given_is_the_project_itself(): void
