@@ -102,7 +102,7 @@ final class AuditCommandFolderOfProjectTest extends TestCase
         $this->inWorkspace(fn (): int => $commandTester->execute(['--path' => [$this->project], '--show-scanned' => true]));
 
         $display = $this->display($commandTester);
-        self::assertStringContainsString(\sprintf('[NOTE] Auditing "%s": "%s" is not a project root, it holds no composer.json.', $this->project, $this->workspace), $display);
+        self::assertStringContainsString(\sprintf('Scope: whole project (no composer.json in "%s": auditing its enclosing project)', $this->workspace), $display);
         self::assertStringContainsString('* config/packages/security.yaml', $display);
         self::assertStringContainsString('3 file(s) in scope', $display);
     }

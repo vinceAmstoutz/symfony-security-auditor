@@ -402,7 +402,7 @@ final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
         self::assertSame(0, $process->getExitCode());
         $this->assertListsExactly([...self::COMMAND_FILES, 'src/Controller/BlogController.php', 'src/Entity/User.php', 'src/Kernel.php'], $this->displayOf($process));
         self::assertStringContainsString($this->withoutWhitespace(\sprintf('Project: %s', $this->project)), $display);
-        self::assertStringContainsString($this->withoutWhitespace(\sprintf('Auditing "%1$s" --path src: "%1$s/src" is not a project root, it holds no composer.json.', $this->project)), $display);
+        self::assertStringContainsString($this->withoutWhitespace('Scope: src (no composer.json in the folder named: auditing its enclosing project)'), $display);
     }
 
     #[MaximumDuration(4000)]
