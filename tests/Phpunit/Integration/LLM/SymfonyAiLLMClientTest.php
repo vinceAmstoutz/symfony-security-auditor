@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 use Closure;
 use DateTimeImmutable;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -32,6 +33,7 @@ use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\PlatformOptions;
 use Symfony\AI\Platform\Result\BaseResult;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
@@ -70,6 +72,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimitBacko
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\CallbackTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
@@ -84,6 +87,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
 
 final class SymfonyAiLLMClientTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws BudgetExceededException
      * @throws MissingAiPlatformException
@@ -488,6 +493,116 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
+    #[DataProvider('platformsTranslatingTheCanonicalOutputCap')]
+    public function test_complete_passes_the_canonical_output_cap_to_a_platform_that_translates_it(string $servingPlatform, string $model): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, $model, new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(servingPlatform: $servingPlatform),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame(4096, $invocationOptionsCapture->options[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function platformsTranslatingTheCanonicalOutputCap(): iterable
+    {
+        yield 'vertex ai' => ['vertexai', 'claude-opus-5-5'];
+        yield 'bedrock' => ['bedrock', 'anthropic.claude-opus-5-5'];
+        yield 'generic gateway' => ['generic', 'claude-opus-5-5'];
+        yield 'openrouter' => ['openrouter', 'anthropic/claude-opus-5-5'];
+        yield 'anthropic' => ['anthropic', 'claude-opus-5-5'];
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('modelsOtherThanClaude')]
+    public function test_complete_sends_no_output_cap_to_a_model_other_than_claude(string $servingPlatform, string $model): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, $model, new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(servingPlatform: $servingPlatform),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame([], array_intersect_key($invocationOptionsCapture->options ?? [], array_flip([PlatformOptions::MAX_OUTPUT_TOKENS, 'max_tokens'])));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function modelsOtherThanClaude(): iterable
+    {
+        yield 'openai reasoning model' => ['openai', 'gpt-5.6'];
+        yield 'gemini thinking model' => ['gemini', 'gemini-3.1-pro-preview'];
+        yield 'vertex ai gemini' => ['vertexai', 'gemini-3.6-flash'];
+        yield 'mistral' => ['mistral', 'mistral-large-latest'];
+        yield 'bedrock nova' => ['bedrock', 'amazon.nova-pro-v1:0'];
+        yield 'generic gateway' => ['generic', 'qwen3-coder'];
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('platformsNotTranslatingTheCanonicalOutputCap')]
+    public function test_complete_sends_no_output_cap_to_a_platform_that_would_not_translate_it(string $servingPlatform): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'deepseek-v4-pro', new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(temperature: 0.2, servingPlatform: $servingPlatform),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame(['temperature' => 0.2], $invocationOptionsCapture->options);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function platformsNotTranslatingTheCanonicalOutputCap(): iterable
+    {
+        yield 'deepseek' => ['deepseek'];
+        yield 'ollama' => ['ollama'];
+        yield 'azure chat completions' => ['azure'];
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
     public function test_complete_still_sends_temperature_for_non_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -573,7 +688,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
 
         $this->expectException(MissingAiPlatformException::class);
-        $this->expectExceptionMessage('No AI platform is configured');
+        $this->expectExceptionMessageContaining('No AI platform is configured');
 
         $symfonyAiLLMClient->complete('sys', 'usr');
     }
@@ -595,7 +710,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
 
         $this->expectException(MissingAiPlatformException::class);
-        $this->expectExceptionMessage('config/packages/ai.yaml');
+        $this->expectExceptionMessageContaining('config/packages/ai.yaml');
 
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
     }
@@ -614,7 +729,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
 
         $this->expectException(MissingAiPlatformException::class);
-        $this->expectExceptionMessage('No AI platform is configured');
+        $this->expectExceptionMessageContaining('No AI platform is configured');
 
         $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
     }
@@ -2013,7 +2128,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(BudgetExceededException::class);
-        $this->expectExceptionMessage('token budget exceeded (200 / 100 tokens)');
+        $this->expectExceptionMessageContaining('token budget exceeded (200 / 100 tokens)');
 
         $symfonyAiLLMClient->completeWithTools(
             'sys',
@@ -2329,7 +2444,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(TransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed after 3 attempts');
+        $this->expectExceptionMessageContaining('LLM call failed after 3 attempts');
 
         try {
             $symfonyAiLLMClient->complete('sys', 'usr');
@@ -2356,7 +2471,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(TransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
+        $this->expectExceptionMessageContaining('LLM call failed after 4 attempts: HTTP 503 Service Unavailable');
 
         $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
     }
@@ -2465,7 +2580,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(NonTransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed with non-transient error');
+        $this->expectExceptionMessageContaining('LLM call failed with non-transient error');
 
         try {
             $symfonyAiLLMClient->complete('sys', 'usr');

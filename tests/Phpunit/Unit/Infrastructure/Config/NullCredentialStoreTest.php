@@ -16,9 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\NullCredentialStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class NullCredentialStoreTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     public function test_it_has_no_credential_to_read_back(): void
     {
         self::assertNull((new NullCredentialStore())->read('ANTHROPIC_API_KEY'));
@@ -40,7 +43,7 @@ final class NullCredentialStoreTest extends TestCase
     public function test_it_refuses_to_pretend_it_stored_a_credential(): void
     {
         $this->expectException(CredentialStoreWriteException::class);
-        $this->expectExceptionMessage('No per-user configuration directory could be resolved');
+        $this->expectExceptionMessageContaining('No per-user configuration directory could be resolved');
 
         (new NullCredentialStore())->write('ANTHROPIC_API_KEY', 'anthropic-test-key-nowhere');
     }

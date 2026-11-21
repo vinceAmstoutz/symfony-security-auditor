@@ -20,11 +20,14 @@ use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\HiddenCredentialPrompt;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\RecordingSymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\UnhideableSymfonyStyle;
 
 final class HiddenCredentialPromptTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string QUESTION = 'Paste the API key (input stays hidden)';
 
     /**
@@ -65,7 +68,7 @@ final class HiddenCredentialPromptTest extends TestCase
     public function test_it_refuses_rather_than_echo_when_the_terminal_cannot_hide_the_answer(): void
     {
         $this->expectException(HiddenInputUnavailableException::class);
-        $this->expectExceptionMessage('cannot hide what is typed into it');
+        $this->expectExceptionMessageContaining('cannot hide what is typed into it');
 
         (new HiddenCredentialPrompt())->ask(new UnhideableSymfonyStyle(new ArrayInput([]), new BufferedOutput()), self::QUESTION);
     }

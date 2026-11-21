@@ -20,9 +20,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class OfflineOnlyPlatformGuardTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard;
 
     #[Override]
@@ -97,7 +100,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_it_refuses_a_platform_that_would_leave_this_machine(string $endpoint): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage($endpoint);
+        $this->expectExceptionMessageContaining($endpoint);
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['azure' => ['base_url' => $endpoint]]),
@@ -123,7 +126,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_a_refusal_quotes_the_origin_of_the_endpoint_and_nothing_else(string $endpoint, string $quotedOrigin): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage(\sprintf('would send your source code to "%s", which is not a loopback or private-range address.', $quotedOrigin));
+        $this->expectExceptionMessageContaining(\sprintf('would send your source code to "%s", which is not a loopback or private-range address.', $quotedOrigin));
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['generic' => ['gw' => ['base_url' => $endpoint]]]),
@@ -151,7 +154,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_an_endpoint_below_an_instance_named_like_the_api_key_is_still_inspected(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('to "https://remote.example.com"');
+        $this->expectExceptionMessageContaining('to "https://remote.example.com"');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['generic' => ['api_key' => ['base_url' => 'https://remote.example.com']]]),
@@ -164,7 +167,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_it_refuses_a_hosted_provider_that_carries_no_endpoint_at_all(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('the "anthropic" platform is a hosted provider with no local endpoint configured');
+        $this->expectExceptionMessageContaining('the "anthropic" platform is a hosted provider with no local endpoint configured');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['anthropic' => ['api_key' => 'sk-secret']]),
@@ -177,7 +180,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_it_refuses_a_provider_whose_configuration_is_not_a_map(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('"bedrock"');
+        $this->expectExceptionMessageContaining('"bedrock"');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['bedrock' => null]),
@@ -190,7 +193,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_it_inspects_endpoints_nested_below_the_provider_key(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('https://api.example.com');
+        $this->expectExceptionMessageContaining('https://api.example.com');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'https://api.example.com']]]),
@@ -203,7 +206,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_it_refuses_as_soon_as_one_of_several_platforms_is_remote(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('"openai"');
+        $this->expectExceptionMessageContaining('"openai"');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig([
@@ -246,7 +249,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_an_api_key_read_from_an_unset_variable_leaves_a_hosted_provider_hosted(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('the "anthropic" platform is a hosted provider with no local endpoint configured');
+        $this->expectExceptionMessageContaining('the "anthropic" platform is a hosted provider with no local endpoint configured');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]),
@@ -259,7 +262,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_a_remote_endpoint_beside_a_setting_read_from_an_unset_variable_is_still_refused(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('the "generic" platform would send your source code to "https://api.example.com"');
+        $this->expectExceptionMessageContaining('the "generic" platform would send your source code to "https://api.example.com"');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['generic' => ['base_url' => 'https://api.example.com', 'completions_path' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]]),
@@ -272,7 +275,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_a_non_url_setting_is_not_mistaken_for_an_endpoint(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('no local endpoint configured');
+        $this->expectExceptionMessageContaining('no local endpoint configured');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['ollama' => ['model' => 'llama3.2', 'region' => 'eu-west-3']]),
@@ -285,7 +288,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_a_setting_that_is_not_a_string_is_not_mistaken_for_an_endpoint(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('no local endpoint configured');
+        $this->expectExceptionMessageContaining('no local endpoint configured');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['ollama' => ['timeout' => 30, 'verify' => true, 'proxy' => null]]),
@@ -298,7 +301,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_every_endpoint_of_a_provider_must_be_local_not_just_the_first(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('https://fallback.example.com');
+        $this->expectExceptionMessageContaining('https://fallback.example.com');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['generic' => [
@@ -314,7 +317,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_an_endpoint_found_before_a_nested_block_is_still_checked(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('https://remote.example.com');
+        $this->expectExceptionMessageContaining('https://remote.example.com');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['generic' => [
@@ -330,7 +333,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     public function test_every_endpoint_inside_one_nested_block_is_checked(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('https://remote.example.com');
+        $this->expectExceptionMessageContaining('https://remote.example.com');
 
         $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
             new StandalonePlatformConfig(['generic' => ['default' => [

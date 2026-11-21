@@ -48,6 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -80,6 +81,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Inv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\JsonSyntaxError;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
@@ -698,7 +700,7 @@ final class AttackerAgentTest extends TestCase
         $logger->expects(self::once())
             ->method('error')
             ->with('Failed to parse attacker agent JSON response', [
-                'error' => 'Syntax error',
+                'error' => JsonSyntaxError::messageFor('invalid json {{{'),
                 'content_preview' => 'invalid json {{{',
             ]);
 
@@ -3781,6 +3783,28 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_project_profile_that_drops_a_hunt_gives_chunks_their_own_context_key(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())
+            ->withProjectProfile(ProjectProfile::of(['symfony/http-kernel' => 'v7.4.0'], []));
+
+        $cache = $this->createMock(ContextAwareAttackerCacheInterface::class);
+        $cache->expects(self::once())->method('getForContext')->with(self::isArray(), self::logicalNot(self::identicalTo('')))->willReturn(null);
+        $cache->method('storeForContext');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+
+        $this->callAnalyze($attackerAgent, $files, $symfonyMapping, new NullCoverageRecorder());
     }
 
     /**

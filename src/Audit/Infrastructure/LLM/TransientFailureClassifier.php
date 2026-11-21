@@ -15,9 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
+use Symfony\AI\Platform\Exception\IncompleteStreamException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
-use Symfony\AI\Platform\Exception\ServerException;
+use Symfony\AI\Platform\Exception\RetryableExceptionInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
@@ -28,6 +29,8 @@ use function Symfony\Component\String\u;
 final readonly class TransientFailureClassifier
 {
     private const string MALFORMED_TOOL_CALL_STOP_REASON = 'malformed_tool_call';
+
+    private const string INCOMPLETE_STREAM_STOP_REASON = 'incomplete_stream';
 
     /** @var list<string> */
     private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504', '529'];
@@ -178,7 +181,7 @@ final readonly class TransientFailureClassifier
 
     private function readsAsTransient(Throwable $throwable): bool
     {
-        if ($throwable instanceof ServerException || $this->hasInChain($throwable, MalformedToolCallException::class) || $this->hasInChain($throwable, TransientHttpStatusException::class)) {
+        if ($this->hasInChain($throwable, RetryableExceptionInterface::class) || $this->hasInChain($throwable, MalformedToolCallException::class) || $this->hasInChain($throwable, TransientHttpStatusException::class)) {
             return true;
         }
 
@@ -248,10 +251,21 @@ final readonly class TransientFailureClassifier
     }
 
     /**
+     * A bridge throws `MaxOutputTokensException` for an answer the output cap
+     * cut off in the middle of a tool call: asking again with the same cap
+     * would cut it off again, while a higher one lets the call through.
+     */
+    public function isToolCallCutByTheOutputCap(Throwable $throwable): bool
+    {
+        return $this->hasInChain($throwable, MaxOutputTokensException::class);
+    }
+
+    /**
      * Why a call that failed was still billed: the provider took the request
      * in and answered it, with nothing usable (the degraded stop reason) or
      * with a tool call whose arguments are not valid JSON
-     * (`malformed_tool_call`). Null for a failure it never answered, which
+     * (`malformed_tool_call`), or with a stream cut before its end
+     * (`incomplete_stream`). Null for a failure it never answered, which
      * spent nothing the budget or the rate window has to hold, and neither
      * does a request it refused with a client error: nothing was served.
      */
@@ -262,7 +276,8 @@ final readonly class TransientFailureClassifier
         }
 
         return $this->degradedStopReason($throwable)
-            ?? ($this->hasInChain($throwable, MalformedToolCallException::class) ? self::MALFORMED_TOOL_CALL_STOP_REASON : null);
+            ?? ($this->hasInChain($throwable, MalformedToolCallException::class) ? self::MALFORMED_TOOL_CALL_STOP_REASON : null)
+            ?? ($this->hasInChain($throwable, IncompleteStreamException::class) ? self::INCOMPLETE_STREAM_STOP_REASON : null);
     }
 
     /**
@@ -321,15 +336,25 @@ final readonly class TransientFailureClassifier
     }
 
     /**
+     * A call cut before its answer ended: the provider may bill it beyond the
+     * usage it reported, so the cost booked for the run is a minimum.
+     */
+    public function isCutMidAnswer(Throwable $throwable): bool
+    {
+        return $this->isConnectionCut($throwable);
+    }
+
+    /**
      * The peer hung up while the response was being read — in curl's wording
      * as symfony/http-client relays it, `Transfer closed with 512 bytes
      * remaining to read for "https://…".` and the like. No HTTP status came
      * back, so a byte count, an HTTP/2 stream id or the URL in that message is
-     * never a status code, and it is retried before any is looked for.
+     * never a status code, and it is retried before any is looked for. A
+     * stream that ends before its terminal event was cut the same way.
      */
     private function isConnectionCut(Throwable $throwable): bool
     {
-        return u($this->joinMessages($throwable))->containsAny(self::CONNECTION_CUT_HINTS);
+        return $this->hasInChain($throwable, IncompleteStreamException::class) || u($this->joinMessages($throwable))->containsAny(self::CONNECTION_CUT_HINTS);
     }
 
     /**

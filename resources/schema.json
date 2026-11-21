@@ -29,7 +29,7 @@
         "max_output_tokens": {
           "type": "integer",
           "minimum": 1,
-          "description": "Maximum output tokens per LLM call (max_tokens). Default: 4096."
+          "description": "Maximum output tokens per LLM call of a Claude model; other models get no cap. Default: 4096."
         },
         "attacker_max_output_tokens": {
           "type": ["integer", "null"],
@@ -44,6 +44,21 @@
         "provider_json_mode": {
           "type": "boolean",
           "description": "Send response_format: {type: json_object} on every call to a Claude/Anthropic-dialect model (its name contains claude) a gateway serves. Not sent on the anthropic and bedrock platforms, which have no JSON-object mode for Claude, and a no-op for every other model. Default: false."
+        },
+        "cli_agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Run the audit on a subscription instead of an API key, through a coding agent's CLI installed on the machine, in place of the symfony/ai platform the application configures. Since 1.23.",
+          "properties": {
+            "platform": {
+              "enum": [null, "claudecode", "codex"],
+              "description": "claudecode (a Claude subscription, through the claude CLI) or codex (a ChatGPT subscription, through the codex CLI). Default: null, which keeps the symfony/ai platform."
+            },
+            "cli_binary": {
+              "type": ["string", "null"],
+              "description": "Path to the CLI when it is not on the PATH. Default: null."
+            }
+          }
         },
         "scan": {
           "type": "object",
@@ -137,6 +152,10 @@
               "type": "integer",
               "minimum": 1,
               "description": "Findings reviewed per LLM call. Default: 1."
+            },
+            "report_static_findings": {
+              "type": "boolean",
+              "description": "Report every redacted credential and every static pre-scan match as a finding, validated by the reviewer. Default: false; the configuration init writes turns it on. Since 1.23."
             },
             "tools_enabled": {
               "type": "boolean",
@@ -369,6 +388,7 @@
                       "ldap_service",
                       "sonata_admin",
                       "easyadmin_crud",
+                      "use_case",
                       "messenger_handler",
                       "webhook_consumer",
                       "event_subscriber",

@@ -1,0 +1,61 @@
+{
+    "anthropic": {
+        "models": {
+            "claude-fable-new": {
+                "id": "claude-fable-new",
+                "family": "claude-fable",
+                "release_date": "2026-09-01",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 10,
+                    "output": 50
+                }
+            },
+            "claude-opus-5-5": {
+                "id": "claude-opus-5-5",
+                "family": "claude-opus",
+                "release_date": "2026-09-22",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 4,
+                    "output": 20
+                }
+            },
+            "claude-sonnet-new": {
+                "id": "claude-sonnet-new",
+                "family": "claude-sonnet",
+                "release_date": "2026-09-28",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 2,
+                    "output": 10
+                }
+            },
+            "claude-haiku-new": {
+                "id": "claude-haiku-new",
+                "family": "claude-haiku",
+                "release_date": "2026-10-07",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0.1,
+                    "output": 0.5
+                }
+            },
+            "claude-tiny-new": {
+                "id": "claude-tiny-new",
+                "family": "claude-tiny",
+                "release_date": "2026-10-08",
+                "last_updated": "2099-01-01",
+                "tool_call": true,
+                "cost": {
+                    "input": 0.01,
+                    "output": 0.05
+                }
+            }
+        }
+    }
+}

@@ -24,10 +24,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config\Fixture\InMemoryCredentialStore;
 
 final class StandalonePlatformConfigResolverTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $tmpDir;
@@ -212,7 +215,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_rejects_an_env_placeholder_whose_variable_is_unset(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('"ANTHROPIC_API_KEY"');
+        $this->expectExceptionMessageContaining('"ANTHROPIC_API_KEY"');
 
         (new StandalonePlatformConfigResolver())
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
@@ -228,7 +231,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_rejects_a_mixed_case_env_placeholder_instead_of_passing_it_through_as_a_literal(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('"openaiApiKey"');
+        $this->expectExceptionMessageContaining('"openaiApiKey"');
 
         (new StandalonePlatformConfigResolver())
             ->resolve(['platform' => ['openai' => ['api_key' => '%env(openaiApiKey)%']]]);
@@ -273,7 +276,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_rejects_a_file_placeholder_whose_variable_is_unset(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('"ANTHROPIC_API_KEY_FILE"');
+        $this->expectExceptionMessageContaining('"ANTHROPIC_API_KEY_FILE"');
 
         (new StandalonePlatformConfigResolver())
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
@@ -291,7 +294,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
         $missingFile = \sprintf('%s/absent-api-key', $this->tmpDir);
 
         $this->expectException(UnreadableCredentialFileException::class);
-        $this->expectExceptionMessage('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" could not be read');
+        $this->expectExceptionMessageContaining('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" could not be read');
 
         (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $missingFile]))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
@@ -309,7 +312,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
         $blankFile = $this->writeCredentialFile(" \n");
 
         $this->expectException(UnreadableCredentialFileException::class);
-        $this->expectExceptionMessage('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" is empty');
+        $this->expectExceptionMessageContaining('The credential file your config reads through "ANTHROPIC_API_KEY_FILE" is empty');
 
         (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY_FILE' => $blankFile]))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(file:ANTHROPIC_API_KEY_FILE)%']]]);
@@ -480,7 +483,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_reports_a_credential_that_is_neither_exported_nor_stored(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('run "auth:set --env-var=ANTHROPIC_API_KEY" to store the key on this machine');
+        $this->expectExceptionMessageContaining('run "auth:set --env-var=ANTHROPIC_API_KEY" to store the key on this machine');
 
         (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore()))
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
@@ -537,7 +540,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_reports_a_plain_setting_whose_variable_is_unset_without_speaking_of_the_api_key(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('The environment variable "LLM_BASE_URL", referenced by your config, is not set.');
+        $this->expectExceptionMessageContaining('The environment variable "LLM_BASE_URL", referenced by your config, is not set.');
 
         (new StandalonePlatformConfigResolver(['LLM_API_KEY' => 'sk-from-env']))
             ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(LLM_BASE_URL)%', 'api_key' => '%env(LLM_API_KEY)%']]]]);
@@ -610,7 +613,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_the_key_of_the_connection_the_provider_selects_is_still_required(string $provider, array $platform, string $expectedVariable): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage(\sprintf('"%s"', $expectedVariable));
+        $this->expectExceptionMessageContaining(\sprintf('"%s"', $expectedVariable));
 
         (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => 'sk-anthropic', 'TOKEN_A' => 'secret-a']))->resolve(['provider' => $provider, 'platform' => $platform]);
     }
@@ -752,7 +755,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_never_reads_a_plain_setting_from_the_credential_store(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('"LLM_BASE_URL"');
+        $this->expectExceptionMessageContaining('"LLM_BASE_URL"');
 
         (new StandalonePlatformConfigResolver([], credentialStore: new InMemoryCredentialStore(['LLM_BASE_URL' => 'http://stored.example'])))
             ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(LLM_BASE_URL)%']]]]);
@@ -832,7 +835,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      */
     public function test_it_names_the_spellings_it_supports_when_refusing_a_placeholder(): void
     {
-        $this->expectExceptionMessage('The placeholder "%env(trim:API_KEY)%" applies an env processor, and the standalone binary applies none (trim:, string:, default:, …): it reads only "%env(VAR)%" and "%env(file:VAR)%"');
+        $this->expectExceptionMessageContaining('The placeholder "%env(trim:API_KEY)%" applies an env processor, and the standalone binary applies none (trim:, string:, default:, …): it reads only "%env(VAR)%" and "%env(file:VAR)%"');
 
         (new StandalonePlatformConfigResolver(['API_KEY' => 'sk-from-env']))
             ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(trim:API_KEY)%']]]]);
@@ -847,7 +850,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      */
     public function test_it_quotes_a_long_refused_placeholder_in_full_so_the_line_can_be_found(): void
     {
-        $this->expectExceptionMessage('The placeholder "%env(default::ANTHROPIC_API_KEY)%"');
+        $this->expectExceptionMessageContaining('The placeholder "%env(default::ANTHROPIC_API_KEY)%"');
 
         (new StandalonePlatformConfigResolver())
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(default::ANTHROPIC_API_KEY)%']]]);

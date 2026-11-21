@@ -16,10 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
@@ -28,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BaseUrlPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\BedrockMantleRoute;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EndpointPlatforms;
@@ -36,10 +35,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HandWrittenPlatformBlock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformConnection;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\RoundTripYaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 
@@ -56,19 +57,20 @@ final readonly class InitCommand
 
     private const string MODEL_PLACEHOLDER = '<model id>';
 
-    private const string DEFAULT_MODEL = 'claude-opus-5-5';
+    private const string LOCAL_OLLAMA = 'http://localhost:11434';
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandaloneConfigFactoryInterface $standaloneConfigFactory,
         private StandaloneConfigWriterInterface $standaloneConfigWriter,
         private BridgeInstallerInterface $bridgeInstaller,
-        private ComposerPreflight $composerPreflight,
         private CredentialStoreInterface $credentialStore,
         private Filesystem $filesystem = new Filesystem(),
         private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
         private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
         private ?PricedModelListInterface $pricedModelList = null,
+        private ?ConnectionTestRunnerInterface $connectionTestRunner = null,
+        private ?PulledModelListInterface $pulledModelList = null,
     ) {}
 
     /**
@@ -80,34 +82,18 @@ final readonly class InitCommand
         InputInterface $input,
         #[MapInput] InitCommandInput $initCommandInput,
     ): int {
-        if ($this->declinesTheOverwriteUnasked($input, $initCommandInput->force)) {
-            return $this->configure($symfonyStyle, $initCommandInput);
-        }
-
-        return $this->composerPreflight->refusal($symfonyStyle) ?? $this->configure($symfonyStyle, $initCommandInput);
-    }
-
-    /**
-     * A run that cannot ask, without `--force`, leaves an existing
-     * configuration as it is, so it goes the way it always went, without
-     * checking first for a Composer it will not use.
-     *
-     * @throws UnresolvableConfigPathException
-     */
-    private function declinesTheOverwriteUnasked(InputInterface $input, bool $force): bool
-    {
-        return !$force && !$input->isInteractive() && $this->filesystem->exists($this->xdgConfigPathResolver->configFile());
+        return $this->configure($symfonyStyle, $initCommandInput, $input->isInteractive());
     }
 
     /**
      * @throws UnresolvableConfigPathException
      * @throws BridgeInstallationFailedException
      */
-    private function configure(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput): int
+    private function configure(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, bool $interactive): int
     {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        $provider = b($initCommandInput->provider ?? $this->pick($symfonyStyle, 'Which AI provider do you want to use? Pick a number, or type any symfony/ai platform — e.g. ollama, or generic.my_gateway for an AI gateway', InitProviderChoices::names(), 'anthropic'))->trim()->toString();
+        $provider = b($initCommandInput->provider ?? InitProviderQuestion::ask($symfonyStyle))->trim()->toString();
 
         if ($this->refused($symfonyStyle, InitRefusal::forProviderText($provider))) {
             return Command::INVALID;
@@ -120,27 +106,21 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $model = b($initCommandInput->model ?? $this->askModel($symfonyStyle, $providerKey))->trim()->toString();
+        $platformConnection = $this->resolveConnection($symfonyStyle, $initCommandInput, $providerKey, $provider, $interactive);
+
+        if (!$platformConnection instanceof PlatformConnection) {
+            return Command::INVALID;
+        }
+
+        $model = b($initCommandInput->model ?? (new InitModelQuestion($this->pricedModelList, $this->pulledModelList))->ask($symfonyStyle, $providerKey, $platformConnection->endpoint))->trim()->toString();
 
         if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
             return Command::INVALID;
         }
 
-        $envVar = $this->resolveApiKeyVariable($symfonyStyle, $initCommandInput, $providerKey);
+        $envVar = $this->resolveApiKeyVariable($initCommandInput, $providerKey);
 
         if ($this->refused($symfonyStyle, InitRefusal::forEnvironmentVariable($envVar))) {
-            return Command::INVALID;
-        }
-
-        $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
-
-        if ($this->refused($symfonyStyle, InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl))) {
-            return Command::INVALID;
-        }
-
-        $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey);
-
-        if ($this->refused($symfonyStyle, InitRefusal::forResolvedEndpoint($providerKey, $provider, $endpoint))) {
             return Command::INVALID;
         }
 
@@ -151,9 +131,10 @@ final readonly class InitCommand
         }
 
         $this->installBridges($symfonyStyle, $provider, $providerKey, $model);
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $baseUrl, $endpoint));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $platformConnection));
 
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
+        ConnectionTestOffer::make($this->connectionTestRunner, $symfonyStyle, $interactive);
 
         return Command::SUCCESS;
     }
@@ -245,11 +226,7 @@ final readonly class InitCommand
      */
     private function installBridge(SymfonyStyle $symfonyStyle, string $provider, ProviderKey $providerKey, string ...$companionPlatforms): void
     {
-        $symfonyStyle->text(\sprintf(
-            'Downloading the %s provider bridge%s with composer — this can take a minute…',
-            OutputFormatter::escape(implode(' and ', [$providerKey->platform, ...$companionPlatforms])),
-            [] === $companionPlatforms ? '' : 's',
-        ));
+        $symfonyStyle->text(\sprintf('Installing support for %s — this can take a minute…', OutputFormatter::escape(ProviderNames::ofPlatform($providerKey->platform))));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir(), ...$companionPlatforms);
     }
 
@@ -267,15 +244,14 @@ final readonly class InitCommand
     private function reportWritten(SymfonyStyle $symfonyStyle, string $configFile, string $provider, string $model, ?string $envVar): void
     {
         $symfonyStyle->success(\sprintf('Configuration written to %s.', $configFile));
-        $symfonyStyle->definitionList(
-            ['Provider' => OutputFormatter::escape($provider)],
-            ['Model' => OutputFormatter::escape($model)],
-            ['API key variable' => $envVar ?? 'none — this platform is configured without a credential'],
-        );
+        if (null === $envVar) {
+            $symfonyStyle->definitionList(['Provider' => OutputFormatter::escape($provider)], ['Model' => OutputFormatter::escape($model)]);
 
-        if (null !== $envVar) {
-            $this->offerToStoreCredential($symfonyStyle, $envVar);
+            return;
         }
+
+        $symfonyStyle->definitionList(['Provider' => OutputFormatter::escape($provider)], ['Model' => OutputFormatter::escape($model)], ['API key variable' => $envVar]);
+        $this->offerToStoreCredential($symfonyStyle, $envVar);
     }
 
     private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile, bool $force): bool
@@ -285,103 +261,70 @@ final readonly class InitCommand
             && !$symfonyStyle->confirm(\sprintf('A configuration already exists at %s. Overwrite it?', $configFile), false);
     }
 
-    private function askModel(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): string
+    private function defaultApiKeyVariable(ProviderKey $providerKey): string
     {
-        $pricedModels = $this->pricedModelList?->pricedModels($providerKey->platform) ?? [];
-
-        return [] === $pricedModels
-            ? $this->ask($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
-            : $this->pick($symfonyStyle, 'Which model should the auditor use? Pick a number, or type any model id', $pricedModels, self::DEFAULT_MODEL);
-    }
-
-    /**
-     * @param list<string> $choices
-     */
-    private function pick(SymfonyStyle $symfonyStyle, string $question, array $choices, string $default): string
-    {
-        $choiceQuestion = new ChoiceQuestion($question, $choices, $default);
-        $choiceQuestion->setValidator(static fn (mixed $answer): string => self::chosen($choices, \is_string($answer) ? $answer : ''));
-
-        $answer = $symfonyStyle->askQuestion($choiceQuestion);
-        \assert(\is_string($answer));
-
-        return $answer;
-    }
-
-    /**
-     * @param list<string> $choices
-     */
-    private static function chosen(array $choices, string $answer): string
-    {
-        return ctype_digit($answer) ? $choices[(int) $answer] ?? $answer : $answer;
-    }
-
-    private function ask(SymfonyStyle $symfonyStyle, string $question, string $default): string
-    {
-        $answer = $symfonyStyle->ask($question, $default);
-        \assert(\is_string($answer));
-
-        return $answer;
-    }
-
-    /**
-     * A platform that makes you supply its endpoint is one you host yourself,
-     * so no credential is invented for it: naming a variable nobody set is what
-     * made `init --provider=ollama` end in "No API key available".
-     */
-    private function defaultApiKeyVariable(ProviderKey $providerKey): ?string
-    {
-        return EndpointPlatforms::requires($providerKey)
-            ? null
-            : \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
+        return \sprintf('%s_API_KEY', u($providerKey->platform)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
     }
 
     /**
      * Null means the connection is written without an `api_key`. Only the
      * platforms whose key the bundle leaves optional may reach that, so an
-     * empty answer elsewhere still falls through to the refusal.
+     * empty answer elsewhere still falls through to the refusal. A platform
+     * that makes you supply its endpoint is one you host yourself, so no
+     * credential is asked for unless `--env-var` names one.
      */
-    private function resolveApiKeyVariable(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    private function resolveApiKeyVariable(InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {
-        if ($initCommandInput->noApiKey) {
+        if ($initCommandInput->noApiKey || CliAgentPlatforms::declares($providerKey) || (null === $initCommandInput->envVar && EndpointPlatforms::requires($providerKey))) {
             return null;
         }
 
-        $default = $this->defaultApiKeyVariable($providerKey);
-        $answer = $initCommandInput->envVar ?? (null === $default
-            ? $this->askRequired($symfonyStyle, \sprintf('Which environment variable holds the API key for %s? Leave it empty to write none, which is what a local install needs', $providerKey->platform))
-            : $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $default));
+        $answer = $initCommandInput->envVar ?? $this->defaultApiKeyVariable($providerKey);
 
         $envVar = b($answer)->trim()->toString();
 
         return '' === $envVar && OptionalApiKeyPlatforms::accept($providerKey) ? null : $envVar;
     }
 
-    private function resolveEndpoint(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    private function resolveEndpoint(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey, bool $interactive): ?string
     {
         if (!EndpointPlatforms::accept($providerKey)) {
             return null;
         }
 
-        $endpoint = b($initCommandInput->endpoint ?? $this->askRequired($symfonyStyle, \sprintf('Endpoint %s should reach (e.g. http://localhost:11434)%s', $providerKey->platform, EndpointPlatforms::requires($providerKey) ? '' : ', or leave it empty to keep the default')))->trim()->toString();
+        if (null === $initCommandInput->endpoint && $interactive && 'ollama' === $providerKey->platform) {
+            return b(InitPrompt::withDefault($symfonyStyle, 'Where does Ollama run?', self::LOCAL_OLLAMA))->trim()->toString();
+        }
+
+        $endpoint = b($initCommandInput->endpoint ?? InitPrompt::required($symfonyStyle, \sprintf('Endpoint %s should reach (e.g. http://localhost:11434)%s', $providerKey->platform, EndpointPlatforms::requires($providerKey) ? '' : ', or leave it empty to keep the default')))->trim()->toString();
 
         return '' !== $endpoint ? $endpoint : null;
     }
 
-    /**
-     * Asked without a default, so no misleading `[]` is offered for a value that
-     * is required. `QuestionHelper` rethrows at end of input when the default is
-     * null, which would abort with exit 1 instead of the refusal this returns to.
-     */
-    private function askRequired(SymfonyStyle $symfonyStyle, string $question): string
+    private function resolveConnection(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey, string $provider, bool $interactive): ?PlatformConnection
     {
-        try {
-            $answer = $symfonyStyle->ask($question);
-        } catch (MissingInputException) {
-            return '';
+        $baseUrl = $this->resolveBaseUrl($symfonyStyle, $initCommandInput, $providerKey);
+        if ($this->refused($symfonyStyle, InitRefusal::forResolvedBaseUrl($providerKey, $provider, $baseUrl))) {
+            return null;
         }
 
-        return \is_string($answer) ? $answer : '';
+        $endpoint = $this->resolveEndpoint($symfonyStyle, $initCommandInput, $providerKey, $interactive);
+        if ($this->refused($symfonyStyle, InitRefusal::forResolvedEndpoint($providerKey, $provider, $endpoint))) {
+            return null;
+        }
+
+        $deployment = $this->resolveDeployment($symfonyStyle, $initCommandInput, $providerKey);
+
+        return $this->refused($symfonyStyle, DeploymentRefusal::of($providerKey, $provider, $deployment)) ? null : new PlatformConnection($baseUrl, $endpoint, $deployment);
+    }
+
+    private function resolveDeployment(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
+    {
+        if ('azure' !== $providerKey->platform) {
+            return $initCommandInput->deployment;
+        }
+
+        return b($initCommandInput->deployment ?? InitPrompt::required($symfonyStyle, 'Azure OpenAI deployment name'))->trim()->toString();
     }
 
     private function resolveBaseUrl(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
@@ -390,7 +333,7 @@ final readonly class InitCommand
             return null;
         }
 
-        $baseUrl = b($initCommandInput->baseUrl ?? $this->askRequired($symfonyStyle, \sprintf('Base URL of the endpoint you want %s to reach (required, e.g. https://your-gateway.example)', $providerKey->platform)))->trim()->toString();
+        $baseUrl = b($initCommandInput->baseUrl ?? InitPrompt::required($symfonyStyle, \sprintf('What is the URL of %s? e.g. %s', ProviderNames::ofPlatform($providerKey->platform), 'azure' === $providerKey->platform ? 'https://<resource>.openai.azure.com' : 'https://your-gateway.example')))->trim()->toString();
 
         return '' !== $baseUrl ? $baseUrl : null;
     }

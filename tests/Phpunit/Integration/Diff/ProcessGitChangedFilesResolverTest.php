@@ -19,9 +19,12 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class ProcessGitChangedFilesResolverTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const int RACY_TIMESTAMP = 1_700_000_000;
 
     private string $tmpDir;
@@ -34,7 +37,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     public function test_it_throws_when_directory_is_not_a_git_tree(): void
     {
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('is not a git working tree');
+        $this->expectExceptionMessageContaining('is not a git working tree');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
@@ -47,7 +50,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->initRepo();
 
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('does not resolve');
+        $this->expectExceptionMessageContaining('does not resolve');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'does-not-exist');
     }
@@ -333,7 +336,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->filesystem->mkdir($this->tmpDir.'/.git');
 
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('does not resolve');
+        $this->expectExceptionMessageContaining('does not resolve');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
@@ -382,7 +385,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->commit('src/Foo.php', '<?php', 'init');
 
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('is not a git working tree');
+        $this->expectExceptionMessageContaining('is not a git working tree');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/.git', 'main');
     }
@@ -446,7 +449,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->initRepo();
 
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('Could not verify git ref "main"');
+        $this->expectExceptionMessageContaining('Could not verify git ref "main"');
 
         (new ProcessGitChangedFilesResolver(timeoutSeconds: -1))->changedSince($this->tmpDir, 'main');
     }
@@ -460,7 +463,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->commit('src/Foo.php', '<?php', 'init');
 
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('Could not determine whether "'.$this->tmpDir.'/src" is a git working tree');
+        $this->expectExceptionMessageContaining('Could not determine whether "'.$this->tmpDir.'/src" is a git working tree');
 
         (new ProcessGitChangedFilesResolver(timeoutSeconds: -1))->changedSince($this->tmpDir.'/src', 'main');
     }
@@ -476,7 +479,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->commit('src/Bar.php', '<?php', 'unrelated root');
 
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('git diff against "main...HEAD" failed');
+        $this->expectExceptionMessageContaining('git diff against "main...HEAD" failed');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
@@ -601,7 +604,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         );
 
         $this->expectException(GitChangedFilesUnavailableException::class);
-        $this->expectExceptionMessage('Could not diff against "main...HEAD"');
+        $this->expectExceptionMessageContaining('Could not diff against "main...HEAD"');
 
         $processGitChangedFilesResolver->changedSince($this->tmpDir, 'main');
     }

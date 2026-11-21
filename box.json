@@ -2,6 +2,7 @@
     "main": "bin/symfony-security-auditor",
     "output": "symfony-security-auditor.phar",
     "directories": ["config", "src"],
+    "files": ["resources/composer.phar"],
     "finder": [
         {
             "notName": ["*.md", "*.dist", "Makefile", "composer.json", "composer.lock"],

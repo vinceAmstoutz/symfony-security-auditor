@@ -34,6 +34,8 @@ final class BudgetTracker
 
     private float $costUsdUsed = 0.0;
 
+    private int $interruptedCalls = 0;
+
     /** @var array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cache_creation_tokens: int, estimated_cost_usd: float, billed_models: list<string>}> */
     private array $usageByModel = [];
 
@@ -120,10 +122,25 @@ final class BudgetTracker
         return round($this->costUsdUsed, 6);
     }
 
+    /**
+     * A call cut before its answer ended, which the provider may bill beyond
+     * the usage it reported: the cost booked is then a minimum.
+     */
+    public function recordInterruptedCall(): void
+    {
+        ++$this->interruptedCalls;
+    }
+
+    public function interruptedCalls(): int
+    {
+        return $this->interruptedCalls;
+    }
+
     public function reset(): void
     {
         $this->tokensUsed = 0;
         $this->costUsdUsed = 0.0;
+        $this->interruptedCalls = 0;
         $this->usageByModel = [];
     }
 }

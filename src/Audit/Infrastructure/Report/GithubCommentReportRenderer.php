@@ -36,6 +36,10 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
 
     public const int MAX_ROWS = 10;
 
+    public function __construct(
+        private ReportPathPrefix $reportPathPrefix = new ReportPathPrefix(),
+    ) {}
+
     #[Override]
     public function format(): string
     {
@@ -45,6 +49,8 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
     #[Override]
     public function render(AuditReport $auditReport): string
     {
+        $reviewSuggestions = GithubReviewSuggestions::block($this->suggestionsOf($auditReport->vulnerabilities()), $this->reportPathPrefix);
+
         return implode("\n\n", [
             self::MARKER,
             $this->headline($auditReport),
@@ -52,6 +58,7 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
             ...$this->findings($auditReport),
             '---',
             $this->credit(),
+            ...(null === $reviewSuggestions ? [] : [$reviewSuggestions]),
         ]);
     }
 
@@ -97,6 +104,7 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
             ...$warning,
             $this->table($shown),
             ...$this->truncationNote(\count($shown), \count($vulnerabilities)),
+            ...$this->suggestedFixes($shown),
         ];
     }
 
@@ -133,6 +141,28 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
         }
 
         return [\sprintf('_Showing the %d most severe of %d findings._', $shown, $total)];
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     *
+     * @return list<string>
+     */
+    private function suggestedFixes(array $vulnerabilities): array
+    {
+        $suggestions = array_map(static fn (GithubSuggestion $githubSuggestion): string => $githubSuggestion->commentSection(), $this->suggestionsOf($vulnerabilities));
+
+        return [] === $suggestions ? [] : ['### Suggested fixes', ...$suggestions];
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     *
+     * @return list<GithubSuggestion>
+     */
+    private function suggestionsOf(array $vulnerabilities): array
+    {
+        return array_values(array_filter(array_map(GithubSuggestion::of(...), $vulnerabilities), static fn (?GithubSuggestion $githubSuggestion): bool => $githubSuggestion instanceof GithubSuggestion));
     }
 
     private function credit(): string

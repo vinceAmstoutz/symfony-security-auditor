@@ -1,0 +1,262 @@
+{
+    "scenario": "api/run-audit-use-case-since",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "api:run-audit <since>='HEAD'",
+                "exit": 0,
+                "stdout": {
+                    "json": {
+                        "@class": "VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\AuditReport",
+                        "auditId()": "AUDIT-<ID>",
+                        "completedAt()": "<TIMESTAMP>",
+                        "consumedBaselineFingerprints()": [],
+                        "cost()": {
+                            "@class": "VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\AuditCost",
+                            "byRole()": [],
+                            "estimatedCostUsd()": 0.0021,
+                            "hasPublishedPricing()": true,
+                            "inputTokens()": 600,
+                            "outputTokens()": 60,
+                            "primaryModel()": "gpt-4o",
+                            "toArray()": {
+                                "input_tokens": 600,
+                                "output_tokens": 60,
+                                "total_tokens": 660,
+                                "estimated_cost_usd": 0.0021,
+                                "primary_model": "gpt-4o",
+                                "by_role": {
+                                    "@class": "stdClass"
+                                },
+                                "by_model": {
+                                    "@class": "stdClass"
+                                }
+                            },
+                            "totalTokens()": 660
+                        },
+                        "coverage()": [
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/NewController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/NewController.php",
+                                "status": "validated"
+                            },
+                            {
+                                "stage": "attacker",
+                                "file": "src/Controller/NewController.php",
+                                "status": "analyzed"
+                            },
+                            {
+                                "stage": "reviewer",
+                                "file": "src/Controller/NewController.php",
+                                "status": "validated"
+                            }
+                        ],
+                        "durationSeconds()": 0,
+                        "filesDiscovered()": 8,
+                        "filesScanned()": 1,
+                        "fingerprints()": [
+                            "SSA-D805EB9A79A7"
+                        ],
+                        "foundNoFile()": false,
+                        "grade()": "SecurityGrade::B",
+                        "hasNoVerdict()": false,
+                        "isComplete()": true,
+                        "isWithoutVerdict()": false,
+                        "normalizedScore()": 93,
+                        "projectPath()": "<WORKSPACE>/project",
+                        "riskLevel()": "LOW",
+                        "riskLevelEnum()": "RiskLevel::Low",
+                        "riskScore()": 7,
+                        "startedAt()": "<TIMESTAMP>",
+                        "toArray()": {
+                            "audit_id": "AUDIT-<ID>",
+                            "project": "<WORKSPACE>/project",
+                            "started_at": "<TIMESTAMP>",
+                            "completed_at": "<TIMESTAMP>",
+                            "duration_seconds": 0,
+                            "files_scanned": 1,
+                            "files_discovered": 8,
+                            "complete": true,
+                            "risk_score": 7,
+                            "risk_level": "LOW",
+                            "score": 93,
+                            "grade": "B",
+                            "total_vulnerabilities": 1,
+                            "by_severity": {
+                                "critical": 0,
+                                "high": 1,
+                                "medium": 0,
+                                "low": 0,
+                                "info": 0
+                            },
+                            "vulnerabilities": [
+                                {
+                                    "id": "VULN-A43EDB69",
+                                    "fingerprint": "SSA-D805EB9A79A7",
+                                    "type": "ssrf",
+                                    "category": "Data Exposure",
+                                    "owasp": "OWASP A01:2025 - Broken Access Control (SSRF)",
+                                    "cwe": "CWE-918",
+                                    "severity": "high",
+                                    "severity_score": 7,
+                                    "title": "New file ssrf",
+                                    "description": "desc",
+                                    "file": "src/Controller/NewController.php",
+                                    "line_start": 7,
+                                    "line_end": 7,
+                                    "vulnerable_code": "code",
+                                    "attack_vector": "vector",
+                                    "proof": "proof",
+                                    "remediation": "fix",
+                                    "confidence": 0.9,
+                                    "reviewer_validated": true,
+                                    "detected_at": "<TIMESTAMP>",
+                                    "synthesized_poc": null,
+                                    "suggested_fix": null,
+                                    "cvss": {
+                                        "version": "4.0",
+                                        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                        "base_score": 8.1
+                                    }
+                                }
+                            ],
+                            "cost": {
+                                "input_tokens": 600,
+                                "output_tokens": 60,
+                                "total_tokens": 660,
+                                "estimated_cost_usd": 0.0021,
+                                "primary_model": "gpt-4o",
+                                "by_role": {
+                                    "@class": "stdClass"
+                                },
+                                "by_model": {
+                                    "@class": "stdClass"
+                                }
+                            },
+                            "scope": {
+                                "since": "HEAD",
+                                "paths": []
+                            },
+                            "coverage": [
+                                {
+                                    "stage": "attacker",
+                                    "file": "src/Controller/NewController.php",
+                                    "status": "analyzed"
+                                },
+                                {
+                                    "stage": "reviewer",
+                                    "file": "src/Controller/NewController.php",
+                                    "status": "validated"
+                                },
+                                {
+                                    "stage": "attacker",
+                                    "file": "src/Controller/NewController.php",
+                                    "status": "analyzed"
+                                },
+                                {
+                                    "stage": "reviewer",
+                                    "file": "src/Controller/NewController.php",
+                                    "status": "validated"
+                                }
+                            ],
+                            "suppressed_fingerprints": [],
+                            "suppressed_baseline_fingerprints": []
+                        },
+                        "totalVulnerabilities()": 1,
+                        "unanalyzedFiles()": [],
+                        "vulnerabilities()": [
+                            {
+                                "@class": "VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\Vulnerability",
+                                "attackVector()": "vector",
+                                "attackerFingerprint()": "SSA-D805EB9A79A7",
+                                "confidence()": 0.9,
+                                "cvssEstimate()": {
+                                    "@class": "VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Model\\CvssEstimate",
+                                    "baseScore()": 8.1,
+                                    "toArray()": {
+                                        "version": "4.0",
+                                        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                        "base_score": 8.1
+                                    },
+                                    "vector()": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N"
+                                },
+                                "description()": "desc",
+                                "detectedAt()": "<TIMESTAMP>",
+                                "echoedFilePath()": "src/Controller/NewController.php",
+                                "filePath()": "src/Controller/NewController.php",
+                                "fingerprint()": "SSA-D805EB9A79A7",
+                                "fingerprintCandidates()": [
+                                    "SSA-D805EB9A79A7"
+                                ],
+                                "id()": "VULN-A43EDB69",
+                                "isHighRisk()": true,
+                                "isReviewerValidated()": true,
+                                "lineEnd()": 7,
+                                "lineStart()": 7,
+                                "proof()": "proof",
+                                "remediation()": "fix",
+                                "severity()": "VulnerabilitySeverity::HIGH",
+                                "suggestedFix()": null,
+                                "synthesizedPoC()": null,
+                                "title()": "New file ssrf",
+                                "toArray()": {
+                                    "id": "VULN-A43EDB69",
+                                    "fingerprint": "SSA-D805EB9A79A7",
+                                    "type": "ssrf",
+                                    "category": "Data Exposure",
+                                    "owasp": "OWASP A01:2025 - Broken Access Control (SSRF)",
+                                    "cwe": "CWE-918",
+                                    "severity": "high",
+                                    "severity_score": 7,
+                                    "title": "New file ssrf",
+                                    "description": "desc",
+                                    "file": "src/Controller/NewController.php",
+                                    "line_start": 7,
+                                    "line_end": 7,
+                                    "vulnerable_code": "code",
+                                    "attack_vector": "vector",
+                                    "proof": "proof",
+                                    "remediation": "fix",
+                                    "confidence": 0.9,
+                                    "reviewer_validated": true,
+                                    "detected_at": "<TIMESTAMP>",
+                                    "synthesized_poc": null,
+                                    "suggested_fix": null,
+                                    "cvss": {
+                                        "version": "4.0",
+                                        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+                                        "base_score": 8.1
+                                    }
+                                },
+                                "type()": "VulnerabilityType::SSRF",
+                                "vulnerableCode()": "code"
+                            }
+                        ]
+                    }
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": [
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/NewController.php",
+                "tool-results model=gpt-4o count=1",
+                "reviewer model=gpt-4o tools=record_review findings=1",
+                "tool-results model=gpt-4o count=1",
+                "attacker model=gpt-4o tools=record_vulnerability,read_file,grep,list_files,lookup_advisory files=src/Controller/NewController.php",
+                "tool-results model=gpt-4o count=1"
+            ]
+        }
+    }
+}

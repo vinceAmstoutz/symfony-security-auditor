@@ -23,11 +23,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem\Fixture\AssertsOwnerOnlyAccessTrait;
 
 final class FilesystemAttackerCacheTest extends TestCase
 {
     use AssertsOwnerOnlyAccessTrait;
+
+    use ExpectsExceptionMessageTrait;
 
     private string $cacheDir;
 
@@ -227,7 +230,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
-        $this->expectExceptionMessage('Attacker cache dir cannot be empty');
+        $this->expectExceptionMessageContaining('Attacker cache dir cannot be empty');
         new FilesystemAttackerCache('   ', new Filesystem(), new NullLogger());
     }
 

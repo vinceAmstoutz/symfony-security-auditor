@@ -32,11 +32,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Release
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdateStatus;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture\FakeReleaseClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\SelfUpdate\Fixture\RecordingPricingCatalogRefresher;
 
 final class SelfUpdaterTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string LATEST_RELEASE_API_URL = 'https://api.github.com/repos/vinceAmstoutz/symfony-security-auditor/releases/latest';
 
     private const string SNAPSHOT_RELEASE_API_URL = 'https://api.github.com/repos/vinceAmstoutz/symfony-security-auditor/releases/tags/snapshot';
@@ -293,7 +296,7 @@ final class SelfUpdaterTest extends TestCase
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'), $this->binaryPath, $filesystem);
 
         $this->expectException(SelfUpdateFailedException::class);
-        $this->expectExceptionMessage('Checksum verification failed');
+        $this->expectExceptionMessageContaining('Checksum verification failed');
 
         $selfUpdater->run('1.0.0', false);
     }
@@ -308,7 +311,7 @@ final class SelfUpdaterTest extends TestCase
 
         try {
             $this->expectException(SelfUpdateFailedException::class);
-            $this->expectExceptionMessage('Could not read the downloaded file');
+            $this->expectExceptionMessageContaining('Could not read the downloaded file');
 
             $selfUpdater->run('1.0.0', false);
         } finally {
@@ -325,7 +328,7 @@ final class SelfUpdaterTest extends TestCase
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', 'NEW', hash('sha256', 'NEW')), $this->workingDirectory.'/missing/symfony-security-auditor');
 
         $this->expectException(SelfUpdateFailedException::class);
-        $this->expectExceptionMessage('not writable');
+        $this->expectExceptionMessageContaining('not writable');
 
         $selfUpdater->run('1.0.0', false);
     }
@@ -348,7 +351,7 @@ final class SelfUpdaterTest extends TestCase
 
         try {
             $this->expectException(SelfUpdateFailedException::class);
-            $this->expectExceptionMessage(\sprintf('The directory "%s" holding the binary is not writable (A temporary file could not be created: Permission denied)', $this->workingDirectory));
+            $this->expectExceptionMessageContaining(\sprintf('The directory "%s" holding the binary is not writable (A temporary file could not be created: Permission denied)', $this->workingDirectory));
 
             $selfUpdater->run('1.0.0', false);
         } finally {
@@ -376,7 +379,7 @@ final class SelfUpdaterTest extends TestCase
 
         try {
             $this->expectException(SelfUpdateFailedException::class);
-            $this->expectExceptionMessage('Failed to replace the binary');
+            $this->expectExceptionMessageContaining('Failed to replace the binary');
 
             $this->pendingBinarySwap->commit();
         } finally {
@@ -405,7 +408,7 @@ final class SelfUpdaterTest extends TestCase
 
         try {
             $this->expectException(SelfUpdateFailedException::class);
-            $this->expectExceptionMessage('Failed to replace the binary');
+            $this->expectExceptionMessageContaining('Failed to replace the binary');
 
             $selfUpdater->run('1.0.0', false);
         } finally {

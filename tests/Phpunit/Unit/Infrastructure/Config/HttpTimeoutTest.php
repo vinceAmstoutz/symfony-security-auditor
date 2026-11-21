@@ -18,9 +18,12 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\HttpTimeout;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class HttpTimeoutTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string CONFIG_FILE = '/home/you/.config/symfony-security-auditor/config.yaml';
 
     private const string PROJECT_CONFIG_FILE = '/work/app/.symfony-security-auditor.yaml';
@@ -58,7 +61,7 @@ final class HttpTimeoutTest extends TestCase
     public function test_it_refuses_a_value_that_is_no_number_of_seconds(mixed $value): void
     {
         $this->expectException(MalformedProjectConfigException::class);
-        $this->expectExceptionMessage(\sprintf('Config file "%s" sets "http_timeout" to something other than a number of seconds above zero.', self::CONFIG_FILE));
+        $this->expectExceptionMessageContaining(\sprintf('Config file "%s" sets "http_timeout" to something other than a number of seconds above zero.', self::CONFIG_FILE));
 
         HttpTimeout::in(['http_timeout' => $value], self::CONFIG_FILE);
     }
@@ -110,7 +113,7 @@ final class HttpTimeoutTest extends TestCase
     public function test_a_project_config_may_not_give_the_provider_less_time(array $projectConfig): void
     {
         $this->expectException(ProjectConfigUserOnlyKeyException::class);
-        $this->expectExceptionMessage(\sprintf('The project config "%s" sets "http_timeout" to something other than a number of seconds at or above the timeout your user config allows — a repository you audit may give the provider more time, never less.', self::PROJECT_CONFIG_FILE));
+        $this->expectExceptionMessageContaining(\sprintf('The project config "%s" sets "http_timeout" to something other than a number of seconds at or above the timeout your user config allows — a repository you audit may give the provider more time, never less.', self::PROJECT_CONFIG_FILE));
 
         HttpTimeout::raisedBy($projectConfig, 900.0, self::PROJECT_CONFIG_FILE);
     }

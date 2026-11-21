@@ -22,9 +22,12 @@ use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class AuditConfigurationDefinitionTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const array RISK_PATTERNS = ['audit_log' => ['regex' => '/AuditService::log/', 'description' => 'privileged action logged']];
 
     private const string ENV_PLACEHOLDER = 'env_0123456789abcdef_MODEL_0123456789abcdef0123456789abcdef';
@@ -190,7 +193,7 @@ final class AuditConfigurationDefinitionTest extends TestCase
     #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_a_risk_pattern_bucket_that_names_no_file_type_is_kept_and_deprecated(): void
     {
-        $this->expectUserDeprecationMessage('Since vinceamstoutz/symfony-security-auditor 1.22: scan.custom_risk_patterns.controlers names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.');
+        $this->expectUserDeprecationMessage('Since vinceamstoutz/symfony-security-auditor 1.22: scan.custom_risk_patterns.controlers names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, use_case, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.');
 
         $processed = $this->process([['scan' => ['custom_risk_patterns' => ['controller' => self::RISK_PATTERNS, 'controlers' => self::RISK_PATTERNS]]]]);
 
@@ -211,7 +214,7 @@ final class AuditConfigurationDefinitionTest extends TestCase
     public function test_a_model_key_refuses_a_value_that_is_no_text(array $path, mixed $value, string $type): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "string", but got "%s".', implode('.', $path), $type));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "string", but got "%s".', implode('.', $path), $type));
 
         $this->process([self::nested($path, $value)]);
     }
@@ -236,7 +239,7 @@ final class AuditConfigurationDefinitionTest extends TestCase
     public function test_a_text_key_refuses_a_value_that_is_no_text(array $path, array $siblings, mixed $value, string $type): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "string", but got "%s".', implode('.', $path), $type));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "string", but got "%s".', implode('.', $path), $type));
 
         $this->process([$this->textSetting($path, $siblings, $value)]);
     }
@@ -275,7 +278,7 @@ final class AuditConfigurationDefinitionTest extends TestCase
     public function test_a_text_key_set_to_a_list_keeps_the_message_it_had(array $path, array $siblings): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "scalar", but got "array".', implode('.', $path)));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "scalar", but got "array".', implode('.', $path)));
 
         $this->process([$this->textSetting($path, $siblings, ['var/audit'])]);
     }
@@ -324,7 +327,7 @@ final class AuditConfigurationDefinitionTest extends TestCase
     public function test_the_instructions_of_a_custom_skill_set_to_null_keep_the_message_they_had(): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage('The path "symfony_security_auditor.audit.custom_skills.pricing.instructions" cannot contain an empty value, but got null.');
+        $this->expectExceptionMessageContaining('The path "symfony_security_auditor.audit.custom_skills.pricing.instructions" cannot contain an empty value, but got null.');
 
         $this->process([['audit' => ['custom_skills' => ['pricing' => ['file_type' => 'controller', 'instructions' => null]]]]]);
     }
@@ -423,7 +426,7 @@ final class AuditConfigurationDefinitionTest extends TestCase
     public function test_a_model_key_set_to_a_list_keeps_the_message_it_had(array $path): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "scalar", but got "array".', implode('.', $path)));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "symfony_security_auditor.%s". Expected "scalar", but got "array".', implode('.', $path)));
 
         $this->process([self::nested($path, ['gpt-4o'])]);
     }
@@ -432,7 +435,7 @@ final class AuditConfigurationDefinitionTest extends TestCase
     public function test_an_empty_model_keeps_the_message_it_had(?string $model, string $message): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage($message);
+        $this->expectExceptionMessageContaining($message);
 
         $this->process([['model' => $model]]);
     }

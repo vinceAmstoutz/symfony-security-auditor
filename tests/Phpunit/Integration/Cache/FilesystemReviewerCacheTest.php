@@ -34,11 +34,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem\Fixture\AssertsOwnerOnlyAccessTrait;
 
 final class FilesystemReviewerCacheTest extends TestCase
 {
     use AssertsOwnerOnlyAccessTrait;
+
+    use ExpectsExceptionMessageTrait;
 
     private string $cacheDir;
 
@@ -339,7 +342,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
-        $this->expectExceptionMessage('Reviewer cache dir cannot be empty');
+        $this->expectExceptionMessageContaining('Reviewer cache dir cannot be empty');
         new FilesystemReviewerCache('   ', new Filesystem(), new NullLogger());
     }
 

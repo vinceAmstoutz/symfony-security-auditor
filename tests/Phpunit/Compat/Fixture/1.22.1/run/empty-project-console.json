@@ -1,0 +1,61 @@
+{
+    "scenario": "run/empty-project-console",
+    "artifacts": [],
+    "result": {
+        "runs": [
+            {
+                "command": "audit:run <project-path>='{project}'",
+                "exit": 1,
+                "stdout": {
+                    "lines": [
+                        "",
+                        " SECURITY AUDITOR",
+                        " Symfony - multi-agent LLM audit",
+                        " https://github.com/vinceAmstoutz/symfony-security-auditor",
+                        "",
+                        " Project: <WORKSPACE>/project",
+                        " Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)",
+                        "",
+                        "",
+                        "Running audit pipeline...",
+                        "-------------------------",
+                        "",
+                        " The audit makes many LLM calls — typically several minutes, 20+ minutes on large projects.",
+                        " Live progress and findings stream below as they happen.",
+                        "",
+                        "",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "  🔍 SYMFONY LLM AUDIT REPORT — AUDIT-<ID>",
+                        "  vinceamstoutz/symfony-security-auditor",
+                        "  https://github.com/vinceamstoutz/symfony-security-auditor",
+                        "══════════════════════════════════════════════════════════════════════",
+                        "",
+                        "  Project : <WORKSPACE>/project",
+                        "  Started : <TIMESTAMP>",
+                        "  Duration: <DURATION>",
+                        "  Files   : 0 scanned",
+                        "  Tokens  : 0 in / 0 out (gpt-4o)",
+                        "  Cost    : $0.0000 (published rates)",
+                        "",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "  RISK LEVEL: UNKNOWN  (no file was analyzed)",
+                        "──────────────────────────────────────────────────────────────────────",
+                        "",
+                        "  ⚠️  Audit incomplete: the scan found no file to audit, so this report has no verdict and cannot vouch that the project is free of vulnerabilities.",
+                        "",
+                        " [ERROR] The scan found no file to audit, so the run has no verdict. A run with no verdict cannot pass, so it fails."
+                    ]
+                },
+                "stderr": {
+                    "lines": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "files": [],
+        "llm": {
+            "lines": []
+        }
+    }
+}

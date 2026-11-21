@@ -54,7 +54,7 @@ jobs:
           persist-credentials: false
 
       - name: Run markdownlint-cli2
-        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
+        uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
         with:
           config: .markdownlint-cli2.jsonc
           globs: '**/*.md'
@@ -171,11 +171,20 @@ jobs:
       - name: Pull request check tests
         run: sh tests/Shell/pull_request_check_test.sh
 
+      - name: Review suggestion tests
+        run: sh tests/Shell/review_suggestions_test.sh
+
       - name: Changelog check tests
         run: sh tests/Shell/changelog_check_test.sh
 
       - name: Changelog check
         run: sh .github/scripts/check-changelog.sh CHANGELOG.md
+
+      - name: Prose check tests
+        run: sh tests/Shell/prose_check_test.sh
+
+      - name: Prose check
+        run: git ls-files -z '*.md' | xargs -0 sh .github/scripts/check-prose.sh
 
   zizmor:
     name: zizmor (GitHub Actions security scan)
@@ -191,7 +200,7 @@ jobs:
           persist-credentials: false
 
       - name: Run zizmor
-        uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
 
   tests:
     name: Tests + Mutation (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony }})
@@ -199,7 +208,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.3', '8.4', '8.5']
+        php: ['8.3', '8.4', '8.5', '8.6']
         # Symfony 8.0 is end of life and Composer refuses its releases for their open security advisories.
         symfony: ['7.4', '8.1']
         exclude:
@@ -219,6 +228,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: pcov
+          ini-values: zend.assertions=1
           # symfony/flex makes `composer update` honour SYMFONY_REQUIRE, which pins the leg's Symfony version.
           tools: flex
 

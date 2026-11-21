@@ -17,6 +17,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPl
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\PendingBinarySwapCommitter;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
+// Composer ships its own unprefixed symfony/console, so it runs before this binary's autoloader is registered.
+$composer = getenv('SYMFONY_SECURITY_AUDITOR_COMPOSER');
+if (is_string($composer) && '' !== $composer) {
+    putenv('SYMFONY_SECURITY_AUDITOR_COMPOSER');
+    unset($_SERVER['SYMFONY_SECURITY_AUDITOR_COMPOSER'], $_ENV['SYMFONY_SECURITY_AUDITOR_COMPOSER']);
+    $_SERVER['argv'][0] = $composer;
+
+    require $composer;
+
+    exit(0);
+}
+
 (static function (): void {
     foreach ([__DIR__.'/../vendor/autoload.php', __DIR__.'/../../../autoload.php'] as $autoload) {
         if (is_file($autoload)) {
@@ -38,7 +50,11 @@ if (null !== $bridgeTreeWarning) {
     fwrite(\STDERR, $bridgeTreeWarning.\PHP_EOL);
 }
 
-$runningBinaryPath = \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) ? $_SERVER['SCRIPT_FILENAME'] : '';
+$runningBinaryPath = match (true) {
+    \function_exists('micro_get_self_filename') => micro_get_self_filename(),
+    \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) => $_SERVER['SCRIPT_FILENAME'],
+    default => '',
+};
 
 $standaloneApplicationFactory = StandaloneApplicationFactory::fromEnvironment($environment, $runningBinaryPath);
 $pendingBinarySwapCommitter = new PendingBinarySwapCommitter($standaloneApplicationFactory->pendingBinarySwap());

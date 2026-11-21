@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformConnection;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 
 final class StandaloneConfigFactoryTest extends TestCase
@@ -27,7 +28,7 @@ final class StandaloneConfigFactoryTest extends TestCase
     {
         self::assertSame(
             $expected,
-            (new StandaloneConfigFactory())->create($provider, 'gpt-5.4', $apiKeyVariable, $baseUrl, $endpoint),
+            (new StandaloneConfigFactory())->create($provider, 'gpt-5.4', $apiKeyVariable, new PlatformConnection($baseUrl, $endpoint)),
         );
     }
 
@@ -67,6 +68,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'openai',
                 'platform' => ['openai' => ['api_key' => '%env(API_TOKEN)%']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -79,6 +81,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'openresponses.my_gateway',
                 'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example', 'api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -91,6 +94,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'openresponses.my_gateway',
                 'platform' => ['openresponses' => ['my_gateway' => ['base_url' => 'https://gw.example/v1%%2Fx%%3Fy', 'api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -103,6 +107,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'ollama',
                 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434/a%%2Fb%%3Fc']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -115,6 +120,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => '%env(GATEWAY_URL)%', 'api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -127,6 +133,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['api_key' => '%env(API_TOKEN)%']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -139,6 +146,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'ollama',
                 'platform' => ['ollama' => ['endpoint' => 'https://ollama.com', 'api_key' => '%env(OLLAMA_API_KEY)%']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -151,6 +159,7 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'ollama',
                 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
 
@@ -163,7 +172,16 @@ final class StandaloneConfigFactoryTest extends TestCase
                 'provider' => 'generic.my_gateway',
                 'platform' => ['generic' => ['my_gateway' => ['base_url' => 'https://gw.example']]],
                 'model' => 'gpt-5.4',
+                'audit' => ['report_static_findings' => true],
             ],
         ];
+    }
+
+    public function test_it_writes_the_deployment_of_an_azure_openai_resource(): void
+    {
+        self::assertSame(
+            ['azure' => ['default' => ['base_url' => 'https://acme.openai.azure.com', 'deployment' => 'gpt-4o-prod', 'api_key' => '%env(AZURE_API_KEY)%']]],
+            (new StandaloneConfigFactory())->create('azure.default', 'gpt-4o', 'AZURE_API_KEY', new PlatformConnection('https://acme.openai.azure.com', deployment: 'gpt-4o-prod'))['platform'],
+        );
     }
 }

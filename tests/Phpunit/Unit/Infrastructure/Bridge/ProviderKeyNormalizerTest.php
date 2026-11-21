@@ -41,6 +41,7 @@ final class ProviderKeyNormalizerTest extends TestCase
         yield 'huggingface package slug' => ['hugging-face', 'huggingface'];
         yield 'elevenlabs package slug' => ['eleven-labs', 'elevenlabs'];
         yield 'amazeeai package slug' => ['amazee-ai', 'amazeeai'];
+        yield 'claudecode package slug' => ['claude-code', 'claudecode'];
         yield 'uppercase package slug' => ['Open-AI', 'openai'];
         yield 'package slug folded while its instance is preserved' => ['open-responses.my_gateway', 'openresponses.my_gateway'];
         yield 'instance left untouched on a platform with no slug override' => ['generic.my_gateway', 'generic.my_gateway'];

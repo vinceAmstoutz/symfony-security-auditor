@@ -19,9 +19,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFileReader;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class StandaloneConfigFileReaderTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string ALIAS_BOMB = <<<'YAML'
         a0: &a0 [x, x, x, x, x, x, x, x, x, x]
         a1: &a1 [*a0, *a0, *a0, *a0, *a0, *a0, *a0, *a0, *a0, *a0]
@@ -61,7 +64,7 @@ final class StandaloneConfigFileReaderTest extends TestCase
         $this->filesystem->dumpFile($this->configFile, self::ALIAS_BOMB);
 
         $this->expectException(MalformedProjectConfigException::class);
-        $this->expectExceptionMessage(\sprintf('Config file "%s" holds 10000 values or more once its YAML aliases are expanded', $this->configFile));
+        $this->expectExceptionMessageContaining(\sprintf('Config file "%s" holds 10000 values or more once its YAML aliases are expanded', $this->configFile));
 
         (new StandaloneConfigFileReader())->read($this->configFile);
     }
@@ -119,7 +122,7 @@ final class StandaloneConfigFileReaderTest extends TestCase
         $this->filesystem->dumpFile($this->configFile, $this->paddedTo(524_289));
 
         $this->expectException(MalformedProjectConfigException::class);
-        $this->expectExceptionMessage(\sprintf('Config file "%s" is larger than 524288 bytes, far more than any configuration needs, so it was not parsed.', $this->configFile));
+        $this->expectExceptionMessageContaining(\sprintf('Config file "%s" is larger than 524288 bytes, far more than any configuration needs, so it was not parsed.', $this->configFile));
 
         (new StandaloneConfigFileReader())->read($this->configFile);
     }
@@ -142,7 +145,7 @@ final class StandaloneConfigFileReaderTest extends TestCase
         $this->filesystem->dumpFile($this->configFile, self::nestedTo(33)."profile: fast\n");
 
         $this->expectException(MalformedProjectConfigException::class);
-        $this->expectExceptionMessage(\sprintf('Config file "%s" nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.', $this->configFile));
+        $this->expectExceptionMessageContaining(\sprintf('Config file "%s" nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.', $this->configFile));
 
         (new StandaloneConfigFileReader())->read($this->configFile);
     }
@@ -155,7 +158,7 @@ final class StandaloneConfigFileReaderTest extends TestCase
         $this->filesystem->dumpFile($this->configFile, str_replace("a:\n", "a:\n# note\n\n", self::nestedTo(33)));
 
         $this->expectException(MalformedProjectConfigException::class);
-        $this->expectExceptionMessage('nests more than 32 levels deep');
+        $this->expectExceptionMessageContaining('nests more than 32 levels deep');
 
         (new StandaloneConfigFileReader())->read($this->configFile);
     }
@@ -169,7 +172,7 @@ final class StandaloneConfigFileReaderTest extends TestCase
         $this->filesystem->dumpFile($this->configFile, $yaml);
 
         $this->expectException(MalformedProjectConfigException::class);
-        $this->expectExceptionMessage(\sprintf('Config file "%s" nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.', $this->configFile));
+        $this->expectExceptionMessageContaining(\sprintf('Config file "%s" nests more than 32 levels deep, far more than any configuration needs, so it was not parsed.', $this->configFile));
 
         (new StandaloneConfigFileReader())->read($this->configFile);
     }
@@ -252,7 +255,7 @@ final class StandaloneConfigFileReaderTest extends TestCase
         $this->filesystem->dumpFile($this->configFile, $this->fileNestingExactly(4_194_305));
 
         $this->expectException(MalformedProjectConfigException::class);
-        $this->expectExceptionMessage('add up to more than 4194304 bytes, so it was not parsed.');
+        $this->expectExceptionMessageContaining('add up to more than 4194304 bytes, so it was not parsed.');
 
         (new StandaloneConfigFileReader())->read($this->configFile);
     }

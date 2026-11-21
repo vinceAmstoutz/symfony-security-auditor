@@ -17,9 +17,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnloadableBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\PlatformCheckErrorConverter;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class PlatformCheckErrorConverterTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const string PLATFORM_CHECK_FAILURE = 'Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 9.0.0".';
 
     private const string RAISING_CALL_DEPRECATION = 'Passing E_USER_ERROR to trigger_error() is deprecated since 8.4, throw an exception or call exit with a string message instead';
@@ -30,7 +33,7 @@ final class PlatformCheckErrorConverterTest extends TestCase
     public function test_the_error_an_older_platform_check_raises_becomes_the_exception_a_newer_one_throws(): void
     {
         $this->expectException(UnloadableBridgeTreeException::class);
-        $this->expectExceptionMessage(self::PLATFORM_CHECK_FAILURE);
+        $this->expectExceptionMessageContaining(self::PLATFORM_CHECK_FAILURE);
 
         (new PlatformCheckErrorConverter())(\E_USER_ERROR, self::PLATFORM_CHECK_FAILURE);
     }

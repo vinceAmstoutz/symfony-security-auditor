@@ -33,11 +33,14 @@ final class InitCommandInput
     #[Option(description: 'Environment variable holding the API key; defaults to <PLATFORM>_API_KEY')]
     public ?string $envVar = null;
 
-    #[Option(description: 'Base URL of the platform endpoint, required by the platforms that declare one (albert, amazeeai, generic.<instance>, openresponses.<instance>); passing it with any other platform is rejected. Skips the prompt when set.')]
+    #[Option(description: 'Base URL of the platform endpoint, required by the platforms that declare one (albert, amazeeai, azure.<instance>, generic.<instance>, openresponses.<instance>); passing it with any other platform is rejected. Skips the prompt when set.')]
     public ?string $baseUrl = null;
 
     #[Option(description: 'Endpoint the platform should reach, for the platforms that declare one (deepgram, elevenlabs, minimax, ollama, together, venice); passing it with any other platform is rejected. Required for ollama, which declares no default. Skips the prompt when set.')]
     public ?string $endpoint = null;
+
+    #[Option(description: 'Deployment name of an Azure OpenAI resource (azure.<instance>); passing it with any other platform is rejected. Skips the prompt when set.')]
+    public ?string $deployment = null;
 
     #[Option(description: 'Write no api_key at all, for the platforms whose key is optional (bedrock, deepgram, elevenlabs, generic, ollama, openresponses); use it for a local server that authenticates nobody')]
     public bool $noApiKey = false;

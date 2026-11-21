@@ -56,6 +56,10 @@ final readonly class DegradedAnswerBooker
      */
     public function bookFailedCall(Throwable $throwable, ?DeferredResult $deferredResult, int $estimatedInputTokens): void
     {
+        if ($this->transientFailureClassifier->isCutMidAnswer($throwable)) {
+            $this->budgetTracker?->recordInterruptedCall();
+        }
+
         $stopReason = $this->transientFailureClassifier->billedStopReason($throwable);
         if (null === $stopReason) {
             $this->rateLimiter->record(0, 0);

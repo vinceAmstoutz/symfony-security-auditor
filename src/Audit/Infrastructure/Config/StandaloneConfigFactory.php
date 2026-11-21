@@ -22,10 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryInterface
 {
     #[Override]
-    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, ?string $baseUrl = null, ?string $endpoint = null): array
+    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, PlatformConnection $platformConnection = new PlatformConnection()): array
     {
         $providerKey = ProviderKey::of($provider);
-        $connection = $this->connection($apiKeyEnvironmentVariable, $baseUrl, $endpoint);
+        $connection = $this->connection($apiKeyEnvironmentVariable, $platformConnection);
 
         if (BedrockMantleRoute::applies($providerKey)) {
             $connection = ['api' => BedrockMantleRoute::of($model), ...$connection];
@@ -35,6 +35,7 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
             'provider' => $provider,
             'platform' => $this->platformBlock($providerKey, $connection),
             'model' => $model,
+            'audit' => ['report_static_findings' => true],
         ];
     }
 
@@ -59,12 +60,16 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
      *
      * @return array<string, string>
      */
-    private function connection(?string $apiKeyEnvironmentVariable, ?string $baseUrl, ?string $endpoint): array
+    private function connection(?string $apiKeyEnvironmentVariable, PlatformConnection $platformConnection): array
     {
-        $connection = null !== $baseUrl ? ['base_url' => ContainerParameterSyntax::literal($baseUrl)] : [];
+        $connection = null !== $platformConnection->baseUrl ? ['base_url' => ContainerParameterSyntax::literal($platformConnection->baseUrl)] : [];
 
-        if (null !== $endpoint) {
-            $connection['endpoint'] = ContainerParameterSyntax::literal($endpoint);
+        if (null !== $platformConnection->endpoint) {
+            $connection['endpoint'] = ContainerParameterSyntax::literal($platformConnection->endpoint);
+        }
+
+        if (null !== $platformConnection->deployment) {
+            $connection['deployment'] = ContainerParameterSyntax::literal($platformConnection->deployment);
         }
 
         if (null !== $apiKeyEnvironmentVariable) {

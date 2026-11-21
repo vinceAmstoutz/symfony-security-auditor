@@ -162,7 +162,7 @@ final readonly class PlatformResultExtractor
     {
         $promptTokens = $tokenUsage->getPromptTokens();
 
-        return null !== $promptTokens && 0 !== $this->cachedTokensInsidePrompt($tokenUsage, $promptTokens);
+        return null !== $promptTokens && null !== $this->cacheCountedInsidePrompt($tokenUsage, $promptTokens);
     }
 
     /**
@@ -199,32 +199,44 @@ final readonly class PlatformResultExtractor
     {
         $promptTokens = $tokenUsage->getPromptTokens() ?? 0;
         $completionTokens = $tokenUsage->getCompletionTokens() ?? 0;
-        $cachedInsidePrompt = $this->cachedTokensInsidePrompt($tokenUsage, $promptTokens);
+        $outputTokens = $completionTokens + $this->thinkingTokensCountedApart($tokenUsage, $promptTokens, $completionTokens);
+        $cacheInsidePrompt = $this->cacheCountedInsidePrompt($tokenUsage, $promptTokens);
+        if (null === $cacheInsidePrompt) {
+            return [$promptTokens, $outputTokens, $tokenUsage->getCacheReadTokens() ?? 0, $tokenUsage->getCacheCreationTokens() ?? 0];
+        }
 
-        return [
-            $promptTokens - $cachedInsidePrompt,
-            $completionTokens + $this->thinkingTokensCountedApart($tokenUsage, $promptTokens, $completionTokens),
-            0 === $cachedInsidePrompt ? $tokenUsage->getCacheReadTokens() ?? 0 : $cachedInsidePrompt,
-            $tokenUsage->getCacheCreationTokens() ?? 0,
-        ];
+        [$cacheReadTokens, $cacheCreationTokens] = $cacheInsidePrompt;
+
+        return [$promptTokens - $cacheReadTokens - $cacheCreationTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
     }
 
     /**
      * Anthropic counts cache reads and writes apart from its input tokens and
-     * always reports the writes; OpenAI-style providers (OpenAI, Gemini,
-     * DeepSeek, gateways) report a total and count the cached tokens inside
+     * reports no total, or one with room for them beside the prompt;
+     * OpenAI-style providers (OpenAI, Gemini, DeepSeek, gateways) report a
+     * total and count the cache reads, and OpenAI its cache writes too, inside
      * the prompt. Booking both as they come would bill the cached share twice
-     * at the full input rate, or never at the cache rate.
+     * at the full input rate, or never at the cache rate. Null when the cache
+     * is counted apart from the prompt.
+     *
+     * @return array{0: int, 1: int}|null the cache reads and writes inside the prompt
      */
-    private function cachedTokensInsidePrompt(TokenUsageInterface $tokenUsage, int $promptTokens): int
+    private function cacheCountedInsidePrompt(TokenUsageInterface $tokenUsage, int $promptTokens): ?array
     {
-        if (null !== $tokenUsage->getCacheCreationTokens() || null === $tokenUsage->getTotalTokens()) {
-            return 0;
+        $totalTokens = $tokenUsage->getTotalTokens();
+        if (null === $totalTokens) {
+            return null;
         }
 
-        $cachedTokens = $tokenUsage->getCacheReadTokens() ?? $tokenUsage->getCachedTokens() ?? 0;
+        $cacheReadTokens = $tokenUsage->getCacheReadTokens() ?? $tokenUsage->getCachedTokens() ?? 0;
+        $cacheCreationTokens = $tokenUsage->getCacheCreationTokens();
+        if (null !== $cacheCreationTokens && $promptTokens + ($tokenUsage->getCompletionTokens() ?? 0) + $cacheReadTokens + $cacheCreationTokens <= $totalTokens) {
+            return null;
+        }
 
-        return $cachedTokens <= $promptTokens ? $cachedTokens : 0;
+        $cacheCreationTokens ??= 0;
+
+        return $cacheReadTokens + $cacheCreationTokens <= $promptTokens ? [$cacheReadTokens, $cacheCreationTokens] : null;
     }
 
     /**

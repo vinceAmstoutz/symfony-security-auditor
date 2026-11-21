@@ -26,6 +26,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -43,9 +44,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExten
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class StandaloneContainerFactoryTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $cacheDir;
 
     #[Override]
@@ -116,7 +120,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_offline_only_refuses_to_boot_against_a_remote_platform(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('"anthropic"');
+        $this->expectExceptionMessageContaining('"anthropic"');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig(
@@ -147,6 +151,25 @@ final class StandaloneContainerFactoryTest extends TestCase
         );
 
         self::assertInstanceOf(AuditCommand::class, $containerBuilder->get(AuditCommand::class));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_hands_out_the_llm_client_the_connection_check_calls(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(['model' => 'gpt-4'], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+
+        self::assertInstanceOf(LLMClientInterface::class, $containerBuilder->get(LLMClientInterface::class));
     }
 
     /**
@@ -630,7 +653,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_it_rejects_a_selector_absent_from_the_platform_block(): void
     {
         $this->expectException(UnknownPlatformProviderException::class);
-        $this->expectExceptionMessage('The selected provider "mistral" is not present in the "platform:" block of your config.');
+        $this->expectExceptionMessageContaining('The selected provider "mistral" is not present in the "platform:" block of your config.');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://a']]], 'mistral')),
@@ -649,7 +672,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_it_does_not_offer_instances_for_a_platform_configured_without_one(): void
     {
         $this->expectException(UnknownPlatformProviderException::class);
-        $this->expectExceptionMessage('The selected provider "ollama.typo" is not present in the "platform:" block of your config.');
+        $this->expectExceptionMessageContaining('The selected provider "ollama.typo" is not present in the "platform:" block of your config.');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(
@@ -671,7 +694,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_it_names_the_configured_instances_when_the_selected_one_does_not_exist(): void
     {
         $this->expectException(UnknownPlatformProviderException::class);
-        $this->expectExceptionMessage('The "generic" platform has no "typo" instance. Configured instances: primary.');
+        $this->expectExceptionMessageContaining('The "generic" platform has no "typo" instance. Configured instances: primary.');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(
@@ -693,7 +716,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_it_names_the_configured_instances_when_an_instance_keyed_platform_is_selected_without_one(): void
     {
         $this->expectException(UnknownPlatformProviderException::class);
-        $this->expectExceptionMessage('The "generic" platform is configured per instance, so "provider: generic" does not select one. Use "generic.<instance>" instead. Configured instances: primary, secondary.');
+        $this->expectExceptionMessageContaining('The "generic" platform is configured per instance, so "provider: generic" does not select one. Use "generic.<instance>" instead. Configured instances: primary, secondary.');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(
@@ -759,7 +782,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_a_platform_whose_bridge_is_not_installed_is_answered_with_the_init_command(): void
     {
         $this->expectException(ProviderBridgeException::class);
-        $this->expectExceptionMessage('Run "symfony-security-auditor init --provider=anthropic" to download it');
+        $this->expectExceptionMessageContaining('Run "symfony-security-auditor init --provider=anthropic" to download it');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(['anthropic' => ['api_key' => 'sk-test']])),
@@ -777,7 +800,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_the_init_advice_names_the_platform_whose_bridge_is_missing_not_the_selected_provider(): void
     {
         $this->expectException(ProviderBridgeException::class);
-        $this->expectExceptionMessage('init --provider=anthropic"');
+        $this->expectExceptionMessageContaining('init --provider=anthropic"');
 
         (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']], 'anthropic' => ['api_key' => 'sk-test']], 'generic.default')),

@@ -20,6 +20,19 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  */
 final readonly class ProjectFileContentSignatures
 {
+    private const array AUTHENTICATION_SIGNATURES = [
+        'implements AuthenticatorInterface',
+        'extends AbstractAuthenticator',
+        'extends AbstractLoginFormAuthenticator',
+        'implements AccessTokenHandlerInterface',
+        'implements AuthenticationSuccessHandlerInterface',
+        'implements AuthenticationFailureHandlerInterface',
+        'implements AuthenticationEntryPointInterface',
+        'implements AccessDeniedHandlerInterface',
+        'implements UserProviderInterface',
+        'implements UserCheckerInterface',
+    ];
+
     public static function looksLikeEasyAdminCrud(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
@@ -73,13 +86,16 @@ final readonly class ProjectFileContentSignatures
     {
         return str_ends_with($path, '.php')
             && (str_contains($content, 'extends ServiceEntityRepository')
-                || str_contains($content, 'extends EntityRepository'));
+                || str_contains($content, 'extends EntityRepository')
+                || str_contains($content, 'implements QueryCollectionExtensionInterface')
+                || str_contains($content, 'implements QueryItemExtensionInterface'));
     }
 
     public static function looksLikeForm(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
-            && str_contains($content, 'extends AbstractType');
+            && (str_contains($content, 'extends AbstractType')
+                || str_contains($content, '#[AsFormType'));
     }
 
     public static function looksLikeTwigExtension(string $path, string $content): bool
@@ -107,6 +123,25 @@ final readonly class ProjectFileContentSignatures
             && str_contains($content, '#[AsMessageHandler');
     }
 
+    public static function looksLikeUseCase(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'implements CommandHandler')
+                || str_contains($content, 'implements QueryHandler')
+                || str_contains($content, '#[CommandHandler')
+                || str_contains($content, '#[QueryHandler')
+                || str_contains($content, '#[AsCommandHandler')
+                || str_contains($content, '#[AsQueryHandler'));
+    }
+
+    public static function looksLikeApiPlatformState(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'ApiPlatform\\State\\')
+            && (str_contains($content, 'implements ProcessorInterface')
+                || str_contains($content, 'implements ProviderInterface'));
+    }
+
     public static function looksLikeWebhookConsumer(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
@@ -117,8 +152,17 @@ final readonly class ProjectFileContentSignatures
 
     public static function looksLikeAuthenticator(string $path, string $content): bool
     {
-        return str_ends_with($path, '.php')
-            && str_contains($content, 'implements AuthenticatorInterface');
+        if (!str_ends_with($path, '.php')) {
+            return false;
+        }
+
+        foreach (self::AUTHENTICATION_SIGNATURES as $signature) {
+            if (str_contains($content, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function looksLikeEventSubscriber(string $path, string $content): bool

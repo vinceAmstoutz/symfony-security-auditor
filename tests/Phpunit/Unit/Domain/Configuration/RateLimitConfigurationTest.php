@@ -16,9 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class RateLimitConfigurationTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     /**
      * @throws InvalidRateLimitConfigurationException
      */
@@ -45,7 +48,7 @@ final class RateLimitConfigurationTest extends TestCase
     public function test_zero_requests_per_minute_rejected(): void
     {
         $this->expectException(InvalidRateLimitConfigurationException::class);
-        $this->expectExceptionMessage('requestsPerMinute must be >= 1 or null, got 0');
+        $this->expectExceptionMessageContaining('requestsPerMinute must be >= 1 or null, got 0');
 
         new RateLimitConfiguration(0, null, null);
     }
@@ -56,7 +59,7 @@ final class RateLimitConfigurationTest extends TestCase
     public function test_zero_input_tokens_per_minute_rejected(): void
     {
         $this->expectException(InvalidRateLimitConfigurationException::class);
-        $this->expectExceptionMessage('inputTokensPerMinute must be >= 1 or null, got 0');
+        $this->expectExceptionMessageContaining('inputTokensPerMinute must be >= 1 or null, got 0');
 
         new RateLimitConfiguration(null, 0, null);
     }
@@ -67,7 +70,7 @@ final class RateLimitConfigurationTest extends TestCase
     public function test_zero_output_tokens_per_minute_rejected(): void
     {
         $this->expectException(InvalidRateLimitConfigurationException::class);
-        $this->expectExceptionMessage('outputTokensPerMinute must be >= 1 or null, got 0');
+        $this->expectExceptionMessageContaining('outputTokensPerMinute must be >= 1 or null, got 0');
 
         new RateLimitConfiguration(null, null, 0);
     }

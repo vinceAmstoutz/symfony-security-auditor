@@ -23,9 +23,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class RegexStaticPreScannerTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private RegexStaticPreScanner $regexStaticPreScanner;
 
     /**
@@ -1877,7 +1880,7 @@ final class RegexStaticPreScannerTest extends TestCase
     public function test_an_invalid_custom_risk_pattern_throws_at_construction(): void
     {
         $this->expectException(InvalidCustomRiskPatternException::class);
-        $this->expectExceptionMessage('Invalid custom risk pattern "broken" (bucket "php")');
+        $this->expectExceptionMessageContaining('Invalid custom risk pattern "broken" (bucket "php")');
 
         new RegexStaticPreScanner([
             'php' => [
@@ -1893,7 +1896,7 @@ final class RegexStaticPreScannerTest extends TestCase
     public function test_a_custom_risk_pattern_that_is_no_text_throws_at_construction_naming_its_key(mixed $regex, string $type): void
     {
         $this->expectException(InvalidCustomRiskPatternException::class);
-        $this->expectExceptionMessage(\sprintf('The scan.custom_risk_patterns.php.audit_log.regex setting is not a pattern: expected text, got %s.', $type));
+        $this->expectExceptionMessageContaining(\sprintf('The scan.custom_risk_patterns.php.audit_log.regex setting is not a pattern: expected text, got %s.', $type));
 
         new RegexStaticPreScanner([
             'php' => [
@@ -1918,7 +1921,7 @@ final class RegexStaticPreScannerTest extends TestCase
     public function test_an_empty_custom_risk_pattern_throws_at_construction(): void
     {
         $this->expectException(InvalidCustomRiskPatternException::class);
-        $this->expectExceptionMessage('empty pattern');
+        $this->expectExceptionMessageContaining('empty pattern');
 
         new RegexStaticPreScanner([
             'php' => [

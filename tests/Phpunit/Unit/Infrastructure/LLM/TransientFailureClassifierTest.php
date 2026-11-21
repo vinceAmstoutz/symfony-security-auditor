@@ -24,6 +24,7 @@ use Symfony\AI\Platform\Exception\InvalidArgumentException as PlatformInvalidArg
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
+use Symfony\AI\Platform\Exception\RetryableExceptionInterface;
 use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
 use Symfony\AI\Platform\Exception\ServerException;
 use Symfony\Component\HttpClient\Exception\TransportException;
@@ -44,6 +45,7 @@ final class TransientFailureClassifierTest extends TestCase
     public static function transientCases(): iterable
     {
         yield 'typed_server_exception_without_transient_hints' => [new ServerException(null, 'provider hiccup')];
+        yield 'retryable_typed_failure_beneath_a_wrapper_without_transient_hints' => [new RuntimeException('call failed', previous: new class('provider hiccup') extends RuntimeException implements RetryableExceptionInterface {})];
         yield 'malformed_tool_call_is_a_sampling_glitch' => [new MalformedToolCallException('Invalid JSON in tool arguments: HTTP 400')];
         yield 'wrapped_malformed_tool_call' => [new RuntimeException('HTTP 400 Bad Request', previous: new MalformedToolCallException('bad arguments'))];
         yield 'http_429' => [new RuntimeException('HTTP 429 Too Many Requests')];

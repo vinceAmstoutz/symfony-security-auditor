@@ -22,9 +22,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\S
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFileReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class YamlStandaloneConfigWriterTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $configFile;
 
     #[Override]
@@ -229,7 +232,7 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         $filesystem->dumpFile($blockingFile, 'x');
 
         $this->expectException(StandaloneConfigWriteException::class);
-        $this->expectExceptionMessage('SYMFONY_SECURITY_AUDITOR_HOME');
+        $this->expectExceptionMessageContaining('SYMFONY_SECURITY_AUDITOR_HOME');
 
         (new YamlStandaloneConfigWriter())->write($blockingFile.'/config.yaml', ['model' => 'claude-opus-4-8']);
     }

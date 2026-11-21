@@ -22,9 +22,12 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class StandaloneMcpServeEndToEndTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $configHome;
@@ -62,7 +65,7 @@ final class StandaloneMcpServeEndToEndTest extends TestCase
         $this->writeConfig("platform:\n  generic:\n    default:\n      base_url: 'http://localhost'\n      api_key: '%env(PROVIDER_API_KEY)%'\nmodel: 'gpt-4'\n");
 
         $this->expectException(MissingEnvironmentVariableException::class);
-        $this->expectExceptionMessage('PROVIDER_API_KEY');
+        $this->expectExceptionMessageContaining('PROVIDER_API_KEY');
 
         $this->resolvedMcpServeCommand()->getCommand();
     }

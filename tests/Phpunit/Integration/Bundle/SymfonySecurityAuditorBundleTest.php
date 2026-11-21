@@ -23,7 +23,9 @@ use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\Bridge\Anthropic\ModelCatalog as AnthropicModelCatalog;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\PlatformOptions;
 use Symfony\AI\Platform\Test\MockPlatformFactory;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -59,6 +61,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipelin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\ProjectProfileStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
@@ -123,12 +126,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportin
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\OptionsRecordingPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\PassThroughLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\UsageReportingLLMClient;
 
 final class SymfonySecurityAuditorBundleTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $tmpDir;
 
     private ?Kernel $bootedKernel = null;
@@ -140,6 +146,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_application_console_offers_no_audit_fix_command(): void
+    {
+        $application = new Application($this->boot(['model' => 'gpt-4o']));
+
+        self::assertFalse($application->has('audit:fix'));
     }
 
     #[RunInSeparateProcess]
@@ -161,6 +176,22 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertNotFalse($auditIndex);
         self::assertGreaterThan($mappingIndex, $dependencyExpansionIndex);
         self::assertLessThan($auditIndex, $dependencyExpansionIndex);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_bundle_profiles_the_project_right_after_mapping_it(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        $auditPipeline = $this->getPrivateService($kernel, AuditPipeline::class);
+        self::assertInstanceOf(AuditPipeline::class, $auditPipeline);
+
+        $stageClasses = array_map(static fn (object $stage): string => $stage::class, $auditPipeline->stages());
+
+        $mappingPosition = array_search(MappingStage::class, $stageClasses, true);
+        self::assertIsInt($mappingPosition);
+        self::assertSame([MappingStage::class, ProjectProfileStage::class], \array_slice($stageClasses, $mappingPosition, 2));
     }
 
     #[RunInSeparateProcess]
@@ -199,7 +230,81 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $llmClient->complete('sys', 'usr');
 
         self::assertArrayNotHasKey('response_format', OptionsRecordingPlatform::$lastOptions);
-        self::assertSame(4096, OptionsRecordingPlatform::$lastOptions['max_tokens']);
+        self::assertSame(4096, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_auditor_runs_on_the_claude_code_cli_its_cli_agent_names(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_calls_to_the_platform_of_the_application_are_streamed(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-sonnet-4-5'], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame(['[]', true], [$llmClient->complete('sys', 'usr')->content(), OptionsRecordingPlatform::$lastOptions['stream'] ?? false]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_calls_to_a_cli_agent_are_not_streamed(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_auditor_leaves_the_platform_of_the_application_to_the_application_when_it_runs_on_a_cli(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]]);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $platform = $this->getPrivateService($kernel, PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+
+        self::assertSame(['OK', 'stub-response'], [$llmClient->complete('sys', 'usr')->content(), $platform->invoke('model', 'usr')->asText()]);
+    }
+
+    public function test_the_auditor_asks_a_cli_for_json_answers_since_the_cli_cannot_carry_its_tools(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'opus', 'cli_agent' => ['platform' => 'codex']]);
+
+        self::assertSame(
+            [false, false, false, false],
+            [
+                $containerBuilder->getParameter('symfony_security_auditor.audit.tools_enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.structured_collection'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_tools_enabled'),
+                $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'),
+            ],
+        );
     }
 
     /**
@@ -562,7 +667,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public function test_bundle_refuses_a_model_key_set_to_a_number_with_a_configuration_error_naming_it(array $config, string $path): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "int".', $path));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "%s". Expected "string", but got "int".', $path));
 
         $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
     }
@@ -585,7 +690,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public function test_bundle_refuses_a_text_key_set_to_no_text_with_a_configuration_error_naming_it(array $config, string $path, string $type): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage(\sprintf('Invalid type for path "%s". Expected "string", but got "%s".', $path, $type));
+        $this->expectExceptionMessageContaining(\sprintf('Invalid type for path "%s". Expected "string", but got "%s".', $path, $type));
 
         $this->loadParameters([...['model' => 'gpt-4o'], ...$config]);
     }
@@ -2067,7 +2172,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             $containerBuilder->getParameter('symfony_security_auditor.scan.custom_risk_patterns'),
         );
         self::assertSame(
-            ['scan.custom_risk_patterns.controlers names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.'],
+            ['scan.custom_risk_patterns.controlers names no file type, so its patterns never run. Key them by one of: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, use_case, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other. A bucket that names no file type is deprecated and will be refused in 2.0.'],
             $containerBuilder->getParameter('symfony_security_auditor.config_notices'),
         );
     }
@@ -2399,6 +2504,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder->getParameterBag()->resolve();
 
         return $containerBuilder;
+    }
+
+    private function fakeClaudeCli(): string
+    {
+        $cli = $this->tmpDir.'/claude';
+        (new Filesystem())->dumpFile($cli, "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n");
+        (new Filesystem())->chmod($cli, 0o755);
+
+        return $cli;
     }
 
     /**

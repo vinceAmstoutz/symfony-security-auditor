@@ -14,13 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Runner;
 
 use Override;
+use Symfony\Component\Process\Process;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario\Step;
 
 /**
  * The standalone binary, built by its own factory from the environment the
  * way `bin/symfony-security-auditor` builds it, in the step's working
- * directory and with the workspace's XDG directories as its home.
+ * directory and with the workspace's XDG directories as its home. Its bridge
+ * installer runs the workspace's offline stand-in for Composer.
  */
 final readonly class StandaloneConsole implements ConsoleInterface
 {
@@ -34,9 +38,19 @@ final readonly class StandaloneConsole implements ConsoleInterface
         $workingDirectory = ConsoleTester::enter($step, $this->workspace);
         ProcessEnvironment::set('PWD', $workingDirectory);
 
-        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment(ProcessEnvironment::current())->create();
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment(ProcessEnvironment::current(), null, $this->bridgeInstaller())->create();
 
         return ConsoleTester::run($standaloneApplication, $step, $this->workspace);
+    }
+
+    private function bridgeInstaller(): ComposerBridgeInstaller
+    {
+        $composer = $this->workspace->resolve('bin/composer');
+
+        return new ComposerBridgeInstaller(
+            static fn (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages): Process => new Process([$composer, 'require', $package, ...array_values($morePackages)]),
+            aiPlatformPin: BundledAiPlatformVersion::detect(),
+        );
     }
 
     /**

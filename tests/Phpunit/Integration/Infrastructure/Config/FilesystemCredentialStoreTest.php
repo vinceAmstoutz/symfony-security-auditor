@@ -22,9 +22,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\C
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class FilesystemCredentialStoreTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private Filesystem $filesystem;
 
     private string $configHome;
@@ -100,7 +103,7 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->givenStoredCredentials('{"ANTHROPIC_API_KEY":"anthropic-test-key-exposed"}', 0644);
 
         $this->expectException(UnreadableCredentialStoreException::class);
-        $this->expectExceptionMessage('readable by other users on this machine (permissions 0644)');
+        $this->expectExceptionMessageContaining('readable by other users on this machine (permissions 0644)');
 
         $this->store()->read('ANTHROPIC_API_KEY');
     }
@@ -182,7 +185,7 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->givenStoredCredentials($contents);
 
         $this->expectException(UnreadableCredentialStoreException::class);
-        $this->expectExceptionMessage('are not valid JSON');
+        $this->expectExceptionMessageContaining('are not valid JSON');
 
         $this->store()->read('ANTHROPIC_API_KEY');
     }
@@ -291,7 +294,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_refuses_to_store_a_credential_it_could_not_read_back(string $credential, string $expectedMessage): void
     {
         $this->expectException(CredentialStoreWriteException::class);
-        $this->expectExceptionMessage($expectedMessage);
+        $this->expectExceptionMessageContaining($expectedMessage);
 
         $this->store()->write('ANTHROPIC_API_KEY', $credential);
     }
@@ -339,7 +342,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_refuses_to_store_a_credential_with_nowhere_to_put_it(): void
     {
         $this->expectException(CredentialStoreWriteException::class);
-        $this->expectExceptionMessage('No per-user configuration directory could be resolved');
+        $this->expectExceptionMessageContaining('No per-user configuration directory could be resolved');
 
         $this->homelessStore()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-homeless');
     }
@@ -353,7 +356,7 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->filesystem->chmod($this->credentialsFile(), 0700);
 
         $this->expectException(UnreadableCredentialStoreException::class);
-        $this->expectExceptionMessage('could not be read');
+        $this->expectExceptionMessageContaining('could not be read');
 
         $this->store()->read('ANTHROPIC_API_KEY');
     }
@@ -367,7 +370,7 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->filesystem->dumpFile(\dirname($this->credentialsFile()), 'a file where the configuration directory belongs');
 
         $this->expectException(CredentialStoreWriteException::class);
-        $this->expectExceptionMessage('could not be written');
+        $this->expectExceptionMessageContaining('could not be written');
 
         $this->store()->write('ANTHROPIC_API_KEY', 'anthropic-test-key-blocked');
     }
@@ -446,7 +449,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_refuses_to_store_a_credential_under_a_name_no_placeholder_can_read(string $variableName): void
     {
         $this->expectException(CredentialStoreWriteException::class);
-        $this->expectExceptionMessage('is not a valid environment variable name');
+        $this->expectExceptionMessageContaining('is not a valid environment variable name');
 
         $this->store()->write($variableName, 'anthropic-test-key-unstorable-name');
     }
@@ -458,7 +461,7 @@ final class FilesystemCredentialStoreTest extends TestCase
     public function test_it_masks_a_refused_name_that_may_be_the_key_itself(): void
     {
         $this->expectException(CredentialStoreWriteException::class);
-        $this->expectExceptionMessage('The API key cannot be stored under "sk-ant…-var": it is not a valid environment variable name');
+        $this->expectExceptionMessageContaining('The API key cannot be stored under "sk-ant…-var": it is not a valid environment variable name');
 
         $this->store()->write('sk-ant-api03-pasted-into-env-var', 'anthropic-test-key-unstorable-name');
     }
@@ -511,7 +514,7 @@ final class FilesystemCredentialStoreTest extends TestCase
         $this->givenStoredCredentials('{"ANTHROPIC_API_KEY": "anthropic-test-key-trunc');
 
         $this->expectException(UnreadableCredentialStoreException::class);
-        $this->expectExceptionMessage('are not valid JSON');
+        $this->expectExceptionMessageContaining('are not valid JSON');
 
         $this->store()->remove('ANTHROPIC_API_KEY');
     }

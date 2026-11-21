@@ -19,9 +19,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocator;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class RunningBinaryLocatorTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private string $workingDirectory;
 
     #[Override]
@@ -270,7 +273,7 @@ final class RunningBinaryLocatorTest extends TestCase
         symlink($target, $procSelfExe);
 
         $this->expectException(SelfUpdateFailedException::class);
-        $this->expectExceptionMessage('running under the "cli" PHP SAPI');
+        $this->expectExceptionMessageContaining('running under the "cli" PHP SAPI');
 
         (new RunningBinaryLocator($procSelfExe, '', 'cli'))->path();
     }
