@@ -52,7 +52,7 @@ bin/castor up
 | Refresh the compatibility job's lock | `bin/castor compat:lock` (after a `composer.json` change) |
 | Symfony console | `docker compose exec php bin/console <command>` |
 
-`bin/castor lint` runs sequentially: Prettier (check) → Markdown lint (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max, 500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict scan) → Install script tests (`tests/Shell/install_script_test.sh`) → Pull request check tests (`tests/Shell/pull_request_check_test.sh`) → Review suggestion tests (`tests/Shell/review_suggestions_test.sh`) → Changelog check (`tests/Shell/changelog_check_test.sh`, then `.github/scripts/check-changelog.sh` on `CHANGELOG.md`) → Prose check (`tests/Shell/prose_check_test.sh`, then `.github/scripts/check-prose.sh` on every tracked Markdown file) → PHPUnit → Infection. `bin/castor lint:fix` auto-fixes steps 1-3 (Prettier, Markdown lint, Composer Normalize); the remaining steps are check-only.
+`bin/castor lint` runs sequentially: Prettier (check) → Markdown lint (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max, 500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict scan) → Install script tests (`tests/Shell/install_script_test.sh`) → Pull request check tests (`tests/Shell/pull_request_check_test.sh`) → Review suggestion tests (`tests/Shell/review_suggestions_test.sh`) → Changelog check (`tests/Shell/changelog_check_test.sh`, then `.github/scripts/check-changelog.sh` on `CHANGELOG.md`) → Prose check (`tests/Shell/prose_check_test.sh`, then `.github/scripts/check-prose.sh` on every tracked Markdown file) → PHPUnit → Infection. `bin/castor lint:fix` auto-fixes steps 1-5 (Prettier, Markdown lint, Composer Normalize, PHP CS Fixer, Rector); the remaining steps are check-only.
 
 Run Infection **through `bin/castor lint`**, never as a bare `bin/infection`. The task's PHPUnit step emits the `--coverage-clover`/`--coverage-xml`/`--log-junit` set that its Infection step then reuses via `--coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100`, matching `.github/workflows/ci.yaml`; invoking `bin/infection` with ad-hoc flags has twice reported a green 100% MSI on a commit CI then rejected. Note that a single green run is still not proof of CI parity: Infection rewrites `phpunit.dist.xml` to force `executionOrder="defects,random"` while disabling result caching, so test order is effectively random per invocation (see #275).
 
@@ -109,6 +109,7 @@ docs/
   ci.md              # CI pipeline documentation
   diagrams.md        # Mermaid diagrams
   faq.md             # Common questions: cost, accuracy, comparisons, model picks, privacy
+  switching-standalone-bundle.md # Moving a setup from the standalone binary to the bundle and back
   troubleshooting.md # Empty reports, LLM errors, advisory issues, cache, CI failures
 ```
 
