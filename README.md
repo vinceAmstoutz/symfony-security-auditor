@@ -111,7 +111,7 @@ symfony-security-auditor audit /path/to/your/symfony/project
 | --- | --- |
 | `auth:set` | Store or replace the key: prompts invisibly, writes an owner-only file |
 | `auth:status` | Show which key an audit would use, where it came from and its SHA-256 fingerprint (never the key) |
-| `auth:test` | Send one short test request to check the key works |
+| `auth:test` | Send one short test request to check the provider answers |
 | `auth:remove` | Forget the stored key on this machine |
 
 The key lives in an owner-only `credentials.json` next to your config, which an audit refuses to read if other users can. **An exported variable always wins**, so Docker, Kubernetes and CI are unchanged: `ANTHROPIC_API_KEY=$(pass show anthropic/api-key) symfony-security-auditor audit .`. Storing nothing is fine too: [Providing the API key](docs/configuration.md#providing-the-api-key) covers environment variables, mounted secret files, password managers and CI secrets.

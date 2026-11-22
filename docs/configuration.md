@@ -572,9 +572,9 @@ The prompt never echoes, so the key stays out of the terminal and the shell hist
 | Command | What it does |
 | --- | --- |
 | `auth:set` | Store or replace the key; `--env-var` targets a variable other than the configured one |
-| `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path |
+| `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path, or that the configured platform (a subscription, a local model) needs no key |
 | `auth:remove` | Forget the stored key (the key stays valid with your provider, so revoke it there too) |
-| `auth:test` | _Since 1.23._ Send one short test request (billed by a paid API, usually well under a cent) and say whether the key works; exits `1` with the provider's reason when it does not. Same check as `doctor --check-connection` |
+| `auth:test` | _Since 1.23._ Send one short test request (billed by a paid API, usually well under a cent) and say whether the provider answers; exits `1` with the provider's reason when it does not. Same check as `doctor --check-connection` |
 
 **Permissions.** The file is written `0600` in a `0700` directory. A file other users can read, or that is not valid JSON, is refused on read with a message telling you to rotate the key; `auth:set` and `auth:remove` still rewrite it. On Windows, which has no POSIX permission bits, the file relies on the ACL of `%APPDATA%`.
 
