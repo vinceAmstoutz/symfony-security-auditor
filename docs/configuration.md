@@ -573,7 +573,7 @@ The prompt never echoes, so the key stays out of the terminal and the shell hist
 | Command | What it does |
 | --- | --- |
 | `auth:set` | Store or replace the key; `--env-var` targets a variable other than the configured one |
-| `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path, or that the configured platform (a subscription, a local model) needs no key |
+| `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path, or (_since 1.23_) that the configured platform, such as a subscription or a local model, needs no key |
 | `auth:remove` | Forget the stored key (the key stays valid with your provider, so revoke it there too) |
 | `auth:test` | _Since 1.23._ Send one short test request (billed by a paid API, usually well under a cent) and say whether the provider answers; exits `1` with the provider's reason when it does not. Same check as `doctor --check-connection` |
 
@@ -581,7 +581,7 @@ The prompt never echoes, so the key stays out of the terminal and the shell hist
 
 **In output** a key is never printed: it is named by a masked preview (`sk-ant…qF4A`) and a truncated SHA-256 fingerprint (`SHA256:ed9ff73cc4b2cd57`). A key shorter than 24 characters is masked entirely.
 
-**Exit codes.** The `auth:*` commands exit `2` when no API-key variable is configured or named with `--env-var`, or when the name is not a valid variable name. When the configured platform needs no key (a subscription, a local model), `auth:status` and `auth:remove` say so and exit `0`; `auth:set` exits `2`. Otherwise `auth:status` exits `0` when a key resolves and `1` when none does; `auth:set` exits `2` when nothing usable was entered or the terminal cannot hide input, `1` when the key cannot be stored; `auth:remove` exits `1` when the file cannot be rewritten.
+**Exit codes.** The `auth:*` commands exit `2` when no API-key variable is configured or named with `--env-var`, or when the name is not a valid variable name. _Since 1.23_, when the configured platform needs no key (a subscription, a local model), `auth:status` and `auth:remove` say so and exit `0`; `auth:set` exits `2`. Otherwise `auth:status` exits `0` when a key resolves and `1` when none does; `auth:set` exits `2` when nothing usable was entered or the terminal cannot hide input, `1` when the key cannot be stored; `auth:remove` exits `1` when the file cannot be rewritten.
 
 Nothing is required: a machine with nothing stored falls back to the environment variable.
 
@@ -1029,7 +1029,7 @@ It runs four checks and prints one line for each:
 
 | Check | What it verifies |
 | --- | --- |
-| Configuration | `config.yaml` resolves, holds a `platform:` block and sets every `%env(...)%` variable of the selected platform (an unset key is reported as `API key`); a key that resolves is shown masked, with a pointer to `auth:status` for where it comes from |
+| Configuration | `config.yaml` resolves, holds a `platform:` block and sets every `%env(...)%` variable of the selected platform (an unset key is reported as `API key`); a key that resolves is shown masked, with a pointer to `auth:status` (_since 1.23_) for where it comes from |
 | Provider bridge | the bridge `init` installed is there, matches the binary's `symfony/ai-platform` release and boots the audit |
 | Composer | `composer` is on the host, for the `lookup_advisory` tool only; `init` uses its own |
 | Pricing catalog | the `symfony/models-dev` catalog that prices the run is there |
@@ -1044,7 +1044,7 @@ _Since 1.23._ `doctor --check-connection` also sends one short request to the pr
 
 ### Shell completion
 
-The binary completes its commands, options and arguments in bash, zsh and fish. `completion` prints the script for your shell and stays out of the command list. Load it from your shell's startup file:
+The binary completes its commands, options and arguments in bash, zsh and fish. `completion` prints the script for your shell and, _since 1.23_, stays out of the command list. Load it from your shell's startup file:
 
 ```bash
 eval "$(symfony-security-auditor completion bash)"
