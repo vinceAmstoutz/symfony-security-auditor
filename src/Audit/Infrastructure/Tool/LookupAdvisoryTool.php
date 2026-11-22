@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
  * The LLM passes a Composer package name and an installed version; the database
  * adapter returns matching CVE entries (or an "no advisories found" message).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class LookupAdvisoryTool implements ToolInterface
 {

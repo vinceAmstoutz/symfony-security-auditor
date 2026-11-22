@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
  * No-op reviewer cache: every lookup misses and stores are discarded. Wired
  * when `cache.enabled` is false so the reviewer always calls the LLM.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class NullReviewerCache implements ReviewerCacheInterface
 {

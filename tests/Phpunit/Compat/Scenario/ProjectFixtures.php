@@ -45,7 +45,7 @@ final readonly class ProjectFixtures
     /**
      * Four controllers whose findings the reviewer confirms, rejects and
      * downgrades, one below the confidence floor, a clean service, the
-     * security configuration, a template, and a git-ignored cache file.
+     * security configuration, a template and a git-ignored cache file.
      *
      * @return array<string, string>
      */
@@ -85,7 +85,7 @@ final readonly class ProjectFixtures
      * The clean project and a controller no request holding it fits the
      * model, so the audit leaves that file unanalyzed and the run incomplete
      * with no finding to trip another gate. The controller is large enough
-     * that the auditor blames it, not its own prompt, and goes on.
+     * that the auditor blames it (not its own prompt) and goes on.
      *
      * @return array<string, string>
      */

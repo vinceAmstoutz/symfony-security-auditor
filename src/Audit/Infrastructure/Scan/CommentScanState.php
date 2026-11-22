@@ -14,11 +14,11 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Where a line reader stands relative to the block comments and the string
  * literals of a line, one character at a time. A `/*` inside a literal opens
- * no comment, and a quote inside a comment opens no literal.
+ * no comment and a quote inside a comment opens no literal.
  */
 final readonly class CommentScanState
 {

@@ -19,11 +19,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InsufficientTrendRepo
 /**
  * Builds a trend by diffing each consecutive report pair. Every count comes
  * from the fingerprint-paired buckets of {@see ReportDifferInterface}, so a
- * report total is `new + persisting` of the diff that ends on it — and the
+ * report total is `new + persisting` of the diff that ends on it; the
  * very first report, which no diff ends on, gets `fixed + unverified +
  * persisting` of the first pair instead.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReportTrendAnalyzer implements ReportTrendAnalyzerInterface
 {

@@ -20,7 +20,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * `<<: - item`, skipping the `&anchor` and `!tag` before them. It errs towards
  * more levels than the parser opens: a colon inside a quoted value counts too.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class YamlLineNodes
 {

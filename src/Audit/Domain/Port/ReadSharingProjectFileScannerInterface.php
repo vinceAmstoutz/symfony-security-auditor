@@ -19,7 +19,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * and its `--path` values through one such scanner, so a file both reach is
  * read and scrubbed once.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ReadSharingProjectFileScannerInterface extends ProjectFileScannerInterface
 {

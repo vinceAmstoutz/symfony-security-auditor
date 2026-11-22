@@ -27,12 +27,12 @@ use PhpParser\NodeFinder;
 /**
  * Follows `$this->helper()` calls from a starting method into other methods
  * declared on the same class, returning every statement node transitively
- * reachable from it — with cycle protection for mutually-calling helpers.
+ * reachable from it, with cycle protection for mutually-calling helpers.
  * Lets an AST parser see through a common refactor: a check it looks for
  * (a security call, an attribute/subject test) moved behind a shared
  * private/protected helper instead of inlined in the method the parser scans.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ThisCallReachability
 {
@@ -44,12 +44,12 @@ final readonly class ThisCallReachability
      * Walks the call graph depth-first with an explicit stack, visiting each
      * method's helper calls in the order they appear (pushed in reverse, so
      * the first call encountered is the next one popped) and appending each
-     * statement once to a single shared result — replacing an earlier
+     * statement once to a single shared result, replacing an earlier
      * recursive version that copied a growing `$visited` set and
      * return-and-concatenated a growing result array at every recursion
      * level. That was quadratic in the length of a
      * `$this->b1()->b2()->…` helper chain: an ordinary-looking file with a
-     * few thousand such methods took minutes, and enough of them exhausted
+     * few thousand such methods took minutes and enough of them exhausted
      * PHP's memory limit outright, instead of resolving in a fraction of a
      * second.
      *
@@ -86,8 +86,8 @@ final readonly class ThisCallReachability
     }
 
     /**
-     * Indexes, once for the whole class, which of its methods call which, and
-     * the calls each method holds that `$isRelevant` accepts — so asking every
+     * Indexes, once for the whole class, which of its methods call which and
+     * the calls each method holds that `$isRelevant` accepts, so asking every
      * public action for the relevant calls it reaches no longer walks the
      * syntax tree of every helper again for each one of them.
      *

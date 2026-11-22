@@ -17,11 +17,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLar
 
 /**
  * Thrown when a single request's estimated input tokens exceed the entire
- * rate-limit window — the request can never fit, no amount of waiting helps.
+ * rate-limit window: the request can never fit, no amount of waiting helps.
  * Extends `LLMRequestTooLargeException` so the chunk analyzers split the
  * chunk the same way they do for a prompt the model itself refuses.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class RateLimitRequestTooLargeException extends LLMRequestTooLargeException
 {

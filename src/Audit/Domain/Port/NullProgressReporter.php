@@ -16,11 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use Override;
 
 /**
- * Default reporter — discards every event. Used when the host has not
+ * Default reporter: discards every event. Used when the host has not
  * registered a custom reporter, so the pipeline can emit events
  * unconditionally without paying any I/O cost.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class NullProgressReporter implements ProgressReporterInterface
 {

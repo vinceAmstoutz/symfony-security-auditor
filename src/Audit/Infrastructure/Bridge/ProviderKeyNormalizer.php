@@ -20,13 +20,13 @@ use function Symfony\Component\String\u;
 /**
  * Folds a user-supplied provider spelling back to the `symfony/ai` platform
  * config key the rest of the stack expects: trims the input, lowercases the
- * platform half, folds an instance name the way `symfony/config` will, and
+ * platform half, folds an instance name the way `symfony/config` will and
  * maps the hyphenated bridge package slugs (`open-ai`, `deep-seek`, …) to their
  * config keys (`openai`, `deepseek`). Without this, `init --provider=open-ai`
  * installs a real bridge package but writes a platform key no container can
  * ever boot from.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProviderKeyNormalizer
 {

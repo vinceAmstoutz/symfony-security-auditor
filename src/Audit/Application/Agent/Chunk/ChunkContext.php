@@ -18,13 +18,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
  * The fully-assembled attacker prompt for a single chunk, plus the cache key
- * and cacheability derived from the cross-iteration context, and the bytes
- * of file content the prompt carries — after code slicing, so it may be less
- * than the files hold, and the files its findings are named by. Once the
+ * and cacheability derived from the cross-iteration context, the bytes
+ * of file content the prompt carries (after code slicing, so it may be less
+ * than the files hold) and the files its findings are named by. Once the
  * model answered, it also says whether that answer came at the tool-call
  * limit, where a look that found nothing is no verdict to keep.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkContext
 {

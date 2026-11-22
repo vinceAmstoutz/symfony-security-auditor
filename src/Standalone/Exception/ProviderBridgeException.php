@@ -20,17 +20,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKey
 
 /**
  * `AiBundle` answers a platform whose bridge is not installed with "Try
- * running composer require <package>" — advice that installs into the audited
+ * running composer require <package>", advice that installs into the audited
  * project's vendor directory, which the binary never loads. The advice is
  * replaced with the command that installs the bridge where the binary looks,
- * for the platform the message names — or, for a platform wrapping others
+ * for the platform the message names (or, for a platform wrapping others
  * that no standalone configuration can boot, with that reason, since `init`
- * refuses it. The bundle's exception is not chained: the console renders
- * every previous exception too, and would print the advice replaced here.
+ * refuses it). The bundle's exception is not chained: the console renders
+ * every previous exception too and would print the advice replaced here.
  * Any other failure of the bundle is not this exception's business and keeps
  * its own message.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class ProviderBridgeException extends RuntimeException
 {

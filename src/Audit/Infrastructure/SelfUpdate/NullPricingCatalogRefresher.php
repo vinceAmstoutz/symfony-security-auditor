@@ -16,12 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 use Override;
 
 /**
- * Used whenever refreshing the pricing catalog is not wanted — `privacy.offline_only`
+ * Used whenever refreshing the pricing catalog is not wanted: `privacy.offline_only`
  * is enabled, or the standalone configuration could not be read confidently
  * enough to know either way (self-update must not depend on a fully
  * resolved provider configuration).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class NullPricingCatalogRefresher implements PricingCatalogRefresherInterface
 {

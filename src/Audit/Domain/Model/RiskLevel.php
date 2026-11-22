@@ -27,7 +27,7 @@ enum RiskLevel: string
     }
 
     /**
-     * Ascending ordinal (`safe` = 0 … `critical` = 4) — the basis of
+     * Ascending ordinal (`safe` = 0 … `critical` = 4): the basis of
      * `isAtLeast()` ordering, exposed so the absolute values are observable.
      */
     public function rank(): int

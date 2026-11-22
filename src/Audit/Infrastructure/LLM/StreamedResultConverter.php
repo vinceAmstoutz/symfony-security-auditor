@@ -34,12 +34,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unfi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnmeteredStreamException;
 
 /**
- * Reads a streamed answer to its end the first time it is asked for, and
+ * Reads a streamed answer to its end the first time it is asked for and
  * gives it back as the result a buffered call would have produced, with the
  * finish reason the stream reported; its usage comes once, through
  * {@see StreamedTokenUsageExtractor}.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StreamedResultConverter implements ResultConverterInterface
 {

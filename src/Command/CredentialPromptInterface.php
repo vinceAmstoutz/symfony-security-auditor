@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailabl
 /**
  * Asks the user for a credential on the console without ever echoing it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface CredentialPromptInterface
 {

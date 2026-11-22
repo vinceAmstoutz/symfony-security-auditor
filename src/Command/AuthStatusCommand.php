@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialS
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 
-/** @internal not part of the BC promise — the command *name* (`auth:status`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`auth:status`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
 final readonly class AuthStatusCommand
 {
@@ -96,7 +96,7 @@ final readonly class AuthStatusCommand
 
     /**
      * The exported variable wins, so a store that cannot be read changes
-     * nothing about the key an audit would use — it is worth a warning, not a
+     * nothing about the key an audit would use: it is worth a warning, not a
      * failure.
      */
     private function holdsStoredCredential(SymfonyStyle $symfonyStyle, string $variableName): bool
@@ -113,7 +113,7 @@ final readonly class AuthStatusCommand
     /**
      * A configuration reading the key through `%env(file:VAR)%` exports the
      * file's path, not the key, so the key an audit would use is the file's
-     * content — and a file that cannot be read means no key resolves at all.
+     * content; a file that cannot be read means no key resolves at all.
      */
     private function reportFromFile(SymfonyStyle $symfonyStyle, string $variableName, string $path, bool $shadowsStoredCredential): int
     {

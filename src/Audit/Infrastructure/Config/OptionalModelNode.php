@@ -28,7 +28,7 @@ use Symfony\Component\Config\Definition\ScalarNode;
  * left out or set to null but not to an empty string; given none it carries
  * `model`, whose `cannotBeEmpty()` refuses both.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class OptionalModelNode extends ScalarNode
 {

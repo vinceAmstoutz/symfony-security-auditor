@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
  * Renders a {@see ReportTrend} as a human-readable console timeline, as a
  * raw JSON document, or as a self-contained HTML page.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class TrendPresenter implements TrendPresenterInterface
 {
@@ -76,8 +76,8 @@ final readonly class TrendPresenter implements TrendPresenterInterface
     }
 
     /**
-     * Report paths are echoed back to the terminal verbatim, so — exactly as
-     * the diff presenter does — each one is collapsed to a single line and
+     * Report paths are echoed back to the terminal verbatim, so (exactly as
+     * the diff presenter does) each one is collapsed to a single line and
      * stripped of control/ANSI/bidi characters so a crafted value cannot
      * forge a fake trend line or spoof the terminal.
      */

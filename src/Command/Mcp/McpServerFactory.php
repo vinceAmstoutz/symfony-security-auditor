@@ -17,7 +17,7 @@ use Mcp\Server\Server;
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class McpServerFactory implements McpServerFactoryInterface
 {
     private const string SERVER_NAME = 'symfony-security-auditor';

@@ -18,7 +18,7 @@ use Override;
 use function Symfony\Component\String\u;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Retains a line that is either structural (declarations, attributes) or
  * dangerous (matches a known security-relevant token or keyword).
@@ -140,7 +140,7 @@ final readonly class SecurityRelevantLineClassifier implements LineRetentionDeci
      * Bare-keyword security tokens that must be word-boundary matched rather
      * than substring matched: a leading-character enumeration (space, `(`,
      * `=`) misses column-0 statements (e.g. a bootstrap script's first line)
-     * and tab-indented ones — silently eliding a real file-inclusion or
+     * and tab-indented ones, silently eliding a real file-inclusion or
      * command-execution line instead of retaining it.
      */
     private const string BARE_KEYWORD_PATTERN = '/\b(?:exec|rand|include|include_once|require|require_once)\b/';

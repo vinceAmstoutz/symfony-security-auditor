@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
-/** @internal not part of the BC promise — the command *name* (`doctor`) is public, but this enum is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`doctor`) is public, but this enum is for internal use only. */
 enum DoctorCheckStatus
 {
     case Ok;

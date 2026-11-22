@@ -54,7 +54,7 @@ final readonly class AccessControlMap
      *
      * @return list<string>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function unreadableConfigurationFiles(): array
     {
@@ -64,7 +64,7 @@ final readonly class AccessControlMap
     /**
      * @return array<string, ApplicationAccessControl>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function applicationAccessControls(): array
     {
@@ -78,7 +78,7 @@ final readonly class AccessControlMap
      *
      * @return array<string, list<string>>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function routeAccessMapFor(string $controllerFilePath): array
     {
@@ -91,7 +91,7 @@ final readonly class AccessControlMap
      *
      * @return list<AccessControlRule>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function accessControlRules(): array
     {
@@ -105,7 +105,7 @@ final readonly class AccessControlMap
      *
      * @return list<AccessControlRule>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function accessControlRulesFor(string $controllerFilePath): array
     {
@@ -162,7 +162,7 @@ final readonly class AccessControlMap
      * configuration was read, whose rules govern its routes; none when the
      * project's rules govern them.
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function applicationFolderFor(string $controllerFilePath): ?string
     {

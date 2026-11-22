@@ -18,15 +18,15 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TerminalText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class MalformedProjectConfigException extends RuntimeException
 {
     /**
      * The parser quotes the offending line, which the audited repository
      * wrote, so its control characters are escaped before the message reaches
-     * a terminal, and its workflow commands are defused, since the console
+     * a terminal and its workflow commands are defused, since the console
      * wraps the message wherever it likes. The parse error is not chained: the
-     * console renders every previous exception too, and would print that line
+     * console renders every previous exception too and would print that line
      * raw.
      */
     public static function fromParseException(string $configFile, ParseException $parseException): self
@@ -61,7 +61,7 @@ final class MalformedProjectConfigException extends RuntimeException
 
     /**
      * Refused before the file is read: a link committed in the audited
-     * repository could point at any file of the user's, and a parse error
+     * repository could point at any file of the user's and a parse error
      * quotes the line it stopped on.
      */
     public static function forSymlink(string $configFile): self

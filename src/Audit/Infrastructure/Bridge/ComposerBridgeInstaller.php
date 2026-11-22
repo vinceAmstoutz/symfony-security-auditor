@@ -34,7 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
  * platform, not a package of its own, so only the platform part selects the
  * bridge.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 {
@@ -73,8 +73,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     /**
      * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::embeddedProcessBuilder() in production); tests inject a stub
-     * @param string                                               $platformPhpVersion the PHP version the bridge tree must resolve for — defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
-     * @param ?string                                              $aiPlatformPin      the `symfony/ai-platform` release the bridge tree is held to — the one this binary bundles ({@see BundledAiPlatformVersion}), so a newer release the bridge would otherwise pull in cannot shadow the bundled classes; null writes no pin
+     * @param string                                               $platformPhpVersion the PHP version the bridge tree must resolve for; defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
+     * @param ?string                                              $aiPlatformPin      the `symfony/ai-platform` release the bridge tree is held to: the one this binary bundles ({@see BundledAiPlatformVersion}), so a newer release the bridge would otherwise pull in cannot shadow the bundled classes; null writes no pin
      */
     public function __construct(
         private Closure $processBuilder,
@@ -91,8 +91,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
      * composer then moves an already installed `symfony/ai-platform` of
      * another release to it, where the manifest pin alone would only report
      * a conflict. `--with-dependencies` lets what those bridges pulled in
-     * move with them — `symfony/ai-open-responses-platform` under the OpenAI
-     * bridge — which composer would otherwise hold at its locked release.
+     * move with them (`symfony/ai-open-responses-platform` under the OpenAI
+     * bridge), which composer would otherwise hold at its locked release.
      *
      * @return Closure(string, ?string, string, string...): Process
      */
@@ -129,9 +129,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     /**
      * Every bridge goes into one `composer require`, so a platform that also
      * needs another's bridge resolves the tree once rather than twice. So
-     * does every bridge the manifest already requires — a second one fetched
+     * does every bridge the manifest already requires, a second one fetched
      * by hand to switch providers included: left out, it stays locked to the
-     * `symfony/ai-platform` release it was resolved with, and the pin cannot
+     * `symfony/ai-platform` release it was resolved with and the pin cannot
      * move.
      *
      * @throws BridgeInstallationFailedException
@@ -169,7 +169,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
-     * The platform a bridge package's slug stands for — the reverse of
+     * The platform a bridge package's slug stands for: the reverse of
      * {@see packageFor()}.
      */
     public static function platformForSlug(string $slug): string
@@ -220,9 +220,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     /**
      * Decoded as objects, not associative arrays, so an empty JSON object such
      * as `config.allow-plugins: {}` survives the round-trip: `json_decode(...,
-     * true)` turns `{}` into `[]`, which `json_encode` writes back as `[]`, and
+     * true)` turns `{}` into `[]`, which `json_encode` writes back as `[]`;
      * Composer then rejects the manifest ("Array value found, but an object is
-     * required") — bricking every later `init` on the tree.
+     * required"), bricking every later `init` on the tree.
      *
      * @throws BridgeInstallationFailedException
      */
@@ -243,9 +243,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     /**
      * Pins `config.platform.php` so `composer require` resolves the bridge for
-     * the runtime that will load it — the standalone binary bundles its own
+     * the runtime that will load it (the standalone binary bundles its own
      * PHP; resolved against the host's, the tree aborts in the binary's
-     * `vendor/composer/platform_check.php` — and `symfony/ai-platform` to the
+     * `vendor/composer/platform_check.php`) and `symfony/ai-platform` to the
      * release the binary bundles. Both pins are refreshed on every install, so
      * a manifest written by an older release is corrected rather than kept
      * forever; every other key is preserved.
@@ -270,11 +270,11 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     /**
      * `Filesystem::exists()` follows a symlink, so a *dangling* one at the
-     * manifest path reads as absent — skipping the "already exists" early
-     * return — and `dumpFile()` then transparently writes through it to
+     * manifest path reads as absent (skipping the "already exists" early
+     * return) and `dumpFile()` then transparently writes through it to
      * wherever it points. Mirrors the guard already applied to the
      * filesystem attacker/reviewer/advisory caches, the standalone config
-     * writer, and the report/baseline writers.
+     * writer and the report/baseline writers.
      *
      * @throws BridgeInstallationFailedException
      */

@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * configure: every setting the platform needs, with `<placeholder>` values for
  * what only the user knows, ready to paste into `config.yaml`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class HandWrittenPlatformBlock
 {

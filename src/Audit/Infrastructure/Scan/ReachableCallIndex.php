@@ -19,15 +19,15 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Answers, for any method of one class, which of the calls a parser looks for
- * the method reaches through `$this->helper()` calls — in the order a
+ * the method reaches through `$this->helper()` calls, in the order a
  * depth-first walk from it meets them, each helper once. Built once per class
  * by {@see ThisCallReachability::indexCalls()}, so that asking every public
  * action costs a walk over the few methods that matter to it, not over every
  * helper it ever reaches: a helper from which no relevant call is reachable
- * is never entered, and a helper that only forwards to one other is stepped
+ * is never entered and a helper that only forwards to one other is stepped
  * over. A chain of thousands of single-call helpers then costs the same for
  * its first method as for its last.
  */

@@ -20,7 +20,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
  * forms reads `Auditing 21 file(s) — 15 controller(s)` rather than padding it
  * with `0 voter(s), 0 form(s)`).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AuditOverviewLine
 {

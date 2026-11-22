@@ -116,7 +116,7 @@ final class AuditContextTest extends TestCase
 
     /**
      * A fingerprint accepted twice in the baseline (two distinct originally
-     * accepted findings sharing the same fingerprint) grants two credits —
+     * accepted findings sharing the same fingerprint) grants two credits:
      * `array_count_values()`-style budgeting, not plain membership.
      *
      * @throws InvalidAuditContextException

@@ -17,7 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface BaselineInterface
 {
     /**
@@ -40,8 +40,8 @@ interface BaselineInterface
 
     /**
      * Loads the maintainer-authored false-positive feedback from a baseline
-     * file: every entry annotated with a non-empty `reason`. A missing file —
-     * or one whose entries carry no reasons — yields empty feedback; a
+     * file: every entry annotated with a non-empty `reason`. A missing file
+     * (or one whose entries carry no reasons) yields empty feedback; a
      * malformed file throws.
      */
     public function feedback(string $path): ReviewerFeedback;
@@ -62,7 +62,7 @@ interface BaselineInterface
      *                                                          carries at least a `fingerprint`
      *                                                          plus human-readable metadata
      *                                                          (`type`, `file`, `title`,
-     *                                                          `added_at`) — or, for a legacy
+     *                                                          `added_at`), or, for a legacy
      *                                                          entry, the bare fingerprint string
      * @param ?string                              $projectPath the audited project, whose directories are walked for a
      *                                                          symlink like the working directory's; null when the

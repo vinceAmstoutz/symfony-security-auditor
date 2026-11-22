@@ -19,9 +19,9 @@ use RuntimeException;
  * Base exception for LLM provider failures that must abort the audit.
  *
  * Covers two cases:
- * - **Non-transient** — missing platform configuration, auth failure, retired/unknown
+ * - **Non-transient**: missing platform configuration, auth failure, retired/unknown
  *   model. These repeat on every subsequent call and must never be swallowed.
- * - **Exhausted transient** — a retriable error (rate-limit 429, 5xx) where every
+ * - **Exhausted transient**: a retriable error (rate-limit 429, 5xx) where every
  *   retry has been exhausted. Continuing to the next chunk would produce the same
  *   failure, so the audit must also abort rather than returning a false-negative SAFE.
  *

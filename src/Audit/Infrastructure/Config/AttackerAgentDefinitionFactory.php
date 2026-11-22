@@ -35,7 +35,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
  * the primary and escalation (cheap-model) service definitions so they cannot
  * drift out of sync with each other or with the constructor itself.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AttackerAgentDefinitionFactory
 {

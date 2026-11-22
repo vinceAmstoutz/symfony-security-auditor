@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageR
  * client error, which names its status for the log and books nothing, while
  * the bridge's message alone decides how it is classified.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class UnconvertedAnswerException extends RuntimeException
 {

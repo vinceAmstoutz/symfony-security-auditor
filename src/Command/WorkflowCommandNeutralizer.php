@@ -18,15 +18,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCom
 
 /**
  * On a GitHub Actions runner a report printed to the job log quotes the
- * audited code and what the model wrote about it, and an error message may
- * quote a checkout path; either could carry a workflow command. Each is
+ * audited code and what the model wrote about it; an error message may
+ * quote a checkout path. Either could carry a workflow command. Each is
  * defused as its format allows, so a document piped into `jq` or redirected
  * into the step summary still reads the same: the JSON formats keep their
- * meaning byte for byte once decoded, the others only lose the markers, and
+ * meaning byte for byte once decoded, the others only lose the markers and
  * any byte that is not UTF-8 reads as `?`. The `github` format's annotations
  * are the ones meant for the runner.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class WorkflowCommandNeutralizer implements WorkflowCommandNeutralizerInterface
 {

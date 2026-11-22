@@ -22,10 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * never sent again in full: that finding is lost without a trace in the
  * answer, so the chunk is not the model's complete verdict. The findings that
  * were recorded are kept, the chunk is recorded as errored so the report says
- * it could not be fully analyzed, and nothing is cached, so the next run asks
+ * it could not be fully analyzed and nothing is cached, so the next run asks
  * the model again instead of replaying the lossy answer.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RefusedRecordingRecorder
 {

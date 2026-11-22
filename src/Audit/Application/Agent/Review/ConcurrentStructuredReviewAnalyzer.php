@@ -32,14 +32,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
  * Resolves every single-finding review in concurrency windows via the
  * tool-batch-capable client, each verdict arriving through its own
  * schema-enforced `record_review` tool. Pending findings are dispatched one
- * `maxConcurrent`-sized window at a time — never as a single oversized batch —
+ * `maxConcurrent`-sized window at a time (never as a single oversized batch),
  * so a budget/provider failure in a later window cannot discard an earlier
  * window's already-applied verdicts; the failing window and every window not
  * yet dispatched are marked `aborted`/`errored` before the exception
  * propagates. Cached verdicts are served first; only the misses are
  * dispatched.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConcurrentStructuredReviewAnalyzer
 {
@@ -151,7 +151,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
 
     /**
      * Marks every finding in the window that just failed, plus every window
-     * not yet attempted, as failed — without touching windows that already
+     * not yet attempted, as failed, without touching windows that already
      * finalized successfully. A finding whose `record_review` tool call
      * already landed in an earlier round of the same failed window's batch
      * call keeps its verdict instead of being marked unreached.
@@ -259,7 +259,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     /**
      * A finding whose `record_review` tool call already landed in an earlier
      * round of this same window's batch call keeps its verdict instead of
-     * being overwritten as errored — mirrors the recovery
+     * being overwritten as errored, mirroring the recovery
      * `failRemainingWindows()` already applies for a Budget/LLMProviderException
      * abort, extended to every other `Throwable` this window's dispatch can
      * throw.

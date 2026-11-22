@@ -19,8 +19,8 @@ use Symfony\Component\Clock\Clock;
 
 /**
  * Merges a JSON report's findings into a baseline file without re-running
- * the audit: existing entries are preserved verbatim — hand-written keys
- * such as `reason` survive — and only findings not yet covered by an entry
+ * the audit: existing entries are preserved verbatim (hand-written keys
+ * such as `reason` survive) and only findings not yet covered by an entry
  * are appended. A prune drops only the entries whose finding the report
  * shows gone: an entry whose file the report did not analyze is kept, the
  * way `audit:diff` keeps such a finding apart as unverified. An entry a
@@ -29,7 +29,7 @@ use Symfony\Component\Clock\Clock;
  * names are computed once per finding and looked up by fingerprint, so a merge
  * grows with the size of the report and of the baseline, not their product.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BaselineMerger implements BaselineMergerInterface
 {
@@ -180,7 +180,7 @@ final readonly class BaselineMerger implements BaselineMergerInterface
 
     /**
      * Every occurrence the run found, whether its report lists the finding or
-     * leaves it out because the baseline accepted it or its type is muted — a
+     * leaves it out because the baseline accepted it or its type is muted: a
      * finding left out counted under the baseline fingerprint that accepted
      * it, which an entry written under another type or path holds.
      *

@@ -15,12 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline;
 
 /**
  * Opt-in companion of {@see CoverageRecorderInterface} for a recorder that
- * keeps which `analyzed` files the model judged on a partial look — it
- * reached its last tool round and found nothing — so the analyzers neither
+ * keeps which `analyzed` files the model judged on a partial look (it
+ * reached its last tool round and found nothing), so the analyzers neither
  * cache that answer as safe nor read it as a verdict. The analyzers check for
  * it with `instanceof`, so a recorder without it keeps working.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface InconclusiveAnalysisRecorderInterface
 {

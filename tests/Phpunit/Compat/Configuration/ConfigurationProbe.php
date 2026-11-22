@@ -27,10 +27,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 /**
  * What the configuration takes at one path: which of a fixed set of values
- * the bundle loads with — the tree accepts it and the extension builds its
+ * the bundle loads with (the tree accepts it and the extension builds its
  * services from it, so a value the tree let through but the release then
- * failed on is not counted as taken — and what each becomes once processed,
- * whether a kernel takes an `%env()%` placeholder there, and the container
+ * failed on is not counted as taken), what each becomes once processed,
+ * whether a kernel takes an `%env()%` placeholder there and the container
  * parameters the bundle publishes for its default configuration and for each
  * profile.
  */

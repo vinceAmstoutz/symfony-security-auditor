@@ -18,14 +18,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use WeakMap;
 
 /**
- * The LLM clients that have reached the recording tool during the run — read
- * its definition to offer it to the model, or called it — so a client that
+ * The LLM clients that have reached the recording tool during the run (read
+ * its definition to offer it to the model, or called it), so a client that
  * builds the tool schemas once and keeps them still counts as offering the
  * tool on every later turn, though those turns read no definition. A client
  * that never did ignores the tools: the first turn that finds so warns once,
  * naming the setting that turns structured collection off for it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RecordingToolClients
 {

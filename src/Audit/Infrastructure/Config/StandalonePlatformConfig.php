@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandalonePlatformConfig
 {
@@ -37,7 +37,7 @@ final readonly class StandalonePlatformConfig
     /**
      * Names the credential the run will authenticate with, so output can say
      * which key was spent without ever printing it. A run told it needs no
-     * credential carries the sentinel instead of a key, and has no identity
+     * credential carries the sentinel instead of a key and has no identity
      * worth showing.
      */
     public function credentialIdentity(): ?CredentialIdentity

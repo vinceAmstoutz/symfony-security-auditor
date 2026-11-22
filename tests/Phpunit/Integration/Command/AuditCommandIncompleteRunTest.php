@@ -49,7 +49,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Partl
 
 /**
  * A run that reached its end without analyzing every file says so on every
- * output — on stderr when stdout carries the report — and fails with its own
+ * output (on stderr when stdout carries the report) and fails with its own
  * exit code only under `--fail-on-incomplete`.
  */
 final class AuditCommandIncompleteRunTest extends TestCase

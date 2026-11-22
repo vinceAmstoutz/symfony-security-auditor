@@ -19,14 +19,14 @@ use function Symfony\Component\String\u;
 
 /**
  * The Bedrock Mantle route `init` writes for a model. Mantle takes an API key
- * where the default InvokeModel route needs an AWS SDK client service, and it
+ * where the default InvokeModel route needs an AWS SDK client service. It
  * serves each vendor on its own protocol: Anthropic models on the Messages
  * API, Gemma on Responses, every other open-weight model on Chat Completions,
  * as the `symfony/ai-bedrock-platform` Mantle model catalogs list them. A model
  * is named after its vendor there (`anthropic.claude-opus-4-8`), which is what
  * the route is read from.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BedrockMantleRoute
 {

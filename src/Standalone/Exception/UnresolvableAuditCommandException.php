@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception;
 
 use RuntimeException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class UnresolvableAuditCommandException extends RuntimeException
 {
     public static function fromContainer(string $serviceId): self

@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Exception;
 use RuntimeException;
 use Symfony\Component\Filesystem\Exception\IOException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class ReportWriteFailedException extends RuntimeException
 {
     public static function forUnwritablePath(string $path): self

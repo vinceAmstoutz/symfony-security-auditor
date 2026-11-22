@@ -43,7 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedR
 /**
  * A tool-using conversation sends the model's own answer back with the tool
  * results. A model that reasons before it calls a tool answers with a signed
- * thinking block, the tool calls and sometimes text in between, and Anthropic
+ * thinking block, the tool calls and sometimes text in between. Anthropic
  * refuses the next request unless that very turn comes back unmodified.
  */
 final class SymfonyAiLLMClientAssistantTurnReplayTest extends TestCase

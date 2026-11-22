@@ -18,7 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * decoded payload, preserved verbatim so merging never loses hand-written
  * keys such as `reason`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BaselineEntry
 {

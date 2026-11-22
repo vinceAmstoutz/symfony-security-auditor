@@ -342,8 +342,8 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * Git refuses a repository it considers unsafe — owned by another user, or
-     * using an extension it does not know — with its own reason and exit code
+     * Git refuses a repository it considers unsafe (owned by another user, or
+     * using an extension it does not know) with its own reason and exit code
      * 128: that reason, not a claim that the ref is missing, is what the user
      * has to act on.
      *
@@ -485,7 +485,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * The audited project is untrusted — its own `.git/config` is attacker
+     * The audited project is untrusted: its own `.git/config` is attacker
      * data. `core.fsmonitor` lets a repo declare an arbitrary command that git
      * runs on any working-tree comparison, including the plain `git diff
      * --name-only HEAD` this resolver issues for uncommitted changes. Left
@@ -534,7 +534,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
      * `core.fsmonitor=` (added above) only closes one config-driven command
      * hook. A `.gitattributes` `filter=` assignment plus a matching
      * `filter.<name>.clean` command in the same untrusted `.git/config`
-     * reaches an arbitrary command too — git runs the clean filter to
+     * reaches an arbitrary command too: git runs the clean filter to
      * normalize a working-tree file before comparing it against the index,
      * which `git diff HEAD` (the plain worktree-vs-HEAD comparison this
      * resolver used for uncommitted changes) triggers for any file whose
@@ -562,8 +562,8 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * A checkout shipped with its own `.git` directory — an archive, a build
-     * context — can carry an index whose entries git finds racily clean once
+     * A checkout shipped with its own `.git` directory (an archive, a build
+     * context) can carry an index whose entries git finds racily clean once
      * extracted and a `.git/config` that relaxes the stat check to what the
      * extraction keeps, so `git diff-files` re-hashes the file through the
      * repository's own clean filter.

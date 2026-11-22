@@ -15,11 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
  * The configuration files the production application loads: those a parser
- * read, in the order the application loads them, the project's apart from
- * those of each monorepo application the run is narrowed to, and those it
+ * read, in the order the application loads them (the project's apart from
+ * those of each monorepo application the run is narrowed to) and those it
  * could not read, each with the reason.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProductionConfiguration
 {

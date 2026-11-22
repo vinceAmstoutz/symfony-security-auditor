@@ -18,12 +18,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 
 /**
  * The baseline the audited project's own config names is read whole and
- * decoded, and the repository chose it: so it must be a regular file inside
+ * decoded. The repository chose it, so it must be a regular file inside
  * the project, by its real path (a link to `/dev/zero` or to a file of the
- * user's is refused, as for `composer.lock`), and small enough to decode
+ * user's is refused, as for `composer.lock`) and small enough to decode
  * within the binary's memory. One that does not exist yet is never read.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AuditedProjectBaseline
 {

@@ -20,26 +20,26 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Two-pass attacker for cost-sensitive audits.
  *
  *   1. A cheap-model attacker (e.g. claude-haiku-4-5) sweeps every chunk.
- *      In typical Symfony projects most files are inert — the cheap sweep
+ *      In typical Symfony projects most files are inert: the cheap sweep
  *      converges quickly with no findings.
  *
  *   2. If the cheap pass found anything, an expensive-model attacker
  *      (e.g. claude-opus-4-7) re-analyses ONLY the files the cheap pass
  *      flagged. Those re-runs receive the cheap findings as
- *      candidateFindings — leads to confirm, refine or discard, never
- *      reviewer-validated context — so the deeper model re-reports what
- *      it confirms instead of treating them as settled, and still hunts
+ *      candidateFindings (leads to confirm, refine or discard, never
+ *      reviewer-validated context), so the deeper model re-reports what
+ *      it confirms instead of treating them as settled and still hunts
  *      for what the first pass missed.
  *
  *   3. The two result sets are merged: every expensive finding is kept; a
  *      cheap finding on a file the expensive pass analyzed (`analyzed` or
  *      `cached`) is dropped, since the deep pass re-reports what it confirms
- *      and its silence is a discard — so a refined location or type never
+ *      and its silence is a discard, so a refined location or type never
  *      reaches the reviewer twice; cheap findings on files it did not judge
  *      (cold files, hot files it errored on, or hot files it reached its
  *      last tool round on without a finding) pass through, deduplicated
@@ -131,7 +131,7 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * `Vulnerability::filePath()` is free text echoed back by the LLM — the
+     * `Vulnerability::filePath()` is free text echoed back by the LLM: the
      * `record_vulnerability` schema only constrains it to a non-blank
      * string, with no cross-check against the chunk's real file list. A
      * cheap-model quirk like a leading `./` must not make a real cheap

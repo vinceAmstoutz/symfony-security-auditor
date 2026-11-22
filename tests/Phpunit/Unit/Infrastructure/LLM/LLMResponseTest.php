@@ -239,7 +239,7 @@ final class LLMResponseTest extends TestCase
      */
     public function test_it_ignores_brackets_inside_strings_when_extracting(): void
     {
-        // String contents must not affect depth counting — `]` inside a JSON
+        // String contents must not affect depth counting: `]` inside a JSON
         // string would otherwise close the outer array prematurely.
         $content = 'note: [{"title":"contains ] bracket"}] end';
         $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -621,7 +621,7 @@ final class LLMResponseTest extends TestCase
      */
     public function test_it_throws_when_prose_contains_unbalanced_bracket_with_no_closer(): void
     {
-        // Prose mentions `[` but no matching `]` ever appears — every opener
+        // Prose mentions `[` but no matching `]` ever appears: every opener
         // candidate fails to scan a balanced block, so the original
         // `JsonException` propagates rather than masking the failure.
         $llmResponse = LLMResponse::of('prose with [no real json here', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -635,7 +635,7 @@ final class LLMResponseTest extends TestCase
      */
     public function test_it_throws_when_prose_surrounds_no_balanced_json_block(): void
     {
-        // Unbalanced braces (`{{{` with no matching closers) — extractor returns
+        // Unbalanced braces (`{{{` with no matching closers): extractor returns
         // null and the original JsonException is rethrown.
         $llmResponse = LLMResponse::of('invalid json {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 

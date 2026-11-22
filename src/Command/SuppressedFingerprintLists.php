@@ -19,7 +19,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * lists the finding under, and, in the same order, under the baseline
  * fingerprint that left it out.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SuppressedFingerprintLists
 {

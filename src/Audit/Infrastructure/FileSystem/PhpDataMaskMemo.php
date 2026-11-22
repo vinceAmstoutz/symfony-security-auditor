@@ -23,7 +23,7 @@ use Closure;
  * Mutable by design: it keeps a lazily built mask across the passes of one scrub, so it opts out
  * of the final readonly rule as a stateful collaborator (see .claude/rules/php-classes.md).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class PhpDataMaskMemo
 {

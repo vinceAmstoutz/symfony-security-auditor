@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario;
  * What the recorded release wrote, read back by the tree under test: its
  * baselines (used, regenerated, merged and pruned), its JSON reports (by
  * `audit:diff`, `audit:trend` and `audit:baseline`) and its cache directory.
- * The release writes them while the scenario is prepared, and the recording
+ * The release writes them while the scenario is prepared and the recording
  * keeps them as artifacts.
  */
 final readonly class ReportScenarios
@@ -133,7 +133,7 @@ final readonly class ReportScenarios
     }
 
     /**
-     * The base project after a fix: the admin controller is guarded, and a new
+     * The base project after a fix: the admin controller is guarded and a new
      * controller brings a new finding.
      *
      * @return list<SetupActionInterface>

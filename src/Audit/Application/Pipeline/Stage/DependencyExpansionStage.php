@@ -26,17 +26,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
 /**
  * With `audit.since_closure: direct`, widens a `--since` diff-mode run's
- * audited file set with the first-degree dependents of any changed voter —
- * the controllers guarded by an attribute the voter's `supports()` accepts,
+ * audited file set with the first-degree dependents of any changed voter
+ * (the controllers guarded by an attribute the voter's `supports()` accepts,
  * whether that guard is a method-level or class-level `#[IsGranted]` or a
- * `denyAccessUnlessGranted()`/`isGranted()` call — so a voter edit that
+ * `denyAccessUnlessGranted()`/`isGranted()` call), so a voter edit that
  * silently weakens an unrelated controller's access control is still caught.
  * Runs after `MappingStage`,
  * which builds the full-project `AccessControlMap` this stage reads from
  * regardless of diff filtering. A dependent outside the run's `--path` scope
  * is left out, since the run audits nothing else.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DependencyExpansionStage implements StageInterface
 {

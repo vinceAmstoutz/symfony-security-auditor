@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 
 use function Symfony\Component\String\u;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInterface
 {
     /**
@@ -172,7 +172,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
 
     /**
      * One line per entry, as long as the lines fit in the byte budget: an entry
-     * too large for what is left is skipped, and the next ones still get their
+     * too large for what is left is skipped and the next ones still get their
      * chance.
      *
      * @return list<string>
@@ -201,8 +201,8 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
     }
 
     /**
-     * Every field is free text from the audited repository's baseline file — a
-     * pull request can write it — so it is quoted as data on a single line,
+     * Every field is free text from the audited repository's baseline file (a
+     * pull request can write it), so it is quoted as data on a single line,
      * with its own double quotation marks folded so none can close the quote
      * early.
      */

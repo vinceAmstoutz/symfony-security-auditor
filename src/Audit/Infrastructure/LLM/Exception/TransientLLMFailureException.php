@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageR
  * `LLMProviderException` so agents can catch it at the Domain boundary and
  * abort the audit rather than silently producing a false-negative SAFE result.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class TransientLLMFailureException extends LLMProviderException
 {
@@ -42,7 +42,7 @@ final class TransientLLMFailureException extends LLMProviderException
 
     /**
      * The same exhausted failure, counting the attempt that failed before the
-     * retries began — the request a concurrent window dispatched first.
+     * retries began: the request a concurrent window dispatched first.
      */
     public function afterOneMoreAttempt(): self
     {

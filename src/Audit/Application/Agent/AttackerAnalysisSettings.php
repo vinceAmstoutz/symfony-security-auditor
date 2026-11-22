@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
  * The scalar config flags driving attacker analysis (tools, lean mode,
  * structured collection, concurrency, tool-iteration budget).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AttackerAnalysisSettings
 {

@@ -17,9 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
  * Outcome of applying a baseline: the (possibly filtered) report, how many
- * findings the baseline suppressed, and the fingerprints that matched it.
+ * findings the baseline suppressed and the fingerprints that matched it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BaselineResult
 {

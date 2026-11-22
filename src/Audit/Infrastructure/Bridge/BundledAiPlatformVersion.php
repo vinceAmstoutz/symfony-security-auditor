@@ -17,12 +17,12 @@ use Composer\InstalledVersions;
 
 /**
  * The `symfony/ai-platform` release this binary was built with, read from the
- * installed-package data of this package's own vendor tree — never from the
+ * installed-package data of this package's own vendor tree, never from the
  * bridge tree, whose autoloader is registered first and may carry the very
  * mismatch being prevented. Null when that dependency is not installed as a
  * tagged release (a branch checkout), where there is nothing to pin.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BundledAiPlatformVersion
 {
@@ -49,7 +49,7 @@ final readonly class BundledAiPlatformVersion
 
     /**
      * The `symfony/ai-platform` version a vendor tree's installed-package data
-     * records, whatever its form — a bridge tree's included.
+     * records, whatever its form (a bridge tree's included).
      *
      * @param array<array-key, mixed> $installed
      */

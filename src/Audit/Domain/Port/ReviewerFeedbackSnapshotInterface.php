@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * Discards any per-run memoized reviewer-feedback snapshot at the start of a
  * new audit run. A long-lived process (e.g. `mcp:serve`) reuses the same
  * container across audits, so a provider that freezes its feedback set for the
- * duration of one run must be told when the next run begins — otherwise every
+ * duration of one run must be told when the next run begins. Otherwise every
  * audit after the first serves the first run's stale feedback.
  */
 interface ReviewerFeedbackSnapshotInterface

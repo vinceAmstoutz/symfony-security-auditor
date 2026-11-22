@@ -24,13 +24,13 @@ use function Symfony\Component\String\b;
 
 /**
  * Console's hidden question falls back to echoing when it cannot hide the
- * input — a terminal without `stty` — which would print the key under a
+ * input (a terminal without `stty`), which would print the key under a
  * prompt promising the opposite, so that fallback is off and the situation
  * is reported instead. A pasted key routinely carries the newline or the
- * stray space that came with it, and the provider rejects those without
+ * stray space that came with it and the provider rejects those without
  * saying why, so the answer is trimmed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class HiddenCredentialPrompt implements CredentialPromptInterface
 {

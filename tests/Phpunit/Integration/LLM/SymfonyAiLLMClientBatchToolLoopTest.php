@@ -455,8 +455,8 @@ final class SymfonyAiLLMClientBatchToolLoopTest extends TestCase
 
     /**
      * A dispatch whose token extraction fails must release its own
-     * reservation as `[0, 0]` — not the poisoned value that failed to
-     * extract — and the fallback conversation's own reservation must still
+     * reservation as `[0, 0]` (not the poisoned value that failed to
+     * extract) and the fallback conversation's own reservation must still
      * be recorded correctly and independently alongside it.
      *
      * @throws MissingAiPlatformException

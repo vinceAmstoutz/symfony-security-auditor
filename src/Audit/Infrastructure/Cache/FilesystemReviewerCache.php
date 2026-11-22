@@ -37,7 +37,7 @@ use function Symfony\Component\String\u;
  * optional key salt (reviewer model + cache version) so a model or contract
  * change invalidates every stored verdict.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
 {
@@ -127,8 +127,8 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
 
     /**
      * `Filesystem::dumpFile()` transparently writes through a symlink at its
-     * destination, and `Filesystem::mkdir()` treats a symlinked directory as
-     * already existing — a cache path derived entirely from the finding's own
+     * destination and `Filesystem::mkdir()` treats a symlinked directory as
+     * already existing: a cache path derived entirely from the finding's own
      * content (attacker-influenced file paths and descriptions) lets a
      * malicious contributor pre-plant a symlink at the exact path this cache
      * will write to, turning a routine audit run into an arbitrary-file
@@ -144,7 +144,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     }
 
     /**
-     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side —
+     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side:
      * `Filesystem::readFile()` also transparently follows a symlink, so the
      * same pre-planted symlink that would otherwise corrupt a write turns an
      * ordinary cache read into an arbitrary-file read whose content is
@@ -185,7 +185,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     {
         $finding = $vulnerability->toArray();
         unset($finding['id']);
-        // detected_at is stamped fresh on every construction — keeping it in the key would make every cache entry a same-run-only hit.
+        // detected_at is stamped fresh on every construction; keeping it in the key would make every cache entry a same-run-only hit.
         unset($finding['detected_at']);
 
         $signature = \sprintf("%s\0%s", json_encode($finding, \JSON_THROW_ON_ERROR), $codeContext);

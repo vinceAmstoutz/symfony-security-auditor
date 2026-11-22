@@ -21,14 +21,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
  * {@see fileType()} appears in the chunk. The `AttackerSkillRegistry` collects
  * every implementation and emits them ordered by {@see priority()}.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface AttackerSkillInterface
 {
     public function fileType(): ProjectFileType;
 
     /**
-     * Emission rank — lower is emitted earlier. The LLM weights
+     * Emission rank: lower is emitted earlier. The LLM weights
      * earlier-in-context instructions more heavily (primacy), so higher-risk
      * surfaces declare a lower priority.
      */

@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface UnpricedModelBudgetGuardInterface
 {
     /**
@@ -30,7 +30,7 @@ interface UnpricedModelBudgetGuardInterface
 
     /**
      * The entry point with nobody to confirm (the MCP server) runs as it did
-     * before the guard existed — the cap never trips for an unpriced model —
+     * before the guard existed (the cap never trips for an unpriced model)
      * and says so in the log instead of refusing.
      */
     public function warnWhenBudgetCannotBeEnforced(LoggerInterface $logger): void;

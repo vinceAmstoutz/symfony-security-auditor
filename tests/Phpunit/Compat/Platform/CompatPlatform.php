@@ -32,8 +32,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPla
 /**
  * The deterministic provider every compatibility scenario runs against, in the
  * pattern of the end-to-end {@see ScriptedAuditPlatform}:
- * its answers derive from the prompt and the {@see PlatformScript} alone, and
- * it logs one line per call so the request sequence can be compared.
+ * its answers derive from the prompt and the {@see PlatformScript} alone.
+ * It logs one line per call so the request sequence can be compared.
  */
 final readonly class CompatPlatform implements PlatformInterface
 {

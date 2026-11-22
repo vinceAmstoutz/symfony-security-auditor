@@ -191,10 +191,10 @@ final class ReportDifferTest extends TestCase
     /**
      * Several findings sharing one fingerprint on both sides but in different
      * counts are paired off 1:1 in encounter order: the current report's first
-     * N (N = the previous count) persist, its remainder is new, and any
+     * N (N = the previous count) persist, its remainder is new and any
      * previous excess is fixed. Pins the slice offset (from the front, not the
      * back) and length so each bucket keeps exactly the entries it should, in
-     * order — not just the right count.
+     * order, not just the right count.
      *
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
@@ -559,9 +559,9 @@ final class ReportDifferTest extends TestCase
 
     /**
      * A ledger says which files the later run looked at. A finding that
-     * disappeared from any other file — one the lean pre-scan skipped, one
+     * disappeared from any other file (one the lean pre-scan skipped, one
      * outside a `--since` or `--path` scope, one the ledger does not name in a
-     * readable entry — was never looked at, so nothing says it is fixed.
+     * readable entry) was never looked at, so nothing says it is fixed.
      *
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
@@ -663,9 +663,9 @@ final class ReportDifferTest extends TestCase
     }
 
     /**
-     * The scan lists a file it left out — over the size limit, unreadable — in
+     * The scan lists a file it left out (over the size limit, unreadable) in
      * the ledger for information only: a comparison reads it as it read the
-     * ledger of a scan that listed nothing, and calls a finding that vanished
+     * ledger of a scan that listed nothing and calls a finding that vanished
      * from the file fixed.
      *
      * @throws ReportFileNotReadableException

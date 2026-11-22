@@ -22,7 +22,7 @@ use InvalidArgumentException;
  * scenario it names), where (a dotted path, `*` standing for one segment and
  * `**` for any number, none included), optionally what (a regular expression matched against
  * the `-line` or `+line` of a text, or against `recorded -> replayed` of a
- * value, each as JSON), why, and the pull request (`#123`) that a CHANGELOG bullet
+ * value, each as JSON), why and the pull request (`#123`) that a CHANGELOG bullet
  * announcing it links, or a list of them when several changes add up to it. A difference in what the scripted provider received
  * (`llm.*`: the tools offered, how files are grouped into requests) is
  * nothing a user sees: it is marked `internal` instead of citing a bullet.

@@ -17,12 +17,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Diff;
  * Compares a replay with its recording. Maps are compared key by key, so a
  * difference names the dotted path of what changed (for instance
  * `runs.0.stdout.json.vulnerabilities.1.severity`); lists are aligned on the
- * items they share first, and text kept as `lines` is compared line by line,
+ * items they share first and text kept as `lines` is compared line by line,
  * so an inserted item or line is one difference instead of a shifted rest.
  *
  * A key a report gained is no difference: `docs/versioning.md` lets a `MINOR`
  * add keys to the JSON a command prints or writes, so inside a JSON document
- * only a key that is gone or a value that changed counts — except for the
+ * only a key that is gone or a value that changed counts, except for the
  * PHP API's accessors, where a new one is listed like any other change.
  */
 final readonly class ObservationDiffer

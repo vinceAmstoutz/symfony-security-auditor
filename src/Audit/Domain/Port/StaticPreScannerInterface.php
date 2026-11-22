@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
  *     concrete locations instead of re-discovering smells.
  *  2. Files with markers can be batched ahead of files without markers,
  *     improving signal-per-token on the early chunks.
- *  3. In `lean mode`, files with zero markers can be skipped entirely —
+ *  3. In `lean mode`, files with zero markers can be skipped entirely:
  *     the biggest token saver on large codebases.
  *
  * Implementations MUST be pure and fast. No I/O beyond reading the

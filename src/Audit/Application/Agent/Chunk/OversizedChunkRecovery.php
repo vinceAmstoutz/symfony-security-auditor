@@ -30,7 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * split in two and each half goes back through the analyzer's own per-chunk
  * path (so a half already in the cache costs nothing and a half still too
  * large is split again); a single file the model cannot fit is recorded as
- * errored — unless the file, as the prompt carried it after code slicing, is
+ * errored, unless the file, as the prompt carried it after code slicing, is
  * only a small share of the refused prompt, so the prompt's fixed part is
  * what leaves no room, which no split can help: the run stops with the
  * reason.
@@ -38,14 +38,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * stored under the whole chunk's own cache key, so the next run serves the
  * chunk from the cache instead of sending it to be refused again.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OversizedChunkRecovery
 {
     /**
      * Below this share of the refused prompt, a file is too small to be what
      * made it too large: the system prompt and the project mapping around it
-     * take up the rest, and they surround every other file the same way.
+     * take up the rest and they surround every other file the same way.
      */
     private const int FIXED_PROMPT_BLAMED_BELOW_FILE_PERCENT = 10;
 
@@ -85,10 +85,10 @@ final readonly class OversizedChunkRecovery
     }
 
     /**
-     * A half cut short or errored is left out of the cache by the analyzers,
+     * A half cut short or errored is left out of the cache by the analyzers
      * and so is the whole chunk then: a cache entry replays as the model's
      * complete verdict, which the merged findings only are once every file
-     * ended analyzed or served from the cache, and none on a partial look.
+     * ended analyzed or served from the cache, never on a partial look.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -134,7 +134,7 @@ final readonly class OversizedChunkRecovery
     /**
      * An abort while the first half is analyzed leaves the second half with
      * a status of its own, as the analyzers do for the chunks after a failing
-     * one — a file without any status would be missing from the report's
+     * one: a file without any status would be missing from the report's
      * list of files that could not be fully analyzed.
      *
      * @param list<ProjectFile>                                                                   $firstHalf

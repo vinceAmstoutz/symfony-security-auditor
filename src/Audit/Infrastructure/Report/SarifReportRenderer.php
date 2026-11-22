@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\DiffHunk;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\FilePatch;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\UnifiedDiff;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class SarifReportRenderer implements ReportRendererInterface, BaselineSuppressingReportRendererInterface
 {
     public function __construct(
@@ -201,8 +201,8 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
 
     /**
      * The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
-     * CommonMark-style `[display text](target)` hyperlink, and mandates
-     * that every viewer — even one with no Markdown support — render it as
+     * CommonMark-style `[display text](target)` hyperlink and mandates
+     * that every viewer (even one with no Markdown support) render it as
      * a clickable link. `Vulnerability::title()` is free LLM-influenced
      * text with no character restrictions, so an unescaped title lets a
      * crafted finding forge a live link into a report a reviewer trusts.
@@ -234,7 +234,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
 
     /**
      * When multiple `VulnerabilityType`s share an OWASP category (they can
-     * have different `category()` values — e.g. `broken_access_control` vs
+     * have different `category()` values, e.g. `broken_access_control` vs
      * `path_traversal` both under A01), the representative used for `name`
      * and `shortDescription` is picked by sorting on the type's own value so
      * it stays stable across runs instead of following whichever finding

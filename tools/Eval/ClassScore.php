@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval;
 
 /**
  * Precision / recall / F1 for one vulnerability class (or the aggregate),
- * computed from true-positive, false-positive, and false-negative counts.
+ * computed from true-positive, false-positive and false-negative counts.
  */
 final readonly class ClassScore
 {

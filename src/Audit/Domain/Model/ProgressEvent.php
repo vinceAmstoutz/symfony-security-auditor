@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-/** @internal not part of the BC promise — the enum *values* (`pipeline.started`, `stage.started`, `stage.completed`, `pipeline.completed`, `audit.started`, `audit.iteration.started`, `attacker.chunk.started`, `attacker.chunk.completed`, `attacker.finding.recorded`, `review.started`, `review.skipped`, `review.finding.reviewed`, `review.completed`) are the wire-format event names carried through `ProgressReporterInterface::report()` and are stable, but the PHP enum itself is for internal use only. */
+/** @internal not part of the BC promise: the enum *values* (`pipeline.started`, `stage.started`, `stage.completed`, `pipeline.completed`, `audit.started`, `audit.iteration.started`, `attacker.chunk.started`, `attacker.chunk.completed`, `attacker.finding.recorded`, `review.started`, `review.skipped`, `review.finding.reviewed`, `review.completed`) are the wire-format event names carried through `ProgressReporterInterface::report()` and are stable, but the PHP enum itself is for internal use only. */
 enum ProgressEvent: string
 {
     case PipelineStarted = 'pipeline.started';

@@ -238,8 +238,8 @@ final class ReviewOutcomeRecorderTest extends TestCase
 
     /**
      * A verdict recovered after a mid-conversation abort was genuinely
-     * reached by the reviewer LLM — the same as a normal, non-aborted
-     * success — so it must be cached the same way, or a retried run pays for
+     * reached by the reviewer LLM (the same as a normal, non-aborted
+     * success), so it must be cached the same way, or a retried run pays for
      * an LLM call that already produced a reliable answer.
      *
      * @throws InvalidCodeLocationException

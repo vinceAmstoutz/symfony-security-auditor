@@ -18,8 +18,8 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Runner\Workspace;
 
 /**
- * Copies a committed input of the suite — a configuration file a release
- * documented, for instance — into the workspace.
+ * Copies a committed input of the suite (a configuration file a release
+ * documented, for instance) into the workspace.
  */
 final readonly class CopyInput implements SetupActionInterface
 {

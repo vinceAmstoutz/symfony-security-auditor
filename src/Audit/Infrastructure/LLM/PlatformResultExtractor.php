@@ -33,11 +33,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 
 /**
- * Extracts token usage, tool calls, text, and the provider finish reason from
+ * Extracts token usage, tool calls, text and the provider finish reason from
  * symfony/ai platform results, recording usage on the optional telemetry
  * recorder and warning when a response was truncated or content-filtered.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformResultExtractor
 {
@@ -121,7 +121,7 @@ final readonly class PlatformResultExtractor
 
     /**
      * The usage a provider reported in the raw answer of a call its bridge
-     * failed to convert, read with that bridge's own extractor — a failed
+     * failed to convert, read with that bridge's own extractor: a failed
      * conversion attaches no `token_usage` metadata. A usage that reports no
      * prompt tokens has the call's estimated input tokens as its input, as in
      * `extractTokens()`. Null when the answer reports none, cannot be read, or
@@ -142,7 +142,7 @@ final readonly class PlatformResultExtractor
     /**
      * The input tokens the provider counts against its input-tokens-per-minute
      * limit for a call booked at `$tokenUsageSnapshot`: the input and the
-     * cache writes, and the cache reads too where the provider counts them
+     * cache writes, plus the cache reads where the provider counts them
      * inside its prompt, as OpenAI-style providers do. Anthropic leaves its
      * cache reads out of that limit. The cost books the cache reads at the
      * cache rate either way.
@@ -214,7 +214,7 @@ final readonly class PlatformResultExtractor
      * Anthropic counts cache reads and writes apart from its input tokens and
      * reports no total, or one with room for them beside the prompt;
      * OpenAI-style providers (OpenAI, Gemini, DeepSeek, gateways) report a
-     * total and count the cache reads, and OpenAI its cache writes too, inside
+     * total and count the cache reads (and OpenAI its cache writes too) inside
      * the prompt. Booking both as they come would bill the cached share twice
      * at the full input rate, or never at the cache rate. Null when the cache
      * is counted apart from the prompt.
@@ -294,12 +294,12 @@ final readonly class PlatformResultExtractor
 
     /**
      * A negative count here is a compromised or malfunctioning provider
-     * response — every caller relies on rejecting it before it ever reaches
+     * response: every caller relies on rejecting it before it ever reaches
      * `RateLimiterInterface::record()`, whose mutable window counters have no
      * lower bound of their own and would stay corrupted for the rest of the
      * rate-limit window. `$tokenUsageRecorder` is optional
      * ({@see PlatformAccountingConfig}
-     * defaults it to `null`), so this guard cannot live behind it — it must
+     * defaults it to `null`), so this guard cannot live behind it: it must
      * run unconditionally.
      *
      * @throws NegativeTokenCountException

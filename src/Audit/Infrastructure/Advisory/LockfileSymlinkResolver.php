@@ -22,13 +22,13 @@ use Symfony\Component\Filesystem\Path;
  * devcontainer shares one: a link out of the project (`/dev/zero`, a file of
  * the audit host) or to anything else than a regular file is refused.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class LockfileSymlinkResolver
 {
     /**
-     * The path to read `$lockfilePath` from — itself, or the regular file
-     * inside `$projectPath` it is a symlink to — or null when the symlink
+     * The path to read `$lockfilePath` from (itself, or the regular file
+     * inside `$projectPath` it is a symlink to), or null when the symlink
      * leaves the project or does not lead to a regular file. The lockfile
      * must exist.
      */

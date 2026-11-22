@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Excep
 
 use RuntimeException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class UnreadableCredentialStoreException extends RuntimeException
 {
     public static function forInsecurePermissions(string $path, int $mode): self
@@ -39,8 +39,8 @@ final class UnreadableCredentialStoreException extends RuntimeException
     }
 
     /**
-     * The command is meant to be pasted into a POSIX shell — the only kind the
-     * permission check runs under — so the path survives spaces and quotes.
+     * The command is meant to be pasted into a POSIX shell (the only kind the
+     * permission check runs under), so the path survives spaces and quotes.
      */
     private static function shellQuoted(string $path): string
     {

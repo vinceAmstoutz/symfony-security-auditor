@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  * of the audit host that never ends is refused instead of being read until
  * memory runs out; a pipe the user names (`--baseline=<(…)`) still reads.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BoundedFileReader
 {

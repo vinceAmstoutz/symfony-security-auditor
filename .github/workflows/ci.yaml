@@ -184,7 +184,7 @@ jobs:
         run: sh tests/Shell/prose_check_test.sh
 
       - name: Prose check
-        run: git ls-files -z '*.md' | xargs -0 sh .github/scripts/check-prose.sh
+        run: sh .github/scripts/check-prose.sh
 
   zizmor:
     name: zizmor (GitHub Actions security scan)

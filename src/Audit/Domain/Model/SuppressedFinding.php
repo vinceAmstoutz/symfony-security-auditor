@@ -15,12 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
  * One occurrence of a finding a run found and its report leaves out: the
- * fingerprint a report lists the finding under, and the one that left it out
- * — the baseline fingerprint whose credit it spent, which a baseline may hold
+ * fingerprint a report lists the finding under and the one that left it out
+ * (the baseline fingerprint whose credit it spent, which a baseline may hold
  * under another type or path spelling than the finding's own, or its own
- * fingerprint when its type is muted.
+ * fingerprint when its type is muted).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SuppressedFinding
 {

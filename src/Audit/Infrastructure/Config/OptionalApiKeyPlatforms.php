@@ -29,7 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * `location` and `project_id` are set, which `init` never writes, so a keyless
  * block of it can never boot and it is not among these.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OptionalApiKeyPlatforms
 {

@@ -27,10 +27,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProvi
  * effective baseline file (the `--baseline` CLI override wins over the
  * configured default). Prior to that call the holder carries no feedback.
  *
- * Mutable by design — non-readonly because the feedback is set after
+ * Mutable by design: non-readonly because the feedback is set after
  * construction. See .claude/rules/php-classes.md for the opt-out policy.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class ReviewerFeedbackHolder implements ReviewerFeedbackProviderInterface
 {

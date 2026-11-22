@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneConfig
 {
@@ -45,7 +45,7 @@ final readonly class StandaloneConfig
     /**
      * Reads `privacy.offline_only` straight off a raw parsed config, for
      * callers that must answer the question before a full `StandaloneConfig`
-     * can be built — `self-update` runs before "init" has ever written a
+     * can be built: `self-update` runs before "init" has ever written a
      * platform.
      *
      * @param array<array-key, mixed> $auditConfig

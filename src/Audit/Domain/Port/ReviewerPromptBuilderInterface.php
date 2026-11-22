@@ -29,7 +29,7 @@ interface ReviewerPromptBuilderInterface
 
     /**
      * Combined user message for batch review. The LLM is expected to return a JSON array of reviews
-     * with the same `id` values as the input vulnerabilities — verdicts are matched back to findings
+     * with the same `id` values as the input vulnerabilities: verdicts are matched back to findings
      * by `id`, so the response order need not match the input order.
      *
      * @param list<Vulnerability>   $vulnerabilities

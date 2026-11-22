@@ -24,12 +24,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
  * attacker and reviewer LLM clients share one instance so the audit budget
  * can be enforced globally and the final report can attribute total cost.
  *
- * Mutable by design — `LLMClientInterface` callers report each call's deltas
+ * Mutable by design: `LLMClientInterface` callers report each call's deltas
  * via {@see record()}; the orchestrator and budget tracker read totals via
  * {@see snapshot()}. {@see reset()} clears state between independent audit
  * runs sharing a recorder instance.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class TokenUsageRecorder
 {

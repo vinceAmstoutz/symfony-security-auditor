@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use Override;
 
-/** @internal default when no security-config parser is wired — extracts nothing */
+/** @internal default when no security-config parser is wired: extracts nothing */
 final readonly class NullSecurityConfigParser implements SecurityConfigParserInterface
 {
     #[Override]

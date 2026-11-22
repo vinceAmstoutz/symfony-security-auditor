@@ -20,7 +20,7 @@ use Symfony\Component\Console\Attribute\Option;
  * with property-level defaults; promoted readonly ctor params are invisible to its reflection.
  * Treated as a context carrier per .claude/rules/php-classes.md.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class InitCommandInput
 {

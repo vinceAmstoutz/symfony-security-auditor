@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * A file a scan matched and still left out of the files to analyze, and why.
+ * A file a scan matched and still left out of the files to analyze, with the reason.
  */
 final readonly class SkippedFile
 {

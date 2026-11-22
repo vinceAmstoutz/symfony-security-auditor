@@ -23,7 +23,7 @@ use Closure;
  * PHP aborts with "internal corruption of phar ... actual filesize mismatch"
  * even though the update itself succeeded.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface BinarySwapSchedulerInterface
 {

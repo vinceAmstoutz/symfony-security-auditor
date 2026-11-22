@@ -37,10 +37,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 /**
  * Orchestrates the attacker pass: deterministic pre-scan, optional lean-mode
  * filtering, feature/type chunking, then delegation to a per-chunk analyzer.
- * The per-chunk prompt assembly, caching, and the sequential/concurrent
+ * The per-chunk prompt assembly, caching and the sequential/concurrent
  * analysis strategies live in dedicated `Chunk\` collaborators built here.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AttackerAgent implements AttackerAgentInterface
 {

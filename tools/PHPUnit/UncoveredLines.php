@@ -17,7 +17,7 @@ use SimpleXMLElement;
 
 /**
  * The statements a Clover report records as never executed, so a failed
- * coverage gate can name what is missing instead of only a percentage — the
+ * coverage gate can name what is missing instead of only a percentage: the
  * difference between a one-line diagnosis and a bisect.
  */
 final readonly class UncoveredLines

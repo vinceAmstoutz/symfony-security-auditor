@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 /**
  * {@see UsageBookingLLMClient} for a batch-capable client, which it stays.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UsageBookingBatchLLMClient implements BatchCapableLLMClientInterface, UsageBookingLLMClientInterface
 {

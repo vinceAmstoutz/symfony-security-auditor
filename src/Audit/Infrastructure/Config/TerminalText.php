@@ -14,12 +14,12 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * Text quoted back to a terminal from the audited repository's config — a
- * key, the offending line of a YAML error — has the characters a terminal
+ * Text quoted back to a terminal from the audited repository's config (a
+ * key, the offending line of a YAML error) has the characters a terminal
  * reads as control sequences, breaks a line on or reorders it escaped: the
- * ASCII control bytes, the eight-bit C1 controls (U+0080–U+009F), the line
+ * ASCII control bytes, the eight-bit C1 controls (U+0080-U+009F), the line
  * and paragraph separators (U+2028, U+2029) and the bidirectional overrides
- * and marks (U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069). Any
+ * and marks (U+061C, U+200E, U+200F, U+202A-U+202E, U+2066-U+2069). Any
  * other UTF-8 text, `équipe` included, reads as written. Text that is not
  * valid UTF-8 has every byte above ASCII escaped, since its C1 bytes cannot
  * be told apart from the rest. Unlike the report's `TerminalTextSanitizer`,
@@ -30,7 +30,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * audited repository's config must meet before it is quoted back or reaches a
  * setting: valid UTF-8 holding none of these characters but a tab.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class TerminalText
 {

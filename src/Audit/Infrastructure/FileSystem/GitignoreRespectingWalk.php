@@ -27,7 +27,7 @@ use Symfony\Component\Finder\SplFileInfo;
  * which reads the same rules and finds none in it. A file the stopped walk
  * already gave comes again; the scan reads it once and keeps it once.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GitignoreRespectingWalk
 {

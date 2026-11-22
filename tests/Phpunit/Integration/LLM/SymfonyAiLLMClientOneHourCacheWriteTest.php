@@ -53,7 +53,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
 
 /**
  * Anthropic keeps a prompt-cache write for five minutes or, with
- * `cache_retention: long`, for an hour, and bills an hour-long write at twice
+ * `cache_retention: long`, for an hour. It bills an hour-long write at twice
  * the base input rate where a five-minute one costs 1.25 times it. The
  * bridge's usage counts every write alike; only the raw answer tells them
  * apart, so each share is priced at its own rate.

@@ -19,7 +19,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Runs `doctor --check-connection` for `init`, in a process of its own so
  * the provider bridge `init` just installed is the one loaded.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ConnectionTestRunnerInterface
 {

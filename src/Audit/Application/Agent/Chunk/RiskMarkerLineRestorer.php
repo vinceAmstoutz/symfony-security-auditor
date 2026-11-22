@@ -19,9 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 /**
  * Puts back, verbatim, the statement of every line the static pre-scanner
  * flagged: the line itself and, when it leaves a call open, the lines up to
- * the closing parenthesis — the arguments are what carry the vulnerability.
+ * the closing parenthesis. The arguments are what carry the vulnerability.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RiskMarkerLineRestorer
 {

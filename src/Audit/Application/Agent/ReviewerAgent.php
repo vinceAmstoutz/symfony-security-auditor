@@ -40,7 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
  * collection, batching, concurrency) and delegates each finding to the
  * matching `Review\` analysis strategy built here.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReviewerAgent implements ReviewerAgentInterface
 {

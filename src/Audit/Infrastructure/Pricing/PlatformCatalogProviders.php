@@ -22,7 +22,7 @@ use function Symfony\Component\String\u;
  * absent here (a self-hosted gateway, a local runtime, a wrapper around
  * another platform) have no listing of their own to prefer.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformCatalogProviders
 {

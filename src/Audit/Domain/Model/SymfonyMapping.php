@@ -33,7 +33,7 @@ final readonly class SymfonyMapping
     }
 
     /**
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function projectProfile(): ProjectProfile
     {
@@ -41,7 +41,7 @@ final readonly class SymfonyMapping
     }
 
     /**
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function withProjectProfile(ProjectProfile $projectProfile): self
     {
@@ -172,7 +172,7 @@ final readonly class SymfonyMapping
     /**
      * @return list<string>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function unreadableConfigurationFiles(): array
     {
@@ -182,7 +182,7 @@ final readonly class SymfonyMapping
     /**
      * @return array<string, ApplicationAccessControl>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function applicationAccessControls(): array
     {
@@ -192,7 +192,7 @@ final readonly class SymfonyMapping
     /**
      * @return array<string, list<string>>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function routeAccessMapFor(string $controllerFilePath): array
     {
@@ -200,7 +200,7 @@ final readonly class SymfonyMapping
     }
 
     /**
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function applicationFolderFor(string $controllerFilePath): ?string
     {
@@ -210,7 +210,7 @@ final readonly class SymfonyMapping
     /**
      * @return list<AccessControlRule>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function accessControlRules(): array
     {
@@ -220,7 +220,7 @@ final readonly class SymfonyMapping
     /**
      * @return list<AccessControlRule>
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function accessControlRulesFor(string $controllerFilePath): array
     {

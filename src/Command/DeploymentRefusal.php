@@ -17,9 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 
 /**
  * Why `init` cannot write the deployment it was given: Azure OpenAI needs
- * one, and no other platform takes one.
+ * one and no other platform takes one.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DeploymentRefusal
 {

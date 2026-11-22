@@ -39,10 +39,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 /**
  * Implements the Domain LLM ports on top of the symfony/ai platform. The
  * single-call paths live here; retry, batching, the tool wavefront, the
- * sequential tool loop, and platform result/option/tool mapping live in
+ * sequential tool loop and platform result/option/tool mapping live in
  * dedicated collaborators built at construction time.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInterface, UsageBookingLLMClientInterface
 {

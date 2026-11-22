@@ -21,7 +21,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
  * lookup query the same way lets a plausible but differently-cased or
  * padded package name still match a real, cached advisory.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PackageNameNormalizer
 {

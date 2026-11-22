@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay;
 use Closure;
 use Override;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class UsleepSleeper implements SleeperInterface
 {
     public const int MICROSECONDS_PER_MILLISECOND = 1000;

@@ -21,7 +21,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * PricingProviderInterface::pricePerMillionInputTokens()}) when it is not
  * implemented, so adding this capability never breaks an existing provider.
  *
- * Prompt caching is genuinely optional — not every provider bills it, and a
+ * Prompt caching is genuinely optional: not every provider bills it. A
  * provider that does not should not be forced to stub these methods. For an
  * unpriced or cache-free model an implementation SHOULD return the base input
  * rate so cache traffic is never under-priced relative to plain input.

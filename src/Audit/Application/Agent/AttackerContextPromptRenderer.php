@@ -17,11 +17,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Renders the prompt preambles the attacker prepends to a chunk's user
  * message: deterministic pre-scan risk markers, the patterns already confirmed
- * by the reviewer in earlier iterations, the findings it rejected, and the
+ * by the reviewer in earlier iterations, the findings it rejected and the
  * unverified candidates a cheaper first-pass model reported.
  */
 final readonly class AttackerContextPromptRenderer
@@ -200,7 +200,7 @@ final readonly class AttackerContextPromptRenderer
      * A candidate title is a first-pass model's free text about untrusted code:
      * quoted so the deep pass reads it as data rather than as an instruction of
      * its own, with embedded double quotes folded so none can close the quote
-     * early, and capped so a runaway title cannot crowd the prompt.
+     * early and capped so a runaway title cannot crowd the prompt.
      */
     private function delimitTitle(string $title): string
     {
@@ -219,8 +219,8 @@ final readonly class AttackerContextPromptRenderer
      * audited (untrusted) codebase; an embedded line break could forge a fake
      * `##`-prefixed section as unguarded prompt text for the next attacker
      * call, so every such value is collapsed to a single line before it enters
-     * the prompt. `\R` under `/u` covers every Unicode line break — CR, LF,
-     * CRLF, VT, FF, NEL, LS and PS — where a plain `str_replace()` of CR and
+     * the prompt. `\R` under `/u` covers every Unicode line break (CR, LF,
+     * CRLF, VT, FF, NEL, LS and PS), where a plain `str_replace()` of CR and
      * LF would let the other five through.
      */
     private function sanitizeLine(string $value): string

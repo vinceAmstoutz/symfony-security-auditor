@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
  * An attacker prompt builder that fits the system prompt to the audited
  * project the mapping profiled: its layout and the packages it installs.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ProfileAwareAttackerPromptBuilderInterface extends AttackerPromptBuilderInterface
 {

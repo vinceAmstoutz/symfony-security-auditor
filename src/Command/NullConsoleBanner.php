@@ -21,7 +21,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * `StandaloneApplication` already renders the banner for every command
  * before the audit command is even resolved.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class NullConsoleBanner implements ConsoleBannerInterface
 {

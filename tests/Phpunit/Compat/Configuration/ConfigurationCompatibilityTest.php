@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\UnreleasedChangelog;
  * `tools/Compat/record-configuration.php`): no path is gone, no default
  * changed, no choice or bound narrowed, no value the release took is refused
  * or read differently, a key a project configuration could set still can,
- * one only the user could set still cannot, and every published container
+ * one only the user could set still cannot and every published container
  * parameter keeps its value, for the default configuration and for each
  * profile, unless `accepted-differences.php` accepts the change. A new path
  * must be documented.

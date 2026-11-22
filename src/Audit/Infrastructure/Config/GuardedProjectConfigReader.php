@@ -19,11 +19,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\P
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
 
 /**
- * Reads one config file that ships with a repository — the working
- * directory's or the audited project's — and refuses what a repository may
+ * Reads one config file that ships with a repository (the working
+ * directory's or the audited project's) and refuses what a repository may
  * not set.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GuardedProjectConfigReader
 {
@@ -116,7 +116,7 @@ final readonly class GuardedProjectConfigReader
 
     /**
      * A project file may cap the run tighter than the configuration before it
-     * — a CI repository lowering its own spend is legitimate — but never
+     * (a CI repository lowering its own spend is legitimate) but never
      * loosen it: a raised, removed or non-numeric cap decides what the run
      * spends, so it stays the user's alone. A merge writes a null or empty
      * `budget` over the caps before it, which is why those count as loosening
@@ -220,8 +220,8 @@ final readonly class GuardedProjectConfigReader
     }
 
     /**
-     * `scan.import_sarif` reads whatever file it names — an absolute path or
-     * one escaping the project root included — and folds its contents into
+     * `scan.import_sarif` reads whatever file it names (an absolute path or
+     * one escaping the project root included) and folds its contents into
      * the LLM prompt. Letting the audited repository declare it would let the
      * repository point the scanner at paths of its own choosing, the same
      * threat model already applied to `platform`/`provider`.

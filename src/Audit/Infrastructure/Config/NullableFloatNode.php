@@ -17,7 +17,7 @@ use Override;
 use Symfony\Component\Config\Definition\FloatNode;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class NullableFloatNode extends FloatNode
 {

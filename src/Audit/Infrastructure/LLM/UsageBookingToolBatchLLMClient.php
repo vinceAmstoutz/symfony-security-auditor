@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 /**
  * {@see UsageBookingLLMClient} for a tool-batch-capable client, which it stays.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UsageBookingToolBatchLLMClient implements ToolBatchCapableLLMClientInterface, UsageBookingLLMClientInterface
 {

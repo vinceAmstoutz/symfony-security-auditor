@@ -24,7 +24,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
  * is matched as one; a malformed pattern, or one containing every delimiter
  * candidate, simply fails to match rather than throwing.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PathPatternVerdicts
 {
@@ -52,7 +52,7 @@ final readonly class PathPatternVerdicts
      * the pattern simply matches nothing.
      *
      * A pattern from the repository may also backtrack catastrophically
-     * (`^/(a+)+z$` against a long route path), and each route meets each
+     * (`^/(a+)+z$` against a long route path) and each route meets each
      * rule, so a match gets {@see self::PATTERN_BACKTRACK_LIMIT} steps rather
      * than `pcre.backtrack_limit`'s million. One it cannot decide within them
      * is null: the pattern may match the route, so it cannot be told.
@@ -94,7 +94,7 @@ final readonly class PathPatternVerdicts
 
     /**
      * Picks a PCRE delimiter guaranteed absent from the pattern, so the pattern
-     * can never prematurely close or corrupt the delimited expression — unlike
+     * can never prematurely close or corrupt the delimited expression, unlike
      * a fixed delimiter (`#`, `{}`, …), which a sufficiently adversarial pattern
      * can always collide with.
      */

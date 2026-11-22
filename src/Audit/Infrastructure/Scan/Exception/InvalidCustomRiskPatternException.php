@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Excepti
 
 use InvalidArgumentException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class InvalidCustomRiskPatternException extends InvalidArgumentException
 {
     public static function forPattern(string $bucket, string $label, string $pattern, string $error): self

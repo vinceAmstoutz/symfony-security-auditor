@@ -25,7 +25,7 @@ use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
  * so even an answer that could not be used is booked at what it was billed;
  * an answer given in one piece is booked at the usage its call settled on.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StreamedTokenUsageExtractor implements TokenUsageExtractorInterface
 {

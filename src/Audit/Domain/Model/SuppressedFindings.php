@@ -16,11 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 /**
  * The findings a run found but its report does not list, one entry per
  * occurrence: the ones the baseline accepted before the reviewer saw them,
- * then the ones taken out of the report afterwards — accepted by the baseline
+ * then the ones taken out of the report afterwards, accepted by the baseline
  * or muted by type. Each is listed under the fingerprint a report gives the
  * finding, beside the baseline fingerprint that left it out.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SuppressedFindings
 {
@@ -58,7 +58,7 @@ final readonly class SuppressedFindings
      * for each baseline fingerprint, the `fingerprint` of every entry carrying
      * it, in the order their credits are named. A finding accepted through an
      * entry's own fingerprint keeps its own, while one accepted through an
-     * entry's `attacker_fingerprint` — a finding the reviewer had reclassified —
+     * entry's `attacker_fingerprint` (a finding the reviewer had reclassified)
      * takes the entry's fingerprint, the one a report lists it under.
      *
      * @param array<string, list<string>> $entryFingerprintsByBaselineFingerprint

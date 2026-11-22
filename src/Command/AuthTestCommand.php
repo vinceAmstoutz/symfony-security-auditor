@@ -17,7 +17,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/** @internal not part of the BC promise — the command *name* (`auth:test`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`auth:test`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
 final readonly class AuthTestCommand
 {

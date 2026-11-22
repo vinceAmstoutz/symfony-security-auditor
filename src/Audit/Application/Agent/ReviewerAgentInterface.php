@@ -17,13 +17,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface ReviewerAgentInterface
 {
     /**
      * @param list<Vulnerability> $vulnerabilities
      * @param list<ProjectFile>   $projectFiles
-     * @param ?list<ProjectFile>  $toolFiles       the files the investigation tools may open, and whose code a
+     * @param ?list<ProjectFile>  $toolFiles       the files the investigation tools may open and whose code a
      *                                             finding in them is reviewed against, when they are not the
      *                                             audited files; null means `$projectFiles`
      *

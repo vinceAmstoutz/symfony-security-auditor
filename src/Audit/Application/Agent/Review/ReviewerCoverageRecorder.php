@@ -24,10 +24,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 /**
  * Records a finding's reviewer coverage entry and emits the matching
  * `review.finding.reviewed` progress event in one step, so every review
- * outcome — validated, rejected, or errored, on every review path — advances
+ * outcome (validated, rejected, or errored, on every review path) advances
  * the progress counter exactly once.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReviewerCoverageRecorder
 {

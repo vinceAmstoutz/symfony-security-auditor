@@ -22,10 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Unr
  * `!tagged_iterator`, as the Symfony kernel does. Symfony YAML copies the
  * rest of a block-style document at every level it descends, so a file is
  * refused before the parse when its size or its nesting could exhaust the
- * memory of the run, and any failure of the parse refuses the file instead
+ * memory of the run and any failure of the parse refuses the file instead
  * of ending the run.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RepositoryYamlReader
 {

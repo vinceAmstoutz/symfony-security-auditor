@@ -437,7 +437,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * `AuditOrchestrator::withoutBaselineAccepted()` already spent this
      * baseline credit skipping a different, never-reviewed finding before the
-     * reviewer ever ran this run — re-applying the same credit here against a
+     * reviewer ever ran this run. Re-applying the same credit here against a
      * distinct, genuinely new, already-validated finding that merely shares
      * its fingerprint must not silently drop it from the final report.
      *
@@ -661,7 +661,7 @@ final class BaselineProcessorTest extends TestCase
     }
 
     /**
-     * Same type/file/title as {@see self::makeVuln()} at a different line —
+     * Same type/file/title as {@see self::makeVuln()} at a different line:
      * a distinct finding (distinct `id()`) sharing the identical, line-
      * independent `fingerprint()`.
      *

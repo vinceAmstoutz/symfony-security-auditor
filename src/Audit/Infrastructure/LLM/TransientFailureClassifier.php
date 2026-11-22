@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unco
 
 use function Symfony\Component\String\u;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class TransientFailureClassifier
 {
     private const string MALFORMED_TOOL_CALL_STOP_REASON = 'malformed_tool_call';
@@ -169,8 +169,8 @@ final readonly class TransientFailureClassifier
      * OpenAI answers an exhausted billing quota with a 429 (`insufficient_quota`,
      * `You exceeded your current quota, please check your plan and billing
      * details.`), which reads as a rate limit. Gemini words a per-minute rate
-     * limit the same way but adds the wait (`Please retry in 41.8s.`), and
-     * that one clears, so a message that suggests a wait is a rate limit.
+     * limit the same way but adds the wait (`Please retry in 41.8s.`).
+     * That one clears, so a message that suggests a wait is a rate limit.
      */
     private function isQuotaExhausted(Throwable $throwable): bool
     {
@@ -205,16 +205,16 @@ final readonly class TransientFailureClassifier
     /**
      * The stop reason `LLMResponse` gives the same outcome when a provider
      * delivers it as a response rather than a failure: the model answered, but
-     * with nothing usable — cut off by the output limit, withheld by a content
-     * filter, or empty. A bridge reports the first two as a typed exception or
+     * with nothing usable (cut off by the output limit, withheld by a content
+     * filter, or empty). A bridge reports the first two as a typed exception or
      * as a plain one naming the provider's own reason (the generic bridge's
      * `Unsupported finish reason "content_filter".`, the Responses API's
      * `response is incomplete (content_filter)`, Cohere's `Unsupported finish
-     * reason "MAX_TOKENS".`), and an answer it failed to convert can only
+     * reason "MAX_TOKENS".`); an answer it failed to convert can only
      * show it in its raw answer (`UnconvertedAnswerException`). That raw
      * answer has the last word: a request it shows refused as too large was
      * never answered, whatever the bridge made of the body that came with the
-     * refusal (`Response does not contain choices.`), and so is one failed
+     * refusal (`Response does not contain choices.`); so is one failed
      * with a status that clears on its own (`TransientHttpStatusException`).
      * A request refused with any other client error is read by the bridge's
      * message alone, as the same failure without a status: an empty answer
@@ -266,7 +266,7 @@ final readonly class TransientFailureClassifier
      * with a tool call whose arguments are not valid JSON
      * (`malformed_tool_call`), or with a stream cut before its end
      * (`incomplete_stream`). Null for a failure it never answered, which
-     * spent nothing the budget or the rate window has to hold, and neither
+     * spent nothing the budget or the rate window has to hold; neither
      * does a request it refused with a client error: nothing was served.
      */
     public function billedStopReason(Throwable $throwable): ?string
@@ -283,8 +283,8 @@ final readonly class TransientFailureClassifier
     /**
      * Recognises framework-level "the LLM returned no content blocks" errors
      * raised by symfony/ai converters when the model responds with an empty
-     * content array. Such responses are not a transport or auth failure —
-     * the call succeeded, the model chose to say nothing — so they must not
+     * content array. Such responses are not a transport or auth failure
+     * (the call succeeded, the model chose to say nothing), so they must not
      * abort the audit. Callers translate this into an empty `LLMResponse`
      * and continue.
      */
@@ -300,12 +300,12 @@ final readonly class TransientFailureClassifier
      * `maximum context length` / `context_length_exceeded`, Mistral's `too
      * large for model`, Gemini's `exceeds the maximum number of tokens`,
      * Bedrock's `Input is too long`, llama.cpp's `exceeds the available context
-     * size`, or an HTTP 413 — a gateway's `Payload Too Large`, or the 413
+     * size`, or an HTTP 413: a gateway's `Payload Too Large`, or the 413
      * status `UnconvertedAnswerException` read from an answer the bridge
      * could not decode). Retrying the same prompt cannot succeed, but a
-     * smaller one can — so callers split the work instead of retrying or
+     * smaller one can, so callers split the work instead of retrying or
      * aborting. A 413 inside a rate-limit answer is a token count, not a
-     * status, and so is one in a connection cut off mid-response.
+     * status, as is one in a connection cut off mid-response.
      */
     public function isRequestTooLarge(Throwable $throwable): bool
     {
@@ -345,11 +345,11 @@ final readonly class TransientFailureClassifier
     }
 
     /**
-     * The peer hung up while the response was being read — in curl's wording
+     * The peer hung up while the response was being read: in curl's wording
      * as symfony/http-client relays it, `Transfer closed with 512 bytes
      * remaining to read for "https://…".` and the like. No HTTP status came
      * back, so a byte count, an HTTP/2 stream id or the URL in that message is
-     * never a status code, and it is retried before any is looked for. A
+     * never a status code; it is retried before any is looked for. A
      * stream that ends before its terminal event was cut the same way.
      */
     private function isConnectionCut(Throwable $throwable): bool

@@ -21,11 +21,11 @@ use Override;
  * once the console application has finished and no further class can be
  * autoloaded from the archive being replaced.
  *
- * Mutable by design — {@see SelfUpdater} registers the move through
- * {@see schedule()} mid-run, and the standalone entry point drains it through
+ * Mutable by design: {@see SelfUpdater} registers the move through
+ * {@see schedule()} mid-run and the standalone entry point drains it through
  * {@see commit()} on the way out.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class PendingBinarySwap implements BinarySwapSchedulerInterface
 {

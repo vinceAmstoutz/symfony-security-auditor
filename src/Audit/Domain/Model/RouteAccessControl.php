@@ -113,9 +113,9 @@ final readonly class RouteAccessControl
     }
 
     /**
-     * The class constants a guard names instead of a literal attribute —
-     * `#[IsGranted(PostVoter::EDIT)]`, `denyAccessUnlessGranted(PostVoter::EDIT)`
-     * — each as `Fully\Qualified\Class::NAME`, for the caller that knows the
+     * The class constants a guard names instead of a literal attribute
+     * (`#[IsGranted(PostVoter::EDIT)]`, `denyAccessUnlessGranted(PostVoter::EDIT)`),
+     * each as `Fully\Qualified\Class::NAME`, for the caller that knows the
      * value the constant holds.
      *
      * @return list<string>
@@ -126,7 +126,7 @@ final readonly class RouteAccessControl
     }
 
     /**
-     * Returns a copy routed from the enclosing class's `#[Route]` — the way
+     * Returns a copy routed from the enclosing class's `#[Route]`, the way
      * Symfony routes an invokable single-action controller's `__invoke()` when
      * the method carries no route of its own. All access-control flags are
      * preserved; only the route identity and `hasRouteAttribute` change.

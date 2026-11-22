@@ -48,7 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\MessageCo
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedTokenUsagePlatform;
 
 /**
- * The budget is checked before every provider call, and a window that blows
+ * The budget is checked before every provider call and a window that blows
  * it is aborted only once every request it already dispatched has been
  * recorded.
  */
@@ -417,7 +417,7 @@ final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
      * A client whose budget is already spent, over a platform scripted with no
      * answer at all: a call that reaches it fails the test with the fixture's
      * own "invoked more times than scripted" error instead of the expected
-     * budget abort, and its invocation count says so too.
+     * budget abort and its invocation count says so too.
      *
      * @throws InvalidAuditBudgetException
      * @throws InvalidTokenUsageException

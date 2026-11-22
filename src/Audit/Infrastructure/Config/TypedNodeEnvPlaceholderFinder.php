@@ -31,7 +31,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
  * can only crash it. This finder names those settings; a text setting keeps
  * its placeholder for the container to resolve where the text is used.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class TypedNodeEnvPlaceholderFinder
 {

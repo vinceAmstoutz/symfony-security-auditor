@@ -60,7 +60,7 @@ final readonly class CodeLocation
      * The path as the model wrote it: {@see self::filePath()} unless the
      * finding was named by another spelling of it.
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      */
     public function echoedFilePath(): string
     {

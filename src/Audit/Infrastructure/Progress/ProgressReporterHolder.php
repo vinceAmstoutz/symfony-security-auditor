@@ -32,10 +32,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
  * Reporter exceptions are swallowed so a misbehaving delegate cannot abort
  * the audit (contract guarantee from ProgressReporterInterface).
  *
- * Mutable by design — non-readonly because the delegate is set after
+ * Mutable by design: non-readonly because the delegate is set after
  * construction. See .claude/rules/php-classes.md for the opt-out policy.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class ProgressReporterHolder implements ProgressReporterInterface
 {

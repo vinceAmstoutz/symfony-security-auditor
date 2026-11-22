@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * The outcome of tracking finding counts across a chronological series of
  * reports.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReportTrend
 {
@@ -30,8 +30,8 @@ final readonly class ReportTrend
 
     /**
      * The trend in one sentence: the first and last totals with the signed
-     * change, and how many findings disappeared from files a later run could
-     * not analyze — those are unverified, not fixed, whatever the totals say.
+     * change and how many findings disappeared from files a later run could
+     * not analyze: those are unverified, not fixed, whatever the totals say.
      */
     public function summary(): string
     {

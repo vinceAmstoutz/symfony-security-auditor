@@ -17,7 +17,7 @@ use RuntimeException;
 use Symfony\Component\Filesystem\Exception\IOException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class StandaloneConfigWriteException extends RuntimeException
 {
     public static function fromIOException(string $configFile, IOException $ioException): self

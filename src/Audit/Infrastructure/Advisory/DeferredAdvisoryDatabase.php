@@ -19,30 +19,30 @@ use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 
 /**
- * Defers constructing {@see ComposerAuditAdvisoryDatabase} — and therefore
- * running `composer audit` — until the first {@see self::lookup()} call,
+ * Defers constructing {@see ComposerAuditAdvisoryDatabase} (and therefore
+ * running `composer audit`) until the first {@see self::lookup()} call,
  * memoizing the result for as long as the holder's path and the content of the
- * project's `composer.lock` stay unchanged, and no longer than the on-disk
+ * project's `composer.lock` stay unchanged and no longer than the on-disk
  * advisory cache keeps an entry (`LockfileHashedAdvisoryCache::TTL_SECONDS`):
  * a service instance reused for days (`mcp:serve`) must see the advisories
  * disclosed since. A load that failed is memoized for
  * `FAILED_LOAD_RETRY_SECONDS` only: a timeout is not paid again on every
- * lookup, and a transient failure does not silence the lookup for good.
+ * lookup and a transient failure does not silence the lookup for good.
  *
  * `ComposerAuditAdvisoryDatabase` is `final readonly`, so it cannot be a
  * Symfony `->lazy()` service: proxy generation requires either a native PHP
- * 8.4+ lazy ghost (this project supports 8.3+) or a subclassing proxy, and
+ * 8.4+ lazy ghost (this project supports 8.3+) or a subclassing proxy and
  * neither works for a final readonly class. This hand-rolled wrapper achieves
- * the same goal — `AuditedProjectPathHolder::path()` must not be read before
- * `AuditCommand` sets it — without relying on proxy generation.
+ * the same goal (`AuditedProjectPathHolder::path()` must not be read before
+ * `AuditCommand` sets it) without relying on proxy generation.
  *
- * Not readonly: it memoizes the inner database on first use, and rebuilds it
+ * Not readonly: it memoizes the inner database on first use and rebuilds it
  * whenever the holder is re-targeted to a different project or the lockfile is
- * rewritten — a service instance reused across two audits (`mcp:serve`) must
- * not keep serving a stale snapshot (stateful collaborator carve-out — same
+ * rewritten. A service instance reused across two audits (`mcp:serve`) must
+ * not keep serving a stale snapshot (stateful collaborator carve-out, same
  * shape as `AuditedProjectPathHolder`).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
 {

@@ -22,12 +22,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
  * One structured-collection round: a fresh collector wired into a single-tool
- * `record_review` registry, and the drain step that turns whatever the LLM
+ * `record_review` registry and the drain step that turns whatever the LLM
  * recorded during the call back into raw verdict payloads. Shared by the
- * single-finding, concurrent, and batched structured review analyzers so the
+ * single-finding, concurrent and batched structured review analyzers so the
  * wiring lives in one place.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StructuredReviewCollectionSession
 {
@@ -53,7 +53,7 @@ final readonly class StructuredReviewCollectionSession
 
     /**
      * Whether the client offered the recording tool to the model or called it:
-     * a client that did neither ignored the tools, and the model's answer text
+     * a client that did neither ignored the tools and the model's answer text
      * is all it said about the finding.
      */
     public function recordingToolReached(): bool

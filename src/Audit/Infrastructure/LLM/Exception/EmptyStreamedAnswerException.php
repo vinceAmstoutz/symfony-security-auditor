@@ -20,7 +20,7 @@ use RuntimeException;
  * word a buffered answer without content, so it reads as the same empty
  * answer.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class EmptyStreamedAnswerException extends RuntimeException
 {

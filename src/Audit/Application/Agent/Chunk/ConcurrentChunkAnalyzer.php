@@ -38,15 +38,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
  * Analyzes cache-miss chunks concurrently as a structured-collection wavefront:
  * one `record_vulnerability` registry + collector per chunk, all resolved
  * through the tool-batch-capable client. Cache hits short-circuit first; chunk
- * order, coverage, caching, drop accounting, and the JSON reading of a turn
+ * order, coverage, caching, drop accounting and the JSON reading of a turn
  * whose client never offered the tool match the sequential analyzer.
  *
- * Pending chunks are dispatched one `maxConcurrent`-sized window at a time —
- * never as a single oversized batch — so that a failure in a later window
- * cannot discard the already-completed findings, cache stores, and coverage
+ * Pending chunks are dispatched one `maxConcurrent`-sized window at a time
+ * (never as a single oversized batch), so that a failure in a later window
+ * cannot discard the already-completed findings, cache stores and coverage
  * of an earlier window.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConcurrentChunkAnalyzer
 {
@@ -243,9 +243,9 @@ final readonly class ConcurrentChunkAnalyzer
 
     /**
      * Dispatches one window and finalizes each of its chunks. The window
-     * accounts for its own chunks when a budget or provider abort ends it —
-     * only the chunks not finalized yet are recorded as failed, so a chunk
-     * finalized before its sibling's abort keeps its `analyzed` status — and
+     * accounts for its own chunks when a budget or provider abort ends it
+     * (only the chunks not finalized yet are recorded as failed, so a chunk
+     * finalized before its sibling's abort keeps its `analyzed` status) and
      * leaves the windows after it to the caller. An abort raised while a chunk
      * is being finalized comes from splitting it, which has recorded each of
      * its halves already, so that chunk is left as its halves recorded it.
@@ -315,7 +315,7 @@ final readonly class ConcurrentChunkAnalyzer
      * A chunk the model could not take in whole is split rather than
      * finalized. Any other failure to finalize one entry (e.g. a cache-store
      * I/O error) is isolated to that entry alone, mirroring
-     * `SequentialChunkAnalyzer`'s per-chunk isolation — a sibling entry in the
+     * `SequentialChunkAnalyzer`'s per-chunk isolation: a sibling entry in the
      * same window that already finalized successfully must keep its result.
      *
      * @throws BudgetExceededException
@@ -386,8 +386,8 @@ final readonly class ConcurrentChunkAnalyzer
 
     /**
      * On a fatal budget/provider abort, records every window from
-     * `$fromWindowNumber` onward — the ones never attempted, since the window
-     * that failed accounted for its own chunks — as failed, without touching
+     * `$fromWindowNumber` onward (the ones never attempted, since the window
+     * that failed accounted for its own chunks) as failed, without touching
      * windows that already finalized. Side effects only: the caller rethrows,
      * so no hydration result is returned or consumed.
      *
@@ -405,7 +405,7 @@ final readonly class ConcurrentChunkAnalyzer
     /**
      * Marks one window's chunks with `$status`, draining any findings the LLM
      * recorded before the batch aborted. Used both to fail the window that
-     * threw and — for a fatal budget/provider abort — every window after it.
+     * threw and (for a fatal budget/provider abort) every window after it.
      *
      * @param array<int, PendingChunk> $window
      * @param ?string                  $reason why the window failed, when it did so as `errored` for a reason worth showing
@@ -428,8 +428,8 @@ final readonly class ConcurrentChunkAnalyzer
 
     /**
      * Recovers findings the LLM already recorded via `record_vulnerability`
-     * tool calls before the batch call carrying this entry's window aborted
-     * — otherwise they vanish with the exception even though
+     * tool calls before the batch call carrying this entry's window aborted.
+     * Otherwise they vanish with the exception even though
      * `drainFoundVulnerabilities()` exists precisely to let a caller recover
      * candidates found before a mid-run abort. A window that was never
      * dispatched drains empty, which is harmless.
@@ -464,11 +464,11 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * A response cut short — by the output token limit, a content filter, the
-     * tool-loop cap or a call that produced no content — is not the model's
+     * A response cut short (by the output token limit, a content filter, the
+     * tool-loop cap or a call that produced no content) is not the model's
      * complete verdict on the chunk: the findings it recorded are kept, but
      * the chunk is recorded as errored so the report says it could not be
-     * fully analyzed, and nothing is cached, so the next run retries it
+     * fully analyzed and nothing is cached, so the next run retries it
      * instead of replaying an empty result as safe.
      *
      * @param list<array<string, mixed>> $rawData

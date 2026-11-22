@@ -15,13 +15,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
  * The findings of a report each baseline entry holds under a former name
- * ({@see FormerFindingNames}), looked up by the entry's fingerprint — and its
- * file, for a name only an entry naming that file holds — instead of by
+ * ({@see FormerFindingNames}), looked up by the entry's fingerprint (and its
+ * file, for a name only an entry naming that file holds) instead of by
  * matching the entry against every finding. Of the findings sharing a
  * fingerprint, only the first one held under each name is kept: a prune spends
  * a fingerprint, not one of its occurrences.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class HeldFindings
 {

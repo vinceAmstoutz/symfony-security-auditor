@@ -17,12 +17,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
  * Opt-in companion of {@see CoverageRecorderInterface} for a recorder that
- * keeps the findings the reviewer rejected — a verdict it reached, unlike a
- * review that failed and reached none — so a later attacker iteration is told
+ * keeps the findings the reviewer rejected (a verdict it reached, unlike a
+ * review that failed and reached none), so a later attacker iteration is told
  * only about the findings the reviewer actually dismissed. The reviewer checks
  * for it with `instanceof`, so a recorder without it keeps working.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface RejectedFindingRecorderInterface
 {

@@ -18,18 +18,18 @@ use Symfony\Component\Filesystem\Path;
 /**
  * `Filesystem::dumpFile()` and `readFile()` transparently follow a symlink
  * anywhere on the way to their target, so a predictable path committed as a
- * symlink by a malicious change — `report.sarif`, `.security-baseline.json`,
- * a cache shard, or a directory above them such as `build -> /elsewhere` —
+ * symlink by a malicious change (`report.sarif`, `.security-baseline.json`,
+ * a cache shard, or a directory above them such as `build -> /elsewhere`)
  * would redirect the read or write out of the project. A path is refused when
  * its file, its directory or any directory between the trusted root (the
  * process working directory by default) and the file is a symlink. Directories
  * above that root are the user's own, the operating system's included
- * (`/var -> /private/var` on macOS), and are left alone. A relative path or
+ * (`/var -> /private/var` on macOS) and are left alone. A relative path or
  * root is read against the working directory, as the filesystem calls read
  * it. A trailing slash is dropped first: `link/` names the directory `link`
  * points to, so `is_link()` would look straight through it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SymlinkGuard
 {

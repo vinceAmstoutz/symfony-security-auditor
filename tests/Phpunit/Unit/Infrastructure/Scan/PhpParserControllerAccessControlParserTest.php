@@ -551,7 +551,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * `isGranted()` + a manual `throw $this->createAccessDeniedException(...)`
      * is an equally standard Symfony access-control idiom, used whenever the
-     * action wants a custom denial message — not just the shorthand
+     * action wants a custom denial message, not just the shorthand
      * `denyAccessUnlessGranted()`.
      *
      * @throws InvalidProjectFileException
@@ -834,7 +834,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * `methods` sits at positional index 6 in Symfony's real
      * `Route::__construct()` order (path, name, requirements, options,
-     * defaults, host, methods, ...) — a fully positional attribute must
+     * defaults, host, methods, ...): a fully positional attribute must
      * resolve it there too, the same as the named form.
      *
      * @throws InvalidProjectFileException

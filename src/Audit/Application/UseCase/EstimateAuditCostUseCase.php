@@ -36,16 +36,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
 
 /**
  * Walks the ingestion stage of the audit pipeline, estimates how many tokens
- * an actual run would consume, and returns an `AuditReport` carrying the
- * estimate as its `AuditCost`. Never invokes the LLM platform — `--dry-run`
+ * an actual run would consume and returns an `AuditReport` carrying the
+ * estimate as its `AuditCost`. Never invokes the LLM platform: `--dry-run`
  * stays free regardless of project size.
  *
  * Estimation strategy: every scanned file contributes its content to a
  * synthetic "attacker prompt" (input). The attacker system prompt's skill
- * blocks are sent once per chunk — chunked the same way `FileChunker` chunks
- * a real run — and added on top. When `audit.tools_enabled` is on, the
+ * blocks are sent once per chunk (chunked the same way `FileChunker` chunks
+ * a real run) and added on top. When `audit.tools_enabled` is on, the
  * attacker may take several tool-call rounds per chunk, each resending the
- * growing conversation plus the tool schemas — `toolRoundTripRatio` inflates
+ * growing conversation plus the tool schemas. `toolRoundTripRatio` inflates
  * the per-round input to account for that. Output tokens are projected at
  * `outputRatio * input` because audit prompts are heavily input-skewed.
  * Multiplied by `max_iterations` to account for the attacker/reviewer loop.
@@ -55,7 +55,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
  * attacker's own overhead into its base would inflate the reviewer estimate by
  * an overhead it never sends.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EstimateAuditCostUseCase
 {
@@ -82,7 +82,7 @@ final readonly class EstimateAuditCostUseCase
     /**
      * The `audit.max_tool_iterations` bound the ratio above was measured
      * against. It moves only when the calibration is redone, which is why it
-     * is not simply `AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS` — changing
+     * is not simply `AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS`: changing
      * that default must change the estimate, not silently re-anchor it.
      */
     public const int CALIBRATION_MAX_TOOL_ITERATIONS = 8;
@@ -242,10 +242,10 @@ final readonly class EstimateAuditCostUseCase
     }
 
     /**
-     * The project mapping every chunk's user message carries — the firewall,
-     * route access-control, voter and form sections — which grows with the
+     * The project mapping every chunk's user message carries (the firewall,
+     * route access-control, voter and form sections), which grows with the
      * routes of the project, not with the chunk. The pipeline maps every file
-     * it scanned, however a git diff then narrows the files to audit, and the
+     * it scanned (however a git diff then narrows the files to audit) and the
      * configured scope besides when `--path` scopes the scan, with the
      * `--path` values that pick the configuration of a monorepo application.
      *

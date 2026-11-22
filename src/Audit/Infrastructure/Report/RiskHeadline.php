@@ -17,12 +17,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
  * How a human-facing report states its risk verdict: as is for a complete run,
- * qualified as covering only the files analyzed for an incomplete one, and not
- * at all for a run with no verdict, which analyzed no file and found nothing —
+ * qualified as covering only the files analyzed for an incomplete one and not
+ * at all for a run with no verdict, which analyzed no file and found nothing:
  * a SAFE there would vouch for code nobody read. Machine-readable formats keep
  * their fields and carry `complete`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RiskHeadline
 {

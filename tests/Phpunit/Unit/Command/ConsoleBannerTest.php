@@ -130,7 +130,7 @@ final class ConsoleBannerTest extends TestCase
     }
 
     /**
-     * Every locale variable is pinned individually, and any not named is
+     * Every locale variable is pinned individually and any not named is
      * cleared: setting all three to one value hides which of them the banner
      * actually read.
      *

@@ -18,11 +18,11 @@ use Closure;
 /**
  * `preg_replace_callback()` that hands the callback where each group sits in the content.
  *
- * The callback of `preg_replace_callback()` receives the text of a match, not its position, and
+ * The callback of `preg_replace_callback()` receives the text of a match, not its position and
  * its `PREG_OFFSET_CAPTURE` flag changes the shape of what the callback receives in a way static
  * analysis does not follow.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OffsetCaptureReplacer
 {
@@ -38,12 +38,12 @@ final readonly class OffsetCaptureReplacer
 
     /**
      * {@see replace()} for a replacement that needs what only the whole content tells: `$shared`
-     * works it out once, before the first match is replaced, and not at all when nothing matches.
+     * works it out once, before the first match is replaced and not at all when nothing matches.
      *
      * @template TShared
      *
      * @param Closure(): TShared                                                     $shared
-     * @param callable(array<int|string, array{0: string, 1: int}>, TShared): string $replacement given each match as its groups, each a `[text, offset]` pair, and what `$shared` worked out
+     * @param callable(array<int|string, array{0: string, 1: int}>, TShared): string $replacement given each match as its groups (each a `[text, offset]` pair) and what `$shared` worked out
      *
      * @return string|null null when the PCRE engine refuses to evaluate the pattern
      */

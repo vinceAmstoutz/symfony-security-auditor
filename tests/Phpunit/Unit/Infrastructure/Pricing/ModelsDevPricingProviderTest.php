@@ -144,7 +144,7 @@ final class ModelsDevPricingProviderTest extends TestCase
     /**
      * `qualified/free-tier-collision` is priced at $0 by `302ai` (alphabetically
      * first) and at $10/$20 by `zzz-collides-on-qualified-key` (alphabetically
-     * last) — an aggregator's stray free-tier listing must never win over a
+     * last): an aggregator's stray free-tier listing must never win over a
      * genuinely paid one for the same qualified id, since that would both
      * under-report the real cost and, via `hasModel()` returning `true`,
      * silently bypass `UnpricedModelBudgetGuard`'s "no published pricing"

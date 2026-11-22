@@ -22,13 +22,13 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
- * Extracts every `#[Route(path:, methods:, name:)]` attribute on a method —
+ * Extracts every `#[Route(path:, methods:, name:)]` attribute on a method:
  * one entry per stacked attribute, so a verb restricted to a second, stacked
  * route is never invisible to the caller. Positional and named arguments
  * resolve identically: matching Symfony's own `Route::__construct()` order,
- * the first unnamed argument is `path`, the second is `name`, and the
+ * the first unnamed argument is `path`, the second is `name` and the
  * seventh is `methods`.
  */
 final readonly class RouteAttributeParser

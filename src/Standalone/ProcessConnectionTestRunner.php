@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
  * Starts this binary again as `doctor --check-connection`, so the request
  * goes through the provider bridge `init` has just installed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProcessConnectionTestRunner implements ConnectionTestRunnerInterface
 {

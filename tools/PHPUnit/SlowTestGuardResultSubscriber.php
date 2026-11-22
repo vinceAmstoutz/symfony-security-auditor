@@ -23,7 +23,7 @@ use PHPUnit\Event\Application\FinishedSubscriber;
  * maximum duration (the guard's headroom-adjusted global bar or its own
  * `#[MaximumDuration]` override). This is the enforcement half of
  * {@see SlowTestGuardExtension}: the report-only detector never fails a run, so
- * a pathological duration — a real `sleep()`, an accidental network call —
+ * a pathological duration (a real `sleep()`, an accidental network call)
  * would otherwise only warn.
  */
 final readonly class SlowTestGuardResultSubscriber implements FinishedSubscriber

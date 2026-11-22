@@ -17,11 +17,11 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * YAML that `init` hands the user, guaranteed to read back as what was dumped.
- * `Yaml::dump()` leaves a string such as `.inf`, `.nan` or `1_000.5` bare, and
+ * `Yaml::dump()` leaves a string such as `.inf`, `.nan` or `1_000.5` bare and
  * the parser then reads it as a float; only such a document is dumped again
  * with every value double-quoted, so an ordinary one keeps its plain look.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RoundTripYaml
 {

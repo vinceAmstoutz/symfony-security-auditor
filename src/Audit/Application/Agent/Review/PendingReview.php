@@ -17,10 +17,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
  * One finding awaiting a dispatched verdict: its position in the caller's
- * finding list, the finding itself, and the code context to cache the verdict
- * under — `null` when caching is bypassed for this run.
+ * finding list, the finding itself and the code context to cache the verdict
+ * under (`null` when caching is bypassed for this run).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PendingReview
 {

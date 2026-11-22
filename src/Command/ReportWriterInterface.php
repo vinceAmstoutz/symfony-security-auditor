@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedExce
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface ReportWriterInterface
 {
     /**

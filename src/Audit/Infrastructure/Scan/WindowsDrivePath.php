@@ -26,7 +26,7 @@ use function Symfony\Component\String\u;
  * comes back as it was, since a backslash is a valid file name character on
  * UNIX.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class WindowsDrivePath
 {

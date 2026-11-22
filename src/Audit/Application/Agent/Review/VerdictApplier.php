@@ -21,10 +21,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
 /**
  * Applies one reviewer verdict payload to a finding: acceptance, optional
- * severity elevation, and optional type correction. Invalid enum values from
+ * severity elevation and optional type correction. Invalid enum values from
  * the model are logged and ignored, keeping the original finding values.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class VerdictApplier
 {

@@ -18,7 +18,7 @@ use UnexpectedValueException;
 /**
  * One entry of `accepted-differences.php`: the published container parameters
  * whose value may differ from the recorded release (`*` stands for any run of
- * characters), why, and the pull request (`#123`) that a `CHANGELOG.md` bullet
+ * characters), why and the pull request (`#123`) that a `CHANGELOG.md` bullet
  * under `## [Unreleased]` links to announce it.
  */
 final readonly class AcceptedParameterChange

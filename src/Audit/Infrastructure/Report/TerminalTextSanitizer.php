@@ -17,18 +17,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsolePr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 
 /**
- * Shared defenses for any LLM-sourced text about to reach a real terminal —
+ * Shared defenses for any LLM-sourced text about to reach a real terminal,
  * used by both the final console report ({@see ConsoleReportRenderer}) and the
  * live progress narration ({@see ConsoleProgressReporter},
  * {@see PlainProgressReporter}).
  * Bypassing Symfony Console's own `<tag>` formatter (`OUTPUT_RAW`, or
  * `OutputFormatter::escape()` on the `<`/`>` characters alone) does not strip a
  * raw ANSI escape byte, a carriage return, or a Unicode bidi override already
- * present in the string — any of which let a crafted finding erase/overwrite
+ * present in the string, any of which let a crafted finding erase/overwrite
  * adjacent output, forge a fake status line, or visually reorder its own
  * rendered text (a Trojan-Source-style spoof).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class TerminalTextSanitizer
 {

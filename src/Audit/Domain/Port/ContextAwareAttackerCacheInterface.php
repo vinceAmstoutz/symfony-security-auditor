@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * Opt-in extension of {@see AttackerCacheInterface} for caches that can key an
  * entry by the chunk PLUS the extra prompt context injected ahead of it: the
  * cross-iteration preambles (prior validated findings, reviewer-rejected
- * findings) AND the static pre-scan risk-marker preamble — the latter is
+ * findings) AND the static pre-scan risk-marker preamble. The latter is
  * folded into `$contextKey` too, since it changes the prompt on an unchanged
  * chunk content hash whenever a `StaticPreScannerInterface` implementation
  * (also a documented extension point) starts flagging a file differently.

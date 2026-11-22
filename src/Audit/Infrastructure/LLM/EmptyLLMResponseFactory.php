@@ -19,12 +19,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 /**
  * Builds the degraded `LLMResponse` that every call path returns after
  * `TransientFailureClassifier::degradedStopReason()` classifies a platform
- * failure as "the model answered with nothing usable" — `empty_content` by
+ * failure as "the model answered with nothing usable": `empty_content` by
  * default, `length` or `content-filter` for the typed outcomes. Callers keep
  * their own logging (message text and level differ per call site) and only
  * share this terminal construction step.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EmptyLLMResponseFactory
 {

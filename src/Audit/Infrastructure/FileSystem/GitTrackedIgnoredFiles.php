@@ -23,7 +23,7 @@ use Symfony\Component\Process\Process;
  * The files git tracks although a `.gitignore` pattern matches them: a rule
  * keeps only untracked files out of a repository.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GitTrackedIgnoredFiles
 {

@@ -14,14 +14,14 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception;
 
 /**
- * A provider failure quotes the URL it was sent to, and some providers take
+ * A provider failure quotes the URL it was sent to and some providers take
  * their API key in that URL's query (Vertex AI's `?key=`). The message of an
  * exception built from such a failure goes to logs, the console and MCP
  * clients, so the value of every credential query parameter is replaced
  * before it is stored. A message the redaction could not evaluate is withheld
  * whole, never returned as it was.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProviderMessageRedactor
 {

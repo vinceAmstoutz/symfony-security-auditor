@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
  * The stakeholder-facing view of an {@see AuditReport}: risk level plus the
- * three distributions a reader needs to size the exposure — by severity, by
- * vulnerability type, and by affected file — with no per-finding detail.
+ * three distributions a reader needs to size the exposure (by severity, by
+ * vulnerability type and by affected file), with no per-finding detail.
  */
 final readonly class ExecutiveSummary
 {

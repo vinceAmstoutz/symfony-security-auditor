@@ -17,17 +17,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
  * The files a finding's echoed path may name. `name()` names a finding by the
- * known file its path denotes — an absolute path, a leading slash, backslashes
- * or a leading `./` alike ({@see EchoedFilePath::comparable()}) — so one file
+ * known file its path denotes, an absolute path, a leading slash, backslashes
+ * or a leading `./` alike ({@see EchoedFilePath::comparable()}), so one file
  * has one spelling in every id, fingerprint and code lookup. Paths are compared
  * byte for byte: one that names a known file as written keeps naming the first
- * such file, these files before the later ones, and a folded spelling resolves
+ * such file (these files before the later ones) and a folded spelling resolves
  * only when it denotes one known file alone, so a look-alike name (a
  * backslash, another Unicode form) never takes the findings of the file it
  * resembles. The paths are indexed once, so naming takes a few lookups
  * whatever the number of files.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class KnownFiles
 {

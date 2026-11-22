@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
  * trust the payload shape (a custom emitter may pass anything), so a missing or
  * wrongly-typed key resolves to a neutral default rather than throwing.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProgressContext
 {
@@ -62,7 +62,7 @@ final readonly class ProgressContext
     }
 
     /**
-     * Renders the reason a chunk failed as a trailing " — reason" suffix on one
+     * Renders the reason a chunk failed as a trailing `" — reason"` suffix on one
      * line, or an empty string when the event names none.
      *
      * @param array<string, mixed> $context
@@ -76,7 +76,7 @@ final readonly class ProgressContext
 
     /**
      * Whether a `review.finding.reviewed` event reports a review that reached
-     * no verdict — its call failed, or an abort stopped it — rather than a
+     * no verdict (its call failed, or an abort stopped it) rather than a
      * finding the reviewer validated or rejected.
      *
      * @param array<string, mixed> $context

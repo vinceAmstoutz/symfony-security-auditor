@@ -22,7 +22,7 @@ use PhpParser\Node\Stmt\Class_;
  * constant declared elsewhere, or holding anything but a string literal, is
  * left out rather than guessed at.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ClassConstantStrings
 {

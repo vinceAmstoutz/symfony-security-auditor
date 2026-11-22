@@ -18,10 +18,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderI
 
 /**
  * Persists a rejected finding's reviewer explanation to triage memory in one
- * step, so every review path — single, structured, concurrent, and batched —
+ * step, so every review path (single, structured, concurrent and batched)
  * records the same cross-run feedback instead of only some of them.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RejectionTriageRecorder
 {

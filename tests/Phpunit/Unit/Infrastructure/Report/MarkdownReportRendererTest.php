@@ -284,7 +284,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * A CommonMark inline code span cannot contain a blank line — a blank line
+     * A CommonMark inline code span cannot contain a blank line: a blank line
      * is resolved as a block separator before inline parsing, so it ends the
      * span no matter how wide the backtick delimiter is. An LLM-sourced
      * `filePath` with an embedded `\n\n` therefore breaks out of the Location
@@ -309,7 +309,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * Unicode bidirectional-override characters let a crafted finding visually
      * reorder its own rendered text (a Trojan-Source spoof) when the Markdown
-     * is viewed or rendered downstream — the sibling HTML renderer already
+     * is viewed or rendered downstream: the sibling HTML renderer already
      * strips them, so the Markdown renderer must too.
      *
      * @throws InvalidCodeLocationException
@@ -376,7 +376,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
 
     /**
      * CommonMark's `[display text](target)` link syntax needs no code fence
-     * or heading marker to work — a title containing it forges a live,
+     * or heading marker to work: a title containing it forges a live,
      * clickable link straight into the rendered report, which the tool's PR
      * comment / `$GITHUB_STEP_SUMMARY` use case renders to real users
      * reviewing security findings.

@@ -208,7 +208,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     {
         $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
 
-        // A handful of canonical values must appear — the LLM should not invent new types.
+        // A handful of canonical values must appear: the LLM should not invent new types.
         self::assertStringContainsString('sql_injection', $prompt);
         self::assertStringContainsString('ssrf', $prompt);
         self::assertStringContainsString('hardcoded_secret', $prompt);
@@ -414,7 +414,7 @@ final class ReviewerPromptBuilderTest extends TestCase
 
     public function test_system_and_batch_system_prompts_share_core_instructions(): void
     {
-        // The two prompts MUST be derived from a shared base — drift between single and batch is a known FP risk.
+        // The two prompts MUST be derived from a shared base: drift between single and batch is a known FP risk.
         $singlePrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
         $batchPrompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
 
@@ -442,7 +442,7 @@ final class ReviewerPromptBuilderTest extends TestCase
             [$vulnerability->id() => $context],
         );
 
-        // Lock both numbering AND the "\n" separator — see analogous AttackerPromptBuilder test.
+        // Lock both numbering AND the "\n" separator (see analogous AttackerPromptBuilder test).
         self::assertStringContainsString("  1 | <?php\n  2 | class Foo {}", $message);
     }
 
@@ -472,7 +472,7 @@ final class ReviewerPromptBuilderTest extends TestCase
 
         $message = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, '');
 
-        // No line-numbered output for empty context — keeps the prompt clean.
+        // No line-numbered output for empty context: keeps the prompt clean.
         self::assertStringNotContainsString('  1 | ', $message);
     }
 

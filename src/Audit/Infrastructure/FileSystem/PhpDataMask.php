@@ -21,14 +21,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\UnmatchedClos
 /**
  * Tells, byte by byte, what a PHP file is made of: code that PHP runs, or text it only carries (the
  * inside of a string, a comment, a heredoc body, the markup around a tag). A file that does not open
- * with a PHP tag — a YAML, dotenv or Twig file, even one that mentions `<?php` further down — is text
- * from end to end, and so is a file with so many unmatched closing brackets that PHP's tokenizer would
+ * with a PHP tag (a YAML, dotenv or Twig file, even one that mentions `<?php` further down) is text
+ * from end to end and so is a file with so many unmatched closing brackets that PHP's tokenizer would
  * stall on it ({@see UnmatchedClosers}): more is redacted in it, never less.
  *
- * A placeholder written over code the parser needs — a constant, a call, a parameter default — leaves
+ * A placeholder written over code the parser needs (a constant, a call, a parameter default) leaves
  * a file that no longer parses; one written over text never does.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PhpDataMask implements Stringable
 {
@@ -82,7 +82,7 @@ final readonly class PhpDataMask implements Stringable
     /**
      * The length of a literal's body when the quotes a pattern paired are the two ends of one literal,
      * 0 when they are not: `'_password='.$enc, '…'` pairs the closing quote of the first string with the
-     * opening quote of the second, and a string running over several lines has no closing quote on the
+     * opening quote of the second and a string running over several lines has no closing quote on the
      * line where it opens.
      */
     public function literalLength(int $opening, int $length): int

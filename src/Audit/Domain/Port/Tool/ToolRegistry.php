@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegis
 /**
  * Holds the catalog of tools available to the attacker agent and dispatches
  * invocation by name. Tool errors are caught and surfaced to the LLM as text
- * results rather than propagating — a misbehaving tool should not kill the audit.
+ * results rather than propagating: a misbehaving tool should not kill the audit.
  */
 final readonly class ToolRegistry
 {

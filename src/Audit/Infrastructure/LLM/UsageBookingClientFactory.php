@@ -21,14 +21,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 
 /**
  * Hands the agents a client whose usage is booked once: the bundled client
- * books its own as it goes, and a client this factory already wrapped books
- * through its wrapper — one client id wired to the other — so both are handed
- * over as they are; any other — one an application wired in place of the
- * bundled client — is wrapped so the usage its answers
- * report reaches the token totals and the audit budget, and keeps the batch
+ * books its own as it goes and a client this factory already wrapped books
+ * through its wrapper (one client id wired to the other), so both are handed
+ * over as they are; any other (one an application wired in place of the
+ * bundled client) is wrapped so the usage its answers
+ * report reaches the token totals and the audit budget, keeping the batch
  * capabilities it has.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UsageBookingClientFactory
 {

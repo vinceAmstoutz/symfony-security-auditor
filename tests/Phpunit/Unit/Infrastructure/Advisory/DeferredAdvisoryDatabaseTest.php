@@ -31,7 +31,7 @@ final class DeferredAdvisoryDatabaseTest extends TestCase
 
     /**
      * Proves construction is not eager: if it were, composer audit would run
-     * against the holder's default path (before `set()` is ever called), and
+     * against the holder's default path (before `set()` is ever called) and
      * the `->with('/audited/project')` constraint below would fail.
      */
     public function test_lookup_runs_composer_audit_against_the_path_the_holder_carries_at_call_time(): void

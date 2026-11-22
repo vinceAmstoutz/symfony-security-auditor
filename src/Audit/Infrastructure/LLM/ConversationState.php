@@ -23,14 +23,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
  * options, the token counters accumulated across rounds, whether a tool has
  * already run (a conversation that ran one cannot be restarted from scratch),
  * the finalized response once it has one, the running estimate the rate
- * limiter reserves against, how many rounds it has left, the one in flight
- * included, and whether the model ever called a tool that does not record (a
+ * limiter reserves against, how many rounds it has left (the one in flight
+ * included) and whether the model ever called a tool that does not record (a
  * conversation that only recorded lost nothing to the round limit).
  *
- * Updates are copy-on-write — `$bag` is a mutable collaborator whose contents
+ * Updates are copy-on-write: `$bag` is a mutable collaborator whose contents
  * are appended in place, but every scalar transition returns a new instance.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConversationState
 {

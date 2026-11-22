@@ -23,7 +23,7 @@ use function Symfony\Component\String\u;
  * a gateway that cannot stream does: the bridge would read it as an empty
  * stream, so it is read as the buffered answer it is.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UnstreamedAnswer
 {

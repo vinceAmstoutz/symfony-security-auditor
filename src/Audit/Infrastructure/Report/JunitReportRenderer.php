@@ -20,19 +20,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * Renders an audit report as JUnit XML — one failed test case per validated
- * finding — for CI test-report panels such as GitLab merge-request widgets. An
+ * Renders an audit report as JUnit XML (one failed test case per validated
+ * finding) for CI test-report panels such as GitLab merge-request widgets. An
  * audit that could not analyze every file adds an errored "Audit completeness"
  * test case naming those files, so a panel never reads it as a clean run.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class JunitReportRenderer implements ReportRendererInterface
 {
     /**
      * Complement of the XML 1.0 Char production: control characters other
-     * than tab/CR/LF, UTF-16 surrogate halves, and the U+FFFE/U+FFFF
-     * non-characters — all valid UTF-8, all rejected by XML parsers.
+     * than tab/CR/LF, UTF-16 surrogate halves and the U+FFFE/U+FFFF
+     * non-characters (all valid UTF-8, all rejected by XML parsers).
      */
     private const string ILLEGAL_XML_CHARACTERS = '/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u';
 
@@ -133,7 +133,7 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
 
     /**
      * DOMDocument::saveXML() writes illegal characters out verbatim without
-     * escaping them — a finding whose LLM-produced text carries one silently
+     * escaping them: a finding whose LLM-produced text carries one silently
      * corrupts the document for any consumer that re-parses it. A value that
      * is not valid UTF-8 at all cannot be repaired and is dropped wholesale.
      * A Unicode bidirectional override is valid XML text and survives this

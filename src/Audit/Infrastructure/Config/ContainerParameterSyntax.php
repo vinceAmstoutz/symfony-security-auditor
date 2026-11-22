@@ -26,7 +26,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
  * A URL `init` writes is escaped the same way, so its percent-encoded octets
  * (`%2F`) reach the container as typed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ContainerParameterSyntax
 {
@@ -57,8 +57,8 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
-     * Whether the container would read part of the value as syntax — a
-     * `%name%` or `%env(VAR)%` reference, or an escaped `%%` — whatever the
+     * Whether the container would read part of the value as syntax (a
+     * `%name%` or `%env(VAR)%` reference, or an escaped `%%`), whatever the
      * resolver makes of a whole-value placeholder first.
      */
     public static function holdsReference(string $value): bool
@@ -78,9 +78,9 @@ final readonly class ContainerParameterSyntax
 
     /**
      * A URL holds a `%` only to percent-encode an octet, which `literal()`
-     * carries to the container intact; a `%` that starts none — the closing
-     * one of `%BASE_URL%`, even when the name itself opens with two hex digits
-     * — belongs to a reference the user meant, which escaping would silently
+     * carries to the container intact; a `%` that starts none (the closing
+     * one of `%BASE_URL%`, even when the name itself opens with two hex digits)
+     * belongs to a reference the user meant, which escaping would silently
      * turn into text, or to no valid URL at all. A whole-value `%env()%` is
      * the caller's to accept before asking.
      */
@@ -90,8 +90,8 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
-     * Text that happens to hold a `%…%` pair — a regex such as
-     * `/sprintf\(.*%s.*%d/`, a range such as `50%-60%` — must reach the
+     * Text that happens to hold a `%…%` pair (a regex such as
+     * `/sprintf\(.*%s.*%d/`, a range such as `50%-60%`) must reach the
      * setting as typed, while a reference the container can resolve
      * (`%env(VAR)%`, `%kernel.project_dir%`) and a doubled `%%` keep their
      * meaning. A pair naming a parameter the bag lacks would abort the run
@@ -108,7 +108,7 @@ final readonly class ContainerParameterSyntax
 
     /**
      * The spelling the container reads back as `$value`: a whole-value
-     * `%env(VAR)%` stays a placeholder for the resolver to substitute, and
+     * `%env(VAR)%` stays a placeholder for the resolver to substitute;
      * anything else has every `%` doubled.
      */
     public static function literal(string $value): string
