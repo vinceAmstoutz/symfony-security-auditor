@@ -155,7 +155,7 @@ return [
         'scenarios' => ['standalone/list'],
         'path' => 'runs.0.stdout.lines',
         'match' => '/^-\\s+completion\\s+Dump the shell completion script$/',
-        'reason' => 'The standalone binary keeps Symfony\'s completion command out of its listing; the command still runs.',
+        'reason' => 'The standalone binary keeps the completion command of Symfony Console out of its listing; the command still runs.',
         'changelog' => '#713',
     ],
     [
