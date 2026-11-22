@@ -115,7 +115,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         $credentialIdentity = $standaloneConfig->platform->credentialIdentity();
 
         return $credentialIdentity instanceof CredentialIdentity
-            ? \sprintf('Config resolves and an API key is available: %s (%s).', $credentialIdentity->maskedPreview, $credentialIdentity->fingerprint)
+            ? \sprintf('Config resolves and an API key is available: %s (%s). Run "%s" to see where it comes from.', $credentialIdentity->maskedPreview, $credentialIdentity->fingerprint, AuthStatusCommand::NAME)
             : 'Config resolves; the configured platform needs no API key.';
     }
 
