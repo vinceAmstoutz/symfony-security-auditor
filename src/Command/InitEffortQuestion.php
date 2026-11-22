@@ -15,10 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 /**
- * The effort the Claude Code CLI runs at, asked of a Claude subscription only:
- * no other platform `init` writes takes one.
+ * The effort a subscription's CLI runs at, asked of a subscription only: no
+ * other platform `init` writes takes one.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -26,16 +27,19 @@ final readonly class InitEffortQuestion
 {
     public const array LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
-    public const string PLATFORM = 'claudecode';
-
     private const string DEFAULT_LEVEL = 'medium';
 
     public static function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
     {
-        if (self::PLATFORM !== $providerKey->platform) {
+        if (!self::takesEffort($providerKey)) {
             return null;
         }
 
-        return NumberedChoice::ask($symfonyStyle, 'Which effort should the model think at? Higher finds more, and uses more of the subscription', self::LEVELS, self::DEFAULT_LEVEL);
+        return NumberedChoice::ask($symfonyStyle, 'Which effort should the model think at? Higher finds more and uses more of the subscription', self::LEVELS, self::DEFAULT_LEVEL);
+    }
+
+    public static function takesEffort(ProviderKey $providerKey): bool
+    {
+        return \array_key_exists($providerKey->platform, CliAgentPlatformFactory::SUBSCRIPTION_MODELS);
     }
 }

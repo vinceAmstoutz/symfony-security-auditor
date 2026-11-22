@@ -32,9 +32,9 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `auth:test` checks that the API key works with one short test request; `auth:status` suggests it once a key resolves ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `doctor` suggests `auth:status` to see where the API key comes from, when the configured platform uses one ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
 - The standalone binary no longer lists Symfony's `completion` command among its own; `completion` still prints the shell completion script ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
-- `init` asks which Claude model a Claude subscription runs on, Opus 5.5 by default. `model` takes any Claude model id there, such as `claude-sonnet-5-5`, besides the `opus`, `sonnet` and `haiku` aliases
-- `init` asks which model reviews the findings on a Claude subscription (Haiku 5.5 by default) and writes it as `reviewer_model`. `init --reviewer-model` sets it without asking
-- `init` asks the effort a Claude subscription runs at (medium by default) and writes it as `effort:` under `platform.claudecode`, which takes `low`, `medium`, `high`, `xhigh` or `max`. `init --effort` sets it without asking; left unset, the Claude Code CLI keeps its own
+- `init` asks which model a Claude or ChatGPT subscription runs on (Opus 5.5 or `gpt-5.4` by default). `model` takes any model id the CLI runs there, such as `claude-sonnet-5-5` or `gpt-5.5`, besides the few its bridge lists
+- `init` asks which model reviews the findings on a subscription (Haiku 5.5 on Claude, `gpt-5.4-mini` on ChatGPT) and writes it as `reviewer_model`. `init --reviewer-model` sets it without asking
+- `init` asks the effort a subscription runs at (medium by default) and writes it as `effort:` under `platform.claudecode` or `platform.codex`, which takes `low`, `medium`, `high`, `xhigh` or `max`. `init --effort` sets it without asking; left unset, the CLI keeps its own
 - `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 

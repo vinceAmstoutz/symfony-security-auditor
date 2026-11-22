@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformServiceId;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TerminalText;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 /**
  * Why `init` will not write a configuration for what it was asked for, as the
@@ -87,7 +88,7 @@ final readonly class InitRefusal
     {
         return match (true) {
             null === $effort => null,
-            InitEffortQuestion::PLATFORM !== $providerKey->platform => \sprintf('Only a Claude subscription (%s) takes an effort; leave --effort out for %s.', InitEffortQuestion::PLATFORM, $providerKey->platform),
+            !InitEffortQuestion::takesEffort($providerKey) => \sprintf('Only a subscription (%s) takes an effort; leave --effort out for %s.', implode(' or ', array_keys(CliAgentPlatformFactory::SUBSCRIPTION_MODELS)), $providerKey->platform),
             !\in_array($effort, InitEffortQuestion::LEVELS, true) => \sprintf('The effort must be one of %s.', implode(', ', InitEffortQuestion::LEVELS)),
             default => null,
         };

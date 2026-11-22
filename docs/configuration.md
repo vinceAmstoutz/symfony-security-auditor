@@ -519,17 +519,19 @@ reviewer_model: claude-haiku-5-5
 
 ### Running on a ChatGPT subscription
 
-_Since 1.23_ the standalone binary can also run on a ChatGPT subscription, through the [Codex](https://github.com/openai/codex) CLI installed on the machine. `init --provider=codex` downloads the bridge and writes:
+_Since 1.23_ the standalone binary can also run on a ChatGPT subscription, through the [Codex](https://github.com/openai/codex) CLI installed on the machine. `init --provider=codex` downloads the bridge and asks for the two models and the effort. It writes:
 
 ```yaml
 provider: codex
 platform:
-    codex: {}
+    codex: { effort: medium }
 model: gpt-5.4
+reviewer_model: gpt-5.4-mini
 ```
 
 - **Requirements.** The `codex` CLI is installed and logged in to the subscription. When `codex` is not on the `PATH`, name it with `cli_binary:` under `codex:`.
-- **Models.** The ones the bundled bridge lists: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-5.3-codex-spark` and `gpt-5.2`.
+- **Models.** _Since 1.23_ `init` offers `gpt-5.4` to find the issues and `gpt-5.4-mini` to review them; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any model id your Codex CLI runs works, such as `gpt-5.5`, not only the ones the bundled bridge lists.
+- **Effort.** _Since 1.23_ `init` asks the reasoning effort, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`, passed to Codex as `model_reasoning_effort`. `--effort` sets it without asking. Afterwards, edit `effort:` under `codex:`; without it, Codex keeps its own default.
 - **How each call runs.** The auditor runs `codex exec` read-only and outside the audited project, with its shell and web search off, the user's Codex configuration and rules ignored and nothing kept of the session. As with Claude Code, the attacker and the reviewer answer in JSON.
 - **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex }` with `model: gpt-5.4` under `symfony_security_auditor:`.
 - **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together.

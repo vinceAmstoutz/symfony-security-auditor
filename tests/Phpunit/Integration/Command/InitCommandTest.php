@@ -195,7 +195,37 @@ final class InitCommandTest extends TestCase
 
         $exitCode = $commandTester->execute(['--provider' => 'anthropic', '--effort' => 'high'], ['interactive' => false]);
 
-        self::assertSame([Command::INVALID, true], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), 'Only a Claude subscription (claudecode) takes an effort; leave --effort out for anthropic.')]);
+        self::assertSame([Command::INVALID, true], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), 'Only a subscription (claudecode or codex) takes an effort; leave --effort out for anthropic.')]);
+    }
+
+    public function test_it_suggests_gpt_5_4_mini_to_review_on_a_chatgpt_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('gpt-5.4-mini', $this->configuredValue('reviewer_model'));
+    }
+
+    public function test_it_offers_the_subscription_models_to_review(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should review the findings? Pick a number, or type a model id [gpt-5.4-mini]: [1] gpt-5.4 [2] gpt-5.4-mini [3] gpt-5.3-codex', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_suggests_a_medium_effort_on_a_chatgpt_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(['codex' => ['effort' => 'medium']], $this->configuredValue('platform'));
     }
 
     public function test_it_tests_the_connection_when_the_user_accepts(): void
@@ -304,14 +334,14 @@ final class InitCommandTest extends TestCase
         self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
     }
 
-    public function test_it_asks_no_model_for_a_chatgpt_subscription(): void
+    public function test_it_asks_the_model_of_a_chatgpt_subscription_suggesting_gpt_5_4(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertSame([false, 'gpt-5.4'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
+        self::assertSame([true, 'gpt-5.4'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
     }
 
     public function test_it_says_it_sends_the_test_request_once_the_user_agreed(): void
@@ -559,14 +589,14 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_the_codex_cli_with_no_api_key_and_its_newest_model(): void
+    public function test_it_configures_the_codex_cli_with_no_api_key_gpt_5_4_gpt_5_4_mini_to_review_and_a_medium_effort(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'codex'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'codex', 'platform' => ['codex' => []], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'codex', 'platform' => ['codex' => ['effort' => 'medium']], 'model' => 'gpt-5.4', 'reviewer_model' => 'gpt-5.4-mini', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }

@@ -40,14 +40,6 @@ final readonly class CliAgentPlatforms
     ];
 
     /**
-     * @var array<string, string>
-     */
-    public const array DEFAULT_MODELS = [
-        'claudecode' => 'opus',
-        'codex' => 'gpt-5.4',
-    ];
-
-    /**
      * Built-in tools off, the machine's own configuration ignored: Claude
      * Code takes an empty tool list and no MCP server but the command line's;
      * Codex runs read-only with its shell and web search off, nothing kept.

@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModel;
@@ -32,7 +31,7 @@ final readonly class InitModelQuestion
 {
     private const string DEFAULT_MODEL = 'claude-opus-5-5';
 
-    private const string CLAUDE_REVIEWER_MODEL = 'claude-haiku-5-5';
+    private const array SUBSCRIPTION_REVIEWER_MODELS = ['claudecode' => 'claude-haiku-5-5', 'codex' => 'gpt-5.4-mini'];
 
     private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5(?:@[a-z0-9-]+)?$#';
 
@@ -43,13 +42,9 @@ final readonly class InitModelQuestion
 
     public function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey, ?string $endpoint = null): string
     {
-        if ('claudecode' === $providerKey->platform) {
-            return NumberedChoice::ask($symfonyStyle, 'Which model should the auditor use? Pick a number, or type a model id', CliAgentPlatformFactory::CLAUDE_MODEL_IDS, CliAgentPlatformFactory::CLAUDE_MODEL_IDS[0]);
-        }
-
-        $subscriptionModel = CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? null;
-        if (null !== $subscriptionModel) {
-            return $subscriptionModel;
+        $subscriptionModels = CliAgentPlatformFactory::SUBSCRIPTION_MODELS[$providerKey->platform] ?? null;
+        if (null !== $subscriptionModels) {
+            return NumberedChoice::ask($symfonyStyle, 'Which model should the auditor use? Pick a number, or type a model id', $subscriptionModels, $subscriptionModels[0]);
         }
 
         if ('ollama' === $providerKey->platform) {
@@ -68,11 +63,12 @@ final readonly class InitModelQuestion
 
     public function askReviewer(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
     {
-        if ('claudecode' !== $providerKey->platform) {
+        $reviewerModel = self::SUBSCRIPTION_REVIEWER_MODELS[$providerKey->platform] ?? null;
+        if (null === $reviewerModel) {
             return null;
         }
 
-        return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', CliAgentPlatformFactory::CLAUDE_MODEL_IDS, self::CLAUDE_REVIEWER_MODEL);
+        return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', CliAgentPlatformFactory::SUBSCRIPTION_MODELS[$providerKey->platform] ?? [$reviewerModel], $reviewerModel);
     }
 
     private function askOllamaModel(SymfonyStyle $symfonyStyle, ?string $endpoint): string

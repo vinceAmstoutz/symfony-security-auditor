@@ -34,9 +34,12 @@ final readonly class CliAgentPlatformFactory
     private const int PRIVATE_DIRECTORY_MODE = 0o700;
 
     /**
-     * The full ids the Claude Code CLI runs besides its aliases, Opus first.
+     * The models each CLI offers a subscription, the suggested one first.
      */
-    public const array CLAUDE_MODEL_IDS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
+    public const array SUBSCRIPTION_MODELS = [
+        'claudecode' => ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
+        'codex' => ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex'],
+    ];
 
     /**
      * @param class-string<ClaudeCodeFactory>|class-string<CodexFactory> $bridgeFactory

@@ -23,14 +23,14 @@ final class InitCommandHelpTest extends TestCase
         self::assertStringContainsString('claude-opus-5-5 — set it for any other provider, it is not derived from one', InitCommandHelp::HELP);
     }
 
-    public function test_it_names_the_reviewer_model_a_claude_subscription_defaults_to(): void
+    public function test_it_names_the_reviewer_model_each_subscription_defaults_to(): void
     {
-        self::assertStringContainsString('<info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription; elsewhere --model reviews too', InitCommandHelp::HELP);
+        self::assertStringContainsString('<info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription, gpt-5.4-mini on a ChatGPT one; elsewhere --model reviews too', InitCommandHelp::HELP);
     }
 
-    public function test_it_names_the_effort_a_claude_subscription_defaults_to(): void
+    public function test_it_names_the_effort_a_subscription_defaults_to(): void
     {
-        self::assertStringContainsString('<info>--effort</info>    medium on a Claude subscription (low, medium, high, xhigh or max); no other provider takes one', InitCommandHelp::HELP);
+        self::assertStringContainsString('<info>--effort</info>    medium on a subscription (low, medium, high, xhigh or max); no other provider takes one', InitCommandHelp::HELP);
     }
 
     public function test_it_names_the_env_var_default_as_the_console_will_print_it(): void

@@ -30,10 +30,10 @@ final class InitCommandInput
     #[Option(description: 'Model the auditor should use; defaults to claude-opus-5-5 for every provider, so set it for any other. Skips the prompt when set.')]
     public ?string $model = null;
 
-    #[Option(description: 'Model that reviews the findings; defaults to claude-haiku-5-5 on a Claude subscription (claudecode), to --model elsewhere. Skips the prompt when set.')]
+    #[Option(description: 'Model that reviews the findings; defaults to claude-haiku-5-5 on a Claude subscription (claudecode), gpt-5.4-mini on a ChatGPT one (codex), --model elsewhere. Skips the prompt when set.')]
     public ?string $reviewerModel = null;
 
-    #[Option(description: 'Effort the Claude Code CLI runs at, for a Claude subscription (claudecode): low, medium, high, xhigh or max; defaults to medium. Skips the prompt when set.')]
+    #[Option(description: 'Effort the subscription CLI runs at (claudecode or codex): low, medium, high, xhigh or max; defaults to medium. Skips the prompt when set.')]
     public ?string $effort = null;
 
     #[Option(description: 'Environment variable holding the API key; defaults to <PLATFORM>_API_KEY')]
